@@ -42,8 +42,9 @@ impl Edit {
 
     fn draft(&mut self) -> Result<&mut Draft> {
         if self.draft.is_none() {
-            let snapshot = super::load_snapshot(self.staged.working().opc_package())?
-                .ok_or_else(|| crate::Error::PartNotFound("web-settings part".into()))?;
+            let snapshot =
+                super::load_snapshot(self.staged.working().opc_package(), &super::Limits::DEFAULT)?
+                    .ok_or_else(|| crate::Error::PartNotFound("web-settings part".into()))?;
             self.draft = Some(snapshot.edit());
         }
         Ok(self

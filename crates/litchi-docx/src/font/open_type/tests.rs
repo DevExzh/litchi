@@ -1,4 +1,4 @@
-use super::{Ligatures, NumForm, NumSpacing, OnOff, OpenType};
+use super::{Ligatures, Limits, NumForm, NumSpacing, OnOff, OpenType};
 
 const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const W14: &str = "http://schemas.microsoft.com/office/word/2010/wordml";
@@ -26,7 +26,7 @@ fn sample() -> Vec<u8> {
 
 #[test]
 fn parses_typed_open_type_family_and_authored_defaults() {
-    let value = OpenType::parse(&sample()).expect("OpenType sample should parse");
+    let value = OpenType::parse(&sample(), &Limits::DEFAULT).expect("OpenType sample should parse");
     assert_eq!(value.ligatures, Some(Ligatures::StandardContextual));
     assert_eq!(value.num_form, Some(NumForm::OldStyle));
     assert_eq!(value.num_spacing, Some(NumSpacing::Tabular));
@@ -41,9 +41,11 @@ fn parses_typed_open_type_family_and_authored_defaults() {
 
 #[test]
 fn absent_and_explicit_on_off_forms_remain_distinct() {
-    let absent =
-        OpenType::parse(format!(r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"/>"#).as_bytes())
-            .unwrap();
+    let absent = OpenType::parse(
+        format!(r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"/>"#).as_bytes(),
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(absent.cntxt_alts, None);
     assert!(!absent.stylistic_sets_present());
 
@@ -52,6 +54,7 @@ fn absent_and_explicit_on_off_forms_remain_distinct() {
             r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"><w14:cntxtAlts w14:val="1"/><w14:stylisticSets/></w:rPr>"#
         )
         .as_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(authored.cntxt_alts, Some(OnOff::on()));
@@ -64,6 +67,7 @@ fn absent_and_explicit_on_off_forms_remain_distinct() {
             r#"<w:rPr xmlns:w="{WORD}" xmlns:w14="{W14}"><w14:cntxtAlts w14:val="false"/></w:rPr>"#
         )
         .as_bytes(),
+        &Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(explicit_false.cntxt_alts, Some(OnOff::off()));

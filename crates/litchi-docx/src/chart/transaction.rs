@@ -228,7 +228,12 @@ impl Transaction {
 
         validate_graph_value(&self.draft)?;
         let mut candidate = target.clone();
-        package::store(&mut candidate, self.before.document_name(), &self.draft)?;
+        package::store_with_limits(
+            &mut candidate,
+            self.before.document_name(),
+            &self.draft,
+            &super::Limits::DEFAULT,
+        )?;
         let snapshot = Snapshot::load(
             &candidate,
             self.before.document_name(),
@@ -369,10 +374,11 @@ impl Patch {
         }
 
         let mut candidate = target.clone();
-        package::store(
+        package::store_with_limits(
             &mut candidate,
             self.after.document_name(),
             self.after.graph(),
+            &super::Limits::DEFAULT,
         )?;
         let snapshot = Snapshot::load(
             &candidate,

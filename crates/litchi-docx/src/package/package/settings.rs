@@ -19,7 +19,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(docx_web::Settings, docx_web::Conformance)>> {
-        docx_web::load(&self.opc)
+        docx_web::load(&self.opc, &docx_web::Limits::DEFAULT)
     }
 
     /// Move complete web-output settings into package ownership.
@@ -233,7 +233,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn glossary(&self) -> Result<Option<(glossary::Catalog, glossary::Conformance)>> {
-        glossary::load(&self.opc)
+        glossary::load(&self.opc, &glossary::Limits::DEFAULT)
     }
 
     /// Move a complete semantic catalog into the package.

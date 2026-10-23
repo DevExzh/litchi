@@ -12,6 +12,8 @@ mod xml;
 pub use package::read;
 pub use xml::{parse, write};
 
+pub(super) use xml::write_with_limits;
+
 pub(super) use rewrite::rewrite;
 
 pub(super) use semantic::{

@@ -122,14 +122,14 @@ fn numeric_div_selectors_reject_missing_positions_without_mutation() {
 #[test]
 fn package_graph_crud_round_trips_and_is_idempotent() {
     let mut package = package(Conformance::Transitional);
-    assert!(load(&package).unwrap().is_none());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
     assert!(!remove(&mut package).unwrap());
 
     let mut settings = Settings::default();
     settings.set_encoding("utf-8").unwrap().set_allow_png(true);
     assert!(put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
     assert_eq!(
-        load(&package).unwrap(),
+        load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings.clone(), Conformance::Transitional))
     );
     assert!(!put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
@@ -137,7 +137,7 @@ fn package_graph_crud_round_trips_and_is_idempotent() {
     settings.set_allow_png(false);
     assert!(put(&mut package, settings, Conformance::Transitional).unwrap());
     assert!(remove(&mut package).unwrap());
-    assert!(load(&package).unwrap().is_none());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
     assert!(!remove(&mut package).unwrap());
 }
 
@@ -158,7 +158,7 @@ fn semantic_noop_preserves_noncanonical_bytes_and_signatures() {
         "rSignature".to_owned(),
         false,
     );
-    let (settings, conformance) = load(&package).unwrap().unwrap();
+    let (settings, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
     assert!(package.is_signed());
 
     assert!(put(&mut package, settings.clone(), Conformance::Strict).is_err());
@@ -176,7 +176,7 @@ fn strict_graph_and_mce_round_trip() {
     settings.set_target_screen_size(Screen::Pixels1920x1200);
     assert!(put(&mut package, settings.clone(), Conformance::Strict).unwrap());
     assert_eq!(
-        load(&package).unwrap(),
+        load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings, Conformance::Strict))
     );
 
@@ -243,7 +243,7 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
     shared.add_part(Box::new(other));
     assert!(remove(&mut shared).is_err());
     assert_eq!(shared.get_part(&name).unwrap().blob(), bytes);
-    assert!(load(&shared).unwrap().is_some());
+    assert!(load(&shared, &Limits::DEFAULT).unwrap().is_some());
 }
 
 #[test]
@@ -339,7 +339,7 @@ fn package_web_patch_is_graph_checked_and_failure_atomic() {
     let source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="800x600"/></w:webSettings>"#;
     let mut package = package(Conformance::Transitional);
     let target = add_raw_web(&mut package, source, Conformance::Transitional);
-    let snapshot = load_snapshot(&package).unwrap().unwrap();
+    let snapshot = load_snapshot(&package, &Limits::DEFAULT).unwrap().unwrap();
     let mut edit = snapshot.edit();
     edit.set_target_screen_size(Some(Screen::Pixels1024x768));
     let commit = edit.commit().unwrap();
@@ -735,7 +735,9 @@ fn serializes_every_modeled_web_setting_for_round_trip() {
         </w:webSettings>"#;
 
     let settings = parse_settings(xml).unwrap();
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
 
     assert_eq!(reparsed, settings);
@@ -748,7 +750,9 @@ fn serializes_every_modeled_web_setting_for_round_trip() {
 
     let mut strict_settings = settings.clone();
     strict_settings.clear_rely_on_vml();
-    let strict = strict_settings.xml(Conformance::Strict).unwrap();
+    let strict = strict_settings
+        .xml(Conformance::Strict, &Limits::DEFAULT)
+        .unwrap();
     assert!(contains_xml(&strict, "<w:blockQuote w:val=\"1\"/>"));
     assert!(contains_xml(&strict, "<w:bodyDiv w:val=\"0\"/>"));
     assert!(contains_xml(&strict, "<w:bodyDiv w:val=\"1\"/>"));
@@ -773,7 +777,9 @@ fn edits_and_clears_every_scalar_web_setting() {
         .set_target_screen_size(Screen::Pixels1800x1440)
         .set_save_smart_tags_as_xml(false);
 
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert_eq!(reparsed.encoding(), Some("utf-8"));
@@ -784,7 +790,7 @@ fn edits_and_clears_every_scalar_web_setting() {
     assert!(settings.set_pixels_per_inch(1024).is_err());
     assert_eq!(settings.pixels_per_inch(), Some(previous_pixels));
 
-    assert!(settings.xml(Conformance::Strict).is_err());
+    assert!(settings.xml(Conformance::Strict, &Limits::DEFAULT).is_err());
 
     settings
         .clear_encoding()
@@ -800,7 +806,12 @@ fn edits_and_clears_every_scalar_web_setting() {
         .clear_save_smart_tags_as_xml();
     assert_eq!(settings, Settings::default());
     assert_eq!(
-        parse_settings(&settings.xml(Conformance::Transitional).unwrap()).unwrap(),
+        parse_settings(
+            &settings
+                .xml(Conformance::Transitional, &Limits::DEFAULT)
+                .unwrap(),
+        )
+        .unwrap(),
         Settings::default()
     );
 }
@@ -843,7 +854,9 @@ fn builds_and_edits_recursive_framesets_for_round_trip() {
 
     let mut settings = Settings::default();
     settings.set_frameset(frameset);
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert!(contains_xml(&serialized, "main &amp; detail"));
@@ -918,7 +931,9 @@ fn builds_and_edits_recursive_html_divisions_for_round_trip() {
 
     let mut settings = Settings::default();
     settings.set_divs(vec![div]).unwrap();
-    let serialized = settings.xml(Conformance::Transitional).unwrap();
+    let serialized = settings
+        .xml(Conformance::Transitional, &Limits::DEFAULT)
+        .unwrap();
     let reparsed = parse_settings(&serialized).unwrap();
     assert_eq!(reparsed, settings);
     assert!(contains_xml(&serialized, "w:id=\"1\""));
@@ -1031,7 +1046,11 @@ fn serialization_rejects_excessive_recursive_nesting() {
         frameset: Some(frameset),
         ..Settings::default()
     };
-    assert!(settings.xml(Conformance::Transitional).is_err());
+    assert!(
+        settings
+            .xml(Conformance::Transitional, &Limits::DEFAULT)
+            .is_err()
+    );
 
     let mut div = make_div(1);
     for value in 2..=(MAX_FRAMESET_NESTING as i64 + 3) {
@@ -1043,5 +1062,9 @@ fn serialization_rejects_excessive_recursive_nesting() {
         divs: Some(vec![div]),
         ..Settings::default()
     };
-    assert!(settings.xml(Conformance::Transitional).is_err());
+    assert!(
+        settings
+            .xml(Conformance::Transitional, &Limits::DEFAULT)
+            .is_err()
+    );
 }

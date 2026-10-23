@@ -1603,7 +1603,7 @@ impl Document {
     /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let main = self.opc.main_document_part()?.partname().clone();
-        crate::chart::package::load(&self.opc, &main)
+        crate::chart::package::load_with_limits(&self.opc, &main, &crate::chart::Limits::DEFAULT)
     }
     /// Get all content controls in the document.
     ///

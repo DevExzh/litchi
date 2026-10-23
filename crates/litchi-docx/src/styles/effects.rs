@@ -1349,17 +1349,25 @@ fn capture_graph_token(
 /// Load a complete owner-wide effects snapshot. Absence is represented by a
 /// present snapshot whose resource() is None.
 pub(crate) fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+    load_with_limits(package, owner, package.read_limits())
+}
+
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    owner: Owner,
+    limits: SourceLimits,
+) -> Result<Snapshot> {
     #[cfg(test)]
     test_trace::record_load();
 
-    let graph = inspect_graph(package)?;
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     let resource = graph
         .binding(owner)
         .map(|binding| {
             Resource::from_part(
                 package.get_part(&binding.target)?,
                 graph.conformance,
-                package.read_limits(),
+                limits,
             )
         })
         .transpose()?;
@@ -1536,7 +1544,17 @@ fn readback_existing_resource_replacement(
 /// Add or replace one owner resource. The operation returns false for an
 /// exact source/conformance no-op and therefore leaves signatures untouched.
 pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result<bool> {
-    let graph = inspect_graph(package)?;
+    let limits = package.read_limits();
+    put_with_limits(package, owner, resource, limits)
+}
+
+pub(crate) fn put_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    resource: Resource,
+    limits: SourceLimits,
+) -> Result<bool> {
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     if resource.conformance != graph.conformance {
         return Err(invalid(
             "stylesWithEffects resource conformance does not match the package",
@@ -1548,7 +1566,7 @@ pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) ->
             Resource::from_part(
                 package.get_part(&binding.target)?,
                 graph.conformance,
-                package.read_limits(),
+                limits,
             )
         })
         .transpose()?;
@@ -1562,9 +1580,9 @@ pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) ->
     }
 
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, Some(resource), None, None)?;
+    publish_resource_with_limits(&mut candidate, owner, Some(resource), None, None, limits)?;
     candidate.validate_signature_edit_from(package)?;
-    let published = load(&candidate, owner)?;
+    let published = load_with_limits(&candidate, owner, limits)?;
     if published.resource().is_none() {
         return Err(invalid("staged stylesWithEffects resource disappeared"));
     }
@@ -1574,14 +1592,23 @@ pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) ->
 
 /// Remove one owner resource. Missing resources are an exact no-op.
 pub(crate) fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
-    let graph = inspect_graph(package)?;
+    let limits = package.read_limits();
+    remove_with_limits(package, owner, limits)
+}
+
+pub(crate) fn remove_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    limits: SourceLimits,
+) -> Result<bool> {
+    let graph = inspect_graph_with_limits(package, None, limits)?;
     if graph.binding(owner).is_none() {
         return Ok(false);
     }
     let mut candidate = package.clone();
-    publish_resource(&mut candidate, owner, None, None, None)?;
+    publish_resource_with_limits(&mut candidate, owner, None, None, None, limits)?;
     candidate.validate_signature_edit_from(package)?;
-    let published = load(&candidate, owner)?;
+    let published = load_with_limits(&candidate, owner, limits)?;
     if published.resource().is_some() {
         return Err(invalid("staged stylesWithEffects resource was not removed"));
     }
@@ -1596,9 +1623,29 @@ fn publish_resource(
     desired_graph: Option<&GraphToken>,
     validated_resource: Option<&Resource>,
 ) -> Result<()> {
-    let graph = inspect_graph_with_validated_resource(
+    let limits = package.read_limits();
+    publish_resource_with_limits(
+        package,
+        owner,
+        resource,
+        desired_graph,
+        validated_resource,
+        limits,
+    )
+}
+
+fn publish_resource_with_limits(
+    package: &mut OpcPackage,
+    owner: Owner,
+    resource: Option<Resource>,
+    desired_graph: Option<&GraphToken>,
+    validated_resource: Option<&Resource>,
+    limits: SourceLimits,
+) -> Result<()> {
+    let graph = inspect_graph_with_limits(
         package,
         validated_resource.map(|resource| (owner, resource)),
+        limits,
     )?;
     let source = match owner {
         Owner::MainDocument => graph.main.clone(),
@@ -1610,7 +1657,6 @@ fn publish_resource(
         })?,
     };
     let binding = graph.binding(owner).cloned();
-    let limits = package.read_limits();
     if let Some(desired_graph) = desired_graph {
         if desired_graph.owner != owner || desired_graph.source.as_deref() != Some(source.as_str())
         {
@@ -1622,7 +1668,7 @@ fn publish_resource(
 
     match (binding, resource) {
         (Some(binding), Some(resource)) => {
-            validate_resource_for_package(&resource, package, graph.conformance)?;
+            validate_resource_for_package(&resource, graph.conformance, limits)?;
             if let Some(desired) = desired_graph {
                 let target_relationships =
                     package.source_relationships_with_limits(&binding.target, limits)?;
@@ -1780,7 +1826,7 @@ fn publish_resource(
             package.remove_part(&binding.target);
         },
         (None, Some(resource)) => {
-            validate_resource_for_package(&resource, package, graph.conformance)?;
+            validate_resource_for_package(&resource, graph.conformance, limits)?;
             let current_relationships =
                 package.source_relationships_with_limits(&source, limits)?;
             let current_content_types = package.source_content_types_with_limits(limits)?;
@@ -1920,15 +1966,15 @@ fn publish_resource(
 
 fn validate_resource_for_package(
     resource: &Resource,
-    package: &OpcPackage,
     conformance: Conformance,
+    limits: SourceLimits,
 ) -> Result<()> {
     if resource.conformance != conformance {
         return Err(invalid(
             "stylesWithEffects resource conformance does not match the package",
         ));
     }
-    validate_xml_with_limits(&resource.xml, Some(conformance), package.read_limits()).map(|_| ())
+    validate_xml_with_limits(&resource.xml, Some(conformance), limits).map(|_| ())
 }
 
 fn validate_effects_part_for_package(
@@ -2406,12 +2452,20 @@ fn next_relationship_id(package: &OpcPackage, source: &PackURI) -> Result<String
 }
 
 fn inspect_graph(package: &OpcPackage) -> Result<GraphState> {
-    inspect_graph_with_validated_resource(package, None)
+    inspect_graph_with_limits(package, None, package.read_limits())
 }
 
 fn inspect_graph_with_validated_resource(
     package: &OpcPackage,
     validated: Option<(Owner, &Resource)>,
+) -> Result<GraphState> {
+    inspect_graph_with_limits(package, validated, package.read_limits())
+}
+
+fn inspect_graph_with_limits(
+    package: &OpcPackage,
+    validated: Option<(Owner, &Resource)>,
+    limits: SourceLimits,
 ) -> Result<GraphState> {
     let conformance = package_conformance(package)?;
     let main_part = package.main_document_part()?;
@@ -2539,12 +2593,7 @@ fn inspect_graph_with_validated_resource(
                 .filter(|binding| same_uri(&binding.target, target))
                 .map(|_| resource)
         });
-        validate_effects_part_for_graph(
-            part,
-            conformance,
-            package.read_limits(),
-            validated_resource,
-        )?;
+        validate_effects_part_for_graph(part, conformance, limits, validated_resource)?;
     }
 
     Ok(GraphState {

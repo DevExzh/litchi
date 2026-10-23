@@ -30,7 +30,7 @@ impl Document {
     pub fn glossary(
         &self,
     ) -> Result<Option<(crate::glossary::Catalog, crate::glossary::Conformance)>> {
-        crate::glossary::load(&self.opc)
+        crate::glossary::load(&self.opc, &crate::glossary::Limits::DEFAULT)
     }
 
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
@@ -707,7 +707,7 @@ impl Document {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(web::Settings, web::Conformance)>> {
-        web::load(&self.opc)
+        web::load(&self.opc, &web::Limits::DEFAULT)
     }
     /// Get document variables.
     ///

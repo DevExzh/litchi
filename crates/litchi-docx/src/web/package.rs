@@ -30,12 +30,15 @@ struct Owner {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
+pub fn load(
+    package: &OpcPackage,
+    limits: &super::Limits,
+) -> Result<Option<(Settings, Conformance)>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
     };
     let part = package.get_part(&owner.target)?;
-    let (settings, conformance) = read(part)?;
+    let (settings, conformance) = read(part, limits)?;
     if conformance != owner.conformance {
         return Err(invalid(
             "web-settings relationship and XML use different conformance families",
@@ -52,14 +55,22 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Settings, Conformance)>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
+pub fn load_snapshot(package: &OpcPackage, limits: &super::Limits) -> Result<Option<Snapshot>> {
     let Some(owner) = locate(package)? else {
         return Ok(None);
     };
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
-    Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance, &super::Limits::DEFAULT)
-        .map(Some)
+    let (settings, conformance) = read(part, limits)?;
+    if conformance != owner.conformance {
+        return Err(invalid(
+            "web-settings relationship and XML use different conformance families",
+        ));
+    }
+    Ok(Some(Snapshot::from_parsed_xml(
+        part.blob().to_vec(),
+        settings,
+        conformance,
+    )))
 }
 
 /// Apply a source-checked web-settings patch to its owning OPC part.
@@ -80,7 +91,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
 pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
     let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
+    let (_, conformance) = read(part, &super::Limits::DEFAULT)?;
     let current = Snapshot::from_xml_with_conformance(
         part.blob().to_vec(),
         conformance,
@@ -97,7 +108,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
         .get_part_mut(&owner.target)?
         .set_blob(candidate.xml_bytes().to_vec());
     validate_internal_targets(&staged)?;
-    let published = load_snapshot(&staged)?
+    let published = load_snapshot(&staged, &super::Limits::DEFAULT)?
         .ok_or_else(|| invalid("staged web-settings ownership disappeared"))?;
     *package = staged;
     Ok(published)
@@ -123,7 +134,7 @@ pub(crate) fn put(
     conformance: Conformance,
 ) -> Result<bool> {
     let xml = write(&value, conformance)?;
-    put_encoded(package, value, conformance, xml)
+    put_encoded(package, value, conformance, xml, &super::Limits::DEFAULT)
 }
 
 pub(crate) fn put_encoded(
@@ -131,6 +142,7 @@ pub(crate) fn put_encoded(
     value: Settings,
     conformance: Conformance,
     xml: Vec<u8>,
+    limits: &super::Limits,
 ) -> Result<bool> {
     let package_conformance = package_conformance(package)?;
     if package_conformance != conformance {
@@ -142,7 +154,7 @@ pub(crate) fn put_encoded(
     let existing = locate(package)?;
     if let Some(owner) = &existing {
         let part = package.get_part(&owner.target)?;
-        let (current, parsed_conformance) = read(part)?;
+        let (current, parsed_conformance) = read(part, limits)?;
         if parsed_conformance != owner.conformance {
             return Err(invalid(
                 "web-settings relationship and XML use different conformance families",
@@ -160,7 +172,7 @@ pub(crate) fn put_encoded(
 
         let mut staged = BlobPart::new(owner.target.clone(), CONTENT_TYPE.to_owned(), xml);
         copy_relationships(part, &mut staged);
-        let (round_trip, staged_conformance) = read(&staged)?;
+        let (round_trip, staged_conformance) = read(&staged, limits)?;
         if round_trip != value || staged_conformance != conformance {
             return Err(invalid("staged web-settings XML did not round-trip"));
         }
@@ -174,7 +186,7 @@ pub(crate) fn put_encoded(
     let main = package.main_document_part()?.partname().clone();
     let target = next_part_name(package)?;
     let staged = BlobPart::new(target.clone(), CONTENT_TYPE.to_owned(), xml);
-    let (round_trip, staged_conformance) = read(&staged)?;
+    let (round_trip, staged_conformance) = read(&staged, limits)?;
     if round_trip != value || staged_conformance != conformance {
         return Err(invalid("staged web-settings XML did not round-trip"));
     }
@@ -203,11 +215,15 @@ pub(crate) fn put_encoded(
 ///
 /// Returns an error if the operation cannot be completed.
 pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
+    remove_with_limits(package, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn remove_with_limits(package: &mut OpcPackage, limits: &super::Limits) -> Result<bool> {
     let Some(owner) = locate(package)? else {
         return Ok(false);
     };
     let part = package.get_part(&owner.target)?;
-    let (_, conformance) = read(part)?;
+    let (_, conformance) = read(part, limits)?;
     if conformance != owner.conformance {
         return Err(invalid(
             "web-settings relationship and XML use different conformance families",

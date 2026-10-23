@@ -28,8 +28,11 @@ pub(in crate::glossary) struct Owner {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
-    let Some(graph) = load_graph(package)? else {
+pub fn load(
+    package: &OpcPackage,
+    limits: &super::Limits,
+) -> Result<Option<(Catalog, Conformance)>> {
+    let Some(graph) = super::graph::raw::load(package, limits)? else {
         return Ok(None);
     };
     let binding = Binding::from_graph(&graph);

@@ -22,20 +22,32 @@ use super::{Error, MAX, MAX_DEPTH, MAX_VALUES, Result};
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
-    if xml.len() > MAX {
-        return Err(invalid("glossary document exceeds 32 MiB"));
-    }
-    let original = parse_dom(xml)?;
+    read_with_limits(xml, &super::Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn read_with_limits(
+    xml: &[u8],
+    limits: &super::Limits,
+) -> Result<(Catalog, Conformance)> {
+    // Keep admission in the one source read so every caller, including the
+    // package owner, proves the selected policy before either DOM projection
+    // retains strings or the MCE projection is parsed.
+    super::graph::raw::admit_xml(xml, limits)?;
+    let original = parse_dom_with_limits(xml, limits)?;
     let original_conformance = Conformance::from_word(original.ns.as_ref())?;
     let producer_entries = extract_producer_entries(original, original_conformance)?;
-    let limits = litchi_ooxml_common::mce::Limits {
-        max_input_bytes: MAX,
-        max_output_bytes: MAX,
-        max_depth: MAX_DEPTH,
-        max_namespace_bindings: MAX_VALUES,
-        max_directive_tokens: MAX_VALUES,
-        max_choices_per_alternate: MAX_VALUES,
-        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    let mce_limits = litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.xml_bytes(),
+        // The projected DOM retains the processed XML, so the expansion
+        // budget must honor both the part and DOM policies before parse_dom.
+        max_output_bytes: limits.xml_bytes().min(limits.dom_bytes()),
+        max_depth: limits.depth(),
+        max_namespace_bindings: limits.attributes(),
+        max_directive_tokens: limits.tokens(),
+        max_choices_per_alternate: limits.values(),
+        max_attributes_per_element: limits
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
     };
     // Glossary entries can carry the same tracked-change attributes as the
     // main document.  Keep Word 2023's dateUtc namespace understood in this
@@ -44,11 +56,10 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
     let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
     capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
     let xml =
-        litchi_ooxml_common::mce::process_markup_compatibility(xml, &capabilities, &limits)?.xml;
-    if xml.len() > MAX {
-        return Err(invalid("processed glossary document exceeds 32 MiB"));
-    }
-    let root = parse_dom(xml.as_ref())?;
+        litchi_ooxml_common::mce::process_markup_compatibility(xml, &capabilities, &mce_limits)?
+            .xml;
+    super::graph::raw::admit_xml(xml.as_ref(), limits)?;
+    let root = parse_dom_with_limits(xml.as_ref(), limits)?;
     let conformance = Conformance::from_word(root.ns.as_ref())?;
     if conformance != original_conformance {
         return Err(invalid(
@@ -59,6 +70,7 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
     let mut catalog = project(&root)?;
     drop(root);
     attach_producer_entries(&mut catalog, producer_entries);
+    validate_catalog_limits(&catalog, limits)?;
     catalog.rebuild_state()?;
     Ok((catalog, conformance))
 }
@@ -69,7 +81,23 @@ pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn write(value: &Catalog, conformance: Conformance) -> Result<Vec<u8>> {
-    let plan = plan_write(value, conformance)?;
+    write_with_limits(value, conformance, &super::Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn write_with_limits(
+    value: &Catalog,
+    conformance: Conformance,
+    limits: &super::Limits,
+) -> Result<Vec<u8>> {
+    validate_catalog_limits(value, limits)?;
+    let plan = plan_write_with_limits(value, conformance, limits)?;
+    if plan.bytes > limits.xml_bytes() {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::XmlBytes,
+            actual: plan.bytes,
+            maximum: limits.xml_bytes(),
+        });
+    }
     let mut xml = String::new();
     xml.try_reserve_exact(plan.bytes)
         .map_err(|source| Error::Allocation {

@@ -151,6 +151,18 @@ pub enum LimitKind {
     XmlNode,
     /// Font-table XML structure.
     XmlStructure,
+    /// Word 2010 OpenType XML bytes.
+    OpenTypeXmlBytes,
+    /// Word 2010 OpenType XML depth.
+    OpenTypeXmlDepth,
+    /// Word 2010 OpenType XML node count.
+    OpenTypeXmlNodes,
+    /// Word 2010 OpenType XML attribute count.
+    OpenTypeXmlAttributes,
+    /// Word 2010 OpenType XML attribute bytes.
+    OpenTypeXmlAttributeBytes,
+    /// Word 2010 OpenType stylistic-set count.
+    OpenTypeStyleSets,
 }
 
 impl LimitKind {
@@ -169,6 +181,12 @@ impl LimitKind {
             Self::Text => "font-table text bytes",
             Self::XmlNode => "font-usage XML node",
             Self::XmlStructure => "font-table XML structure",
+            Self::OpenTypeXmlBytes => "OpenType XML bytes",
+            Self::OpenTypeXmlDepth => "OpenType XML depth",
+            Self::OpenTypeXmlNodes => "OpenType XML node count",
+            Self::OpenTypeXmlAttributes => "OpenType XML attribute count",
+            Self::OpenTypeXmlAttributeBytes => "OpenType XML attribute bytes",
+            Self::OpenTypeStyleSets => "OpenType stylistic-set count",
         }
     }
 }

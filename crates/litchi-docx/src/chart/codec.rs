@@ -9,12 +9,11 @@
 //! XML discovery, validation, and shared `DrawingML` schema delegation.
 
 use super::model::{
-    COLOR_STYLE_CT, Conformance, Graph, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_CHART_XML,
-    MAX_CHARTS, MAX_COMPANION_XML, MAX_DEPTH, MAX_DOCUMENT_XML, MAX_NODES, MAX_TOTAL_BYTES,
-    MAX_WORKBOOK_BYTES, R, RS, STYLE_CT,
+    COLOR_STYLE_CT, Conformance, Graph, MAX_CHART_XML, MAX_CHARTS, MAX_COMPANION_XML,
+    MAX_TOTAL_BYTES, MAX_WORKBOOK_BYTES, R, RS, STYLE_CT,
 };
 use crate::error::{Error, Result};
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_opc::PackURI;
@@ -39,13 +38,20 @@ pub(crate) struct ChartScan {
 }
 
 #[derive(Default)]
-struct Limits {
+struct ScanState {
     nodes: usize,
     attributes: usize,
     attribute_bytes: usize,
 }
 
 pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
+    validate_graph_value_with_limits(graph, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn validate_graph_value_with_limits(
+    graph: &Graph,
+    policy: &super::Limits,
+) -> Result<()> {
     if graph.charts.len() > MAX_CHARTS {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::Count,
@@ -69,7 +75,7 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
         if !parts.insert(chart.part_name.as_str()) {
             return Err(invalid("chart resource part names collide"));
         }
-        let scan = scan_chart_xml(&chart.data, graph.conformance)?;
+        let scan = scan_chart_xml_with_limits(&chart.data, graph.conformance, policy)?;
         add_total(
             &mut total,
             chart.data.len(),
@@ -116,7 +122,13 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
                 if !parts.insert(resource.part_name.as_str()) {
                     return Err(invalid("chart resource part names collide"));
                 }
-                validate_companion_xml(&resource.data, MAX_COMPANION_XML, root, label)?;
+                validate_companion_xml_with_limits(
+                    &resource.data,
+                    policy.companion_xml_bytes(),
+                    root,
+                    label,
+                    policy,
+                )?;
                 add_total(
                     &mut total,
                     resource.data.len(),
@@ -159,34 +171,45 @@ pub(crate) fn validate_graph_value(graph: &Graph) -> Result<()> {
 }
 
 pub(crate) fn document_references(xml: &[u8]) -> Result<(Conformance, Vec<String>)> {
+    document_references_with_limits(xml, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn document_references_with_limits(
+    xml: &[u8],
+    policy: &super::Limits,
+) -> Result<(Conformance, Vec<String>)> {
     for conformance in [Conformance::Transitional, Conformance::Strict] {
-        if let Ok(value) = scan_document_xml(xml, conformance) {
+        if let Ok(value) = scan_document_xml(xml, conformance, policy) {
             return Ok((conformance, value));
         }
     }
     Err(invalid("invalid DOCX document root or chart anchors"))
 }
 
-fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>> {
-    if xml.len() > MAX_DOCUMENT_XML {
+fn scan_document_xml(
+    xml: &[u8],
+    conformance: Conformance,
+    policy: &super::Limits,
+) -> Result<Vec<String>> {
+    if xml.len() > policy.document_xml_bytes() {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::DocumentXmlBytes,
             actual: xml.len(),
-            maximum: MAX_DOCUMENT_XML,
+            maximum: policy.document_xml_bytes(),
         });
     }
-    let processed = process_ooxml(xml)?;
-    if processed.len() > MAX_DOCUMENT_XML {
+    let processed = process_markup(xml, policy, policy.document_xml_bytes())?;
+    if processed.len() > policy.document_xml_bytes() {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::ProcessedDocumentXmlBytes,
             actual: processed.len(),
-            maximum: MAX_DOCUMENT_XML,
+            maximum: policy.document_xml_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut limits = Limits::default();
+    let mut limits = ScanState::default();
     let mut root = false;
     let mut frames: Vec<(usize, usize)> = Vec::new();
     let mut references = Vec::new();
@@ -194,8 +217,8 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
         match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 depth += 1;
-                structure(&mut limits, depth)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
+                structure(&mut limits, depth, policy)?;
+                let (ns, local, attrs) = element_info(&reader, &element, &mut limits, policy)?;
                 if !root {
                     if ns != conformance.w() || local != "document" {
                         return Err(invalid("invalid document root or namespace"));
@@ -216,8 +239,8 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
                 }
             },
             Event::Empty(element) => {
-                structure(&mut limits, depth + 1)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
+                structure(&mut limits, depth + 1, policy)?;
+                let (ns, local, attrs) = element_info(&reader, &element, &mut limits, policy)?;
                 if !root {
                     if ns != conformance.w() || local != "document" {
                         return Err(invalid("invalid document root or namespace"));
@@ -266,35 +289,43 @@ fn scan_document_xml(xml: &[u8], conformance: Conformance) -> Result<Vec<String>
 }
 
 pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<ChartScan> {
-    if xml.len() > MAX_CHART_XML {
+    scan_chart_xml_with_limits(xml, conformance, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn scan_chart_xml_with_limits(
+    xml: &[u8],
+    conformance: Conformance,
+    policy: &super::Limits,
+) -> Result<ChartScan> {
+    if xml.len() > policy.chart_xml_bytes() {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::XmlBytes,
             actual: xml.len(),
-            maximum: MAX_CHART_XML,
+            maximum: policy.chart_xml_bytes(),
         });
     }
     litchi_drawingml::chart::reader::read(Cursor::new(xml))
         .map_err(|error| invalid(format!("DrawingML chart schema: {error}")))?;
-    let processed = process_ooxml(xml)?;
-    if processed.len() > MAX_CHART_XML {
+    let processed = process_markup(xml, policy, policy.chart_xml_bytes())?;
+    if processed.len() > policy.chart_xml_bytes() {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::ProcessedChartXmlBytes,
             actual: processed.len(),
-            maximum: MAX_CHART_XML,
+            maximum: policy.chart_xml_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
-    let mut limits = Limits::default();
+    let mut limits = ScanState::default();
     let mut root = false;
     let mut scan = ChartScan::default();
     loop {
         match reader.read_event().map_err(xml_error)? {
             Event::Start(element) => {
                 depth += 1;
-                structure(&mut limits, depth)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
+                structure(&mut limits, depth, policy)?;
+                let (ns, local, attrs) = element_info(&reader, &element, &mut limits, policy)?;
                 if !root {
                     if ns != conformance.c() || local != "chartSpace" {
                         return Err(invalid("invalid chartSpace root or namespace"));
@@ -307,8 +338,8 @@ pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<Cha
                 inspect_chart_element(&ns, &local, &attrs, conformance, depth, &mut scan)?;
             },
             Event::Empty(element) => {
-                structure(&mut limits, depth + 1)?;
-                let (ns, local, attrs) = element_info(&reader, &element, &mut limits)?;
+                structure(&mut limits, depth + 1, policy)?;
+                let (ns, local, attrs) = element_info(&reader, &element, &mut limits, policy)?;
                 if !root {
                     if ns != conformance.c() || local != "chartSpace" {
                         return Err(invalid("invalid chartSpace root or namespace"));
@@ -391,6 +422,16 @@ pub(crate) fn validate_companion_xml(
     root_name: &str,
     label: &str,
 ) -> Result<()> {
+    validate_companion_xml_with_limits(xml, max, root_name, label, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn validate_companion_xml_with_limits(
+    xml: &[u8],
+    max: usize,
+    root_name: &str,
+    label: &str,
+    policy: &super::Limits,
+) -> Result<()> {
     if xml.len() > max {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::CompanionXmlBytes,
@@ -398,7 +439,7 @@ pub(crate) fn validate_companion_xml(
             maximum: max,
         });
     }
-    let processed = process_ooxml(xml)?;
+    let processed = process_markup(xml, policy, max)?;
     if processed.len() > max {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::ProcessedCompanionXmlBytes,
@@ -417,7 +458,8 @@ pub(crate) fn validate_companion_xml(
 fn element_info(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
-    limits: &mut Limits,
+    limits: &mut ScanState,
+    policy: &super::Limits,
 ) -> Result<ResolvedElement> {
     let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
     let local = std::str::from_utf8(element.local_name().as_ref())
@@ -434,11 +476,11 @@ fn element_info(
             continue;
         }
         limits.attributes += 1;
-        if limits.attributes > MAX_ATTRIBUTES {
+        if limits.attributes > policy.attributes() {
             return Err(Error::ChartLimit {
                 kind: crate::chart::LimitKind::XmlAttributeCount,
                 actual: limits.attributes,
-                maximum: MAX_ATTRIBUTES,
+                maximum: policy.attributes(),
             });
         }
         let (namespace, name) = reader.resolver().resolve_attribute(item.key);
@@ -462,13 +504,13 @@ fn element_info(
             .ok_or(Error::ChartLimit {
                 kind: crate::chart::LimitKind::XmlAttributeBytes,
                 actual: usize::MAX,
-                maximum: MAX_ATTRIBUTE_BYTES,
+                maximum: policy.attribute_bytes(),
             })?;
-        if limits.attribute_bytes > MAX_ATTRIBUTE_BYTES {
+        if limits.attribute_bytes > policy.attribute_bytes() {
             return Err(Error::ChartLimit {
                 kind: crate::chart::LimitKind::XmlAttributeBytes,
                 actual: limits.attribute_bytes,
-                maximum: MAX_ATTRIBUTE_BYTES,
+                maximum: policy.attribute_bytes(),
             });
         }
         if !expanded_names.insert(expanded_name) {
@@ -499,24 +541,42 @@ fn attr<'a>(attrs: &'a [ResolvedAttribute], namespace: &str, name: &str) -> Opti
         .map(|(_, _, value)| value.as_str())
 }
 
-fn structure(limits: &mut Limits, depth: usize) -> Result<()> {
+fn structure(limits: &mut ScanState, depth: usize, policy: &super::Limits) -> Result<()> {
     limits.nodes += 1;
-    if limits.nodes > MAX_NODES || depth > MAX_DEPTH {
-        return Err(if limits.nodes > MAX_NODES {
+    if limits.nodes > policy.nodes() || depth > policy.depth() {
+        return Err(if limits.nodes > policy.nodes() {
             Error::ChartLimit {
                 kind: crate::chart::LimitKind::XmlStructure,
                 actual: limits.nodes,
-                maximum: MAX_NODES,
+                maximum: policy.nodes(),
             }
         } else {
             Error::ChartLimit {
                 kind: crate::chart::LimitKind::XmlStructure,
                 actual: depth,
-                maximum: MAX_DEPTH,
+                maximum: policy.depth(),
             }
         });
     }
     Ok(())
+}
+
+fn process_markup(xml: &[u8], policy: &super::Limits, output_maximum: usize) -> Result<Vec<u8>> {
+    let limits = MceLimits {
+        max_input_bytes: policy.document_xml_bytes().max(policy.chart_xml_bytes()),
+        max_output_bytes: output_maximum,
+        max_depth: policy.depth(),
+        max_namespace_bindings: policy.attributes(),
+        max_directive_tokens: policy.nodes(),
+        max_choices_per_alternate: policy.nodes(),
+        max_attributes_per_element: policy
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
+        ..MceLimits::default()
+    };
+    process_markup_compatibility(xml, &Capabilities::default(), &limits)
+        .map(|output| output.xml)
+        .map_err(Error::from)
 }
 
 pub(crate) fn ownership(graph: &Graph) -> BTreeSet<String> {
@@ -654,7 +714,7 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod attribute_tests {
-    use super::{Limits, ResolvedAttribute, element_info};
+    use super::{ResolvedAttribute, ScanState, element_info};
     use crate::error::{Error, Result};
     use quick_xml::events::Event;
     use quick_xml::reader::NsReader;
@@ -662,15 +722,20 @@ mod attribute_tests {
     /// The attributes `element_info` resolves on the first start tag of `xml`.
     fn attributes(xml: &str) -> Result<Vec<ResolvedAttribute>> {
         let mut reader = NsReader::from_reader(xml.as_bytes());
-        let mut limits = Limits::default();
+        let mut limits = ScanState::default();
         loop {
             match reader
                 .read_event()
                 .map_err(|error| Error::Xml(error.to_string()))?
             {
                 Event::Start(element) | Event::Empty(element) => {
-                    return element_info(&reader, &element, &mut limits)
-                        .map(|(_, _, attributes)| attributes);
+                    return element_info(
+                        &reader,
+                        &element,
+                        &mut limits,
+                        &super::super::Limits::DEFAULT,
+                    )
+                    .map(|(_, _, attributes)| attributes);
                 },
                 Event::Eof => panic!("the fixture has a start tag"),
                 _ => {},

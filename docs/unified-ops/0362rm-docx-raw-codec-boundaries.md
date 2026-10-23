@@ -1,6 +1,6 @@
 # 0362rm — DOCX raw codec boundaries
 
-- Date: 2026-10-22.
+- Date: 2026-10-23.
 - Status: source and tracked-consumer migration complete; runtime, allocation,
   and performance qualification remain pending the coordinator's released
   Cargo lane.
@@ -44,6 +44,20 @@ checks newly serialized catalog XML once before staging it, and web/font raw
 publication reuses the same serialized bytes for policy admission and package
 staging. Untouched package payloads continue to be shared by the existing OPC
 graph code.
+
+The source-closure admission walks the complete owned relationship graph under
+the selected policy before creating the retained `HashSet`, role map, queue, or
+auxiliary projection. It charges the selected part, payload, relationship,
+string, and aggregate metadata budgets as it discovers each target; owner main,
+root, relationship ID, and literal target metadata are charged too. Direct
+`Part::new` admission includes its own name/content-type metadata. Graph
+matching retains owner relationship identity, so equal root XML with a changed
+owner or changed auxiliary part cannot be accepted as an unchanged graph.
+Glossary XML is admitted before either DOM parse, including the MCE-projected
+bytes. Font parsing follows the same before-MCE and projected-byte admission;
+the font count and text budgets are checked before semantic tree allocation.
+Chart raw load/store route through the limits-aware package helpers, and the
+web/effects package paths carry their selected policy through the source read.
 
 The package modules retain only crate-private canonical implementation helpers;
 there is no public alias for a former top-level `put`, `remove`, `store`,

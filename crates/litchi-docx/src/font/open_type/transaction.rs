@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::error::Result;
 
+use super::Limits;
 use super::codec;
 use super::model::OpenType;
 
@@ -24,8 +25,9 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
+    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
         let xml = xml.into();
+        super::limit::admit_xml(&xml, limits)?;
         let value = codec::parse(&xml)?;
         Ok(Self {
             xml: Arc::from(xml.into_boxed_slice()),

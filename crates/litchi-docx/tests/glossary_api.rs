@@ -9,6 +9,7 @@ fn entry(name: &str, text: &str) -> litchi_docx::Result<Entry> {
             r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:docPartBody>"#
         )
         .into_bytes(),
+        &Limits::DEFAULT,
     )
 }
 

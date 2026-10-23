@@ -17,19 +17,17 @@ use quick_xml::events::Event;
 
 /// Parse detached web-settings XML under `limits`.
 pub fn parse(xml: &[u8], limits: &Limits) -> Result<(Settings, Conformance)> {
-    admit_xml(xml, limits)?;
-    codec::parse(xml)
+    codec::parse(xml, limits)
 }
 
 /// Read a web-settings part under `limits`.
 pub fn read(part: &dyn Part, limits: &Limits) -> Result<(Settings, Conformance)> {
-    admit_xml(part.blob(), limits)?;
-    codec::read(part)
+    codec::read(part, limits)
 }
 
 /// Serialize web-settings XML under `limits`.
 pub fn write(settings: &Settings, conformance: Conformance, limits: &Limits) -> Result<Vec<u8>> {
-    let xml = codec::write(settings, conformance)?;
+    let xml = codec::write_with_limits(settings, conformance, limits)?;
     admit_xml(&xml, limits)?;
     Ok(xml)
 }
@@ -42,15 +40,15 @@ pub fn put(
     limits: &Limits,
 ) -> Result<bool> {
     admit_package(package, limits)?;
-    let xml = codec::write(&settings, conformance)?;
+    let xml = codec::write_with_limits(&settings, conformance, limits)?;
     admit_xml(&xml, limits)?;
-    package::put_encoded(package, settings, conformance, xml)
+    package::put_encoded(package, settings, conformance, xml, limits)
 }
 
 /// Remove document-owned web settings under `limits`.
 pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
     admit_package(package, limits)?;
-    package::remove(package)
+    package::remove_with_limits(package, limits)
 }
 
 pub(crate) fn admit_xml(xml: &[u8], limits: &Limits) -> Result<()> {

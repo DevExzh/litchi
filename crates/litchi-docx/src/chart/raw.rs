@@ -27,7 +27,7 @@ pub use super::model::Resource;
 /// payloads accepted by the OPC codec.
 pub fn load(package: &OpcPackage, document_name: &PackURI, limits: &Limits) -> Result<Graph> {
     admit_package(package, document_name, limits)?;
-    package::load(package, document_name)
+    package::load_with_limits(package, document_name, limits)
 }
 
 /// Replace a selected document's complete chart graph under `limits`.
@@ -42,7 +42,7 @@ pub fn store(
 ) -> Result<()> {
     admit_package(package, document_name, limits)?;
     admit_graph(graph, limits)?;
-    package::store(package, document_name, graph)
+    package::store_with_limits(package, document_name, graph, limits)
 }
 
 fn admit_package(package: &OpcPackage, document_name: &PackURI, limits: &Limits) -> Result<()> {
@@ -53,7 +53,7 @@ fn admit_package(package: &OpcPackage, document_name: &PackURI, limits: &Limits)
         limits,
         crate::chart::LimitKind::DocumentXmlBytes,
     )?;
-    let (_, references) = super::codec::document_references(document.blob())?;
+    let (_, references) = super::codec::document_references_with_limits(document.blob(), limits)?;
     if references.len() > limits.charts() {
         return Err(Error::ChartLimit {
             kind: crate::chart::LimitKind::Count,

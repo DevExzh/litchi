@@ -31,7 +31,7 @@ fn entry(name: &str, relationship_id: Option<&str>) -> Entry {
         id: Some(Id::new("{12345678-1234-4ABC-8DEF-1234567890AB}").expect("canonical ID")),
         ..Props::new(Name::new(name).expect("name").with_decorated(false))
     };
-    Entry::new(name, body)
+    Entry::new(name, body, &Limits::DEFAULT)
         .and_then(|entry| entry.with_props(props))
         .expect("entry")
 }

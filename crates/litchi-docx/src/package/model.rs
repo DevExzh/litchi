@@ -380,7 +380,11 @@ fn merge_word_font(
         let key = font::FontKey::new(generate_guid_bytes());
         let mut obfuscated = data;
         font::obfuscate(&mut obfuscated, key)?;
-        let mut embedded = font::Embed::new(style, key, font::Resource::new(obfuscated)?);
+        let mut embedded = font::Embed::new(
+            style,
+            key,
+            font::Resource::new(obfuscated, &font::Limits::DEFAULT)?,
+        );
         if subsetted {
             embedded = embedded.with_subset(true);
         }

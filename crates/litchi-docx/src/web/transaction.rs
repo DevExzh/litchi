@@ -64,6 +64,18 @@ impl Snapshot {
         Ok(snapshot)
     }
 
+    pub(super) fn from_parsed_xml(
+        xml: impl Into<Vec<u8>>,
+        settings: Settings,
+        conformance: Conformance,
+    ) -> Self {
+        Self {
+            xml: Arc::from(xml.into().into_boxed_slice()),
+            settings,
+            conformance,
+        }
+    }
+
     /// Borrow the exact authored XML retained by this snapshot.
     #[inline]
     #[must_use]
@@ -277,7 +289,6 @@ impl Transaction {
     pub fn commit(self) -> Result<Commit> {
         // The canonical writer is used only as a complete semantic validation
         // pass. The authored bytes below are produced by the surgical codec.
-        let _ = self.next.xml(self.base.conformance)?;
         if self.edits.is_empty() {
             return Ok(Commit {
                 patch: Patch {

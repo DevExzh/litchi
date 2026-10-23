@@ -5,6 +5,7 @@
 //! Semantic glossary projection and typed document-part encoding.
 
 use super::super::graph::relationship_references;
+use super::super::limit::Limits;
 use super::super::model::{
     Catalog, Category, Conformance, Entry, EntryAnalysis, Gallery, Id, Insert, Kind, Name,
     ProducerEntry, Props,
@@ -16,7 +17,10 @@ use super::validation::{
     only_w, onoff, parse_behavior, parse_type, validate_catalog_fields, validate_entry_fields,
     validate_name, wattr_get, wval, xml_error,
 };
-use super::xml::{Attr, Content, Node, XmlSink, XmlSize, esc, node_write, node_xml, parse_dom};
+use super::xml::{
+    Attr, Content, Node, XmlSink, XmlSize, esc, node_write, node_xml, parse_dom,
+    parse_dom_with_limits,
+};
 
 pub(in crate::glossary) fn project(n: &Node) -> Result<Catalog> {
     expect(n, "glossaryDocument")?;
@@ -554,12 +558,15 @@ pub(in crate::glossary) fn prepare_opaque(xml: &[u8], local: &str) -> Result<Nod
     Ok(root)
 }
 
-pub(in crate::glossary) fn prepare_opaque_for(
+pub(in crate::glossary) fn prepare_opaque_for_with_limits(
     xml: &[u8],
     local: &str,
     conformance: Conformance,
+    limits: &Limits,
 ) -> Result<Node> {
-    let root = prepare_opaque(xml, local)?;
+    super::super::graph::raw::admit_xml(xml, limits)?;
+    let root = parse_dom_with_limits(xml, limits)?;
+    expect(&root, local)?;
     if conformance == Conformance::Strict {
         reject_vml(&root)?;
     }

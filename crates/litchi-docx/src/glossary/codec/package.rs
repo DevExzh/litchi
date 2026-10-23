@@ -5,9 +5,10 @@
 //! Glossary package planning and failure-bounded XML assembly.
 
 use super::super::MAX;
+use super::super::limit::Limits;
 use super::super::model::{Catalog, Conformance};
 use super::super::{Arc, Error, Result};
-use super::semantic::{prepare_opaque_for, write_entry};
+use super::semantic::{prepare_opaque_for_with_limits, write_entry};
 use super::validation::{invalid, validate_catalog_fields};
 use super::xml::{Node, XmlSink, XmlSize, node_write};
 
@@ -88,11 +89,19 @@ pub(in crate::glossary) fn plan_write(
     value: &Catalog,
     conformance: Conformance,
 ) -> Result<WritePlan> {
+    plan_write_with_limits(value, conformance, &Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn plan_write_with_limits(
+    value: &Catalog,
+    conformance: Conformance,
+    limits: &Limits,
+) -> Result<WritePlan> {
     validate_catalog_fields(value)?;
     let background = value
         .background
         .as_deref()
-        .map(|xml| prepare_opaque_for(xml, "background", conformance))
+        .map(|xml| prepare_opaque_for_with_limits(xml, "background", conformance, limits))
         .transpose()?;
     let mut bodies = Vec::new();
     bodies
@@ -120,7 +129,7 @@ pub(in crate::glossary) fn plan_write(
             entry
                 .body
                 .as_deref()
-                .map(|xml| prepare_opaque_for(xml, "docPartBody", conformance))
+                .map(|xml| prepare_opaque_for_with_limits(xml, "docPartBody", conformance, limits))
                 .transpose()?
         });
     }

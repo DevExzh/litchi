@@ -214,7 +214,11 @@ mod web_settings {
         for name in SIGNED {
             let original = fixture(name);
             let package = open(&original);
-            assert!(web::load_snapshot(package.opc_package()).unwrap().is_some());
+            assert!(
+                web::load_snapshot(package.opc_package(), &web::Limits::DEFAULT)
+                    .unwrap()
+                    .is_some()
+            );
             let empty = package.edit_web().commit().unwrap();
             assert!(!empty.diagnostics().changed());
             assert!(empty.patch().is_noop());
@@ -309,6 +313,7 @@ mod glossary_family {
             name,
             format!(r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{name}</w:t></w:r></w:p></w:docPartBody>"#)
                 .into_bytes(),
+            &litchi_docx::glossary::Limits::DEFAULT,
         )
         .unwrap()
     }
@@ -426,9 +431,12 @@ mod glossary_family {
         let unsigned = open(&signed).unsign();
         let output = bytes(&mut unsigned.apply_glossary(&patch).unwrap().into_package());
         assert!(!carries_signature(&output));
-        let (catalog, _) = glossary::load(&OpcPackage::from_vec(output).unwrap())
-            .unwrap()
-            .unwrap();
+        let (catalog, _) = glossary::load(
+            &OpcPackage::from_vec(output).unwrap(),
+            &glossary::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap();
         assert!(catalog.get("Patched").unwrap().is_some());
 
         package = package.unsign();

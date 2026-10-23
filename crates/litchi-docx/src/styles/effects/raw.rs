@@ -10,13 +10,14 @@ use super::{Owner, Resource, Snapshot};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::OpcPackage;
+use litchi_opc::SourceLimits;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
 /// Load one owner resource under `limits`.
 pub fn load(package: &OpcPackage, owner: Owner, limits: &Limits) -> Result<Snapshot> {
     admit_package(package, owner, limits)?;
-    super::load(package, owner)
+    super::load_with_limits(package, owner, source_limits(limits)?)
 }
 
 /// Put one owner resource under `limits`.
@@ -28,13 +29,25 @@ pub fn put(
 ) -> Result<bool> {
     admit_package(package, owner, limits)?;
     admit_xml(resource.xml_bytes(), limits)?;
-    super::put(package, owner, resource)
+    super::put_with_limits(package, owner, resource, source_limits(limits)?)
 }
 
 /// Remove one owner resource under `limits`.
 pub fn remove(package: &mut OpcPackage, owner: Owner, limits: &Limits) -> Result<bool> {
     admit_package(package, owner, limits)?;
-    super::remove(package, owner)
+    super::remove_with_limits(package, owner, source_limits(limits)?)
+}
+
+fn source_limits(limits: &Limits) -> Result<SourceLimits> {
+    let xml_bytes = u64::try_from(limits.xml_bytes())
+        .map_err(|_| Error::InvalidFormat("effects XML byte limit overflows u64".to_owned()))?;
+    SourceLimits::builder()
+        .max_part_bytes(xml_bytes)
+        .and_then(|value| value.max_events(limits.events()))
+        .and_then(|value| value.max_depth(limits.depth()))
+        .and_then(|value| value.max_xml_attribute_bytes(limits.attribute_bytes()))
+        .and_then(|value| value.build())
+        .map_err(Error::Opc)
 }
 
 pub(crate) fn admit_xml(xml: &[u8], limits: &Limits) -> Result<()> {
@@ -161,10 +174,49 @@ fn check_attributes(
 }
 
 fn admit_package(package: &OpcPackage, owner: Owner, limits: &Limits) -> Result<()> {
-    let graph = super::inspect_graph(package)?;
-    let Some(binding) = graph.binding(owner) else {
-        return Ok(());
-    };
-    let part = package.get_part(&binding.target)?;
-    admit_xml(part.blob(), limits)
+    // Preflight the selected owner bytes before inspect_graph parses them
+    // under the package-wide source policy.  The graph validator still owns
+    // topology, content-type, and semantic checks; this pass only establishes
+    // the caller's tighter effects budget before any of those allocations.
+    let source_names = owner_sources(package, owner)?;
+    for source_name in source_names {
+        let source = package.get_part(&source_name)?;
+        for relationship in source
+            .rels()
+            .iter()
+            .filter(|relationship| relationship.reltype() == super::RELATIONSHIP_TYPE)
+        {
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            let target = package.get_part(&target)?;
+            if target.content_type() == super::CONTENT_TYPE {
+                admit_xml(target.blob(), limits)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn owner_sources(package: &OpcPackage, owner: Owner) -> Result<Vec<litchi_opc::PackURI>> {
+    let main = package.main_document_part()?.partname().clone();
+    if owner == Owner::MainDocument {
+        return Ok(vec![main]);
+    }
+
+    let main_part = package.get_part(&main)?;
+    let mut sources = Vec::new();
+    for relationship in main_part.rels().iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            super::GLOSSARY_RELATIONSHIP_TYPE | super::STRICT_GLOSSARY_RELATIONSHIP_TYPE
+        )
+    }) {
+        if relationship.is_external() {
+            continue;
+        }
+        sources.push(relationship.target_partname()?);
+    }
+    Ok(sources)
 }

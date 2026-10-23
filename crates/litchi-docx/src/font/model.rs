@@ -573,7 +573,25 @@ impl Resource {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(data: Vec<u8>) -> Result<Self> {
+    pub fn new(data: Vec<u8>, limits: &super::Limits) -> Result<Self> {
+        // Validate the caller-selected budget before turning the payload into
+        // a shared allocation.  The hard format bound remains the first
+        // check, so an invalid embedded-font payload is never retained.
+        validate_resource_len(data.len())?;
+        if data.len() > limits.embedded_font_bytes() {
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::EmbeddedFontBytes,
+                actual: data.len(),
+                maximum: limits.embedded_font_bytes(),
+            });
+        }
+        if data.len() > limits.aggregate_font_bytes() {
+            return Err(Error::FontLimit {
+                kind: crate::font::LimitKind::AggregateBytes,
+                actual: data.len(),
+                maximum: limits.aggregate_font_bytes(),
+            });
+        }
         Self::from_shared(Arc::new(data))
     }
 

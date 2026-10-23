@@ -146,7 +146,7 @@ fn obfuscation_and_compact_license_are_checked() {
 #[test]
 fn move_first_crud_preserves_shared_resources_and_extensions() {
     let mut package = package();
-    let shared = Resource::new((0u8..64).collect()).expect("resource");
+    let shared = Resource::new((0u8..64).collect(), &Limits::DEFAULT).expect("resource");
     let first = Font::new("Alpha")
         .expect("font")
         .with_alt("Alpha Alt")
@@ -264,7 +264,7 @@ fn graph_delete_keeps_resources_referenced_outside_the_table() {
         .with_embed(Embed::new(
             Style::Regular,
             KEY,
-            Resource::new(vec![0; 32]).expect("resource"),
+            Resource::new(vec![0; 32], &Limits::DEFAULT).expect("resource"),
         ))
         .expect("face");
     let mut table = Table::new();
@@ -311,7 +311,7 @@ fn graph_delete_keeps_resources_referenced_outside_the_table() {
 fn constructors_prevent_invalid_authoring_state() {
     assert!(Font::new("").is_err());
     assert!(Font::new("12345678901234567890123456789012").is_err());
-    assert!(Resource::new(vec![0; 31]).is_err());
+    assert!(Resource::new(vec![0; 31], &Limits::DEFAULT).is_err());
     assert!("bad".parse::<FontKey>().is_err());
     assert!(raw::Attr::new("", "value").is_err());
 

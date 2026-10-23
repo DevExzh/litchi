@@ -609,7 +609,12 @@ impl Catalog {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn set_background(&mut self, xml: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    pub fn set_background(
+        &mut self,
+        xml: Vec<u8>,
+        limits: &super::Limits,
+    ) -> Result<Option<Vec<u8>>> {
+        super::graph::raw::admit_xml(&xml, limits)?;
         if self.background.as_ref() == Some(&xml) {
             return Ok(self.background.replace(xml));
         }
@@ -1069,7 +1074,8 @@ impl Entry {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn new(name: impl Into<String>, body_xml: Vec<u8>) -> Result<Self> {
+    pub fn new(name: impl Into<String>, body_xml: Vec<u8>, limits: &super::Limits) -> Result<Self> {
+        super::graph::raw::admit_xml(&body_xml, limits)?;
         let name = Name::new(name)?;
         let entry = Self {
             props: Some(Props::new(name)),
@@ -1122,7 +1128,8 @@ impl Entry {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn with_body(mut self, body: Vec<u8>) -> Result<Self> {
+    pub fn with_body(mut self, body: Vec<u8>, limits: &super::Limits) -> Result<Self> {
+        super::graph::raw::admit_xml(&body, limits)?;
         if self.body.as_ref() != Some(&body) {
             self.producer = None;
             self.lineage = None;

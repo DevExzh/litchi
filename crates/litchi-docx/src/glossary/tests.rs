@@ -9,7 +9,9 @@ use std::sync::Arc;
 
 fn fixture(bytes: &[u8]) -> (Catalog, Conformance) {
     let package = OpcPackage::from_bytes(bytes).expect("package");
-    load(&package).expect("load").expect("glossary")
+    load(&package, &Limits::DEFAULT)
+        .expect("load")
+        .expect("glossary")
 }
 
 fn package_for(conformance: Conformance) -> OpcPackage {
@@ -71,6 +73,7 @@ fn entry(name: &str) -> Entry {
     Entry::new(
         name,
         format!(r#"<w:docPartBody xmlns:w="{W}"><w:p/></w:docPartBody>"#).into_bytes(),
+        &Limits::DEFAULT,
     )
     .expect("entry")
 }
@@ -342,7 +345,7 @@ C</w:t></w:r></w:p></w:docPartBody>"#
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Line endings", body.into_bytes()).unwrap())
+        .add(Entry::new("Line endings", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let output = String::from_utf8(write(&catalog, Conformance::Transitional).unwrap()).unwrap();
     assert!(output.contains("A&#xD;B\nC"), "{output}");
@@ -366,7 +369,7 @@ fn opaque_namespace_mapping_does_not_rewrite_literal_values() {
         background: None,
         background_refs: Arc::from([]),
         background_lineage: None,
-        entries: vec![Entry::new("Literal", body.into_bytes()).unwrap()],
+        entries: vec![Entry::new("Literal", body.into_bytes(), &Limits::DEFAULT).unwrap()],
         binding: None,
         state: CatalogState::default(),
     };
@@ -574,7 +577,7 @@ fn exact_noop_preserves_custom_root_bytes_and_signature() {
         false,
     );
     assert!(package.is_signed());
-    let (loaded, conformance) = load(&package).unwrap().unwrap();
+    let (loaded, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
     assert!(!put(&mut package, loaded, conformance).unwrap());
     assert_eq!(package.get_part(&custom).unwrap().blob(), source.as_slice());
     assert!(package.is_signed());
@@ -1036,7 +1039,7 @@ fn standards_relationship_matrix_round_trips_owned_parts_and_keeps_references() 
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Matrix", body.into_bytes()).unwrap())
+        .add(Entry::new("Matrix", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
     graph.rels = vec![
@@ -1535,7 +1538,7 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
         );
         let mut catalog = Catalog::new();
         catalog
-            .add(Entry::new("Picture", body.into_bytes()).unwrap())
+            .add(Entry::new("Picture", body.into_bytes(), &Limits::DEFAULT).unwrap())
             .unwrap();
         let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
         graph.rels.push(raw::Rel {
@@ -1579,13 +1582,13 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
         r#"<w:docPartBody xmlns:w="{W}" xmlns:r="{R}"><w:p r:embed="rIdImage"/><w:p/></w:docPartBody>"#
     );
     let destination_entry = destination_entry
-        .with_body(rebound_body.into_bytes())
+        .with_body(rebound_body.into_bytes(), &Limits::DEFAULT)
         .unwrap();
     assert!(destination_catalog.add(destination_entry).is_err());
     let background = format!(r#"<w:background xmlns:w="{W}" xmlns:r="{R}" r:id="rIdImage"/>"#);
     assert!(
         destination_catalog
-            .set_background(background.into_bytes())
+            .set_background(background.into_bytes(), &Limits::DEFAULT)
             .is_err()
     );
     assert!(destination_catalog.background().is_none());
@@ -1605,7 +1608,7 @@ fn inactive_mce_relationship_ids_remain_bound_to_their_physical_graph() {
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Inactive reference", body.into_bytes()).unwrap())
+        .add(Entry::new("Inactive reference", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     let mut graph = raw::Graph::new(catalog, Conformance::Transitional);
     graph.rels.push(raw::Rel {
@@ -1922,19 +1925,21 @@ fn unowned_parts_in_the_conventional_glossary_directory_are_preserved() {
 #[test]
 fn semantic_payload_limits_fail_before_xml_parsing() {
     let oversized = vec![b'x'; MAX + 1];
-    let entry_error = Entry::new("Oversized", oversized).unwrap_err().to_string();
+    let entry_error = Entry::new("Oversized", oversized, &Limits::DEFAULT)
+        .unwrap_err()
+        .to_string();
     assert!(
-        entry_error.contains("payload exceeds 32 MiB"),
+        entry_error.contains("glossary XML bytes limit exceeded"),
         "{entry_error}"
     );
 
     let mut catalog = Catalog::new();
     let background_error = catalog
-        .set_background(vec![b'x'; MAX + 1])
+        .set_background(vec![b'x'; MAX + 1], &Limits::DEFAULT)
         .unwrap_err()
         .to_string();
     assert!(
-        background_error.contains("payload exceeds 32 MiB"),
+        background_error.contains("glossary XML bytes limit exceeded"),
         "{background_error}"
     );
     assert!(catalog.background().is_none());
@@ -1996,7 +2001,7 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ">".repeat(600_000)
     );
     let background_error = catalog
-        .set_background(background.into_bytes())
+        .set_background(background.into_bytes(), &Limits::DEFAULT)
         .unwrap_err()
         .to_string();
     assert!(
@@ -2011,7 +2016,10 @@ fn canonical_write_matches_its_checked_plan() {
     let mut catalog = Catalog::new();
     catalog.add(entry("Planned")).unwrap();
     catalog
-        .set_background(format!(r#"<w:background xmlns:w="{W}" w:color="A&amp;B"/>"#).into_bytes())
+        .set_background(
+            format!(r#"<w:background xmlns:w="{W}" w:color="A&amp;B"/>"#).into_bytes(),
+            &Limits::DEFAULT,
+        )
         .unwrap();
 
     for conformance in [Conformance::Transitional, Conformance::Strict] {
@@ -2036,7 +2044,7 @@ fn aggregate_auxiliary_payload_limit_rejects_before_mutation() {
         ));
     }
     assert!(raw::put(&mut package, &graph, &Limits::default()).is_err());
-    assert!(load(&package).unwrap().is_none());
+    assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
 }
 
 #[test]
@@ -2161,7 +2169,7 @@ fn transaction_catalog_crud_preserves_opaque_entry_xml() {
     );
     let mut catalog = Catalog::new();
     catalog
-        .add(Entry::new("Keep", body.into_bytes()).unwrap())
+        .add(Entry::new("Keep", body.into_bytes(), &Limits::DEFAULT).unwrap())
         .unwrap();
     raw::put(
         &mut package,

@@ -10,7 +10,11 @@ const KEY: FontKey = FontKey::new([
 
 #[test]
 fn downstream_surface_is_short_safe_and_move_first() -> litchi_docx::Result<()> {
-    let face = Embed::new(Style::Regular, KEY, Resource::new(vec![0; 32])?);
+    let face = Embed::new(
+        Style::Regular,
+        KEY,
+        Resource::new(vec![0; 32], &Limits::DEFAULT)?,
+    );
     let font = Font::new("Example")?
         .with_charset(Charset::Ansi)
         .with_family(Family::Swiss)

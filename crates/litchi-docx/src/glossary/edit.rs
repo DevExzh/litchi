@@ -16,6 +16,7 @@
 //! catalog.add(glossary::Entry::new(
 //!     "Signature",
 //!     br#"<w:docPartBody xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p/></w:docPartBody>"#.to_vec(),
+//!     &glossary::Limits::DEFAULT,
 //! )?)?;
 //! let mut edit = package.edit_glossary();
 //! edit.put(catalog, glossary::Conformance::Transitional)?;
