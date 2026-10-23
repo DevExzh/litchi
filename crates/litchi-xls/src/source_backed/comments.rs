@@ -87,9 +87,15 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook's comments cannot be read.
     pub fn edit_comments(&self) -> Result<Edit> {
+        let package = self
+            .staging_package()
+            .map_err(|error| crate::source_backed::protected_edit_error(error, "edit comments"))?;
+        let inner = package.edit_comments().map_err(|error| {
+            crate::source_backed::protected_edit_error(error, "edit comments")
+        })?;
         Ok(Edit {
             source: self.clone(),
-            inner: self.staging_package()?.edit_comments()?,
+            inner,
         })
     }
 

@@ -117,10 +117,15 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook cannot be read as cell values.
     pub fn edit_cells(&self) -> Result<Edit> {
-        let snapshot = self
-            .staging_package()?
-            .cell_values()
-            .map_err(crate::scoped::package_error)?;
+        let package = self
+            .staging_package()
+            .map_err(|error| crate::source_backed::protected_edit_error(error, "edit cells"))?;
+        let snapshot = package.cell_values().map_err(|error| {
+            crate::source_backed::protected_edit_error(
+                crate::scoped::package_error(error),
+                "edit cells",
+            )
+        })?;
         Ok(Edit {
             source: self.clone(),
             inner: snapshot.edit(),

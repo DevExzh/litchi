@@ -227,6 +227,26 @@ pub(crate) fn workbook_error(error: crate::SourceBackedError) -> crate::Error {
     }
 }
 
+/// Classify the common object-layer protection guard at the source-backed
+/// family boundary.  The object package is deliberately format-neutral, so it
+/// reports a protected CFB as a low-level error; a public source-backed edit
+/// must expose the shared format error contract instead.
+pub(crate) fn protected_edit_error(error: crate::Error, operation: &'static str) -> crate::Error {
+    if matches!(
+        &error,
+        crate::Error::Object(litchi_ole_common::Error::Cfb(
+            litchi_cfb::OleError::InvalidFormat(message),
+        )) if message == "signed, encrypted, or DRM containers are not eligible for object editing"
+    ) {
+        return crate::Error::refused(
+            litchi_core::edit::RefusalKind::Protected,
+            operation,
+            "signed, encrypted, or DRM containers are not eligible for source-backed editing",
+        );
+    }
+    error
+}
+
 impl SourceBackedWorkbook {
     /// The source-backed package view of this workbook, the staging base of
     /// a source-backed family edit.

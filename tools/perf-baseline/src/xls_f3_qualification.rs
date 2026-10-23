@@ -1053,7 +1053,7 @@ enum SecurityOpenError {
 }
 
 const EXPECTED_PROTECTED_REFUSAL: &str =
-    "signed, encrypted, or DRM containers are not eligible for object editing";
+    "signed, encrypted, or DRM containers are not eligible for source-backed editing";
 
 fn require_signed_marker(bytes: &[u8]) -> Result<()> {
     let mut ole = OleFile::open(Cursor::new(bytes))?;
@@ -1115,15 +1115,13 @@ fn require_encrypted_marker(bytes: &[u8]) -> Result<()> {
 
 fn require_signed_refusal(error: SecurityOpenError, label: &str) -> Result<()> {
     match error {
-        SecurityOpenError::Edit(litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(
-            message,
-        )))
-        | SecurityOpenError::Source(litchi_xls::SourceBackedError::Cfb(
-            litchi_cfb::OleError::InvalidFormat(message),
-        ))
-        | SecurityOpenError::Source(litchi_xls::SourceBackedError::Parse(
-            litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(message)),
-        )) if message == EXPECTED_PROTECTED_REFUSAL => Ok(()),
+        SecurityOpenError::Edit(litchi_xls::Error::Refused(refusal))
+            if refusal.kind() == RefusalKind::Protected
+                && refusal.operation() == "edit cells"
+                && refusal.reason() == EXPECTED_PROTECTED_REFUSAL =>
+        {
+            Ok(())
+        },
         other => Err(format!(
             "XLS F3 {label} fixture returned an unexpected security refusal: {other:?}"
         )
