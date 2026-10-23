@@ -180,6 +180,34 @@ impl Sheet<'_> {
             .transpose()
     }
 
+    /// Resolve the format that a typed request will actually see.  A pending
+    /// complete style is the effective baseline for later typed facets; using
+    /// the immutable source here would incorrectly retain a request that is
+    /// already equal to that pending style.
+    fn effective_typed_format(&self, address: Address) -> Result<Option<Format>> {
+        let Some(action) = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.cells.get(&address))
+        else {
+            return self.source_format(address);
+        };
+        let Some(style) = (match action {
+            Action::Update {
+                style: Some(style), ..
+            } => Some(style),
+            _ => None,
+        }) else {
+            return self.source_format(address);
+        };
+        let raw = match style {
+            StyleEffect::Set(raw) => *raw,
+            StyleEffect::Reset => 0,
+        };
+        self.edit.base.inner.format(raw).map(Some)
+    }
+
     fn has_pending_style(&self, address: Address) -> bool {
         self.edit.sheets.get(&self.position).is_some_and(|actions| {
             actions.fonts.contains_key(&address)
@@ -196,16 +224,81 @@ impl Sheet<'_> {
         })
     }
 
-    /// Whether a complete cell-style action already precedes any typed facet
-    /// request for this address.  A typed facet that happens to equal the
-    /// immutable source is still an authored override of that pending full
-    /// style and must not be discarded during bounded admission.
     fn has_pending_complete_style(&self, address: Address) -> bool {
         self.edit
             .sheets
             .get(&self.position)
             .and_then(|actions| actions.cells.get(&address))
-            .is_some_and(|action| matches!(action, Action::Update { style: Some(_), .. }))
+            .is_some_and(|action| {
+                matches!(
+                    action,
+                    Action::Update { style: Some(_), .. } | Action::Remove
+                )
+            })
+    }
+
+    /// Discard typed style requests when a complete style operation resolves
+    /// to the immutable source.  This path runs before capture admission, so
+    /// it must release every facet explicitly rather than relying on a later
+    /// complete-style replacement to overwrite the ledger.
+    fn discard_typed_style_noop(&mut self, address: Address) -> Result<()> {
+        let had_fill = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .is_some_and(|actions| actions.fills.contains_key(&address));
+        let had_border = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .is_some_and(|actions| actions.borders.contains_key(&address));
+        self.edit.discard_fill(self.position, address)?;
+        self.edit.discard_border(self.position, address)?;
+        let (font, alignment, protection, quote_prefix, number_format) = self
+            .edit
+            .sheets
+            .get_mut(&self.position)
+            .map_or((false, false, false, false, false), |actions| {
+                (
+                    actions.fonts.remove(&address).is_some(),
+                    actions.alignments.remove(&address).is_some(),
+                    actions.protections.remove(&address).is_some(),
+                    actions.quote_prefixes.remove(&address).is_some(),
+                    actions.number_formats.remove(&address).is_some(),
+                )
+            });
+        if had_fill {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Fill);
+        }
+        if had_border {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Border);
+        }
+        if font {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Font);
+        }
+        if alignment {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Alignment);
+        }
+        if protection {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Protection);
+        }
+        if quote_prefix {
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::QuotePrefix);
+        }
+        if number_format {
+            self.edit.release_cell_capture_facet(
+                self.position,
+                address,
+                CaptureFacet::NumberFormat,
+            );
+        }
+        Ok(())
     }
 
     fn has_pending_cell_effect(&self, address: Address) -> bool {
@@ -464,15 +557,6 @@ impl Sheet<'_> {
     /// Unmerge the range containing one checked cell, if any.
     pub fn unmerge<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        // Admit the worksheet-before image before asking the source store for
-        // its merge index. A deferred worksheet store can allocate its full
-        // XML payload during that lookup.
-        let capture = self.edit.preflight_cell_capture_with_facet(
-            self.position,
-            address,
-            CaptureFacet::Structural,
-            0,
-        )?;
         let range = match (|| -> Result<Option<Rect>> {
             let data = self
                 .edit
@@ -499,15 +583,17 @@ impl Sheet<'_> {
             ))
         })() {
             Ok(range) => range,
-            Err(error) => {
-                self.edit.rollback_cell_capture(capture);
-                return Err(error);
-            },
+            Err(error) => return Err(error),
         };
         let Some(range) = range else {
-            self.edit.rollback_cell_capture(capture);
             return Ok(self);
         };
+        let capture = self.edit.preflight_cell_capture_with_facet(
+            self.position,
+            address,
+            CaptureFacet::Structural,
+            0,
+        )?;
         let cancel_add = self
             .edit
             .sheets
@@ -570,10 +656,7 @@ impl Sheet<'_> {
         {
             match self.source_rich_text(address) {
                 Ok(source) => source.is_some(),
-                Err(error) => {
-                    self.edit.rollback_cell_capture(capture);
-                    return Err(error);
-                },
+                Err(error) => return Err(error),
             }
         } else {
             false
@@ -1050,6 +1133,7 @@ impl Sheet<'_> {
         }
         let address = at.into().resolve()?;
         let had_pending_style = self.has_pending_style(address);
+        let has_pending_complete_style = self.has_pending_complete_style(address);
         if had_pending_style
             && self
                 .edit
@@ -1068,9 +1152,10 @@ impl Sheet<'_> {
         {
             return Ok(self);
         }
-        if self.edit.capture_budgeted() && !had_pending_style {
+        if self.edit.capture_budgeted() && !has_pending_complete_style {
             let source_style = self.source_style(address)?;
             if source_style == Some(style.raw()) {
+                self.discard_typed_style_noop(address)?;
                 return Ok(self);
             }
         }
@@ -1137,6 +1222,7 @@ impl Sheet<'_> {
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         let had_pending_style = self.has_pending_style(address);
+        let has_pending_complete_style = self.has_pending_complete_style(address);
         if had_pending_style
             && self
                 .edit
@@ -1155,8 +1241,9 @@ impl Sheet<'_> {
         {
             return Ok(self);
         }
-        if self.edit.capture_budgeted() && !had_pending_style {
+        if self.edit.capture_budgeted() && !has_pending_complete_style {
             if self.source_style(address)?.is_none() {
+                self.discard_typed_style_noop(address)?;
                 return Ok(self);
             }
         }
@@ -1260,10 +1347,11 @@ impl Sheet<'_> {
         let mut merged = previous.clone().unwrap_or_default();
         merged.merge(change);
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && font_change_matches_source(
                 &merged,
-                self.source_format(address)?.as_ref().and_then(Format::font),
+                self.effective_typed_format(address)?
+                    .as_ref()
+                    .and_then(Format::font),
             )
         {
             self.edit
@@ -1319,10 +1407,9 @@ impl Sheet<'_> {
         let mut merged = previous.unwrap_or_default();
         merged.merge(change);
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && alignment_change_matches_source(
                 &merged,
-                self.source_format(address)?
+                self.effective_typed_format(address)?
                     .as_ref()
                     .and_then(Format::alignment),
             )
@@ -1396,10 +1483,9 @@ impl Sheet<'_> {
         let mut merged = previous.clone().unwrap_or_else(BorderChange::new);
         merged.merge(change);
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && border_change_matches_source(
                 &merged,
-                self.source_format(address)?
+                self.effective_typed_format(address)?
                     .as_ref()
                     .and_then(Format::border),
             )
@@ -1486,10 +1572,11 @@ impl Sheet<'_> {
         let mut merged = previous.clone().unwrap_or_else(FillChange::new);
         merged.merge(change);
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && fill_change_matches_source(
                 &merged,
-                self.source_format(address)?.as_ref().and_then(Format::fill),
+                self.effective_typed_format(address)?
+                    .as_ref()
+                    .and_then(Format::fill),
             )
         {
             self.edit.discard_fill(self.position, address)?;
@@ -1537,10 +1624,9 @@ impl Sheet<'_> {
         let mut merged = previous.unwrap_or_default();
         merged.merge(change);
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && protection_change_matches_source(
                 &merged,
-                self.source_format(address)?
+                self.effective_typed_format(address)?
                     .as_ref()
                     .and_then(Format::protection),
             )
@@ -1592,10 +1678,9 @@ impl Sheet<'_> {
             return Ok(self);
         }
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && quote_prefix_matches_source(
                 value,
-                self.source_format(address)?
+                self.effective_typed_format(address)?
                     .as_ref()
                     .map(Format::quote_prefix),
             )
@@ -1659,10 +1744,9 @@ impl Sheet<'_> {
             return Ok(self);
         }
         if self.edit.capture_budgeted()
-            && !self.has_pending_complete_style(address)
             && number_format_matches_source(
                 code.as_deref(),
-                self.source_format(address)?
+                self.effective_typed_format(address)?
                     .as_ref()
                     .and_then(|format| format.number_format().code()),
             )
@@ -2032,15 +2116,13 @@ pub(super) fn fill_change_matches_source(
                 let Some(source) = source.and_then(cell_format::Fill::pattern) else {
                     return false;
                 };
-                let pattern = change
-                    .pattern_change()
-                    .unwrap_or(Some(replacement.pattern()));
+                let pattern = change.pattern_change().unwrap_or(replacement.pattern());
                 let foreground = change
                     .foreground_change()
-                    .unwrap_or(Some(replacement.foreground()));
+                    .unwrap_or(replacement.foreground());
                 let background = change
                     .background_change()
-                    .unwrap_or(Some(replacement.background()));
+                    .unwrap_or(replacement.background());
                 source.pattern() == pattern
                     && source.foreground() == foreground
                     && source.background() == background

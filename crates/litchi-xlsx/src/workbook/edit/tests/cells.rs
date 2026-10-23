@@ -22,6 +22,7 @@ use crate::style::stylesheet::{FontColor, FontColorKind, Scheme, Script};
 use crate::{FontChange, StyleState};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, SourceLimits, TargetMode};
+use std::mem::size_of;
 
 fn table_workbook(with_existing_merge: bool) -> crate::Package {
     let baseline = crate::Package::new().expect("baseline");
@@ -662,6 +663,24 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         .unmerge("H8")
         .expect("missing range is a no-op");
     assert!(missing.commit().expect("no-op commit").patch().is_noop());
+
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut bounded_missing = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    bounded_missing
+        .sheet(0usize)
+        .expect("lookup")
+        .expect("sheet")
+        .unmerge("H8")
+        .expect("bounded missing range is a no-op");
+    assert!(
+        bounded_missing
+            .commit()
+            .expect("bounded no-op commit")
+            .patch()
+            .is_noop()
+    );
 }
 
 #[test]
@@ -1489,6 +1508,152 @@ fn typed_facet_equal_to_source_overrides_pending_complete_style() {
     let font = format.font().expect("font");
     assert_eq!(font.bold(), Some(true));
     assert_eq!(font.name(), None);
+}
+
+#[test]
+fn typed_facet_equal_to_pending_complete_style_releases_capture() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut configure = source.edit().expect("configure edit");
+    configure
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "styled")
+        .and_then(|sheet| {
+            sheet.font(
+                "A1",
+                &FontChange::new()
+                    .bold(Some(true))
+                    .name(Some("Accent"))
+                    .expect("font name"),
+            )
+        })
+        .expect("complete source style");
+    let configured = configure.commit().expect("configure commit").into_package();
+    let accent = configured
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("accent style");
+    let sheet = &configured.inner.sheets[0];
+    let worksheet_bytes = configured
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let maximum = configured
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(size_of::<StyleEffect>());
+    let mut edit = configured
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.style("B1", &accent).expect("pending complete style");
+    sheet
+        .font("B1", &FontChange::new().bold(Some(true)))
+        .expect("typed request equals pending style");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
+}
+
+#[test]
+fn source_style_and_reset_release_superseded_typed_capture() {
+    let source = styled_workbook();
+    let source_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("source style");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let font = FontChange::new().bold(Some(true));
+    let payload = Content::from("after style supersession");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>().saturating_mul(2))
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(font.retained_bytes())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.font("A1", &font).expect("typed style");
+    sheet
+        .style("A1", &source_style)
+        .expect("source style supersession");
+    sheet
+        .set("B1", payload)
+        .expect("released typed capture leaves room for payload");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
+
+    let source = crate::Package::new().expect("source workbook");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let payload = Content::from("after reset supersession");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>().saturating_mul(2))
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(font.retained_bytes())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.font("B1", &font).expect("typed style");
+    sheet.reset_style("B1").expect("missing reset supersession");
+    sheet
+        .set("C1", payload)
+        .expect("released reset capture leaves room for payload");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
 }
 
 #[test]

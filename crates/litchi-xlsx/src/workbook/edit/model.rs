@@ -3178,24 +3178,6 @@ pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) 
             .saturating_add(sheet.name_key.len())
             .saturating_add(sheet.part_uri.as_str().len())
             .saturating_add(sheet.relationship_id.capacity());
-        if let Some(store) = sheet.cells.get() {
-            // The sparse store's payload vectors are private to the cell
-            // module. Its value is still a retained owner allocation, so
-            // count the fixed store and record counts here; the XML payload
-            // itself is charged below through the package part.
-            bytes = bytes.saturating_add(size_of_val(store)).saturating_add(
-                store
-                    .stored_cell_count()
-                    .saturating_mul(size_of::<Stored>()),
-            );
-        }
-    }
-
-    if let Some(strings) = workbook.inner.shared_strings.get() {
-        bytes = bytes.saturating_add(size_of_val(strings.as_ref()));
-        for text in strings.iter() {
-            bytes = bytes.saturating_add(text.as_str().len());
-        }
     }
     for name in &workbook.inner.external_reference_ids {
         bytes = bytes.saturating_add(name.capacity());

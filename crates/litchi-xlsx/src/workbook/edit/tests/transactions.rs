@@ -74,6 +74,58 @@ fn mixed_join_normalizes_unbounded_typed_noop_before_bounded_admission() {
 }
 
 #[test]
+fn mixed_join_normalizes_typed_noop_against_pending_complete_style() {
+    let source = styled_workbook();
+    let pending_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("pending style");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(size_of::<StyleEffect>());
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut unbounded = source.edit().expect("unbounded edit");
+    unbounded
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1", &pending_style)
+        .and_then(|sheet| {
+            sheet.fill(
+                "B1",
+                &crate::style::FillChange::new()
+                    .pattern(Some(crate::style::cell_format::Pattern::Solid)),
+            )
+        })
+        .expect("stage pending style and matching typed facet");
+    bounded
+        .join(unbounded)
+        .expect("pending-style typed no-op joins within its final capture");
+    assert!(
+        bounded
+            .sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fills.is_empty())
+    );
+}
+
+#[test]
 fn primary_edit_capture_budget_rejects_before_cell_staging() {
     let source = crate::Package::new().expect("source workbook");
     // The native ledger admits only the two final endpoints at this
@@ -109,13 +161,13 @@ fn primary_edit_capture_budget_replaces_repeated_cell_payload() {
         .expect("worksheet part")
         .blob()
         .len();
-    let final_content = crate::Content::from("final authored value");
+    let final_content = Content::from("final authored value");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(final_content.retained_bytes());
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
@@ -151,13 +203,13 @@ fn canceled_payload_and_absent_remove_release_capture() {
         .expect("worksheet part")
         .blob()
         .len();
-    let payload = crate::Content::from("after cancellation");
+    let payload = Content::from("after cancellation");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(payload.retained_bytes());
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
@@ -185,13 +237,14 @@ fn mixed_bounded_and_unbounded_join_admits_staged_capture() {
         .expect("worksheet part")
         .blob()
         .len();
-    let content = crate::Content::from("mixed join payload");
+    let content = Content::from("mixed join payload");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes().saturating_mul(2));
     let mut bounded = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
@@ -225,13 +278,13 @@ fn failed_first_cell_capture_rolls_back_worksheet_descriptor() {
         .expect("worksheet part")
         .blob()
         .len();
-    let payload = crate::Content::from("after rollback");
+    let payload = Content::from("after rollback");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(payload.retained_bytes());
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
@@ -261,14 +314,14 @@ fn primary_edit_capture_budget_merges_payload_and_style_facets() {
         .expect("worksheet part")
         .blob()
         .len();
-    let content = crate::Content::from("authored payload");
+    let content = Content::from("authored payload");
     let font = crate::style::FontChange::new().bold(Some(true));
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes())
         .saturating_add(font.retained_bytes());
     let mut edit = source
@@ -295,13 +348,13 @@ fn joined_edits_merge_capture_ledgers_and_reject_over_budget_results() {
         .expect("worksheet part")
         .blob()
         .len();
-    let content = crate::Content::from("joined payload");
+    let content = Content::from("joined payload");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes());
     let mut left = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
