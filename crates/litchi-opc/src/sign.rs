@@ -1151,6 +1151,7 @@ mod tests {
     use p256::ecdsa::SigningKey;
 
     use super::*;
+    use crate::SourceLimits;
 
     const POI_DOCX: &[u8] =
         include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.docx");

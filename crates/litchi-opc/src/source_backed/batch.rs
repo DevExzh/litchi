@@ -1282,6 +1282,7 @@ fn batch_refusal(reason: &'static str) -> OpcError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SourceLimits;
     use soapberry_zip::office::StreamingArchiveWriter;
 
     fn archive_bytes() -> Vec<u8> {
@@ -1309,7 +1310,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             archive_bytes(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();

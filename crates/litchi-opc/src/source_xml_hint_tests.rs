@@ -13,6 +13,7 @@
 )]
 
 use super::*;
+use crate::SourceCacheLimits;
 use crate::content_type::ContentType;
 use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits, SourceVersion};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -58,7 +59,7 @@ fn open_package(document: &[u8]) -> SourceBackedPackage {
     SourceBackedPackage::from_vec(
         archive_bytes(document),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture package must open")

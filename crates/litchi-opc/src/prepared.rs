@@ -165,6 +165,7 @@ mod tests {
     use super::PreparedOoxmlSource;
     use crate::error::OpcError;
     use crate::source_backed::SourceBackedPackage;
+    use crate::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 
     const WORD_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
@@ -239,7 +240,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             docx_bytes(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("open");
@@ -254,7 +255,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             docx_bytes(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("open");
@@ -272,7 +273,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             docx_bytes(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("open");
@@ -291,7 +292,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             docx_bytes(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("open");

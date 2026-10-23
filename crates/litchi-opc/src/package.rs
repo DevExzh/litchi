@@ -2243,7 +2243,7 @@ impl OpcPackage {
                 "content-types replacement binding does not match its XML".to_owned(),
             ));
         }
-        replacement_relationships.xml.preflight_under(limits)?;
+        replacement_relationships.preflight_under(limits)?;
         let replacement_relationships_parsed = PackageReader::parse_owned_relationships(
             replacement_relationships.bytes(),
             replacement_relationships.owner(),

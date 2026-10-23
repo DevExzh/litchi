@@ -1802,6 +1802,7 @@ mod tests {
     use std::io;
 
     use super::*;
+    use crate::SourceLimits;
 
     #[test]
     fn bounded_authored_content_types_match_legacy_bytes_and_exact_limits() {

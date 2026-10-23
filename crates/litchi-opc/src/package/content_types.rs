@@ -103,7 +103,7 @@ impl<'source> ContentTypesEditPlan<'source> {
                 source.bytes(),
                 limits,
             )?;
-            let binding = Arc::clone(&source.binding);
+            let binding = SharedArc::clone(&source.binding);
             crate::content_type::ContentTypeMap::from_xml(source.bytes(), limits)?;
             return Ok(super::OwnedContentTypes {
                 xml: source.xml.with_limits(limits),
