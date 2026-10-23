@@ -95,7 +95,7 @@ const MAX_GRAPH_METADATA_BYTES: usize = 32 * 1024 * 1024;
 
 pub use edit::{Commit, Diagnostics, Edit, LimitKind, Patch};
 pub use graph::raw;
-pub use limit::Limits;
+pub use limit::{GraphLimits, Limits};
 pub use model::{Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props};
 pub use package::load;
 pub use transaction::{Revision, Snapshot};

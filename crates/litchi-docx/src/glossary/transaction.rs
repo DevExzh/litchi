@@ -1,8 +1,4 @@
 #![expect(
-    clippy::assigning_clones,
-    reason = "clone assignment preserves validation-before-replacement behavior"
-)]
-#![expect(
     clippy::manual_let_else,
     reason = "the match form keeps both parser outcomes explicit"
 )]
@@ -877,29 +873,6 @@ fn next_relationship_id_from(part: &dyn super::Part, start: u32) -> Result<Strin
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::next_relationship_id_from;
-    use litchi_opc::{BlobPart, PackURI, Part};
-
-    #[test]
-    fn saturated_native_relationship_id_is_bounded() {
-        let mut part = BlobPart::new(
-            PackURI::new("/word/document.xml").unwrap(),
-            "application/xml".to_owned(),
-            Vec::new(),
-        );
-        part.rels_mut().add_relationship(
-            "urn:test".to_owned(),
-            "native.bin".to_owned(),
-            "rId4294967295".to_owned(),
-            false,
-        );
-        let error = next_relationship_id_from(&part, u32::MAX).unwrap_err();
-        assert!(error.to_string().contains("no glossary relationship ID"));
-    }
-}
-
 fn staged_graph_usage(
     draft: Option<&raw::Graph>,
     empty_usage: &GraphUsage,
@@ -1396,4 +1369,27 @@ fn feed_bytes(hash: &mut u64, value: &[u8]) {
     }
     *hash ^= value.len() as u64;
     *hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::next_relationship_id_from;
+    use litchi_opc::{BlobPart, PackURI, Part};
+
+    #[test]
+    fn saturated_native_relationship_id_is_bounded() {
+        let mut part = BlobPart::new(
+            PackURI::new("/word/document.xml").unwrap(),
+            "application/xml".to_owned(),
+            Vec::new(),
+        );
+        part.rels_mut().add_relationship(
+            "urn:test".to_owned(),
+            "native.bin".to_owned(),
+            "rId4294967295".to_owned(),
+            false,
+        );
+        let error = next_relationship_id_from(&part, u32::MAX).unwrap_err();
+        assert!(error.to_string().contains("no glossary relationship ID"));
+    }
 }

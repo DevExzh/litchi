@@ -687,8 +687,7 @@ fn semantic_put_admits_catalog_before_loading_existing_graph() {
         MAX_VALUES,
         MAX_STRING,
         1,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let mut catalog = Catalog::new();
@@ -885,8 +884,7 @@ fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        1,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(1, MAX_GRAPH_METADATA_BYTES),
     )
     .expect("narrow graph-byte policy");
     assert!(
@@ -910,8 +908,7 @@ fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
         MAX_VALUES,
         MAX_STRING,
         1,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .expect("narrow name policy");
     let error = raw::Part::new(
@@ -952,8 +949,7 @@ fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        1,
+        GraphLimits::new(MAX_GRAPH_BYTES, 1),
     )
     .expect("narrow metadata policy");
     assert!(
@@ -988,8 +984,7 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        root_bytes - 1,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(root_bytes - 1, MAX_GRAPH_METADATA_BYTES),
     )
     .expect("graph-byte boundary policy");
     let mut graph_package = package();
@@ -1030,8 +1025,7 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        metadata - 1,
+        GraphLimits::new(MAX_GRAPH_BYTES, metadata - 1),
     )
     .expect("metadata boundary policy");
     let mut metadata_package = package();
@@ -2197,8 +2191,7 @@ fn unchanged_background_rebind_checks_existing_catalog() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let error = catalog
@@ -2240,8 +2233,7 @@ fn changed_background_rebind_checks_existing_entries() {
         MAX_VALUES,
         1,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let error = catalog
@@ -2275,8 +2267,7 @@ fn changed_background_rebind_checks_retained_graph_bytes() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        graph_bytes,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(graph_bytes, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
 
@@ -2401,8 +2392,7 @@ fn raw_write_admits_generated_xml_shape_limits() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let error = raw::write(&Catalog::new(), Conformance::Transitional, &limits)
@@ -2428,8 +2418,7 @@ fn raw_put_admits_generated_xml_shape_before_staging() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        MAX_GRAPH_BYTES,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let mut package = package();
@@ -2541,8 +2530,7 @@ fn transaction_auxiliary_budget_is_admitted_before_staging() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        graph_bytes,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(graph_bytes, MAX_GRAPH_METADATA_BYTES),
     )
     .unwrap();
     let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();
@@ -2588,8 +2576,7 @@ fn transaction_catalog_growth_replans_root_bytes_before_staging() {
         MAX_VALUES,
         MAX_STRING,
         MAX_NAME_KEY,
-        source_root_bytes + 1,
-        MAX_GRAPH_METADATA_BYTES,
+        GraphLimits::new(source_root_bytes + 1, MAX_GRAPH_METADATA_BYTES),
     )
     .expect("tight canonical-root policy");
     let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();

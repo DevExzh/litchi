@@ -463,7 +463,9 @@ struct OwnerSource {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ThemeRelationships {
     Absent,
-    Exact(OwnedRelationships),
+    // Most theme owners have no relationship member. Keep the full OPC
+    // relationship index out of the common absent/fresh enum footprint.
+    Exact(Box<OwnedRelationships>),
     FreshAbsent { owner: String },
 }
 
@@ -608,7 +610,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
             let name = PackURI::new(&snapshot.graph.theme_name)?;
             let relationships = package.source_relationships(&name, opc_limits)?;
             if relationships.member_present() {
-                Ok(ThemeRelationships::Exact(relationships))
+                Ok(ThemeRelationships::Exact(Box::new(relationships)))
             } else {
                 Ok(ThemeRelationships::FreshAbsent {
                     owner: snapshot.graph.theme_name.clone(),
@@ -903,11 +905,11 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
         },
         ThemeRelationships::Exact(theme_relationship_xml) => {
             let current_theme =
-                package.source_relationships(theme_relationship_xml.owner(), limits)?;
-            if current_theme != *theme_relationship_xml {
+                package.source_relationships(theme_relationship_xml.as_ref().owner(), limits)?;
+            if current_theme != *theme_relationship_xml.as_ref() {
                 package.try_replace_relationships(
                     &current_theme,
-                    theme_relationship_xml,
+                    theme_relationship_xml.as_ref(),
                     limits,
                 )?;
             }

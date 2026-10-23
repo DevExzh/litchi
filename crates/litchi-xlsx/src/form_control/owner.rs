@@ -603,7 +603,10 @@ impl OwnerProfile {
 enum RetainedPayload {
     Owned(Arc<Vec<u8>>),
     Source(PartData),
-    Relationships(OwnedRelationships),
+    // Relationship tokens carry the complete OPC relationship index. Keep
+    // that uncommon sidecar behind a pointer so every retained payload stays
+    // compact in the form-control owner and read-set hot paths.
+    Relationships(Box<OwnedRelationships>),
 }
 
 impl RetainedPayload {
@@ -616,7 +619,7 @@ impl RetainedPayload {
     }
 
     fn relationships(token: OwnedRelationships) -> Self {
-        Self::Relationships(token)
+        Self::Relationships(Box::new(token))
     }
 
     fn as_bytes(&self) -> &[u8] {

@@ -70,16 +70,17 @@ pub(super) fn parse(xml: &[u8], limits: &super::Limits) -> Result<Table> {
     if xml.len() > MAX_XML {
         return Err(invalid("font-table part is too large"));
     }
-    let mut mce_limits = MceLimits::default();
-    mce_limits.max_input_bytes = limits.xml_bytes();
-    mce_limits.max_output_bytes = limits.xml_bytes();
-    mce_limits.max_depth = limits.depth();
-    mce_limits.max_namespace_bindings = limits.attributes();
-    mce_limits.max_directive_tokens = limits.nodes();
-    mce_limits.max_choices_per_alternate = limits.nodes();
-    mce_limits.max_attributes_per_element = limits
-        .attributes()
-        .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING);
+    let mce_limits = MceLimits {
+        max_input_bytes: limits.xml_bytes(),
+        max_output_bytes: limits.xml_bytes(),
+        max_depth: limits.depth(),
+        max_namespace_bindings: limits.attributes(),
+        max_directive_tokens: limits.nodes(),
+        max_choices_per_alternate: limits.nodes(),
+        max_attributes_per_element: limits
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
+    };
     let xml = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
     if xml.len() > MAX_XML {
         return Err(invalid("MCE-expanded font table is too large"));

@@ -141,15 +141,16 @@ pub(crate) fn admit_table(table: &Table, conformance: Conformance, limits: &Limi
     }
     let mut resources = HashSet::new();
     for font in &table.fonts {
-        for value in [Some(font.name.as_str()), font.alternate_name.as_deref()] {
-            if let Some(value) = value {
-                if value.len() > limits.text_bytes() {
-                    return Err(Error::FontLimit {
-                        kind: crate::font::LimitKind::Text,
-                        actual: value.len(),
-                        maximum: limits.text_bytes(),
-                    });
-                }
+        for value in [Some(font.name.as_str()), font.alternate_name.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            if value.len() > limits.text_bytes() {
+                return Err(Error::FontLimit {
+                    kind: crate::font::LimitKind::Text,
+                    actual: value.len(),
+                    maximum: limits.text_bytes(),
+                });
             }
         }
         for attribute in &font.extension_attributes {
