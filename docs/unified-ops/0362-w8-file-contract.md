@@ -221,9 +221,11 @@ times XLS import on 100 rows. Follow-up for the XLS owner.
 - Patch replay by content identity for PPTX `source::cross_slide_copy`,
   ODP `tail_append`, XLS and RTF source-backed patches (the coordinator
   decision), with tests per format.
-- DOCX `apply_durable_ink` family `Commit` (if W4 does not), design doc
-  §16.4 for `litchi-sheet-text`, the inventory re-run and the remaining
-  glossary cells; RTF `edit::Error` onto `Refused(Refusal)` (§3).
+- The inventory re-run and remaining glossary cells; RTF `edit::Error` onto
+  `Refused(Refusal)` (§3). DOCX `apply_durable_ink` already returns its
+  family `Commit` (`3c1d25de24`); its native/allocation qualification remains
+  open. Design §16.4 is already closed by the implemented `litchi-sheet-text`
+  leaf and `litchi::sheet::text` re-export; it is not a remaining W8 task.
 - PPT first-commit cost is resolved by accepted record 0362j, already in
   this candidate base; its measured production source is unchanged here.
 - After W4/W4b merge: rerun the gate's `ops-all` profile against their

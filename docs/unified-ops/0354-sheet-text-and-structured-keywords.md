@@ -190,8 +190,10 @@ in `litchi_core::metadata::keywords`:
 
 - The import route was measured at the parse level only (§1.3).
 - RTF has no unified metadata write, so `\keywords` is read-only (unchanged).
-- The design document (§16.4) still says the text tooling is re-homed behind
-  `import`; it is now a leaf that `import` shares a tokenizer with.
+- The design document's §16.4 wording is now closed: the text tooling is an
+  independent `litchi-sheet-text` leaf, re-exported by `litchi::sheet::text`,
+  and unified `import` consumes that leaf. The historical "re-homed behind
+  `import`" wording is superseded by the implemented design text.
 
 ## 6. Gates
 
