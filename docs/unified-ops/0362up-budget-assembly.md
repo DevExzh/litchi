@@ -130,3 +130,16 @@ typed structural/limit errors; effective owners keep their physical source
 policy. This is a focused runtime pass, not complete composition acceptance.
 [docx-pptx-odf-runtime-v14.json](results/0362up/docx-pptx-odf-runtime-v14.json)
 retains exact source, commands, test summary and external artifact hashes.
+
+## Complete facade runtime pass
+
+The full all-feature `litchi-ops` library passes all 1,002 tests on
+`bf09ddfd9c`, closing the nine failures returned in v12. The run takes
+202.67 seconds including compilation and 40.73 seconds in tests. XLSB
+then passes 771 tests and returns one transitive replay provenance assertion:
+both retained original content-types images differ from effective publication.
+The remaining fixture repair must preserve exact published archives and
+untouched payload/relationship images. Final native DOCX, the complete gate,
+inventory and performance qualification remain required.
+[facade-xlsb-runtime-v17.json](results/0362up/facade-xlsb-runtime-v17.json)
+retains both commands, test summaries and external log identities.
