@@ -349,3 +349,10 @@ The formatting check on `3107f05f23` reports one newly simplified ODF test
 assertion. The configured formatter corrects its wrapping without changing
 behavior. [format-assembly-v2.json](results/0362uf/format-assembly-v2.json)
 preserves the initial failed check; the assembled rerun follows this repair.
+
+The formatting rerun on `3dce711b8e` passes in 28.98 seconds.
+[format-assembly-v3.json](results/0362uf/format-assembly-v3.json) records
+the exact source and empty diagnostic log. The subsequent reviewed Clippy
+repair is in [0362ur](0362ur-clippy-v3-consumers.md); it keeps glossary
+limits unchanged and scopes smaller enum representations to relationship
+tokens. The full Clippy rerun is still required.
