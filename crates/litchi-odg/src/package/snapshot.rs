@@ -38,9 +38,10 @@ use quick_xml::{
     reader::NsReader,
 };
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
-    ops::Range,
+    ops::{Deref, Range},
     path::Path,
     sync::Arc,
 };
@@ -1152,8 +1153,10 @@ impl Package {
     ) -> Edit {
         Edit {
             source: self.clone(),
-            content: self.content_xml().to_string(),
-            styles: self.styles_xml().map(str::to_owned),
+            content: LazyPart::source(self, EditPart::Content),
+            styles: self
+                .styles_xml()
+                .map(|_| LazyPart::source(self, EditPart::Styles)),
             content_splices: Some(Vec::new()),
             changes: Vec::new(),
             resource_edits: Vec::new(),
@@ -1510,8 +1513,8 @@ fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
 /// A staged source-bound package shape edit.
 pub struct Edit {
     source: Package,
-    content: String,
-    styles: Option<String>,
+    content: LazyPart,
+    styles: Option<LazyPart>,
     content_splices: Option<Vec<ContentSplice>>,
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
@@ -1520,6 +1523,55 @@ pub struct Edit {
     package_replacement: Option<Package>,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
+}
+
+#[derive(Clone, Copy)]
+enum EditPart {
+    Content,
+    Styles,
+}
+
+/// A source part borrowed through the owning package until the first mutation.
+///
+/// The package clone retained here is O(1); only `set_owned` materializes the
+/// selected XML part.  `Deref` keeps read-only transaction paths borrowed.
+struct LazyPart {
+    source: Package,
+    part: EditPart,
+    owned: Option<String>,
+}
+
+impl LazyPart {
+    fn source(source: &Package, part: EditPart) -> Self {
+        Self {
+            source: source.clone(),
+            part,
+            owned: None,
+        }
+    }
+
+    fn source_text(&self) -> &str {
+        match self.part {
+            EditPart::Content => self.source.content_xml(),
+            EditPart::Styles => self.source.styles_xml().unwrap_or_default(),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        self.owned.as_deref().unwrap_or_else(|| self.source_text())
+    }
+
+    fn set_owned(&mut self, value: String) {
+        self.owned = Some(value);
+    }
+}
+
+impl Deref for LazyPart {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
 }
 
 #[derive(Debug)]
@@ -1758,7 +1810,8 @@ impl Edit {
         let mut attribute = String::new();
         push_attribute(&mut attribute, qualified_name, Some(value))?;
         self.invalidate_content_splices();
-        self.content = insert_xml(&self.content, insertion, &attribute)?;
+        self.content
+            .set_owned(insert_xml(&self.content, insertion, &attribute)?);
         Ok(())
     }
 
@@ -1774,7 +1827,7 @@ impl Edit {
                 escaped.as_bytes(),
             )?;
         }
-        self.content = next;
+        self.content.set_owned(next);
         Ok(())
     }
 
@@ -1818,7 +1871,7 @@ impl Edit {
         {
             self.content_splices = None;
         }
-        self.content = next;
+        self.content.set_owned(next);
         Ok(())
     }
 
@@ -2165,7 +2218,7 @@ impl Edit {
             ) {
                 self.requires_package_projection = true;
             }
-            self.content = after_xml;
+            self.content.set_owned(after_xml);
             self.invalidate_content_splices();
         } else if let Some(styles) = &mut self.styles {
             // styles.xml is handed to PackageWriter as a replacement when it
@@ -2196,7 +2249,7 @@ impl Edit {
                 style_name,
                 current.as_ref(),
             );
-            *styles = after_xml;
+            styles.set_owned(after_xml);
             if requires_projection {
                 self.requires_package_projection = true;
             }
@@ -2824,11 +2877,12 @@ impl Edit {
         } else {
             None
         };
-        let styled_content = if let Some((_name, style_xml)) = generated_style.as_ref() {
-            insert_automatic_style(&self.content, style_xml)?
-        } else {
-            self.content.clone()
-        };
+        let styled_content: Cow<'_, str> =
+            if let Some((_name, style_xml)) = generated_style.as_ref() {
+                Cow::Owned(insert_automatic_style(&self.content, style_xml)?)
+            } else {
+                Cow::Borrowed(self.content.as_str())
+            };
         let styled_parsed = parse_content(&styled_content)?;
         let at = if position == styled_parsed.pages.len() {
             styled_parsed.drawing_insert_position
@@ -2842,7 +2896,7 @@ impl Edit {
         if generated_style.is_some() {
             let content = insert_child_xml(&styled_content, at, &xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
         } else {
             self.insert_content_child(at, &xml)?;
         }
@@ -3236,7 +3290,7 @@ impl Edit {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_definitions(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -3268,7 +3322,7 @@ impl Edit {
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.style.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleRemoved {
                 name: name.to_owned(),
@@ -3327,7 +3381,7 @@ impl Edit {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_resources(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -3364,7 +3418,7 @@ impl Edit {
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.resource.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleResourceRemoved {
                 kind,
@@ -3419,7 +3473,7 @@ impl Edit {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
@@ -3454,7 +3508,7 @@ impl Edit {
         let xml = serialize_form_control(control)?;
         let content = replace_xml(&self.content, span, &xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlReplaced {
@@ -3498,7 +3552,7 @@ impl Edit {
             .ok_or_else(|| Error::InvalidFormat("ODG form-control span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::FormControlRemoved {
                 id: identifier.to_owned(),
@@ -3600,7 +3654,7 @@ impl Edit {
             )?;
             let content = insert_automatic_style(&self.content, &resource_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleResourceInserted {
                     kind,
@@ -3704,7 +3758,7 @@ impl Edit {
             )?;
             let content = insert_automatic_style(&self.content, &style_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleInserted {
                     name: destination_name.clone(),
@@ -3862,7 +3916,7 @@ impl Edit {
         };
         let content = insert_child_xml(&self.content, at, &transfer_xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
@@ -3945,7 +3999,7 @@ impl Edit {
             }
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerInserted {
                 page,
@@ -3993,7 +4047,7 @@ impl Edit {
             .ok_or_else(|| Error::InvalidFormat("ODG layer span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerRemoved {
                 page,
@@ -4259,7 +4313,7 @@ impl Edit {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
@@ -4509,8 +4563,8 @@ impl Edit {
                 changed,
             });
         }
-        if self.content == self.source.content_xml()
-            && self.styles == self.source.styles_xml().map(str::to_owned)
+        if self.content.as_str() == self.source.content_xml()
+            && self.styles.as_deref() == self.source.styles_xml()
             && self.resource_edits.is_empty()
         {
             return Ok(Commit::unchanged(self.source));
@@ -4573,7 +4627,7 @@ impl Edit {
             )?
         };
         let snapshot = self.source.reopen_same_flavor(rebuilt)?;
-        if snapshot.content_xml() != self.content {
+        if snapshot.content_xml() != self.content.as_str() {
             return invalid("ODG package edit failed exact content readback");
         }
         if snapshot.styles_xml() != self.styles.as_deref() {
@@ -12068,13 +12122,13 @@ fn clone_bounded_string(source: &str, maximum: usize, resource: &'static str) ->
 }
 
 fn own_bounded_cow<'a>(
-    value: std::borrow::Cow<'a, str>,
+    value: Cow<'a, str>,
     maximum: usize,
     resource: &'static str,
 ) -> Result<String> {
     match value {
-        std::borrow::Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
-        std::borrow::Cow::Owned(value) => {
+        Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
+        Cow::Owned(value) => {
             if value.len() > maximum {
                 return Err(Error::InvalidFormat(format!(
                     "{resource} exceeds the byte limit"
@@ -14265,6 +14319,66 @@ fn joined_refusal(reason: &'static str) -> Error {
 mod tests {
     use super::*;
     use quick_xml::events::{BytesCData, BytesPI, BytesText};
+
+    fn lazy_source_package() -> Package {
+        let content = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"/></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
+        let styles = br#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        writer.set_mimetype(MIMETYPE).unwrap();
+        writer.add_file("content.xml", content).unwrap();
+        writer.add_file("styles.xml", styles).unwrap();
+        Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn edit_parts_stay_borrowed_for_noop_and_pure_replacement() {
+        let source = lazy_source_package();
+        let edit = source.edit();
+        assert!(edit.content.owned.is_none());
+        assert_eq!(edit.content.as_ptr(), source.content_xml().as_ptr());
+        let styles = edit.styles.as_ref().expect("fixture has styles.xml");
+        assert!(styles.owned.is_none());
+        assert_eq!(styles.as_ptr(), source.styles_xml().unwrap().as_ptr());
+        drop(edit);
+
+        let mut mutation = source.edit();
+        mutation.set_page_name(0, "Materialized page").unwrap();
+        assert!(mutation.content.owned.is_some());
+        assert!(mutation
+            .styles
+            .as_ref()
+            .is_some_and(|part| part.owned.is_none()));
+        drop(mutation);
+
+        let no_op = source.edit().commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+
+        let mut replacement_edit = source.edit();
+        replacement_edit
+            .add_page(Page::new("Replacement page"))
+            .unwrap();
+        let replacement = replacement_edit.commit().unwrap();
+        let limits = CompositionLimits::new(2, 2, 4, 2);
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(replacement.patch().prepare("replacement", limits).unwrap())
+            .unwrap();
+        let mut owner = source.edit();
+        owner.join(joined).unwrap();
+        owner.apply_pending_joined().unwrap();
+        assert!(owner.package_replacement.is_some());
+        assert!(owner.content.owned.is_none());
+        assert!(
+            owner
+                .styles
+                .as_ref()
+                .is_some_and(|part| part.owned.is_none())
+        );
+        let committed = owner.commit_core().unwrap();
+        assert!(committed.diagnostics().changed());
+    }
 
     #[test]
     fn borrowed_event_admission_rejects_oversized_ignored_inputs() {
