@@ -43,3 +43,16 @@ where the new cache part fits the aggregate but the rewritten workbook does
 not. Rustfmt and `git diff --check` are the static checks run for this
 candidate. Cargo validation is deferred under the coordinator's build and
 disk hold; no performance qualification is claimed here.
+
+The source-only lifecycle harness was refreshed in this candidate. It compares
+`0befb112d96d2409e6f40c9abfeb4813665905ad` with
+`5726f03c7db2dd7dd539000b45f109f14ea8c33a` through one API and now covers
+owned open, the first selected lazy read, raw slicer and timeline insertion,
+typed replacement, commit/replay/inverse, stale-patch refusal, no-op, native
+IDs and paths, untouched worksheet bytes, and deferred decode counters. The
+existing perf-baseline normal and allocator binaries dispatch the selector;
+the normal target records elapsed samples and unavailable allocation status,
+while the allocator target records operation-scoped allocation samples. The
+existing coordinator target root at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets` is available for a
+later assigned run; this commit creates no target or evidence artifact.

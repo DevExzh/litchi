@@ -39,6 +39,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("odp-append-attribution") => {
             return litchi_perf_baseline::odp_append_attribution::run_from_args(args);
         },
+        Some(selector) if selector == std::ffi::OsStr::new("xlsx-raw-identity") => {
+            return litchi_perf_baseline::xlsx_raw_identity::run_from_args(args);
+        },
         _ => {},
     }
     litchi_perf_baseline::run()
