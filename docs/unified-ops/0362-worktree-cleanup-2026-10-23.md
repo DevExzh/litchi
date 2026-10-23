@@ -637,3 +637,49 @@ The empty `uo2/legacy-replay-errors` worktree was likewise retained because
 its tracked paths are absent and its state is ambiguous.
 
 The coordinator verified all 25 quarantine file hashes and sizes, retained branch refs and removed path absence. The external receipt is /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twelfth-wave/receipt.md (3560 bytes, SHA-256 `657e21e9403c8fd83befe96ba4f0078173f1e38301329fcc743a0d17c600c96c`). The manifest is 4,803 bytes. No build or measurement artifact was removed.
+
+## Thirteenth cleanup: five merged source leaves
+
+Against integration `5dae0abf78aa325a6ce395355108624ed5e66e1d`, the five
+approved leaves were rechecked immediately before removal. All had clean
+tracked/index state, zero nonignored untracked files, zero active process
+cwd/file-descriptor users at the final guard, and no protected top-level target,
+binary, capture, native, portable, or measurement directory:
+
+- `uo2/0360adc-raw-aggregate-sparse` at
+  `f3588167a1ed7739bfd4b7a476d0a7b4a1778e28`: 71,865,303 apparent bytes.
+- `uo2/0362re-docx-section` at
+  `4004efa04f8dd8621ab66c5914844a7617656fcb`: 6,257,806,042 bytes.
+- `uo2/0362rg-docx-redact-sanitize` at
+  `52d9edc77cbcc605ffd3f94434b637dc8f90644e`: 6,257,835,178 bytes.
+- `uo2/0362ria-error-classification` at
+  `f716e4b329dbabd4863cd6f8d8a19002596c15d5`: 185,226,211 bytes.
+- `uo2/w8-docx-paragraph-copy` at
+  `e1af87ed91d358488122877095d7111cab7553b0`: 6,256,072,690 bytes.
+
+Each worktree was removed with `git worktree remove` without `--force`; every
+branch ref remains. The measured apparent checkout total is exactly
+19,028,805,424 bytes. The earlier candidate note said 18,029,455,424 due to
+an arithmetic error; there was no filesystem measurement discrepancy.
+
+Ten ignored generated files totaling 739,055 bytes were moved, not deleted,
+to `quarantine/thirteenth-wave/ignored/`. Their relative paths, sizes, and
+SHA-256 values are in `manifest.json`, SHA-256
+`5f23fb94827c4b60a928690eab204b02928acb27658f2015128a3d3736aede53`.
+
+Exact recreation and restore:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0360adc-raw-aggregate-sparse uo2/0360adc-raw-aggregate-sparse
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362re-docx-section uo2/0362re-docx-section
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362rg-docx-redact-sanitize uo2/0362rg-docx-redact-sanitize
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362ri-error-classification uo2/0362ria-error-classification
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-w8-docx-paragraph-copy uo2/w8-docx-paragraph-copy
+python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/thirteenth-wave/restore.py
+```
+
+The coordinator independently verified all ten quarantine sizes and hashes,
+retained branch identities, source ancestry and removed path absence. The
+external receipt is `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/thirteenth-wave/receipt.md` (2317 bytes, SHA-256
+`0601cab17193857fdef67156c76ab7e67301b94b2ef9501c28a259f0e1f323bf`). The manifest is
+2791 bytes. No target, native binary or measurement evidence was removed.
