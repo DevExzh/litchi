@@ -750,7 +750,7 @@ fn set_focused_sheet_chart_data(
             "focused Numbers chart data source failed: {error}"
         )))
     })?;
-    let edit = match focused.edit_sheet_chart_data(
+    let mut edit = match focused.edit_sheet_chart_data(
         FocusedSheetSelector::index(sheet_index),
         FocusedChartSelector::index(chart_position),
     ) {
@@ -769,13 +769,20 @@ fn set_focused_sheet_chart_data(
             )));
         },
     };
-    // The focused constructor now defers dependency admission until commit.
-    // Keep one fallback copy so a deferred UnsupportedDependency refusal
-    // reaches the legacy full-grid writer with the caller's exact input.
-    let fallback_data = data.clone();
+    // The focused constructor defers dependency admission.  Ask it to load
+    // the source while the caller still owns the requested grid, so a
+    // deferred UnsupportedDependency can move that exact input into the
+    // legacy full-grid replacement without cloning the grid on success.
+    if let Err(error) = edit.before() {
+        return Err(map_focused_chart_data_error(error, data));
+    }
     let committed = match edit.set(data).commit() {
         Ok(committed) => committed,
-        Err(error) => return Err(map_focused_chart_data_error(error, fallback_data)),
+        Err(error) => {
+            return Err(FocusedSheetChartDataError::Host(Error::InvalidFormat(
+                format!("focused Numbers chart data commit failed: {error}"),
+            )));
+        },
     };
     let mut target_bytes = Vec::new();
     committed
@@ -809,7 +816,7 @@ fn map_focused_chart_data_error(
         FocusedSheetChartDataError::UnsupportedDependency(fallback_data)
     } else {
         FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
-            "focused Numbers chart data commit failed: {error}"
+            "focused Numbers chart data admission failed: {error}"
         )))
     }
 }

@@ -21,6 +21,12 @@ Table-merges keeps the selected positions and budget until `regions`, a merge
 operation, or `commit`; its source regions and dimensions are then decoded
 once and reused by the existing mutation and exact-publication paths.
 
+The iWork Numbers chart consumer now calls the fallible chart `before` getter
+while it still owns the requested grid.  A deferred `UnsupportedDependency`
+therefore transfers that same grid to the legacy full replacement route; a
+successful focused edit moves the grid once into `set` without an unconditional
+full-grid clone.
+
 No panic or placeholder value is used for a deferred failure.  Existing typed
 source, refusal, budget, verification, patch-conflict, exact-no-op, and
 replay behavior remains on the fallible operation that now performs the
