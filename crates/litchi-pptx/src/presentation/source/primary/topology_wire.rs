@@ -1354,25 +1354,6 @@ fn folded_ascii(value: &str) -> Result<String> {
     Ok(folded)
 }
 
-fn state_payload_len(state: &State) -> Result<usize> {
-    state
-        .root
-        .len()
-        .checked_add(state.presentation_relationships.len())
-        .and_then(|length| length.checked_add(state.content_types.len()))
-        .ok_or_else(|| invalid("state payload length overflows"))
-}
-
-fn change_len(change: &Change) -> Result<usize> {
-    change_len_from_lengths(
-        &change.key,
-        &change.content_type,
-        &change.relationship_type,
-        change.before.as_ref().map(image_lengths),
-        change.after.as_ref().map(image_lengths),
-    )
-}
-
 fn change_len_from_lengths(
     key: &StableSlideKey,
     content_type: &str,
@@ -1394,26 +1375,6 @@ fn change_len_from_lengths(
         .and_then(|length| length.checked_add(after_len))
         .ok_or_else(|| invalid("change length overflows"))?;
     Ok(total)
-}
-
-fn dependent_len(dependent: &Dependent) -> Result<usize> {
-    if dependent.part_uri.as_str().len() > u32::MAX as usize
-        || dependent.content_type.len() > u32::MAX as usize
-    {
-        return Err(invalid("dependent Part exceeds wire width"));
-    }
-    let before_len = image_len(dependent.before.as_ref())?;
-    let after_len = image_len(dependent.after.as_ref())?;
-    8usize
-        .checked_add(dependent.part_uri.as_str().len())
-        .and_then(|length| length.checked_add(dependent.content_type.len()))
-        .and_then(|length| length.checked_add(before_len))
-        .and_then(|length| length.checked_add(after_len))
-        .ok_or_else(|| invalid("dependent length overflows"))
-}
-
-fn image_len(image: Option<&PartImage>) -> Result<usize> {
-    image_lengths_len(image.map(image_lengths))
 }
 
 fn image_lengths(image: &PartImage) -> ImageLengths {

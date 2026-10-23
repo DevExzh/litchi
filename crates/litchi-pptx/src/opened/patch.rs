@@ -968,17 +968,6 @@ impl Patch {
         add_len(&mut length, self.metadata.encoded_len()?)?;
         Ok(length)
     }
-
-    fn require_encoded_limit(&self) -> Result<()> {
-        let length = self.encoded_len()?;
-        if length > self.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
-                kind: crate::opened::LimitKind::PatchBytes,
-                maximum: self.limits.max_patch_bytes(),
-            });
-        }
-        Ok(())
-    }
 }
 
 /// Visit differences without collecting the complete package's names or

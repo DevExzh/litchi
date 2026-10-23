@@ -1454,15 +1454,6 @@ fn planned_diff_dependents(source: &Package, target: &Package) -> Result<Vec<Pla
     planned_diff_dependents_from_entries(source, source_entries, target_entries)
 }
 
-fn planned_dependent(dependent: &Dependent) -> PlannedDependent {
-    PlannedDependent {
-        part_uri: dependent.part_uri.clone(),
-        content_type: dependent.content_type.clone(),
-        before: dependent.before.as_ref().map(planned_image),
-        after: dependent.after.as_ref().map(planned_image),
-    }
-}
-
 fn planned_diff_dependents_from_entries(
     package: &Package,
     source_entries: Vec<PlannedDependent>,
@@ -1867,25 +1858,6 @@ fn effective_state_with_retention(package: &Package) -> Result<(State, Retention
         },
         retained,
     ))
-}
-
-fn build_revision(
-    package: &Package,
-    root: Arc<Vec<u8>>,
-    order: Arc<[StableSlideKey]>,
-    changes: Arc<[Change]>,
-    dependents: Arc<[Dependent]>,
-    target_state: Option<&State>,
-) -> Result<Revision> {
-    build_revision_with_retention(
-        package,
-        root,
-        order,
-        changes,
-        dependents,
-        target_state,
-        Retention::default(),
-    )
 }
 
 fn build_revision_with_retention(
@@ -2328,35 +2300,6 @@ fn upsert_dependent(dependents: &mut Vec<Dependent>, dependent: Dependent) {
 
 fn sort_dependents(dependents: &mut [Dependent]) {
     dependents.sort_unstable_by_key(|dependent| dependent.part_uri.as_str().to_ascii_lowercase());
-}
-
-fn diff_dependents(
-    source: &Package,
-    target: &Package,
-    retained: &mut Retention,
-) -> Result<Vec<Dependent>> {
-    let source_entries = current_dependents(source);
-    let target_entries = current_dependents(target);
-    let mut dependents = Vec::new();
-    let mut seen = HashSet::new();
-    for entry in source_entries.iter().chain(target_entries.iter()) {
-        if !seen.insert(entry.part_uri.as_str().to_ascii_lowercase()) {
-            continue;
-        }
-        let before = effective_dependent(source, &entry.part_uri, retained)?;
-        let after = effective_dependent(target, &entry.part_uri, retained)?;
-        if before == after {
-            continue;
-        }
-        dependents.push(Dependent {
-            part_uri: entry.part_uri.clone(),
-            content_type: entry.content_type.clone(),
-            before,
-            after,
-        });
-    }
-    sort_dependents(&mut dependents);
-    Ok(dependents)
 }
 
 fn rebase_dependents_to_physical(
@@ -2821,61 +2764,6 @@ fn current_changes(package: &Package, retained: &mut Retention) -> Result<Vec<Ch
             }),
         });
     }
-    Ok(changes)
-}
-
-fn diff_changes(
-    source: &Package,
-    target: &Package,
-    retained: &mut Retention,
-) -> Result<Vec<Change>> {
-    let source_changes = current_changes(source, retained)?;
-    let target_changes = current_changes(target, retained)?;
-    let mut source_map = HashMap::new();
-    let mut target_map = HashMap::new();
-    for change in source_changes {
-        source_map.insert(change.key.clone(), change);
-    }
-    for change in target_changes {
-        target_map.insert(change.key.clone(), change);
-    }
-    let mut keys = HashSet::new();
-    keys.extend(source_map.keys().cloned());
-    keys.extend(target_map.keys().cloned());
-    let mut changes = Vec::new();
-    for key in keys {
-        let source_change = source_map.get(&key);
-        let target_change = target_map.get(&key);
-        let before = match source_change {
-            Some(change) => change.after.clone(),
-            None => physical_image(source, &key, retained)?.map(|image| image.0),
-        };
-        let after = match target_change {
-            Some(change) => change.after.clone(),
-            None => physical_image(target, &key, retained)?.map(|image| image.0),
-        };
-        if before == after {
-            continue;
-        }
-        let metadata = target_change
-            .or(source_change)
-            .ok_or(Error::PatchConflict)?;
-        changes.push(Change {
-            key,
-            content_type: metadata.content_type.clone(),
-            relationship_type: metadata.relationship_type.clone(),
-            before,
-            after,
-        });
-    }
-    changes.sort_unstable_by(|left, right| {
-        left.key
-            .part_uri
-            .as_str()
-            .cmp(right.key.part_uri.as_str())
-            .then(left.key.slide_id.cmp(&right.key.slide_id))
-            .then(left.key.relationship_id.cmp(&right.key.relationship_id))
-    });
     Ok(changes)
 }
 

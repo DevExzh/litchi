@@ -2498,6 +2498,7 @@ impl SourceBackedSlideSnapshot {
     /// Check the retained caller execution policy before creating an edit
     /// handle. The infallible [`Self::edit`] constructor remains available for
     /// compatibility because it performs no payload I/O.
+    #[cfg(test)]
     pub(crate) fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
         self.check_execution()?;
         Ok(self.edit())
