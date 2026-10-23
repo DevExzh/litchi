@@ -742,9 +742,14 @@ impl Xlsx {
             // Counting reads the sheet's drawing: only for an unnamed chart.
             None => format!("Chart {}", source.chart_count(sheet)? + 1),
         };
-        let mut edit = source.edit_charts()?;
+        let mut edit = source.edit_charts_with_options(super::feature_write::part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let index = edit.add(sheet, &anchor, &name, &xml)?;
-        let target = edit.commit()?.into_package();
+        let native = edit.commit()?;
+        let native_patch_bytes = native.patch().retained_bytes();
+        let target = native.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok((
             Commit::from_metadata(
@@ -754,7 +759,7 @@ impl Xlsx {
                 target,
                 true,
                 1,
-                0,
+                native_patch_bytes,
                 limits.max_snapshot_bytes(),
             )?,
             Path::from_steps([
@@ -807,7 +812,7 @@ impl Xlsx {
         if first_row != last_row && first_column != last_column {
             return Err(invalid("the series range is one row or one column"));
         }
-        let package = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let package = self.editor_for_write()?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -864,7 +869,7 @@ impl Xlsx {
             .replace('$', "")
             .parse::<xlsx::Rect>()
             .map_err(|_| invalid("dataRange is not an A1 range"))?;
-        let package = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let package = self.editor_for_write()?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -1060,7 +1065,9 @@ impl Xlsx {
         }
         let sheet = node.sheet_position();
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut native = source.edit_charts()?;
+        let mut native = source.edit_charts_with_options(
+            super::feature_write::part_edit_options(&source, limits.max_snapshot_bytes()),
+        )?;
         if geometry.iter().any(Option::is_some) {
             let current = self
                 .sheet_chart_cells(sheet, item.chart as usize)?
@@ -1092,6 +1099,7 @@ impl Xlsx {
         }
         let commit = native.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let target = commit.into_package();
         let after = if changed {
             self.adopt_workbook(target.clone())
@@ -1105,7 +1113,7 @@ impl Xlsx {
             target,
             changed,
             1,
-            0,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?))
     }
@@ -1133,9 +1141,13 @@ impl Xlsx {
         };
         let sheet = node.sheet_position();
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut native = source.edit_charts()?;
+        let mut native = source.edit_charts_with_options(
+            super::feature_write::part_edit_options(&source, limits.max_snapshot_bytes()),
+        )?;
         native.remove(sheet, item.chart as usize)?;
-        let target = native.commit()?.into_package();
+        let commit = native.commit()?;
+        let native_patch_bytes = commit.patch().retained_bytes();
+        let target = commit.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok(Some(Commit::from_metadata(
             self,
@@ -1144,7 +1156,7 @@ impl Xlsx {
             target,
             true,
             1,
-            0,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?))
     }

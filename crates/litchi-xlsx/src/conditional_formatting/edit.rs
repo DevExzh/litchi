@@ -297,8 +297,17 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
     pub fn edit_conditional_formats(&self) -> Result<Edit> {
+        self.edit_conditional_formats_with_options(crate::EditOptions::default())
+    }
+
+    /// Start a conditional-formatting edit with an explicit retained-patch
+    /// budget.
+    pub fn edit_conditional_formats_with_options(
+        &self,
+        options: crate::EditOptions,
+    ) -> Result<Edit> {
         Ok(Edit {
-            staged: Staged::new(self, "edit_conditional_formats")?,
+            staged: Staged::new_with_options(self, "edit_conditional_formats", options)?,
         })
     }
 

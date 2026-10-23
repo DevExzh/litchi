@@ -64,6 +64,22 @@ impl Patch {
     pub const fn after(&self) -> &Snapshot {
         self.0.after()
     }
+
+    /// The semantic payload retained by this reversible patch.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        let before = self
+            .0
+            .before()
+            .source_arc()
+            .map_or(0, |bytes| bytes.capacity());
+        let after = self
+            .0
+            .after()
+            .source_arc()
+            .map_or(0, |bytes| bytes.capacity());
+        before.saturating_add(after)
+    }
 }
 
 impl crate::record::Record for Patch {
@@ -82,6 +98,7 @@ pub struct Edit {
     target: crate::record::Source,
     before: Snapshot,
     staged: PageBreaks,
+    max_retained_bytes: Option<usize>,
 }
 
 impl crate::Package {
@@ -93,6 +110,15 @@ impl crate::Package {
     /// refused, and an error when the selector does not select a worksheet
     /// or its page-break XML is invalid.
     pub fn edit_page_breaks<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        self.edit_page_breaks_with_options(selector, crate::EditOptions::default())
+    }
+
+    /// Start a page-break edit with an explicit retained-patch budget.
+    pub fn edit_page_breaks_with_options<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+        options: crate::EditOptions,
+    ) -> Result<Edit> {
         let target = crate::record::Source::new(self, "edit_page_breaks")?;
         let before = Snapshot::load(&target, selector)?;
         let staged = before.page_breaks().clone();
@@ -100,6 +126,7 @@ impl crate::Package {
             target,
             before,
             staged,
+            max_retained_bytes: options.max_retained_bytes_value(),
         })
     }
 
@@ -222,6 +249,22 @@ impl Edit {
             });
         }
         let output = super::replace(self.before.source_xml(), &self.staged)?;
+        if let Some(maximum) = self.max_retained_bytes {
+            let observed = self
+                .before
+                .source_arc()
+                .map(|before| before.capacity())
+                .unwrap_or(0)
+                .saturating_add(output.capacity());
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX page-break retained patch".into(),
+                }));
+            }
+        }
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
             .get_part_mut(self.before.worksheet_part_name())?

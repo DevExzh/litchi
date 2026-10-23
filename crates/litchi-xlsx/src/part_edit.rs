@@ -25,6 +25,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode}
 
 use crate::Package;
 use crate::error::{Error, Result, invalid};
+use crate::workbook::EditOptions;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Relationship {
@@ -322,6 +323,214 @@ impl PartPatch {
         }
     }
 
+    /// The semantic payload retained by this patch.
+    ///
+    /// This charge covers the exact part images, relationship fields and
+    /// manifest bytes held by the reversible patch. It deliberately excludes
+    /// allocator overhead and parser/cache state; callers charge package
+    /// endpoints separately when they retain them alongside this patch.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        fn relationship_bytes(relationship: &Relationship) -> usize {
+            relationship
+                .id
+                .capacity()
+                .saturating_add(relationship.kind.capacity())
+                .saturating_add(relationship.target.capacity())
+        }
+
+        fn image_bytes(image: &RelationshipImage) -> usize {
+            image.bytes.capacity()
+        }
+
+        fn state_bytes(state: &State) -> usize {
+            state
+                .content_type
+                .capacity()
+                .saturating_add(state.blob.capacity())
+                .saturating_add(
+                    state
+                        .relationships
+                        .iter()
+                        .map(relationship_bytes)
+                        .sum::<usize>(),
+                )
+                .saturating_add(image_bytes(&state.relationship_xml))
+        }
+
+        fn root_bytes(root: &RootState) -> usize {
+            root.relationships
+                .iter()
+                .map(relationship_bytes)
+                .sum::<usize>()
+                .saturating_add(image_bytes(&root.image))
+        }
+
+        fn content_types_bytes(image: &ContentTypesImage) -> usize {
+            image.retained.as_ref().map_or(0, |bytes| bytes.capacity())
+        }
+
+        self.deltas
+            .iter()
+            .fold(0usize, |total, delta| {
+                let total = total
+                    .saturating_add(delta.name.as_str().len())
+                    .saturating_add(delta.before.as_ref().map_or(0, state_bytes))
+                    .saturating_add(delta.after.as_ref().map_or(0, state_bytes));
+                total
+            })
+            .saturating_add(self.root.as_ref().map_or(0, |(before, after)| {
+                root_bytes(before).saturating_add(root_bytes(after))
+            }))
+            .saturating_add(self.content_types.as_ref().map_or(0, |(before, after)| {
+                content_types_bytes(before).saturating_add(content_types_bytes(after))
+            }))
+    }
+
+    /// Estimate the patch payload without constructing any patch-owned state.
+    /// The estimate follows the same semantic fields as [`Self::retained_bytes`]
+    /// and is used as the admission step immediately before capture.
+    fn estimate_retained_bytes(
+        before: &OpcPackage,
+        after: &OpcPackage,
+        names: &BTreeSet<String>,
+        all: bool,
+    ) -> Result<usize> {
+        fn relationship_bytes(relationship: &litchi_opc::Relationship) -> usize {
+            relationship
+                .r_id()
+                .len()
+                .saturating_add(relationship.reltype().len())
+                .saturating_add(relationship.target_ref().len())
+        }
+
+        fn relationship_image_bytes(package: &OpcPackage, owner: &PackURI) -> Result<usize> {
+            if let Some((bytes, _)) = package.retained_relationships_xml(owner)? {
+                return Ok(bytes.len());
+            }
+            // The OPC relationship planner exposes the exact canonical member
+            // length without materializing the XML. This keeps admission
+            // bounded by existing graph metadata and avoids both a second
+            // source copy and an archive-size-based false refusal.
+            Ok(package
+                .plan_source_relationships_with_limits(owner, package.read_limits())?
+                .final_len())
+        }
+
+        fn state_bytes(package: &OpcPackage, part: &dyn Part) -> Result<usize> {
+            Ok(part
+                .content_type()
+                .len()
+                .saturating_add(part.blob_arc().capacity())
+                .saturating_add(part.rels().iter().map(relationship_bytes).sum::<usize>())
+                .saturating_add(relationship_image_bytes(package, part.partname())?))
+        }
+
+        fn optional_part<'a>(
+            package: &'a OpcPackage,
+            name: &PackURI,
+        ) -> Result<Option<&'a dyn Part>> {
+            match package.get_part(name) {
+                Ok(part) => Ok(Some(part)),
+                Err(litchi_opc::OpcError::PartNotFound(_)) => Ok(None),
+                Err(error) => Err(error.into()),
+            }
+        }
+
+        let mut observed = 0usize;
+        let mut add_delta = |name: &PackURI,
+                             before_part: Option<&dyn Part>,
+                             after_part: Option<&dyn Part>|
+         -> Result<()> {
+            let changed = match (before_part, after_part) {
+                (Some(before_part), Some(after_part)) => {
+                    !same_part(before, before_part, after, after_part)?
+                },
+                (None, None) => false,
+                _ => true,
+            };
+            if changed {
+                observed = observed
+                    .saturating_add(name.as_str().len())
+                    .saturating_add(
+                        before_part
+                            .map(|part| state_bytes(before, part))
+                            .transpose()?
+                            .unwrap_or(0),
+                    )
+                    .saturating_add(
+                        after_part
+                            .map(|part| state_bytes(after, part))
+                            .transpose()?
+                            .unwrap_or(0),
+                    );
+            }
+            Ok(())
+        };
+
+        if all {
+            for part in before.try_iter_parts() {
+                let part = part?;
+                add_delta(
+                    part.partname(),
+                    Some(part),
+                    optional_part(after, part.partname())?,
+                )?;
+            }
+            for part in after.try_iter_parts() {
+                let part = part?;
+                if optional_part(before, part.partname())?.is_none() {
+                    add_delta(part.partname(), None, Some(part))?;
+                }
+            }
+        } else {
+            for name in names {
+                let name =
+                    PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;
+                add_delta(
+                    &name,
+                    optional_part(before, &name)?,
+                    optional_part(after, &name)?,
+                )?;
+            }
+        }
+
+        let root = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
+        if !before.same_retained_relationships(after, &root)?
+            || before.rels().len() != after.rels().len()
+            || before.rels().iter().any(|relationship| {
+                after
+                    .rels()
+                    .get(relationship.r_id())
+                    .is_none_or(|candidate| {
+                        candidate.reltype() != relationship.reltype()
+                            || candidate.target_ref() != relationship.target_ref()
+                            || candidate.is_external() != relationship.is_external()
+                    })
+            })
+        {
+            let before_fields = before.rels().iter().map(relationship_bytes).sum::<usize>();
+            let after_fields = after.rels().iter().map(relationship_bytes).sum::<usize>();
+            observed = observed
+                .saturating_add(before_fields)
+                .saturating_add(after_fields)
+                .saturating_add(relationship_image_bytes(before, &root)?)
+                .saturating_add(relationship_image_bytes(after, &root)?);
+        }
+
+        if !before.same_retained_content_types(after)? {
+            let before_bytes = before
+                .content_types_source_bytes()
+                .map_or(0, |bytes| bytes.capacity());
+            let after_bytes = after
+                .content_types_source_bytes()
+                .map_or(0, |bytes| bytes.capacity());
+            observed = observed
+                .saturating_add(before_bytes)
+                .saturating_add(after_bytes);
+        }
+        Ok(observed)
+    }
+
     pub(crate) fn inverse(&self) -> Self {
         Self {
             deltas: self
@@ -610,6 +819,7 @@ pub(crate) struct Staged {
     source: Package,
     staged: Option<OpcPackage>,
     touched: BTreeSet<String>,
+    max_retained_bytes: Option<usize>,
     /// Whether a whole-graph operation ran, so the commit compares every
     /// part instead of the touched ones.
     all: bool,
@@ -618,12 +828,22 @@ pub(crate) struct Staged {
 impl Staged {
     /// Start staging; refuses packages whose mutations are not allowed.
     pub(crate) fn new(package: &Package, operation: &'static str) -> Result<Self> {
+        Self::new_with_options(package, operation, EditOptions::default())
+    }
+
+    /// Start staging with an explicit patch-retention ceiling.
+    pub(crate) fn new_with_options(
+        package: &Package,
+        operation: &'static str,
+        options: EditOptions,
+    ) -> Result<Self> {
         package.workbook_ref().ensure_mutation_allowed(operation)?;
         Ok(Self {
             operation,
             source: package.clone(),
             staged: None,
             touched: BTreeSet::new(),
+            max_retained_bytes: options.max_retained_bytes_value(),
             all: false,
         })
     }
@@ -751,6 +971,22 @@ impl Staged {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
+        if let Some(maximum) = self.max_retained_bytes {
+            let observed = PartPatch::estimate_retained_bytes(
+                self.source.opc(),
+                &staged,
+                &self.touched,
+                self.all,
+            )?;
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX part edit retained patch".into(),
+                }));
+            }
+        }
         let patch = if self.all {
             PartPatch::capture_all(self.source.opc(), &staged)?
         } else {
@@ -1388,6 +1624,12 @@ macro_rules! family {
             #[must_use]
             pub fn inverse(&self) -> Self {
                 Self(self.0.inverse())
+            }
+
+            /// The semantic payload retained by this reversible patch.
+            #[must_use]
+            pub fn retained_bytes(&self) -> usize {
+                self.0.retained_bytes()
             }
         }
 

@@ -253,3 +253,36 @@ fn package_transaction_reads_back_and_reverses_page_breaks() {
         &PageBreaks::new()
     );
 }
+
+#[test]
+fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
+    let source = crate::Package::new().unwrap();
+    let collection = Collection::horizontal([Break::new(7, 0, 0).unwrap()]).unwrap();
+
+    let mut probe = source.edit_page_breaks("Sheet1").unwrap();
+    probe.set_horizontal(collection.clone()).unwrap();
+    let required = probe.commit().unwrap().patch().retained_bytes();
+    assert!(required > 0);
+
+    let mut rejected = source
+        .edit_page_breaks_with_options(
+            "Sheet1",
+            crate::EditOptions::default().with_max_retained_bytes(required - 1),
+        )
+        .unwrap();
+    rejected.set_horizontal(collection.clone()).unwrap();
+    assert!(matches!(
+        rejected.commit(),
+        Err(crate::Error::ResourceLimit(limit)) if limit.limit == (required - 1) as u64
+    ));
+
+    let mut exact = source
+        .edit_page_breaks_with_options(
+            "Sheet1",
+            crate::EditOptions::default().with_max_retained_bytes(required),
+        )
+        .unwrap();
+    exact.set_horizontal(collection).unwrap();
+    let commit = exact.commit().unwrap();
+    assert_eq!(commit.patch().retained_bytes(), required);
+}
