@@ -512,6 +512,9 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     route_artifact = write_new(output_dir / "original-baseline-route-map.json", mapped)
     projection_args = argparse.Namespace(workspace=workspace, package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE, lock=lock, toolchain=workspace / "rust-toolchain.toml", probe=probe, fixture=Path(fixture_artifact["path"]), features=[], all_features=True, target=args.target, profile=args.profile)
     projection = provenance.dependency_projection(projection_args)
+    selected_features = set(projection["features"]["selected"])
+    if not set(W8_FEATURES).issubset(selected_features):
+        raise fail("all-features projection omitted a format required by the corrected probe")
     projection_artifact = write_new(output_dir / "litchi_w8_dependency_projection.json", projection)
     assembly = {
         "schema": "litchi_w8_original_baseline_overlay.v2", "status": "prepared_consumer_adapter_only", "qualification": "not_run",
