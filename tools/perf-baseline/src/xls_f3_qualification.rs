@@ -347,7 +347,7 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     source.mutate();
     match edit.commit() {
         Ok(commit) if implementation == Implementation::Baseline => {
-            require_nonempty_output(write_package(commit.package())?, "stage/mutate/commit")?;
+            require_baseline_output(write_package(commit.package()), "stage/mutate/commit")?;
         },
         Ok(_) => return Err("XLS F3 stale source was accepted at commit".into()),
         Err(error) if implementation == Implementation::Candidate => {
@@ -370,8 +370,8 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     source.mutate();
     match workbook.apply_cells(commit.patch()) {
         Ok(replayed) if implementation == Implementation::Baseline => {
-            require_nonempty_output(
-                write_package(replayed.package())?,
+            require_baseline_output(
+                write_package(replayed.package()),
                 "same-owner forward replay",
             )?;
         },
@@ -393,8 +393,8 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     let inverse = commit.patch().inverse();
     match commit.package().apply_cells(&inverse) {
         Ok(restored) if implementation == Implementation::Baseline => {
-            require_nonempty_output(
-                write_package(restored.package())?,
+            require_baseline_output(
+                write_package(restored.package()),
                 "same-owner inverse replay",
             )?;
         },
@@ -434,6 +434,9 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
                 );
             }
         },
+        Err(error)
+            if implementation == Implementation::Baseline
+                && matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) => {},
         Err(error) => {
             return Err(
                 format!("XLS F3 baseline deferred-read disposition changed: {error:?}").into(),
@@ -458,6 +461,9 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
         Err(error) if implementation == Implementation::Candidate => {
             require_output_source_changed(error, "mutate/committed-write")?;
         },
+        Err(error) if implementation == Implementation::Baseline => {
+            require_output_source_changed(error, "mutate/committed-write")?;
+        },
         Err(error) => {
             return Err(format!(
                 "XLS F3 baseline mutate/committed-write disposition changed: {error:?}"
@@ -473,6 +479,32 @@ fn require_nonempty_output(output: Vec<u8>, label: &str) -> Result<()> {
         return Err(format!("XLS F3 baseline {label} accepted with empty output").into());
     }
     Ok(())
+}
+
+fn require_baseline_output(output: Result<Vec<u8>>, label: &str) -> Result<()> {
+    match output {
+        Ok(output) => require_nonempty_output(output, label),
+        Err(error)
+            if error
+                .downcast_ref::<litchi_xls::source_backed::OutputError>()
+                .is_some_and(|error| {
+                    matches!(
+                        error,
+                        litchi_xls::source_backed::OutputError::Package(
+                            litchi_xls::package::Error::Source(
+                                litchi_xls::SourceBackedError::SourceChanged { .. }
+                            )
+                        )
+                    )
+                }) =>
+        {
+            Ok(())
+        },
+        Err(error) => Err(format!(
+            "XLS F3 baseline {label} returned an unrecorded publication error: {error:?}"
+        )
+        .into()),
+    }
 }
 
 fn require_commit_source_changed(error: litchi_xls::Error, label: &str) -> Result<()> {
