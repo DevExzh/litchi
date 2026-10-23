@@ -155,7 +155,11 @@ mod tests {
 
         let mut probe = package.edit_auto_filter().unwrap();
         probe.set_auto_filter(0, Some(value.clone())).unwrap();
-        let required = probe.commit().unwrap().patch().retained_bytes();
+        let (after, patch) = probe.commit().unwrap().into_parts();
+        let required = package
+            .retained_bytes()
+            .saturating_add(after.retained_bytes())
+            .saturating_add(patch.retained_bytes());
         assert!(required > 0);
 
         let mut rejected = package
@@ -176,6 +180,12 @@ mod tests {
             .unwrap();
         exact.set_auto_filter(0, Some(value)).unwrap();
         let commit = exact.commit().unwrap();
-        assert_eq!(commit.patch().retained_bytes(), required);
+        assert_eq!(
+            package
+                .retained_bytes()
+                .saturating_add(commit.package().retained_bytes())
+                .saturating_add(commit.patch().retained_bytes()),
+            required
+        );
     }
 }

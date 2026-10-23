@@ -218,10 +218,13 @@ impl Patch {
     /// allocations are outside this semantic retention budget.
     #[must_use]
     pub fn retained_bytes(&self) -> usize {
+        // State strings are canonical `str::to_owned` fields; charge their
+        // logical bytes so metadata-only admission uses the same definition.
+        // Native blob buffers retain their actual Vec capacity.
         fn state_bytes(state: &State) -> usize {
             state
                 .content_type
-                .capacity()
+                .len()
                 .saturating_add(state.blob.capacity())
                 .saturating_add(
                     state
@@ -230,9 +233,9 @@ impl Patch {
                         .map(|relationship| {
                             relationship
                                 .id
-                                .capacity()
-                                .saturating_add(relationship.kind.capacity())
-                                .saturating_add(relationship.target.capacity())
+                                .len()
+                                .saturating_add(relationship.kind.len())
+                                .saturating_add(relationship.target.len())
                         })
                         .sum::<usize>(),
                 )
@@ -1308,18 +1311,34 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        if let Some(maximum) = self.max_retained_bytes {
-            let observed =
+        let target = if let Some(maximum) = self.max_retained_bytes {
+            let estimated_patch =
                 Patch::estimate_retained_bytes(self.package.opc(), &self.staged, &self.touched)?;
+            let target = if estimated_patch == 0 {
+                self.package.clone()
+            } else {
+                self.package
+                    .workbook_ref()
+                    .adopt_published_package(self.staged.clone())
+                    .map(Package::from_workbook)?
+            };
+            let observed = self
+                .package
+                .retained_bytes()
+                .saturating_add(target.retained_bytes())
+                .saturating_add(estimated_patch);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
                     resource: litchi_core::Resource::Memory,
                     observed: u64::try_from(observed).unwrap_or(u64::MAX),
                     limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                    scope: "XLSX chart retained patch".into(),
+                    scope: "XLSX chart retained package".into(),
                 }));
             }
-        }
+            Some(target)
+        } else {
+            None
+        };
         let patch = Patch::capture(self.package.opc(), &self.staged, &self.touched)?;
         let diagnostics = Diagnostics {
             parts: patch.deltas.len(),
@@ -1331,11 +1350,29 @@ impl Edit {
                 diagnostics,
             });
         }
-        let package = self
-            .package
-            .workbook_ref()
-            .adopt_published_package(self.staged)
-            .map(Package::from_workbook)?;
+        let package = match target {
+            Some(target) => target,
+            None => self
+                .package
+                .workbook_ref()
+                .adopt_published_package(self.staged)
+                .map(Package::from_workbook)?,
+        };
+        if let Some(maximum) = self.max_retained_bytes {
+            let observed = self
+                .package
+                .retained_bytes()
+                .saturating_add(package.retained_bytes())
+                .saturating_add(patch.retained_bytes());
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX chart retained package".into(),
+                }));
+            }
+        }
         Ok(Commit {
             package,
             patch,
@@ -1509,7 +1546,11 @@ mod tests {
         probe
             .add(0, &Anchor::new(0, 0, 5, 10), "Budget", &xml)
             .unwrap();
-        let required = probe.commit().unwrap().patch().retained_bytes();
+        let (after, patch) = probe.commit().unwrap().into_parts();
+        let required = package
+            .retained_bytes()
+            .saturating_add(after.retained_bytes())
+            .saturating_add(patch.retained_bytes());
         assert!(required > 0);
 
         let mut rejected = package
@@ -1534,7 +1575,13 @@ mod tests {
             .add(0, &Anchor::new(0, 0, 5, 10), "Budget", &xml)
             .unwrap();
         let commit = exact.commit().unwrap();
-        assert_eq!(commit.patch().retained_bytes(), required);
+        assert_eq!(
+            package
+                .retained_bytes()
+                .saturating_add(commit.package().retained_bytes())
+                .saturating_add(commit.patch().retained_bytes()),
+            required
+        );
     }
 
     #[test]

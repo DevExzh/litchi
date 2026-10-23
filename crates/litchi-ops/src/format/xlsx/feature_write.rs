@@ -17,6 +17,8 @@
 //! adapter is stricter (an unknown CF `type`, a list literal with quotes) it
 //! refuses rather than guesses.
 
+use std::io::Read as _;
+
 use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_xlsx as xlsx;
@@ -79,8 +81,8 @@ native_feature_commit!(xlsx::page_breaks::edit::Commit);
 /// patch editor then checks its own exact semantic payload before constructing
 /// patch-owned states; the final adapter repeats the complete charge.
 pub(super) fn part_edit_options(source: &xlsx::Package, maximum: usize) -> xlsx::EditOptions {
-    xlsx::EditOptions::default()
-        .with_max_retained_bytes(maximum.saturating_sub(source.retained_bytes().saturating_mul(2)))
+    let _ = source;
+    xlsx::EditOptions::default().with_max_retained_bytes(maximum)
 }
 
 fn error(code: Code, message: impl Into<String>) -> Error {
@@ -1072,21 +1074,99 @@ fn read_source(src: &str, staged_limit: usize) -> Result<Vec<u8>> {
             )
             .with_property("src"));
         }
-        if payload.len() / 4 * 3 > maximum {
+        let significant = payload
+            .bytes()
+            .filter(|byte| !byte.is_ascii_whitespace())
+            .count();
+        let padding = payload
+            .bytes()
+            .rev()
+            .skip_while(u8::is_ascii_whitespace)
+            .take_while(|byte| *byte == b'=')
+            .count();
+        let decoded = significant
+            .saturating_add(3)
+            .checked_div(4)
+            .unwrap_or(usize::MAX)
+            .saturating_mul(3)
+            .saturating_sub(if significant % 4 == 0 {
+                padding.min(2)
+            } else {
+                0
+            });
+        if decoded > maximum {
             return Err(invalid("src", "the image is too large"));
         }
-        use base64::Engine as _;
-        return base64::engine::general_purpose::STANDARD
-            .decode(payload.trim())
-            .map_err(|_| invalid("src", "the data URI payload is not base64"));
+        let mut decoder = base64::read::DecoderReader::new(
+            Base64Input::new(payload.as_bytes()),
+            &base64::engine::general_purpose::STANDARD,
+        );
+        let mut output = Vec::with_capacity(decoded.min(maximum));
+        let mut chunk = [0_u8; 8192];
+        loop {
+            let count = decoder
+                .read(&mut chunk)
+                .map_err(|_| invalid("src", "the data URI payload is not base64"))?;
+            if count == 0 {
+                break;
+            }
+            let observed = output.len().saturating_add(count);
+            if observed > maximum {
+                return Err(invalid("src", "the image is too large"));
+            }
+            output.extend_from_slice(&chunk[..count]);
+        }
+        return Ok(output);
     }
-    let length = std::fs::metadata(src)
-        .map_err(|source| Error::from(source).with_property("src"))?
-        .len();
-    if length > maximum as u64 {
-        return Err(invalid("src", "the image is too large"));
+    let file =
+        std::fs::File::open(src).map_err(|source| Error::from(source).with_property("src"))?;
+    let mut reader = file.take(u64::try_from(maximum).unwrap_or(u64::MAX).saturating_add(1));
+    let mut output = Vec::with_capacity(maximum.min(8192));
+    let mut chunk = [0_u8; 8192];
+    loop {
+        let count = reader
+            .read(&mut chunk)
+            .map_err(|source| Error::from(source).with_property("src"))?;
+        if count == 0 {
+            break;
+        }
+        let observed = output.len().saturating_add(count);
+        if observed > maximum {
+            return Err(invalid("src", "the image is too large"));
+        }
+        output.extend_from_slice(&chunk[..count]);
     }
-    std::fs::read(src).map_err(|source| Error::from(source).with_property("src"))
+    Ok(output)
+}
+
+/// A zero-copy filtering reader for base64 payloads.  Data URI whitespace is
+/// ignored by the base64 grammar, but is never copied into a second complete
+/// encoded buffer before bounded decoding.
+struct Base64Input<'a> {
+    bytes: &'a [u8],
+    offset: usize,
+}
+
+impl<'a> Base64Input<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, offset: 0 }
+    }
+}
+
+impl std::io::Read for Base64Input<'_> {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let mut written = 0;
+        while written < output.len() && self.offset < self.bytes.len() {
+            let byte = self.bytes[self.offset];
+            self.offset += 1;
+            if byte.is_ascii_whitespace() {
+                continue;
+            }
+            output[written] = byte;
+            written += 1;
+        }
+        Ok(written)
+    }
 }
 
 /// The image content type and file extension of `data`, by signature.

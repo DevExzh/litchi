@@ -330,12 +330,17 @@ impl PartPatch {
     /// allocator overhead and parser/cache state; callers charge package
     /// endpoints separately when they retain them alongside this patch.
     pub(crate) fn retained_bytes(&self) -> usize {
+        // These fields are canonical strings copied with `str::to_owned` by
+        // `State::read`; charge their logical bytes so the metadata-only
+        // estimator below has the same definition without rebuilding them.
+        // Blob and exact relationship-member images retain their Vec
+        // capacities because those buffers are the native patch payload.
         fn relationship_bytes(relationship: &Relationship) -> usize {
             relationship
                 .id
-                .capacity()
-                .saturating_add(relationship.kind.capacity())
-                .saturating_add(relationship.target.capacity())
+                .len()
+                .saturating_add(relationship.kind.len())
+                .saturating_add(relationship.target.len())
         }
 
         fn image_bytes(image: &RelationshipImage) -> usize {
@@ -345,7 +350,7 @@ impl PartPatch {
         fn state_bytes(state: &State) -> usize {
             state
                 .content_type
-                .capacity()
+                .len()
                 .saturating_add(state.blob.capacity())
                 .saturating_add(
                     state
@@ -405,7 +410,7 @@ impl PartPatch {
 
         fn relationship_image_bytes(package: &OpcPackage, owner: &PackURI) -> Result<usize> {
             if let Some((bytes, _)) = package.retained_relationships_xml(owner)? {
-                return Ok(bytes.len());
+                return Ok(bytes.capacity());
             }
             // The OPC relationship planner exposes the exact canonical member
             // length without materializing the XML. This keeps admission
@@ -971,32 +976,57 @@ impl Staged {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
-        if let Some(maximum) = self.max_retained_bytes {
-            let observed = PartPatch::estimate_retained_bytes(
-                self.source.opc(),
-                &staged,
-                &self.touched,
-                self.all,
-            )?;
+        let source = self.source;
+        let target = if let Some(maximum) = self.max_retained_bytes {
+            let estimated_patch =
+                PartPatch::estimate_retained_bytes(source.opc(), &staged, &self.touched, self.all)?;
+            // Build the exact target owner once, before patch capture, so the
+            // admission charge covers the real source and target endpoints
+            // rather than assuming the edit preserves package size.
+            let target = source.derive(staged.clone())?;
+            let observed = source
+                .retained_bytes()
+                .saturating_add(target.retained_bytes())
+                .saturating_add(estimated_patch);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
                     resource: litchi_core::Resource::Memory,
                     observed: u64::try_from(observed).unwrap_or(u64::MAX),
                     limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                    scope: "XLSX part edit retained patch".into(),
+                    scope: "XLSX part edit retained package".into(),
+                }));
+            }
+            Some(target)
+        } else {
+            None
+        };
+        let patch = if self.all {
+            PartPatch::capture_all(source.opc(), &staged)?
+        } else {
+            PartPatch::capture(source.opc(), &staged, &self.touched)?
+        };
+        if patch.is_noop() {
+            return Ok((source, patch));
+        }
+        crate::signature_policy::ensure_unsigned(&staged)?;
+        let package = match target {
+            Some(target) => target,
+            None => source.derive(staged)?,
+        };
+        if let Some(maximum) = self.max_retained_bytes {
+            let observed = source
+                .retained_bytes()
+                .saturating_add(package.retained_bytes())
+                .saturating_add(patch.retained_bytes());
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX part edit retained package".into(),
                 }));
             }
         }
-        let patch = if self.all {
-            PartPatch::capture_all(self.source.opc(), &staged)?
-        } else {
-            PartPatch::capture(self.source.opc(), &staged, &self.touched)?
-        };
-        if patch.is_noop() {
-            return Ok((self.source, patch));
-        }
-        crate::signature_policy::ensure_unsigned(&staged)?;
-        let package = self.source.derive(staged)?;
         Ok((package, patch))
     }
 }
