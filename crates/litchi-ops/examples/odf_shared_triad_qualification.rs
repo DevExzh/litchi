@@ -1238,7 +1238,7 @@ mod probe {
             "odm",
             "odm_title",
             "deterministic_builder",
-            "litchi_odm::Builder::new",
+            "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
             &source,
             &changed_output,
             &file_changed_output,
