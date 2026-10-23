@@ -1695,6 +1695,13 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .then(|| change.replacement.as_slice())
             })
         };
+        let appended_payload = |name: &str| {
+            retained
+                .policy_appended
+                .iter()
+                .find(|member| member.name.eq_ignore_ascii_case(name))
+                .map(|member| member.payload.as_slice())
+        };
 
         let mut aggregate_bytes = 0_u64;
         let mut relationship_parts = 0_u64;
@@ -1930,17 +1937,15 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 package.cache.check_context().map_err(map_execution_error)?;
             }
             let member = relationship_member_name(&owner)?;
-            if is_omitted(&member) {
+            // An omitted source member may be reintroduced as a generated
+            // final member. Census the final payload before honoring the
+            // omission; otherwise a replacement relationship part vanishes
+            // from the XML and graph limits while publication still emits it.
+            let replacement = changed_payload(&member).or_else(|| appended_payload(&member));
+            if is_omitted(&member) && replacement.is_none() {
                 continue;
             }
-            let changed = changed_payload(&member).or_else(|| {
-                retained
-                    .policy_appended
-                    .iter()
-                    .find(|appended| appended.name.eq_ignore_ascii_case(&member))
-                    .map(|appended| appended.payload.as_slice())
-            });
-            let (bytes, events, relationships) = if let Some(xml) = changed {
+            let (bytes, events, relationships) = if let Some(xml) = replacement {
                 let relationships = parse_relationship_xml(xml, &owner, limits)?;
                 let bytes = xml.len() as u64;
                 (
@@ -2097,6 +2102,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .iter()
                 .find(|member| member.name.eq_ignore_ascii_case(name))
                 .map(|member| member.payload.as_slice())
+        };
+        let final_payload = |name: &str| {
+            changed_payload(name).or_else(|| appended_payload(name))
         };
         let mut appended_names = HashSet::new();
         appended_names
@@ -2270,9 +2278,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         )?;
 
         let (content_types_bytes, content_type_mapping_count) =
-            if let Some(payload) = changed_payload(content_types_name)
-                .or_else(|| appended_payload(content_types_name))
-            {
+            if let Some(payload) = final_payload(content_types_name) {
                 let parsed = super::ContentTypeMap::from_xml(payload, limits)?;
                 (payload.len() as u64, parsed.mapping_count() as u64)
         } else {
@@ -2335,12 +2341,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for owner in relationship_owners {
             let member = relationship_member_name(&owner)?;
-            if is_omitted(&member) {
+            let replacement = final_payload(&member);
+            if is_omitted(&member) && replacement.is_none() {
                 continue;
             }
-            let changed = changed_payload(&member);
-            let appended_xml = appended_payload(&member);
-            let relationships = if let Some(xml) = changed.or(appended_xml) {
+            let relationships = if let Some(xml) = replacement {
                 let parsed = PackageReader::parse_owned_relationships(xml, &owner, limits)?;
                 let events = super::relationship_xml_event_count(xml, limits)?;
                 relationship_xml_bytes = relationship_xml_bytes
