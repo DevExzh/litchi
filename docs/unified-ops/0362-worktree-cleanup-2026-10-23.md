@@ -257,3 +257,34 @@ git worktree add --detach /home/zhuhe/code/litchi-worktrees/uo2-xlsx-final-quali
 The sixth wave reclaimed 31,566,664,232 checkout bytes while retaining the
 external DOCX target, all source refs, tracked evidence, and quarantined
 generated files.
+
+## Seventh cleanup wave
+
+Two completed inactive source leaves were removed on 2026-10-23 after their
+commits were confirmed as ancestors of integration
+`355cfe414118f0a76dc907a33893e938bfb0bebe`:
+
+- `uo2/workspace-v21-consumers` at
+  `ddb398129cf08f6d864e6092c73224ae2c5df045`: 6,261,086,693 bytes.
+- `uo2/clippy-v2-consumers` at
+  `a1697ddbdb1027f43021b0bbf3f1948d2ca69f45`: 6,261,100,997 bytes.
+
+The apparent checkout total was 12,522,187,690 bytes. Both trees had clean
+tracked state and zero untracked or ignored files, so no quarantine was
+needed. Targeted checks found no local targets, caches, protected executables,
+or measurement artifacts. Shared tracked `docs/performance/results` and
+`docs/report` evidence, including receipt JSON under a tracked `binaries`
+directory, was not changed or removed from Git. Process cwd and
+file-descriptor checks found no active users. Dirty perf-v23, old ODF, budget,
+XLS F3, active review/qualification, target, and executable leaves were not
+touched. Removal used `git worktree remove` without `--force`.
+
+Exact recreation commands:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-workspace-v21-consumers uo2/workspace-v21-consumers
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-clippy-v2-consumers uo2/clippy-v2-consumers
+```
+
+The seventh wave reclaimed 12,522,187,690 checkout bytes while retaining both
+branch refs, tracked evidence, and all protected worktrees.
