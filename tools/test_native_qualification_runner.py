@@ -19,6 +19,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_qualification_runner as runner  # noqa: E402
+from native_qualification import prepare_w4b_w5_inputs as source_prep  # noqa: E402
 from native_qualification import w5_analyzer_adapter as w5_adapter  # noqa: E402
 
 
@@ -83,6 +84,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 "W5_AFTER_SOURCE": str(Path(directory) / "w5-after-source"),
                 "W5_TARGET_ROOT": str(target_root),
                 "LITCHI_COORD_BIN": directory,
+                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
                 "W4B_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
                 "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
             }
@@ -108,7 +110,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             data["target_limit_bytes"] = 1
             path = Path(directory) / "manifest.json"
             path.write_text(json.dumps(data), encoding="utf-8")
-            old = {key: os.environ.get(key) for key in ("NATIVE_QUAL_OUTPUT", "W5_BEFORE_SOURCE", "W5_AFTER_SOURCE", "W5_TARGET_ROOT", "LITCHI_COORD_BIN", "W5_ANALYZER")}
+            old = {key: os.environ.get(key) for key in ("NATIVE_QUAL_OUTPUT", "W5_BEFORE_SOURCE", "W5_AFTER_SOURCE", "W5_TARGET_ROOT", "LITCHI_COORD_BIN", "LITCHI_NATIVE_QUAL_ROOT", "W5_ANALYZER")}
             try:
                 os.environ.update(
                     {
@@ -117,6 +119,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                         "W5_AFTER_SOURCE": str(Path(directory) / "after"),
                         "W5_TARGET_ROOT": str(Path(directory) / "targets"),
                         "LITCHI_COORD_BIN": directory,
+                        "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
                         "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
                     }
                 )
@@ -269,6 +272,40 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(qualified["schema"], w5_adapter.SUMMARY_SCHEMA)
             self.assertEqual(qualified["lane"], "w5-legacy")
             self.assertEqual(qualified["analysis"], analysis)
+
+    def test_w5_source_overlay_replaces_only_the_recorded_routes_module(self) -> None:
+        candidate = (ROOT / "crates/litchi-ops/examples/legacy_w5_source_probe.rs").read_text(encoding="utf-8")
+        routes = (ROOT / "docs/unified-ops/results/0359a/routes_before.rs").read_text(encoding="utf-8")
+        adapted = source_prep._adapt_w5_probe(candidate, routes)
+        self.assertIn("SourceSnapshot::from_bytes", adapted)
+        self.assertIn("source_backed::Package::from_bytes", candidate)
+        self.assertEqual(adapted.count("mod routes {"), 1)
+        self.assertIn("PLAN_ONLY_ROUTE: bool = true", adapted)
+
+    def test_w4b_crud_overlay_is_only_the_recorded_trait_import(self) -> None:
+        baseline = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
+        adapted = source_prep._adapt_w4b_crud(baseline)
+        self.assertEqual(
+            adapted,
+            "use litchi::sheet::{WorkbookTrait, Worksheet};\n"
+            "use litchi_core::sheet::Cell as _;\nfn main() {}\n",
+        )
+        with self.assertRaisesRegex(source_prep.PreparationError, "already contains"):
+            source_prep._adapt_w4b_crud(
+                baseline.replace(
+                    "fn main", "use litchi_core::sheet::Cell as _;\nfn main"
+                )
+            )
+
+    def test_source_preparation_requires_external_disjoint_provenance(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-prep-paths-") as directory:
+            root = Path(directory)
+            before = root / "before"
+            after = root / "after"
+            before.mkdir()
+            after.mkdir()
+            with self.assertRaisesRegex(source_prep.PreparationError, "pairwise disjoint"):
+                source_prep._require_disjoint_sources(before, after, before / "provenance.json")
 
     def test_symlink_artifact_is_never_hashed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-link-") as directory:

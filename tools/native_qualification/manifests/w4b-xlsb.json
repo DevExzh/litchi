@@ -27,6 +27,7 @@
     "before": {
       "source_root": "$W4B_BEFORE_SOURCE",
       "target_dir": "$W4B_TARGET_ROOT/before",
+      "allow_dirty": true,
       "lock_paths": ["Cargo.lock", "tools/perf-baseline/Cargo.lock"],
       "build": [
         {

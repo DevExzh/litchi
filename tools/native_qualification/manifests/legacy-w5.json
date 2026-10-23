@@ -8,8 +8,8 @@
   "validators": [
     {
       "id": "historical-analyze",
-      "script": "{source_root}/tools/native_qualification/w5_analyzer_adapter.py",
-      "argv": ["python3", "{source_root}/tools/native_qualification/w5_analyzer_adapter.py", "$W5_ANALYZER", "{output_dir}"],
+      "script": "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/w5_analyzer_adapter.py",
+      "argv": ["python3", "$LITCHI_NATIVE_QUAL_ROOT/tools/native_qualification/w5_analyzer_adapter.py", "$W5_ANALYZER", "{output_dir}"],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],
       "require_stdout": true
@@ -21,7 +21,8 @@
   "shared": {
     "probe_paths": [
       "crates/litchi-ops/examples/legacy_w5_source_probe.rs",
-      "crates/litchi-ops/examples/legacy_w5_probe.rs"
+      "crates/litchi-ops/examples/legacy_w5_probe.rs",
+      "docs/unified-ops/results/0359a/routes_before.rs"
     ],
     "fixture_paths": []
   },
@@ -29,6 +30,7 @@
     "before": {
       "source_root": "$W5_BEFORE_SOURCE",
       "target_dir": "$W5_TARGET_ROOT/before",
+      "allow_dirty": true,
       "lock_paths": ["Cargo.lock"],
       "build": [
         {
