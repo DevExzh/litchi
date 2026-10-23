@@ -72,6 +72,13 @@ class FixtureDescriptor(unittest.TestCase):
 
 
 class DependencyProjection(unittest.TestCase):
+    @staticmethod
+    def reviewed_probe(root: Path) -> Path:
+        probe = root / provenance.PROBE_RELATIVE
+        probe.parent.mkdir(parents=True, exist_ok=True)
+        probe.write_bytes(PROBE.read_bytes())
+        return probe
+
     def projection_args(self, root: Path, lock: Path, fixture: Path, probe: Path) -> argparse.Namespace:
         return argparse.Namespace(
             workspace=root,
@@ -109,12 +116,38 @@ class DependencyProjection(unittest.TestCase):
                 encoding="utf-8",
             )
             fixture = root / "fixture.json"
-            probe = PROBE
+            probe = self.reviewed_probe(root)
             fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(probe)))
             projection = provenance.dependency_projection(self.projection_args(root, lock, fixture, probe))
             self.assertEqual(projection["lock"]["packages"][0]["name"], "litchi-ops")
             self.assertEqual(projection["features"]["selected"], ["docx", "xlsx"])
             self.assertEqual(projection["workload"]["route_count"], 109)
+
+    def test_projection_rejects_a_different_workspace_package(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "crates/litchi-ops"
+            package_dir.mkdir(parents=True)
+            (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            (root / "rust-toolchain.toml").write_text(
+                "[toolchain]\nchannel = \"1.95.0\"\n",
+                encoding="utf-8",
+            )
+            (package_dir / "Cargo.toml").write_text(
+                "[package]\nname = \"litchi-core\"\nversion = \"0.0.1\"\n"
+                "[features]\ndocx = []\n",
+                encoding="utf-8",
+            )
+            lock = root / "Cargo.lock"
+            lock.write_text(
+                "version = 4\n\n[[package]]\nname = \"litchi-core\"\nversion = \"0.0.1\"\n",
+                encoding="utf-8",
+            )
+            probe = self.reviewed_probe(root)
+            fixture = root / "fixture.json"
+            fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(probe)))
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.dependency_projection(self.projection_args(root, lock, fixture, probe))
 
     def test_projection_rejects_fixture_for_another_probe(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -132,7 +165,7 @@ class DependencyProjection(unittest.TestCase):
                 "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
                 encoding="utf-8",
             )
-            probe = PROBE
+            probe = self.reviewed_probe(root)
             fixture = root / "fixture.json"
             fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(probe)))
             altered = json.loads(fixture.read_text(encoding="utf-8"))
@@ -158,6 +191,7 @@ class DependencyProjection(unittest.TestCase):
                 encoding="utf-8",
             )
             fixture = root / "fixture.json"
+            probe = self.reviewed_probe(root)
             fixture.write_bytes(
                 provenance.canonical(
                     {
@@ -167,7 +201,7 @@ class DependencyProjection(unittest.TestCase):
                 )
             )
             with self.assertRaises(provenance.ProvenanceError):
-                provenance.dependency_projection(self.projection_args(root, lock, fixture, PROBE))
+                provenance.dependency_projection(self.projection_args(root, lock, fixture, probe))
 
 
 class EndpointManifest(unittest.TestCase):
@@ -190,13 +224,16 @@ class EndpointManifest(unittest.TestCase):
             "[features]\ndocx = []\nxlsx = []\n",
             encoding="utf-8",
         )
+        probe = root / provenance.PROBE_RELATIVE
+        probe.parent.mkdir(parents=True, exist_ok=True)
+        probe.write_bytes(PROBE.read_bytes())
         lock = root / "Cargo.lock"
         lock.write_text(
             "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
             encoding="utf-8",
         )
         fixture = root / "fixture.json"
-        fixture_value = provenance.fixture_descriptor(PROBE)
+        fixture_value = provenance.fixture_descriptor(probe)
         fixture.write_bytes(provenance.canonical(fixture_value))
 
         projection_args = argparse.Namespace(
@@ -204,7 +241,7 @@ class EndpointManifest(unittest.TestCase):
             package_manifest=package_manifest,
             lock=lock,
             toolchain=toolchain,
-            probe=PROBE,
+            probe=probe,
             fixture=fixture,
             features=["docx,xlsx"],
             all_features=False,
@@ -249,7 +286,7 @@ class EndpointManifest(unittest.TestCase):
                 "source": provenance.artifact(source),
                 "binary": provenance.artifact(binary),
                 "lock": provenance.artifact(lock),
-                "probe": provenance.artifact(PROBE),
+                "probe": provenance.artifact(probe),
                 "routes": provenance.artifact(raw_routes),
             },
             "outcomes": [
@@ -275,7 +312,7 @@ class EndpointManifest(unittest.TestCase):
             "source_assembly": provenance.artifact(source_assembly),
             "binary": provenance.artifact(binary),
             "lock": provenance.artifact(lock),
-            "probe": provenance.artifact(PROBE),
+            "probe": provenance.artifact(probe),
             "fixture": provenance.artifact(fixture),
             "dependency_projection_sha256": provenance.digest(projection),
             "workspace_manifest_sha256": provenance.digest(workspace_manifest),
@@ -292,7 +329,7 @@ class EndpointManifest(unittest.TestCase):
             binary=binary,
             source=source,
             lock=lock,
-            probe=PROBE,
+            probe=probe,
             fixture=fixture,
             dependency_projection=projection,
             workspace=root,

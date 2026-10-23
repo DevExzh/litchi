@@ -33,6 +33,11 @@ then binds the executable, source assembly, lock, probe, fixture, projection,
 workspace/package manifests, toolchain, build receipt and complete untimed
 109-route validation receipt into the `litchi_file_endpoint.v1` manifest
 expected by `results/0362h/run.py`.
+The package declaration must be `litchi-ops` at the canonical
+`crates/litchi-ops/Cargo.toml` path, and the probe must be at
+`crates/litchi-ops/examples/file_w8_qualified_probe.rs` in that same
+workspace.  The runner rechecks both path and package-name identities before
+calibration.
 
 Keep all generated descriptors, lockfiles, source archives, manifests and
 binaries in `.coord` or another external scratch directory.  The tool rejects

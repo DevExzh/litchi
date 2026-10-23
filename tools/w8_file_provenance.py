@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 REVIEWED_PROBE_SHA256 = "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
+PACKAGE_NAME = "litchi-ops"
+PACKAGE_MANIFEST_RELATIVE = Path("crates/litchi-ops/Cargo.toml")
+PROBE_RELATIVE = Path("crates/litchi-ops/examples/file_w8_qualified_probe.rs")
 EXPECTED_FAMILIES = (
     "docx", "odt", "doc", "rtf", "xlsx", "xlsb", "xls", "ods",
     "pptx", "ppt", "odp",
@@ -340,6 +343,10 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
     if not workspace_manifest.is_file():
         raise fail(f"workspace Cargo.toml is missing: {workspace_manifest}")
     probe = safe_location(args.probe, "probe")
+    if package_manifest != root / PACKAGE_MANIFEST_RELATIVE:
+        raise fail(f"package manifest must be {PACKAGE_MANIFEST_RELATIVE} within the workspace")
+    if probe != root / PROBE_RELATIVE:
+        raise fail(f"probe must be {PROBE_RELATIVE} within the workspace")
     fixture = safe_location(args.fixture, "fixture descriptor")
     toolchain = safe_location(args.toolchain, "toolchain")
     for path, label in ((lock, "lockfile"), (package_manifest, "package manifest"), (toolchain, "toolchain")):
@@ -367,8 +374,8 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
         })
     lock_packages.sort(key=lambda item: (item["name"], item["version"], item.get("source") or ""))
     package = package_data.get("package")
-    if not isinstance(package, dict) or not isinstance(package.get("name"), str):
-        raise fail("package manifest has no package.name")
+    if not isinstance(package, dict) or package.get("name") != PACKAGE_NAME:
+        raise fail(f"package manifest must declare package.name = {PACKAGE_NAME!r}")
     features = package_data.get("features", {})
     if not isinstance(features, dict):
         raise fail("package manifest features table is malformed")
@@ -385,6 +392,11 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
         package_version = workspace_data.get("workspace", {}).get("package", {}).get("version")
     if not isinstance(package_version, str) or not package_version:
         raise fail(f"could not resolve {package['name']} package version")
+    if not any(
+        item["name"] == PACKAGE_NAME and item["version"] == package_version
+        for item in lock_packages
+    ):
+        raise fail(f"lockfile has no {PACKAGE_NAME} package at version {package_version}")
     toolchain_text = read_text(toolchain, "toolchain")
     try:
         toolchain_data = tomllib.loads(toolchain_text)
@@ -605,15 +617,16 @@ def endpoint_manifest(args: argparse.Namespace) -> dict[str, Any]:
     toolchain_path = safe_location(args.toolchain, "toolchain")
     if workspace_manifest_path != workspace / "Cargo.toml":
         raise fail("workspace manifest is not the supplied workspace Cargo.toml")
-    try:
-        package_manifest_path.relative_to(workspace)
-    except ValueError as error:
-        raise fail("package manifest is outside the supplied workspace") from error
+    if package_manifest_path != workspace / PACKAGE_MANIFEST_RELATIVE:
+        raise fail(f"package manifest must be {PACKAGE_MANIFEST_RELATIVE} within the workspace")
+    probe_path = safe_location(args.probe, "probe")
+    if probe_path != workspace / PROBE_RELATIVE:
+        raise fail(f"probe must be {PROBE_RELATIVE} within the workspace")
     workspace_manifest = artifact(workspace_manifest_path)
     package_manifest = artifact(package_manifest_path)
     toolchain = artifact(toolchain_path)
     lock = artifact(safe_location(args.lock, "lockfile"))
-    probe = artifact(safe_location(args.probe, "probe"))
+    probe = artifact(probe_path)
     fixture_path = safe_location(args.fixture, "fixture descriptor")
     fixture, routes = verified_fixture(args.probe, fixture_path)
     fixture_artifact = artifact(fixture_path)

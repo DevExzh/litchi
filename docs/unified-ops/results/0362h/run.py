@@ -19,6 +19,7 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 from typing import Any
 
 MIN_SAMPLE_NS = 150_000_000
@@ -29,6 +30,9 @@ SHA256 = re.compile(r"^[0-9a-f]{64}$")
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 EXPECTED_ROUTE_COUNT = 109
 REVIEWED_PROBE_SHA256 = "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
+PACKAGE_NAME = "litchi-ops"
+PACKAGE_MANIFEST_RELATIVE = Path("crates/litchi-ops/Cargo.toml")
+PROBE_RELATIVE = Path("crates/litchi-ops/examples/file_w8_qualified_probe.rs")
 EXPECTED_FAMILIES = (
     "docx", "odt", "doc", "rtf", "xlsx", "xlsb", "xls", "ods",
     "pptx", "ppt", "odp",
@@ -153,8 +157,7 @@ def reviewed_projection(
         not isinstance(workspace, dict)
         or workspace.get("manifest_sha256") != fields["workspace_manifest"]["sha256"]
         or workspace.get("package_manifest_sha256") != fields["package_manifest"]["sha256"]
-        or not isinstance(workspace.get("package"), str)
-        or not workspace["package"]
+        or workspace.get("package") != PACKAGE_NAME
         or not isinstance(workspace.get("package_version"), str)
         or not workspace["package_version"]
     ):
@@ -180,6 +183,11 @@ def reviewed_projection(
             or not isinstance(package["dependencies"], list)
         ):
             raise RuntimeError(f"{label} lock package {index} is incomplete")
+    if not any(
+        package["name"] == PACKAGE_NAME and package["version"] == workspace["package_version"]
+        for package in packages
+    ):
+        raise RuntimeError(f"{label} lock projection has no {PACKAGE_NAME} package")
     features = value.get("features")
     if (
         not isinstance(features, dict)
@@ -509,6 +517,21 @@ def verify_endpoint_details(value: dict[str, Any], fields: dict[str, Any], label
     fields["workspace_manifest"] = workspace
     fields["package_manifest"] = package
     fields["toolchain"] = toolchain
+    workspace_path = Path(workspace["path"]).resolve()
+    if workspace_path.name != "Cargo.toml":
+        raise RuntimeError(f"{label} workspace manifest is not Cargo.toml")
+    expected_package = (workspace_path.parent / PACKAGE_MANIFEST_RELATIVE).resolve()
+    expected_probe = (workspace_path.parent / PROBE_RELATIVE).resolve()
+    if package["path"] != str(expected_package):
+        raise RuntimeError(f"{label} package manifest is not crates/litchi-ops/Cargo.toml")
+    if fields["probe"]["path"] != str(expected_probe):
+        raise RuntimeError(f"{label} probe is not crates/litchi-ops/examples/file_w8_qualified_probe.rs")
+    try:
+        package_data = tomllib.loads(Path(package["path"]).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise RuntimeError(f"{label} package manifest is invalid: {error}") from error
+    if package_data.get("package", {}).get("name") != PACKAGE_NAME:
+        raise RuntimeError(f"{label} package manifest does not declare {PACKAGE_NAME}")
     features = value.get("features")
     if not isinstance(features, dict) or projection_value.get("features") != features:
         raise RuntimeError(f"{label} feature projection is missing or stale")
