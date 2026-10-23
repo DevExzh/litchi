@@ -12804,10 +12804,12 @@ fn selected_block_control_paragraph_text(
     paragraph: Position,
 ) -> Result<String> {
     let (start, end) = select_block_control_paragraph(snapshot, controls, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "block control paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "block control paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
@@ -12913,10 +12915,12 @@ fn selected_nested_cell_paragraph_text(
     paragraph: Position,
 ) -> Result<String> {
     let (start, end) = select_nested_cell_paragraph(snapshot, path, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "nested table paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "nested table paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: path.first().map_or(0, |address| address.table.get()),
@@ -13192,10 +13196,12 @@ fn selected_cell_paragraph_text(
         )?;
     let start = checked_relative_start(selection.start, paragraph_range)?;
     let end = checked_relative_end(selection.start, paragraph_range)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "table cell paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "table cell paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: table.get(),

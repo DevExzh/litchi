@@ -109,3 +109,25 @@ The inode-exhaustion failure is retained outside the checkout as
 `paragraph-marker-test-v17.log` (4,369 bytes,
 `6636d22591be4d2cdbf48d4006117c34ccb9489ab4080e56e7db60fb9c9f1ed7`) for
 diagnostic provenance only.
+
+## v18 correction
+
+The selected paragraph readers and replay preconditions now use the same
+marker-preserving scanner as their writers for:
+
+- `replace_table_cell_paragraph_text`;
+- `replace_block_content_control_paragraph_text`; and
+- `replace_nested_table_cell_paragraph_text`.
+
+Their whole-cell counterpart remains strict. This keeps changed text,
+readback, forward replay, inverse replay, and stale preconditions coherent
+without a second scan or an untyped fallback. The focused native test edits a
+bookmarked paragraph through all three routes, checks every marker and new
+text, then proves durable replay and inverse restoration through the shared
+`commit_and_check` path. The all-feature signed DOCX no-op/cancellation test
+also passes after the route changes.
+
+| v18 log | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `selected-routes-v18.log` | 529 | `552a514ade4600fedec1f6b999d696c2bb39d9bc5306ae7d944898e7a3c9ec94` |
+| `signature-test-v18.log` | 620 | `f7b6c9a758fa2848e33e3b9194b9f9891564445fabb9acc5a69d5228237f8dbc` |
