@@ -3,7 +3,16 @@
 //! prevents the qualification workload from silently drifting from the
 //! tested graph and metadata sidecars.
 
-include!("../tests/body_footnote.rs");
+#[allow(dead_code)]
+mod body_footnote {
+    include!("../tests/body_footnote.rs");
+
+    pub(super) fn generated() -> Vec<u8> {
+        build_fixture()
+            .expect("synthetic body-footnote fixture")
+            .bytes
+    }
+}
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -14,6 +23,6 @@ fn main() {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| panic!("usage: generate_footnote_fixture --output PATH"));
     assert!(args.next().is_none(), "unexpected generator argument");
-    let fixture = build_fixture().expect("synthetic body-footnote fixture");
-    std::fs::write(output, fixture.bytes).expect("write generated body-footnote fixture");
+    std::fs::write(output, body_footnote::generated())
+        .expect("write generated body-footnote fixture");
 }

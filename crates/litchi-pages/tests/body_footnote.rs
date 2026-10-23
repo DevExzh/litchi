@@ -1,9 +1,9 @@
-//! Integration coverage for the selector-first Pages body-footnote lifecycle.
-//!
-//! The fixture deliberately carries the native metadata sidecar as well as
-//! the rooted body graph.  Lifecycle edits are expected to publish one exact
-//! candidate across the document and metadata components; the tests below
-//! keep that contract visible while the owner implementation grows.
+// Integration coverage for the selector-first Pages body-footnote lifecycle.
+//
+// The fixture deliberately carries the native metadata sidecar as well as
+// the rooted body graph.  Lifecycle edits are expected to publish one exact
+// candidate across the document and metadata components; the tests below
+// keep that contract visible while the owner implementation grows.
 
 use std::io;
 
@@ -14,7 +14,9 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp, tswp};
-use litchi_pages::footnote::body::{Footnote, Position, Selector};
+use litchi_pages::footnote::body::Position;
+#[cfg(test)]
+use litchi_pages::footnote::body::{Footnote, Selector};
 use litchi_pages::{Package, footnote::body::transaction::Error as BodyFootnoteError};
 use prost::Message as _;
 
