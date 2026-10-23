@@ -2020,3 +2020,960 @@ See [0063](0063-source-pptx-modern-comments.md).
   exception is granted. Three workers continue these bounded repairs; native
   qualification, remaining integrations, the complete inventory/glossary sweep
   and final 53-check gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, resumed handoff and combined repairs):
+  Read the updated external `.coord/ctx-resume.txt` and
+  `.coord/triage-2026-10-22.md` before continuing. The replay integration
+  branch now includes trunk `a18593385c`, RTF through `5909588b99`, DOCX
+  paragraph-copy through `9f1b3eb45f`, and durable Ink through `f97f0eef7a`.
+  Its current head is `3c1d25de24`. Conflict resolutions preserve inverse
+  RTF diagnostics, generic return checking and Ink source-owner sharing.
+  Record 0362u retains 63 passing focused RTF tests and 144 combined DOCX
+  tests, strict DOCX/ops/XLSB Clippy, all five RTF result rules and fresh
+  DOCX minimal/full profiles with 42/43 result contracts. These are
+  integration receipts, not final performance or trunk acceptance.
+
+  The resumed full gate on older assembly `ad1c6cede8` completed: its actual
+  script ran 52 checks, with 48 passing and four failing. Workspace docs
+  passed, including the earlier memory-sensitive IWA documentation. Ops
+  failed on seven stale RTF consumers and two XLSB refusal assertions;
+  committed repairs `0641d926aa` and `759b09f0d9` now pass focused checks.
+  Facade/workspace tests also found a missing doctest import and ZIP refusal
+  mismatch; native-resave found an out-of-date lockfile. ZIP repair
+  `a4d69035be` passes 104 affected tests and strict Clippy on its branch.
+  The doctest and locked-tool repairs are being validated in the assembly.
+  All failed logs are preserved; the earlier 225-group run remains partial.
+
+  W4 owner compaction and sequential-reader policy propagation are committed
+  as `da0068d02b`: 1,816 library tests, five reader-policy tests, 18 tab-state
+  tests and Clippy pass. Its allocation residual and proof-backed history
+  costs remain unaccepted. Capability review found that old slicer/timeline
+  stores exposed physical relationship IDs and part names; the typed raw
+  replacement `47c89d20da` is under review for bounded policy, fidelity and
+  full validation. XLSB raw-policy slices reach `1309cfc15e`, but retained
+  default-policy leaks are still being repaired; its closure claim is not
+  accepted. No capability golden was changed to hide these gaps.
+
+  The updated signed-replay decision permits exact no-op replay on matching
+  signed content through both leaf and File, preserving signed bytes.
+  Candidate `7e7cfe421c` is under review for removal-authorized, changed-base
+  and freshness cases. Changed signed content remains refused. DOCX's fresh
+  inventory has 27 rows in implemented categories; variables and SVG
+  migrations are active, with remaining document/section/story work required.
+
+  Record 0361fda formally returns iWork constructor and retained-header
+  instruction regressions from the resumed 0361fd evidence. New constructor
+  repairs require matched measurement; no host-noise waiver applies. ODF
+  raw styles, W5 legacy costs, ODP retained-content heap and DOC body-toggle
+  work continue in isolated branches. Native qualification for all remaining
+  candidates, final inventory/glossary, corpus dispositions and the final
+  combined gate remain required. The user authorized additional parallel
+  workers; builds remain capped. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, legacy/ODF assembly and replay review):
+  The integration branch reaches `bf529cb322`. It contains the detector and
+  resave-lock repairs `557577e512`, ZIP integration `532cd8634b`, and W5/ODF
+  through `8d1199f45e`. Record 0362uc preserves all three failed all-features
+  harness attempts and the passing repairs: current XLSX adapters take
+  precedence over legacy adapters, and the XLSB CRUD driver uses the fixed
+  error reason. The locked workspace all-target/all-feature check, locked
+  harness and native-resave checks, benchmark matrix and crate boundaries
+  pass. The ZIP integration passes 657 tests with two existing ignored tests;
+  the detector facade passes all 20 doctests. These remain assembly receipts,
+  not final trunk or native-performance acceptance.
+
+  DOCX SVG cleanup `135a7b6e63` is being validated in that assembly. Variables
+  reach `5200fb8743`, with a further borrowed/owned input-policy review open.
+  Standalone document, section, story/glossary, paragraph-copy and
+  redaction/sanitize/hyperlink API migrations have separate workers. Public
+  raw codec capabilities must remain available without renamed snapshot
+  publication or additional per-operation copies. The fresh full-feature
+  SVG capture passes both policy checks; a separate minimal-feature capture
+  and the final combined inventory remain required.
+
+  XLSB `89146628f3` re-admits durable content under the recipient's actual
+  raw limits rather than rejecting a wider producer profile. Review found
+  additional stale-base error paths; 0360el is repairing these and checking
+  byte admission before copying replay images. Separate ODF and legacy
+  reviews are repairing public replay/freshness classifications. Substrate
+  scope record 0362rd is an audit proposal, not an exemption or completed
+  migration.
+
+  Signed replay candidate `7e7cfe421c` was returned: an unsigned endpoint
+  cannot be promoted to signed merely because it retains old source bytes.
+  The repair must construct and replay an actual signed no-op while preserving
+  independently reopened unsigned equivalence. ODP candidate `bd7a095a56`
+  reduces cold heap but retains a semantic reread/allocation regression;
+  0362ya records it without acceptance. The iWork object-size and constructor
+  costs, W4 admission residual, DOC body-toggle work and RTF refusal cost
+  remain open. Record 0359r rejects the measured packed-Refusal experiment.
+  Final semantic integration tests, native qualification, corpus dispositions,
+  inventory/glossary closure and the complete assembled gate remain required.
+  Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, bounded raw models and semantic assembly):
+  Record 0362uc now records all nine combined legacy/ODF semantic groups on
+  `50122ae80a`: 750 tests pass. The runner stopped at its target-size guard
+  before the final ODT group, then passed that group after obsolete check-only
+  metadata was moved outside the target. Both stops and external log hashes
+  are retained; the eight passing groups were not repeated.
+
+  The assembly advances through `8d50e23436`. It integrates bounded DOCX
+  variables through `7dae046af8`, the paragraph raw-codec repair through
+  `e1af87ed91`, DOC body-toggle staging through `2452934481`, signed exact
+  no-op replay through `ba8f9610aa`, and DOCX/iWork error classifications
+  through `938108c265`. Raw paragraph replay accepts reopened matching XML;
+  package replay keeps its full artifact proof and preflights recipient limits
+  before copying. The combined checks on this head are running: variables,
+  the five related DOCX integration suites, DOC atomicity, and DOC/DOCX facade
+  suites have passed. This is an assembly checkpoint, not final acceptance.
+
+  Review record 0360ada returns XLSX raw batch admission, retained-policy and
+  owner-options gaps. Record 0359sa returns legacy raw stale-base errors that
+  still use corruption categories; actual stale replay must be PatchConflict.
+  ODP progress repair now also preserves secondary callback diagnostics; its
+  inline error growth was caught and corrected before integration. The ODP
+  streaming correctness repairs pass on their branch, while matched original
+  0358a lifecycle measurements remain in progress.
+
+  DOC and RTF measurement attribution was tightened. DOC's historical
+  single-route whole-process profile included an unselected 1k batch seed;
+  route-local ordinary-edit instructions are 0.988216 of base, and the probe
+  selection correction is queued as `428bf4d44a`. The RTF cold parser delta
+  disappears with matched executable path/arguments/environment, as recorded
+  in `eabd1d9f47`; native timing and heap qualification remain required. iWork
+  fixes the mutable MessageInfo length admission bypass, but its constructor
+  cost and one retained-validation case remain returned.
+
+  Remaining DOCX raw/document/section/story migrations, signed same-value and
+  cancelling edits, IWA detection consumers, W4/W4b returns, public ODF error
+  boundaries, final inventory/glossary, corpus dispositions, native performance
+  qualification and the complete assembled gate remain required. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, completed combined checks and next returns):
+  Record 0362ud commits all seven passing checks on `8d50e23436`: 183 semantic
+  and facade tests, strict DOCX/DOC/ops all-target/all-feature Clippy, and the
+  locked all-feature performance harness check. The integration branch then
+  advances to `6571179db7`, merging the corrected DOC probe selection and
+  seven typed legacy raw replay conflicts. These later changes still require
+  combined validation; record 0362ud describes its exact earlier source head.
+
+  The ODP freshness candidate preserves progress and secondary diagnostics
+  with its original error layout, but boundary review found missing facade
+  plumbing and lossy save/materialization conversion. The additional return
+  is recorded in 0362rha; 0362rhb is repairing it. Record 0362yda returns the
+  matched ODP allocation/instruction increases and requires route-level
+  attribution and semantic output checks. Native qualification is still open;
+  noisy timing attempts are retained without an acceptance claim.
+
+  DOCX story projection sharing passes its focused checks, but original
+  consuming-Commit baseline measurements and independent raw replay chains
+  remain required. Redaction/sanitize review found admission after allocation
+  and caller-controlled relationship IDs in changed public errors; 0362rga
+  is repairing them while preserving artifact-bound inverse capability.
+  XLSX raw admission reaches `2d44bc4c55`, with independent review, strict
+  Clippy and matched insertion costs still pending. DOC's public body-text
+  conflict variant also needs the canonical PatchConflict name (0359sc).
+
+  All previous remaining engineering, corpus, inventory/glossary, native
+  performance and final assembled-gate requirements still apply. Nothing
+  has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay validation and resource recovery):
+  Record 0362ue preserves the combined replay runs and their corrections.
+  On `5fbcfc45e7`, 1,487 DOC, OLE and DataSpaces tests passed, with three
+  existing ignored tests. The next facade group stopped on denied
+  `unused_qualifications` lints introduced by a module-level test import;
+  `eb931ca487` corrects that import. The earlier protected-DOC assertion was
+  also corrected: matching protected content still requires authorization,
+  while changed content returns `PatchConflict`.
+
+  The integration branch reaches `c2122e2678`, including DataSpaces error
+  exhaustiveness, legacy alias removal, the qualified substrate scope audit,
+  and DOC's consuming final handoff through `76391f1a71`. The DOC change
+  removes the redundant Vec clone; conversion into Arc storage still copies
+  once. Its matched performance qualification remains open. Forty glossary
+  checker tests pass after the new alias bans. A fresh seven-group combined
+  run is active on this fixed source; no result is inferred for unfinished
+  groups or newer worker branches.
+
+  Source branches now include the ODF public error-boundary migration
+  `6ad7dfd8e8`, canonical ODF streaming-limit and reader names `84469fd9e4`,
+  DOCX section migration `96c9c4ac5c`, and IWA package-triad migration
+  `5a5715688a`. Their remaining consumer checks and combined validation are
+  required before acceptance. DOCX document memoization was returned again:
+  generation tracking added allocations and invalidated unchanged branches.
+  Pinned Rust 1.95 source review confirms that the existing weak key already
+  invalidates on `Arc::make_mut`; the suspected in-place mutation hole was
+  not present. Memo allocation and branch reuse still need repair. Story raw
+  replay is under
+  independent review and still needs original-lifecycle qualification.
+
+  Performance returns remain active for XLSX raw admission and reader state,
+  XLSB reader reuse, DOC, RTF replay, ODP append and iWork constructors. The
+  ODP error repair has passing public facade/save regressions and unchanged
+  error layout, with final affected Clippy pending. Disk pressure temporarily
+  stopped all new builds; owners reclaimed inactive generated caches without
+  deleting protected measurement artifacts. Resumed commands use bounded
+  existing targets and a free-space guard. Final native qualification,
+  corpus dispositions, inventory/glossary closure and the complete assembled
+  gate remain required. Only the comprehensive redaction audit is deferred.
+  Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay checks complete and API assembly):
+  Record 0362ue now records all seven passing combined groups on
+  `c2122e2678`: 1,578 tests pass, with three existing ignored tests; strict
+  all-target/all-feature DOC/OLE/crypto/ops Clippy and the locked all-feature
+  performance harness check also pass. Receipt `eaae26801b` names that exact
+  source; it does not validate newer branches.
+
+  The assembly reaches `b588c1a65f`, integrating the canonical ODF names,
+  typed ODF replay/progress and public error boundaries, PPTX classifications,
+  DOCX document/story/section/redaction raw models, and IWA primary edits.
+  DOCX section and redaction facade consumers are migrated in their respective
+  local merge commits. These newer changes still require combined validation.
+  Further reviewed XLSX raw/reader-state, XLSB admitted-reader and consuming
+  DOC handoff repairs are queued for that validation snapshot.
+
+  Signed cancellation candidate `f3c5accd86` is returned: restoring the
+  endpoint alone leaves a changed native leaf patch, and unsigned coalescers
+  acquire unnecessary original-value tracking. The repair must produce a
+  genuine signed no-op patch, cover DOCX and invalid intermediate edits, and
+  keep ordinary unsigned costs unchanged. Required OPC raw constructor policy
+  and DOCX raw helper migrations remain active engineering work.
+
+  Independent iWork review identifies a constructor benchmark mismatch:
+  historical Vec construction was compared with new incremental collection
+  admission. The large direct ratios are not same-operation regression
+  evidence. Equivalent raw-constructor and full lifecycle qualification are
+  still required, alongside safe admission-ledger optimization. XLSX reader
+  evidence distinguishes requested bytes from lower live/peak heap and fewer
+  allocation calls; native qualification remains open. DOC, RTF and ODP
+  performance returns, corpus dispositions, final inventory/glossary closure
+  and the complete assembled gate remain required. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, extended assembly and policy returns):
+  The integration branch reaches `c48e382321`, adding reviewed XLSX raw
+  admission/reader state, XLSB raw policy/admitted-reader reuse, consuming
+  DOC body publication, and RTF shared replay storage. The original signed
+  no-op return remains unresolved; candidate `2ed47bf56e` still retains a
+  changed native patch behind an endpoint marker and is returned again.
+  The repair must produce a genuine native no-op bound to the signed source,
+  retain admission guards, and cover supported paragraph/run/story routes.
+
+  Record 0362uf preserves the assembled consumer checks. The first stopped
+  before compilation on the new ODF dependency's lock state; an offline
+  refresh corrects the generated workspace lock and the tracked harness
+  dependency edge. The next check reached XLSX and found a raw-budget plan
+  type mismatch and ambiguous closure error. The correction keeps original
+  owner metrics separate from the proposed relationship edit. These runs do
+  not count as completed consumer validation. Fifty-six glossary/iWork
+  checker unit tests pass; the earlier 1,578-test receipt remains tied to
+  `c2122e2678`.
+
+  Independent review returns two additional policy gaps. DOCX restored
+  replay must retain recipient semantic/source/cache/execution policy on
+  every path, including deferred endpoints, without losing proven same-owner
+  fast paths (0362rn). XLSX externally supplied packages must retain custom
+  cache policy and both package/facade execution contexts through deferred
+  materialization (0360aea). Both are being repaired and require tests.
+
+  OPC required-limit ingress and DOCX raw codec/helper migrations have source
+  commits and are under integration review; all consumers must move together.
+  The ODP lazy append-fact repair has no definite static correctness blocker,
+  but needs exact-source lifecycle qualification. RTF final-source allocation
+  and instruction measurements are running. Fair iWork constructor evidence
+  identifies required current-field admission costs; complete consumer
+  lifecycle qualification and safe optimization remain required.
+
+  Resource recovery removed 8.1 GB of proven unmeasured debug artifacts after
+  retaining hashes/provenance, and relocated the inactive root release cache
+  intact outside the target. No measured executable was deleted. Native
+  qualification, corpus dispositions, final inventory/glossary and the full
+  assembled gate remain open. Only the comprehensive redaction audit is
+  deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, policy review and consumer rerun):
+  The reviewed assembly reaches `d797add634`, adding corrected historical
+  DOCX error records, XLSB retained-provenance presence assertions, the RTF
+  final-source qualification receipt, and the external XLSX cache/context
+  repair. Independent review confirms that the XLSX owner retains the supplied
+  package's cache policy and both package/facade execution contexts through
+  deferred reads and writes. These changes still require combined validation.
+
+  Record 0362uf also preserves the DOCX compilation stop and correction:
+  a missing documentation-macro comma and denied redundant qualification
+  are fixed in `d43273a13b`. The fourth locked workspace/harness consumer
+  attempt is running on the fixed assembly. No unfinished command counts as
+  a pass; the last completed 1,578-test receipt remains tied to `c2122e2678`.
+
+  The final-source RTF receipt reports 34 focused tests passing, about
+  2.67 million fewer matched Callgrind instructions, and unchanged peak heap,
+  with three first-promotion allocations across the measured replay workload.
+  Native timing remains unqualified because compiler activity contaminated
+  the attempt. Its evidence is retained without a native acceptance claim.
+
+  OPC constructor review returns production calls that use default limits
+  instead of the existing package's retained policy, including replacement
+  relationship admission. XLSX raw aggregate review returns a lazy-payload
+  allocation bypass: `try_iter_parts()` decodes parts before the tighter raw
+  aggregate policy is checked. Both repairs remain required. DOCX raw helper
+  review likewise requires selected limits through MCE, semantic projection,
+  and output planning before allocation, while preserving shared resources.
+
+  DOCX cross-owner restored replay is being repaired with an explicit bounded
+  OPC artifact-stream path for deferred/effective endpoints. Producer source
+  checks and recipient output accounting must remain separate, including
+  nested restores; a full-artifact Vec fallback is not accepted. Genuine
+  signed native no-op patches, iWork constructor correctness and performance,
+  the other performance returns, corpus dispositions, final inventory/glossary
+  and the full assembled gate remain open. Only the comprehensive redaction
+  audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete consumer diagnostics and cleanup):
+  The assembly reaches `d686be4af0`. Record 0362uf preserves the fourth
+  and fifth check failures and their private DOCX accessor/ODT error-boundary
+  corrections. The sixth attempt on `a814baa1de` used `--keep-going`, passed
+  the format libraries, and exposed remaining ODF facade/native-test error
+  migrations and invalid nested PPTX refusal guards. Its runner ended without
+  saving a final exit receipt; the retained compiler log establishes failure,
+  not an inferred exit code or duration. The harness was not reached. Two
+  isolated DOCX/IWA test lints are corrected in `d686be4af0`; the other
+  consumer repairs are assigned as 0362ug–0362ui. The last completed
+  1,578-test receipt remains tied to `c2122e2678`.
+
+  XLSX raw aggregate candidate `5726f03c7d` now admits the original ledger
+  before proposed relationship allocations, retains admitted deferred payload
+  lengths, and adds malformed declared-size regressions. Static review and
+  combined runtime checks remain required, along with matched owned-open and
+  first-read costs for the added metadata. OPC constructor and token policy
+  work must preserve captured limits through every existing-owner operation.
+
+  DOCX restored replay is adopting a generic typed artifact-stream bridge
+  so producer errors survive the OPC boundary. Its final-output admission
+  must match the recipient's actual source policy, preserve nested output
+  accounting, and retain both primary freshness and secondary failures.
+  Catalog-only checks and whole-file materialization do not close that work.
+  Signed native no-op budget preservation remains under repair. The iWork
+  retained-header optimization also remains returned: mutations that change
+  nested encoded length must fall back to canonical serialization, and a
+  prior optimized candidate cannot establish that its failures pre-existed.
+
+  The owner requests periodic consolidation and removal of unused leaf
+  worktrees. Cleanup now checks merged ancestry, uncommitted/ignored data,
+  active processes and measurement references before removing source-only
+  checkouts; protected measurement artifacts and branch references remain.
+  All returned performance work, corpus dispositions, final inventory/glossary
+  and the complete assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, reviewed consumer repairs and consolidation):
+  The integration assembly reaches `7abf64f495`, with the independently
+  reviewed XLSX raw aggregate admission repair, stable PPTX refusal guards,
+  typed ODF facade errors, and native ODF consumer migration merged. ODF
+  staging now recodes only invalid-format/parse and generic unsupported
+  errors; source changes, resource limits, I/O, and typed refusals retain
+  their classifications. Combined consumer and semantic validation remains
+  required. The seventh consumer attempt ended during resource preflight:
+  the runner and target-size process are absent and no command log or exit
+  receipt exists. It establishes no compiler result. A separate runner starts the eighth
+  attempt on `7abf64f495` with an explicit process and source receipt.
+
+  Two clean, inactive merged worktrees were removed without forcing, freeing
+  341,943,958 bytes. Branch refs and exact recreation commands are retained;
+  eleven generated files were quarantined with hashes. Worktrees containing
+  measurement evidence, protected artifacts, or tracked changes remain intact.
+  The reduced cleanup receipt is recorded in `e726df19c1`.
+
+  The XLSX lifecycle harness is returned for correctness checks before its
+  measurements can qualify the raw aggregate change. OPC streamed publication
+  is adding exact prepared ZIP output metrics so recipient admission can run
+  before the first sink byte while reusing the prepared compressed data.
+  Recipient-policy enforcement, raw helper limits, signed native no-op budget
+  preservation, performance returns, corpus dispositions, final inventory and
+  glossary, and the complete assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, required-policy assembly and second cleanup):
+  The integration assembly reaches `b170204d17`. The eighth workspace
+  diagnostic pass finished with exit 101 after 439.95 seconds; record 0362uf
+  preserves its exact source, log hash and failure. Record 0362uj fixes the
+  remaining mixed core/ODF consumer boundaries, ODS test imports and XLSX
+  test calls without weakening assertions. The ninth locked workspace and
+  harness check is running on the assembled source; no pass is inferred.
+
+  Reviewed token-policy and required OPC constructor migrations are merged.
+  Conflict resolution retains owner/recipient limit intersections, atomic
+  content-type and relationship admission, tightened no-op relationship
+  validation, and XLSX source/cache/package/facade execution policies. The
+  raw aggregate reader and private fragment helper use the canonical names.
+  ZIP admission now reuses final prepared bytes before publication, preserves
+  scheduled preparation, and performs metadata scans only on policy paths.
+  A metadata iterator covers directory records without enlarging the retained
+  ordinary index. These changes still require combined runtime validation.
+
+  The XLSX lifecycle harness now fails on fidelity violations and has an
+  explicit source-version adapter for required OPC ingress. Current source
+  history probes contain only current APIs; the historical e63 probes have
+  pinned external source and overlay reproduction instructions. Measurements
+  against the final assembly remain required.
+
+  A second cleanup wave removed four clean, inactive merged leaves without
+  forcing, totaling 6,484,524,650 bytes of checkout contents. Branch refs and
+  exact recreation commands remain recorded in the cleanup receipt. Dirty
+  trees, measurement artifacts and protected executables were retained.
+
+  Independent review continues to return incomplete selected-limit and
+  preallocation paths in DOCX glossary helpers, generic streamed-publication
+  admission, and signed native no-op budget handling. Those branches remain
+  outside this assembly pending repair. The iWork constructor and ODP lifecycle
+  performance returns, native qualification, corpus dispositions, final
+  inventory/glossary, and full assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, native stream assembly and third cleanup):
+  The source assembly reaches `44901f50d1`, adding the bounded iWork
+  constructor/inline-version repair, ODP bounded text memo and append repair,
+  authenticated OPC stream publication and DOCX consumers, and concrete XLS
+  cell iteration with deferred target reopening. Independent static reviews
+  found no remaining blocker in these source proposals. Combined compilation,
+  semantic validation and performance qualification still determine acceptance.
+
+  DOCX merge resolution retains existing redaction patch types, typed
+  conflicts, source/effective fingerprint memos, cache/read-ahead policy and
+  native/facade contexts separately. It fixes an incoming context fallback
+  that would replace a native context or manage an originally unmanaged source.
+  New regressions exercise both combinations through deferred edits and both
+  restore paths. Freshness checks remain non-materializing.
+
+  Record 0362uf retains consumer attempts 10–13. The focused OPC library/unit
+  test check progressed to external consumer imports, which record 0362ul
+  repairs. The ignored workspace lock was refreshed offline after the iWork
+  dependency change. The first assembled stream check then failed on new
+  stream helper/type scopes, retained-field mismatches, generic ownership and
+  denied lints. Those compiler repairs are in progress; no workspace, harness
+  or semantic pass is inferred from the stopped checks.
+
+  A third cleanup wave removed five clean, inactive merged leaves without
+  forcing, totaling 12,743,246,777 bytes of checkout contents. Branch refs,
+  exact recreation commands, and measurement evidence remain retained; four
+  ignored generated files were quarantined with hashes.
+
+  DOCX raw helper selected-limit and consumer repairs, signed native no-op
+  coverage/accounting, and ODraw residual review remain active. The XLSX raw
+  baseline qualification build is being prepared. All native qualification,
+  corpus dispositions, final inventory/glossary, and the complete assembled
+  gate remain open. Only the comprehensive redaction audit is deferred.
+  Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, runtime admission and fourth cleanup):
+  The integration assembly reaches `ff86f4a1c0`, incorporating the complete
+  required-policy consumer migration, ODraw retained-policy/raw-limit closure,
+  XLS concrete iteration/deferred reopen, reproducible ODP probe routing, and
+  the XLSX historical raw qualification harness. Record 0362uf preserves the
+  fourteenth and fifteenth workspace compiler failures and their repairs.
+  The sixteenth all-target/all-feature workspace and harness pass is running;
+  no unfinished result counts as a pass.
+
+  OPC runtime validation on `8acd229235` passes all 714 library tests. It
+  follows repairs for two policy-confounded fixtures and a real final-output
+  admission bypass: appended replacement relationships must be counted even
+  when the original relationship entry is omitted. ZIP runtime validation
+  reaches 505 passing tests and one failing ZIP64/comment geometry regression;
+  that failure remains assigned for diagnosis and repair.
+
+  DOCX whole-owner replay now checks source freshness, complete base identity,
+  recipient policy and the redaction inverse capability before publication.
+  Same-owner and equal-content ordinary restores retain their supported paths;
+  unrelated content changes cannot fall back to scoped replay. The raw-helper
+  branch remains unmerged pending generated-root shape admission before capture
+  and elimination of duplicate catalog planning, despite its passing leaf
+  library receipt. Signed native no-op accounting also remains under repair.
+
+  The tooling pass records 1,334 tests with one matrix coverage failure, plus
+  archive-header boundary coverage and dependency-classification failures.
+  The matrix repair now preserves allocator/instruction diagnostics and
+  explicitly unqualified native results, without inventing comparison ratios
+  for unpaired values. Crate-boundary fixes and the assembled rerun remain open.
+
+  A fourth cleanup wave removed six clean, inactive merged leaves without
+  forcing, totaling 37,259,489,031 bytes of checkout contents. Seven generated
+  files (457,223 bytes) were quarantined with hashes. Branch references,
+  recreation commands, measurement evidence and active worktrees are retained.
+
+  Native qualification, full corpus replay/dispositions, final inventory and
+  glossary, and the complete assembled gate remain required. The integration
+  branch is staging these changes; they are not yet accepted into trunk. Only
+  the comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, prepared DOCX admission and tooling pass):
+  The integration assembly reaches `c9e8d8dfbf`. The DOCX raw-helper chain
+  is merged after final review of prepared graph admission: known incoming
+  catalog/graph bounds precede current-source capture, generated XML is
+  admitted before retained allocation, and canonical reads reuse same-policy
+  admission while preserving MCE and semantic validation. Merge resolution
+  retains the current required OPC constructors and recipient-policy calls.
+  The final leaf library receipt records 1,491 tests passing on `3b3a7c66fb`;
+  it is separate from combined assembly validation.
+
+  ZIP passes all 506 library tests; OPC's prior 714-test pass remains tied to
+  `8acd229235`. All eight Python tooling unittest modules pass (1,340 tests)
+  on `828d9473da`. Record 0362uf preserves the seventeenth workspace failure
+  and its complete consumer repair. The eighteenth check confirms four
+  glossary default-policy helpers are now used only by unit tests; production
+  compilation rejects them as dead code. Their test-only scoping and another
+  assembled rerun remain required. Neither stopped run reaches the harness.
+
+  Corrected glossary/OLE records distinguish implemented source from pending
+  qualification. Both W4/W4b tips are already ancestors; content-matching
+  replay is implemented across the assigned formats. Public ODF archive,
+  manifest and raw-writer limit paths remain required and are assigned to a
+  dedicated leaf. Standalone generic CFB/ZIP primitives are not silently
+  treated as format-facing API debt; public format leaks remain in scope.
+
+  The frozen XLSX candidate at `ff86f4a1c0` passes 16/16 fidelity operations
+  in each allocator/native/Callgrind run. Its instruction total is 0.2965%
+  above the pinned historical baseline; owned-open and first-read costs are
+  reported separately. Concurrent compiler activity means native timing is
+  unqualified. Signed snapshot accounting is split into XLSX/shared, XLSB,
+  and PPTX repair lanes; complete pre-capture budget enforcement remains
+  under review. The XLS deferred-reopen qualification harness is also being
+  corrected before measurement.
+
+  A fifth cleanup wave removed three clean, inactive merged source leaves
+  without forcing, totaling 18,782,352,655 bytes of checkout contents. Two
+  generated bytecode files (323,671 bytes) were quarantined with hashes. All
+  protected targets, measurement artifacts, active leaves and branch refs
+  remain retained. The reduced receipt is merged through `a7e4393bbf`.
+
+  Native qualification, full corpus replay/dispositions, final current
+  inventory/glossary validation and the complete assembled gate remain open.
+  Source integration is not yet accepted into trunk. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, combined DOCX pass and ODF raw assembly):
+  The integration branch reaches `16ba04ff9f`. Required ODF archive, manifest
+  and raw-writer policies are assembled, including retained facade policies
+  and flat-projection XML limits. Internal ZIP scratch projections retain
+  their explicit source-ceiling distinction without widening XML policy.
+  Static review found no extra publication, source copy or scan. Combined
+  runtime and performance qualification remain required.
+
+  The assembled DOCX library passes all 1,515 tests on `d1a49d80a1`. The
+  execution-context regression now exercises the deferred publication
+  boundary directly and both restore paths; its earlier fixture and type
+  failures remain recorded. OPC/ZIP all-target/all-feature compilation passes.
+  Workspace checking stops on ODF policy getter/import and remaining consumer
+  qualifications/imports across ODF, DOCX and XLSB. Those are assigned as one
+  repair batch. Both harness compiler groups remain unreached. The prior
+  workspace formatting pass is recorded separately from these later merges.
+
+  Signed-edit review returned missing pre-capture admission across XLSX
+  feature/cell paths, XLSB lazy patch payloads, PPTX source edits and DOCX
+  facade XML captures. Shared dispatcher feature configurations and remaining
+  budgets also need repair. These leaves remain outside the assembly. The
+  semantic retention budget continues to charge native package/patch data,
+  not derived parser/cache memory; signed replacement phases retain their
+  staged charge and release discarded proofs before canonical capture.
+
+  XLS deferred-cell qualification exposed original-source freshness gaps at
+  commit, first read, output and same-owner replay. The source repair and
+  independent replay/lineage harness are under review before measurement.
+  Other compiler activity still prevents a quiet-host timing claim.
+
+  A sixth cleanup wave removed six merged, inactive source leaves without
+  force, reclaiming 31,566,664,232 checkout bytes. Eight generated files
+  totaling 6,444,308 bytes were quarantined with hashes. Branch references,
+  recreation commands, external DOCX build output, protected measurement
+  executables and evidence remain retained. Receipt `dbd343ebd1` is merged.
+
+  Native qualification, full corpus replay/dispositions, final current
+  inventory/glossary and the complete assembled gate remain open. Source
+  integration has not yet been accepted into trunk. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, workspace and harness compilation):
+  The source integration reaches `3107f05f23`. Workspace checking with all
+  targets/features passes on `7de3789ede`; the complete performance harness
+  and isolated XLSX raw harness both compile with all targets/features on
+  `808f9883a0`. Their consumer migrations preserve existing workload and
+  publication timing boundaries. Record 0362uf retains exact source and log
+  hashes for both successes and the preceding failures.
+
+  The third broad Clippy pass reaches XLSX, DOCX and XLSB production/test
+  lints after the complete OPC/ODF cleanup. Its terminal failure is recorded
+  and the whole diagnosed batch is assigned for repair. These compilation
+  results do not constitute the complete 53-check gate or native qualification.
+
+  A separate diagnostic branch, `uo2/budget-validation`, composes signed
+  native budget proposals with the current immutable owner and required-policy
+  APIs. Its first compilation exposed a stale OPC retained-field reference;
+  that failure and repair are recorded in 0362up. A new combined native/facade
+  check is running on `3ae4cb2420`. Review still requires exact XLSX capture
+  accounting without extra endpoint scans, PPTX sizing without a second graph
+  proof, and final verification of DOCX admission before snapshot capture.
+  This diagnostic branch is not accepted into the source integration or trunk.
+
+  A seventh cleanup wave removed two clean, inactive merged leaf worktrees
+  without force, reclaiming 12,522,187,690 checkout bytes. Branch references
+  and recreation commands remain recorded; dirty leaves, build targets and
+  measurement evidence were preserved. Receipt `e16821b336` is merged.
+
+  XLS deferred-reopen fidelity/provenance repair, native qualification, full
+  corpus replay/dispositions, final inventory/glossary and the complete
+  assembled gate remain required. Source integration is not yet accepted into
+  trunk. Only the comprehensive redaction audit is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-23, isolated documentation pass):
+  The exact workspace documentation gate passes on `0f8ce50050`, with
+  warnings denied, one Cargo job and a 20 GB memory cap. The 316.00-second
+  passing run has no diagnostic output and a 3,440,007,569-byte target.
+  Preceding isolated runs exposed stale ODB, ODC and OPC links and a public
+  OLE link to private state; all are corrected and their failures retained
+  in 0362uf. No memory kill occurred in these reruns. This closes the
+  documentation failure on that source, not the full 53-check gate.
+
+  Integration now reaches `045d3721ae`, including the independently reviewed
+  Clippy v3 batch and the Numbers native limit payload repair. Numbers now
+  preserves exact kind/observed/maximum values through popup/reply helpers;
+  reply-specific field/nesting mapping retains its existing public axes.
+  The fourth broad Clippy run and a combined Numbers library run are queued
+  together on the fresh documentation target. Results remain pending.
+
+  Diagnostic budget composition reaches `152eb8a53b`. Scoped DOCX, XLSB and
+  XLSX feature reviews are clear, but shared XLSX cell transfer/cancellation
+  accounting, rich-text fidelity and native metadata preparation still need
+  repair. Review returned late target admission, duplicate metadata planning
+  and noncanonical limit entry points; no such behavior is accepted. A new
+  combined native/facade compiler check is running. XLS deferred freshness
+  review additionally covers cold materialization and package output handoff.
+
+  The eighth cleanup removed three clean inactive leaves, retaining their
+  branch references and exact recreation commands, and reclaimed
+  18,784,234,793 checkout bytes. Generated cache was moved reversibly to an
+  external hashed quarantine, reducing the main target by 440,535,840
+  apparent bytes. Hard-link accounting and restoration evidence are retained;
+  measured/release binaries and dirty worktrees were preserved.
+
+  Source integration is still staging, not accepted into trunk. Final
+  combined runtime validation, native qualification, corpus dispositions,
+  inventory/glossary and the complete gate remain required. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, workspace Clippy pass and budget review):
+  Workspace Clippy with all targets/features and warnings denied passes on
+  `c3a9a0cef4` in 213.64 seconds. Its preceding run found an internal raw
+  container size lint and a nested Numbers test import. The container keeps
+  the complete ODF policy on the stack without an extra allocation; its
+  narrow expectation applies only when both variants exist. The Numbers
+  library run is still active on this same frozen source.
+
+  Diagnostic budget composition reaches `62c11a3dde`. The reviewed combined
+  XLSX sheet-property/filter repair `750d918386` charges the peak of sequential
+  discarded native proofs and final endpoints, including shrinking and
+  expanding edits. Common metadata `1929682421` passes scoped API/fidelity
+  review for prepared layout reuse, escaping, relationship-ID release and
+  no-op identity. Default-path overhead still needs performance qualification.
+  Shared XLSX cell fidelity/accounting and metadata endpoint admission remain
+  returned engineering work, assigned to separate workers. No diagnostic
+  source has been accepted into the main integration or trunk.
+
+  XLS source-freshness repair `c2ca0efbe8` passed static review and is composed
+  with current immutable OLE policies. Combined compilation exposed regression
+  test coordinate types and stale helper/API references; narrow fixes are
+  committed and the seventh native check is active. Runtime source-fence and
+  fresh F3 qualification remain required. The complete gate, native measures,
+  corpus replay/dispositions and final inventory/glossary remain open.
+  Only the comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, Numbers/XLS runtime and ninth cleanup):
+  Main integration reaches `eed44807af`. Workspace Clippy passes on
+  `c3a9a0cef4`, followed by 488 passing Numbers library tests and four ignored
+  cases. Record 0362uf retains exact commands and log hashes. The glossary
+  now closes integrated DOCX helper/model and ODF raw-limit source rows;
+  fresh rustdoc inventory, native/performance and final-gate statuses remain
+  explicitly open. These documentation changes do not claim acceptance.
+
+  Diagnostic composition reaches `374fb0e5d9`. Common OOXML passes 482 tests
+  on `af09b4fcf9`. A generated numeric XLS fixture repairs seven setup failures
+  without weakening the new freshness assertions. The full XLS unit and
+  integration run then passes 1,863 tests across 85 suites, with one ignored,
+  on `374fb0e5d9`. XLSX library tests are still running on that frozen source.
+  Native compiler checking has reached the facade, where the complete batch
+  of consumer type/import/borrow diagnostics is assigned for repair.
+
+  The second XLSX cell proposal fixes plain/rich transfers, source styles,
+  ordinary transfer atomicity, existing merges and hyperlink aggregation,
+  but review still returns effective-style composition, bounded no-op joins,
+  exact no-op admission and repeated rich-text source scans. Separate workers
+  own cell accounting, bulk rich reads and metadata endpoint admission.
+  None is accepted as an exception. DOC final qualification is preparing a
+  controlled, provenance-recorded baseline that retains current error codes.
+
+  The ninth cleanup removes two clean merged leaves and reclaims
+  12,518,628,337 apparent checkout bytes. Two ignored files totaling 151,969
+  bytes are held in an external hashed quarantine with a restore script;
+  branch references, active/dirty leaves, build targets and measurements are
+  retained. Receipt `95904ba027` is merged into the main integration.
+
+  Full combined runtime/gates, native and quiet-host qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain required.
+  Source integration has not been accepted into trunk. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, strict budget compilation and scoped proofs):
+  Main integration reaches `66110f0fb9`. DOC final qualification now includes
+  the structural CHPX audit: removed history blocks are unreachable through
+  the active FIB/BTE graph, and all 28 active formatting-page payloads and
+  ranges are unchanged. The ordinary route is byte-exact. Record 0359qe
+  preserves the controlled baseline, instruction/heap results and the pending
+  quiet-host timing boundary. Reviewed DOCX Ink and ODP qualification harnesses
+  are merged; fresh builds and correctness preflights are starting. Harness
+  infrastructure does not itself establish performance acceptance.
+
+  Diagnostic budget composition reaches `4470ecce16`. Strict combined
+  all-target/all-feature native/facade compilation passes on `2cadd934b7`,
+  followed by the facade without default features. Metadata runtime initially
+  passes ten tests and exposes one empty-fixture setup error; the corrected
+  populated fixture then passes all eleven tests, preserving exact-limit and
+  one-below assertions. Record 0362up retains source/command/log receipts.
+  Cache-independent endpoint accounting and bulk rich-transfer fidelity
+  passed scoped review. The two PPTX runtime repairs and obsolete helper
+  removal are composed, with combined PPTX runtime validation now running.
+
+  The new cell-normalization proposal `06afe43fa0` remains under review for
+  atomic joins, signed and source-equivalent no-ops, typed error preservation
+  and default-path costs. It has not been accepted. IWork qualification is
+  returned for its original footnote workload, semantic expectations and
+  complete validation proofs; W4b/W5 orchestration is correcting analyzer
+  output and stale-result isolation. These remain engineering requirements.
+
+  The tenth cleanup removes one clean merged metadata leaf without force,
+  reclaiming 6,262,042,222 apparent bytes. Its ignored 139,592-byte lockfile
+  is retained in a hashed external quarantine with restoration instructions.
+  Two other leaves remain because active processes hold their directories
+  or files. Branch references, targets and measurement artifacts are retained;
+  receipt `3baa225cf8` is merged.
+
+  Final combined runtime/gates, native and quiet-host qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain required.
+  Source integration is still staging, not accepted into trunk. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete facade return and qualification readiness):
+  Main integration reaches `8300a93345`. Reviewed W4b/W5 execution tooling
+  now prepares explicitly selected historical/current source pairs, guards
+  the recorded baseline consumer adaptations, preserves real analyzer output
+  and rejects stale result files. Its upstream-checkout rejection guard no
+  longer matches the lexical test itself; all three reference tests pass on
+  the assembled content. The final inventory note records decimal target
+  limits, valid cache reuse and completed design/replay source work without
+  claiming a fresh inventory or final gate pass.
+
+  Diagnostic composition reaches `d4d1820dbe`. All eleven metadata-focused
+  XLSX tests and all 27 PPTX module tests pass on `4470ecce16`. The broader
+  all-feature facade suite on `55051a8e4f` passes 993 tests and fails nine.
+  Record 0362upa returns the complete batch: DOCX classification, retained
+  hyperlinks and signed no-op behavior; ODF typed-cause assertions; signed
+  DOC/XLS no-op/cancellation policy; and signed PPTX cancellation. The two
+  ODF assertions now retain their contract-correct core cause, and reviewed
+  PPTX private unsigned staging permits cancellation proof before the signed
+  publication fence. Their runtime rerun remains required. DOCX and legacy
+  repairs are active. The runner stopped before XLSB, which remains queued.
+
+  Shared XLSX normalization remains returned on the separate current-source
+  repair leaf `b2a1e6e735`: explicit empty-cell fidelity, native string
+  identity, failed-setter atomicity, compact join planning, bounded lookup
+  cost and typed normalization errors must all be corrected. Temporary
+  compiler overlays are no longer needed on that composed source.
+
+  DOCX Ink qualification retains the original baseline and explicitly
+  records shared-source changes for the integrated-route comparison. The
+  streamed digest correction and all producer/runner/collector provenance
+  consumers passed review; a fresh matched build is active. Earlier partial
+  runs remain preserved. ODP's candidate release build succeeded, but its
+  probe needs separate same-owner whole-artifact inverse proof and reopened
+  content-scope proof; untimed correctness must run without a quiet-host
+  requirement. The old binary cannot qualify the corrected probe. IWork
+  baseline mapping preserves the original constructor and owner sources;
+  its integrated source-delta successor is under review before real builds.
+
+  W8 readiness preserves `f2bbbc8d07` as the original baseline, with a
+  workload-equivalent compatibility overlay still required. The 0359qe
+  matrix rows are reviewed as diagnostics, with busy-host wall results
+  explicitly unqualified. Final provenance tooling still needs exact ops
+  package binding. No source archive, binary or measurement result is
+  silently reused under a different baseline label.
+
+  Additional cleanup assessment retains leaves with active evidence handles
+  and all protected build/measurement artifacts. Verified stale read-only
+  Git commands from completed reviews were stopped; source and build work
+  were not interrupted. The earlier ten cleanup receipts remain authoritative.
+
+  Full combined runtime/gates, quiet-host native qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain open.
+  Source integration is staging, not accepted into trunk. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete facade/XLSX passes and original baselines):
+  Main integration reaches `a658b88ee3`. The complete all-feature facade
+  library passes all 1,002 tests on diagnostic source `bf09ddfd9c`, closing
+  the nine v12 failures. The full all-feature XLSX library passes 1,871 tests
+  on `a58dbaceb3`; representation-aware normalization, atomic joins and typed
+  failure sources passed independent review. Unbounded rich setters avoid
+  eager source reads, and join refusal restores both edits without cloning
+  whole edits or retained action payloads. Record 0362upe retains source,
+  commands, hashes and durable external log mirrors; native performance
+  qualification remains open.
+
+  Diagnostic composition reaches `47caed4627`. The complete DOCX library
+  passes all 1,519 tests on this source. A preceding full run exposed bookmark
+  loss risk in whole-cell replacement. The corrected shared scanner keeps
+  whole-cell operations strict, while paragraph writers, readback and replay
+  preconditions consistently preserve markers. New direct, nested-cell and
+  content-control proofs cover changed text, durable replay and inverse
+  restoration. The workspace all-target/all-feature Clippy run is active.
+  Signed DOC fallback now preflights the original CFB under caller limits
+  before private signature removal; exact DOC/XLS no-ops and cancellation
+  pass the complete facade suite. These source repairs are reviewed and
+  composed, not accepted as performance exceptions.
+
+  XLSB now passes 771 library tests with one remaining transitive replay
+  fixture assertion: both retained original content-types images can differ
+  from the effective publication after different edit generations. Its owner
+  is running the focused cases while preserving exact archive, effective
+  graph and untouched payload/relationship checks. Records 0362up/0362upa
+  retain all complete runtime failures and successes. The full assembled
+  gate remains required.
+
+  DOCX Ink matched correctness and allocation preflight passes all six routes;
+  candidate allocations are lower or equal, with native timing unclaimed.
+  ODP's original e4a baseline now builds and passes its six untimed legacy
+  proofs on the frozen fixture. Its adapter preserves the actual legacy
+  materialize/write and plan/publication lifecycle. Shared timing routes are
+  open, read, write and append; candidate-only patch/inverse/scoped correctness
+  remains strict. A final candidate build and paired qualification are pending.
+
+  IWork qualification now preserves the original constructor/owner baselines
+  and the exact seed registry resolutions. Initial metadata preparation
+  preserves all common identities and admits only the reviewed SmallVec
+  addition; release builds remain locked. Producer, validator, runner and
+  collector bindings passed review. Fresh matched builds and untimed
+  preflights are active. W8's baseline tool now verifies the complete pristine
+  f2 source tree and uses only four probe consumer adaptations; all 109 route
+  bindings retain native/facade workloads and publication boundaries. The
+  original-baseline build is active; no new timing result is claimed.
+
+  The final inventory runner is merged. It captures all 68 direct library
+  packages with all features and hidden items, validates source/lock/toolchain
+  stability around captures, records capped execution and peak RSS, uses
+  external temporary storage, and leaves disposition decisions for review.
+  Fresh final-source inventory and glossary validation have not run yet.
+
+  The eleventh cleanup removes one clean inactive merged worktree without
+  force, retaining its branch and quarantining its 139,553-byte lockfile.
+  The removed checkout represented 6,257,821,238 apparent bytes. An abandoned
+  1,060,162,316-byte ODF partial checkout was relocated with a complete external
+  manifest and restore helper; that relocation is not counted as disk space
+  freed. Protected targets, measurements and active leaves remain untouched.
+
+  Final runtime/gates, quiet-host native qualification, corpus dispositions
+  and fresh inventory/glossary validation remain required. Source integration
+  is staging, not accepted into trunk. Only the comprehensive redaction audit
+  is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, shared types and twelfth cleanup):
+  Main integration and diagnostic composition reach `5dae0abf78`. The earlier
+  XLSB return is closed: all 772 all-feature library tests pass on
+  `73a38420b8`, with logical transitive member comparison scoped by the existing
+  OPC contract and same-owner/unreferenced exact checks retained. The full
+  facade, DOCX and XLSX passes recorded above remain source-pinned evidence;
+  the complete final gate is still required.
+
+  The final-sweep audit found changed-only Diagnostics and plain Commit copies
+  still required to migrate under 0351 section 2.2. PPT/PPTX, XLS/XLSB, Pages
+  and ODF now use the shared core shapes; genuinely richer diagnostics and
+  PPTX's extra opened snapshot state remain custom. Pages metadata replay now
+  returns the Commit triad, and its consumers and replay/no-op tests migrate
+  with it. ODI flat planning/source helpers move to Patch. Records 0362us and
+  0362usa–0362usd retain the audit and review boundaries. ODM's changed-byte
+  comparison now occurs during commit rather than lazily in diagnostics; its
+  final native qualification remains required, with no performance waiver.
+
+  The glossary now enforces 30 nominated shared identities through rustdoc
+  nominal IDs, including alias/re-export resolution and fail-closed missing,
+  ambiguous, cyclic and unrelated cases. The Pages replay rule and ODI helper
+  bans survive conflict resolution. Glossary/inventory tool tests pass 54/54.
+  The shared Commit Debug now prints only content-free diagnostics, avoiding
+  a newly exposed payload route through derived format Debug implementations;
+  six core edit tests pass, including payload-formatting rejection. This is
+  a narrow obligation of the changed API, not completion of redaction audit 22.
+
+  The complete composed Clippy v23 run returns three spelling-only lints in
+  XLSX facade admission and a PPTX test seam. These are fixed. The v24 complete
+  all-target/all-feature workspace pass is active on `5dae0abf78`. A separate
+  owner-replay sweep found ODG's three apply_joined plan-publication methods
+  still returning Package; that work is returned for migration into Edit
+  staging, preserving bounded composition, policies, source checks, aggregate
+  patch/diagnostics and one publication.
+
+  The pristine f2 W8 baseline build now passes all 109 untimed route checks
+  and its fail-closed endpoint verification; receipt 43c9fc24fd is reviewed
+  and merged. IWork's harness now admits only source-declared inactive lock
+  edges and rejects undeclared edges even when both endpoint locks and seed
+  contain them. Its 20 tests pass. The reusable Pages fixture example builds
+  without the previous inclusion errors. Earlier build/preflight packets
+  remain external; fresh coherent final-candidate qualification waits for
+  source freeze. No new native timing result is claimed.
+
+  Twelfth cleanup removes four clean, inactive, merged source worktrees
+  without force, retaining their branch refs. Their apparent checkout size
+  totals 25,037,023,460 bytes. Twenty-five ignored generated files totaling
+  8,173,100 bytes are hash-verified in external quarantine with restore
+  instructions. Protected targets, measurements and incomplete checkouts
+  remain untouched; the coordinator verified every retained file identity.
+
+  Source integration remains staging, not accepted into trunk. ODG completion,
+  the full 53-check gate, all 68 final inventory captures and dispositions,
+  corpus replay, glossary closure and native qualification remain open.
+  Only comprehensive redaction audit 22 is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, composed Clippy and thirteenth cleanup):
+  Main integration reaches `5ee8387c2c`. Complete all-target/all-feature
+  workspace Clippy with warnings denied passes on clean source
+  `8225b82dde7bac272e9e77789a78751ae07aaa2a`, after the six v24 consumer
+  lint sites were migrated in `0bed2f0710`. The run completed in 199.602
+  seconds with a 4.40 GB external target. Record 0362us and the reduced
+  v25 receipt retain the source, command, lock and external log identity.
+  This is a composed workspace pass, not the complete final 53-check gate.
+
+  The reviewed proposal-only replay registration helper is merged at
+  `8225b82dde`. It checks concrete/default aliases before resolving declared
+  generic bindings, including reordered parameters; every proposed row
+  still needs nominal result and owner proofs. It never changes or accepts
+  policy. The glossary and final-inventory tool suites pass 60 tests. Fresh
+  all-68 rustdoc capture, policy registration and row dispositions remain
+  required after the remaining source correction.
+
+  ODG's replacement of the three owner apply_joined plan-publication methods
+  remains returned for correction. Source `15f677ed52` and receipt
+  `c5e14c8d7f` pass 48 focused tests and strict checks, but independent review
+  still finds replacement-segment name validation, intermediate replacement
+  policy, and projected/inherited style-dependency gaps. The worker is
+  preserving ordered operations within one sub-edit while fixing conflicts
+  between independent work; a broad mixed-operation capability ban is not
+  accepted. No ODG joined migration has been merged into main integration.
+
+  Thirteenth cleanup removes five more verified clean, inactive, merged
+  source leaves without force. Their apparent checkout size totals
+  19,028,805,424 bytes. All branch refs remain; ten generated files totaling
+  739,055 bytes are hash-quarantined with restore instructions. The
+  coordinator independently verified file identities, ancestry and removed
+  path absence. Receipt `db36955293` records the operation. Targets, native
+  binaries, measurements and incomplete checkouts remain protected.
+
+  Source integration remains staging. Final inventory/glossary closure,
+  the full gate, corpus replay and native qualification remain required.
+  Comprehensive redaction audit 22 is the only deferral. Nothing is pushed.
