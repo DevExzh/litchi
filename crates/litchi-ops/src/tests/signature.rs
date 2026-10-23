@@ -526,8 +526,8 @@ fn assert_unsigned_output(format: FileFormat, output: &[u8], expected: &str, wha
 }
 
 /// An exact no-op through the leaf entry the editor builder reaches, on the
-/// signed input, keeps it byte for byte; a compound-file leaf refuses the
-/// signed container instead of editing it.
+/// signed input, keeps it byte for byte. Changed operations remain covered by
+/// each format's signed-input policy tests below.
 #[track_caller]
 fn assert_exact_noop(input: &Input) {
     let label = &input.label;
@@ -616,13 +616,17 @@ fn assert_exact_noop(input: &Input) {
             "{label}: the DOC editor admitted a signed container"
         ),
         #[cfg(feature = "xls")]
-        FileFormat::Xls => assert!(
-            litchi_xls::Package::from_bytes(bytes)
-                .unwrap()
-                .edit()
-                .is_err(),
-            "{label}: the XLS editor admitted a signed container"
-        ),
+        FileFormat::Xls => {
+            let package = litchi_xls::Package::from_bytes(bytes).unwrap();
+            let commit = package.edit().unwrap().commit().unwrap();
+            assert!(!commit.diagnostics().changed(), "{label}");
+            assert!(commit.patch().is_noop(), "{label}: eager no-op patch");
+            assert_eq!(
+                &commit.package().to_bytes().unwrap(),
+                bytes,
+                "{label}: eager no-op"
+            );
+        },
         #[cfg(feature = "ppt")]
         FileFormat::Ppt => assert!(
             litchi_ppt::text_edit::SourceSnapshot::open(source()).is_err(),

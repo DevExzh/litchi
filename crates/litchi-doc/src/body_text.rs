@@ -964,6 +964,15 @@ where
 /// Immutable, exact-source snapshot for the body-text transaction seam.
 pub(crate) struct Snapshot {
     source: Arc<[u8]>,
+    /// A private mutation-capable candidate for a source carrying only CFB
+    /// signature metadata. The published owner always retains `source`; this
+    /// candidate exists solely so an eager edit can validate and prove an
+    /// exact no-op without admitting a protected container to the object
+    /// editor.
+    candidate_source: Option<Arc<[u8]>>,
+    /// Whether the retained source carries any signature marker recognized by
+    /// the strict DOC owner or by the CFB signature editor.
+    signed: bool,
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
     source_limits: crate::package::SourceLimits,
@@ -981,6 +990,8 @@ impl Clone for Snapshot {
         }
         Self {
             source: Arc::clone(&self.source),
+            candidate_source: self.candidate_source.as_ref().map(Arc::clone),
+            signed: self.signed,
             fingerprint_cache,
             limits: self.limits,
             source_limits: self.source_limits,
@@ -1070,17 +1081,40 @@ impl Snapshot {
         )
         .map_err(Error::Invalid)?;
         let source_limits = options.source_limits;
-        let (_strict_editor, mut ole) =
-            RevisionEditor::open_with_ole_file_with_policy_and_admission(
+        let (strict_editor, mut ole, candidate_source) =
+            match RevisionEditor::open_with_ole_file_with_policy_and_admission(
                 bytes.clone(),
                 options.revision_limits,
                 options.protection_policy.clone(),
                 |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
-            )
-            .map_err(Error::Invalid)?;
+            ) {
+                Ok((editor, ole)) => (editor, ole, None),
+                Err(original_error) => {
+                    validate_original_source_for_fallback(&bytes, source_limits)?;
+                    let Some(candidate) = unsigned_doc_source(&bytes) else {
+                        return Err(Error::Invalid(original_error));
+                    };
+                    let candidate: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
+                    let (editor, ole) =
+                        RevisionEditor::open_with_ole_file_with_policy_and_admission(
+                            candidate.to_vec(),
+                            options.revision_limits,
+                            options.protection_policy.clone(),
+                            |ole| {
+                                crate::package::preflight_declared_streams(ole, source_limits)
+                                    .map(|_| ())
+                            },
+                        )
+                        .map_err(Error::Invalid)?;
+                    (editor, ole, Some(candidate))
+                },
+            };
         crate::raw::Reader::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
+        let signed = candidate_source.is_some() || strict_editor.dofr_source_is_signed();
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
+            candidate_source,
+            signed,
             fingerprint_cache: OnceLock::new(),
             limits: options.revision_limits,
             source_limits: options.source_limits,
@@ -1094,10 +1128,12 @@ impl Snapshot {
     ///
     /// The [`DiagnosticEvent`] stream has the same fixed phase sequence as
     /// [`Self::open_bounded_profiled`]. The separate [`CfbParseEvent`]
-    /// observer receives one balanced pair around the strict owner's single
-    /// top-level `OleFile::open` when source-length preflight and strict-owner
-    /// input validation permit parsing. Preflight itself is intentionally
-    /// silent in the high-level stream.
+    /// observer receives one balanced pair around the successful strict
+    /// owner's top-level `OleFile::open` when source-length preflight and
+    /// strict-owner input validation permit parsing. A signed CFB fallback
+    /// discards the failed strict parse events and reports the candidate parse
+    /// instead. Preflight itself is intentionally silent in the high-level
+    /// stream.
     ///
     /// # Panics
     ///
@@ -1139,24 +1175,58 @@ impl Snapshot {
         let bytes = input.into();
         crate::raw::Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
             .map_err(Error::Invalid)?;
-        let mut ole = observe_phase(
+        let mut failed_strict_events = Vec::new();
+        let (mut ole, signed, candidate_source) = observe_phase(
             &mut observer,
             DiagnosticPhase::StrictOwnerValidation,
             || {
-                let (_strict_editor, ole) =
-                    RevisionEditor::open_with_ole_file_profiled_with_admission(
-                        bytes.clone(),
-                        limits,
-                        |event| {
+                let strict_result = RevisionEditor::open_with_ole_file_profiled_with_admission(
+                    bytes.clone(),
+                    limits,
+                    |event| {
+                        failed_strict_events.push(event);
+                    },
+                    |ole| {
+                        crate::package::preflight_declared_streams(ole, source_limits).map(|_| ())
+                    },
+                );
+                match strict_result {
+                    Ok((strict_editor, ole)) => {
+                        for event in failed_strict_events.drain(..) {
                             cfb_observer(event);
-                        },
-                        |ole| {
-                            crate::package::preflight_declared_streams(ole, source_limits)
-                                .map(|_| ())
-                        },
-                    )
-                    .map_err(Error::Invalid)?;
-                Ok(ole)
+                        }
+                        Ok((ole, strict_editor.dofr_source_is_signed(), None))
+                    },
+                    Err(original_error) => {
+                        if let Err(error) =
+                            validate_original_source_for_fallback(&bytes, source_limits)
+                        {
+                            for event in failed_strict_events.drain(..) {
+                                cfb_observer(event);
+                            }
+                            return Err(error);
+                        }
+                        let Some(candidate) = unsigned_doc_source(&bytes) else {
+                            for event in failed_strict_events.drain(..) {
+                                cfb_observer(event);
+                            }
+                            return Err(Error::Invalid(original_error));
+                        };
+                        let candidate: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
+                        let (_editor, ole) =
+                            RevisionEditor::open_with_ole_file_profiled_with_admission(
+                                candidate.to_vec(),
+                                limits,
+                                |event| cfb_observer(event),
+                                |ole| {
+                                    crate::package::preflight_declared_streams(ole, source_limits)
+                                        .map(|_| ())
+                                },
+                            )
+                            .map_err(Error::Invalid)?;
+                        Ok((ole, true, Some(candidate)))
+                    },
+                }
             },
         )?;
         observe_phase(
@@ -1172,6 +1242,8 @@ impl Snapshot {
         })?;
         Ok(Self {
             source,
+            candidate_source,
+            signed,
             fingerprint_cache: OnceLock::new(),
             limits,
             source_limits,
@@ -1778,8 +1850,12 @@ impl Snapshot {
             source_limits,
         )
         .map_err(Error::Invalid)?;
+        let source = self
+            .candidate_source
+            .as_ref()
+            .map_or_else(|| self.source.as_ref().to_vec(), |source| source.to_vec());
         let (mut editor, _ole) = RevisionEditor::open_with_ole_file_with_policy_and_admission(
-            self.source.as_ref().to_vec(),
+            source,
             self.limits,
             self.protection_policy.clone(),
             |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
@@ -1821,6 +1897,7 @@ impl std::fmt::Debug for Snapshot {
             .debug_struct("Snapshot")
             .field("bytes", &self.source.len())
             .field("fingerprint", &self.fingerprint())
+            .field("signed", &self.signed)
             .field("limits", &self.limits)
             .field("source_limits", &self.source_limits)
             .field("transaction_limits", &self.transaction_limits)
@@ -1868,7 +1945,7 @@ pub(crate) struct Edit {
 impl Edit {
     fn new(source: Snapshot) -> Result<Self> {
         let editor = source.editor()?;
-        let signed = editor.dofr_source_is_signed();
+        let signed = source.signed;
         Ok(Self {
             source,
             editor,
@@ -1968,8 +2045,18 @@ impl Edit {
         self.editor
             .authorize_rendered(&bytes)
             .map_err(Error::Invalid)?;
-        if self.signed && bytes != self.source.bytes() {
-            return Err(Error::Refused(Refusal::SignedSource));
+        if self.signed {
+            if self
+                .source
+                .candidate_source
+                .as_ref()
+                .is_some_and(|candidate| bytes.as_slice() == candidate.as_ref())
+            {
+                return Ok(self.source.bytes().to_vec());
+            }
+            if bytes != self.source.bytes() {
+                return Err(Error::Refused(Refusal::SignedSource));
+            }
         }
         Ok(bytes)
     }
@@ -3014,6 +3101,8 @@ impl Edit {
             .map_err(Error::Invalid)?;
             let snapshot = Snapshot {
                 source: Arc::from(bytes.into_boxed_slice()),
+                candidate_source: None,
+                signed: false,
                 fingerprint_cache: OnceLock::new(),
                 limits: self.source.limits,
                 source_limits: self.source.source_limits,
@@ -5744,6 +5833,36 @@ fn has_structural_content(text: &str) -> bool {
     })
 }
 
+/// Return a private mutation-capable copy when `bytes` contains legacy CFB
+/// signature state. The signature editor is used only as a bounded detector
+/// and candidate builder; callers retain and publish the original bytes.
+fn unsigned_doc_source(bytes: &[u8]) -> Option<Vec<u8>> {
+    let mut editor =
+        litchi_sign::cfb::Editor::open(bytes.to_vec(), litchi_sign::cfb::Format::Doc).ok()?;
+    editor.clear().ok()?;
+    let unsigned = editor.finish().ok()?;
+    (unsigned != bytes).then_some(unsigned)
+}
+
+/// Re-apply the caller's physical source policy to the original CFB before a
+/// signed fallback strips signature metadata. The strict owner may have
+/// failed during its admission callback, so validating only the stripped
+/// candidate would allow an oversized signature stream to disappear from the
+/// policy accounting.
+fn validate_original_source_for_fallback(
+    bytes: &[u8],
+    source_limits: crate::package::SourceLimits,
+) -> Result<()> {
+    let ole = crate::raw::Reader::<Cursor<Vec<u8>>>::open_ole_file_with_limits(
+        Cursor::new(bytes.to_vec()),
+        source_limits,
+    )
+    .map_err(Error::Invalid)?;
+    crate::package::preflight_declared_streams(&ole, source_limits)
+        .map(|_| ())
+        .map_err(Error::Invalid)
+}
+
 fn drawing_dependency(text: &str) -> Option<DrawingDependency> {
     if text.contains('\u{1}') {
         Some(DrawingDependency::InlinePictureOrObjectPreview)
@@ -5985,6 +6104,30 @@ mod tests {
             .add_stream(vec!["OpaqueVendorData".to_string()], b"untouched".to_vec())
             .expect("opaque stream should be admitted");
         crate::package::object_edit_bytes(&package).expect("fixture package should finish")
+    }
+
+    fn doc_with_signature_stream(payload: &[u8]) -> Vec<u8> {
+        let mut source =
+            OleFile::open(Cursor::new(doc(&["alpha"]))).expect("fixture CFB should open");
+        let paths = source.list_streams();
+        let mut writer = OleWriter::new();
+        for path in paths {
+            let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+            let stream = source
+                .open_stream(&refs)
+                .expect("fixture stream should open");
+            writer
+                .create_stream(&refs, &stream)
+                .expect("fixture stream should copy");
+        }
+        writer
+            .create_stream(&["_xmlsignatures"], payload)
+            .expect("signature stream should be admitted");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .write_to(&mut output)
+            .expect("signed fixture should finish");
+        output.into_inner()
     }
 
     fn dofr_record(kind: u32, payload: &[u8]) -> Vec<u8> {
@@ -6482,6 +6625,95 @@ mod tests {
                 maximum: 1,
             })) if observed > 1
         ));
+    }
+
+    #[test]
+    fn signed_fallback_preserves_original_entry_and_aggregate_limits() {
+        let bytes = doc_with_signature_stream(&vec![0_u8; 128 * 1024]);
+        let entry_limits = crate::package::SourceLimits::builder()
+            .max_entry_bytes(64 * 1024)
+            .expect("entry limit is within the safety ceiling")
+            .build()
+            .expect("entry source limits");
+        assert!(matches!(
+            Snapshot::from_bytes_with_options(
+                bytes.clone(),
+                OpenOptions::default().source_limits(entry_limits),
+            ),
+            Err(Error::Invalid(crate::package::Error::Limit {
+                kind: crate::package::SourceLimitKind::EntryBytes,
+                observed,
+                maximum,
+            })) if maximum == 64 * 1024 && observed > maximum
+        ));
+
+        let aggregate_limits = crate::package::SourceLimits::builder()
+            .max_aggregate_bytes(64 * 1024)
+            .expect("aggregate limit is within the safety ceiling")
+            .build()
+            .expect("aggregate source limits");
+        assert!(matches!(
+            Snapshot::from_bytes_with_options(
+                bytes,
+                OpenOptions::default().source_limits(aggregate_limits),
+            ),
+            Err(Error::Invalid(crate::package::Error::Limit {
+                kind: crate::package::SourceLimitKind::AggregateBytes,
+                observed,
+                maximum,
+            })) if maximum == 64 * 1024 && observed > maximum
+        ));
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_signed_fallback_preserves_original_source_limits() {
+        let bytes = doc_with_signature_stream(&vec![0_u8; 128 * 1024]);
+        let source_limits = crate::package::SourceLimits::builder()
+            .max_entry_bytes(64 * 1024)
+            .expect("entry limit is within the safety ceiling")
+            .build()
+            .expect("entry source limits");
+        let mut events = Vec::new();
+        let mut cfb_events = Vec::new();
+        let result = Snapshot::open_bounded_profiled_with_source_limits(
+            bytes,
+            Limits::default(),
+            TransactionLimits::default(),
+            source_limits,
+            |event| events.push(event),
+            |event| cfb_events.push(event),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(crate::package::Error::Limit {
+                kind: crate::package::SourceLimitKind::EntryBytes,
+                observed,
+                maximum,
+            })) if maximum == 64 * 1024 && observed > maximum
+        ));
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
     }
 
     #[cfg(feature = "performance-diagnostics")]

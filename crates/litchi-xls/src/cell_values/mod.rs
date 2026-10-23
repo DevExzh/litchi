@@ -2726,6 +2726,9 @@ impl Edit {
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
                 }
+                if self.staged_removal(sheet_index, reference) {
+                    return self.restore_removed_cell(sheet_index, reference, target, value);
+                }
                 self.stage(sheet_index, entry_index, target, value)
             },
             Err(error)
@@ -2742,6 +2745,9 @@ impl Edit {
                 let target = storage_for_new_value(&value, text_present).map_err(|_| error)?;
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
+                }
+                if self.staged_removal(sheet_index, reference) {
+                    return self.restore_removed_cell(sheet_index, reference, target, value);
                 }
                 self.stage_structural(StructuralChange::Cell {
                     sheet: sheet_index,
@@ -3044,6 +3050,56 @@ impl Edit {
                     }
                 )
             })
+    }
+
+    /// Replace a staged structural removal with its final cell state. A
+    /// remove-then-reinsert sequence is one reversible structural operation,
+    /// not an overlap between the fixed-width and structural families. This
+    /// lets a coalesced signed edit prove an exact cancellation while keeping
+    /// the ordinary overlap refusal for independent mixed operations.
+    fn restore_removed_cell(
+        &mut self,
+        sheet: usize,
+        reference: Reference,
+        storage: Storage,
+        value: Value,
+    ) -> Result<()> {
+        let index = self
+            .structural_index
+            .cell(sheet, reference)
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "staged cell removal disappeared before reinsertion",
+            })?;
+        let change = self
+            .structural_changes
+            .get_mut(index)
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "staged cell removal index is stale",
+            })?;
+        let StructuralChange::Cell { before, after, .. } = change else {
+            return Err(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "staged cell removal changed family before reinsertion",
+            });
+        };
+        if after.is_some() {
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "a cell has more than one structural outcome",
+            ));
+        }
+        let style = before
+            .as_ref()
+            .map(|(_, _, style)| *style)
+            .ok_or(Error::PatchConflict {
+                operation: "edit cells",
+                reason: "staged cell removal has no source state",
+            })?;
+        *after = Some((storage, value, style));
+        Ok(())
     }
 
     /// Inserts a previously absent scalar cell with an existing XF resource.
@@ -4727,49 +4783,53 @@ impl Edit {
             )?;
         }
 
+        // A coalesced edit may briefly intern a text that is restored by a
+        // later command. The final Workbook equality proves that no resource
+        // survived publication; do not validate the transient resource ledger
+        // as if it were part of the exact no-op. Canonicalize this path for
+        // both unsigned and signed owners so the patch is genuinely empty.
+        if workbook_bytes.as_slice() == self.source.inner.workbook_stream.as_ref() {
+            verify_readback(&self.source, &self.changes)?;
+            verify_structural_readback(
+                &self.source,
+                &self.source,
+                &self.structural_changes,
+                &self.resource_changes,
+            )?;
+            verify_layout_readback(&self.source, &layout)?;
+            let semantic = SemanticPatch::from_transaction(&self.source, &[], &[], &[], &[])?;
+            let changed_number_fields = self
+                .changes
+                .iter()
+                .filter(|change| {
+                    change_is_effective(&self.source, change)
+                        && self.source.inner.sheets[change.sheet].entries[change.entry]
+                            .cell
+                            .storage
+                            == Storage::Number
+                })
+                .count();
+            let patch = Patch::new(
+                Arc::clone(&self.source.inner.bytes),
+                Arc::clone(&self.source.inner.bytes),
+                semantic,
+            );
+            return Ok(Commit {
+                snapshot: self.source,
+                patch,
+                diagnostics: Diagnostics {
+                    changed: false,
+                    changed_cells,
+                    changed_number_fields,
+                    touched_streams: 0,
+                },
+            });
+        }
         if self.source.inner.signed {
             // A signed owner may stage and validate a logical cell/tab plan,
             // but it must never enter the object editor with a changed Workbook
-            // stream. Equality is checked against the original native
-            // stream, so an unsigned reserialization cannot manufacture a
-            // signed no-op. The original CFB bytes become both patch sides.
-            if workbook_bytes.as_slice() == self.source.inner.workbook_stream.as_ref() {
-                verify_readback(&self.source, &self.changes)?;
-                verify_structural_readback(
-                    &self.source,
-                    &self.source,
-                    &self.structural_changes,
-                    &self.resource_changes,
-                )?;
-                verify_resource_readback(&self.source, &self.resource_changes)?;
-                verify_layout_readback(&self.source, &layout)?;
-                let changed_number_fields = self
-                    .changes
-                    .iter()
-                    .filter(|change| {
-                        change_is_effective(&self.source, change)
-                            && self.source.inner.sheets[change.sheet].entries[change.entry]
-                                .cell
-                                .storage
-                                == Storage::Number
-                    })
-                    .count();
-                let patch = Patch::new(
-                    Arc::clone(&self.source.inner.bytes),
-                    Arc::clone(&self.source.inner.bytes),
-                    semantic,
-                );
-                return Ok(Commit {
-                    snapshot: self.source,
-                    patch,
-                    diagnostics: Diagnostics {
-                        changed: false,
-                        changed_cells,
-                        changed_number_fields,
-                        touched_streams: 0,
-                    },
-                });
-            }
+            // stream. Equality was checked above, so an actual change remains
+            // refused before publication.
             return Err(Error::Signed);
         }
 
