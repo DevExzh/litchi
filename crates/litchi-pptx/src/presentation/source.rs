@@ -5,7 +5,6 @@
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
 pub mod primary;
-pub use primary::EditOptions;
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;

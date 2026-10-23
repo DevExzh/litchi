@@ -2711,7 +2711,7 @@ fn source_key_for_position(package: &Package, position: usize) -> Result<StableS
 
 fn check_payload_budget<'a>(
     root: Option<&[u8]>,
-    mut slides: impl Iterator<Item = &'a SourceBackedSlideSnapshot>,
+    slides: impl Iterator<Item = &'a SourceBackedSlideSnapshot>,
 ) -> Result<()> {
     check_payload_budget_with_limit(
         root,

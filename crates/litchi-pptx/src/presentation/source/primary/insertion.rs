@@ -202,7 +202,7 @@ pub(super) fn plan(
         super::topology::preflight_candidate_for_admission(
             package,
             &root,
-            order.clone(),
+            order.clone().into(),
             &planned,
             &dependents,
             max_patch_bytes,

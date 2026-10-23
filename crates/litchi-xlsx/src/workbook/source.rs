@@ -930,10 +930,10 @@ impl SourceBackedWorkbook {
             );
             endpoint = endpoint
                 .saturating_add(size_of::<super::model::SheetData>())
-                .saturating_add(sheet.name.capacity())
-                .saturating_add(sheet.name_key.len())
+                .saturating_add(sheet.name().len())
+                .saturating_add(sheet.name_key().len())
                 .saturating_add(sheet.part_uri.as_str().len())
-                .saturating_add(sheet.relationship_id.len());
+                .saturating_add(sheet.relationship_id().len());
         }
 
         endpoint = endpoint
@@ -952,7 +952,8 @@ impl SourceBackedWorkbook {
             .saturating_add(
                 inner
                     .defined_names
-                    .len()
+                    .as_ref()
+                    .map_or(0, |names| names.len())
                     .saturating_mul(size_of::<raw::DefinedName>()),
             );
 

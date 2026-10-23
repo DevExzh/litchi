@@ -3871,7 +3871,7 @@ impl Edit {
             }
         }
         let candidate_source = publication.finish().map_err(crate::Error::from)?;
-        self.admit_snapshot_xml(candidate_source.len())?;
+        self.admit_snapshot_xml(candidate_source.bytes().len())?;
         let candidate =
             Snapshot::from_source_xml_with_identity(candidate_source, identity, context)?;
         for plan in &plans {
@@ -6580,6 +6580,8 @@ impl Edit {
             crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
         }
         let managed_context = self.projected.managed_context();
+        let snapshot_budget = self.snapshot_budget;
+        let base_bytes = self.base.xml_bytes().len();
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
@@ -6619,17 +6621,17 @@ impl Edit {
         } else {
             match self.compaction {
                 CompactionPolicy::PreserveUnmodified => {
-                    commit_preserving_unmodified(&self.base, &self.projected, self.snapshot_budget)?
+                    commit_preserving_unmodified(&self.base, &self.projected, snapshot_budget)?
                 },
                 CompactionPolicy::WholeDocument => {
-                    compact_whole_document(&self.base, &self.projected, self.snapshot_budget)?
+                    compact_whole_document(&self.base, &self.projected, snapshot_budget)?
                 },
             }
         };
         // PreserveUnmodified and WholeDocument can compact a projection at
         // publication time.  Charge the bytes that the commit actually
         // retains, not only the pre-compaction candidate.
-        self.admit_snapshot_xml(projected.xml_bytes().len())?;
+        admit_snapshot_pair(snapshot_budget, base_bytes, projected.xml_bytes().len())?;
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }

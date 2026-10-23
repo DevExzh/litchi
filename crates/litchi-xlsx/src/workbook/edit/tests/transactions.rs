@@ -42,13 +42,13 @@ fn primary_edit_capture_budget_replaces_repeated_cell_payload() {
         .expect("worksheet part")
         .blob()
         .len();
-    let final_content = crate::Content::from("final authored value");
+    let final_content = Content::from("final authored value");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(final_content.retained_bytes());
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
@@ -76,14 +76,14 @@ fn primary_edit_capture_budget_merges_payload_and_style_facets() {
         .expect("worksheet part")
         .blob()
         .len();
-    let content = crate::Content::from("authored payload");
+    let content = Content::from("authored payload");
     let font = crate::style::FontChange::new().bold(Some(true));
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes())
         .saturating_add(font.retained_bytes());
     let mut edit = source
@@ -110,13 +110,13 @@ fn joined_edits_merge_capture_ledgers_and_reject_over_budget_results() {
         .expect("worksheet part")
         .blob()
         .len();
-    let content = crate::Content::from("joined payload");
+    let content = Content::from("joined payload");
     let maximum = source
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
-        .saturating_add(size_of::<crate::workbook::edit::Change>())
-        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes());
     let mut left = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))

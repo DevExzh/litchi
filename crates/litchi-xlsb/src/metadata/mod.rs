@@ -139,7 +139,7 @@ impl Edit {
 
     /// Discard every staged change.
     pub fn reset(&mut self) {
-        self.inner.reset();
+        self.inner = self.inner.base().plan();
     }
 
     /// Compute the patch and publish it to a new snapshot.

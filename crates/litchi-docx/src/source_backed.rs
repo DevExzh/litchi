@@ -1988,7 +1988,8 @@ impl Package {
                 .map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
             if let Some(options) = edit_options {
-                options.admit_source_bytes(main.declared_uncompressed_size()?)?;
+                options
+                    .admit_source_bytes(main.declared_uncompressed_size().map_err(Error::from)?)?;
             }
             let partname = main.partname();
             let context = self.physical_package()?.execution_context();
