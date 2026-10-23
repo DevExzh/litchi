@@ -1090,7 +1090,7 @@ fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(fixture())),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         Some(context),
     )

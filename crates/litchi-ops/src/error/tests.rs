@@ -2210,9 +2210,7 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
     );
     assert_code(
         litchi_docx::Error::TailAppend(Box::new(
-            litchi_docx::source_backed::tail_append::Error::Execution(
-                litchi_core::ExecutionError::Cancelled,
-            ),
+            litchi_docx::source_backed::tail_append::Error::Execution(ExecutionError::Cancelled),
         )),
         Code::Cancelled,
     );

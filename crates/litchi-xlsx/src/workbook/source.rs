@@ -3425,8 +3425,8 @@ mod tests {
         use std::sync::atomic::Ordering;
 
         use litchi_opc::OpcError;
+        use litchi_opc::SourceCacheLimits;
         use litchi_opc::constants::content_type as ct;
-        use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{
@@ -3984,7 +3984,7 @@ mod tests {
         use std::sync::Arc;
         use std::sync::atomic::Ordering;
 
-        use litchi_opc::{OpcError, SourceBackedPackage, SourceCacheLimits};
+        use litchi_opc::{OpcError, SourceBackedPackage, SourceCacheLimits, SourceReadPolicy};
 
         use super::super::SourceCell;
         use super::streaming_0364_tests::{dependency_xlsx, plain_shared_strings, styles};

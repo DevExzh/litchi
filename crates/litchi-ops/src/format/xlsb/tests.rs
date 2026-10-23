@@ -10,7 +10,7 @@ use std::sync::{Arc, Barrier};
 
 use litchi_core::sheet::{CellValue, WorkbookTrait};
 use litchi_core::{Metadata, ReadAt, SourceVersion};
-use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
 use litchi_xlsb as xlsb;
 
 use super::{SourceWorkbook, Xlsb, XlsbEditor, XlsbOwner};
@@ -536,6 +536,7 @@ fn counted() -> (Arc<AtomicUsize>, Xlsb) {
         Metadata::default(),
         MetadataRepairs::default(),
         &OpenOptions::new(),
+        SourceLimits::default(),
     );
     reads.store(0, Ordering::SeqCst);
     (reads, handle)
@@ -677,6 +678,7 @@ fn observed_query(rows: u32, selector: &str) -> (usize, usize) {
         Metadata::default(),
         MetadataRepairs::default(),
         &OpenOptions::new(),
+        SourceLimits::default(),
     ));
     let matches = file.query(selector).unwrap().count();
     let before = source.versions.load(Ordering::SeqCst);
@@ -715,6 +717,7 @@ fn query_steps_share_one_check_with_their_node_reads() {
         Metadata::default(),
         MetadataRepairs::default(),
         &OpenOptions::new(),
+        SourceLimits::default(),
     ));
     let mut matches = file.query("sheet, cell").unwrap();
     assert!(matches.next().unwrap().is_ok());

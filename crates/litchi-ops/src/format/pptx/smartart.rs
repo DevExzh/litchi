@@ -353,7 +353,7 @@ impl Pptx {
         }
         let position = tree.handle.position().get();
         let source = self.editable_owner()?;
-        let base = eager(&source)?;
+        let base = eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         let parts = native.smartart(slide as usize, position)?;
         let next = apply(&parts, change, extents(tree))?;
@@ -475,7 +475,7 @@ impl Pptx {
             .count();
         let name = name.unwrap_or_else(|| format!("Diagram {}", ordinal + 1));
         let source = self.editable_owner()?;
-        let base = eager(&source)?;
+        let base = eager(&source, self.0.ooxml_limits)?;
         let mut edit = base.edit()?;
         edit.add_smartart(slide, &spec, &name, bounds)?;
         let (target, patch) = edit.commit()?.into_parts();
@@ -705,7 +705,7 @@ impl Pptx {
     /// A commit that changes nothing.
     fn unchanged(&self) -> Result<Commit> {
         let source = self.editable_owner()?;
-        let base = eager(&source)?;
+        let base = eager(&source, self.0.ooxml_limits)?;
         let (target, patch) = base.edit()?.commit()?.into_parts();
         Ok(Commit {
             after: self.clone(),

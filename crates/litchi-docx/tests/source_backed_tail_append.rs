@@ -381,8 +381,8 @@ fn settings_archive(
 fn part_bytes(archive: &[u8], uri: &str) -> Vec<u8> {
     SourceBackedPackage::from_vec(
         archive.to_vec(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published archive must open")

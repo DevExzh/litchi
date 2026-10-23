@@ -541,8 +541,7 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
 /// with a well-formed stand-in and its bytes are put back here.
 fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
     let reader =
-        litchi_opc::phys_pkg::PhysPkgReader::new(archive, litchi_opc::SourceLimits::default())
-            .unwrap();
+        litchi_opc::phys_pkg::PhysPkgReader::new(archive, SourceLimits::default()).unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let data = if name == member {
@@ -560,7 +559,7 @@ fn open(bytes: &[u8]) -> source_backed::Package {
 }
 
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
-    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()

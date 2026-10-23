@@ -29,5 +29,20 @@ allowances, or new targets were introduced. The independent DOCX production,
 XLSB theme, and ODP example diagnostics from that check remain with their
 owning workers.
 
-Validation was limited to formatting, whitespace, no-caller search, and
-repository artifact guards as requested; no Cargo target was started.
+The completed v17 workspace check reported the remaining consumer diagnostics.
+All 65 unnecessary qualifications now use the imported policy or core names.
+DOCX source-backed test constructors now use the DOCX one-argument
+`SourceBackedPackage::from_read_at`; the explicit five-argument constructors
+in the OPC consumers retain their limits, cache policy, read policy, and
+execution context. SmartArt promotion, XLSB metadata reconstruction, and
+XLSB test owners now pass the retained OPC read limits. PPTX metadata uses the
+handle's retained limits when it re-admits a revised source package, while an
+unrevised owner continues to adopt its retained source graph. The four private
+`ooxml_read_limits` accessors are ordinary functions because their state is
+behind `Arc`; no const API was required. XLSX streaming subtests now import
+`SourceReadPolicy` only in the module that uses it.
+
+The v17 policy values, assertions, source retention, and cache behavior are
+unchanged. No concurrent budget changes were copied. Validation remained
+limited to formatting, whitespace, source-constructor/qualification audits,
+and repository artifact guards; no Cargo target was started.
