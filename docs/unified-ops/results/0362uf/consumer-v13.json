@@ -1,0 +1,28 @@
+{
+  "source": "44901f50d173fc9cc78d8f56d7c2a07f3012c7b8",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 101,
+      "seconds": 6.884201756000039,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v13/check-0.log",
+      "bytes": 19978,
+      "sha256": "4ccf1f1bd8dd57d1af0c5882da227319992f546e9c91daa98b7d0d3b8f96c20d",
+      "target_bytes_before": 18349223933,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "First assembled authenticated artifact-stream check exposed production and unit-test compilation errors. Focusedgroup failed; workspace and harness groups not reached. Repairs remain required."
+}

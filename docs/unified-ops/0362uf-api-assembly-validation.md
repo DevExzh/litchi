@@ -155,3 +155,16 @@ after 11.73 seconds. [consumer-v12.json](results/0362uf/consumer-v12.json)
 retains the source and full log hash. Record 0362ul repairs every diagnosed
 external consumer, including the last one-argument owning constructor.
 Workspace and harness groups were not reached.
+
+## Authenticated artifact-stream assembly
+
+The thirteenth attempt on `44901f50d1` is the first compiler check after
+assembling the authenticated OPC artifact-stream protocol, DOCX consumers,
+and XLS iterator/deferred-reopen follow-ups. The focused group stopped with
+exit 101 after 6.88 seconds. New stream code has missing helper/type scope,
+prepared-retention field mismatches, generic bound/ownership and exhaustive
+match errors, plus denied qualifications. The compilation repair must retain
+all reviewed recipient admission, cancellation, proof and typed-error paths.
+
+[consumer-v13.json](results/0362uf/consumer-v13.json) preserves the source and
+log hash. Workspace/harness checks and semantic acceptance remain pending.
