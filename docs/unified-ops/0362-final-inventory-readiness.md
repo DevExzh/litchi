@@ -14,7 +14,10 @@ logs and reports outside the checkout:
 FREEZE=$(GIT_OPTIONAL_LOCKS=0 git rev-parse HEAD)
 test -z "$(GIT_OPTIONAL_LOCKS=0 git status --porcelain)"
 OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
-mkdir -p "$OUT"/{glossary,inventory,receipts,target}
+TMPDIR="$OUT/tmp"
+case "$TMPDIR" in /tmp|/tmp/*) echo "TMPDIR must be external: $TMPDIR" >&2; exit 1;; esac
+mkdir -p "$OUT"/{glossary,inventory,receipts,target} "$TMPDIR"
+export TMPDIR
 ```
 
 Each receipt records `FREEZE`, the exact command, `rustc -Vv`, `cargo -V`,
@@ -40,6 +43,7 @@ export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 \
   CARGO_NET_OFFLINE=true RUSTC_BOOTSTRAP=1 LITCHI_MEM_MAX=20G
 export CARGO_TARGET_DIR="$OUT/target"
+export TMPDIR="$OUT/tmp"
 ```
 
 Before each Cargo command, perform the 19,200,000,000-byte decimal target
@@ -100,6 +104,40 @@ commit, `--all-features`, `--document-hidden-items`, locked dependency graph
 and matching toolchain. A feature-specific output from
 `check_api_glossary.py` is not an all-features inventory substitute merely
 because the file has the right rustdoc schema.
+
+The executable wrapper enumerates the direct library manifests itself and
+requires the expected 68-package count. Run it only after the final candidate
+is frozen; the command below keeps all generated output external and reuses a
+single existing target cache when Cargo can fingerprint it safely:
+
+```sh
+source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
+FREEZE=$(GIT_OPTIONAL_LOCKS=0 git rev-parse HEAD)
+OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
+python3 tools/final_api_inventory.py \
+  --root "$PWD" \
+  --output "$OUT" \
+  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target
+```
+
+The wrapper creates and preflights the external `$OUT/tmp` `TMPDIR` without
+deleting existing files, and rejects output paths under `/tmp`. It verifies
+the resolved Cargo shim (including `systemd-run`, the
+20G `MemoryMax` expression, and an empty inherited `LITCHI_CAPPED` marker),
+measures each command with `/usr/bin/time -v`, and records peak RSS beside
+the JSON size/SHA-256. It rechecks the full source commit, cleanliness,
+lockfile and toolchain identity before and after every package and around the
+final inventory. The wrapper writes `packages.json` (including the actual 68
+package names), one JSON and receipt per package, external
+stdout/stderr/resource logs, `inventory.tsv`, and an
+initially unassigned `disposition.tsv` whose explicit column is `decision`.
+It invokes `api_debt_inventory.py` only after all 68 JSON captures succeed;
+diagnostic/skip paths are marked `incomplete`, never `complete`. Its
+fake-command fixture tests are build-free:
+
+```sh
+python3 -m unittest tools.test_final_api_inventory
+```
 
 ## Disposition
 
