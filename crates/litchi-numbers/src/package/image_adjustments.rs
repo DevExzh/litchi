@@ -418,7 +418,7 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the controls read before this edit.
-    #[must_use]
+    #[must_use = "inspect the image adjustments result"]
     pub fn before(&mut self) -> Result<ImageAdjustments, Error> {
         self.ensure_loaded()?;
         self.selection
@@ -428,7 +428,7 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the controls currently staged for publication.
-    #[must_use]
+    #[must_use = "inspect the staged image adjustments result"]
     pub fn after(&mut self) -> Result<ImageAdjustments, Error> {
         self.ensure_loaded()?;
         self.after.ok_or(Error::InvalidSource)

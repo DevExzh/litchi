@@ -73,13 +73,13 @@ impl Edit<'_> {
     }
 
     /// Return the currently staged merged regions.
-    #[must_use]
+    #[must_use = "inspect the merged regions result"]
     pub fn regions(&mut self) -> Result<&[Region], TableMergesError> {
         self.ensure_loaded()?;
-        Ok(self
+        self
             .regions
             .as_deref()
-            .ok_or(TableMergesError::InvalidSource)?)
+            .ok_or(TableMergesError::InvalidSource)
     }
 
     /// Stage one new merged-cell rectangle.

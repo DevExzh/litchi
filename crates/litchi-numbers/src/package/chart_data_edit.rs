@@ -152,22 +152,22 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the chart data observed when this edit began.
-    #[must_use]
+    #[must_use = "inspect the chart data result"]
     pub fn before(&mut self) -> Result<&ChartData, ChartDataError> {
         self.ensure_before()?;
         self.before.as_deref().ok_or(ChartDataError::InvalidSource)
     }
 
     /// Return the chart data staged for publication.
-    #[must_use]
+    #[must_use = "inspect the staged chart data result"]
     pub fn after(&mut self) -> Result<&ChartData, ChartDataError> {
-        match self.after.as_ref() {
-            Some(data) => Ok(data),
-            None => {
-                self.ensure_before()?;
-                self.before.as_deref().ok_or(ChartDataError::InvalidSource)
-            },
+        if self.after.is_none() {
+            self.ensure_before()?;
         }
+        self.after
+            .as_ref()
+            .or(self.before.as_deref())
+            .ok_or(ChartDataError::InvalidSource)
     }
 
     /// Stage a complete replacement of the finite numeric values.
@@ -373,10 +373,9 @@ impl Package {
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
     ) -> Result<Edit<'_>, ChartDataError> {
-        let mut budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
-        let sheet_position =
-            super::chart_arrangement::resolve_sheet_position(self, sheet_selector.into())
-                .map_err(map_arrangement_error)?;
+        let budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
+        let sheet_position = chart_arrangement::resolve_sheet_position(self, sheet_selector.into())
+            .map_err(map_arrangement_error)?;
         let chart_position = chart_selector.into().as_position();
         Edit::new(self, sheet_position, chart_position, budget)
     }

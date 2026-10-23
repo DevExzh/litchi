@@ -244,7 +244,7 @@ impl Edit<'_> {
     }
 
     /// Return the settings that would be published.
-    #[must_use]
+    #[must_use = "inspect the table title settings result"]
     pub fn settings(&mut self) -> Result<Settings, Error> {
         self.ensure_loaded()?;
         self.settings.ok_or_else(invalid_source)
