@@ -137,6 +137,190 @@ def _commit_paths(
     return sorted(set(paths))
 
 
+def _generic_parameters(surface: gate.Surface, path: tuple[str, ...]) -> list[dict[str, Any]]:
+    item_id = surface.item_ids.get(path)
+    item = surface.index.get(item_id, {})
+    inner = item.get("inner", {})
+    definition = next(iter(inner.values()), {})
+    parameters = definition.get("generics", {}).get("params", [])
+    return [
+        parameter
+        for parameter in parameters
+        if isinstance(parameter, dict)
+        and isinstance(parameter.get("name"), str)
+        and isinstance(parameter.get("kind"), dict)
+        and "type" in parameter["kind"]
+    ]
+
+
+def _raw_type_arguments(value: Any) -> list[Any] | None:
+    if not isinstance(value, dict) or len(value) != 1:
+        return None
+    resolved = value.get("resolved_path")
+    if not isinstance(resolved, dict):
+        return [] if value.get("generic") is not None else None
+    arguments = resolved.get("args")
+    if arguments is None:
+        return []
+    bracketed = arguments.get("angle_bracketed")
+    if not isinstance(bracketed, dict) or bracketed.get("constraints"):
+        return None
+    result = []
+    for argument in bracketed.get("args", []):
+        if not isinstance(argument, dict):
+            return None
+        if "lifetime" in argument:
+            continue
+        if "type" not in argument:
+            return None
+        result.append(argument["type"])
+    return result
+
+
+def _bind_alias_type(
+    raw: Any,
+    actual: Any,
+    *,
+    parameters: set[str],
+    bindings: dict[str, Any],
+    return_types: gate.ReturnTypes,
+) -> bool:
+    """Bind alias parameters by the rustdoc alias target, never by position."""
+    if not isinstance(raw, dict) or len(raw) != 1:
+        return False
+    generic = raw.get("generic")
+    if generic is not None:
+        if generic not in parameters:
+            return False
+        previous = bindings.get(generic)
+        if previous is not None and previous != actual:
+            return False
+        bindings[generic] = actual
+        return True
+    resolved = raw.get("resolved_path")
+    if not isinstance(resolved, dict) or not isinstance(actual, tuple) or actual[0] != "nominal":
+        return False
+    target_identity = return_types._resolve_nominal_identity(str(resolved.get("id")))
+    actual_identity = return_types._resolve_nominal_identity(str(actual[1]))
+    if target_identity is None or target_identity != actual_identity:
+        return False
+    raw_arguments = _raw_type_arguments(raw)
+    if raw_arguments is None or len(raw_arguments) != len(actual[2]):
+        return False
+    return all(
+        _bind_alias_type(
+            argument,
+            value,
+            parameters=parameters,
+            bindings=bindings,
+            return_types=return_types,
+        )
+        for argument, value in zip(raw_arguments, actual[2])
+    )
+
+
+def _generic_specs(
+    expected: tuple[str, ...],
+    payload: Any,
+    *,
+    surface: gate.Surface,
+    method: tuple[str, ...],
+    return_types: gate.ReturnTypes,
+) -> tuple[list[Any] | None, str | None]:
+    """Render only arguments justified by the expected type's own generics."""
+    parameters = _generic_parameters(surface, expected)
+    if not parameters:
+        # A canonical dependency path has no local definition. Its arguments
+        # are already ordered by the dependency's resolved signature; this is
+        # the only case where the normalized payload supplies positional args.
+        if surface.item_ids.get(expected) is None and isinstance(payload, tuple):
+            specs = []
+            for argument in payload[2]:
+                spec, reason = _type_spec(
+                    argument,
+                    surface=surface,
+                    method=method,
+                    return_types=return_types,
+                )
+                if reason:
+                    return None, reason
+                specs.append(spec)
+            return specs, None
+        return [], None
+
+    item_id = surface.item_ids.get(expected)
+    item = surface.index.get(item_id, {})
+    inner = item.get("inner", {})
+    definition = next(iter(inner.values()), {})
+    bindings: dict[str, Any] = {}
+    if "type_alias" in inner:
+        alias_target = definition.get("type")
+        if not _bind_alias_type(
+            alias_target,
+            payload,
+            parameters={parameter["name"] for parameter in parameters},
+            bindings=bindings,
+            return_types=return_types,
+        ):
+            return None, "unsupported-generic-mapping"
+    elif (not isinstance(payload, tuple) or payload[0] != "nominal"
+          or return_types._resolve_nominal_identity(str(payload[1]))
+          != return_types.nominal_identity(expected)):
+        return None, "unsupported-generic-mapping"
+    else:
+        for parameter, argument in zip(parameters, payload[2]):
+            bindings[parameter["name"]] = argument
+
+    last_bound = max(
+        (index for index, parameter in enumerate(parameters)
+         if parameter["name"] in bindings),
+        default=-1,
+    )
+    specs: list[Any] = []
+    for parameter in parameters[:last_bound + 1]:
+        name = parameter["name"]
+        argument = bindings.get(name)
+        if argument is None:
+            default = parameter["kind"]["type"].get("default")
+            argument = return_types.resolve(default) if default is not None else None
+        if argument is None:
+            return None, "unsupported-generic-mapping"
+        spec, reason = _type_spec(
+            argument,
+            surface=surface,
+            method=method,
+            return_types=return_types,
+        )
+        if reason:
+            return None, reason
+        specs.append(spec)
+    return specs, None
+
+
+def _candidate_specs(
+    expected: tuple[str, ...],
+    payload: Any,
+    *,
+    surface: gate.Surface,
+    method: tuple[str, ...],
+    return_types: gate.ReturnTypes,
+) -> list[tuple[list[Any], str | None]]:
+    """Try Rust's defaults first, then an identity-derived generic mapping."""
+    candidates: list[tuple[list[Any], str | None]] = [([], None)]
+    specs, reason = _generic_specs(
+        expected,
+        payload,
+        surface=surface,
+        method=method,
+        return_types=return_types,
+    )
+    if specs:
+        candidates.append((specs, reason))
+    elif reason:
+        candidates.append(([], reason))
+    return candidates
+
+
 def _owner_method_paths(surface: gate.Surface, owner: str) -> list[tuple[str, ...]]:
     prefix = tuple(owner.split("::"))
     return sorted(
@@ -204,31 +388,29 @@ def propose(document: dict[str, Any], profile: dict[str, Any]) -> dict[str, Any]
             result_proved = False
             owner_proved = False
             for expected in commit_paths:
-                specs: list[Any] = []
-                reason: str | None = None
-                for argument in payload[2]:
-                    spec, reason = _type_spec(
-                        argument,
-                        surface=surface,
-                        method=method,
-                        return_types=return_types,
-                    )
+                for specs, reason in _candidate_specs(
+                    expected,
+                    payload,
+                    surface=surface,
+                    method=method,
+                    return_types=return_types,
+                ):
                     if reason:
+                        unsupported_reason = reason
+                        continue
+                    checked_args = [return_types.policy_type(spec, method) for spec in specs]
+                    if any(argument is None for argument in checked_args):
+                        unsupported_reason = "missing-identity"
+                        continue
+                    result_ok = return_types.matches_result(method, expected, checked_args)
+                    owner_ok = result_ok and return_types.matches_owner(
+                        method, expected, checked_args
+                    )
+                    result_proved = result_proved or result_ok
+                    owner_proved = owner_proved or owner_ok
+                    if owner_ok:
+                        proven.append((expected, specs))
                         break
-                    specs.append(spec)
-                if reason:
-                    unsupported_reason = reason
-                    continue
-                checked_args = [return_types.policy_type(spec, method) for spec in specs]
-                if any(argument is None for argument in checked_args):
-                    unsupported_reason = "missing-identity"
-                    continue
-                result_ok = return_types.matches_result(method, expected, checked_args)
-                owner_ok = result_ok and return_types.matches_owner(method, expected, checked_args)
-                result_proved = result_proved or result_ok
-                owner_proved = owner_proved or owner_ok
-                if owner_ok:
-                    proven.append((expected, specs))
             if not proven:
                 if owner_proved:
                     # Defensive: this branch is unreachable while proving rows,

@@ -15,8 +15,12 @@ For each nominated `immutable_owners` type it considers only direct public
 `apply`/`apply_*` methods not already present in `result_methods`. A candidate
 is emitted only when `ReturnTypes.matches_result` and `matches_owner` both
 prove the exported `Commit`/`BatchCommit` identity. Local aliases are matched
-by nominal identity; concrete family `Commit` paths are preferred, and any
-equivalent checked paths are reported as alternatives. Unsupported, ambiguous,
+by nominal identity. Each path is first checked with its own Rust defaults (so
+a zero-parameter alias remains a zero-argument policy row); a non-default
+generic row is rendered from the alias target's declared bindings, never by
+guessing the underlying argument order. Concrete family `Commit` paths are
+preferred, and any equivalent checked paths are reported as alternatives.
+Unsupported, ambiguous,
 missing-identity, wrong-owner, and non-Commit results remain explicit
 `unresolved` findings. Raw, record, Patch-owned, and History helpers are not
 nominated and therefore are not inferred. Existing rows are listed separately.

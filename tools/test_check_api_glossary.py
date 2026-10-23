@@ -143,6 +143,7 @@ pub fn open_with_options() {}
 pub struct MutableDraft;
 pub mod returns {
     pub struct Package;
+    pub struct OtherPackage;
     pub struct Other;
     pub struct Patch;
     pub struct Error;
@@ -169,6 +170,9 @@ pub mod returns {
         pub fn fake_result(&self) -> fake::Result<Commit> { fake::Result(Triad(Package)) }
         pub fn fake_commit(&self) -> Result<fake::Commit> { Ok(fake::Commit) }
     }
+    impl OtherPackage {
+        pub fn apply_alias_other(&self, _: &Patch) -> Result<CommitAlias<Self>> { Ok(Triad(OtherPackage)) }
+    }
     impl<P> Triad<P> {
         pub fn again(self) -> Result<Self> { Ok(self) }
         pub fn package(&self) -> &P { &self.0 }
@@ -176,6 +180,28 @@ pub mod returns {
         pub fn patch(&self) -> &Patch { &Patch }
         pub fn diagnostics(&self) -> &() { &() }
         pub fn into_parts(self) -> (P, Patch) { (self.0, Patch) }
+    }
+}
+pub mod core_alias {
+    pub struct Package;
+    pub struct Patch;
+    pub struct Error;
+    pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+    impl Package {
+        pub fn apply(&self, _: &Patch) -> Result<Commit> { todo!() }
+    }
+}
+pub mod core_alias_mapped {
+    pub struct Package;
+    pub struct Patch;
+    pub struct OtherPackage;
+    pub struct OtherPatch;
+    pub struct Error;
+    pub type Commit<A = Patch, B = Package> = litchi_core::edit::Commit<B, A>;
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+    impl OtherPackage {
+        pub fn apply(&self, _: &OtherPatch) -> Result<Commit<OtherPatch, Self>> { todo!() }
     }
 }
 pub mod durable {
@@ -399,14 +425,54 @@ class RustdocTests(unittest.TestCase):
         unresolved = {row["method"]: row["reason"] for row in result["unresolved"]}
         self.assertEqual(candidates["fixture::returns::Package::apply"]["ok"],
                          "fixture::returns::Commit")
+        self.assertNotIn("type_args", candidates["fixture::returns::Package::apply"])
         self.assertEqual(candidates["fixture::returns::Package::apply_alias"]["ok"],
                          "fixture::returns::Commit")
+        self.assertNotIn("type_args", candidates["fixture::returns::Package::apply_alias"])
         self.assertEqual(candidates["fixture::returns::Package::apply_other_patch"]["ok"],
                          "fixture::returns::Commit")
         self.assertEqual(unresolved["fixture::returns::Package::apply_other_owner"],
                          "wrong-owner")
         self.assertEqual(unresolved["fixture::returns::Package::apply_bad"],
                          "non-commit-result")
+
+    def test_replay_rule_proposals_map_alias_generics_in_declared_order(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=[
+                "fixture::returns::Package",
+                "fixture::returns::OtherPackage",
+            ],
+        ))
+        candidates = {row["method"]: row for row in result["candidates"]}
+        self.assertEqual(candidates["fixture::returns::OtherPackage::apply_alias_other"], {
+            "method": "fixture::returns::OtherPackage::apply_alias_other",
+            "ok": "fixture::returns::Commit",
+            "type_args": ["fixture::returns::OtherPackage"],
+        })
+
+    def test_replay_rule_proposals_prefer_zero_parameter_core_alias(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=["fixture::core_alias::Package"],
+        ))
+        candidates = {row["method"]: row for row in result["candidates"]}
+        row = candidates["fixture::core_alias::Package::apply"]
+        self.assertEqual(row["method"], "fixture::core_alias::Package::apply")
+        self.assertEqual(row["ok"], "fixture::core_alias::Commit")
+        self.assertNotIn("type_args", row)
+        self.assertIn("litchi_core::edit::Commit", row["alternatives"])
+
+    def test_replay_rule_proposals_follow_reordered_alias_parameters(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=["fixture::core_alias_mapped::OtherPackage"],
+        ))
+        row = {item["method"]: item for item in result["candidates"]}[
+            "fixture::core_alias_mapped::OtherPackage::apply"
+        ]
+        self.assertEqual(row["ok"], "fixture::core_alias_mapped::Commit")
+        self.assertEqual(row["type_args"], [
+            "fixture::core_alias_mapped::OtherPatch",
+            "fixture::core_alias_mapped::OtherPackage",
+        ])
 
     def test_replay_rule_proposals_fail_closed_for_missing_return_identity(self):
         document = copy.deepcopy(self.document)
