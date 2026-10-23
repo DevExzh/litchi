@@ -93,6 +93,7 @@ pub struct RelationshipFragmentPlan<'a> {
 impl OwnedRelationships {
     /// Capture bounded exact entries for a durable metadata delta.
     pub fn fragments_with_limits(&self, limits: SourceLimits) -> Result<RelationshipFragments> {
+        let limits = self.xml.limits().min(limits);
         RelationshipFragments::from_bytes_with_limits(self.owner.clone(), self.bytes_arc(), limits)
     }
     /// Plan guarded entry transport while retaining unrelated destination XML.
@@ -106,6 +107,7 @@ impl OwnedRelationships {
         edits: &[RelationshipFragmentEdit<'a>],
         limits: SourceLimits,
     ) -> Result<RelationshipFragmentPlan<'a>> {
+        let limits = self.xml.limits().min(limits);
         Kind::Relationships(self.owner.clone()).admit_edit_count(edits.len(), limits)?;
         let mut inner_edits = Vec::new();
         inner_edits
