@@ -96,7 +96,9 @@ FIXTURE_GENERATOR_OUTER_GRACE_S = 30.0
 FIXTURE_GENERATOR_OUTER_TIMEOUT_S = (
     FIXTURE_GENERATOR_TIMEOUT_S + FIXTURE_GENERATOR_OUTER_GRACE_S
 )
-SCHEMA = "litchi.iwa.native-qualification.v1"
+SCHEMA = "litchi.iwa.native-qualification.v2"
+COMPARISON = "integrated-route"
+SOURCE_DELTA_SCHEMA = "litchi.iwa.source-delta.v1"
 OWNER_FIXTURES = (
     "basic.numbers",
     "media-replacement-native.key",
@@ -534,6 +536,98 @@ def _source_files(root: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _source_content(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the path-independent identity retained in a source delta."""
+
+    bytes_count = row.get("bytes")
+    digest = row.get("sha256")
+    if (
+        not isinstance(bytes_count, int)
+        or bytes_count < 0
+        or not isinstance(digest, str)
+        or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+    ):
+        raise QualificationError("source delta contains an invalid content identity")
+    return {"bytes": bytes_count, "sha256": digest}
+
+
+def _validate_source_delta_path(path: str) -> None:
+    if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
+        raise QualificationError("source delta has an invalid path")
+
+
+def _source_delta_row(path: str, content: Mapping[str, Any], side: str) -> dict[str, Any]:
+    _validate_source_delta_path(path)
+    return {"path": path, side: _source_content(content)}
+
+
+def source_delta(
+    base: Mapping[str, Mapping[str, Any]],
+    candidate: Mapping[str, Mapping[str, Any]],
+    base_commit: str,
+    candidate_commit: str,
+) -> dict[str, Any]:
+    """Describe every changed, added, or removed source file.
+
+    The comparison is intentionally over the complete archived source tree,
+    rather than a format or shared-crate prefix.  This permits an integrated
+    route to compare the original baseline with the reviewed candidate while
+    retaining an immutable, content-bound explanation of every source delta.
+    """
+
+    if re.fullmatch(r"[0-9a-f]{40}", base_commit) is None or re.fullmatch(
+        r"[0-9a-f]{40}", candidate_commit
+    ) is None:
+        raise QualificationError("source delta refs must be full commit ids")
+    base_only: list[dict[str, Any]] = []
+    candidate_only: list[dict[str, Any]] = []
+    changed: list[dict[str, Any]] = []
+    for path in sorted(set(base) | set(candidate)):
+        _validate_source_delta_path(path)
+        before = base.get(path)
+        after = candidate.get(path)
+        if before is None:
+            if after is None:
+                raise QualificationError("source delta has an inconsistent file map")
+            candidate_only.append(_source_delta_row(path, after, "candidate"))
+        elif after is None:
+            base_only.append(_source_delta_row(path, before, "base"))
+        elif _source_content(before) != _source_content(after):
+            changed.append(
+                {
+                    "path": path,
+                    "base": _source_content(before),
+                    "candidate": _source_content(after),
+                }
+            )
+    return {
+        "schema": SOURCE_DELTA_SCHEMA,
+        "comparison": COMPARISON,
+        "base_commit": base_commit,
+        "candidate_commit": candidate_commit,
+        "base_only": base_only,
+        "candidate_only": candidate_only,
+        "changed": changed,
+    }
+
+
+def verify_source_delta(
+    value: Mapping[str, Any],
+    source_maps: Mapping[str, Mapping[str, Mapping[str, Any]]],
+    base_commit: str,
+    candidate_commit: str,
+) -> None:
+    """Verify an integrated source delta against both retained source maps."""
+
+    if not isinstance(value, Mapping):
+        raise QualificationError("missing integrated source delta")
+    expected = source_delta(
+        source_maps["base"], source_maps["candidate"], base_commit, candidate_commit
+    )
+    if dict(value) != expected:
+        raise QualificationError("integrated source delta does not match retained source files")
+
+
 def snapshot_source(output: Path, label: str, revision: str, lock: Path) -> tuple[Path, dict[str, Any]]:
     commit = git_revision(revision)
     source = output / f"source-{label}"
@@ -625,6 +719,8 @@ def build(args: argparse.Namespace) -> None:
     manifest: dict[str, Any] = {
         "schema": SCHEMA,
         "family": family,
+        "comparison": COMPARISON,
+        "requested_refs": {"base": args.base, "candidate": args.candidate},
         "status": "building",
         "routes": list(ROUTES[family]),
         "builder": artifact(Path(__file__)),
@@ -633,9 +729,30 @@ def build(args: argparse.Namespace) -> None:
         "endpoints": {},
     }
     save_json(output / "build.json", manifest)
-    common_lock: Path | None = None
+    snapshots: dict[str, tuple[Path, dict[str, Any]]] = {}
+    source_maps: dict[str, dict[str, dict[str, Any]]] = {}
     for label, revision in (("base", args.base), ("candidate", args.candidate)):
         source, provenance = snapshot_source(output, label, revision, lock)
+        snapshots[label] = (source, provenance)
+        source_manifest = load_json(Path(provenance["manifest"]["path"]))
+        source_maps[label] = {
+            row["path"]: _source_content(row) for row in source_manifest["files"]
+        }
+    resolved_refs = {
+        label: snapshots[label][1]["commit"] for label in ("base", "candidate")
+    }
+    manifest["resolved_refs"] = resolved_refs
+    manifest["source_delta"] = source_delta(
+        source_maps["base"], source_maps["candidate"], resolved_refs["base"], resolved_refs["candidate"]
+    )
+    verify_source_delta(manifest["source_delta"], source_maps, resolved_refs["base"], resolved_refs["candidate"])
+    # The complete source comparison is admitted before the first Cargo child
+    # starts.  Subsequent consumers independently recompute it from the
+    # retained source manifests.
+    save_json(output / "build.json", manifest)
+    common_lock: Path | None = None
+    for label in ("base", "candidate"):
+        source, provenance = snapshots[label]
         project = output / f"project-{label}"
         (project / "src").mkdir(parents=True)
         shutil.copyfile(probe, project / "src/main.rs")
@@ -713,6 +830,12 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
         verify_artifact(data[key])
     if data["probe"]["path"] != str(PROBES[family].resolve()):
         raise QualificationError("build was made with a different probe source")
+    if data.get("comparison") != COMPARISON:
+        raise QualificationError("build manifest is not an integrated-route comparison")
+    resolved_refs = data.get("resolved_refs")
+    if not isinstance(resolved_refs, Mapping) or set(resolved_refs) != {"base", "candidate"}:
+        raise QualificationError("build manifest lacks resolved baseline/candidate refs")
+    source_maps: dict[str, dict[str, dict[str, Any]]] = {}
     for label in ("base", "candidate"):
         endpoint = data["endpoints"].get(label)
         if not isinstance(endpoint, Mapping):
@@ -721,10 +844,14 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
         source_manifest = load_json(Path(endpoint["source"]["manifest"]["path"]))
         verify_artifact(source_manifest["archive"])
         source_dir = output / f"source-{label}"
+        source_maps[label] = {}
         for row in source_manifest["files"]:
             actual = artifact(source_dir / row["path"])
             if (actual["bytes"], actual["sha256"]) != (row["bytes"], row["sha256"]):
                 raise QualificationError(f"source snapshot changed: {label}/{row['path']}")
+            source_maps[label][row["path"]] = _source_content(row)
+        if endpoint["source"].get("commit") != resolved_refs[label]:
+            raise QualificationError(f"{label} source ref does not match the integrated comparison")
         for key in ("project_manifest", "project_source", "lock"):
             verify_artifact(endpoint[key])
         commands = endpoint.get("commands")
@@ -741,34 +868,13 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
             raise QualificationError(f"matched endpoints disagree on {key}")
     if base["lock"]["sha256"] != candidate["lock"]["sha256"]:
         raise QualificationError("matched endpoints use different Cargo.lock files")
-    base_files = {row["path"]: row["sha256"] for row in load_json(Path(base["source"]["manifest"]["path"]))["files"]}
-    candidate_files = {row["path"]: row["sha256"] for row in load_json(Path(candidate["source"]["manifest"]["path"]))["files"]}
-    _verify_source_sets(base_files, candidate_files, family)
+    verify_source_delta(
+        data.get("source_delta"),
+        source_maps,
+        resolved_refs["base"],
+        resolved_refs["candidate"],
+    )
     return data
-
-
-def _verify_source_sets(
-    base_files: Mapping[str, str], candidate_files: Mapping[str, str], family: str
-) -> None:
-    """Allow changes only in the format family and reject unapproved additions."""
-
-    excluded = {
-        "constructor": ("crates/litchi-iwa-core/",),
-        "owner": (
-            "crates/litchi-numbers/",
-            "crates/litchi-keynote/",
-            "crates/litchi-pages/",
-        ),
-    }[family]
-    for path, digest in base_files.items():
-        if path not in candidate_files:
-            raise QualificationError(f"candidate source is missing {path}")
-        if not path.startswith(excluded) and candidate_files[path] != digest:
-            raise QualificationError(f"unmatched shared source changed: {path}")
-    extras = set(candidate_files) - set(base_files)
-    unapproved = sorted(path for path in extras if not path.startswith(excluded))
-    if unapproved:
-        raise QualificationError(f"candidate added unapproved shared source: {unapproved[0]}")
 
 
 def _validation_command(family: str, binary: Path, fixtures: Path | None, destination: Path) -> list[str]:
@@ -912,6 +1018,9 @@ def validate(args: argparse.Namespace) -> None:
         "family": family,
         "status": "complete",
         "build": artifact(output / "build.json"),
+        "comparison": build["comparison"],
+        "resolved_refs": build["resolved_refs"],
+        "source_delta": build["source_delta"],
         "fixtures": fixture_manifest,
         "endpoints": rows,
     }
@@ -925,6 +1034,9 @@ def load_validation(output: Path, family: str, build: Mapping[str, Any]) -> dict
         raise QualificationError("correctness validation is missing or incomplete")
     if data.get("build", {}).get("sha256") != artifact(output / "build.json")["sha256"]:
         raise QualificationError("correctness validation does not match build manifest")
+    for key in ("comparison", "resolved_refs", "source_delta"):
+        if data.get(key) != build.get(key):
+            raise QualificationError(f"correctness validation does not retain build {key}")
     for label in ("base", "candidate"):
         for variant in ("native", "allocation"):
             row = data["endpoints"][label][variant]
@@ -941,6 +1053,55 @@ def load_validation(output: Path, family: str, build: Mapping[str, Any]) -> dict
     if data["endpoints"]["base"]["allocation"]["value"] != data["endpoints"]["candidate"]["allocation"]["value"]:
         raise QualificationError("baseline/candidate allocation correctness differs")
     return data
+
+
+def collect(args: argparse.Namespace) -> None:
+    """Verify a completed build/validation/run packet for handoff.
+
+    Collection is deliberately read-only with respect to source and binary
+    provenance.  ``load_build`` recomputes the complete integrated source
+    delta, so this consumer cannot silently fall back to the removed
+    shared-prefix equality rule.
+    """
+
+    family = require_family(args.family)
+    output = outside_checkout(args.output)
+    build = load_build(output, family)
+    validation = load_validation(output, family, build)
+    run_value: dict[str, Any] | None = None
+    if args.attempt is not None:
+        attempt = output / args.attempt
+        run_manifest = load_json(attempt / "manifest.json")
+        if (
+            run_manifest.get("schema") != SCHEMA
+            or run_manifest.get("family") != family
+            or run_manifest.get("status") != "complete"
+        ):
+            raise QualificationError("native attempt is not a complete matching run")
+        if run_manifest.get("build") != artifact(output / "build.json"):
+            raise QualificationError("native attempt does not match the build manifest")
+        if run_manifest.get("validation") != artifact(output / "validation.json"):
+            raise QualificationError("native attempt does not match the validation manifest")
+        for key in ("comparison", "resolved_refs", "source_delta"):
+            if run_manifest.get(key) != build.get(key):
+                raise QualificationError(f"native attempt does not retain build {key}")
+        for label in ("base", "candidate"):
+            if run_manifest.get("sources", {}).get(label) != build["endpoints"][label]["source"]:
+                raise QualificationError(f"native attempt source identity changed: {label}")
+        run_value = {"manifest": artifact(attempt / "manifest.json"), "qualified": run_manifest.get("qualified")}
+    result = {
+        "schema": SCHEMA,
+        "family": family,
+        "status": "complete",
+        "build": artifact(output / "build.json"),
+        "validation": artifact(output / "validation.json"),
+        "comparison": build["comparison"],
+        "resolved_refs": build["resolved_refs"],
+        "source_delta": build["source_delta"],
+        "run": run_value,
+    }
+    destination = outside_checkout(args.out) if args.out is not None else output / "collection.json"
+    save_json(destination, result)
 
 
 def _program(arguments: str) -> str:
@@ -1323,6 +1484,9 @@ def run_native(args: argparse.Namespace) -> None:
         "validation": artifact(output / "validation.json"),
         "runner": artifact(Path(__file__)),
         "probe": artifact(PROBES[family]),
+        "comparison": build["comparison"],
+        "resolved_refs": build["resolved_refs"],
+        "source_delta": build["source_delta"],
         "sources": {
             label: build["endpoints"][label]["source"] for label in ("base", "candidate")
         },
@@ -1438,6 +1602,9 @@ def run_native(args: argparse.Namespace) -> None:
         for label in ("base", "candidate"):
             if final_build["endpoints"][label]["source"] != manifest["sources"][label]:
                 raise QualificationError(f"{label} source identity changed during timing")
+        for key in ("comparison", "resolved_refs", "source_delta"):
+            if final_build.get(key) != manifest[key]:
+                raise QualificationError(f"{key} changed during timing")
         if family == "owner":
             if fixtures is None or fixture_identity(fixtures, regenerate=True) != manifest["fixtures"]:
                 raise QualificationError("owner fixture identity changed during timing")
@@ -1496,6 +1663,9 @@ def parser() -> argparse.ArgumentParser:
         help="run a non-fixed route/protocol subset without producing an acceptance result",
     )
     run_parser.add_argument("--routes", nargs="*")
+    collect_parser = sub.add_parser("collect", parents=[common])
+    collect_parser.add_argument("--attempt")
+    collect_parser.add_argument("--out", type=Path)
     prepare_parser = sub.add_parser("prepare-fixtures")
     prepare_parser.add_argument("output", type=Path)
     return command
@@ -1508,6 +1678,8 @@ def main(argv: list[str] | None = None) -> int:
             build(args)
         elif args.phase == "validate":
             validate(args)
+        elif args.phase == "collect":
+            collect(args)
         elif args.phase == "prepare-fixtures":
             prepare_fixtures(args.output)
         else:
