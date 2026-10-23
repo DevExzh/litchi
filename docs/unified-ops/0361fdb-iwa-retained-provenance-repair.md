@@ -578,3 +578,49 @@ the path, field, message and archive-info routes; object, parse, validation
 and encoding routes retain their earlier lower candidate totals. This is
 Callgrind/allocation evidence only. Native timing remains pending a verified
 quiet host.
+
+## Inline common message versions (`5fd7624a24`)
+
+The final constructor return migrates `MessageInfo.versions` from an always-
+heap `Vec<u32>` to `SmallVec<[u32; 3]>`. The common `[1, 0, 5]` sequence is
+inline; arbitrary public sequences still spill dynamically, remain mutable,
+and retain their serialized representation. Every workspace consumer and test
+was migrated in the same commit. The `smallvec` `union` feature is active in
+the `litchi-iwa-core` feature graph.
+
+The admission guard now requires both exact default values and non-spilled
+storage before using the minimal collection ledger. This closes the equality
+gap where a spilled SmallVec containing `[1, 0, 5]` could otherwise look
+minimal. Spilled-memory accounting charges the full sequence length, not
+`len - 3`; this preserves the existing logical-length budget contract. The
+Keynote source-owned heap estimate similarly excludes inline storage while
+retaining conversion scratch accounting.
+
+The reduced receipt is
+[`constructor-v24-smallvec.json`](results/0361fd/constructor-v24-smallvec.json).
+The exact matched targets remain outside the repository:
+
+| target | path | bytes | files |
+|---|---|---:|---:|
+| base | `/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-base` | 753,422,513 | 1,498 |
+| candidate | `/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-candidate` | 476,841,172 | 1,128 |
+
+The allocator binaries are 658,296 bytes (base) and 698,704 bytes
+(candidate); the Callgrind binaries are 633,744 and 677,464 bytes. Their
+paths, SHA-256 values, and the protected pre-SmallVec binaries are recorded in
+the receipt. Existing target directories and evidence were retained; no
+protected artifact was removed.
+
+Against the exact pre-migration representation, the allocation probe removes
+the 12-byte, one-call `message_info` allocation for eight common messages.
+For the complete raw constructor at 128 messages, peak/allocated bytes/calls
+fall from `28,160/2,816,300/13,000` to `26,624/2,662,700/200`. Callgrind
+falls by 1,863,443 Ir at 12,000 iterations for the direct 128-message raw
+route and by 677,683,840 Ir for raw end-to-end; the full fixed and count
+tables are in the receipt and external TSV summaries. These are matched
+allocation and instruction results only. Native timing remains pending a
+verified quiet host.
+
+Correctness tests passed: 84 `litchi-iwa-core` unit tests, the focused Keynote
+heap-accounting test, and the selected all-target consumer check. Canonical
+and retained output hashes matched the pre-migration and candidate endpoints.
