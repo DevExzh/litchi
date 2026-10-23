@@ -42,6 +42,8 @@ HARD_MEMORY_LIMIT_BYTES = 2 * 1024**3
 MAX_CHILD_OUTPUT_BYTES = 16 * 1024 * 1024
 DEFAULT_CALIBRATION_START_BATCH = 1
 DEFAULT_CALIBRATION_MAX_BATCH = 1 << 20
+MAX_QUIET_LOADAVG = 1.0
+MAX_QUIET_RUNNABLE = 1
 BASELINE_LINEAGE = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
 CANDIDATE_LINEAGE = "8acd229235e3c01c6e529f6d1f055d84b8e03de4"
 PROBE_COMMITS = (
@@ -274,6 +276,44 @@ def is_heavy_process(executable: str, command: str) -> bool:
     return bool(HEAVY_PROCESS_WORD.search(command))
 
 
+def selected_cpu_ticks(proc: Path, cpu: int) -> list[int]:
+    try:
+        lines = (proc / "stat").read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise RunnerError(f"cannot read /proc/stat: {error}") from error
+    label = f"cpu{cpu}"
+    for line in lines:
+        fields = line.split()
+        if fields and fields[0] == label:
+            try:
+                return [int(value) for value in fields[1:]]
+            except ValueError as error:
+                raise RunnerError(f"invalid {label} counters in /proc/stat") from error
+    raise RunnerError(f"/proc/stat has no counters for selected CPU {cpu}")
+
+
+def process_stat(entry: Path) -> tuple[str, int, int] | None:
+    """Return (state, processor, utime+stime) from /proc/<pid>/stat."""
+    try:
+        raw = (entry / "stat").read_text(encoding="ascii")
+    except (FileNotFoundError, PermissionError, OSError, UnicodeError):
+        return None
+    close = raw.rfind(")")
+    if close < 0:
+        return None
+    fields = raw[close + 2 :].split()
+    # The list starts at field 3 (state); processor is field 39, or index 36.
+    if len(fields) <= 36:
+        return None
+    try:
+        state = fields[0]
+        processor = int(fields[36])
+        cpu_time = int(fields[11]) + int(fields[12])
+    except (IndexError, ValueError):
+        return None
+    return state, processor, cpu_time
+
+
 def process_scan(cpu: int) -> dict[str, Any]:
     proc = Path("/proc")
     load_path = proc / "loadavg"
@@ -285,8 +325,11 @@ def process_scan(cpu: int) -> dict[str, Any]:
         runnable = int(load_fields[3].split("/", 1)[0])
     except (OSError, UnicodeError, ValueError) as error:
         raise RunnerError(f"cannot read /proc/loadavg: {error}") from error
+    cpu_ticks = selected_cpu_ticks(proc, cpu)
     processes: list[dict[str, Any]] = []
     heavy_processes: list[dict[str, Any]] = []
+    selected_cpu_processes: list[dict[str, Any]] = []
+    selected_cpu_runnable: list[dict[str, Any]] = []
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
@@ -314,29 +357,63 @@ def process_scan(cpu: int) -> dict[str, Any]:
             allowed = sorted(parse_cpu_list(allowed_text))
         except ValueError:
             continue
+        stat = process_stat(entry)
+        if stat is None:
+            continue
+        state, processor, cpu_time = stat
+        pid = int(entry.name)
         process = {
-            "pid": int(entry.name),
+            "pid": pid,
             "comm": comm,
             "affinity": allowed,
             "command": command_parts,
+            "state": state,
+            "processor": processor,
+            "cpu_time_ticks": cpu_time,
         }
         processes.append(process)
-        if is_heavy_process(comm, " ".join(command_parts)) and int(entry.name) != os.getpid():
+        if processor == cpu and pid != os.getpid():
+            selected_cpu_processes.append(process)
+            if state in {"R", "D"}:
+                selected_cpu_runnable.append(process)
+        if is_heavy_process(comm, " ".join(command_parts)) and pid != os.getpid():
             heavy_processes.append(process)
     processes.sort(key=lambda item: item["pid"])
     heavy_processes.sort(key=lambda item: item["pid"])
+    selected_cpu_processes.sort(key=lambda item: item["pid"])
+    selected_cpu_runnable.sort(key=lambda item: item["pid"])
+    quiet = (
+        not heavy_processes
+        and loadavg[0] <= MAX_QUIET_LOADAVG
+        and runnable <= MAX_QUIET_RUNNABLE
+        and not selected_cpu_runnable
+    )
     scan = {
         "cpu": cpu,
         "loadavg": loadavg,
         "runnable_processes": runnable,
+        "selected_cpu_ticks": cpu_ticks,
         "processes": processes,
         "heavy_processes": heavy_processes,
-        "quiet": not heavy_processes,
+        "selected_cpu_processes": selected_cpu_processes,
+        "selected_cpu_runnable": selected_cpu_runnable,
+        "quiet": quiet,
     }
     scan["scan_sha256"] = sha256_bytes(canonical_json(scan))
-    if heavy_processes:
-        pids = [process["pid"] for process in heavy_processes]
-        raise RunnerError(f"heavy processes present during quiet scan: {pids}")
+    if not quiet:
+        reasons: list[str] = []
+        if heavy_processes:
+            reasons.append(f"heavy processes {[process['pid'] for process in heavy_processes]}")
+        if loadavg[0] > MAX_QUIET_LOADAVG:
+            reasons.append(f"loadavg {loadavg[0]:.3f} > {MAX_QUIET_LOADAVG:.3f}")
+        if runnable > MAX_QUIET_RUNNABLE:
+            reasons.append(f"runnable {runnable} > {MAX_QUIET_RUNNABLE}")
+        if selected_cpu_runnable:
+            reasons.append(
+                "selected CPU runnable "
+                + str([process["pid"] for process in selected_cpu_runnable])
+            )
+        raise RunnerError("quiet load/CPU gate failed: " + "; ".join(reasons))
     return scan
 
 
@@ -456,6 +533,13 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
     if not complete and not options.diagnostic:
         raise RunnerError(
             "only the complete 3-route x 2-corpus matrix qualifies; use --diagnostic for subsets"
+        )
+    if not options.diagnostic and (
+        options.control_lineage != BASELINE_LINEAGE
+        or options.candidate_lineage != CANDIDATE_LINEAGE
+    ):
+        raise RunnerError(
+            "lineage overrides require --diagnostic and are explicitly unqualified"
         )
     return routes, corpora
 

@@ -17,6 +17,14 @@ fingerprint, and numeric readback validation remains unchanged. The
 coordinator should qualify write-only, first-read, and read-after-write costs
 against the former forward-only plan before claiming the F3 saving.
 
+The deferred cell family fences the original dynamic source before and after
+planning and before and after each deferred target materialization/publication;
+staging's owned cell snapshot is not a freshness oracle. A stale
+stage-to-commit therefore returns the retained family `Io` source-change
+reason, while a stale deferred `write_to`/`save` retains the typed
+`OutputError::Package(Error::Source(SourceChanged { .. }))` boundary. The
+non-deferred source-version path keeps its existing fast path.
+
 Validation was limited to formatting and static diff/artifact guards in this
 leaf. The coordinator should run the XLS and unified-ops checks on the merged
 assembly.
@@ -74,6 +82,17 @@ The two hardening commits (`28d4a7c49f` for the probe/record and
 well. The runner checks the exact hashes of the probe, corpus, library and
 runner files against this checkout, and rejects a missing cherry-pick or any
 source edit before launching a child.
+
+The current probe additionally allocates its bounded publication sink before
+the route timer, and its replay oracle reopens independent equal-content
+source and target owners. The runner accepts the pinned baseline and candidate
+lineages for qualification; lineage overrides are allowed only with
+`--diagnostic`, which marks the receipt unqualified. Before and after every
+child it records the selected CPU's `/proc/stat` counters, load average,
+runnable count, and selected-CPU runnable processes. A scan is quiet only when
+no heavy process is present, one-minute load is at most 1.0, runnable count is
+at most one, and no other process is running or uninterruptibly sleeping on
+the selected CPU.
 
 If either snapshot already contains one of these commits, that cherry-pick is a
 no-op in the regeneration log and must be recorded as such. The copied source

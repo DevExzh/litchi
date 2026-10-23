@@ -367,9 +367,9 @@ fn require_output_source_changed(
     label: &str,
 ) -> Result<()> {
     match error {
-        litchi_xls::source_backed::OutputError::Overlay(
-            litchi_cfb::OverlayError::SourceChanged { .. },
-        ) => Ok(()),
+        litchi_xls::source_backed::OutputError::Package(litchi_xls::package::Error::Source(
+            litchi_xls::SourceBackedError::SourceChanged { .. },
+        )) => Ok(()),
         other => Err(format!(
             "XLS F3 {label} returned the wrong output freshness error: {other:?}"
         )
@@ -387,8 +387,11 @@ fn write_package(package: &SourceBackedWorkbook) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn write_commit(commit: &cells::Commit, capacity: usize) -> Result<CountingSink> {
-    let mut sink = CountingSink::new(capacity)?;
+fn write_commit(
+    commit: &cells::Commit,
+    mut sink: CountingSink,
+    capacity: usize,
+) -> Result<CountingSink> {
     commit.package().write_to(&mut sink)?;
     if sink.bytes.len() != capacity {
         return Err(format!(
@@ -482,6 +485,10 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
     // Source opening is intentionally outside every route clock, matching the
     // existing xls_numeric selectors. Each call receives fresh source bytes.
     let source = source_workbook(&fixture.archive)?;
+    // The publication sink's bounded allocation is setup, not route work.
+    // Allocate it before the route timer so first-read and write-only timings
+    // compare only the owner operation and the bounded stream writes.
+    let publication_sink = CountingSink::new(output_capacity)?;
     let route_started = Instant::now();
 
     let edit_started = Instant::now();
@@ -503,7 +510,7 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
     match route {
         Route::WriteOnly => {
             let write_started = Instant::now();
-            let sink = write_commit(&commit, output_capacity)?;
+            let sink = write_commit(&commit, publication_sink, output_capacity)?;
             write_ns = elapsed_ns(write_started.elapsed())?;
             output = sink.bytes;
             route_elapsed_ns = elapsed_ns(route_started.elapsed())?;
@@ -517,11 +524,11 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
             route_elapsed_ns = elapsed_ns(route_started.elapsed())?;
             // Publication is intentionally after the first-read clock. This
             // route isolates the moved target reopen from output streaming.
-            output = write_commit(&commit, output_capacity)?.bytes;
+            output = write_commit(&commit, publication_sink, output_capacity)?.bytes;
         },
         Route::ReadAfterWrite => {
             let write_started = Instant::now();
-            let sink = write_commit(&commit, output_capacity)?;
+            let sink = write_commit(&commit, publication_sink, output_capacity)?;
             write_ns = elapsed_ns(write_started.elapsed())?;
             output = sink.bytes;
             let read_started = Instant::now();
@@ -643,9 +650,14 @@ fn verify_partial_publication(commit: &cells::Commit, expected: &[u8]) -> Result
 
 fn verify_patch(source: &SourceBackedWorkbook, commit: &cells::Commit) -> Result<()> {
     let patch = commit.patch();
-    let applied = source.apply_cells(patch)?;
-    let applied_bytes = write_package(applied.package())?;
+    // Reopen both equal-content recipients independently.  Reusing the
+    // original owner or committed owner would only prove Arc identity and
+    // would not exercise the patch's content lineage contract.
+    let source_bytes = write_package(source)?;
     let committed_bytes = write_package(commit.package())?;
+    let independent_source = source_workbook(&source_bytes)?;
+    let applied = independent_source.apply_cells(patch)?;
+    let applied_bytes = write_package(applied.package())?;
     if applied_bytes != committed_bytes {
         return Err("XLS F3 patch replay changed committed bytes".into());
     }
@@ -658,9 +670,9 @@ fn verify_patch(source: &SourceBackedWorkbook, commit: &cells::Commit) -> Result
             format!("XLS F3 stale recipient returned the wrong error: {stale_error:?}").into(),
         );
     }
-    let restored = commit.package().apply_cells(&patch.inverse())?;
+    let independent_target = source_workbook(&committed_bytes)?;
+    let restored = independent_target.apply_cells(&patch.inverse())?;
     let restored_bytes = write_package(restored.package())?;
-    let source_bytes = write_package(source)?;
     if restored_bytes != source_bytes {
         return Err("XLS F3 inverse patch did not restore source bytes".into());
     }
@@ -1243,7 +1255,12 @@ fn verify_real_producer() -> Result<()> {
     if cell.value() != &Value::Number(replacement) {
         return Err("XLS F3 real producer output value differs".into());
     }
-    let restored = commit.package().apply_cells(&commit.patch().inverse())?;
+    let replayed = source_workbook(REAL_PRODUCER)?.apply_cells(commit.patch())?;
+    if write_package(replayed.package())? != output {
+        return Err("XLS F3 real producer forward replay changed bytes".into());
+    }
+    let independent_target = source_workbook(&output)?;
+    let restored = independent_target.apply_cells(&commit.patch().inverse())?;
     if write_package(restored.package())? != REAL_PRODUCER {
         return Err("XLS F3 real producer inverse did not restore bytes".into());
     }
