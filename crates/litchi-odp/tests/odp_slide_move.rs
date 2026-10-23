@@ -225,6 +225,7 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
@@ -237,6 +238,7 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
@@ -263,6 +265,7 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
