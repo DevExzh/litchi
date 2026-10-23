@@ -1,27 +1,78 @@
 {
   "record": "0362uga",
   "worktree": "uo2/odp-lazy-entry",
-  "status": "source-repair-complete",
+  "status": "source-repair-complete-and-validated",
+  "validated_source_commit": "337e4e67158f952f48003292b4f6e3bbd659c4ed",
+  "source": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "required_files": [
+      "clippy.toml",
+      "rust-toolchain.toml",
+      ".cargo/config.toml"
+    ]
+  },
+  "preflight": {
+    "command": "source /home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/env.sh; rustc --version; cargo --version; verify clippy.toml rust-toolchain.toml .cargo/config.toml; print jobs/memory/incremental/target/TMPDIR; du -sb target",
+    "result": "passed",
+    "log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-337e4e6715-preflight.log",
+      "bytes": 357,
+      "sha256": "b0787757c3f76fbbe993343730efadc521344a04cbee4db45a63647ef8241626"
+    }
+  },
   "checks": [
     {
       "command": "cargo test --offline --locked -p litchi-odp --all-targets --all-features",
       "result": "passed",
-      "unit_tests": 236,
-      "integration_failures": 0
+      "suites": 38,
+      "passed": 447,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-337e4e6715-tests.log",
+        "bytes": 44409,
+        "sha256": "43122e6d01329e6eca917d6c7ec3d01c0c335543ce4cfbec93bb4ffe133a7901"
+      }
     },
     {
       "command": "cargo clippy --offline --locked -p litchi-odp --all-targets --all-features -- -D warnings",
-      "result": "passed"
+      "result": "passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-337e4e6715-clippy.log",
+        "bytes": 217,
+        "sha256": "bc3fb4ac10952ac55f51eda2b75dd320068cbe1bce0e1da5255c6e0d9dc9bb56"
+      }
     },
     {
-      "command": "cargo fmt --all",
-      "result": "passed"
+      "command": "cargo check --offline --locked -p litchi-ops --all-targets --all-features",
+      "result": "passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-337e4e6715-ops-check.log",
+        "bytes": 11972,
+        "sha256": "5f58c46ab94aaf1cc68ed391334ef8c601616819f235a4af9389f2625cfb2b8e"
+      }
     },
     {
-      "command": "git diff --check",
-      "result": "passed"
+      "commands": [
+        "rustfmt --edition 2024 --check crates/litchi-odp/src/authoring/edit.rs crates/litchi-odp/tests/odp_slide_move.rs crates/litchi-odp/tests/presentation_edit.rs crates/litchi-odp/tests/odp_text_box_batch.rs",
+        "git diff --check"
+      ],
+      "result": "passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-337e4e6715-static.log",
+        "bytes": 225,
+        "sha256": "3edbb053a8472ab3faf0ee020fd4e7642bc6054457ee580f0cbb8993fa07986a"
+      }
     }
   ],
+  "target": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/target",
+    "bytes_before_last_observation": 899302543,
+    "bytes_after": 1464079272,
+    "hard_cap_bytes": 21474836480
+  },
   "performance": {
     "native_timing": false,
     "baseline_build": false,

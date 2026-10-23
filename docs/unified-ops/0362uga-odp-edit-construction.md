@@ -40,15 +40,23 @@ replay, limit, refusal, fidelity and streaming tests remain green.
 
 ## Validation
 
-The isolated worktree used one capped Cargo job at a time, with
+The isolated worktree used Rust 1.95.0, one capped Cargo job at a time,
 `--offline --locked`, debug information disabled, incremental compilation
 disabled, and the workspace-local temporary directory from the coordinator
-environment:
+environment.  The source validation commit was
+`337e4e67158f952f48003292b4f6e3bbd659c4ed`:
 
 * `cargo test --offline --locked -p litchi-odp --all-targets --all-features` —
-  passed (236 unit tests plus all ODP integration targets; no failures).
+  passed (38 suites, 447 passed, 0 failed, 0 ignored, 0 measured).
 * `cargo clippy --offline --locked -p litchi-odp --all-targets --all-features -- -D warnings` — passed.
-* `cargo fmt --all` and `git diff --check` — passed.
+* `cargo check --offline --locked -p litchi-ops --all-targets --all-features` — passed.
+* `rustfmt --edition 2024 --check` on the changed ODP source/tests and
+  `git diff --check` — passed.
+
+The raw command logs, byte counts, SHA-256 values, toolchain preflight and
+target-size observations are recorded in the compact receipt below.  The
+receipt commit itself only changes documentation and therefore does not alter
+the validated ODP source.
 
 No native timing, baseline build, or performance exception is claimed in this
 slice.  The compact command receipt is
