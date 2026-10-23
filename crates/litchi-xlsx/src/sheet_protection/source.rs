@@ -16,6 +16,7 @@ use litchi_opc::SourceBackedPackage;
 
 use super::{Metadata, Snapshot, replace_protection, validate_metadata};
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!("sheet-protection", super::Patch);
@@ -85,11 +86,11 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its XML
-    /// is invalid, or the source cannot be read.
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
     pub fn edit_sheet_protection<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
-        Ok(Edit::new(self.clone(), before))
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())))
     }
 
     /// Replay a sheet-protection patch onto this workbook.
@@ -107,83 +108,96 @@ impl SourceBackedWorkbook {
 /// An isolated sheet-protection edit over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
-    staged: Metadata,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` inherits the source metadata; `Some` stores a complete
+    /// replacement.
+    staged: Option<Metadata>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            workbook,
-            staged: before.metadata().clone(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
         }
     }
 
-    /// Exact source state captured when this edit began.
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<&Metadata> {
+        match self.staged.as_ref() {
+            Some(staged) => Ok(staged),
+            None => Ok(self.resolve_before()?.metadata()),
+        }
+    }
+
+    /// Resolve the exact source state observed by this edit.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Complete staged protection metadata.
     #[must_use]
-    pub const fn metadata(&self) -> &Metadata {
-        &self.staged
+    pub fn metadata(&self) -> Result<&Metadata> {
+        self.effective()
     }
 
     /// Replace the complete staged protection state after validation.
     pub fn set(&mut self, value: Metadata) -> Result<bool> {
         validate_metadata(&value)?;
-        if self.staged == value {
+        if self.effective()? == &value {
             return Ok(false);
         }
-        self.staged = value;
+        self.staged = Some(value);
         Ok(true)
     }
 
     /// Edit a clone atomically, retaining the previous staged state on error.
     pub fn update(&mut self, operation: impl FnOnce(&mut Metadata) -> Result<()>) -> Result<bool> {
-        let mut candidate = self.staged.clone();
+        let mut candidate = self.effective()?.clone();
         operation(&mut candidate)?;
         self.set(candidate)
     }
 
     /// Remove all sheet protection and protected ranges.
-    pub fn clear(&mut self) -> bool {
-        if self.staged == Metadata::default() {
-            return false;
+    pub fn clear(&mut self) -> Result<bool> {
+        if self.effective()? == &Metadata::default() {
+            return Ok(false);
         }
-        self.staged = Metadata::default();
-        true
+        self.staged = Some(Metadata::default());
+        Ok(true)
     }
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
-        self.staged = self.before.metadata().clone();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.metadata() != &self.staged
+        self.staged = None;
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        validate_metadata(&self.staged)?;
-        if !self.changed() {
-            let patch = super::Patch::new(self.before.clone(), self.before);
-            return commit_change(&self.workbook, patch);
+        let before = self.resolve_before()?.clone();
+        let staged = self.staged.unwrap_or_else(|| before.metadata().clone());
+        before.check_execution()?;
+        validate_metadata(&staged)?;
+        if before.metadata() == &staged {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        let output = replace_protection(self.before.source_xml(), &self.staged)?;
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
-        if snapshot.metadata() != &self.staged {
+        let output = replace_protection(before.source_xml(), &staged)?;
+        let snapshot = Snapshot::from_rewritten_source(&before, output)?;
+        if snapshot.metadata() != &staged {
             return Err(invalid(
                 "sheet-protection publication changed the staged semantic state",
             ));
         }
-        self.before.check_execution()?;
-        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
+        before.check_execution()?;
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

@@ -178,7 +178,7 @@ fn target_margins() -> Margins {
 
 fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::page_margins::source::Edit {
     let mut edit = editor.edit_page_margins("Sheet1").unwrap();
-    assert!(edit.set(target_margins()));
+    assert!(edit.set(target_margins()).unwrap());
     edit
 }
 
@@ -345,10 +345,10 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let bytes = ordinary_fixture("", false);
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit_page_margins("Sheet1").unwrap();
-    assert!(edit.set(target_margins()));
-    assert!(!edit.set(target_margins()));
-    assert!(edit.remove());
-    assert!(!edit.remove());
+    assert!(edit.set(target_margins()).unwrap());
+    assert!(!edit.set(target_margins()).unwrap());
+    assert!(edit.remove().unwrap());
+    assert!(!edit.remove().unwrap());
     let noop = edit.commit().unwrap();
     assert!(!noop.diagnostics().changed());
 
@@ -389,7 +389,7 @@ fn signed_zero_noop_is_exact_and_changed_output_is_canonical() {
         PageMargin::from_inches(0.3).unwrap(),
         PageMargin::from_inches(0.4).unwrap(),
     );
-    assert!(!edit.set(normalized));
+    assert!(!edit.set(normalized).unwrap());
     let noop = edit.commit().unwrap();
     let mut output = Vec::new();
     noop.package().write_to(&mut output).unwrap();
@@ -405,7 +405,7 @@ fn signed_zero_noop_is_exact_and_changed_output_is_canonical() {
         PageMargin::from_inches(0.3).unwrap(),
         PageMargin::from_inches(0.4).unwrap(),
     );
-    assert!(edit.set(changed));
+    assert!(edit.set(changed).unwrap());
     let commit = edit.commit().unwrap();
     assert!(
         commit
@@ -477,7 +477,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     let mce = fixture(mce_sheet, "", false);
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
     let mut edit = editor.edit_page_margins("Sheet1").unwrap();
-    edit.remove();
+    edit.remove().unwrap();
     assert!(edit.commit().is_err());
 
     let limits = SourceLimits::builder()
@@ -536,7 +536,7 @@ fn chartsheet_selection_is_refused() {
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(matches!(
-        editor.edit_page_margins("Sheet1"),
+        editor.edit_page_margins("Sheet1").unwrap().commit(),
         Err(Error::NotWorksheet { .. })
     ));
 }

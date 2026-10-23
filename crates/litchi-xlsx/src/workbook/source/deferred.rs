@@ -429,6 +429,13 @@ impl SourceBackedWorkbook {
         Ok(&view.inner.package)
     }
 
+    /// Check source and execution fences without materializing a pending
+    /// publication. Lazy source-backed edit entries use this for bounded
+    /// caller-input admission; payload resolution remains in `LazySource`.
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        self.inner.execution_check()
+    }
+
     pub(crate) fn edit_source(&self) -> Result<(&SourceBackedPackage, &super::SourceInner)> {
         let view = self.view()?;
         view.inner.package.check_execution()?;

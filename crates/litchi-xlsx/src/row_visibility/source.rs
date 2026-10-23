@@ -133,7 +133,7 @@ impl SourceBackedWorkbook {
     /// Returns an error when the selector does not name a worksheet, its row
     /// closure is unsafe to edit, or the source cannot be read.
     pub fn edit_row_visibility<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = self.edit_sheet_values(selector)?.before().clone();
+        let before = self.edit_sheet_values(selector)?.before()?.clone();
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(MAX_BATCH_EDITS)

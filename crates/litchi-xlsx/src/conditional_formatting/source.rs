@@ -16,6 +16,7 @@ use litchi_opc::SourceBackedPackage;
 
 use super::{Formatting, Snapshot};
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!("conditional-formatting", super::Patch);
@@ -87,11 +88,11 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its XML
-    /// is invalid, or the source cannot be read.
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
     pub fn edit_conditional_formats<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
-        Ok(Edit::new(self.clone(), before))
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())))
     }
 
     /// Replay a conditional-formatting patch onto this workbook.
@@ -109,39 +110,57 @@ impl SourceBackedWorkbook {
 /// An isolated conditional-formatting edit over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
-    staged: Vec<Formatting>,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` inherits the source collection; `Some` stores a complete
+    /// replacement, including an empty collection.
+    staged: Option<Vec<Formatting>>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            workbook,
-            staged: before.collections().to_vec(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
+        }
+    }
+
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<&[Formatting]> {
+        match self.staged.as_deref() {
+            Some(staged) => Ok(staged),
+            None => Ok(self.resolve_before()?.collections()),
         }
     }
 
     #[must_use]
-    /// Exact source state captured when this edit began.
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    /// Resolve the exact source state observed by this edit.
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     #[must_use]
     /// Complete ordered collection currently staged for publication.
-    pub fn collections(&self) -> &[Formatting] {
-        &self.staged
+    pub fn collections(&self) -> Result<&[Formatting]> {
+        self.effective()
     }
 
     /// Replace the complete ordered owner collection atomically.
     pub fn set_collections(&mut self, value: Vec<Formatting>) -> Result<bool> {
-        super::package::validate_authored(&value, self.before.differential_format_count())?;
-        if self.staged == value {
+        super::package::validate_authored(
+            &value,
+            self.resolve_before()?.differential_format_count(),
+        )?;
+        if self.effective()? == value.as_slice() {
             return Ok(false);
         }
-        self.staged = value;
+        self.staged = Some(value);
         Ok(true)
     }
 
@@ -150,56 +169,51 @@ impl Edit {
         &mut self,
         operation: impl FnOnce(&mut Vec<Formatting>) -> Result<()>,
     ) -> Result<bool> {
-        let mut candidate = self.staged.clone();
+        let mut candidate = self.effective()?.to_vec();
         operation(&mut candidate)?;
         self.set_collections(candidate)
     }
 
     /// Remove all direct core conditional-formatting owners.
-    pub fn clear(&mut self) -> bool {
-        if self.staged.is_empty() {
-            return false;
+    pub fn clear(&mut self) -> Result<bool> {
+        if self.effective()?.is_empty() {
+            return Ok(false);
         }
-        self.staged.clear();
-        true
+        self.staged = Some(Vec::new());
+        Ok(true)
     }
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
-        self.staged = self.before.collections().to_vec();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.collections() != self.staged
+        self.staged = None;
     }
 
     /// Validate, rewrite, reopen, and freeze the isolated edit.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        if !self.changed() {
-            let patch = super::Patch::new(self.before.clone(), self.before);
-            return commit_change(&self.workbook, patch);
+        let before = self.resolve_before()?.clone();
+        let staged = self.staged.unwrap_or_else(|| before.collections().to_vec());
+        before.check_execution()?;
+        if before.collections() == staged.as_slice() {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        if self.before.mutation_locked() {
+        if before.mutation_locked() {
             return Err(invalid(
                 "worksheet protection forbids conditional-formatting mutation",
             ));
         }
-        let dxf_count = self.before.differential_format_count();
-        super::package::validate_authored(&self.staged, dxf_count)?;
-        let output = super::replace_conditional_formattings(
-            self.before.source_xml(),
-            &self.staged,
-            dxf_count,
-        )?;
+        let dxf_count = before.differential_format_count();
+        super::package::validate_authored(&staged, dxf_count)?;
+        let output =
+            super::replace_conditional_formattings(before.source_xml(), &staged, dxf_count)?;
         let readback = super::package::parse_editable_conditional_formattings(&output, dxf_count)?;
-        if readback != self.staged {
+        if readback != staged {
             return Err(invalid(
                 "conditional-formatting publication changed the staged state",
             ));
         }
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output, readback)?;
-        self.before.check_execution()?;
-        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
+        let snapshot = Snapshot::from_rewritten_source(&before, output, readback)?;
+        before.check_execution()?;
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

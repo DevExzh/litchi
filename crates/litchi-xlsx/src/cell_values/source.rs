@@ -22,6 +22,7 @@ use crate::cell::{Cell, Content, Number, Value};
 use crate::error::{Error, Result, invalid};
 use crate::formula::Formula;
 use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 pub mod sheet;
@@ -188,8 +189,8 @@ enum StagedValueEdit {
 /// Clone-staged atomic value changes over a bounded worksheet set of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: MultiSnapshot,
+    source: LazySource<MultiSnapshot>,
+    selectors: Vec<Selector<'static>>,
     staged: BTreeMap<usize, Vec<(Address, StagedValueEdit)>>,
     staged_cells: usize,
 }
@@ -200,17 +201,32 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when a selector does not name a worksheet, the set
-    /// exceeds its bounds, or the source cannot be read.
+    /// Returns an error when the set exceeds its bounds or source execution is
+    /// refused. Selector and payload errors are deferred until first use.
     pub fn edit_cell_values<'a, I>(&self, selectors: I) -> Result<Edit>
     where
         I: IntoIterator<Item = Selector<'a>>,
     {
-        let package = self.edit_package()?;
-        Edit::new(
-            self.clone(),
-            MultiSnapshot::load_source_backed(package, selectors)?,
-        )
+        self.check_execution()?;
+        let mut selected = Vec::new();
+        selected
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| Error::Allocation {
+                resource: "multi-sheet selector staging",
+                source,
+            })?;
+        for selector in selectors {
+            if selected.len() >= MAX_SHEET_OWNERS {
+                return Err(invalid(format!(
+                    "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+                )));
+            }
+            selected.push(own_selector(selector));
+        }
+        if selected.is_empty() {
+            return Err(invalid("multi-sheet value edits require one worksheet"));
+        }
+        Ok(Edit::new(self.clone(), selected))
     }
 
     /// Begin a bounded selector-first transaction and stage its initial batch.
@@ -218,10 +234,10 @@ impl SourceBackedWorkbook {
     where
         I: IntoIterator<Item = SheetChange<'a>>,
     {
-        self.edit_package()?.check_execution()?;
+        self.check_execution()?;
         let mut requests = edits.into_iter();
         let first = requests.next();
-        self.edit_package()?.check_execution()?;
+        self.check_execution()?;
         let first =
             first.ok_or_else(|| invalid("multi-sheet value edits require one cell edit"))?;
         let mut selectors = Vec::new();
@@ -241,7 +257,7 @@ impl SourceBackedWorkbook {
             })?;
         pending.push(first);
         for request in requests {
-            self.edit_package()?.check_execution()?;
+            self.check_execution()?;
             if pending.len() >= MAX_BATCH_EDITS {
                 return Err(Error::limit(
                     super::LimitKind::BatchEdits,
@@ -352,19 +368,25 @@ impl crate::workbook::source::deferred::Report for Record {
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: MultiSnapshot) -> Result<Self> {
-        Ok(Self {
-            workbook,
-            before,
+    fn new(workbook: SourceBackedWorkbook, selectors: Vec<Selector<'static>>) -> Self {
+        Self {
+            source: LazySource::new(workbook),
+            selectors,
             staged: BTreeMap::new(),
             staged_cells: 0,
-        })
+        }
     }
 
-    /// Exact source snapshots captured at transaction start.
+    fn resolve_before(&self) -> Result<&MultiSnapshot> {
+        let selectors = self.selectors.clone();
+        self.source
+            .resolve(|package| MultiSnapshot::load_source_backed(package, selectors))
+    }
+
+    /// Resolve the exact source snapshots observed by this transaction.
     #[must_use]
-    pub const fn before(&self) -> &MultiSnapshot {
-        &self.before
+    pub fn before(&self) -> Result<&MultiSnapshot> {
+        self.resolve_before()
     }
 
     /// Number of unique staged cell selectors across all worksheets.
@@ -381,8 +403,8 @@ impl Edit {
 
     /// Number of selected worksheet owners.
     #[must_use]
-    pub fn worksheet_count(&self) -> usize {
-        self.before.len()
+    pub fn worksheet_count(&self) -> Result<usize> {
+        Ok(self.resolve_before()?.len())
     }
 
     /// Stage one selector-first numeric insertion for an absent coordinate.
@@ -444,7 +466,8 @@ impl Edit {
     where
         I: IntoIterator<Item = SheetChange<'a>>,
     {
-        self.before.check_execution()?;
+        let before = self.resolve_before()?.clone();
+        before.check_execution()?;
         let remaining = MAX_BATCH_EDITS.saturating_sub(self.staged_cells);
         let mut pending = Vec::new();
         pending
@@ -454,7 +477,7 @@ impl Edit {
                 source,
             })?;
         for request in edits {
-            self.before.check_execution()?;
+            before.check_execution()?;
             if pending.len() >= remaining {
                 return Err(Error::limit(
                     super::LimitKind::BatchEdits,
@@ -462,9 +485,8 @@ impl Edit {
                     MAX_BATCH_EDITS,
                 ));
             }
-            let position = resolve_snapshot_selector(&self.before, &request.selector)?;
-            let snapshot = self
-                .before
+            let position = resolve_snapshot_selector(&before, &request.selector)?;
+            let snapshot = before
                 .sheets()
                 .iter()
                 .find(|snapshot| snapshot.sheet_position() == position)
@@ -566,10 +588,10 @@ impl Edit {
                     StagedValueEdit::Remove
                 },
             };
-            self.before.check_execution()?;
+            before.check_execution()?;
             pending.push((position, address, value));
         }
-        self.before.check_execution()?;
+        before.check_execution()?;
         let original_staged_cells = self.staged_cells;
         let pending_len = pending.len();
         let mut rollback = Vec::new();
@@ -588,7 +610,7 @@ impl Edit {
                 rollback.push((*position, original_len));
             }
         }
-        self.before.check_execution()?;
+        before.check_execution()?;
         for (position, address, value) in pending {
             self.staged
                 .entry(position)
@@ -596,7 +618,7 @@ impl Edit {
                 .push((address, value));
         }
         self.staged_cells = original_staged_cells + pending_len;
-        if let Err(error) = self.before.check_execution() {
+        if let Err(error) = before.check_execution() {
             for (position, original_len) in rollback {
                 let remove_position = self.staged.get_mut(&position).is_some_and(|entries| {
                     entries.truncate(original_len);
@@ -621,9 +643,10 @@ impl Edit {
     /// Validate and rewrite the staged changes and return the committed
     /// workbook, the exact patch and the diagnostics.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
+        let before = self.resolve_before()?.clone();
+        before.check_execution()?;
         let mut expected_actions = 0usize;
-        for snapshot in self.before.sheets() {
+        for snapshot in before.sheets() {
             if let Some(staged) = self.staged.get(&snapshot.sheet_position()) {
                 expected_actions = expected_actions
                     .checked_add(effective_action_count(snapshot, staged)?)
@@ -639,7 +662,7 @@ impl Edit {
         }
         let mut after = Vec::new();
         after
-            .try_reserve_exact(self.before.len())
+            .try_reserve_exact(before.len())
             .map_err(|source| Error::Allocation {
                 resource: "multi-sheet candidate snapshots",
                 source,
@@ -647,7 +670,7 @@ impl Edit {
         let mut changed_cells = 0usize;
         let mut touched_worksheets = 0usize;
         let mut aggregate_bytes = 0usize;
-        for snapshot in self.before.sheets() {
+        for snapshot in before.sheets() {
             snapshot.check_execution()?;
             let Some(staged) = self.staged.get(&snapshot.sheet_position()) else {
                 aggregate_bytes = super::snapshot::checked_multi_bytes(
@@ -714,18 +737,18 @@ impl Edit {
             after.push(candidate);
         }
         if changed_cells != 0 {
-            let workbook = self.before.sheets()[0].invalidated_workbook_xml()?;
+            let workbook = before.sheets()[0].invalidated_workbook_xml()?;
             for snapshot in &mut after {
                 *snapshot = snapshot
                     .clone()
                     .with_invalidated_workbook(Arc::clone(&workbook))?;
             }
         }
-        self.before.check_execution()?;
+        before.check_execution()?;
         let after = MultiSnapshot::from_sheets(after)?;
         super::commit_change(
-            &self.workbook,
-            Record::new(self.before, after, changed_cells, touched_worksheets),
+            self.source.workbook(),
+            Record::new(before, after, changed_cells, touched_worksheets),
         )
     }
 }

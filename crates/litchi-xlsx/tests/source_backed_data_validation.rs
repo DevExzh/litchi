@@ -327,7 +327,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     .unwrap();
     let snapshot = editor
         .edit_data_validations("Sheet1")
-        .map(|edit| edit.before().clone())
+        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
         .unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -379,7 +379,7 @@ fn managed_one_under_budget_refuses_before_selected_payload_retention() {
     assert!(matches!(
         editor
             .edit_data_validations("Sheet1")
-            .map(|edit| edit.before().clone()),
+            .and_then(|edit| edit.before().map(|snapshot| snapshot.clone())),
         Err(Error::Package(OpcError::Execution(
             ExecutionError::ResourceLimit(_)
         )))
@@ -424,8 +424,8 @@ fn add_replace_clear_noop_and_atomic_update_are_exact() {
         SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(seeded))).unwrap();
     let mut edit = editor.edit_data_validations("Sheet1").unwrap();
     assert!(!edit.set_collections(target_collections()).unwrap());
-    assert!(edit.clear());
-    assert!(!edit.clear());
+    assert!(edit.clear().unwrap());
+    assert!(!edit.clear().unwrap());
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let mut output = Vec::new();
@@ -443,7 +443,7 @@ fn add_replace_clear_noop_and_atomic_update_are_exact() {
         }),
         Err(Error::UnsupportedSelector)
     ));
-    assert!(edit.collections().is_empty());
+    assert!(edit.collections().unwrap().is_empty());
     assert!(
         edit.update(|collections| {
             *collections = target_collections();
@@ -452,7 +452,7 @@ fn add_replace_clear_noop_and_atomic_update_are_exact() {
         .unwrap()
     );
     assert!(!edit.set_collections(target_collections()).unwrap());
-    assert!(edit.clear());
+    assert!(edit.clear().unwrap());
     assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
@@ -594,7 +594,7 @@ fn chartsheet_selection_is_refused_and_editor_is_send() {
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(matches!(
-        editor.edit_data_validations("Sheet1"),
+        editor.edit_data_validations("Sheet1").unwrap().commit(),
         Err(Error::NotWorksheet { .. })
     ));
 }

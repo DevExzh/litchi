@@ -3153,7 +3153,7 @@ mod row_reuse_tests {
     fn no_op_source_edit_shares_the_original_semantic_store() {
         let editor = source_backed_editor(&scalar_fixture());
         let edit = editor.edit("Sheet1").unwrap();
-        let before = edit.before().clone();
+        let before = edit.before().unwrap().clone();
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().after().shares_cell_store_with(&before));

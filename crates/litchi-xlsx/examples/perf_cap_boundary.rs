@@ -365,15 +365,15 @@ fn run_iteration(fixture: &Fixture) -> AnyResult<u128> {
     let duration_ns = started.elapsed().as_nanos();
 
     let transaction = planned?;
-    if transaction.worksheet_count() != 1 {
+    if transaction.worksheet_count()? != 1 {
         return Err("cap-boundary selected an unexpected worksheet count".into());
     }
     let a1 = Address::from_a1("A1")?;
     let last = Address::from_a1(&fixture.last_cell)?;
     let first_expected = Value::Number(Number::new("1")?);
     let last_expected = Value::Number(Number::new(fixture.cells.to_string())?);
-    if transaction.before().value(0, a1) != Some(&first_expected)
-        || transaction.before().value(0, last) != Some(&last_expected)
+    let before = transaction.before()?;
+    if before.value(0, a1) != Some(&first_expected) || before.value(0, last) != Some(&last_expected)
     {
         return Err("cap-boundary source snapshot lost A1 or the last cell".into());
     }

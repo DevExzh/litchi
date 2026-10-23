@@ -338,7 +338,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     .unwrap();
     let snapshot = editor
         .edit_sheet_protection("Sheet1")
-        .map(|edit| edit.before().clone())
+        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
         .unwrap();
     assert_eq!(snapshot.metadata(), &Metadata::new());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -387,7 +387,7 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit_sheet_protection("Sheet1").unwrap();
     assert!(!edit.set(existing).unwrap());
-    assert!(edit.clear());
+    assert!(edit.clear().unwrap());
     let remove = edit.commit().unwrap();
     assert!(remove.diagnostics().changed());
     let mut output = Vec::new();
@@ -407,7 +407,7 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let bytes = ordinary_fixture("", false);
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let mut edit = editor.edit_sheet_protection("Sheet1").unwrap();
-    let unchanged = edit.metadata().clone();
+    let unchanged = edit.metadata().unwrap().clone();
     assert!(matches!(
         edit.update(|metadata| {
             *metadata = target_metadata();
@@ -415,7 +415,7 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
         }),
         Err(Error::UnsupportedSelector)
     ));
-    assert_eq!(edit.metadata(), &unchanged);
+    assert_eq!(edit.metadata().unwrap(), &unchanged);
     assert!(
         edit.update(|metadata| {
             *metadata = target_metadata();
@@ -424,8 +424,8 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
         .unwrap()
     );
     assert!(!edit.set(target_metadata()).unwrap());
-    assert!(edit.clear());
-    assert!(!edit.clear());
+    assert!(edit.clear().unwrap());
+    assert!(!edit.clear().unwrap());
     assert!(!edit.commit().unwrap().diagnostics().changed());
 
     let signed = ordinary_fixture("", true);
@@ -587,7 +587,7 @@ fn chartsheet_selection_is_refused() {
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(matches!(
-        editor.edit_sheet_protection("Sheet1"),
+        editor.edit_sheet_protection("Sheet1").unwrap().commit(),
         Err(Error::NotWorksheet { .. })
     ));
 }

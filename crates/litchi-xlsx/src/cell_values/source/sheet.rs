@@ -23,6 +23,7 @@ use crate::cell::{Cell, Content, Number, Value};
 use crate::error::{Result, invalid};
 use crate::formula::Formula;
 use crate::raw::worksheet::edit::rewrite_value_only_with_provenance;
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!(
@@ -159,10 +160,8 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its
-    /// value closure is unsafe to edit, or the source cannot be read.
+    /// Value-closure and selector errors are deferred until first use.
     pub fn edit_sheet_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let package = self.edit_package()?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(MAX_BATCH_EDITS)
@@ -170,9 +169,10 @@ impl SourceBackedWorkbook {
                 resource: "value-only batch staging",
                 source,
             })?;
+        self.check_execution()?;
         Ok(Edit {
-            workbook: self.clone(),
-            before: Snapshot::load_source_backed(package, selector)?,
+            source: LazySource::new(self.clone()),
+            selector: own_selector(selector.into()),
             staged,
         })
     }
@@ -192,16 +192,22 @@ impl SourceBackedWorkbook {
 /// Clone-staged atomic value changes over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
     staged: Vec<(Address, StagedValueEdit)>,
 }
 
 impl Edit {
-    /// Exact source snapshot captured at transaction start.
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    /// Resolve the exact source snapshot observed by this edit.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Number of unique staged selectors.
@@ -251,7 +257,8 @@ impl Edit {
 
     /// Stage a bounded batch atomically.
     pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = Change>) -> Result<()> {
-        self.before.check_execution()?;
+        let before = self.resolve_before()?.clone();
+        before.check_execution()?;
         let mut pending = Vec::new();
         pending
             .try_reserve_exact(MAX_BATCH_EDITS.saturating_sub(self.staged.len()))
@@ -260,7 +267,7 @@ impl Edit {
                 source,
             })?;
         for edit in edits {
-            self.before.check_execution()?;
+            before.check_execution()?;
             if self.staged.len() + pending.len() >= MAX_BATCH_EDITS {
                 return Err(Error::limit(
                     LimitKind::BatchEdits,
@@ -279,10 +286,10 @@ impl Edit {
                     "duplicate value-only selector '{address}'"
                 )));
             }
-            let source = self.before.editable_cell(address);
+            let source = before.editable_cell(address);
             let value = match edit {
                 Change::Insert { value, .. } => {
-                    self.before.require_insertable_absence(address)?;
+                    before.require_insertable_absence(address)?;
                     let value = Value::Number(value);
                     value.validate_for_write()?;
                     StagedValueEdit::Insert(Content::Value(value))
@@ -293,12 +300,12 @@ impl Edit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
-                    self.before.require_shared_string_free_target(address)?;
+                    before.require_shared_string_free_target(address)?;
                     value.validate_for_write()?;
                     if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
+                        return Err(before.edit_blocked(address));
                     }
-                    self.before.require_unmerged_target(address)?;
+                    before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
                 Change::SetFormula { formula, .. } => {
@@ -307,10 +314,10 @@ impl Edit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
-                    self.before.require_shared_string_free_target(address)?;
+                    before.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
-                    self.before.require_formula_target(address)?;
-                    self.before.require_unmerged_target(address)?;
+                    before.require_formula_target(address)?;
+                    before.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
                 Change::SetSharedFormula { formula, .. } => {
@@ -319,10 +326,10 @@ impl Edit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
-                    self.before.require_shared_string_free_target(address)?;
+                    before.require_shared_string_free_target(address)?;
                     Content::Formula(formula.clone()).validate_for_write()?;
-                    self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
-                    self.before.require_unmerged_target(address)?;
+                    before.shared_formula_group(address, MAX_BATCH_EDITS)?;
+                    before.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
                 Change::Clear { .. } => {
@@ -331,11 +338,11 @@ impl Edit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
-                    self.before.require_shared_string_free_target(address)?;
+                    before.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
+                        return Err(before.edit_blocked(address));
                     }
-                    self.before.require_unmerged_target(address)?;
+                    before.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
                 Change::Remove { .. } => {
@@ -344,21 +351,21 @@ impl Edit {
                             "cell selector '{address}' has no existing cell owner"
                         ))
                     })?;
-                    self.before.require_shared_string_free_target(address)?;
+                    before.require_shared_string_free_target(address)?;
                     if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
+                        return Err(before.edit_blocked(address));
                     }
-                    self.before.require_unmerged_target(address)?;
+                    before.require_unmerged_target(address)?;
                     StagedValueEdit::Remove
                 },
             };
-            self.before.check_execution()?;
+            before.check_execution()?;
             pending.push((address, value));
         }
-        self.before.check_execution()?;
+        before.check_execution()?;
         let original_len = self.staged.len();
         self.staged.extend(pending);
-        if let Err(error) = self.before.check_execution() {
+        if let Err(error) = before.check_execution() {
             self.staged.truncate(original_len);
             return Err(error);
         }
@@ -373,8 +380,9 @@ impl Edit {
     /// Validate and rewrite the staged changes and return the committed
     /// workbook, the exact patch and the diagnostics.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        let expected_actions = effective_action_count(&self.before, &self.staged)?;
+        let before = self.resolve_before()?.clone();
+        before.check_execution()?;
+        let expected_actions = effective_action_count(&before, &self.staged)?;
         if expected_actions > MAX_BATCH_EDITS {
             return Err(Error::limit(
                 LimitKind::BatchEdits,
@@ -384,21 +392,20 @@ impl Edit {
         }
         let mut actions = BTreeMap::new();
         for (address, value) in &self.staged {
-            append_actions(&self.before, *address, value, &mut actions)?;
+            append_actions(&before, *address, value, &mut actions)?;
         }
         if actions.is_empty() {
-            let patch = SheetRecord::new(self.before.clone(), self.before.clone(), 0);
-            self.before.check_execution()?;
-            return commit_change(&self.workbook, patch);
+            let patch = SheetRecord::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
         let changed = actions.len();
         let output = rewrite_value_only_with_provenance(
-            self.before.source_xml(),
-            self.before.sheet_name(),
+            before.source_xml(),
+            before.sheet_name(),
             actions,
-            self.before.source_facts(),
+            before.source_facts(),
         )?;
-        let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
+        let snapshot = Snapshot::from_rewritten_value_source(&before, output)?
             .with_invalidated_calculation()?;
         for (address, expected) in &self.staged {
             let matches = match expected {
@@ -409,11 +416,11 @@ impl Edit {
                     snapshot.cell(*address) == Some(&content.as_cell())
                 },
                 StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
-                    &self.before,
+                    &before,
                     &snapshot,
                     *address,
                     formula,
-                    shared_formula_changed(&self.before, *address, formula)?,
+                    shared_formula_changed(&before, *address, formula)?,
                 )?,
                 StagedValueEdit::Clear => {
                     snapshot.contains_cell(*address) && snapshot.value(*address).is_none()
@@ -426,10 +433,10 @@ impl Edit {
                 ));
             }
         }
-        self.before.check_execution()?;
+        before.check_execution()?;
         commit_change(
-            &self.workbook,
-            SheetRecord::new(self.before, snapshot, changed),
+            self.source.workbook(),
+            SheetRecord::new(before, snapshot, changed),
         )
     }
 }
