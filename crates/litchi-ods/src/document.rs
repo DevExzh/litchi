@@ -3818,7 +3818,7 @@ fn content_validation_error(error: crate::content_validation::Error) -> CoreErro
     invalid_error(format!("ODS content-validation edit failed: {error}"))
 }
 
-fn is_reserved_path(path: &str) -> bool {
+pub(crate) fn is_reserved_path(path: &str) -> bool {
     CORE_PATHS.contains(&path) || path.starts_with("META-INF/")
 }
 
@@ -4345,12 +4345,7 @@ fn validate_package_size(length: usize, limits: Limits) -> CoreResult<()> {
 }
 
 fn validate_resource_count(package: &Archive, limits: Limits) -> CoreResult<()> {
-    let count = package
-        .package()
-        .files()?
-        .into_iter()
-        .filter(|path| !is_reserved_path(path) && !path.ends_with('/'))
-        .count();
+    let count = package.resource_count();
     if count > limits.resources {
         invalid(format!(
             "ODS resource count limit exceeded: observed {count}, limit {}",
