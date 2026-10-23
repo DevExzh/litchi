@@ -326,22 +326,13 @@ impl Patch {
                 }
             },
             PatchData::Durable(data) => {
-                total = body_len(
-                    total,
-                    &data.before_order,
-                    &data.after_order,
-                    data.before_root.len(),
-                    data.after_root.len(),
-                )?;
-                for change in data.changes.iter() {
-                    total = entry_len(total, &change.key, change.before.len(), change.after.len())?;
-                }
-                if data.changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
-                    return Err(limit(
-                        "source-backed durable patch slides",
-                        MAX_SOURCE_BACKED_SLIDE_BATCH,
-                    ));
-                }
+                total = data_wire_len(data)?
+                    .checked_add(if self.shape_removals {
+                        REMOVAL_MAGIC.len()
+                    } else {
+                        0
+                    })
+                    .ok_or_else(|| limit("source-backed durable patch bytes", maximum()))?;
             },
             PatchData::Topology(data) => {
                 total = data.encoded_len()?
@@ -777,6 +768,32 @@ pub(super) fn local_wire_len(
     total = body_len(total, before_order, after_order, before_root, after_root)?;
     for (key, before, after) in changes {
         total = entry_len(total, key, *before, *after)?;
+    }
+    Ok(total)
+}
+
+/// Size the durable (already detached from a source owner) patch envelope.
+///
+/// This is deliberately shared with the primary facade's accounting path:
+/// the `Data` fields are the authoritative wire representation, while the
+/// outer `Patch` adds the optional removal marker when it is enabled.
+pub(super) fn data_wire_len(data: &Data) -> Result<usize> {
+    let mut total = HEADER;
+    total = body_len(
+        total,
+        &data.before_order,
+        &data.after_order,
+        data.before_root.len(),
+        data.after_root.len(),
+    )?;
+    for change in data.changes.iter() {
+        total = entry_len(total, &change.key, change.before.len(), change.after.len())?;
+    }
+    if data.changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
+        return Err(limit(
+            "source-backed durable patch slides",
+            MAX_SOURCE_BACKED_SLIDE_BATCH,
+        ));
     }
     Ok(total)
 }
