@@ -51,8 +51,18 @@ impl Change for StoryRedactionChange {
                     return Ok(package.clone());
                 }
                 let base = package.clone();
-                let patch = Arc::clone(patch);
-                package.deferred(move |writer| base.write_story_hyperlink_redaction(writer, &patch))
+                let stream_base = base.clone();
+                let ordinary_patch = Arc::clone(patch);
+                let stream_patch = Arc::clone(patch);
+                package.deferred(
+                    move |writer, policy| {
+                        base.write_story_hyperlink_redaction(writer, &ordinary_patch, policy)
+                    },
+                    move |target| {
+                        let parts = record::publication_parts(&stream_patch)?;
+                        stream_base.stream_relationship_overlays(target, parts)
+                    },
+                )
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(crate::Error::refused(

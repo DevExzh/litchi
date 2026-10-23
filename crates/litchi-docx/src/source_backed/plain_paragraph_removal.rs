@@ -32,8 +32,7 @@ impl Change for RemovalChange {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        let base = package.clone();
-        Ok(package.deferred(move |writer| base.write_part_overlay(writer, &main, &xml))?)
+        Ok(package.deferred_part_overlay(main, xml)?)
     }
 }
 

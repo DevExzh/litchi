@@ -47,16 +47,30 @@ impl Change for LayoutChange {
             return Ok(package.clone());
         }
         let base = package.clone();
-        package.deferred(move |writer| {
-            // The committed target was derived from this complete artifact.
-            if base.source_artifact_fingerprint()? != fingerprint {
-                return Err(crate::Error::conflict(
-                    "commit_section_layout",
-                    "section patch artifact fingerprint differs",
-                ));
-            }
-            base.write_part_overlay(writer, &main, &target)
-        })
+        let stream_base = base.clone();
+        let stream_main = main.clone();
+        let stream_target = Arc::clone(&target);
+        package.deferred(
+            move |writer, policy| {
+                // The committed target was derived from this complete artifact.
+                if base.source_artifact_fingerprint()? != fingerprint {
+                    return Err(crate::Error::conflict(
+                        "commit_section_layout",
+                        "section patch artifact fingerprint differs",
+                    ));
+                }
+                base.write_part_overlay(writer, &main, &target, policy)
+            },
+            move |target_sink| {
+                if stream_base.source_artifact_fingerprint()? != fingerprint {
+                    return Err(crate::Error::conflict(
+                        "commit_section_layout",
+                        "section patch artifact fingerprint differs",
+                    ));
+                }
+                stream_base.stream_part_overlay(target_sink, &stream_main, &stream_target)
+            },
+        )
     }
 }
 

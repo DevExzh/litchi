@@ -64,6 +64,14 @@ fn open(bytes: &[u8]) -> source_backed::Package {
     source_backed::Package::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec()))).unwrap()
 }
 
+fn open_with_source_limits(bytes: &[u8], limits: SourceLimits) -> source_backed::Package {
+    source_backed::Package::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes.to_vec())),
+        litchi_docx::OpenOptions::default().source_limits(limits),
+    )
+    .unwrap()
+}
+
 fn main_only_fixture(document: &str) -> Vec<u8> {
     let mut package = OpcPackage::new();
     package
@@ -638,8 +646,7 @@ fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_out
         Some("changed")
     );
 
-    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
-        .unwrap();
+    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
     assert!(matches!(
         snapshot.raw_tree(tight_limits),
         Err(story_text::Error::Limit {
@@ -726,9 +733,7 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
     let restrictive_limits =
         story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
     let restrictive = open(&source)
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().story_text(restrictive_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(restrictive_limits))
         .story_text_snapshot(story_text::Selector::Header(0))
         .unwrap();
     assert!(matches!(
@@ -766,8 +771,8 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
 #[test]
 fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
     let source = fixture();
-    let producer_limits = story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096)
-        .unwrap();
+    let producer_limits =
+        story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096).unwrap();
     let producer = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
     let snapshot = producer
@@ -778,22 +783,18 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         .unwrap();
     let patch = tree.patch().unwrap();
 
-    let accepted_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096)
-        .unwrap();
+    let accepted_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096).unwrap();
     let accepted = open(&source)
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(accepted_limits))
         .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
     let accepted_target = patch.apply(&accepted).unwrap();
     assert_eq!(accepted_target.limits_value(), accepted_limits);
 
-    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
-        .unwrap();
-    let narrow = open(&source).with_semantic_limits(
-        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
-    );
+    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
+    let narrow = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(narrow_limits));
     let narrow_snapshot = narrow
         .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
@@ -807,6 +808,144 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
     let package_patch = patch.clone().into();
     assert!(matches!(
         narrow.apply_story_text(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    // A package-family commit carries the full-artifact restore fast path.
+    // A recipient with a narrower semantic policy must use the family
+    // publisher instead, so the recipient's output ceiling is enforced rather
+    // than inheriting the producer's admitted policy.
+    let mut owner_edit = producer
+        .edit_story_text(story_text::Selector::Main)
+        .unwrap();
+    let broad_owner_text = (0..2_200)
+        .map(|index| format!("{index:04x}"))
+        .collect::<String>();
+    owner_edit
+        .replace_paragraph_text(Position::new(0), &broad_owner_text)
+        .unwrap();
+    let owner_commit = owner_edit.commit().unwrap();
+
+    // An owner commit is deferred: replay it onto an independently opened
+    // equal-content package and verify that the recipient writes exactly the
+    // producer's bytes, including the inverse. This exercises the bounded
+    // artifact-stream restore path rather than the same-owner shortcut.
+    let mut producer_bytes = Vec::new();
+    owner_commit
+        .package()
+        .write_to(&mut producer_bytes)
+        .unwrap();
+    let independent = open(&source)
+        .apply_story_text(owner_commit.patch())
+        .unwrap();
+    let mut independent_bytes = Vec::new();
+    independent
+        .package()
+        .write_to(&mut independent_bytes)
+        .unwrap();
+    assert_eq!(independent_bytes, producer_bytes);
+    let mut independent_inverse = Vec::new();
+    independent
+        .package()
+        .apply_story_text(&owner_commit.patch().inverse())
+        .unwrap()
+        .package()
+        .write_to(&mut independent_inverse)
+        .unwrap();
+    assert_eq!(independent_inverse, source);
+
+    // The source ceiling admits the recipient's original archive exactly,
+    // while the changed producer artifact is larger. The refusal must happen
+    // from the restore preflight before any output is accepted.
+    assert!(producer_bytes.len() > source.len());
+    let exact_source_limits = SourceLimits::builder()
+        .max_input_bytes(source.len() as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let narrow_source = open_with_source_limits(&source, exact_source_limits);
+    assert!(matches!(
+        narrow_source.apply_story_text(owner_commit.patch()),
+        Err(story_text::Error::Document(Error::ArtifactStream(error)))
+            if matches!(
+                error.opc_error(),
+                Some(litchi_opc::OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::InputBytes,
+                    ..
+                })
+            )
+    ));
+
+    // A recipient may admit the original archive while refusing the larger
+    // changed main part. The artifact-stream census must enforce the full
+    // recipient profile before accepting any output, rather than checking
+    // only the archive's total input length.
+    let part_tight_limits = SourceLimits::builder()
+        .max_input_bytes(source.len() as u64)
+        .unwrap()
+        .max_part_bytes(1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let part_tight = open_with_source_limits(&source, part_tight_limits);
+    assert!(matches!(
+        part_tight.apply_story_text(owner_commit.patch()),
+        Err(story_text::Error::Document(Error::ArtifactStream(error)))
+            if matches!(
+                error.opc_error(),
+                Some(litchi_opc::OpcError::Limit {
+                    kind: litchi_opc::SourceLimitKind::PartBytes,
+                    ..
+                })
+            )
+    ));
+
+    // The exact member count remains a valid recipient profile for an
+    // unchanged cross-owner replay. One below that admitted count is refused
+    // at source admission, before a replay can publish anything.
+    let admitted_part_count = open(&source)
+        .source_backed_package()
+        .unwrap()
+        .iter_parts()
+        .count();
+    let exact_parts = SourceLimits::builder()
+        .max_input_bytes(source.len() as u64)
+        .unwrap()
+        .max_parts(admitted_part_count)
+        .unwrap()
+        .build()
+        .unwrap();
+    let exact_part_recipient = open_with_source_limits(&source, exact_parts);
+    let exact_part_replay = exact_part_recipient
+        .apply_story_text(owner_commit.patch())
+        .unwrap();
+    let mut exact_part_output = Vec::new();
+    exact_part_replay
+        .package()
+        .write_to(&mut exact_part_output)
+        .unwrap();
+    assert_eq!(exact_part_output, producer_bytes);
+
+    let below_parts = SourceLimits::builder()
+        .max_input_bytes(source.len() as u64)
+        .unwrap()
+        .max_parts(admitted_part_count.saturating_sub(1))
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(
+        source_backed::Package::from_read_at_with_options(
+            Arc::new(OwnedSource::new(source.clone())),
+            litchi_docx::OpenOptions::default().source_limits(below_parts),
+        )
+        .is_err()
+    );
+
+    assert!(matches!(
+        narrow.apply_story_text(owner_commit.patch()),
         Err(story_text::Error::Limit {
             kind: story_text::LimitKind::OutputBytes,
             ..

@@ -1,7 +1,7 @@
 //! Logical owner boundary over a retained effective graph.
 
 use super::*;
-use litchi_opc::PreparedTopology;
+use litchi_opc::{ArtifactStreamPolicy, PreparedTopology};
 
 impl Package {
     /// Start a bounded composition tied to this owner's complete artifact.
@@ -73,17 +73,25 @@ impl Package {
 
     /// Recheck the physical archive and every retained transfer source/context.
     pub fn check_source(&self) -> Result<()> {
-        match &self.effective {
-            Some(topology) => Ok(topology.check_source()?),
-            None => {
-                if let Some(deferred) = &self.deferred {
-                    deferred.base.check_source()?;
-                }
-                let physical = self.physical_source()?;
-                physical.source_version()?;
-                Ok(physical.check_execution()?)
-            },
+        if let Some(deferred) = &self.deferred {
+            deferred.base.check_source()?;
         }
+        if let Some(topology) = &self.effective {
+            topology.check_source()?;
+        }
+        // A deferred owner retains the opened physical source as its
+        // freshness dependency.  Calling `physical_source` here would
+        // publish and reopen the complete deferred archive merely to prove
+        // that dependency is still current.  Keep this fence non-materializing
+        // for every apply path, including same-owner replay.  The physical
+        // package and facade context are checked even for an effective owner,
+        // because both remain retained dependencies of that facade.
+        self.physical.source_version()?;
+        self.physical.check_execution()?;
+        if let Some(context) = &self.execution {
+            context.check().map_err(source_document_execution_error)?;
+        }
+        Ok(())
     }
 
     /// Publish the effective package, preserving unchanged physical members.
@@ -95,6 +103,22 @@ impl Package {
                 .physical
                 .clone()
                 .write_topology_to_stream(writer, SourceTopologyPlan::new())?),
+        }
+    }
+
+    /// Publish through an enclosing OPC artifact-stream policy.
+    pub(crate) fn write_to_with_policy(
+        &self,
+        writer: &mut dyn Write,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        match (&self.effective, &self.deferred) {
+            (Some(topology), _) => Ok(topology.publish_to_stream_with_policy(writer, policy)?),
+            (None, Some(deferred)) => deferred.write_with_policy(writer, Some(policy)),
+            (None, None) => Ok(self
+                .physical
+                .clone()
+                .write_exact_source_with_policy(writer, policy)?),
         }
     }
 
@@ -142,14 +166,26 @@ impl Package {
         // A package writing exactly the commit's before artifact (a share of
         // it, or a reopened copy of its bytes) gets the commit's exact after
         // package, so the inverse of a commit restores the source archive.
-        if let Some((before, after)) = patch.restore()
-            && self
-                .same_artifact(before)
-                .map_err(crate::document::Error::from)?
-        {
-            return self
-                .restored(before, after)
-                .map_err(crate::document::Error::from);
+        if let Some((before, after)) = patch.restore() {
+            let same_semantic_limits = self.semantic_limits() == before.semantic_limits();
+            // The cache identity is preserved only by package clones and
+            // semantic-limit projections. Every physical/context/effective
+            // boundary mints a new identity in with_execution, so this is the
+            // only restored replay path that may share the committed owner
+            // without rehashing or rematerializing it.
+            if same_semantic_limits
+                && self.same_owner(before)
+                && after.semantic_limits() == self.semantic_limits()
+            {
+                return Ok(after.clone());
+            }
+            if same_semantic_limits
+                && self
+                    .same_artifact(before)
+                    .map_err(crate::document::Error::from)?
+            {
+                return self.restored(after).map_err(crate::document::Error::from);
+            }
         }
         let result = (|| {
             let (name, current) = self.main_document_snapshot_with_before(

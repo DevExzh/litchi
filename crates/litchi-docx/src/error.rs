@@ -30,6 +30,11 @@ pub enum Error {
     #[error("OPC error: {0}")]
     Opc(#[from] litchi_opc::error::OpcError),
 
+    /// A source-backed artifact stream failed while preserving the producer's
+    /// typed error and any accepted publication prefix.
+    #[error(transparent)]
+    ArtifactStream(Box<litchi_opc::ArtifactStreamError<Error>>),
+
     /// A requested OPC part is absent.
     #[error("DOCX part not found: {0}")]
     PartNotFound(String),
@@ -121,6 +126,12 @@ pub enum Error {
     /// the typed stream error, carried through the package writer.
     #[error(transparent)]
     ParagraphStream(Box<crate::source_backed::tail_append_stream::Error>),
+
+    /// A committed plain-paragraph tail append failed while its deferred
+    /// source splice was being written.  Keep the operation's typed refusal,
+    /// execution, limit, I/O, and incomplete-output causes intact.
+    #[error(transparent)]
+    TailAppend(Box<crate::source_backed::tail_append::Error>),
 
     /// A semantic selector matched more than one producer object.
     #[error("{object} selector '{key}' is ambiguous")]
@@ -397,6 +408,12 @@ impl Error {
             Self::Refused(refusal) => Some(refusal),
             _ => None,
         }
+    }
+}
+
+impl From<litchi_opc::ArtifactStreamError<Error>> for Error {
+    fn from(error: litchi_opc::ArtifactStreamError<Error>) -> Self {
+        Self::ArtifactStream(Box::new(error))
     }
 }
 

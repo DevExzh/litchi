@@ -2179,12 +2179,48 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
             Code::InvalidInput,
         );
     }
+    let producer = litchi_opc::ArtifactStreamError::Producer(litchi_docx::Error::PatchConflict {
+        operation: "stream",
+        reason: "another base",
+    });
+    assert_code(
+        litchi_docx::Error::ArtifactStream(Box::new(producer)),
+        Code::InvalidInput,
+    );
+    let partial = litchi_opc::ArtifactStreamError::Publication {
+        written: 1,
+        source: Box::new(litchi_opc::ArtifactStreamError::Producer(
+            litchi_docx::Error::PatchConflict {
+                operation: "stream",
+                reason: "another base",
+            },
+        )),
+        secondary: None,
+    };
+    assert_code(
+        litchi_docx::Error::ArtifactStream(Box::new(partial)),
+        Code::IoError,
+    );
     assert_code(
         litchi_docx::Error::Internal {
             operation: "edit",
             reason: "invariant",
         },
         Code::InternalError,
+    );
+    assert_code(
+        litchi_docx::Error::TailAppend(Box::new(
+            litchi_docx::source_backed::tail_append::Error::Execution(
+                litchi_core::ExecutionError::Cancelled,
+            ),
+        )),
+        Code::Cancelled,
+    );
+    assert_code(
+        litchi_docx::Error::TailAppend(Box::new(
+            litchi_docx::source_backed::tail_append::Error::PatchConflict,
+        )),
+        Code::InvalidInput,
     );
     assert_code(
         litchi_docx::document::Error::PatchConflict,

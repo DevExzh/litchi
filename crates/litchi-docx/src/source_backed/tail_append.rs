@@ -29,7 +29,8 @@ use litchi_ooxml_common::xml_name::is_qualified_name;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::source_backed::VerifiedDecodedReaderError;
 use litchi_opc::{
-    SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    ArtifactStreamGuard, ArtifactStreamPublication, ArtifactStreamTarget, SourcePartSpliceFragment,
+    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
 };
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -496,8 +497,61 @@ pub(crate) struct PreparedTail {
 }
 
 impl PreparedTail {
-    fn write(&self, writer: &mut dyn Write) -> Result<()> {
-        publish_splice(self.splice.duplicate(), &self.options, writer)
+    fn write(
+        &self,
+        writer: &mut dyn Write,
+        policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
+        publish_splice(self.splice.duplicate(), &self.options, writer, policy)
+    }
+
+    fn stream_to_target(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> crate::Result<ArtifactStreamPublication> {
+        let guard = TailPublicationGuard::from_options(&self.options);
+        target
+            .publish_splice_with_guard(&self.splice, &guard)
+            .map_err(crate::Error::from)
+    }
+}
+
+/// Carries the tail edit's optional cancellation fences into the native OPC
+/// splice writer. The package execution context remains the target policy's
+/// authority; this guard only repeats the format-owned checks that ordinary
+/// publication performs before each sink callback.
+struct TailPublicationGuard {
+    execution: Option<ExecutionContext>,
+    cancellation: Option<CancellationToken>,
+}
+
+impl TailPublicationGuard {
+    fn from_options(options: &EditOptions) -> Self {
+        Self {
+            execution: options.execution.clone(),
+            cancellation: options.cancellation.clone(),
+        }
+    }
+}
+
+impl ArtifactStreamGuard for TailPublicationGuard {
+    type Error = crate::Error;
+
+    fn check(&self) -> std::result::Result<(), Self::Error> {
+        if let Some(execution) = self.execution.as_ref() {
+            execution.check().map_err(stream_execution_error)?;
+        }
+        if let Some(cancellation) = self.cancellation.as_ref() {
+            cancellation.check().map_err(stream_execution_error)?;
+        }
+        Ok(())
+    }
+}
+
+fn stream_execution_error(error: ExecutionError) -> crate::Error {
+    match error {
+        ExecutionError::Cancelled => crate::Error::Opc(litchi_opc::OpcError::Cancelled),
+        error => crate::Error::Opc(litchi_opc::OpcError::Execution(error)),
     }
 }
 
@@ -559,8 +613,12 @@ impl crate::source_backed::deferred::Change for TailChange {
         if prepared.splice.is_noop() {
             return Ok(package.clone());
         }
+        let stream_prepared = Arc::clone(&prepared);
         package
-            .deferred(move |writer| prepared.write(writer).map_err(tail_to_document))
+            .deferred(
+                move |writer, policy| prepared.write(writer, policy).map_err(tail_to_document),
+                move |target| stream_prepared.stream_to_target(target),
+            )
             .map_err(Error::Document)
     }
 }
@@ -568,7 +626,7 @@ impl crate::source_backed::deferred::Change for TailChange {
 fn tail_to_document(error: Error) -> DocumentError {
     match error {
         Error::Document(error) => error,
-        other => DocumentError::Other(other.to_string()),
+        other => DocumentError::TailAppend(Box::new(other)),
     }
 }
 
@@ -869,10 +927,17 @@ fn publish_splice(
     splice: SourcePartSplicePlan<'_>,
     options: &EditOptions,
     writer: &mut dyn Write,
+    policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
 ) -> Result<()> {
     check_options(options)?;
     let guarded_result = if options.execution.is_none() && options.cancellation.is_none() {
-        (splice.write_to(writer), None)
+        (
+            match policy {
+                Some(policy) => splice.write_to_with_policy(writer, policy),
+                None => splice.write_to(writer),
+            },
+            None,
+        )
     } else {
         let failure = Arc::new(Mutex::new(None));
         let guarded = PublicationCheckedWriter {
@@ -881,7 +946,10 @@ fn publish_splice(
             cancellation: options.cancellation.clone(),
             failure: Arc::clone(&failure),
         };
-        let result = splice.write_to(guarded);
+        let result = match policy {
+            Some(policy) => splice.write_to_with_policy(guarded, policy),
+            None => splice.write_to(guarded),
+        };
         let failure = failure
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

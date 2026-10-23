@@ -33,9 +33,8 @@ impl Change for VariablesChange {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        let base = package.clone();
         let (partname, xml) = target;
-        package.deferred(move |writer| base.write_part_overlay(writer, &partname, &xml))
+        package.deferred_part_overlay(partname, xml)
     }
 }
 

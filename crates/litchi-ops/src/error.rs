@@ -1271,6 +1271,19 @@ impl Classify for litchi_docx::Error {
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            // A nonempty accepted prefix means the sink observed a partial
+            // publication, regardless of whether the producer or OPC layer
+            // raised the secondary cause. A zero-prefix stream preserves the
+            // original typed producer/OPC classification.
+            Self::ArtifactStream(error) if error.written().is_some_and(|written| written != 0) => {
+                Class::of(Code::IoError)
+            },
+            Self::ArtifactStream(error) => error
+                .opc_error()
+                .map(|error| error.classify())
+                .or_else(|| error.producer_error().map(|error| error.classify()))
+                .unwrap_or_else(|| Class::of(Code::InternalError)),
+            Self::TailAppend(error) => classify_docx_tail_append(error),
             Self::InkLimit { .. }
             | Self::AltChunkLimit { .. }
             | Self::GlossaryLimit { .. }
@@ -1304,6 +1317,23 @@ impl Classify for litchi_docx::Error {
             | Self::Other(_) => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
+    }
+}
+
+#[cfg(feature = "docx")]
+fn classify_docx_tail_append(error: &litchi_docx::source_backed::tail_append::Error) -> Class {
+    use litchi_docx::source_backed::tail_append::Error as TailAppendError;
+
+    match error {
+        TailAppendError::Document(error) => error.classify(),
+        TailAppendError::Refused(refusal) => refusal.kind().classify(),
+        TailAppendError::Limit { .. } => Class::of(Code::LimitExceeded),
+        TailAppendError::Allocation { .. } => Class::of(Code::InternalError),
+        TailAppendError::Execution(error) => error.classify(),
+        TailAppendError::Scan(_) => Class::of(Code::CorruptFile),
+        TailAppendError::Io(error) => error.classify(),
+        TailAppendError::PatchConflict => Class::of(Code::InvalidInput),
+        _ => Class::of(Code::CorruptFile),
     }
 }
 

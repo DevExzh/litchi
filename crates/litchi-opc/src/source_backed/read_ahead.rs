@@ -272,6 +272,16 @@ impl Drop for FillLease<'_> {
 }
 
 impl ArchiveReadAhead {
+    /// Return the source-read policy captured at admission.  Publication may
+    /// drain the retained window and switch the adapter to exact reads, but
+    /// the deferred owner must still be able to reopen its output under the
+    /// original configured policy.
+    pub(super) const fn source_read_policy(&self) -> SourceReadPolicy {
+        SourceReadPolicy {
+            window_bytes: self.configured_window_bytes,
+        }
+    }
+
     /// Construct a window after the source snapshot has captured its length
     /// and version.  Memory is admitted before the vector allocation and the
     /// reservation remains live until the window is disabled or dropped.

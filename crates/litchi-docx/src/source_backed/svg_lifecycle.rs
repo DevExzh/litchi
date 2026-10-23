@@ -13,8 +13,9 @@ use litchi_core::{Reservation, Resource as CoreResource, SourceVersion};
 use litchi_drawingml::svg_blip;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    AuthoredXmlFragment, EffectiveTopology, PackURI, PartData, PartView, SourceArtifact,
-    SourceArtifactFingerprint, SourceTopologyPlan, TargetMode,
+    ArtifactStreamPublication, ArtifactStreamTarget, AuthoredXmlFragment, EffectiveTopology,
+    PackURI, PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceTopologyPlan,
+    TargetMode,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -1731,6 +1732,7 @@ impl super::Package {
         writer: &mut dyn std::io::Write,
         current: &Snapshot,
         target: &Snapshot,
+        policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         let plan = build_batch_topology_plan(self.physical_package()?, current, target)?;
         publish_checked_topology(
@@ -1739,8 +1741,28 @@ impl super::Package {
             plan,
             current,
             target,
+            policy,
         )?;
         Ok(())
+    }
+
+    /// Publish an SVG batch through the sealed OPC artifact target. Candidate
+    /// graph validation remains DOCX-owned and runs before the target is
+    /// allowed to emit any bytes; OPC owns the recipient census and ZIP
+    /// publication itself.
+    pub(crate) fn stream_svg_batch(
+        &self,
+        target_sink: &mut ArtifactStreamTarget<'_>,
+        current: &Snapshot,
+        target: &Snapshot,
+    ) -> Result<ArtifactStreamPublication> {
+        let package = self.physical_package()?.clone();
+        let plan = build_batch_topology_plan(&package, current, target)?;
+        let prepared = package.prepare_topology(plan)?;
+        prepared.with_candidate(|candidate| {
+            Ok(validate_effective_candidate(candidate, current, target))
+        })??;
+        target_sink.publish_topology(&prepared).map_err(Error::Opc)
     }
 }
 
@@ -1754,6 +1776,7 @@ fn publish_checked_topology<W: std::io::Write>(
     plan: SourceTopologyPlan,
     before: &Snapshot,
     expected: &Snapshot,
+    policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
 ) -> Result<SourceArtifactFingerprint> {
     let prepared = package.prepare_topology(plan)?;
     prepared.with_candidate(|candidate| {
@@ -1763,7 +1786,10 @@ fn publish_checked_topology<W: std::io::Write>(
         inner: writer,
         hasher: Sha256::new(),
     };
-    prepared.publish_to_stream(&mut output)?;
+    match policy {
+        Some(policy) => prepared.publish_to_stream_with_policy(&mut output, policy)?,
+        None => prepared.publish_to_stream(&mut output)?,
+    }
     Ok(SourceArtifactFingerprint::from_sha256(
         output.hasher.finalize().into(),
     ))
