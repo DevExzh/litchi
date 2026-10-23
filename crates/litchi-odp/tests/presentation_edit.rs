@@ -266,6 +266,8 @@ fn incomplete_source_page_coverage_is_refused_without_panicking() {
     // Edit construction is O(1); the source-coverage refusal is deferred
     // until the transaction is first published.
     let transaction = snapshot.edit().unwrap();
+    assert!(transaction.slides().is_err());
+    assert!(transaction.layers().is_err());
     assert!(transaction.commit().is_err());
 }
 

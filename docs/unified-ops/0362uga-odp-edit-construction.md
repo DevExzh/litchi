@@ -27,9 +27,10 @@ work to edit construction.  Generated builder packages, whose projection is
 not yet cached, therefore remain fully lazy until their first operation or
 commit.
 
-The packaged edit's slide projection is fallible as well: a deferred source
-projection error is returned to the caller instead of being converted into a
-dummy empty slice.
+The packaged edit's slide and layer projections are fallible as well: deferred
+source or entry-admission errors are returned to the caller instead of being
+converted into dummy values.  Successful entry admission is cached for the
+transaction, so repeated read projections do not rescan the source.
 
 Focused unit coverage asserts that a packaged edit starts with no mutable
 draft, that an exact no-op commit does not materialize one, that the first

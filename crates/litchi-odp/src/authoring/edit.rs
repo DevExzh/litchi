@@ -763,7 +763,7 @@ impl Package {
         Ok(Edit {
             source: self.clone(),
             draft: None,
-            entry_validated: false,
+            entry_validated: OnceLock::new(),
             changed: false,
             rdf: None,
             charts: None,
@@ -828,7 +828,7 @@ impl<'a> From<&'a str> for Selector<'a> {
 pub struct Edit {
     source: Package,
     draft: Option<MutablePresentation>,
-    entry_validated: bool,
+    entry_validated: OnceLock<()>,
     changed: bool,
     rdf: Option<RdfDraft>,
     charts: Option<ChartDraft>,
@@ -1030,22 +1030,24 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the deferred source slide projection cannot be
-    /// materialized under the editing limits.
+    /// materialized under the editing limits or the source fails edit-entry
+    /// admission.
     #[must_use]
     pub fn slides(&self) -> FamilyResult<&[Slide]> {
+        self.ensure_entry().map_err(PackageError::from)?;
         match self.draft.as_ref() {
             Some(draft) => Ok(draft.slides()),
             None => self.source.slides(),
         }
     }
 
-    fn ensure_entry(&mut self) -> CoreResult<()> {
-        if self.entry_validated {
+    fn ensure_entry(&self) -> CoreResult<()> {
+        if self.entry_validated.get().is_some() {
             return Ok(());
         }
         let presentation = self.source.projection()?;
         validate_edit_entry(presentation)?;
-        self.entry_validated = true;
+        let _ = self.entry_validated.set(());
         Ok(())
     }
 
@@ -1084,6 +1086,7 @@ impl Edit {
     /// The inventory is rebuilt from the source-bound XML after replaying the
     /// staged layer operations.  Unknown XML remains outside this typed view.
     pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
+        self.ensure_entry().map_err(PackageError::from)?;
         let package = self.layer_package()?;
         crate::authoring::layer::inventory(&package).map_err(PackageError::from)
     }
@@ -5197,6 +5200,21 @@ mod tests {
         let commit = edit.commit()?;
         assert!(!commit.diagnostics().changed());
         assert_eq!(commit.package().as_bytes(), source_bytes.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn read_projection_caches_successful_entry_admission_without_a_draft()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let edit = source.edit()?;
+        assert!(edit.entry_validated.get().is_none());
+        assert_eq!(edit.slides()?.len(), 1);
+        assert!(edit.entry_validated.get().is_some());
+        assert!(edit.draft.is_none());
+        assert_eq!(edit.slides()?.len(), 1);
         Ok(())
     }
 
