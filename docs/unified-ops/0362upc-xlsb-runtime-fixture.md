@@ -45,9 +45,16 @@ lineage differences only for the changed package root and
 `/custom/transitive-root.bin` relationship owner. It continues to require the
 same semantic graph and publication, exact source presence and bytes for every
 untouched relationship owner, and the complete effective archive member set
-and decompressed payloads. ZIP member order is deliberately excluded from
-the effective comparison because targeted preservation may append a changed
-owner after the source tail.
+and decompressed payloads. Here “effective archive” means the sorted set of
+published member names and their decoded payloads: the comparison deliberately
+ignores ZIP compression, local/central framing, member order and other ZIP
+container metadata. This follows the existing writer contract in
+[0303 §10](0303-pptx-docx-producer-structure-gaps.md): Part bytes,
+relationship XML and `[Content_Types].xml` are exact, while ZIP container bytes
+may be recompressed. It is not a new exception or waiver. The broader member
+comparison is scoped to these transitive replay/direct/inverse cases and their
+changed relationship owners; same-owner and unreferenced comparisons retain
+their exact serialized-byte checks and untouched source-image checks.
 
 The granted focused receipt was generated outside the checkout (so no large
 evidence is committed):
