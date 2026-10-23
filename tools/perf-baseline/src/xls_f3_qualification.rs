@@ -19,12 +19,15 @@
 use std::error::Error;
 use std::hint::black_box;
 use std::io::{self, Cursor, Write};
-use std::sync::Arc;
+use std::sync::{
+    Arc, RwLock,
+    atomic::{AtomicU64, Ordering},
+};
 use std::time::Instant;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_core::Position;
 use litchi_core::sheet::CellValue;
+use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_xls::SourceBackedWorkbook;
 use litchi_xls::cell_values::{Reference, Selector, Storage, Value};
 use litchi_xls::source_backed::cells;
@@ -159,6 +162,7 @@ impl Write for CountingSink {
 
 #[derive(Debug)]
 struct PrefixSink {
+    bytes: Vec<u8>,
     accepted: usize,
     limit: usize,
 }
@@ -169,12 +173,76 @@ impl Write for PrefixSink {
             return Err(io::Error::other("intentional XLS F3 sink failure"));
         }
         let accepted = bytes.len().min(self.limit - self.accepted);
+        self.bytes.extend_from_slice(&bytes[..accepted]);
         self.accepted = self.accepted.saturating_add(accepted);
         Ok(accepted)
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
+    }
+}
+
+/// A source whose bytes and revision can be changed after an owner opens it.
+/// The F3 preflight uses this to prove that the public owner reports the typed
+/// `SourceChanged` refusal instead of silently reading a stale source.
+#[derive(Debug)]
+struct VersionedSource {
+    bytes: RwLock<Vec<u8>>,
+    revision: AtomicU64,
+}
+
+impl VersionedSource {
+    fn new(bytes: &[u8]) -> Self {
+        Self {
+            bytes: RwLock::new(bytes.to_vec()),
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn mutate(&self) {
+        let mut bytes = self
+            .bytes
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(first) = bytes.first_mut() {
+            *first ^= 1;
+        }
+        self.revision.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        let bytes = self
+            .bytes
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        u64::try_from(bytes.len())
+            .map_err(|_| io::Error::other("XLS F3 source length does not fit u64"))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let start = usize::try_from(offset).map_err(|_| {
+            io::Error::new(io::ErrorKind::InvalidInput, "XLS F3 source offset overflow")
+        })?;
+        let bytes = self
+            .bytes
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if output.is_empty() || start >= bytes.len() {
+            return Ok(0);
+        }
+        let count = output.len().min(bytes.len() - start);
+        output[..count].copy_from_slice(&bytes[start..start + count]);
+        Ok(count)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x584c_535f_4633_0001,
+            self.revision.load(Ordering::Relaxed),
+        ))
     }
 }
 
@@ -196,6 +264,28 @@ fn source_workbook(bytes: &[u8]) -> Result<SourceBackedWorkbook> {
     Ok(SourceBackedWorkbook::from_read_at(Arc::new(
         litchi_core::OwnedSource::new(bytes.to_vec()),
     ))?)
+}
+
+fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let specification = fixture
+        .edits
+        .first()
+        .ok_or("XLS F3 fixture has no selected cell for freshness")?;
+    source.mutate();
+    let error = match workbook.cell_value_by_index(
+        specification.sheet_index,
+        u32::from(specification.reference.row()),
+        u32::from(specification.reference.column()),
+    ) {
+        Ok(_) => return Err("XLS F3 changed source was unexpectedly accepted".into()),
+        Err(error) => error,
+    };
+    if !matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) {
+        return Err(format!("XLS F3 freshness oracle returned the wrong error: {error:?}").into());
+    }
+    Ok(())
 }
 
 fn cell_snapshot(bytes: &[u8]) -> Result<litchi_xls::cell_values::Snapshot> {
@@ -320,17 +410,22 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
     let mut output = Vec::new();
     let mut write_ns = 0;
     let mut read_ns = 0;
+    let route_elapsed_ns;
     match route {
         Route::WriteOnly => {
             let write_started = Instant::now();
             let sink = write_commit(&commit, output_capacity)?;
             write_ns = elapsed_ns(write_started.elapsed())?;
             output = sink.bytes;
+            route_elapsed_ns = elapsed_ns(route_started.elapsed())?;
         },
         Route::FirstRead => {
             let read_started = Instant::now();
             read_first_target(commit.package(), fixture)?;
             read_ns = elapsed_ns(read_started.elapsed())?;
+            // Stop the first-read route clock before publication. The output
+            // write remains an untimed correctness check for this route.
+            route_elapsed_ns = elapsed_ns(route_started.elapsed())?;
             // Publication is intentionally after the first-read clock. This
             // route isolates the moved target reopen from output streaming.
             output = write_commit(&commit, output_capacity)?.bytes;
@@ -343,12 +438,12 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
             let read_started = Instant::now();
             read_first_target(commit.package(), fixture)?;
             read_ns = elapsed_ns(read_started.elapsed())?;
+            route_elapsed_ns = elapsed_ns(route_started.elapsed())?;
         },
     }
-    let elapsed_ns = elapsed_ns(route_started.elapsed())?;
 
     Ok(Measurement {
-        elapsed_ns,
+        elapsed_ns: route_elapsed_ns,
         edit_ns,
         set_ns,
         commit_ns,
@@ -369,7 +464,7 @@ fn prepare_expected(fixture: &Fixture) -> Result<Expected> {
     }
     verify_output(fixture, &output)?;
     verify_patch(&source, &commit)?;
-    verify_partial_publication(&commit, output.len())?;
+    verify_partial_publication(&commit, &output)?;
     Ok(Expected {
         digest: sha256_hex(&output),
         output,
@@ -399,16 +494,45 @@ fn verify_sample(
     Ok(measurement)
 }
 
-fn verify_partial_publication(commit: &cells::Commit, output_bytes: usize) -> Result<()> {
+fn verify_partial_publication(commit: &cells::Commit, expected: &[u8]) -> Result<()> {
     let mut sink = PrefixSink {
+        bytes: Vec::new(),
         accepted: 0,
-        limit: output_bytes / 2,
+        limit: expected.len() / 2,
     };
-    if commit.package().write_to(&mut sink).is_ok()
-        || sink.accepted == 0
-        || sink.accepted >= output_bytes
+    let error = match commit.package().write_to(&mut sink) {
+        Ok(_) => return Err("XLS F3 partial sink unexpectedly accepted complete output".into()),
+        Err(error) => error,
+    };
+    let litchi_xls::source_backed::OutputError::Overlay(
+        litchi_cfb::OverlayError::IncompleteOutput {
+            progress:
+                litchi_cfb::OutputProgress::Prefix {
+                    accepted,
+                    expected: progress_expected,
+                },
+            source,
+        },
+    ) = error
+    else {
+        return Err(
+            format!("XLS F3 partial sink returned an untyped output error: {error:?}").into(),
+        );
+    };
+    let authored = u64::try_from(sink.bytes.len())?;
+    let expected_bytes = u64::try_from(expected.len())?;
+    if accepted != authored
+        || progress_expected != expected_bytes
+        || sink.bytes.is_empty()
+        || sink.bytes.len() >= expected.len()
+        || !matches!(source.as_ref(), litchi_cfb::OverlayError::Io(_))
+        || sink.bytes.as_slice() != &expected[..sink.bytes.len()]
     {
-        return Err("XLS F3 partial sink did not produce a typed prefix failure".into());
+        return Err(format!(
+            "XLS F3 partial sink progress/prefix mismatch: accepted={accepted}, authored={authored}, expected={progress_expected}, sink_bytes={}",
+            sink.bytes.len()
+        )
+        .into());
     }
     Ok(())
 }
@@ -418,8 +542,17 @@ fn verify_patch(source: &SourceBackedWorkbook, commit: &cells::Commit) -> Result
     let applied = source.apply_cells(patch)?;
     let applied_bytes = write_package(applied.package())?;
     let committed_bytes = write_package(commit.package())?;
-    if applied_bytes != committed_bytes || commit.package().apply_cells(patch).is_ok() {
-        return Err("XLS F3 patch replay or stale-recipient gate failed".into());
+    if applied_bytes != committed_bytes {
+        return Err("XLS F3 patch replay changed committed bytes".into());
+    }
+    let stale_error = match commit.package().apply_cells(patch) {
+        Ok(_) => return Err("XLS F3 stale recipient unexpectedly accepted the patch".into()),
+        Err(error) => error,
+    };
+    if !matches!(stale_error, litchi_xls::Error::PatchConflict { .. }) {
+        return Err(
+            format!("XLS F3 stale recipient returned the wrong error: {stale_error:?}").into(),
+        );
     }
     let restored = commit.package().apply_cells(&patch.inverse())?;
     let restored_bytes = write_package(restored.package())?;
@@ -583,7 +716,11 @@ fn build_fixtures(choice: CorpusChoice) -> Result<Vec<Fixture>> {
 fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
     let source = source_workbook(&fixture.archive)?;
     let noop = source.edit_cells()?.commit()?;
-    if noop.diagnostics().changed() || !noop.patch().is_noop() {
+    let diagnostics = noop.diagnostics();
+    if diagnostics.changed()
+        || !noop.patch().is_noop()
+        || diagnostics.source_fingerprint() != diagnostics.target_fingerprint()
+    {
         return Err(format!("XLS F3 {} no-op changed its source", fixture.name).into());
     }
     if write_package(noop.package())? != fixture.archive {
@@ -687,16 +824,149 @@ fn encrypted_fixture() -> Result<Vec<u8>> {
     Ok(builder.build()?.to_encrypted_bytes()?)
 }
 
-fn expect_refused(bytes: &[u8], label: &str) -> Result<()> {
-    let workbook = match source_workbook(bytes) {
-        Ok(workbook) => workbook,
-        Err(_) => return Ok(()),
+#[derive(Clone, Copy)]
+enum SecurityExpectation {
+    Open,
+    RefuseSignedOpen,
+    RefuseEncryptedOpen,
+}
+
+#[derive(Debug)]
+enum SecurityOpenError {
+    Source(litchi_xls::SourceBackedError),
+    Edit(litchi_xls::Error),
+}
+
+const EXPECTED_PROTECTED_REFUSAL: &str =
+    "signed, encrypted, or DRM containers are not eligible for object editing";
+
+fn require_signed_marker(bytes: &[u8]) -> Result<()> {
+    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut pending = vec![Vec::<String>::new()];
+    let mut signed_path = None;
+    while let Some(path) = pending.pop() {
+        let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+        for entry in ole.list_directory_entries(&references)? {
+            let mut full_path = path.clone();
+            full_path.push(entry.name.clone());
+            if entry.entry_type == 2
+                && entry.name.eq_ignore_ascii_case("DigitalSignature")
+                && litchi_ole_common::protection::is_protected_component(&entry.name)
+            {
+                signed_path = Some(full_path);
+            } else if entry.entry_type == 1 {
+                pending.push(full_path);
+            }
+        }
+    }
+    let Some(signed_path) = signed_path else {
+        return Err("XLS F3 signed fixture lacks its DigitalSignature marker".into());
     };
-    let mut edit = match workbook.edit_cells() {
-        Ok(edit) => edit,
-        Err(_) => return Ok(()),
+    let references = signed_path.iter().map(String::as_str).collect::<Vec<_>>();
+    if ole.open_stream(&references)?.is_empty() {
+        return Err("XLS F3 signed fixture has an empty DigitalSignature marker".into());
+    }
+    Ok(())
+}
+
+fn require_encrypted_marker(bytes: &[u8]) -> Result<()> {
+    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let workbook = ole
+        .open_stream(&["Workbook"])
+        .or_else(|_| ole.open_stream(&["Book"]))?;
+    let mut offset = 0usize;
+    while offset < workbook.len() {
+        let header_end = offset
+            .checked_add(4)
+            .ok_or("XLS F3 encrypted marker header offset overflow")?;
+        let header = workbook
+            .get(offset..header_end)
+            .ok_or("XLS F3 encrypted marker has a truncated BIFF header")?;
+        let kind = u16::from_le_bytes([header[0], header[1]]);
+        let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        let end = header_end
+            .checked_add(payload_len)
+            .ok_or("XLS F3 encrypted marker record length overflow")?;
+        let payload = workbook
+            .get(header_end..end)
+            .ok_or("XLS F3 encrypted marker has a truncated BIFF payload")?;
+        if kind == 0x002f && payload.len() >= 2 {
+            return Ok(());
+        }
+        offset = end;
+    }
+    Err("XLS F3 encrypted fixture lacks a BIFF FILEPASS marker".into())
+}
+
+fn require_signed_refusal(error: SecurityOpenError, label: &str) -> Result<()> {
+    match error {
+        SecurityOpenError::Edit(litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(
+            message,
+        )))
+        | SecurityOpenError::Source(litchi_xls::SourceBackedError::Cfb(
+            litchi_cfb::OleError::InvalidFormat(message),
+        ))
+        | SecurityOpenError::Source(litchi_xls::SourceBackedError::Parse(
+            litchi_xls::Error::Cfb(litchi_cfb::OleError::InvalidFormat(message)),
+        )) if message == EXPECTED_PROTECTED_REFUSAL => Ok(()),
+        other => Err(format!(
+            "XLS F3 {label} fixture returned an unexpected security refusal: {other:?}"
+        )
+        .into()),
+    }
+}
+
+fn require_encrypted_refusal(error: SecurityOpenError, label: &str) -> Result<()> {
+    match error {
+        SecurityOpenError::Source(litchi_xls::SourceBackedError::EncryptedUnsupported)
+        | SecurityOpenError::Edit(litchi_xls::Error::PasswordRequired) => Ok(()),
+        other => Err(format!(
+            "XLS F3 {label} fixture returned an unexpected encryption refusal: {other:?}"
+        )
+        .into()),
+    }
+}
+
+fn verify_security_refusal(
+    bytes: &[u8],
+    label: &str,
+    expectation: SecurityExpectation,
+) -> Result<()> {
+    match expectation {
+        SecurityExpectation::Open => {},
+        SecurityExpectation::RefuseSignedOpen => require_signed_marker(bytes)?,
+        SecurityExpectation::RefuseEncryptedOpen => require_encrypted_marker(bytes)?,
+    }
+    let opened = source_workbook(bytes)
+        .map_err(SecurityOpenError::Source)
+        .and_then(|workbook| {
+            workbook
+                .edit_cells()
+                .map(|edit| (workbook, edit))
+                .map_err(SecurityOpenError::Edit)
+        });
+    let (workbook, mut edit) = match opened {
+        Ok(opened) => {
+            if !matches!(expectation, SecurityExpectation::Open) {
+                return Err(format!("XLS F3 {label} fixture unexpectedly opened").into());
+            }
+            opened
+        },
+        Err(error) => {
+            if matches!(expectation, SecurityExpectation::Open) {
+                return Err(format!("XLS F3 {label} fixture failed to open: {error:?}").into());
+            }
+            return match expectation {
+                SecurityExpectation::RefuseSignedOpen => require_signed_refusal(error, label),
+                SecurityExpectation::RefuseEncryptedOpen => require_encrypted_refusal(error, label),
+                SecurityExpectation::Open => {
+                    Err(format!("XLS F3 {label} fixture failed to open").into())
+                },
+            };
+        },
     };
-    let snapshot = cell_snapshot(bytes)?;
+
+    let snapshot = litchi_xls::Package::from_source(workbook.clone())?.cell_values()?;
     let Some((sheet, reference, storage, value)) = snapshot.worksheets().find_map(|sheet| {
         sheet.cells().find_map(|cell| {
             let Value::Number(value) = cell.value() else {
@@ -709,7 +979,7 @@ fn expect_refused(bytes: &[u8], label: &str) -> Result<()> {
             .then_some((sheet.position(), cell.reference(), cell.storage(), *value))
         })
     }) else {
-        return Err(format!("XLS F3 {label} refusal fixture has no numeric cell").into());
+        return Err(format!("XLS F3 {label} fixture has no numeric guard cell").into());
     };
     let staged = match storage {
         Storage::Number => edit.set_number(
@@ -724,23 +994,44 @@ fn expect_refused(bytes: &[u8], label: &str) -> Result<()> {
         ),
         _ => return Err(format!("XLS F3 {label} selected an invalid storage family").into()),
     };
-    if staged.is_err() {
-        return Ok(());
-    }
-    if edit.commit().is_ok() {
-        return Err(format!("XLS F3 {label} edit was accepted").into());
+    if staged.is_ok() {
+        if edit.commit().is_ok() {
+            return Err(format!("XLS F3 {label} edit was accepted").into());
+        }
+    } else {
+        let noop = edit.commit()?;
+        let diagnostics = noop.diagnostics();
+        if diagnostics.changed()
+            || !noop.patch().is_noop()
+            || diagnostics.source_fingerprint() != diagnostics.target_fingerprint()
+        {
+            return Err(format!("XLS F3 {label} staged refusal was not failure-atomic").into());
+        }
     }
     Ok(())
 }
 
 fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
-    expect_refused(&protected_fixture()?, "protected")?;
-    expect_refused(
+    verify_security_refusal(
+        &protected_fixture()?,
+        "protected",
+        SecurityExpectation::Open,
+    )?;
+    verify_security_refusal(
         &add_stream(&fixture.archive, &["DigitalSignature"], b"signature")?,
         "signed",
+        SecurityExpectation::RefuseSignedOpen,
     )?;
-    expect_refused(&macro_fixture(&fixture.archive)?, "macro")?;
-    expect_refused(&encrypted_fixture()?, "encrypted")?;
+    verify_security_refusal(
+        &macro_fixture(&fixture.archive)?,
+        "macro",
+        SecurityExpectation::Open,
+    )?;
+    verify_security_refusal(
+        &encrypted_fixture()?,
+        "encrypted",
+        SecurityExpectation::RefuseEncryptedOpen,
+    )?;
     Ok(())
 }
 
@@ -923,6 +1214,7 @@ where
     // These are invariant gates. They run once before any warmup or measured
     // sample and therefore never enter route timing.
     for fixture in &fixtures {
+        verify_source_freshness(fixture)?;
         verify_noop_and_unsupported(fixture)?;
         verify_security_fixtures(fixture)?;
     }
