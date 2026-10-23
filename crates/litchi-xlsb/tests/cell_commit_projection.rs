@@ -56,9 +56,8 @@ fn numbers_workbook() -> Vec<u8> {
 /// Return the numbers fixture with the first cached Xnum replaced by NaN.
 fn nan_workbook() -> Vec<u8> {
     let source = numbers_workbook();
-    let mut package =
-        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default())
-            .expect("read fixture OPC");
+    let mut package = OpcPackage::from_reader(Cursor::new(source), SourceLimits::default())
+        .expect("read fixture OPC");
     let uri = PackURI::new(SHEET1).expect("worksheet URI");
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
