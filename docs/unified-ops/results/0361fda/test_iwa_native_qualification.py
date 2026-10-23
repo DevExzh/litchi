@@ -251,7 +251,9 @@ class NativeQualificationTests(unittest.TestCase):
             for name in ("litchi-numbers", "litchi-keynote", "litchi-pages"):
                 packages[name] = (
                     f"[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n"
-                    "[dependencies]\nlitchi-iwa-core = { path = \"../litchi-iwa-core\" }\n"
+                    "[dependencies]\nlitchi-iwa-core = { path = \"../litchi-iwa-core\" }\n\n"
+                    "[target.'cfg(windows)'.dependencies]\n"
+                    "litchi-iwa-common = { path = \"../litchi-iwa-common\" }\n"
                 )
             if candidate:
                 packages["litchi-ops"] = (
@@ -270,6 +272,9 @@ class NativeQualificationTests(unittest.TestCase):
         candidate: bool,
         owner: bool = False,
         rogue: bool = False,
+        extra_registry_dependency: str | None = None,
+        extra_registry_version: str = "9.9.9",
+        extra_registry_checksum: str = "c" * 64,
         omit_snap_edge: bool = False,
         omit_snap_registry: bool = False,
         duplicate_smallvec: bool = False,
@@ -283,8 +288,9 @@ class NativeQualificationTests(unittest.TestCase):
             dependencies.append("snap")
         if candidate:
             dependencies.append("smallvec")
-        if rogue:
-            dependencies.append("rogue")
+        extra_registry_dependency = extra_registry_dependency or ("rogue" if rogue else None)
+        if extra_registry_dependency:
+            dependencies.append(extra_registry_dependency)
         rows = [
             "version = 4",
             "",
@@ -350,24 +356,31 @@ class NativeQualificationTests(unittest.TestCase):
                         'checksum = "' + "c" * 64 + '"',
                     ]
                 )
-        if rogue:
+        if extra_registry_dependency:
             rows.extend(
                 [
                     "",
                     "[[package]]",
-                    'name = "rogue"',
-                    'version = "9.9.9"',
+                    f'name = "{extra_registry_dependency}"',
+                    f'version = "{extra_registry_version}"',
                     'source = "registry+https://github.com/rust-lang/crates.io-index"',
-                    'checksum = "' + "c" * 64 + '"',
+                    f'checksum = "{extra_registry_checksum}"',
                 ]
             )
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
     def _write_seed_lock(
-        self, path: Path, *, snap_source: str = RUNNER.REGISTRY_SOURCE
+        self,
+        path: Path,
+        *,
+        snap_source: str = RUNNER.REGISTRY_SOURCE,
+        rogue: bool = False,
+        extra_registry_dependency: str | None = None,
+        extra_registry_version: str = "9.9.9",
+        extra_registry_checksum: str = "c" * 64,
     ) -> None:
         checksum = RUNNER.REVIEWED_REGISTRY_ADDITIONS["constructor"][0]["checksum"]
-        path.write_text(
+        contents = (
             "version = 3\n\n"
             "[[package]]\n"
             'name = "snap"\n'
@@ -378,9 +391,18 @@ class NativeQualificationTests(unittest.TestCase):
             'name = "smallvec"\n'
             'version = "1.16.3"\n'
             'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
-            f'checksum = "{checksum}"\n',
-            encoding="utf-8",
+            f'checksum = "{checksum}"\n'
         )
+        extra_registry_dependency = extra_registry_dependency or ("rogue" if rogue else None)
+        if extra_registry_dependency:
+            contents += (
+                "\n[[package]]\n"
+                f'name = "{extra_registry_dependency}"\n'
+                f'version = "{extra_registry_version}"\n'
+                'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                f'checksum = "{extra_registry_checksum}"\n'
+            )
+        path.write_text(contents, encoding="utf-8")
 
     def test_endpoint_lock_delta_binds_source_edges_registry_and_features(self) -> None:
         base_source = self.directory / "constructor-base"
@@ -410,6 +432,38 @@ class NativeQualificationTests(unittest.TestCase):
             candidate_lock,
             seed_lock,
         )
+
+        # Even when an undeclared registry edge is present in both endpoint
+        # locks and the seed, it is outside the selected source closure.
+        extra_base = self.directory / "constructor-extra-base.lock"
+        extra_candidate = self.directory / "constructor-extra-candidate.lock"
+        extra_seed = self.directory / "constructor-extra-seed.lock"
+        self._write_dependency_lock(
+            extra_base,
+            candidate=False,
+            extra_registry_dependency="chrono",
+            extra_registry_version="1.0.0",
+        )
+        self._write_dependency_lock(
+            extra_candidate,
+            candidate=True,
+            extra_registry_dependency="chrono",
+            extra_registry_version="1.0.0",
+        )
+        self._write_seed_lock(
+            extra_seed,
+            extra_registry_dependency="chrono",
+            extra_registry_version="1.0.0",
+        )
+        with self.assertRaisesRegex(RUNNER.QualificationError, "undeclared"):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                extra_base,
+                extra_candidate,
+                extra_seed,
+            )
 
         # A row shared by both endpoints is still bound to the pinned seed;
         # comparing endpoints alone would accept this changed version.

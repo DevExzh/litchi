@@ -33,7 +33,9 @@ seed; the constructor's reviewed `smallvec` lock addition is pinned to
 version 1.16.3 and its recorded crates.io checksum. The owner source adds the
 same edge but already has that identity in its baseline closure, so its lock
 delta records no registry addition while still checking the exact required
-identity. Release builds use `--locked`; validation, timing, and collection
+identity. Lock edges must be declared by the corresponding source manifest;
+inactive target and development edges are admitted only when declared, and
+unrelated lock edges are rejected. Release builds use `--locked`; validation, timing, and collection
 recompute both comparisons from retained source and lock artifacts. There is
 no shared-prefix or blanket lock-drift exception. The runner also freezes the
 lockfile identities, records toolchain and binary hashes,

@@ -104,7 +104,7 @@ FIXTURE_GENERATOR_OUTER_TIMEOUT_S = (
 SCHEMA = "litchi.iwa.native-qualification.v4"
 COMPARISON = "integrated-route"
 SOURCE_DELTA_SCHEMA = "litchi.iwa.source-delta.v1"
-LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v3"
+LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v4"
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 REVIEWED_REGISTRY_ADDITIONS = {
     "constructor": [
@@ -711,7 +711,7 @@ def _source_dependency_entries(root: Path) -> tuple[dict[str, dict[str, Any]], s
         owner = package["name"]
         packages.add(owner)
         sections: list[tuple[str, Mapping[str, Any]]] = []
-        for section in ("dependencies", "build-dependencies"):
+        for section in ("dependencies", "build-dependencies", "dev-dependencies"):
             value = document.get(section, {})
             if value and not isinstance(value, Mapping):
                 raise QualificationError(f"{path} has malformed {section}")
@@ -722,7 +722,7 @@ def _source_dependency_entries(root: Path) -> tuple[dict[str, dict[str, Any]], s
         for target_name, target in sorted(targets.items()):
             if not isinstance(target, Mapping):
                 raise QualificationError(f"{path} has malformed target {target_name}")
-            for section in ("dependencies", "build-dependencies"):
+            for section in ("dependencies", "build-dependencies", "dev-dependencies"):
                 value = target.get(section, {})
                 if value and not isinstance(value, Mapping):
                     raise QualificationError(f"{path} has malformed target {section}")
@@ -796,8 +796,13 @@ def _source_dependency_active(entry: Mapping[str, Any]) -> bool:
         return False
     scope = entry.get("scope")
     if not isinstance(scope, str) or not scope.startswith("target:"):
+        if scope == "dev-dependencies":
+            return False
         return True
-    target = scope.split(":", 2)[1]
+    parts = scope.split(":", 2)
+    target = parts[1]
+    if len(parts) == 3 and parts[2] == "dev-dependencies":
+        return False
     if target == "cfg(unix)":
         return os.name == "posix"
     if target == "cfg(windows)":
@@ -837,10 +842,12 @@ def _source_dependency_delta(
             break
         closure = expanded
 
-    def dependency_edge_map(entries: Mapping[str, Mapping[str, Any]]) -> dict[str, list[str]]:
+    def dependency_edge_map(
+        entries: Mapping[str, Mapping[str, Any]], *, active: bool
+    ) -> dict[str, list[str]]:
         result: dict[str, set[str]] = {owner: set() for owner in sorted(closure)}
         for entry in entries.values():
-            if entry["owner"] in closure and _source_dependency_active(entry):
+            if entry["owner"] in closure and (not active or _source_dependency_active(entry)):
                 result[entry["owner"]].add(entry["package"])
         return {owner: sorted(values) for owner, values in result.items()}
 
@@ -879,8 +886,10 @@ def _source_dependency_delta(
             }
         )
 
-    base_dependency_edges = dependency_edge_map(base_entries)
-    candidate_dependency_edges = dependency_edge_map(candidate_entries)
+    base_dependency_edges = dependency_edge_map(base_entries, active=True)
+    candidate_dependency_edges = dependency_edge_map(candidate_entries, active=True)
+    base_declared_dependency_edges = dependency_edge_map(base_entries, active=False)
+    candidate_declared_dependency_edges = dependency_edge_map(candidate_entries, active=False)
 
     return {
         "schema": "litchi.iwa.dependency-delta.v2",
@@ -891,6 +900,8 @@ def _source_dependency_delta(
         "changed": changed,
         "base_dependency_edges": base_dependency_edges,
         "candidate_dependency_edges": candidate_dependency_edges,
+        "base_declared_dependency_edges": base_declared_dependency_edges,
+        "candidate_declared_dependency_edges": candidate_declared_dependency_edges,
         "base_local_edges": {
             owner: sorted(set(values) & local_packages)
             for owner, values in base_dependency_edges.items()
@@ -1104,9 +1115,19 @@ def lock_delta_manifest(
     package_names = set(source_dependencies["packages"])
     base_edges = _dependency_edges(base_rows, package_names)
     candidate_edges = _dependency_edges(candidate_rows, package_names)
-    for label, actual, expected in (
-        ("baseline", base_edges, source_dependencies["base_dependency_edges"]),
-        ("candidate", candidate_edges, source_dependencies["candidate_dependency_edges"]),
+    for label, actual, expected, declared in (
+        (
+            "baseline",
+            base_edges,
+            source_dependencies["base_dependency_edges"],
+            source_dependencies["base_declared_dependency_edges"],
+        ),
+        (
+            "candidate",
+            candidate_edges,
+            source_dependencies["candidate_dependency_edges"],
+            source_dependencies["candidate_declared_dependency_edges"],
+        ),
     ):
         missing_edges = {
             owner: sorted(set(expected[owner]) - set(actual[owner]))
@@ -1116,6 +1137,15 @@ def lock_delta_manifest(
         if missing_edges:
             raise QualificationError(
                 f"{label} Cargo.lock lacks source-declared dependency edges: {missing_edges}"
+            )
+        undeclared_edges = {
+            owner: sorted(set(actual[owner]) - set(declared[owner]))
+            for owner in actual
+            if set(actual[owner]) - set(declared[owner])
+        }
+        if undeclared_edges:
+            raise QualificationError(
+                f"{label} Cargo.lock has undeclared dependency edges: {undeclared_edges}"
             )
     required_seed_rows: dict[str, list[dict[str, Any]]] = {}
     for label, edges, rows in (
@@ -1161,6 +1191,10 @@ def lock_delta_manifest(
             "required": required_seed_rows,
         },
         "local_edges": {"base": base_edges, "candidate": candidate_edges},
+        "declared_edges": {
+            "base": source_dependencies["base_declared_dependency_edges"],
+            "candidate": source_dependencies["candidate_declared_dependency_edges"],
+        },
     }
 
 
