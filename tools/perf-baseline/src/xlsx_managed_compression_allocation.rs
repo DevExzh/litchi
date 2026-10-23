@@ -16,6 +16,7 @@ use crate::allocation_metrics::{self, Sample as AllocationSample, Status as Allo
 use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
 use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
+use litchi_xlsx::OpenOptions;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -670,13 +671,13 @@ fn run_iteration(
     let limits = super::super::context_limits(&budget, plan.workers);
 
     let mut core_region = allocation_metrics::begin();
-    let editor =
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            SourceLimits::default(),
-            plan.cache_limits,
-            context,
-        )?;
+    let editor = SourceBackedEditor::from_read_at_with_options(
+        source,
+        OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(plan.cache_limits)
+            .execution_context(context),
+    )?;
     let ingress = core_region.split();
     let (commit, changed, changed_cells) = stage_timed_commit(&editor, &plan.updates)?;
     let edit_commit = core_region.split();

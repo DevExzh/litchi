@@ -542,14 +542,14 @@ fn managed_editor_retains_payload_closure_and_releases_budget() {
     let bytes = ordinary(before_xml);
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor =
-        RowVisibilityEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(VersionedSource::new(bytes)),
-            litchi_xlsx::SourceLimits::default(),
-            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap(),
-            context,
-        )
-        .unwrap();
+    let editor = RowVisibilityEditor::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
 
     assert!(editor.cache_diagnostics().budget_managed);
     // A managed source-backed workbook pins only its workbook catalog.
@@ -576,10 +576,11 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let source = Arc::new(VersionedSource::new(bytes));
     source.reject_small_read_at(worksheet_data_offset);
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         source.clone(),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let opened = editor.cache_diagnostics().successful_loads;
@@ -606,10 +607,11 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let bytes = ordinary(before_xml);
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     cancellation_source.cancel();
@@ -621,10 +623,11 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -642,10 +645,11 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -660,10 +664,11 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let edit = editor.edit("Sheet1").unwrap();
@@ -687,10 +692,11 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
     assert!(part_len(&bytes, UNUSED) > available_memory);
     assert!(u64::try_from(bytes.len()).unwrap() > available_memory);
     let (budget, _cancellation_source, context) = managed_context(available_memory);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -724,10 +730,11 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
         .to_vec();
     let (budget, _cancellation_source, context) =
         managed_context(exact + MANAGED_PUBLICATION_PLANNING_HEADROOM);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -783,10 +790,11 @@ fn managed_changed_publication_refuses_without_planning_headroom() {
     let bytes = ordinary(before_xml);
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -843,10 +851,11 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     assert!(part_len(&signed, UNUSED) > signed_noop_memory);
     assert!(u64::try_from(signed.len()).unwrap() > signed_noop_memory);
     let (budget, _cancellation_source, context) = managed_context(signed_noop_memory);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(signed.clone())),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let noop = editor.edit("Sheet1").unwrap().commit().unwrap();
@@ -858,10 +867,11 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, _cancellation_source, context) = managed_context(signed_exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(signed)),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();
@@ -879,10 +889,11 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     ));
     let protected_exact = part_len(&protected, MAIN) + part_len(&protected, SHEET);
     let (budget, _cancellation_source, context) = managed_context(protected_exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(protected)),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     assert!(editor.edit("Sheet1").is_err());
@@ -897,10 +908,11 @@ fn managed_source_revision_is_refused_before_output() {
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
     let source = Arc::new(VersionedSource::new(bytes));
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor = RowVisibilityEditor::from_read_at_with_execution_context(
+    let editor = RowVisibilityEditor::from_read_at_with_options(
         source.clone(),
-        litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(litchi_xlsx::SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let mut edit = editor.edit("Sheet1").unwrap();

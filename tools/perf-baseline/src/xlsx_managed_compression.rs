@@ -19,6 +19,7 @@ use litchi_core::{
     OwnedSource, ReadAt, Resource,
 };
 use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
+use litchi_xlsx::OpenOptions;
 use litchi_xlsx::cell_values::Commit as MultiCommit;
 use serde::Serialize;
 use std::{
@@ -305,14 +306,13 @@ fn open_editor(
     context: ExecutionContext,
 ) -> AnyResult<SourceBackedEditor> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    Ok(
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            SourceLimits::default(),
-            cache_limits(corpus, updates)?,
-            context,
-        )?,
-    )
+    Ok(SourceBackedEditor::from_read_at_with_options(
+        source,
+        OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits(corpus, updates)?)
+            .execution_context(context),
+    )?)
 }
 
 fn stage_commit(editor: &SourceBackedEditor, updates: &[XlsxCoordinate]) -> AnyResult<MultiCommit> {

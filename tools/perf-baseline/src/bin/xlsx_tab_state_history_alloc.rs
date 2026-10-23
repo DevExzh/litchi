@@ -198,7 +198,10 @@ fn managed_context() -> AnyResult<ExecutionContext> {
     ))
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn open_workbook(
     fixture: &[u8],
     profile: PolicyProfile,
@@ -221,7 +224,10 @@ fn open_workbook(
     Ok(litchi_xlsx::SourceBackedWorkbook::from_read_at_with_options(source, options)?)
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn open_workbook(
     fixture: &[u8],
     profile: PolicyProfile,
@@ -247,7 +253,10 @@ fn open_workbook(
     }
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn open_editor(
     fixture: &[u8],
     profile: PolicyProfile,

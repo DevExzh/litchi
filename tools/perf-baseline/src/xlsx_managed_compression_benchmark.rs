@@ -15,6 +15,7 @@ use super::{
 use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::{Budget, OwnedSource, ReadAt, Resource};
 use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
+use litchi_xlsx::OpenOptions;
 use litchi_xlsx::cell_values::Patch as MultiPatch;
 use serde::Serialize;
 use std::{
@@ -371,10 +372,11 @@ fn prepare_inverse_patch(
     cache_limits: SourceCacheLimits,
 ) -> AnyResult<MultiPatch> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let editor = SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
+    let editor = SourceBackedEditor::from_read_at_with_options(
         source,
-        SourceLimits::default(),
-        cache_limits,
+        OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits),
     )?;
     let commit = super::stage_commit(&editor, updates)?;
     Ok(commit.patch().clone())
@@ -416,13 +418,13 @@ fn timed_iteration(plan: &CasePlan<'_>, sink: &mut BoundedSink) -> AnyResult<Tim
 
     let total_started = Instant::now();
     let ingress_started = Instant::now();
-    let editor =
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            SourceLimits::default(),
-            plan.cache_limits,
-            context,
-        )?;
+    let editor = SourceBackedEditor::from_read_at_with_options(
+        source,
+        OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(plan.cache_limits)
+            .execution_context(context),
+    )?;
     let ingress_ns = elapsed_ns(ingress_started)?;
 
     let edit_started = Instant::now();

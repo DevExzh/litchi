@@ -23,7 +23,8 @@ w5-counting-allocator = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
 # The current XLSX adapter wins under --all-features. Historical baselines
-# select only legacy-xlsx-source-history with --no-default-features.
+# select only legacy-xlsx-source-history with --no-default-features; see
+# unified-xlsx-source-history/README.md for the pinned build workflow.
 current-xlsx-source-history = []
 legacy-xlsx-source-history = []
 # The paired OLE probe is built against either migration boundary when these

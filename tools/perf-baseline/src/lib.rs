@@ -113,9 +113,9 @@ use litchi_pptx::shape::text::{
 };
 use litchi_xlsx::Package as XlsxPackage;
 use litchi_xlsx::{
-    Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
-    StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
-    Value as XlsxValue,
+    Cell as XlsxCell, MergeChoice, MergeLimits, OpenOptions as XlsxOpenOptions, Rect, RowIndex,
+    SourceBackedWorkbook, StreamingCell, StreamingCellValue, StreamingWorkbookLimits,
+    StreamingWorkbookWriter, Value as XlsxValue,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -44500,19 +44500,23 @@ fn run_xlsx_cell_values_edit_save(
                 let payload_budget =
                     payload_budget.ok_or("XLSX managed cell CRUD payload budget is missing")?;
                 let (budget, context) = xlsx_cell_values_managed_context(payload_budget, maximum)?;
-                let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    read_at,
-                    SourceLimits::default(),
-                    cache_limits,
-                    context,
-                )?;
+                let editor =
+                    crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+                        read_at,
+                        XlsxOpenOptions::new()
+                            .source_limits(SourceLimits::default())
+                            .cache_limits(cache_limits)
+                            .execution_context(context),
+                    )?;
                 (editor, Some(budget))
             } else {
-                let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
-                    read_at,
-                    SourceLimits::default(),
-                    cache_limits,
-                )?;
+                let editor =
+                    crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+                        read_at,
+                        XlsxOpenOptions::new()
+                            .source_limits(SourceLimits::default())
+                            .cache_limits(cache_limits),
+                    )?;
                 (editor, None)
             };
             let open_duration = open_started.elapsed();
@@ -46204,13 +46208,13 @@ fn xlsx_cell_values_output_refusal_replay(
     let probe_version = probe_source.version()?;
     let (probe_budget, probe_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, successful_output_ceiling)?;
-    let probe_editor =
-        crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            probe_source.clone(),
-            SourceLimits::default(),
-            cache_limits,
-            probe_context,
-        )?;
+    let probe_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+        probe_source.clone(),
+        XlsxOpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(probe_context),
+    )?;
     let selectors = xlsx_update_sheet_selectors(updates);
     let mut probe_edit = probe_editor.edit_sheets(selectors)?;
     for coordinate in updates {
@@ -46254,13 +46258,13 @@ fn xlsx_cell_values_output_refusal_replay(
     let refusal_version = refusal_source.version()?;
     let (refusal_budget, refusal_context) =
         xlsx_cell_values_managed_probe_context(payload_budget, one_under_output_limit)?;
-    let refusal_editor =
-        crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            refusal_source.clone(),
-            SourceLimits::default(),
-            cache_limits,
-            refusal_context,
-        )?;
+    let refusal_editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at_with_options(
+        refusal_source.clone(),
+        XlsxOpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache_limits)
+            .execution_context(refusal_context),
+    )?;
     let selectors = xlsx_update_sheet_selectors(updates);
     let mut refusal_edit = refusal_editor.edit_sheets(selectors)?;
     for coordinate in updates {

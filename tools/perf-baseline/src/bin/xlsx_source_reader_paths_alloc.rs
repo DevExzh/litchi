@@ -31,9 +31,15 @@ const MAIN_PART: &str = "/xl/workbook.xml";
 const SHEET_PART: &str = "/xl/worksheets/sheet1.xml";
 const STYLES_PART: &str = "/xl/styles.xml";
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 const API_VARIANT: &str = "pre-w4-source-reader";
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 const API_VARIANT: &str = "w4-source-reader-lazy-cache";
 
 #[derive(Debug, Clone, Copy)]
@@ -210,14 +216,13 @@ where
         black_box(&owner);
     }
     let after = allocation_metrics::snapshot();
-    Ok((allocation_delta(before, after, scope, iterations)?, observations))
+    Ok((
+        allocation_delta(before, after, scope, iterations)?,
+        observations,
+    ))
 }
 
-fn run_open_route(
-    iterations: usize,
-    warmups: usize,
-    fixture: &[u8],
-) -> AnyResult<AllocationDelta> {
+fn run_open_route(iterations: usize, warmups: usize, fixture: &[u8]) -> AnyResult<AllocationDelta> {
     for _ in 0..warmups {
         let owner = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(
             fixture.to_vec(),
@@ -302,7 +307,11 @@ fn allocation_delta(
         status: "measured-count-only",
         scope,
         operation_count,
-        allocation_calls: subtract(after.allocation_calls, before.allocation_calls, "allocation")?,
+        allocation_calls: subtract(
+            after.allocation_calls,
+            before.allocation_calls,
+            "allocation",
+        )?,
         deallocation_calls: subtract(
             after.deallocation_calls,
             before.deallocation_calls,
