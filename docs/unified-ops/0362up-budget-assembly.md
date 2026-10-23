@@ -23,3 +23,11 @@ now reads the retained policy_appended entry payload lengths.
 [native-check-v1.json](results/0362up/native-check-v1.json) records the exact
 source, command, external logs and hashes. No native crate pass is inferred
 from the stopped build.
+
+The second check on `3ae4cb2420` stops in OPC after 125.55 seconds: the
+metadata-only topology planner added a state field without the revision
+initializer and omitted a required source policy argument. The subsequent
+PPTX proposal replaces that planner with affected-member metadata sizing
+and removes both mismatches. Independent review and combined compilation
+remain required. [native-check-v2.json](results/0362up/native-check-v2.json)
+records the exact command and failure; no dependent-crate pass is inferred.
