@@ -33,22 +33,60 @@ The pinned source identities are:
 | included e4a route | `fc08a3d65ec38c9053b1927e25943762c06c6894026e186b011bfb0dab028bb9` |
 | common probe source | `9d709068b90f685fd45b367320296484020c4af45bd42da32d7ac13d5ac41650` |
 
-At the next authorized build slot, select the adapter explicitly:
+At the next authorized build slot, select the adapter explicitly. The copied
+example is a temporary generated overlay, not part of the baseline source
+identity. Keep the build receipt and all binaries outside both worktrees:
 
 ```text
-cp /path/to/unified-ops-api/tools/perf-baseline/odp_native_qualification_e4a_probe.rs \
-  /path/to/uo2-odp-heap-repair-0362yd-baseline/crates/litchi-odp/examples/odp_native_qualification_legacy_probe.rs
-CARGO_TARGET_DIR=/external/odp-0362yd-baseline-target \
-cargo build --offline --locked --release \
-  --manifest-path /path/to/uo2-odp-heap-repair-0362yd-baseline/Cargo.toml \
+set -eu
+ADAPTER_SRC=/path/to/unified-ops-api/tools/perf-baseline/odp_native_qualification_e4a_probe.rs
+BASELINE=/path/to/uo2-odp-heap-repair-0362yd-baseline
+ADAPTER_DST=$BASELINE/crates/litchi-odp/examples/odp_native_qualification_legacy_probe.rs
+TARGET=/external/odp-0362yd-baseline-target
+RECEIPT=/external/odp-qualification/0362yf-baseline-build-receipt.txt
+ADAPTER_SHA=f8c0544e057a5aedf7bee759ed21313858efad36b4f6460c8a368f55411a7203
+test -z "$(git -C "$BASELINE" status --porcelain --untracked-files=all)"
+test ! -e "$ADAPTER_DST"
+cleanup() {
+  rm -f -- "$ADAPTER_DST"
+  test -z "$(git -C "$BASELINE" status --porcelain --untracked-files=all)"
+}
+trap cleanup EXIT
+cp -- "$ADAPTER_SRC" "$ADAPTER_DST"
+test "$(sha256sum "$ADAPTER_SRC" | cut -d' ' -f1)" = "$ADAPTER_SHA"
+test "$(sha256sum "$ADAPTER_DST" | cut -d' ' -f1)" = "$ADAPTER_SHA"
+mkdir -p "$(dirname "$RECEIPT")"
+{
+  printf 'baseline_head '; git -C "$BASELINE" rev-parse HEAD
+  printf 'adapter_source_sha256 '; sha256sum "$ADAPTER_SRC" | cut -d' ' -f1
+  printf 'adapter_overlay_sha256 '; sha256sum "$ADAPTER_DST" | cut -d' ' -f1
+  printf 'target_dir %s\n' "$TARGET"
+  printf 'command cargo build --offline --locked --release --manifest-path %s -p litchi-odp --example odp_native_qualification_legacy_probe\n' "$BASELINE/Cargo.toml"
+} >"$RECEIPT"
+CARGO_TARGET_DIR="$TARGET" cargo build --offline --locked --release \
+  --manifest-path "$BASELINE/Cargo.toml" \
   -p litchi-odp --example odp_native_qualification_legacy_probe
+BINARY=$TARGET/release/examples/odp_native_qualification_legacy_probe
+test -x "$BINARY"
+printf 'binary_sha256 '; sha256sum "$BINARY" | cut -d' ' -f1 >>"$RECEIPT"
+printf 'binary_bytes '; stat -c '%s' "$BINARY" >>"$RECEIPT"
+test "$(sha256sum "$ADAPTER_DST" | cut -d' ' -f1)" = "$ADAPTER_SHA"
+# EXIT trap removes only the generated overlay. The receipt and binary remain.
 ```
 
-The build must record the resolved e4a `HEAD`, the adapter SHA-256, binary
-SHA-256 and external target path. The protocol adapter's routes are exactly
-`open`, `read`, `write` and `append`; it has no `replay` route. The old
-historical probe's ten positional routes remain available only to the legacy
-allocator/Callgrind diagnostics and are not used for matched native timing.
+The build receipt must preserve the resolved e4a `HEAD`, the source and copied
+overlay adapter SHA-256 values, exact command, binary byte count/SHA-256 and
+external target path. The final overlay hash check happens before the `EXIT`
+trap removes only the named generated example. Verify
+`git -C "$BASELINE" status --porcelain --untracked-files=all` is empty after
+the trap; do not remove or reset any other file. A separate clean checkout at
+the same e4a commit may be used instead, but its copied source and resulting
+binary must carry the same receipt identities. The qualification manifest may
+then resolve the clean baseline `HEAD` and binary without weakening its source
+cleanliness check. The protocol adapter's routes are exactly `open`, `read`,
+`write` and `append`; it has no `replay` route. The old historical probe's ten
+positional routes remain available only to the legacy allocator/Callgrind
+diagnostics and are not used for matched native timing.
 
 ## Proof boundary
 
