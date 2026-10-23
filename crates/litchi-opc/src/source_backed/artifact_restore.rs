@@ -18,6 +18,7 @@ use sha2::{Digest as _, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::io::{self, Write};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// The phase in which an artifact producer is being invoked.
@@ -167,16 +168,28 @@ fn relationship_owner_from_member(member_name: &str) -> Result<Option<PackURI>> 
     if !super::is_relationship_member_name(member_name) {
         return Ok(None);
     }
-    if member_name == "_rels/.rels" {
+    if member_name.eq_ignore_ascii_case("_rels/.rels") {
         return PackURI::new(super::PACKAGE_URI)
             .map(Some)
             .map_err(OpcError::InvalidPackUri);
     }
-    let Some((directory, filename)) = member_name.rsplit_once("/_rels/") else {
+    let marker = b"/_rels/";
+    let marker_start = member_name
+        .as_bytes()
+        .windows(marker.len())
+        .rposition(|window| {
+            window
+                .iter()
+                .zip(marker)
+                .all(|(actual, expected)| actual.eq_ignore_ascii_case(expected))
+        });
+    let Some(marker_start) = marker_start else {
         return Err(overlay_unavailable(
             "relationship member owner cannot be derived",
         ));
     };
+    let directory = &member_name[..marker_start];
+    let filename = &member_name[marker_start + marker.len()..];
     let Some((filename, extension)) = filename.rsplit_once('.') else {
         return Err(overlay_unavailable(
             "relationship member owner has an invalid suffix",
@@ -193,6 +206,36 @@ fn relationship_owner_from_member(member_name: &str) -> Result<Option<PackURI>> 
         .map_err(OpcError::InvalidPackUri)
 }
 
+fn catalog_part_index(catalog: &super::AdmittedCatalog, owner: &PackURI) -> Option<usize> {
+    // The catalog's admission already rejects ambiguous OPC-equivalent Part
+    // names. Reuse its exact/case-folded lookup index instead of scanning all
+    // Parts for every relationship owner.
+    catalog.parts_by_name.get(owner).copied().or_else(|| {
+        let wanted = owner.as_str();
+        catalog.casefold_order.as_ref().and_then(|order| {
+            order
+                .binary_search_by(|index| {
+                    super::cmp_ascii_case_insensitive(
+                        catalog.parts[*index].partname.as_str(),
+                        wanted,
+                    )
+                })
+                .ok()
+                .map(|position| order[position])
+        })
+    })
+}
+
+fn canonical_relationship_owner(
+    catalog: &super::AdmittedCatalog,
+    owner: &PackURI,
+) -> Result<PackURI> {
+    let index = catalog_part_index(catalog, owner);
+    Ok(index
+        .and_then(|index| catalog.parts.get(index))
+        .map_or_else(|| owner.clone(), |part| part.partname.clone()))
+}
+
 fn admit_content_types_xml(xml: &[u8], limits: SourceLimits) -> Result<()> {
     let _ = super::ContentTypeMap::from_xml(xml, limits)?;
     Ok(())
@@ -206,9 +249,20 @@ fn parse_relationship_xml(
     PackageReader::parse_owned_relationships(xml, owner, limits)
 }
 
-fn admit_relationship_xml(xml: &[u8], owner: &PackURI, limits: SourceLimits) -> Result<()> {
-    let _ = parse_relationship_xml(xml, owner, limits)?;
-    Ok(())
+fn admit_preservation_member_names(
+    source: &SourceSnapshot,
+    archive: &soapberry_zip::office::IndexedArchive<super::SourceReader>,
+    limits: SourceLimits,
+) -> Result<()> {
+    source.ensure_current()?;
+    for entry in archive.preservation_entries() {
+        limits.check(
+            SourceLimitKind::ArchiveMemberNameBytes,
+            entry.raw_name_len() as u64,
+            limits.max_archive_member_name_bytes(),
+        )?;
+    }
+    source.ensure_current()
 }
 
 /// The typed failure bridge for a source-backed producer.
@@ -300,6 +354,15 @@ impl<E> ArtifactStreamError<E> {
     }
 }
 
+fn with_secondary<E>(
+    primary: ArtifactStreamError<E>,
+    secondary: Option<ArtifactStreamError<E>>,
+) -> ArtifactStreamError<E> {
+    secondary.map_or(primary, |secondary| {
+        ArtifactStreamError::incomplete(0, primary, Some(secondary))
+    })
+}
+
 impl<E> fmt::Debug for ArtifactStreamError<E> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("artifact stream operation failed")
@@ -314,6 +377,200 @@ impl<E> fmt::Display for ArtifactStreamError<E> {
 
 impl<E> std::error::Error for ArtifactStreamError<E> {}
 
+/// The exact result of one mediated artifact publication.
+///
+/// The producer cannot construct this value or write to the target directly.
+/// It is minted only after one of the native OPC publication methods has
+/// completed its recipient census and emitted one complete artifact. The
+/// fingerprint is over the bytes accepted by the target sink.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArtifactStreamPublication {
+    written: u64,
+    fingerprint: SourceArtifactFingerprint,
+    target_token: u64,
+}
+
+impl ArtifactStreamPublication {
+    /// Return the exact number of bytes accepted by the publication target.
+    #[must_use]
+    pub const fn written(self) -> u64 {
+        self.written
+    }
+
+    /// Return the SHA-256 fingerprint of the accepted artifact bytes.
+    #[must_use]
+    pub const fn fingerprint(self) -> SourceArtifactFingerprint {
+        self.fingerprint
+    }
+}
+
+static NEXT_ARTIFACT_STREAM_TARGET: AtomicU64 = AtomicU64::new(1);
+
+/// A sealed recipient target for one complete native OPC artifact.
+///
+/// `ArtifactStreamTarget` intentionally does not implement [`Write`]. A
+/// format producer can publish only through the native source, topology,
+/// overlay, and splice methods below; arbitrary bytes cannot bypass the OPC
+/// census or the ZIP preservation profile. The target is created by the OPC
+/// facade and is valid for exactly one publication attempt.
+pub struct ArtifactStreamTarget<'a> {
+    writer: &'a mut dyn Write,
+    policy: &'a ArtifactStreamPolicy<'a>,
+    token: u64,
+    claimed: bool,
+    invalidated: bool,
+    written: u64,
+    hasher: Sha256,
+    publication: Option<ArtifactStreamPublication>,
+}
+
+impl<'a> ArtifactStreamTarget<'a> {
+    fn new(writer: &'a mut dyn Write, policy: &'a ArtifactStreamPolicy<'a>) -> Self {
+        Self {
+            writer,
+            policy,
+            token: NEXT_ARTIFACT_STREAM_TARGET.fetch_add(1, Ordering::Relaxed),
+            claimed: false,
+            invalidated: false,
+            written: 0,
+            hasher: Sha256::new(),
+            publication: None,
+        }
+    }
+
+    fn publish<F>(&mut self, operation: F) -> Result<ArtifactStreamPublication>
+    where
+        F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
+    {
+        if self.claimed {
+            self.invalidated = true;
+            return Err(overlay_unavailable(
+                "artifact stream target already has a publication attempt",
+            ));
+        }
+        self.claimed = true;
+        let policy = self.policy;
+        let mut sink = ArtifactTargetSink { target: self };
+        operation(&mut sink, policy)?;
+        let publication = ArtifactStreamPublication {
+            written: sink.target.written,
+            fingerprint: SourceArtifactFingerprint::from_sha256(
+                sink.target.hasher.clone().finalize().into(),
+            ),
+            target_token: sink.target.token,
+        };
+        sink.target.publication = Some(publication);
+        Ok(publication)
+    }
+
+    /// Publish an exact retained source artifact.
+    pub fn publish_source_artifact(
+        &mut self,
+        artifact: &SourceArtifact,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| artifact.write_to_with_policy(writer, policy))
+    }
+
+    /// Publish an exact source-backed package through the recipient policy.
+    pub fn publish_source_package(
+        &mut self,
+        package: SourceBackedPackage,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| package.write_exact_source_with_policy(writer, policy))
+    }
+
+    /// Publish a prepared effective topology.
+    pub fn publish_topology(
+        &mut self,
+        topology: &super::PreparedTopology,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| topology.publish_to_stream_with_policy(writer, policy))
+    }
+
+    /// Prepare and publish one bounded source-backed overlay plan.
+    pub fn publish_overlay(
+        &mut self,
+        package: SourceBackedPackage,
+        plan: super::SourceTopologyPlan,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| {
+            package.write_topology_to_stream_with_policy(writer, plan, policy)
+        })
+    }
+
+    /// Publish a bounded decoded-member splice plan.
+    pub fn publish_splice(
+        &mut self,
+        plan: &super::SourcePartSplicePlan<'_>,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| {
+            plan.duplicate()
+                .write_to_with_policy(writer, policy)
+                .map(|_| ())
+        })
+    }
+
+    fn written(&self) -> u64 {
+        self.written
+    }
+
+    fn fingerprint(&self) -> SourceArtifactFingerprint {
+        SourceArtifactFingerprint::from_sha256(self.hasher.clone().finalize().into())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+
+    fn validate_publication(&self, publication: ArtifactStreamPublication) -> Result<()> {
+        if self.invalidated
+            || self.publication != Some(publication)
+            || publication.target_token != self.token
+            || publication.written != self.written
+            || publication.fingerprint != self.fingerprint()
+        {
+            return Err(overlay_unavailable(
+                "artifact stream publication proof does not belong to this target",
+            ));
+        }
+        Ok(())
+    }
+}
+
+struct ArtifactTargetSink<'target, 'a> {
+    target: &'target mut ArtifactStreamTarget<'a>,
+}
+
+impl Write for ArtifactTargetSink<'_, '_> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let accepted = self.target.writer.write(bytes)?;
+        if accepted > bytes.len() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "artifact stream target sink overreported accepted bytes",
+            ));
+        }
+        if accepted != 0 {
+            self.target.hasher.update(&bytes[..accepted]);
+            self.target.written = self
+                .target
+                .written
+                .checked_add(accepted as u64)
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "artifact stream target byte count overflow",
+                    )
+                })?;
+        }
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.target.writer.flush()
+    }
+}
+
 /// A bounded source-backed producer that can be authenticated before output
 /// is accepted by a caller-owned sink.
 pub trait ArtifactStream {
@@ -322,16 +579,15 @@ pub trait ArtifactStream {
     /// Check the producer's source/version and execution context.
     fn check_fresh(&self) -> std::result::Result<(), Self::Error>;
 
-    /// Stream this artifact into `writer` under the recipient policy.
+    /// Stream this artifact through the sealed native OPC target.
     ///
-    /// Implementations must use the policy-aware OPC writers for every
-    /// source-backed publication they perform. Those writers keep producer
-    /// input/work checks and charge recipient output only in `Publish` mode.
+    /// Implementations must call exactly one target publication method. The
+    /// returned proof is tied to that target invocation and cannot be created
+    /// by a producer or reused with another target.
     fn stream_to(
         &self,
-        writer: &mut dyn Write,
-        policy: &ArtifactStreamPolicy<'_>,
-    ) -> std::result::Result<(), Self::Error>;
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> std::result::Result<ArtifactStreamPublication, Self::Error>;
 }
 
 impl<'recipient> ArtifactStreamPolicy<'recipient> {
@@ -473,6 +729,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             .map(|context| context.check().map_err(map_execution_error))
             .transpose()?;
         let limits = self.recipient_limits;
+        if view.replacement.is_none() {
+            admit_preservation_member_names(view.source, view.archive, limits)?;
+        }
         if view.replacement.is_none() {
             limits.check(
                 SourceLimitKind::InputBytes,
@@ -626,12 +885,13 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         let mut relationship_events = 0_u64;
         let mut total_relationships = 0_u64;
         let mut relationship_owners = HashSet::new();
+        let mut admitted_relationships = HashMap::new();
         for owner in view.catalog.relationship_xml_metrics.keys() {
             relationship_owners.insert(owner.clone());
         }
         for (_, member_name) in view.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(owner);
+                relationship_owners.insert(canonical_relationship_owner(view.catalog, &owner)?);
             }
         }
 
@@ -646,6 +906,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             total_relationships = total_relationships
                 .checked_add(count)
                 .ok_or_else(|| overlay_unavailable("recipient relationship count overflow"))?;
+            limits.check(
+                SourceLimitKind::TotalRelationships,
+                total_relationships,
+                limits.max_total_relationships() as u64,
+            )?;
             for relationship in relationships.iter() {
                 for value in [
                     relationship.r_id(),
@@ -704,6 +969,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             if !view.catalog.relationship_xml_metrics.contains_key(&owner) {
                 check_relationships(&parsed)?;
             }
+            admitted_relationships.insert(owner, parsed);
         }
         limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
@@ -726,10 +992,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits.max_total_relationships() as u64,
         )?;
 
-        // Count the reachable relationship graph without allocating payloads.
-        // This is exact for the unchanged source catalog and remains a useful
-        // lower-level guard before a changed producer supplies its final-plan
-        // graph census.
+        // Count the reachable relationship graph from the bounded, recipient-
+        // admitted XML map. Keeping orphan owners in this map is important:
+        // an orphan relationship part can still lead to another relationship
+        // part, and the graph limit must cover that chain rather than falling
+        // back to the source catalog only.
         let mut graph = HashSet::new();
         let mut work = Vec::new();
         for relationship in view.catalog.package_relationships.iter() {
@@ -748,22 +1015,24 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
         }
         while let Some(owner) = work.pop() {
-            let Some(index) = view.catalog.parts_by_name.get(&owner).copied() else {
-                continue;
-            };
-            for relationship in view.catalog.parts[index].relationships.iter() {
-                if !relationship.is_external() {
-                    let target = relationship.target_partname()?;
-                    if graph.insert(target.clone()) {
-                        let count = u64::try_from(graph.len()).map_err(|_| {
-                            overlay_unavailable("recipient graph node count exceeds u64")
-                        })?;
-                        limits.check(
-                            SourceLimitKind::RelationshipGraphNodes,
-                            count,
-                            limits.max_relationship_graph_nodes() as u64,
-                        )?;
-                        work.push(target);
+            if let Some((_, relationships)) = admitted_relationships
+                .iter()
+                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
+            {
+                for relationship in relationships.iter() {
+                    if !relationship.is_external() {
+                        let target = relationship.target_partname()?;
+                        if graph.insert(target.clone()) {
+                            let count = u64::try_from(graph.len()).map_err(|_| {
+                                overlay_unavailable("recipient graph node count exceeds u64")
+                            })?;
+                            limits.check(
+                                SourceLimitKind::RelationshipGraphNodes,
+                                count,
+                                limits.max_relationship_graph_nodes() as u64,
+                            )?;
+                            work.push(target);
+                        }
                     }
                 }
             }
@@ -970,6 +1239,18 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
         }
         let generated_names = effective.added_member_names.as_ref();
+        if generated_names.len() != retained.policy_appended.len()
+            || generated_names.iter().any(|name| {
+                !retained
+                    .policy_appended
+                    .iter()
+                    .any(|member| member.name.eq_ignore_ascii_case(name))
+            })
+        {
+            return Err(overlay_unavailable(
+                "prepared appended member metadata is not bound to its emitted entries",
+            ));
+        }
         for name in generated_names {
             let name_bytes = u64::try_from(name.len())
                 .map_err(|_| overlay_unavailable("generated member name exceeds u64"))?;
@@ -979,17 +1260,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 limits.max_archive_member_name_bytes(),
             )?;
             let payload = retained
-                .appended_metadata
+                .policy_appended
                 .iter()
-                .find(|(member, _)| member.eq_ignore_ascii_case(name))
-                .map(|(_, payload)| payload.as_slice())
-                .or_else(|| {
-                    effective.parts.iter().find_map(|part| {
-                        (part.source_index.is_none()
-                            && part.partname(package).membername().eq_ignore_ascii_case(name))
-                        .then(|| part.replacement.as_deref().unwrap_or_default())
-                    })
-                })
+                .find(|member| member.name.eq_ignore_ascii_case(name))
+                .map(|member| member.payload.as_slice())
                 .ok_or_else(|| {
                     overlay_unavailable("generated member payload metadata is unavailable")
                 })?;
@@ -1135,7 +1409,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for (_, member_name) in package.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(owner);
+                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
             }
         }
         relationship_owners.insert(
@@ -1144,6 +1418,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         for part in &effective.parts {
             relationship_owners.insert(part.partname(package).clone());
         }
+        let mut admitted_relationships = HashMap::new();
         for owner in relationship_owners {
             let member = relationship_member_name(&owner)?;
             if is_omitted(&member) {
@@ -1151,15 +1426,19 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
             let changed = changed_payload(&member).or_else(|| {
                 retained
-                    .appended_metadata
+                    .policy_appended
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case(&member))
-                    .map(|(_, payload)| payload.as_slice())
+                    .find(|appended| appended.name.eq_ignore_ascii_case(&member))
+                    .map(|appended| appended.payload.as_slice())
             });
-            let (bytes, events) = if let Some(xml) = changed {
-                admit_relationship_xml(xml, &owner, limits)?;
+            let (bytes, events, relationships) = if let Some(xml) = changed {
+                let relationships = parse_relationship_xml(xml, &owner, limits)?;
                 let bytes = xml.len() as u64;
-                (bytes, super::relationship_xml_event_count(xml, limits)?)
+                (
+                    bytes,
+                    super::relationship_xml_event_count(xml, limits)?,
+                    relationships,
+                )
             } else if package.catalog.relationship_xml_metrics.contains_key(&owner) {
                 let Some(xml) = read_structural_member(
                     &package.source,
@@ -1173,11 +1452,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                         "source relationship XML is unavailable for effective topology",
                     ));
                 };
-                admit_relationship_xml(&xml.bytes, &owner, limits)?;
+                let relationships = parse_relationship_xml(&xml.bytes, &owner, limits)?;
                 let bytes = u64::try_from(xml.bytes.len())
                     .map_err(|_| overlay_unavailable("relationship XML length exceeds u64"))?;
                 let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
-                (bytes, events)
+                (bytes, events, relationships)
             } else {
                 let Some(xml) = read_structural_member(
                     &package.source,
@@ -1189,11 +1468,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 )? else {
                     continue;
                 };
-                admit_relationship_xml(&xml.bytes, &owner, limits)?;
+                let relationships = parse_relationship_xml(&xml.bytes, &owner, limits)?;
                 let bytes = u64::try_from(xml.bytes.len())
                     .map_err(|_| overlay_unavailable("relationship XML length exceeds u64"))?;
                 let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
-                (bytes, events)
+                (bytes, events, relationships)
             };
             limits.check(
                 SourceLimitKind::RelationshipXmlBytes,
@@ -1207,6 +1486,12 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             relationship_events = relationship_events
                 .checked_add(events)
                 .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
+            admitted_relationships.insert(owner, relationships);
+        }
+        for part in &effective.parts {
+            admitted_relationships
+                .entry(part.partname(package).clone())
+                .or_insert_with(|| part.relationships(package).clone());
         }
         limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
@@ -1231,12 +1516,12 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits,
         )?;
         while let Some(owner) = work.pop() {
-            let Some(part) = effective.parts.iter().find(|part| {
-                part.partname(package).is_equivalent_to(&owner)
-            }) else {
-                continue;
-            };
-            enqueue_graph_targets(part.relationships(package), &mut graph, &mut work, limits)?;
+            if let Some((_, relationships)) = admitted_relationships
+                .iter()
+                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
+            {
+                enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
+            }
         }
         Ok(())
     }
@@ -1250,11 +1535,13 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         package: &SourceBackedPackage,
         replacements: &[super::ChangedOverlay],
         omitted_members: &[String],
+        appended: &[super::PolicyAppendedEntry],
     ) -> Result<()> {
         self.check_recipient()?;
         package.source.ensure_current()?;
         package.cache.check_context().map_err(map_execution_error)?;
         let limits = self.recipient_limits;
+        let content_types_name = package.catalog.content_types_member.as_str();
         let is_omitted = |name: &str| {
             omitted_members
                 .iter()
@@ -1267,6 +1554,48 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .then(|| change.replacement.as_slice())
             })
         };
+        let appended_payload = |name: &str| {
+            appended
+                .iter()
+                .find(|member| member.name.eq_ignore_ascii_case(name))
+                .map(|member| member.payload.as_slice())
+        };
+        let mut appended_names = HashSet::new();
+        appended_names
+            .try_reserve(appended.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC appended member names",
+                source,
+            })?;
+        for member in appended {
+            let folded = super::folded_ascii_name(
+                &member.name,
+                "source-backed OPC folded appended member name",
+            )?;
+            if !appended_names.insert(folded) {
+                return Err(overlay_unavailable(
+                    "multiple appended members resolve to one ASCII-folded name",
+                ));
+            }
+            if !is_omitted(&member.name)
+                && (package
+                    .archive
+                    .file_names()
+                    .any(|name| name.eq_ignore_ascii_case(&member.name))
+                    || changed_payload(&member.name).is_some())
+            {
+                return Err(overlay_unavailable(
+                    "appended member collides with a retained source or replacement member",
+                ));
+            }
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                member.name.len() as u64,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let bytes = member.payload.len() as u64;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+        }
         let mut members = 0_u64;
         let mut relationships_parts = 0_u64;
         let mut aggregate_bytes = 0_u64;
@@ -1305,6 +1634,19 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
             }
         }
+        for member in appended {
+            members = members
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("recipient member count overflows"))?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(member.payload.len() as u64)
+                .ok_or_else(|| overlay_unavailable("recipient aggregate bytes overflow"))?;
+            if super::is_relationship_member_name(&member.name) {
+                relationships_parts = relationships_parts
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
+            }
+        }
         limits.check(SourceLimitKind::Members, members, limits.max_members() as u64)?;
         let source_entry_count = u64::try_from(package.archive.preservation_entry_count())
             .map_err(|_| overlay_unavailable("source ZIP entry count exceeds u64"))?;
@@ -1312,6 +1654,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             .map_err(|_| overlay_unavailable("omitted ZIP entry count exceeds u64"))?;
         let final_entry_count = source_entry_count
             .checked_sub(omitted_entry_count)
+            .and_then(|count| count.checked_add(appended.len() as u64))
             .ok_or_else(|| overlay_unavailable("recipient ZIP entry count underflows"))?;
         limits.check(
             SourceLimitKind::ArchiveTotalEntries,
@@ -1346,16 +1689,35 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .checked_add(bytes)
                 .ok_or_else(|| overlay_unavailable("recipient Part bytes overflow"))?;
         }
+        let mut appended_part_count = 0_u64;
+        for member in appended {
+            if member.name.eq_ignore_ascii_case(content_types_name)
+                || super::is_relationship_member_name(&member.name)
+            {
+                continue;
+            }
+            appended_part_count = appended_part_count
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("recipient Part count overflows"))?;
+            let bytes = member.payload.len() as u64;
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            total_part_bytes = total_part_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient Part bytes overflow"))?;
+        }
         let part_count = package
             .catalog
             .parts
             .iter()
             .filter(|part| !is_omitted(part.partname.membername()))
             .count();
+        let part_count = u64::try_from(part_count)
+            .map_err(|_| overlay_unavailable("recipient Part count exceeds u64"))?
+            .checked_add(appended_part_count)
+            .ok_or_else(|| overlay_unavailable("recipient Part count overflows"))?;
         limits.check(
             SourceLimitKind::Parts,
-            u64::try_from(part_count)
-                .map_err(|_| overlay_unavailable("recipient Part count exceeds u64"))?,
+            part_count,
             limits.max_parts() as u64,
         )?;
         limits.check(
@@ -1364,9 +1726,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits.max_total_part_bytes(),
         )?;
 
-        let content_types_name = package.catalog.content_types_member.as_str();
         let (content_types_bytes, content_type_mapping_count) =
-            if let Some(payload) = changed_payload(content_types_name) {
+            if let Some(payload) = changed_payload(content_types_name)
+                .or_else(|| appended_payload(content_types_name))
+            {
                 let parsed = super::ContentTypeMap::from_xml(payload, limits)?;
                 (payload.len() as u64, parsed.mapping_count() as u64)
         } else {
@@ -1410,7 +1773,12 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for (_, member_name) in package.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(owner);
+                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
+            }
+        }
+        for member in appended {
+            if let Some(owner) = relationship_owner_from_member(&member.name)? {
+                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
             }
         }
         for owner in relationship_owners {
@@ -1419,7 +1787,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 continue;
             }
             let changed = changed_payload(&member);
-            let relationships = if let Some(xml) = changed {
+            let appended_xml = appended_payload(&member);
+            let relationships = if let Some(xml) = changed.or(appended_xml) {
                 let parsed = PackageReader::parse_owned_relationships(xml, &owner, limits)?;
                 let events = super::relationship_xml_event_count(xml, limits)?;
                 relationship_xml_bytes = relationship_xml_bytes
@@ -1480,7 +1849,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         let mut work = Vec::new();
         enqueue_graph_targets(root, &mut graph, &mut work, limits)?;
         while let Some(owner) = work.pop() {
-            if let Some(relationships) = relationship_map.get(&owner) {
+            if let Some((_, relationships)) = relationship_map
+                .iter()
+                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
+            {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
@@ -1503,6 +1875,11 @@ fn check_relationships(
     *total = total
         .checked_add(count)
         .ok_or_else(|| overlay_unavailable("recipient relationship count overflows"))?;
+    limits.check(
+        SourceLimitKind::TotalRelationships,
+        *total,
+        limits.max_total_relationships() as u64,
+    )?;
     for relationship in relationships.iter() {
         for value in [
             relationship.r_id(),
@@ -1705,11 +2082,9 @@ impl ArtifactStream for SourceArtifact {
 
     fn stream_to(
         &self,
-        writer: &mut dyn Write,
-        policy: &ArtifactStreamPolicy<'_>,
-    ) -> Result<()> {
-        policy.admit_source_artifact(self)?;
-        write_exact_snapshot_with_policy(&self.snapshot, writer, policy)
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+        target.publish_source_artifact(self)
     }
 }
 
@@ -1727,34 +2102,27 @@ pub struct SourceArtifactRestoreProof {
     pub original_sha256: SourceArtifactFingerprint,
 }
 
-struct DigestLimitSink {
-    hasher: Sha256,
+struct BoundedProbeSink {
     accepted: u64,
     limit: u64,
 }
 
-impl DigestLimitSink {
+impl BoundedProbeSink {
     fn new(limit: u64) -> Self {
         Self {
-            hasher: Sha256::new(),
             accepted: 0,
             limit,
         }
     }
-
-    fn fingerprint(self) -> SourceArtifactFingerprint {
-        SourceArtifactFingerprint::from_sha256(self.hasher.finalize().into())
-    }
 }
 
-impl Write for DigestLimitSink {
+impl Write for BoundedProbeSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let remaining = self.limit.saturating_sub(self.accepted);
         let accepted = bytes.len().min(usize::try_from(remaining).unwrap_or(usize::MAX));
         if accepted == 0 {
             return Ok(0);
         }
-        self.hasher.update(&bytes[..accepted]);
         self.accepted = self.accepted.saturating_add(accepted as u64);
         Ok(accepted)
     }
@@ -1771,14 +2139,44 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
     name: &'static str,
     policy: &ArtifactStreamPolicy<'_>,
 ) -> std::result::Result<(), ArtifactStreamError<S::Error>> {
-    policy.check_recipient().map_err(ArtifactStreamError::opc)?;
-    artifact
+    let policy_error = policy
+        .check_recipient()
+        .err()
+        .map(ArtifactStreamError::opc);
+    let initial_freshness = artifact
         .check_fresh()
-        .map_err(ArtifactStreamError::producer)?;
-    let mut digest = DigestLimitSink::new(expected_len.saturating_add(1));
-    let result = artifact
-        .stream_to(&mut digest, policy)
+        .err()
+        .map(ArtifactStreamError::producer);
+    let initial_error = match (policy_error, initial_freshness) {
+        (None, None) => None,
+        (Some(error), None) | (None, Some(error)) => Some(error),
+        (Some(policy), Some(freshness)) => Some(ArtifactStreamError::incomplete(
+            0,
+            policy,
+            Some(freshness),
+        )),
+    };
+    if let Some(initial_error) = initial_error {
+        let final_freshness = artifact
+            .check_fresh()
+            .err()
+            .map(ArtifactStreamError::producer);
+        return Err(with_secondary(initial_error, final_freshness));
+    }
+    let mut probe_sink = BoundedProbeSink::new(expected_len.saturating_add(1));
+    let mut target = ArtifactStreamTarget::new(&mut probe_sink, policy);
+    let stream_result = artifact
+        .stream_to(&mut target)
         .map_err(ArtifactStreamError::producer);
+    let result = match stream_result {
+        Ok(publication) => target
+            .validate_publication(publication)
+            .map_err(ArtifactStreamError::opc),
+        Err(error) => Err(error),
+    };
+    let accepted = target.written();
+    let fingerprint = target.fingerprint();
+    drop(target);
     let policy_result = policy
         .take_failure()
         .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
@@ -1793,17 +2191,13 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
         .check_fresh()
         .map_err(ArtifactStreamError::producer);
     if let Err(freshness) = freshness {
-        return match result {
-            Ok(()) => Err(freshness),
-            Err(error) => Err(ArtifactStreamError::incomplete(
-                0,
-                freshness,
-                Some(error),
-            )),
-        };
+        return Err(match result {
+            Ok(()) => freshness,
+            Err(error) => ArtifactStreamError::incomplete(0, freshness, Some(error)),
+        });
     }
     if let Err(error) = result {
-        if digest.accepted > expected_len {
+        if accepted > expected_len {
             let mismatch = ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
                 artifact: name,
                 field: "length",
@@ -1812,13 +2206,13 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
         }
         return Err(error);
     }
-    if digest.accepted != expected_len {
+    if accepted != expected_len {
         return Err(ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
             artifact: name,
             field: "length",
         }));
     }
-    if digest.fingerprint() != expected_fingerprint {
+    if fingerprint != expected_fingerprint {
         return Err(ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
             artifact: name,
             field: "fingerprint",
@@ -1890,17 +2284,45 @@ impl SourceBackedPackage {
                 .map_err(ArtifactStreamError::opc)?;
             &policy_owned
         };
-        policy
-            .check_recipient()
-            .map_err(ArtifactStreamError::opc)?;
         let probe = policy.probe();
-        stream
+        let policy_error = policy
+            .check_recipient()
+            .err()
+            .map(ArtifactStreamError::opc);
+        let initial_freshness = stream
             .check_fresh()
-            .map_err(ArtifactStreamError::producer)?;
-        let mut digest = DigestLimitSink::new(max_output_bytes.saturating_add(1));
-        let result = stream
-            .stream_to(&mut digest, &probe)
+            .err()
+            .map(ArtifactStreamError::producer);
+        let initial_error = match (policy_error, initial_freshness) {
+            (None, None) => None,
+            (Some(error), None) | (None, Some(error)) => Some(error),
+            (Some(policy), Some(freshness)) => Some(ArtifactStreamError::incomplete(
+                0,
+                policy,
+                Some(freshness),
+            )),
+        };
+        if let Some(initial_error) = initial_error {
+            let final_freshness = stream
+                .check_fresh()
+                .err()
+                .map(ArtifactStreamError::producer);
+            return Err(with_secondary(initial_error, final_freshness));
+        }
+        let mut probe_sink = BoundedProbeSink::new(max_output_bytes.saturating_add(1));
+        let mut target = ArtifactStreamTarget::new(&mut probe_sink, &probe);
+        let stream_result = stream
+            .stream_to(&mut target)
             .map_err(ArtifactStreamError::producer);
+        let result = match stream_result {
+            Ok(publication) => target
+                .validate_publication(publication)
+                .map_err(ArtifactStreamError::opc),
+            Err(error) => Err(error),
+        };
+        let accepted = target.written();
+        let fingerprint = target.fingerprint();
+        drop(target);
         let policy_result = probe
             .take_failure()
             .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
@@ -1925,25 +2347,23 @@ impl SourceBackedPackage {
             };
         }
         if let Err(error) = result {
-            if digest.accepted <= max_output_bytes {
+            if accepted <= max_output_bytes {
                 return Err(error);
             }
             let limit = ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
                 resource: SpliceResource::OutputBytes,
-                actual: digest.accepted,
+                actual: accepted,
                 maximum: max_output_bytes,
             });
             return Err(ArtifactStreamError::incomplete(0, limit, Some(error)));
         }
-        if digest.accepted > max_output_bytes {
+        if accepted > max_output_bytes {
             return Err(ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
                 resource: SpliceResource::OutputBytes,
-                actual: digest.accepted,
+                actual: accepted,
                 maximum: max_output_bytes,
             }));
         }
-        let accepted = digest.accepted;
-        let fingerprint = digest.fingerprint();
         Ok((accepted, fingerprint))
     }
 
@@ -1982,9 +2402,6 @@ impl SourceBackedPackage {
                 .map_err(ArtifactStreamError::opc)?;
             &policy_owned
         };
-        policy
-            .check_recipient()
-            .map_err(ArtifactStreamError::opc)?;
         if max_output_bytes == 0 || max_output_bytes == u64::MAX {
             return Err(ArtifactStreamError::opc(OpcError::InvalidSourcePartSpliceLimit {
                 resource: SpliceResource::OutputBytes,
@@ -1999,35 +2416,54 @@ impl SourceBackedPackage {
             }));
         }
         let probe = policy.probe();
-        preflight_stream(
+        let current_preflight = preflight_stream(
             current,
             proof.current_len,
             proof.current_sha256,
             "current",
             &probe,
-        )?;
-        preflight_stream(
+        );
+        let original_preflight = preflight_stream(
             original,
             proof.original_len,
             proof.original_sha256,
             "original",
             &probe,
-        )?;
+        );
+        match (current_preflight, original_preflight) {
+            (Ok(()), Ok(())) => {},
+            (Err(current), Ok(())) => return Err(current),
+            (Ok(()), Err(original)) => return Err(original),
+            (Err(current), Err(original)) => {
+                return Err(ArtifactStreamError::incomplete(
+                    0,
+                    current,
+                    Some(original),
+                ));
+            },
+        }
 
         let mut written = 0_u64;
         let mut counted = Counted::new(writer, &mut written);
-        policy
-            .check_recipient()
-            .map_err(ArtifactStreamError::opc)?;
-        let result = original
-            .stream_to(&mut counted, policy)
-            .map_err(ArtifactStreamError::producer)
-            .and_then(|()| {
-                counted
-                    .flush()
-                    .map_err(map_io_error)
-                    .map_err(ArtifactStreamError::opc)
-            });
+        let mut target = ArtifactStreamTarget::new(&mut counted, policy);
+        let result = match policy.check_recipient().map_err(ArtifactStreamError::opc) {
+            Err(error) => Err(error),
+            Ok(()) => original
+                .stream_to(&mut target)
+                .map_err(ArtifactStreamError::producer)
+                .and_then(|publication| {
+                    target
+                        .validate_publication(publication)
+                        .map_err(ArtifactStreamError::opc)
+                })
+                .and_then(|()| {
+                    target
+                        .flush()
+                        .map_err(map_io_error)
+                        .map_err(ArtifactStreamError::opc)
+                }),
+        };
+        drop(target);
         let policy_result = policy
             .take_failure()
             .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
@@ -2265,33 +2701,71 @@ fn copy_authenticated(
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "focused policy tests deliberately panic on fixture errors"
+    )]
+
     use super::*;
-
-    struct BytesStream(&'static [u8]);
-
-    impl ArtifactStream for BytesStream {
-        type Error = OpcError;
-
-        fn check_fresh(&self) -> Result<()> {
-            Ok(())
-        }
-
-        fn stream_to(
-            &self,
-            writer: &mut dyn Write,
-            _policy: &ArtifactStreamPolicy<'_>,
-        ) -> Result<()> {
-            writer.write_all(self.0).map_err(map_io_error)
-        }
-    }
+    use super::super::SourceCacheLimits;
+    use soapberry_zip::office::StreamingArchiveWriter;
 
     fn fingerprint(bytes: &[u8]) -> SourceArtifactFingerprint {
         SourceArtifactFingerprint::from_sha256(Sha256::digest(bytes).into())
     }
 
+    fn append_fixture(with_orphan_relationship: bool) -> SourceBackedPackage {
+        const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        const DOCUMENT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
+            .unwrap();
+        writer
+            .write_stored("word/document.xml", b"<document/>")
+            .unwrap();
+        if with_orphan_relationship {
+            writer
+                .write_stored("word/_rels/document.xml.rels", DOCUMENT_RELATIONSHIPS)
+                .unwrap();
+            writer
+                .write_stored("custom/orphan.xml", b"<orphan/>")
+                .unwrap();
+        }
+        SourceBackedPackage::from_vec(
+            writer.finish_to_bytes().unwrap(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+    }
+
+    fn test_policy(limits: SourceLimits) -> ArtifactStreamPolicy<'static> {
+        ArtifactStreamPolicy {
+            phase: ArtifactStreamPhase::Publish,
+            recipient_limits: limits,
+            recipient_context: None,
+            recipient_output_reservation_failures: None,
+            failure: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn appended_member(name: &str, payload: &[u8]) -> PolicyAppendedEntry {
+        PolicyAppendedEntry::new_shared(
+            name,
+            Arc::new(payload.to_vec()),
+            soapberry_zip::CompressionMethod::Store,
+        )
+    }
+
     #[test]
     fn preflight_caps_an_overlong_stream_before_publication() {
-        let stream = BytesStream(b"abcd");
+        let stream = append_fixture(false).source_artifact();
+        let expected_fingerprint = stream.fingerprint().unwrap();
         let policy = ArtifactStreamPolicy {
             phase: ArtifactStreamPhase::Probe,
             recipient_limits: SourceLimits::default(),
@@ -2299,7 +2773,13 @@ mod tests {
             recipient_output_reservation_failures: None,
             failure: Arc::new(Mutex::new(None)),
         };
-        let error = preflight_stream(&stream, 3, fingerprint(b"abc"), "original", &policy)
+        let error = preflight_stream(
+            &stream,
+            stream.len() - 1,
+            expected_fingerprint,
+            "original",
+            &policy,
+        )
             .expect_err("the bounded probe must reject a fourth byte");
         assert!(matches!(
             error,
@@ -2312,7 +2792,8 @@ mod tests {
 
     #[test]
     fn preflight_authenticates_exact_length_and_digest() {
-        let stream = BytesStream(b"abc");
+        let stream = append_fixture(false).source_artifact();
+        let expected_fingerprint = stream.fingerprint().unwrap();
         let policy = ArtifactStreamPolicy {
             phase: ArtifactStreamPhase::Probe,
             recipient_limits: SourceLimits::default(),
@@ -2320,9 +2801,21 @@ mod tests {
             recipient_output_reservation_failures: None,
             failure: Arc::new(Mutex::new(None)),
         };
-        preflight_stream(&stream, 3, fingerprint(b"abc"), "original", &policy)
+        preflight_stream(
+            &stream,
+            stream.len(),
+            expected_fingerprint,
+            "original",
+            &policy,
+        )
             .expect("matching length and digest should pass");
-        let error = preflight_stream(&stream, 3, fingerprint(b"abd"), "original", &policy)
+        let error = preflight_stream(
+            &stream,
+            stream.len(),
+            fingerprint(b"abd"),
+            "original",
+            &policy,
+        )
             .expect_err("a changed digest must be rejected");
         assert!(matches!(
             error,
@@ -2331,5 +2824,142 @@ mod tests {
                 field: "fingerprint"
             })
         ));
+    }
+
+    #[test]
+    fn appended_ordinary_part_checks_exact_and_one_under_part_limits() {
+        let package = append_fixture(false);
+        let appended = appended_member("custom/new.bin", b"new-part");
+        let source_part_bytes = package
+            .catalog
+            .parts
+            .iter()
+            .map(|part| package.archive.metadata_for(part.entry_id).unwrap().uncompressed_size())
+            .sum::<u64>();
+        let exact = SourceLimits::builder()
+            .max_parts(package.catalog.parts.len() + 1)
+            .unwrap()
+            .max_total_part_bytes(source_part_bytes + 8)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(exact)
+            .admit_changed_overlays(&package, &[], &[], &[appended])
+            .is_ok());
+
+        let one_under = SourceLimits::builder()
+            .max_parts(package.catalog.parts.len())
+            .unwrap()
+            .max_total_part_bytes(source_part_bytes + 7)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(one_under)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &[],
+                &[appended_member("custom/new.bin", b"new-part")],
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn appended_content_types_checks_exact_and_one_under_bytes() {
+        const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        let package = append_fixture(false);
+        let exact = SourceLimits::builder()
+            .max_content_types_bytes(CONTENT_TYPES.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(exact)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["[Content_Types].xml".to_owned()],
+                &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
+            )
+            .is_ok());
+
+        let one_under = SourceLimits::builder()
+            .max_content_types_bytes(CONTENT_TYPES.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(one_under)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["[Content_Types].xml".to_owned()],
+                &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn appended_relationship_checks_exact_and_one_under_xml_bytes() {
+        const RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let package = append_fixture(false);
+        let exact = SourceLimits::builder()
+            .max_total_relationship_xml_bytes(RELATIONSHIPS.len())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(exact)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["_rels/.rels".to_owned()],
+                &[appended_member("_rels/.rels", RELATIONSHIPS)],
+            )
+            .is_ok());
+
+        let one_under = SourceLimits::builder()
+            .max_total_relationship_xml_bytes(RELATIONSHIPS.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(one_under)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["_rels/.rels".to_owned()],
+                &[appended_member("_rels/.rels", RELATIONSHIPS)],
+            )
+            .is_err());
+    }
+
+    #[test]
+    fn appended_relationship_graph_checks_exact_and_one_under_nodes() {
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let package = append_fixture(true);
+        let exact = SourceLimits::builder()
+            .max_relationship_graph_nodes(2)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(exact)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["_rels/.rels".to_owned()],
+                &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
+            )
+            .is_ok());
+
+        let one_under = SourceLimits::builder()
+            .max_relationship_graph_nodes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(test_policy(one_under)
+            .admit_changed_overlays(
+                &package,
+                &[],
+                &["_rels/.rels".to_owned()],
+                &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
+            )
+            .is_err());
     }
 }

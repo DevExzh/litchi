@@ -52,7 +52,10 @@ mod materialize;
 mod revision;
 mod view;
 pub use artifact_restore::SourceArtifactRestoreProof;
-pub use artifact_restore::{ArtifactStream, ArtifactStreamError, ArtifactStreamPolicy};
+pub use artifact_restore::{
+    ArtifactStream, ArtifactStreamError, ArtifactStreamPolicy, ArtifactStreamPublication,
+    ArtifactStreamTarget,
+};
 pub use view::{PreparedMetadataData, PreparedPartData, PreparedPartView};
 mod read_ahead;
 use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
@@ -2988,6 +2991,53 @@ enum ChangedOverlayTarget {
     Member(String),
 }
 
+/// One appended member whose OPC admission facts and ZIP payload are minted
+/// from the same immutable bytes. Policy-aware direct publication keeps this
+/// bundle through admission and then hands the derived ZIP entry to the
+/// preservation writer; callers cannot provide a name/semantic payload that
+/// disagrees with the emitted member.
+struct PolicyAppendedEntry {
+    entry: Arc<soapberry_zip::RegeneratedEntry>,
+    name: String,
+    payload: Arc<Vec<u8>>,
+}
+
+impl PolicyAppendedEntry {
+    fn new_shared(
+        name: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+        compression: soapberry_zip::CompressionMethod,
+    ) -> Self {
+        let name = name.into();
+        let entry = soapberry_zip::RegeneratedEntry::new_shared(
+            name.clone(),
+            Arc::clone(&payload),
+        )
+        .compression_method(compression);
+        Self {
+            entry: Arc::new(entry),
+            name,
+            payload,
+        }
+    }
+
+    fn new_precompressed(
+        name: impl Into<String>,
+        payload: &AuthorizedPrecompressedPart,
+    ) -> Self {
+        let name = name.into();
+        let entry = soapberry_zip::RegeneratedEntry::new_precompressed_shared(
+            name.clone(),
+            payload.physical.clone(),
+        );
+        Self {
+            entry: Arc::new(entry),
+            name,
+            payload: Arc::clone(&payload.expected_decoded),
+        }
+    }
+}
+
 /// A source-backed topology after bounded preflight and overlay construction.
 ///
 /// Preparation owns every generated overlay and source authorization needed by
@@ -3044,9 +3094,7 @@ struct PreparedTopologyRetention {
     _metadata_reservation: Option<Arc<Reservation>>,
     omitted_members: Vec<String>,
     appended: Vec<Arc<soapberry_zip::RegeneratedEntry>>,
-    // Exact decoded metadata shares the appended publication payload.
-    appended_metadata: Vec<(String, Arc<Vec<u8>>)>,
-    _appended_metadata_reservation: Option<Arc<Reservation>>,
+    policy_appended: Vec<PolicyAppendedEntry>,
     _additions: Vec<TopologyPartAddition>,
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
     /// One monitored-read scope per transfer source (change 0600's counted
@@ -11145,6 +11193,18 @@ impl SourceBackedPackage {
                 resource: "source-backed OPC topology appended members",
                 source,
             })?;
+        let mut policy_appended = Vec::new();
+        policy_appended
+            .try_reserve_exact(
+                additions
+                    .len()
+                    .checked_add(new_relationship_member_count)
+                    .ok_or_else(|| overlay_unavailable("topology policy append count overflows usize"))?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology policy appended members",
+                source,
+            })?;
         let transfer_source_count = source_xml_tokens
             .len()
             .checked_add(
@@ -11194,7 +11254,7 @@ impl SourceBackedPackage {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
-            let entry = match &addition.payload {
+            let policy_entry = match &addition.payload {
                 TopologyPartPayload::Decoded(payload) => {
                     if xml_minifier::audit::package::is_xml_part(
                         addition.partname.as_str(),
@@ -11206,11 +11266,11 @@ impl SourceBackedPackage {
                             validate_overlay_xml(addition.partname.as_str(), payload)?;
                         }
                     }
-                    soapberry_zip::RegeneratedEntry::new_shared(
+                    PolicyAppendedEntry::new_shared(
                         addition.partname.membername(),
                         Arc::clone(payload),
+                        soapberry_zip::CompressionMethod::Deflate,
                     )
-                    .compression_method(soapberry_zip::CompressionMethod::Deflate)
                 },
                 TopologyPartPayload::SourceXml(payload) => {
                     // This payload was fully checked earlier in this
@@ -11220,11 +11280,11 @@ impl SourceBackedPackage {
                     monitored_transfer_sources.push(payload.source.monitor_publication());
                     source_xml_tokens.push(payload.as_ref().clone());
                     transfer_sources.push(payload.source_snapshot());
-                    soapberry_zip::RegeneratedEntry::new_shared(
+                    PolicyAppendedEntry::new_shared(
                         addition.partname.membername(),
                         payload.payload_arc(),
+                        soapberry_zip::CompressionMethod::Deflate,
                     )
-                    .compression_method(soapberry_zip::CompressionMethod::Deflate)
                 },
                 TopologyPartPayload::Precompressed(payload) => {
                     monitored_transfer_sources
@@ -11243,52 +11303,31 @@ impl SourceBackedPackage {
                             payload.expected_decoded(),
                         )?;
                     }
-                    soapberry_zip::RegeneratedEntry::new_precompressed_shared(
+                    PolicyAppendedEntry::new_precompressed(
                         addition.partname.membername(),
-                        payload.physical.clone(),
+                        payload,
                     )
                 },
             };
-            appended.push(Arc::new(entry));
+            appended.push(Arc::clone(&policy_entry.entry));
+            policy_appended.push(policy_entry);
         }
-        // Keep generated relationship bytes available to immutable candidate
-        // readers. Reserve the additional index and duplicated member names
-        // before allocating them; payload storage is shared with publication.
-        let appended_metadata_count = relationship_publications
-            .iter()
-            .filter(|publication| publication.existing_entry.is_none())
-            .count();
-        let appended_metadata_bytes = relationship_publications
-            .iter()
-            .filter(|publication| publication.existing_entry.is_none())
-            .try_fold(0usize, |bytes, publication| {
-                bytes
-                    .checked_add(size_of::<(String, Arc<Vec<u8>>)>())
-                    .and_then(|bytes| bytes.checked_add(publication.member_name.len()))
-                    .ok_or_else(|| overlay_unavailable("appended metadata index bound overflows"))
-            })?;
-        let appended_metadata_reservation = self.reserve_topology_memory(
-            u64::try_from(appended_metadata_bytes)
-                .map_err(|_| overlay_unavailable("appended metadata index exceeds u64"))?,
-        )?;
-        let mut appended_metadata = Vec::new();
-        appended_metadata
-            .try_reserve_exact(appended_metadata_count)
-            .map_err(|source| OpcError::Allocation {
-                resource: "source-backed OPC appended metadata index",
-                source,
-            })?;
+        // Generated relationship bytes share their policy publication bundle;
+        // the bundle retains the exact semantic payload and emitted entry
+        // together through admission and replay.
         for (index, mut publication) in relationship_publications.into_iter().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
             if publication.existing_entry.is_none() {
                 let (member_name, xml) = publication.raw_or_owned_xml();
-                appended_metadata.push((member_name.clone(), Arc::clone(&xml)));
-                appended.push(Arc::new(
-                    soapberry_zip::RegeneratedEntry::new_shared(member_name, xml)
-                        .compression_method(soapberry_zip::CompressionMethod::Deflate),
-                ));
+                let policy_entry = PolicyAppendedEntry::new_shared(
+                    member_name,
+                    xml,
+                    soapberry_zip::CompressionMethod::Deflate,
+                );
+                appended.push(Arc::clone(&policy_entry.entry));
+                policy_appended.push(policy_entry);
             }
         }
         let transfer_sources = if transfer_sources.is_empty() {
@@ -11305,6 +11344,10 @@ impl SourceBackedPackage {
             (
                 appended.capacity(),
                 size_of::<Arc<soapberry_zip::RegeneratedEntry>>(),
+            ),
+            (
+                policy_appended.capacity(),
+                size_of::<PolicyAppendedEntry>(),
             ),
             (
                 transfer_sources
@@ -11349,6 +11392,11 @@ impl SourceBackedPackage {
                 .and_then(|bytes| retention_bytes.checked_add(bytes))
                 .ok_or_else(|| overlay_unavailable("retained addition name bound overflows"))?;
         }
+        for appended in &policy_appended {
+            retention_bytes = retention_bytes
+                .checked_add(appended.name.capacity())
+                .ok_or_else(|| overlay_unavailable("retained appended name bound overflows"))?;
+        }
         let retention_reservation = self.reserve_topology_memory(
             u64::try_from(retention_bytes)
                 .map_err(|_| overlay_unavailable("retained topology metadata exceeds u64"))?,
@@ -11359,8 +11407,7 @@ impl SourceBackedPackage {
                 _metadata_reservation: retention_reservation,
                 omitted_members,
                 appended,
-                appended_metadata,
-                _appended_metadata_reservation: appended_metadata_reservation,
+                policy_appended,
                 _additions: additions,
                 transfer_sources,
                 _transfer_monitors: monitored_transfer_sources,
@@ -13782,15 +13829,23 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
         omitted_member_names: &[String],
-        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+        appended: &[PolicyAppendedEntry],
         policy: &artifact_restore::ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
-        policy.admit_changed_overlays(&self, replacements, omitted_member_names)?;
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names, appended)?;
+        let mut appended_entries = Vec::new();
+        appended_entries
+            .try_reserve_exact(appended.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC policy appended entries",
+                source,
+            })?;
+        appended_entries.extend(appended.iter().map(|member| Arc::clone(&member.entry)));
         self.write_changed_overlays_with_appended_inner(
             writer,
             replacements,
             omitted_member_names,
-            appended,
+            &appended_entries,
             None,
             Some(policy),
         )
@@ -13868,7 +13923,7 @@ impl SourceBackedPackage {
         omitted_member_names: &[String],
         policy: &artifact_restore::ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
-        policy.admit_changed_overlays(&self, replacements, omitted_member_names)?;
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names, &[])?;
         self.write_changed_overlays_with_appended_inner(
             writer,
             replacements,
@@ -14797,7 +14852,11 @@ fn is_relationship_member_name(member_name: &str) -> bool {
     let has_rels_extension = filename
         .rsplit_once('.')
         .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("rels"));
-    has_rels_extension && (directory == "_rels" || directory.ends_with("/_rels"))
+    let in_rels_directory = directory.eq_ignore_ascii_case("_rels")
+        || directory
+            .rsplit_once('/')
+            .is_some_and(|(_, segment)| segment.eq_ignore_ascii_case("_rels"));
+    has_rels_extension && in_rels_directory
 }
 
 fn folded_part_name(partname: &PackURI) -> Result<String> {
