@@ -368,8 +368,11 @@ impl Package {
     }
 
     /// Adopt a source-backed semantic reader and the exact CFB view it came
-    /// from. This handoff performs no payload read or second semantic parse.
+    /// from. A deferred cell publication is materialized at this explicit
+    /// facade handoff so the package's retained CFB and semantic owner always
+    /// describe the same bytes; ordinary source-backed commits remain lazy.
     pub fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
+        let workbook = workbook.materialized()?;
         let cfb = workbook.shared_cfb();
         let source_limits = workbook.retained_limits();
         let leniency = workbook.retained_leniency();
