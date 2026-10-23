@@ -20,3 +20,15 @@ eagerly reparses and validates it.
 
 Cargo was not run in this leaf per coordination. The coordinator should rerun
 the focused XLSB runtime group and the composed v13 check after merging.
+
+## v15 follow-up
+
+The next composed run on `dfd7` passed 770 tests and exposed two remaining
+provenance comparisons. Direct structural commits retain the original
+content-types member as stale source provenance while a replay can retain the
+same graph's effective authored publication; those source byte images are
+intentionally different even though the publication is identical. The graph
+helper now permits only that explicit original-versus-effective distinction,
+requires source presence and equal effective publication, and additionally
+compares the complete serialized archive. All untouched part and relationship
+source images remain exact, including the inverse path.

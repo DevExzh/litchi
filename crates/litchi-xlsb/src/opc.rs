@@ -278,8 +278,29 @@ mod tests {
     }
 
     fn assert_graph_equal(left: &Package, right: &Package) {
-        let left = graph_snapshot(left);
-        let right = graph_snapshot(right);
+        assert_graph_equal_with_source_policy(left, right, false);
+    }
+
+    /// Compare a replayed graph with a directly committed graph. A structural
+    /// content-types edit can leave the original source member as provenance
+    /// on the direct candidate while replay materializes the effective authored
+    /// publication as its retained source member. The publication and the
+    /// complete serialized archive must still be identical; only that
+    /// original-versus-effective source distinction is allowed to differ.
+    fn assert_replayed_graph_equal(left: &Package, right: &Package) {
+        assert_graph_equal_with_source_policy(left, right, true);
+        assert_eq!(left.to_bytes().unwrap(), right.to_bytes().unwrap());
+    }
+
+    fn assert_graph_equal_with_source_policy(
+        left: &Package,
+        right: &Package,
+        allow_effective_content_types_source: bool,
+    ) {
+        let left_snapshot = graph_snapshot(left);
+        let right_snapshot = graph_snapshot(right);
+        let left = &left_snapshot;
+        let right = &right_snapshot;
         assert_bytes_equal(
             "content-types publication",
             &left.content_types_publication,
@@ -294,7 +315,16 @@ mod tests {
             left.content_types_source.as_ref(),
             right.content_types_source.as_ref(),
         ) {
-            assert_bytes_equal("content-types source", left, right);
+            if !allow_effective_content_types_source || left == right {
+                assert_bytes_equal("content-types source", left, right);
+            } else {
+                let left_is_effective = left == &left_snapshot.content_types_publication;
+                let right_is_effective = right == &right_snapshot.content_types_publication;
+                assert_ne!(
+                    left_is_effective, right_is_effective,
+                    "content-types source mismatch must distinguish the retained original from the effective publication",
+                );
+            }
         }
         assert_eq!(left.root_relationships, right.root_relationships);
         assert_eq!(
@@ -444,9 +474,10 @@ mod tests {
         assert!(after.projection_cached());
 
         let reopened_before = Package::from_bytes(&before_bytes).unwrap();
+        assert_graph_equal(&reopened_before, &package);
         let replayed = reopened_before.apply_opc(&patch).unwrap().into_package();
         assert!(!replayed.projection_cached());
-        assert_graph_equal(&replayed, &after);
+        assert_replayed_graph_equal(&replayed, &after);
         assert!(replayed.workbook().is_ok());
 
         let reopened_after = Package::from_bytes(&after_bytes).unwrap();
@@ -455,7 +486,7 @@ mod tests {
             .unwrap()
             .into_package();
         assert!(!restored.projection_cached());
-        assert_graph_equal(&restored, &package);
+        assert_replayed_graph_equal(&restored, &package);
         assert!(restored.workbook().is_ok());
     }
 
@@ -546,16 +577,16 @@ mod tests {
 
         let replayed = source.apply_opc(&patch).unwrap().into_package();
         assert!(replayed.projection_cached());
-        assert_graph_equal(&replayed, &after);
+        assert_replayed_graph_equal(&replayed, &after);
 
         let reopened = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
         let reopened_replayed = reopened.apply_opc(&patch).unwrap().into_package();
         assert!(reopened_replayed.projection_cached());
-        assert_graph_equal(&reopened_replayed, &after);
+        assert_replayed_graph_equal(&reopened_replayed, &after);
 
         let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
         assert!(restored.projection_cached());
-        assert_graph_equal(&restored, &source);
+        assert_replayed_graph_equal(&restored, &source);
 
         let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
         let reopened_restored = reopened_after
@@ -563,7 +594,7 @@ mod tests {
             .unwrap()
             .into_package();
         assert!(reopened_restored.projection_cached());
-        assert_graph_equal(&reopened_restored, &source);
+        assert_replayed_graph_equal(&reopened_restored, &source);
     }
 
     #[test]
