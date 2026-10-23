@@ -712,6 +712,32 @@ fn eager_owner_editor_is_the_snapshot_and_retention_can_be_refused() {
     }
 }
 
+#[cfg(any(unix, windows))]
+#[test]
+fn metadata_preflight_refuses_released_source_before_limit_or_freshness() {
+    let fixture = fixture("xlsx/InlineStrings.xlsx");
+    let file = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), &fixture).unwrap();
+    let options = OpenOptions::new().retain_source(false);
+
+    let released = open_path(file.path(), &options);
+    let error = released
+        .editor_for_metadata_with_snapshot_limit(0)
+        .expect_err("retention refusal precedes the low endpoint limit");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert_eq!(error.format(), Some(litchi_core::FileFormat::Xlsx));
+    assert!(error.suggestion().is_some());
+
+    let stale = open_path(file.path(), &options);
+    std::fs::write(file.path(), b"changed source").unwrap();
+    let error = stale
+        .editor_for_metadata_with_snapshot_limit(usize::MAX)
+        .expect_err("retention refusal precedes source freshness");
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert_eq!(error.format(), Some(litchi_core::FileFormat::Xlsx));
+    assert!(error.suggestion().is_some());
+}
+
 #[cfg(feature = "encryption")]
 #[test]
 fn supplied_package_source_policy_survives_default_facade_adoption() {

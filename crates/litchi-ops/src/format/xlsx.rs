@@ -634,6 +634,9 @@ impl Xlsx {
         &self,
         maximum: usize,
     ) -> Result<xlsx::Package> {
+        if !self.0.retain_source {
+            return Err(source_released());
+        }
         if let XlsxOwner::Source(workbook) = &self.0.owner {
             self.check_source_for_replay()?;
             let observed = workbook.retained_bytes_for_edit()?;
