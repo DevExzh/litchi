@@ -234,10 +234,60 @@ impl Error {
 /// Result type for the canonical package transaction.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Deferred-open state for an ordinary package edit.
+///
+/// This is public only as the default parameter of [`Edit`]. Keeping the
+/// observer state out of this value preserves the ordinary edit's `Send` and
+/// `Sync` auto traits when diagnostics are enabled.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OrdinaryEditState;
+
+trait DeferredOpenState {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit>;
+}
+
+impl DeferredOpenState for OrdinaryEditState {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit> {
+        let source = package.body_snapshot(options)?;
+        source.edit().map_err(Error::from)
+    }
+}
+
 #[cfg(feature = "performance-diagnostics")]
-struct ProfiledOpen<'a> {
-    observer: Box<dyn FnMut(body_text::DiagnosticEvent) + 'a>,
-    cfb_observer: Box<dyn FnMut(body_text::CfbParseEvent) + 'a>,
+/// Deferred observer state for a profiled package edit.
+#[doc(hidden)]
+pub struct ProfiledOpen<'a> {
+    observer: Option<Box<dyn FnMut(body_text::DiagnosticEvent) + 'a>>,
+    cfb_observer: Option<Box<dyn FnMut(body_text::CfbParseEvent) + 'a>>,
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<'a> DeferredOpenState for ProfiledOpen<'a> {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit> {
+        let observer = self.observer.take().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "DOC profiled edit was opened more than once".into(),
+            ))
+        })?;
+        let cfb_observer = self.cfb_observer.take().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "DOC profiled edit was opened more than once".into(),
+            ))
+        })?;
+        let snapshot = body_text::Snapshot::open_bounded_profiled_with_cfb_observer(
+            package.to_bytes().map_err(Error::Package)?,
+            options.revision_limits,
+            options.transaction_limits,
+            package.source_limits(),
+            observer,
+            cfb_observer,
+        )
+        .map_err(Error::from)?;
+        snapshot
+            .edit_with_options(options.clone())
+            .map_err(Error::from)
+    }
 }
 
 /// Content-free facts about one published package transaction.
@@ -399,26 +449,31 @@ fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> R
     ))
 }
 /// Primary immutable DOC package transaction.
-pub struct Edit<'a> {
+pub struct Edit<'a, S = OrdinaryEditState> {
     package: Package,
     options: EditOptions,
     inner: Option<body_text::Edit>,
+    state: S,
     _profile: std::marker::PhantomData<&'a ()>,
-    #[cfg(feature = "performance-diagnostics")]
-    profiled_open: Option<ProfiledOpen<'a>>,
 }
 
-impl<'a> fmt::Debug for Edit<'a> {
+impl<'a, S> fmt::Debug for Edit<'a, S> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
             .field("package", &self.package)
-            .field("retained_render_bytes", &self.retained_render_bytes())
+            .field(
+                "retained_render_bytes",
+                &self
+                    .inner
+                    .as_ref()
+                    .and_then(body_text::Edit::retained_render_bytes),
+            )
             .finish_non_exhaustive()
     }
 }
 
-impl Edit<'static> {
+impl Edit<'static, OrdinaryEditState> {
     pub(crate) fn from_package_with_options(
         package: Package,
         options: EditOptions,
@@ -432,9 +487,8 @@ impl Edit<'static> {
             package,
             options,
             inner: None,
+            state: OrdinaryEditState,
             _profile: std::marker::PhantomData,
-            #[cfg(feature = "performance-diagnostics")]
-            profiled_open: None,
         })
     }
 
@@ -445,15 +499,14 @@ impl Edit<'static> {
             options: package.retained_edit_options(),
             package,
             inner: Some(inner),
+            state: OrdinaryEditState,
             _profile: std::marker::PhantomData,
-            #[cfg(feature = "performance-diagnostics")]
-            profiled_open: None,
         }
     }
 }
 
-impl<'a> Edit<'a> {
-    #[cfg(feature = "performance-diagnostics")]
+#[cfg(feature = "performance-diagnostics")]
+impl<'a> Edit<'a, ProfiledOpen<'a>> {
     pub(crate) fn from_profiled(
         package: Package,
         options: EditOptions,
@@ -464,41 +517,41 @@ impl<'a> Edit<'a> {
             package,
             options,
             inner: None,
+            state: ProfiledOpen {
+                observer: Some(Box::new(observer)),
+                cfb_observer: Some(Box::new(cfb_observer)),
+            },
             _profile: std::marker::PhantomData,
-            profiled_open: Some(ProfiledOpen {
-                observer: Box::new(observer),
-                cfb_observer: Box::new(cfb_observer),
-            }),
         }
     }
 
+    /// Finish the deferred profiled open and return the ordinary transferable
+    /// edit after its observers have been consumed.
+    #[must_use = "the profiled edit must be retained or converted"]
+    pub fn into_unprofiled(mut self) -> Result<Edit<'static>> {
+        self.inner_mut()?;
+        let Edit {
+            package,
+            options,
+            inner,
+            state: _,
+            _profile: _,
+        } = self;
+        Ok(Edit {
+            package,
+            options,
+            inner,
+            state: OrdinaryEditState,
+            _profile: std::marker::PhantomData,
+        })
+    }
+}
+
+#[allow(private_bounds)]
+impl<'a, S: DeferredOpenState> Edit<'a, S> {
     fn inner_mut(&mut self) -> Result<&mut body_text::Edit> {
         if self.inner.is_none() {
-            #[cfg(feature = "performance-diagnostics")]
-            if let Some(profiled) = self.profiled_open.take() {
-                let snapshot = body_text::Snapshot::open_bounded_profiled_with_cfb_observer(
-                    self.package.to_bytes().map_err(Error::Package)?,
-                    self.options.revision_limits,
-                    self.options.transaction_limits,
-                    self.package.source_limits(),
-                    profiled.observer,
-                    profiled.cfb_observer,
-                )
-                .map_err(Error::from)?;
-                self.inner = Some(
-                    snapshot
-                        .edit_with_options(self.options.clone())
-                        .map_err(Error::from)?,
-                );
-            } else {
-                let source = self.package.body_snapshot(&self.options)?;
-                self.inner = Some(source.edit().map_err(Error::from)?);
-            }
-            #[cfg(not(feature = "performance-diagnostics"))]
-            {
-                let source = self.package.body_snapshot(&self.options)?;
-                self.inner = Some(source.edit().map_err(Error::from)?);
-            }
+            self.inner = Some(self.state.open(&self.package, &self.options)?);
         }
         self.inner.as_mut().ok_or_else(|| {
             Error::Package(PackageError::InvalidFormat(
@@ -986,7 +1039,7 @@ impl Package {
 
 #[cfg(test)]
 mod tests {
-    use super::{Diagnostics, EditOptions, Error, LimitKind};
+    use super::{Diagnostics, Edit, EditOptions, Error, LimitKind};
     use crate::Builder;
     use crate::body_text::{self, TextTarget, TransactionLimits};
     use crate::parts::fib::FileInformationBlock;
@@ -997,6 +1050,27 @@ mod tests {
         OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
     };
     use std::io::Cursor;
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn ordinary_edit_keeps_send_and_sync_auto_traits() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Edit<'static>>();
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[allow(dead_code)]
+    fn accepts_borrowed_non_send_profiled_observer<'a>(
+        package: &'a crate::Package,
+        marker: &'a std::rc::Rc<std::cell::Cell<usize>>,
+    ) -> super::Result<Edit<'a, super::ProfiledOpen<'a>>> {
+        package.edit_profiled(
+            EditOptions::default(),
+            move |_| marker.set(marker.get().saturating_add(1)),
+            |_| {},
+        )
+    }
 
     fn package() -> crate::Package {
         package_with_paragraphs(1)

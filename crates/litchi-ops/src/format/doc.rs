@@ -496,7 +496,7 @@ impl Doc {
         let observed = source
             .saturating_mul(2)
             .saturating_add(size_of::<litchi_doc::Patch>())
-            .saturating_add(size_of::<litchi_doc::Edit>())
+            .saturating_add(size_of::<litchi_doc::Edit<'static>>())
             .saturating_add(additional);
         if observed > maximum {
             return Err(crate::transaction::Error::Limit {

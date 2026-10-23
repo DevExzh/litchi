@@ -184,7 +184,7 @@ impl Package {
         options: super::EditOptions,
         observer: impl FnMut(body_text::DiagnosticEvent) + 'a,
         cfb_observer: impl FnMut(body_text::CfbParseEvent) + 'a,
-    ) -> Result<Edit<'a>> {
+    ) -> Result<Edit<'a, super::edit::ProfiledOpen<'a>>> {
         let options = self.constrained_edit_options(options);
         Ok(Edit::from_profiled(
             self.clone(),

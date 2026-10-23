@@ -63,7 +63,7 @@ impl Format {
         }
     }
 
-    fn stage(&self, edit: &mut litchi_doc::Edit, target: TextTarget) -> Result<()> {
+    fn stage(&self, edit: &mut litchi_doc::Edit<'static>, target: TextTarget) -> Result<()> {
         match self {
             Self::Bold(value) => {
                 edit.set_character_property(target, CharacterProperty::Bold, *value)
@@ -508,7 +508,7 @@ impl Doc {
         })
     }
 
-    pub(super) fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit> {
+    pub(super) fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit<'static>> {
         self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
         let source_bytes = self
             .retained_source_len()
@@ -526,7 +526,7 @@ impl Doc {
     /// no byte keeps this handle.
     pub(super) fn publish(
         &self,
-        edit: litchi_doc::Edit,
+        edit: litchi_doc::Edit<'static>,
         operations: usize,
         limits: &SemanticLimits,
     ) -> Result<WriteCommit> {

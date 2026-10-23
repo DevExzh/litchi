@@ -55,7 +55,7 @@ impl Snapshot {
         Self::open_bounded(bytes, limits, TransactionLimits::default())
     }
 
-    pub(crate) fn edit(&self) -> Result<litchi_doc::Edit, BoxError> {
+    pub(crate) fn edit(&self) -> Result<litchi_doc::Edit<'static>, BoxError> {
         Ok(self.package.edit_with_options(self.options.clone())?)
     }
 
