@@ -31,7 +31,7 @@ use litchi_core::Metadata;
 use litchi_ooxml_common::custom::{self, Host};
 use litchi_ooxml_common::properties::{self, Snapshot, app};
 
-pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
+pub use litchi_ooxml_common::properties::{CommitOptions, Diagnostics, Error, LimitKind, Patch};
 
 use crate::Package;
 
@@ -102,7 +102,13 @@ impl Edit {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.inner.commit()?;
+        self.commit_with_options(CommitOptions::default())
+    }
+
+    /// Compute and publish the edit under the supplied retained-byte
+    /// admission options.
+    pub fn commit_with_options(self, options: CommitOptions) -> Result<Commit> {
+        let commit = self.inner.commit_with_options(options)?;
         let diagnostics = commit.diagnostics().clone();
         let (opc, patch) = commit.into_parts();
         let package = if patch.is_noop() {

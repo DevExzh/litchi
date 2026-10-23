@@ -575,9 +575,8 @@ fn repair_shape_fragments(props: &mut Props, sink: &mut Sink<'_>) -> Result<()> 
 }
 
 pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
-    validate_collection(props)?;
-    let estimated = estimated_xml_size(props)?;
-    let mut writer = Writer::new(Vec::with_capacity(estimated));
+    let encoded = encoded_len(props)?;
+    let mut writer = Writer::new(Vec::with_capacity(encoded));
     writer.write_event(Event::Decl(BytesDecl::new(
         "1.0",
         Some("UTF-8"),
@@ -633,6 +632,91 @@ pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     Ok(xml)
 }
 
+/// Plan the exact byte length of a canonical custom-properties part without
+/// allocating the XML payload. The calculation mirrors the `quick_xml`
+/// writer calls in [`encode`], including attribute and text escaping.
+pub(crate) fn encoded_len(props: &Props) -> Result<usize> {
+    validate_collection(props)?;
+    let mut length = 0usize;
+    checked_size_add(
+        &mut length,
+        b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>".len(),
+    )?;
+    checked_size_add(&mut length, b"<Properties xmlns=\"".len())?;
+    checked_size_add(&mut length, CUSTOM_NS.len())?;
+    checked_size_add(&mut length, b"\" xmlns:vt=\"".len())?;
+    checked_size_add(&mut length, VT_NS.len())?;
+    checked_size_add(&mut length, b"\">".len())?;
+
+    for (name, property) in &props.properties {
+        checked_size_add(&mut length, b"<property fmtid=\"".len())?;
+        checked_size_add(&mut length, escaped_attribute_len(&property.format_id))?;
+        checked_size_add(&mut length, b"\" pid=\"".len())?;
+        checked_size_add(&mut length, property.pid.to_string().len())?;
+        checked_size_add(&mut length, b"\" name=\"".len())?;
+        checked_size_add(&mut length, escaped_attribute_len(name))?;
+        checked_size_add(&mut length, b"\">".len())?;
+
+        let value_name = property.wire.qualified_name();
+        checked_size_add(&mut length, 1usize.saturating_add(value_name.len()))?;
+        let value = value_lexical(&property.value)?;
+        if property.wire == WireKind::Empty {
+            checked_size_add(&mut length, 2)?;
+        } else {
+            checked_size_add(&mut length, 1)?;
+            checked_size_add(&mut length, escaped_text_len(&value))?;
+            checked_size_add(&mut length, 2usize.saturating_add(value_name.len()))?;
+            checked_size_add(&mut length, 1)?;
+        }
+        checked_size_add(&mut length, b"</property>".len())?;
+    }
+    checked_size_add(&mut length, b"</Properties>".len())?;
+    if length > MAX_XML_BYTES {
+        return Err(limit(
+            crate::LimitKind::CustomPropertiesXmlBytes,
+            MAX_XML_BYTES,
+            length,
+        ));
+    }
+    Ok(length)
+}
+
+fn checked_size_add(total: &mut usize, added: usize) -> Result<()> {
+    *total = total.checked_add(added).ok_or_else(|| {
+        limit(
+            crate::LimitKind::CustomPropertiesXmlBytes,
+            MAX_XML_BYTES,
+            usize::MAX,
+        )
+    })?;
+    Ok(())
+}
+
+fn escaped_text_len(value: &str) -> usize {
+    value.chars().fold(0usize, |length, character| {
+        length.saturating_add(match character {
+            '<' | '>' => 4,
+            '&' => 5,
+            '\'' | '"' => 6,
+            '\r' => 5,
+            other => other.len_utf8(),
+        })
+    })
+}
+
+fn escaped_attribute_len(value: &str) -> usize {
+    value.chars().fold(0usize, |length, character| {
+        length.saturating_add(match character {
+            '<' | '>' => 4,
+            '&' => 5,
+            '\'' | '"' => 6,
+            '\r' | '\n' => 5,
+            '\t' => 4,
+            other => other.len_utf8(),
+        })
+    })
+}
+
 fn validate_collection(props: &Props) -> Result<()> {
     reserved::validate(props, None)?;
     if props.properties.len() > MAX_PROPERTIES {
@@ -676,39 +760,6 @@ fn validate_collection(props: &Props) -> Result<()> {
         )?;
     }
     Ok(())
-}
-
-fn estimated_xml_size(props: &Props) -> Result<usize> {
-    let mut size = 256usize;
-    for (name, property) in &props.properties {
-        size = size
-            .checked_add(256)
-            .and_then(|size| {
-                name.len()
-                    .checked_mul(6)
-                    .and_then(|name| size.checked_add(name))
-            })
-            .and_then(|size| {
-                value_text_bytes(&property.value)
-                    .checked_mul(6)
-                    .and_then(|text| size.checked_add(text))
-            })
-            .ok_or_else(|| {
-                limit(
-                    crate::LimitKind::CustomPropertiesXmlBytes,
-                    MAX_XML_BYTES,
-                    usize::MAX,
-                )
-            })?;
-        if size > MAX_XML_BYTES {
-            return Err(limit(
-                crate::LimitKind::CustomPropertiesXmlBytes,
-                MAX_XML_BYTES,
-                size,
-            ));
-        }
-    }
-    Ok(size)
 }
 
 fn validate_root(

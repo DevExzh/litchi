@@ -38,7 +38,8 @@ mod write;
 mod transaction_tests;
 
 pub use transaction::{
-    Change, Commit, Diagnostics, Edit, Error, Family, LimitKind, Patch, Plan, Snapshot,
+    Change, Commit, CommitOptions, Diagnostics, Edit, Error, Family, LimitKind, Patch, Plan,
+    Snapshot,
 };
 pub use write::clear;
 

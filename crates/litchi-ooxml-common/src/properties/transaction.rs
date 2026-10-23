@@ -69,6 +69,9 @@ pub enum LimitKind {
     /// Package relationship identifiers or part names available for a new
     /// family part.
     Names,
+    /// Retained bytes of the complete property patch, including its before
+    /// and after part payloads. This is checked before the patch is built.
+    RetainedBytes,
 }
 
 /// Why a metadata read, edit or patch failed.
@@ -777,6 +780,144 @@ impl Plan {
         self
     }
 
+    /// Plan the exact retained size of the patch this plan would produce.
+    ///
+    /// The family codecs validate values and count their encoded XML without
+    /// constructing any replacement payload. This is the admission phase for
+    /// [`CommitOptions::max_retained_bytes`]; it deliberately does not expose
+    /// a detached patch or a second publication API.
+    fn planned_retained_bytes(&self) -> Result<usize> {
+        let Self {
+            base,
+            metadata,
+            app: staged_app,
+            custom,
+        } = self;
+        let mut changes = 0usize;
+        let mut changed = false;
+        let mut relationship_ids = base.relationship_ids.clone();
+
+        let (core_target, app_target) = match metadata {
+            Some(target) => {
+                let before = base.metadata()?;
+                let changed_fields: Vec<_> = before.changed_fields(target).collect();
+                if let Some(field) = changed_fields.iter().copied().find(|field| {
+                    !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
+                }) {
+                    return Err(Error::Unsupported { field });
+                }
+                let core_changed = changed_fields
+                    .iter()
+                    .any(|field| CORE_FIELDS.contains(field));
+                let app_changed = changed_fields
+                    .iter()
+                    .any(|field| app::METADATA_FIELDS.contains(field));
+                let app_base = match staged_app {
+                    Some(staged) => staged.clone(),
+                    None => base.app_props()?,
+                };
+                let app_target = if app_changed {
+                    Some(Some(app::Props::merged(app_base.as_ref(), target)?))
+                } else {
+                    staged_app.clone()
+                };
+                (core_changed.then_some(target.clone()), app_target)
+            },
+            None => (None, staged_app.clone()),
+        };
+
+        if let Some(target) = core_target {
+            let after_len = match &base.core.present {
+                Some(present) => {
+                    let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
+                        Error::Invalid(format!("invalid UTF-8 in core properties: {error}"))
+                    })?;
+                    let (current, dialect) = read::decode(xml)?;
+                    if Some(dialect) != base.core_dialect {
+                        return Err(Error::Invalid(
+                            "core-properties XML namespace does not match its relationship dialect"
+                                .to_owned(),
+                        ));
+                    }
+                    let merged = Core::merged(Some(&current), &target)?;
+                    (merged != current).then(|| super::write::encoded_len(&merged, dialect))
+                },
+                None => {
+                    let merged = Core::merged(None, &target)?;
+                    Some(super::write::encoded_len(&merged, Dialect::Transitional))
+                },
+            }
+            .transpose()?;
+            if let Some(after_len) = after_len {
+                changes = changes.saturating_add(planned_change_bytes(
+                    base,
+                    Family::Core,
+                    Some(after_len),
+                    &mut relationship_ids,
+                )?);
+                changed = true;
+            }
+        }
+
+        if let Some(target) = app_target {
+            let current = base.app_props()?;
+            if target != current {
+                let after_len = match (&base.app.present, &target) {
+                    (Some(present), Some(props)) => app::splice_len(&present.bytes, props)?,
+                    (None, Some(props)) => Some(app::encode_new_len(props)?),
+                    (_, None) => None,
+                };
+                if let Some(after_len) = after_len {
+                    changes = changes.saturating_add(planned_change_bytes(
+                        base,
+                        Family::App,
+                        Some(after_len),
+                        &mut relationship_ids,
+                    )?);
+                } else if base.app.present.is_some() {
+                    changes = changes.saturating_add(planned_change_bytes(
+                        base,
+                        Family::App,
+                        None,
+                        &mut relationship_ids,
+                    )?);
+                }
+                changed = true;
+            }
+        }
+
+        if let Some(target) = custom
+            && !target.same_values(&base.custom_value)
+        {
+            target.validate_for(base.host)?;
+            if !base.custom_value.tolerance_report().is_clean() {
+                return Err(Error::Invalid(
+                    "the custom properties were repaired when they were read; rewriting them would drop the properties that were skipped"
+                        .to_owned(),
+                ));
+            }
+            let after_len = if target.is_empty() {
+                None
+            } else {
+                Some(custom::encoded_len(target)?)
+            };
+            changes = changes.saturating_add(planned_change_bytes(
+                base,
+                Family::Custom,
+                after_len,
+                &mut relationship_ids,
+            )?);
+            changed = true;
+        }
+
+        if changed {
+            Ok(size_of::<Patch>().saturating_add(changes))
+        } else {
+            let scope = planned_scope_bytes(base)?;
+            Ok(size_of::<Patch>().saturating_add(scope.saturating_mul(2)))
+        }
+    }
+
     /// Compute the exact patch of the staged values: the read view after
     /// it, the patch and what changed. Nothing is published; the owner
     /// checks and publishes the patch over its source.
@@ -947,6 +1088,86 @@ impl Plan {
     }
 }
 
+fn planned_change_bytes(
+    snapshot: &Snapshot,
+    family: Family,
+    after_len: Option<usize>,
+    relationship_ids: &mut BTreeSet<String>,
+) -> Result<usize> {
+    let state = snapshot.family(family);
+    let (part_len, relationship_id_len, relationship_type_len, relationship_target_len, before_len) =
+        match &state.present {
+            Some(present) => (
+                present.part.as_str().len(),
+                present.relationship_id.capacity(),
+                present.relationship_type.capacity(),
+                present.relationship_target.capacity(),
+                present.bytes.capacity(),
+            ),
+            None => {
+                let relationship_id = next_relationship_id(relationship_ids)?;
+                let relationship_id_len = relationship_id.len();
+                relationship_ids.insert(relationship_id);
+                let part_len = state.new_part.as_str().len();
+                let relationship_target_len = state.new_part.as_str().trim_start_matches('/').len();
+                let relationship_type_len = match family {
+                    Family::Core => rt::CORE_PROPERTIES,
+                    Family::App => rt::EXTENDED_PROPERTIES,
+                    Family::Custom => rt::CUSTOM_PROPERTIES,
+                }
+                .len();
+                (
+                    part_len,
+                    relationship_id_len,
+                    relationship_type_len,
+                    relationship_target_len,
+                    0,
+                )
+            },
+        };
+    Ok(size_of::<Change>()
+        .saturating_add(part_len)
+        .saturating_add(relationship_id_len)
+        .saturating_add(relationship_type_len)
+        .saturating_add(relationship_target_len)
+        .saturating_add(before_len)
+        .saturating_add(after_len.unwrap_or(0)))
+}
+
+fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
+    let mut relationship_ids = snapshot.relationship_ids.clone();
+    let mut total = 0usize;
+    for family in [Family::Core, Family::App, Family::Custom] {
+        let state = snapshot.family(family);
+        let bytes = match &state.present {
+            Some(present) => size_of::<Change>()
+                .saturating_add(present.part.as_str().len())
+                .saturating_add(present.relationship_id.capacity())
+                .saturating_add(present.relationship_type.capacity())
+                .saturating_add(present.relationship_target.capacity())
+                .saturating_add(present.bytes.capacity().saturating_mul(2)),
+            None => {
+                let relationship_id = next_relationship_id(&mut relationship_ids)?;
+                relationship_ids.insert(relationship_id.clone());
+                size_of::<Change>()
+                    .saturating_add(state.new_part.as_str().len())
+                    .saturating_add(relationship_id.len())
+                    .saturating_add(
+                        match family {
+                            Family::Core => rt::CORE_PROPERTIES,
+                            Family::App => rt::EXTENDED_PROPERTIES,
+                            Family::Custom => rt::CUSTOM_PROPERTIES,
+                        }
+                        .len(),
+                    )
+                    .saturating_add(state.new_part.as_str().trim_start_matches('/').len())
+            },
+        };
+        total = total.saturating_add(bytes);
+    }
+    Ok(total)
+}
+
 /// A staged edit of an owning package's document properties.
 ///
 /// The edit shares the source package (an [`OpcPackage`] clone shares every
@@ -1065,7 +1286,38 @@ impl Edit {
     /// for an exceeded bound; and [`Error::Signed`] for a changed edit of a
     /// signed package.
     pub fn commit(self) -> Result<Commit> {
+        self.commit_with_options(CommitOptions::default())
+    }
+
+    /// Compute and publish the edit under the supplied admission options.
+    ///
+    /// The retained-byte bound is checked from the plan's exact family XML
+    /// lengths before [`Plan::finish`] allocates any after-image or applies a
+    /// patch to a candidate package. A final invariant check remains after
+    /// publication to catch an allocator capacity that exceeds its planned
+    /// length without making that late check the admission mechanism.
+    pub fn commit_with_options(self, options: CommitOptions) -> Result<Commit> {
+        if let Some(maximum) = options.max_retained_bytes_value() {
+            let observed = self.plan.planned_retained_bytes()?;
+            if observed > maximum {
+                return Err(Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                });
+            }
+        }
         let (_, patch, diagnostics) = self.plan.finish()?;
+        if let Some(maximum) = options.max_retained_bytes_value() {
+            let observed = patch.retained_bytes();
+            if observed > maximum {
+                return Err(Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                });
+            }
+        }
         let mut package = self.package;
         patch.apply(&mut package)?;
         Ok(Commit::new(package, patch, diagnostics))
@@ -1203,6 +1455,38 @@ impl Diagnostics {
 /// [`Patch`] and what changed. Read the properties after it with
 /// [`Snapshot::read`]`(commit.package(), host)`.
 pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch, Diagnostics>;
+
+/// Admission options for a metadata commit.
+///
+/// The retained-byte bound is checked with the property families' exact
+/// planned XML lengths before [`Edit::commit`] materializes a patch or
+/// candidate package. The ordinary [`Edit::commit`] path remains unbounded.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct CommitOptions {
+    max_retained_bytes: Option<usize>,
+}
+
+impl CommitOptions {
+    /// Creates unbounded commit options.
+    pub const fn new() -> Self {
+        Self {
+            max_retained_bytes: None,
+        }
+    }
+
+    /// Bounds retained property-patch bytes for this commit.
+    pub const fn max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = Some(maximum);
+        self
+    }
+
+    /// The selected retained-byte bound, when one was supplied.
+    #[must_use]
+    pub const fn max_retained_bytes_value(self) -> Option<usize> {
+        self.max_retained_bytes
+    }
+}
 
 /// The exact change of one family's part.
 ///

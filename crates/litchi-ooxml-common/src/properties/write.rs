@@ -189,6 +189,13 @@ pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     xml.finish()
 }
 
+/// Return the exact UTF-8 length produced by [`encode`] without allocating
+/// the XML string. Metadata admission uses this before retaining an after
+/// image of a core-properties part.
+pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
+    preflight(props, dialect)
+}
+
 fn preflight(props: &Core, dialect: Dialect) -> Result<usize> {
     let mut bytes = 0usize;
     add_xml_bytes(&mut bytes, XML_DECLARATION.len())?;

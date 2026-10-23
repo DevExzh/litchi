@@ -9,7 +9,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
+use super::{CommitOptions, Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
 use crate::leniency::ToleranceReport;
 
@@ -66,6 +66,36 @@ fn snapshot_projects_core_and_app_fields_into_one_metadata() {
         snapshot.custom_props().get("Project"),
         Some(&Value::Text("Litchi".into()))
     );
+}
+
+#[test]
+fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| {
+        metadata.title = Some("A & <property> \r\n B".to_owned());
+    })
+    .unwrap();
+    let expected = edit.clone().commit().unwrap().patch().retained_bytes();
+
+    let committed = edit
+        .commit_with_options(CommitOptions::new().max_retained_bytes(expected))
+        .unwrap();
+    assert_eq!(committed.patch().retained_bytes(), expected);
+
+    let mut under = Edit::new(&package, Host::Word).unwrap();
+    under
+        .update_metadata(|metadata| {
+            metadata.title = Some("A & <property> \r\n B".to_owned());
+        })
+        .unwrap();
+    assert!(matches!(
+        under.commit_with_options(CommitOptions::new().max_retained_bytes(expected - 1)),
+        Err(Error::Limit {
+            kind: super::LimitKind::RetainedBytes,
+            ..
+        })
+    ));
 }
 
 #[test]
