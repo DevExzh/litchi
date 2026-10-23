@@ -1,7 +1,9 @@
 //! Structural additions delegate authoring and preservation to the native owner.
 use super::node::Item;
 use super::spec::{SLIDE_WRITE_TABLE, SlideProperty};
-use super::write::{Commit, Proof};
+use super::write::{
+    Commit, Proof, native_snapshot_budget, opened_edit_options, source_edit_options,
+};
 use super::{Editable, Nav, Pptx, PptxOwner};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -138,8 +140,9 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("shape") || node.kind().eq_ignore_ascii_case("textbox")
         {
-            // `add_text_box` constructs the native edit on every success
-            // path, which performs the strict admission once (record 0281).
+            // `add_text_box` constructs its bounded native edit on every
+            // success path, which performs strict admission once (record
+            // 0281).
             let source = self.editable_owner()?;
             return self.add_text_box(parent, node, source, limits);
         }
@@ -276,10 +279,13 @@ impl Pptx {
         // promoted for a slide added with `title` or `text`, as comment and
         // notes writes promote it (record 0346).
         let shorthand = title.is_some() || body.is_some();
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, after) = match &source {
             Editable::Source(_) | Editable::Eager(_) if shorthand => {
                 let package = Self::eager_base(&source)?;
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 let _ = edit.insert_slide(Position::new(index), &layout)?;
                 edit.set_slide_properties(index, name.as_deref(), hidden)?;
                 if let Some(title) = &title {
@@ -305,7 +311,9 @@ impl Pptx {
                 (Editable::Eager(target), Proof::Eager(patch), after)
             },
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 let _ = edit.insert_slide(Position::new(index), &layout)?;
                 edit.set_slide_properties(Position::new(index), name.as_deref(), hidden)?;
                 let (target, patch) = edit.commit()?.into_parts();
@@ -313,7 +321,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), after)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 let _ = edit.insert_slide(Position::new(index), &layout)?;
                 edit.set_slide_properties(Position::new(index), name.as_deref(), hidden)?;
                 let (target, patch) = edit.commit()?.into_parts();
@@ -324,18 +334,7 @@ impl Pptx {
         };
         let path =
             Path::from_steps([Step::new("slide").with(Predicate::Index(Position::new(index)))]);
-        Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
-                after,
-                source,
-                target,
-                proof,
-                operations: 1,
-            },
-            path,
-        ))
+        Ok((Commit::new(after, source, target, proof, 1), path))
     }
 }
 /// The modern comment kind and its aliases (record 0346).

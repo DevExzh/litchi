@@ -1,5 +1,8 @@
 //! Slide metadata dispatch through the existing native transaction family.
-use super::{Commit, Editable, Pptx, Proof, allocation, bound, error, validate_text};
+use super::{
+    Commit, Editable, Pptx, Proof, allocation, bound, error, native_error, native_snapshot_budget,
+    opened_edit_options, source_edit_options, validate_text,
+};
 use crate::format::pptx::Nav;
 use crate::format::pptx::node::Item;
 use crate::format::pptx::spec::{SLIDE_WRITE_TABLE, SlideProperty};
@@ -172,9 +175,12 @@ impl Pptx {
             _ => None,
         };
         let owner = promoted.as_ref().unwrap_or(&source);
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, changed) = match owner {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(native_error)?;
                 for position in &targets {
                     if metadata {
                         edit.set_slide_properties(*position, name.as_deref(), hidden)?;
@@ -188,7 +194,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(native_error)?;
                 for position in &targets {
                     if metadata {
                         edit.set_slide_properties(*position, name.as_deref(), hidden)?;
@@ -217,14 +225,6 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations: targets.len(),
-        })
+        Ok(Commit::new(after, source, target, proof, targets.len()))
     }
 }

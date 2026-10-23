@@ -3,7 +3,9 @@ use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::structure::{bound, error};
 use super::write::text::TextValues;
-use super::write::{Commit, Proof, validate_text};
+use super::write::{
+    Commit, Proof, native_snapshot_budget, opened_edit_options, source_edit_options, validate_text,
+};
 use super::{Editable, Nav, Pptx, steps};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -135,7 +137,7 @@ impl Pptx {
         );
         let slide = slide.position as usize;
         let scene = self
-            .slide_scene(slide)?
+            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         // Ordinary shape paths count direct p:sp siblings, not mixed drawing
         // elements or group descendants. Reuse the read path's classification.
@@ -157,7 +159,9 @@ impl Pptx {
         let (target, proof, after) = match &source {
             // A click action needs the eager editor's hyperlink verbs.
             Editable::Source(package) if link.is_none() => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_snapshot_budget(limits)))
+                    .map_err(super::write::native_error)?;
                 // The source editor returns the native non-visual shape ID.
                 // The unified path is ordinal, so the detached scene above
                 // supplies the stable direct-shape position independently.
@@ -172,7 +176,9 @@ impl Pptx {
             },
             Editable::Eager(_) | Editable::Source(_) => {
                 let package = super::smartart::eager(&source)?;
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+                    .map_err(super::write::native_error)?;
                 let _ =
                     edit.add_text_box(Position::new(slide), text.as_deref().unwrap_or(""), bounds)?;
                 if !body.is_empty() {
@@ -192,15 +198,13 @@ impl Pptx {
             Step::new("shape").with(Predicate::Index(Position::new(ordinal))),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
                 target,
                 proof,
-                operations: 1 + usize::from(!body.is_empty()) + usize::from(link.is_some()),
-            },
+                1 + usize::from(!body.is_empty()) + usize::from(link.is_some()),
+            ),
             path,
         ))
     }

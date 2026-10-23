@@ -10,7 +10,7 @@
 use super::node::Item;
 use super::spec::{Kind, PICTURE_WRITE_TABLE, PictureSetter};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof, validate_text};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options, validate_text};
 use super::{Editable, Nav, Pptx, steps};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -184,7 +184,7 @@ impl Pptx {
         );
         let slide = slide.position as usize;
         let scene = self
-            .slide_scene(slide)?
+            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         let ordinal = scene
             .roots()
@@ -204,7 +204,9 @@ impl Pptx {
             )?),
         };
         let link = click.for_add(self.slides_in_catalog()?)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         edit.add_picture(slide, &name, &resource, bounds)?;
         if let Some(alt) = alt.as_deref() {
             // The new picture is the last shape of the slide in pre-order.
@@ -222,15 +224,13 @@ impl Pptx {
             Step::new("picture").with(Predicate::Index(Position::new(ordinal))),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }
@@ -357,7 +357,9 @@ impl Pptx {
         let shape = tree.handle.position().get();
         let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let mut operations = 0;
         if let Some(bounds) = bounds {
             operations += edit.set_shape_properties(
@@ -381,14 +383,12 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Some(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Some(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
+            Editable::Eager(target),
+            Proof::Eager(patch),
             operations,
-        }))
+        )))
     }
 }

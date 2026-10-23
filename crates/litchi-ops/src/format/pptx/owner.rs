@@ -98,6 +98,20 @@ impl Pptx {
     /// The detached shape scene of the selected slide, or `None` past the
     /// catalog end.
     pub(super) fn slide_scene(&self, position: usize) -> Result<Option<Scene>> {
+        self.slide_scene_with_snapshot_budget(
+            position,
+            litchi_pptx::opened::Limits::default().max_patch_bytes(),
+        )
+    }
+
+    /// The detached shape scene under an operation's native snapshot budget.
+    /// Source-backed scenes use this ceiling for their parser/retention
+    /// reservation; eager scenes already own their decoded package payload.
+    pub(super) fn slide_scene_with_snapshot_budget(
+        &self,
+        position: usize,
+        max_snapshot_bytes: usize,
+    ) -> Result<Option<Scene>> {
         self.finish(|| {
             if let Some(revision) = &self.0.revision {
                 return self.finish(|| {
@@ -105,7 +119,12 @@ impl Pptx {
                     if position >= presentation.slide_count()? {
                         return Ok(None);
                     }
-                    strict_scene(presentation.slide(position)?.scene()?).map(Some)
+                    strict_scene(
+                        presentation
+                            .slide(position)?
+                            .scene_with_max_patch_bytes(max_snapshot_bytes)?,
+                    )
+                    .map(Some)
                 });
             }
             match &self.0.owner {
@@ -114,7 +133,7 @@ impl Pptx {
                     let Some(slide) = presentation.slide(position) else {
                         return Ok(None);
                     };
-                    strict_scene(slide.scene()?).map(Some)
+                    strict_scene(slide.scene_with_max_patch_bytes(max_snapshot_bytes)?).map(Some)
                 },
                 PptxOwner::Eager(package) => {
                     let Some(part) = super::eager_slide_part(self, package, position)? else {

@@ -26,7 +26,7 @@ use litchi_pptx::shape::owned::Handle;
 use super::node::{Item, TreeContainer, TreeItem};
 use super::spec::{Kind, MEDIA_WRITE_TABLE, MediaSetter};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof, validate_text};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options, validate_text};
 use super::{Editable, Nav, Pptx, steps};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -238,7 +238,7 @@ impl Pptx {
             None => Kind::Media,
         };
         let scene = self
-            .slide_scene(slide)?
+            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         let ordinal = select(scene.roots(), element)?.len();
         let name = name.unwrap_or_else(|| {
@@ -260,7 +260,9 @@ impl Pptx {
         );
         let source = self.editable_owner()?;
         let base = super::smartart::eager(&source)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         native.add_media(
             slide,
             kind,
@@ -285,15 +287,13 @@ impl Pptx {
             Step::new(element.name_static()).with(Predicate::Index(Position::new(ordinal))),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }

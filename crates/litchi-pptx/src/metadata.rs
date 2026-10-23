@@ -43,6 +43,41 @@ use crate::Package;
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Bounds for one metadata edit's retained exact patch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    max_patch_bytes: usize,
+}
+
+impl EditOptions {
+    /// The native default retained-patch ceiling.
+    pub const fn new() -> Self {
+        Self {
+            max_patch_bytes: crate::opened::Limits::DEFAULT.max_patch_bytes(),
+        }
+    }
+
+    /// Set the exact retained-patch ceiling for this edit.
+    #[must_use]
+    pub const fn max_patch_bytes(mut self, maximum: usize) -> Self {
+        self.max_patch_bytes = maximum;
+        self
+    }
+
+    /// The selected retained-patch ceiling.
+    #[must_use]
+    pub const fn max_patch_bytes_value(self) -> usize {
+        self.max_patch_bytes
+    }
+}
+
+impl Default for EditOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A staged metadata edit of one [`Package`].
 ///
 /// Dropping the edit discards it.
@@ -106,13 +141,34 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.inner.commit()?;
-        let diagnostics = commit.diagnostics().clone();
-        let (opc, patch) = commit.into_parts();
+        self.commit_with_options(EditOptions::default())
+    }
+
+    /// Compute and publish the patch under an exact retained-byte ceiling.
+    /// The complete before/after family payloads are sized before the package
+    /// candidate is cloned or the patch is applied, so a refused edit does
+    /// not publish a partially materialized metadata revision.
+    pub fn commit_with_options(self, options: EditOptions) -> Result<Commit> {
+        let (_snapshot, patch, diagnostics) = self.inner.finish()?;
+        let retained = patch.changes().iter().fold(0_usize, |bytes, change| {
+            bytes
+                .saturating_add(change.before().map_or(0, <[u8]>::len))
+                .saturating_add(change.after().map_or(0, <[u8]>::len))
+        });
+        if retained > options.max_patch_bytes_value() {
+            return Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                observed: retained,
+                maximum: options.max_patch_bytes_value(),
+            });
+        }
         // An exact no-op publishes the source graph itself.
         let package = if patch.is_noop() {
+            patch.check(self.package.opc.as_ref())?;
             self.package.duplicate()
         } else {
+            let mut opc = (*self.package.opc).clone();
+            patch.apply(&mut opc)?;
             self.package.with_metadata_opc(opc)
         };
         Ok(Commit::new(package, patch, diagnostics))
@@ -259,5 +315,22 @@ mod tests {
             replayed.package().to_bytes().unwrap(),
             package.to_bytes().unwrap()
         );
+    }
+
+    #[test]
+    fn retained_patch_limit_is_checked_before_metadata_publication() {
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_metadata().unwrap();
+        edit.update(|metadata| metadata.title = Some("bounded metadata".to_owned()))
+            .unwrap();
+        assert!(matches!(
+            edit.commit_with_options(EditOptions::default().max_patch_bytes(1)),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                observed,
+                maximum: 1,
+            }) if observed > 1
+        ));
+        assert_eq!(package.metadata().unwrap().title, None);
     }
 }

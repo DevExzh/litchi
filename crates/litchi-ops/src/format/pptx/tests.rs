@@ -8,7 +8,7 @@ use litchi_core::{Metadata, Position, ReadAt};
 use super::{Editable, Pptx, PptxSlide, SlideDescriptor};
 use crate::error::{Code, Error, Source};
 use crate::options::OpenOptions;
-use crate::{opc, pptx};
+use crate::{IntoTarget, opc, pptx};
 
 /// Fixtures with metadata, without metadata, and with several slides.
 const FIXTURES: [&str; 3] = ["backgrounds.pptx", "sample.pptx", "shapes.pptx"];
@@ -524,6 +524,46 @@ fn source_promotion_reuses_admitted_catalog_and_preserves_exact_noop() {
         bytes
     );
     assert_eq!(handle.slide_count().unwrap(), 2);
+}
+
+#[test]
+fn native_pptx_commits_account_their_retained_proof() {
+    let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
+    let target = "/slide[1]/shape[1]".into_target().unwrap();
+    let limits = crate::transaction::SemanticLimits::default();
+
+    let text = handle
+        .set_with_limits(
+            target.clone(),
+            crate::props! { "text" => "native snapshot accounting" },
+            &limits,
+        )
+        .unwrap();
+    assert!(text.snapshot_bytes() > 0);
+
+    let link = handle
+        .set_with_limits(
+            target.clone(),
+            crate::props! { "link" => "https://example.com/native-snapshot-charge" },
+            &limits,
+        )
+        .unwrap();
+    assert!(link.snapshot_bytes() > 0);
+
+    // Click setters compose a text/property edit with a second hyperlink
+    // edit.  Both native proofs remain charged on the unsigned path.
+    let combined = handle
+        .set_with_limits(
+            target,
+            crate::props! {
+                "text" => "native snapshot accounting",
+                "link" => "https://example.com/native-snapshot-charge",
+            },
+            &limits,
+        )
+        .unwrap();
+    assert!(combined.snapshot_bytes() > text.snapshot_bytes());
+    assert!(combined.snapshot_bytes() > link.snapshot_bytes());
 }
 
 #[test]

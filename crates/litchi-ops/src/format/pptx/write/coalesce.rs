@@ -21,7 +21,10 @@
 //! writes keep the ordinary writer, which promotes it.
 
 use super::text::{self, TextValues};
-use super::{Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error};
+use super::{
+    Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error,
+    native_snapshot_budget,
+};
 use crate::format::pptx::spec::{Kind, PARAGRAPH_WRITE_TABLE, RUN_WRITE_TABLE};
 use crate::format::pptx::steps;
 use crate::registry::Operation;
@@ -306,7 +309,9 @@ impl Run {
         remaining_snapshot: usize,
     ) -> Result<Self> {
         base.check_source_for_write()?;
-        let source_bytes = base.retained_source_len()?.unwrap_or(0);
+        let source_bytes = base
+            .retained_source_len()?
+            .ok_or_else(|| super::snapshot_limit(usize::MAX, remaining_snapshot))?;
         if source_bytes > remaining_snapshot {
             return Err(super::snapshot_limit(source_bytes, remaining_snapshot));
         }
@@ -488,6 +493,7 @@ fn proof_is_noop(proof: &Proof) -> bool {
         Proof::Source(patch) => patch.is_noop(),
         Proof::Eager(patch) => patch.is_noop(),
         Proof::Metadata(patch) => patch.is_noop(),
+        Proof::Combined(proofs) => proofs.iter().all(proof_is_noop),
     }
 }
 
@@ -583,7 +589,9 @@ fn shape_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != slide)
     {
-        let Some(scene) = file.slide_scene(slide)? else {
+        let Some(scene) =
+            file.slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
+        else {
             return Ok(None);
         };
         *scene_cache = Some((slide, cache_scene(scene)?));
@@ -781,7 +789,9 @@ fn format_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != slide)
     {
-        let Some(scene) = file.slide_scene(slide)? else {
+        let Some(scene) =
+            file.slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
+        else {
             return Ok(None);
         };
         *scene_cache = Some((slide, cache_scene(scene)?));
@@ -1002,7 +1012,9 @@ fn story_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != story.slide)
     {
-        let Some(scene) = file.slide_scene(story.slide)? else {
+        let Some(scene) =
+            file.slide_scene_with_snapshot_budget(story.slide, native_snapshot_budget(limits))?
+        else {
             return Ok(None);
         };
         *scene_cache = Some((story.slide, cache_scene(scene)?));
@@ -1472,12 +1484,11 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
 /// before/after wire-size preflight at commit; the facade only contributes the
 /// remaining budget and never substitutes a Rust struct size for that proof.
 fn new_native_edit_with_snapshot_budget(
-    base: &Pptx,
+    _base: &Pptx,
     source: &Editable,
     remaining_snapshot: usize,
 ) -> Result<NativeEdit> {
-    let native_limit =
-        remaining_snapshot.min(litchi_pptx::opened::Limits::default().max_patch_bytes());
+    let native_limit = remaining_snapshot;
     match source {
         Editable::Source(package) => package
             .edit_with_options(
@@ -1486,15 +1497,6 @@ fn new_native_edit_with_snapshot_budget(
             .map(NativeEdit::Source)
             .map_err(native_error),
         Editable::Eager(package) => {
-            // Admission stores one default-bounded eager edit. Reuse it only
-            // when the caller's remaining budget still covers that native
-            // bound; otherwise capture a fresh edit carrying the exact
-            // caller-selected limit.
-            if remaining_snapshot >= litchi_pptx::opened::Limits::default().max_patch_bytes()
-                && let Some(edit) = base.take_spare_edit(package)
-            {
-                return Ok(NativeEdit::Eager(edit));
-            }
             let options = litchi_pptx::opened::EditOptions::default()
                 .limits(litchi_pptx::opened::Limits::default().with_max_patch_bytes(native_limit));
             package
@@ -1877,15 +1879,13 @@ fn commit_native(
             let commit_after = after.clone();
             Ok((
                 after,
-                Commit {
-                    snapshot_bytes: 0,
-                    retained_cache: std::sync::OnceLock::new(),
-                    after: commit_after,
+                Commit::new(
+                    commit_after,
                     source,
                     target,
-                    proof: super::Proof::Source(patch),
+                    super::Proof::Source(patch),
                     operations,
-                },
+                ),
             ))
         },
         NativeEdit::Eager(edit) => {
@@ -1903,15 +1903,13 @@ fn commit_native(
             let commit_after = after.clone();
             Ok((
                 after,
-                Commit {
-                    snapshot_bytes: 0,
-                    retained_cache: std::sync::OnceLock::new(),
-                    after: commit_after,
+                Commit::new(
+                    commit_after,
                     source,
                     target,
-                    proof: super::Proof::Eager(patch),
+                    super::Proof::Eager(patch),
                     operations,
-                },
+                ),
             ))
         },
     }

@@ -10,7 +10,7 @@ use std::sync::{Arc, OnceLock};
 
 use litchi_core::{FileFormat, Metadata};
 
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget};
 use super::{Editable, Pptx, PptxOwner, PptxState};
 use crate::error::Result;
 use crate::format::metadata::{self, Assignments};
@@ -18,6 +18,7 @@ use crate::format::signature::Opened;
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 use crate::{opc, pptx};
 
 fn native(error: pptx::metadata::Error) -> crate::Error {
@@ -29,6 +30,7 @@ fn commit(
     package: &pptx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
+    max_patch_bytes: usize,
 ) -> Result<(pptx::Package, pptx::metadata::Patch, Metadata)> {
     let mut edit = package.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
@@ -38,7 +40,12 @@ fn commit(
     }
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
-    let (after, patch) = edit.commit().map_err(native)?.into_parts();
+    let (after, patch) = edit
+        .commit_with_options(
+            pptx::metadata::EditOptions::default().max_patch_bytes(max_patch_bytes),
+        )
+        .map_err(native)?
+        .into_parts();
     Ok((after, patch, metadata))
 }
 
@@ -82,19 +89,22 @@ impl Pptx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let root = metadata::is_root(target) && metadata::names_metadata(props);
         if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Pptx)?;
-        self.set_metadata(&assignments, props.len()).map(Some)
+        self.set_metadata(&assignments, props.len(), limits)
+            .map(Some)
     }
 
     fn set_metadata(
         &self,
         assignments: &Assignments,
         authored_operations: usize,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         // A signed metadata setter is staged through the unsigned private
         // owner so the publication fence can distinguish a genuine no-op
@@ -106,28 +116,25 @@ impl Pptx {
             &package,
             |value| assignments.apply(value),
             Some(assignments),
+            native_snapshot_budget(limits),
         )?;
         if patch.is_noop() {
-            return Ok(Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
-                after: self.clone(),
-                target: source.clone(),
+            return Ok(Commit::new(
+                self.clone(),
+                source.clone(),
                 source,
-                proof: Proof::Metadata(patch),
-                operations: authored_operations,
-            });
+                Proof::Metadata(patch),
+                authored_operations,
+            ));
         }
         let after_package = Arc::new(after_package);
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after: self.adopt_metadata(Arc::clone(&after_package), metadata),
-            source: Editable::Eager(package),
-            target: Editable::Eager(after_package),
-            proof: Proof::Metadata(patch),
-            operations: authored_operations,
-        })
+        Ok(Commit::new(
+            self.adopt_metadata(Arc::clone(&after_package), metadata),
+            Editable::Eager(package),
+            Editable::Eager(after_package),
+            Proof::Metadata(patch),
+            authored_operations,
+        ))
     }
 
     /// Adopt an eager metadata revision with its committed metadata cached.
@@ -142,6 +149,7 @@ impl Pptx {
             metadata: OnceLock::from(Some(metadata).filter(Metadata::has_data)),
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
+            retained_source_len: OnceLock::new(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: super::owner::Related::default(),
@@ -150,10 +158,8 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
-            admitted: OnceLock::new(),
             cells: std::sync::Mutex::new(None),
             notes: std::sync::Mutex::new(None),
-            spare: std::sync::Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -161,6 +167,11 @@ impl Pptx {
 
 /// Create-time metadata: commit `metadata` to a fresh presentation.
 pub(super) fn create(package: pptx::Package, metadata: &Metadata) -> Result<Pptx> {
-    let (package, _, _) = commit(&package, |value| *value = metadata.clone(), None)?;
+    let (package, _, _) = commit(
+        &package,
+        |value| *value = metadata.clone(),
+        None,
+        litchi_pptx::opened::Limits::default().max_patch_bytes(),
+    )?;
     Pptx::from_package(package, &OpenOptions::new())
 }

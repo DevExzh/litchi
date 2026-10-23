@@ -18,7 +18,7 @@ use litchi_core::selector::{Path, Predicate, Step};
 use super::node::{Item, TreeItem};
 use super::spec::{COLUMN_WRITE_TABLE, ColumnSetter, Kind};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options};
 use super::{Editable, Nav, Pptx};
 use crate::node::Value;
 use crate::path::PathArg;
@@ -98,7 +98,12 @@ enum Change {
 }
 
 impl Pptx {
-    fn change_columns(&self, table: &TreeItem, change: Change) -> Result<Commit> {
+    fn change_columns(
+        &self,
+        table: &TreeItem,
+        change: Change,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
         let source = if matches!(&change, Change::Width { .. }) {
@@ -107,7 +112,9 @@ impl Pptx {
             self.editable_owner()?
         };
         let base = super::smartart::eager(&source)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         match change {
             Change::Width { column, width } => {
                 native.set_table_column_width(slide, shape, Position::new(column), width)?;
@@ -128,15 +135,13 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 
     /// `add(/slide[N]/table[M], col, {width, text})`.
@@ -223,6 +228,7 @@ impl Pptx {
                 width,
                 text,
             },
+            limits,
         )?;
         let path = Path::from_steps([
             Step::new("slide").with(Predicate::Index(Position::new(slide))),
@@ -264,6 +270,7 @@ impl Pptx {
                 column: item.index as usize,
                 width,
             },
+            limits,
         )
         .map(Some)
     }
@@ -283,6 +290,7 @@ impl Pptx {
             Change::Remove {
                 column: item.index as usize,
             },
+            limits,
         )
         .map(Some)
     }

@@ -23,7 +23,9 @@ use litchi_pptx::opened::{TextBody, TextProperties};
 use super::node::{CellRef, Item, TextItem, TreeContainer, TreeItem};
 use super::spec::{Kind, PARAGRAPH_WRITE_TABLE, RUN_WRITE_TABLE};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{
+    Commit, Proof, native_snapshot_budget, opened_edit_options, source_edit_options,
+};
 use super::{Editable, Nav, Pptx, text};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -191,7 +193,12 @@ enum Change<'a> {
 impl Pptx {
     /// Publish one text structure change through the native edit of the
     /// body's owner.
-    fn commit_text_structure(&self, located: Located, change: Change<'_>) -> Result<Commit> {
+    fn commit_text_structure(
+        &self,
+        located: Located,
+        change: Change<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let source = self.editable_owner()?;
         let slide = Position::new(located.slide);
         let body = located.body;
@@ -199,9 +206,12 @@ impl Pptx {
             (Editable::Source(_), true) => Editable::Eager(super::smartart::eager(&source)?),
             _ => source.clone(),
         };
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof) = match &owner {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 match change {
                     Change::InsertParagraph(position, properties) => {
                         edit.insert_paragraph(slide, body, Position::new(position), properties)?;
@@ -224,7 +234,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch))
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 match change {
                     Change::InsertParagraph(position, properties) => {
                         edit.insert_paragraph(slide, body, Position::new(position), properties)?;
@@ -251,15 +263,7 @@ impl Pptx {
             Editable::Source(package) => self.adopt_source(package.clone())?,
             Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations: 1,
-        })
+        Ok(Commit::new(after, source, target, proof, 1))
     }
 
     /// `add(parent, paragraph, {…})`.
@@ -317,6 +321,7 @@ impl Pptx {
         let commit = self.commit_text_structure(
             located,
             Change::InsertParagraph(position, values.properties()),
+            limits,
         )?;
         let path = child_path(&parent_path, "paragraph", position)?;
         Ok((commit, path))
@@ -396,6 +401,7 @@ impl Pptx {
         let commit = self.commit_text_structure(
             located,
             Change::InsertRun(paragraph.paragraph as usize, at, values.properties()),
+            limits,
         )?;
         let path = child_path(&parent_path, "run", ordinal)?;
         Ok((commit, path))
@@ -433,7 +439,8 @@ impl Pptx {
         drop(node);
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let located = text_body(&text)?;
-        self.commit_text_structure(located, change).map(Some)
+        self.commit_text_structure(located, change, limits)
+            .map(Some)
     }
 }
 

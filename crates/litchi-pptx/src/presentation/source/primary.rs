@@ -1400,9 +1400,19 @@ impl Slide {
     /// Read an owned shape scene without losing managed source reservations.
     ///
     /// Managed reads reserve `64 * input_bytes + 1024` bytes of parsing and
-    /// retention headroom, capped at 128 MiB. This conservative policy can
-    /// refuse large slides even when their final scene would fit the budget.
+    /// retention headroom, capped at the native edit's default patch budget.
+    /// Callers with a smaller remaining budget use
+    /// [`Self::scene_with_max_patch_bytes`] instead.
     pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
+        self.scene_with_max_patch_bytes(crate::opened::Limits::default().max_patch_bytes())
+    }
+
+    /// Read an owned shape scene under a caller-selected retained-memory
+    /// ceiling. Facade edits pass their remaining snapshot budget here so a
+    /// source-backed planning read cannot reserve the native default after
+    /// the edit has already been bounded more tightly.
+    pub fn scene_with_max_patch_bytes(&self, maximum: usize) -> Result<crate::shape::owned::Scene> {
+        let maximum = maximum.min(self.snapshot.max_output_bytes);
         self.package.check()?;
         crate::source_limits::validate_xml_limits(
             self.snapshot.xml.as_bytes(),
@@ -1413,7 +1423,8 @@ impl Slide {
                 super::SourcePart::from_binding(&self.snapshot.closure.slide.slide, data.clone())?;
             super::validate_source_slide_root(&part)?;
         }
-        let scene_reservation = reserve_scene(&self.package, self.snapshot.xml.as_bytes().len())?;
+        let scene_reservation =
+            reserve_scene(&self.package, self.snapshot.xml.as_bytes().len(), maximum)?;
         let parsed = crate::shape::Scene::read(self.snapshot.xml.as_bytes())?;
         let scene = match &self.snapshot.xml {
             SourcePayload::Original(data) => {
@@ -1504,9 +1515,15 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
-        let mut edit = snapshot.edit_checked()?;
+        let mut edit = snapshot.edit_checked_with_max_patch_bytes(self.max_patch_bytes)?;
         let shape_id = edit.add_text_box(text, bounds)?;
         let after = edit.commit_checked()?.snapshot;
+        if after.xml.as_bytes().len() > self.max_patch_bytes {
+            return Err(limit(
+                "source-backed primary slide output bytes",
+                self.max_patch_bytes,
+            ));
+        }
         let candidate = self.working.with_snapshot(after.clone())?;
         if self.working.topology.is_some() {
             self.working = candidate;
@@ -2069,14 +2086,26 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
-        let reservation = reserve(&self.working, &snapshot)?;
-        let mut edit = snapshot.edit_checked()?;
+        let bounded_snapshot = snapshot.with_max_patch_bytes(self.max_patch_bytes);
+        let reservation = reserve(&self.working, &bounded_snapshot)?;
+        let mut edit = snapshot.edit_checked_with_max_patch_bytes(self.max_patch_bytes)?;
         let changed = stage(&mut edit)?;
         if changed == 0 {
             self.working.check()?;
             return Ok(0);
         }
         let mut after = edit.commit_checked()?.snapshot;
+        // The bounded edit has already performed the exact native rewrite,
+        // but check its resulting payload before handing it to the package
+        // revision builder.  Passing a clone into `with_snapshot` first used
+        // to allocate the candidate XML before the facade ceiling was
+        // observed; a rejected candidate must never escape that preflight.
+        if after.xml.as_bytes().len() > self.max_patch_bytes {
+            return Err(limit(
+                "source-backed primary slide output bytes",
+                self.max_patch_bytes,
+            ));
+        }
         if let Some(reservation) = reservation {
             if let SourcePayload::Edited(bytes) = after.xml {
                 after.xml = SourcePayload::ReservedEdit {
@@ -2383,7 +2412,7 @@ fn reserve_edit(
     let Some(context) = package.owner.package.execution_context() else {
         return Ok(None);
     };
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = snapshot.max_output_bytes;
     let bytes = replacements.iter().try_fold(
         snapshot
             .xml
@@ -2417,11 +2446,14 @@ fn reserve_edit(
 
 // Reserve parser/index/MCE retention headroom before processing. Refuse an
 // unexpectedly larger retained scene before it can escape the admission charge.
-fn reserve_scene(package: &Package, input_bytes: usize) -> Result<Option<Reservation>> {
+fn reserve_scene(
+    package: &Package,
+    input_bytes: usize,
+    maximum: usize,
+) -> Result<Option<Reservation>> {
     let Some(context) = package.owner.package.execution_context() else {
         return Ok(None);
     };
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
     let bytes = input_bytes
         .checked_mul(64)
         .and_then(|bytes| bytes.checked_add(1024))

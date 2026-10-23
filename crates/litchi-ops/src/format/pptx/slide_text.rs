@@ -11,7 +11,7 @@
 use super::node::Item;
 use super::spec::{Kind, PLACEHOLDER_ADD_TABLE, PLACEHOLDER_TYPE, PlaceholderSetter};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof, validate_text};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options, validate_text};
 use super::{Editable, Nav, Pptx, steps};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -120,7 +120,7 @@ impl Pptx {
             .with_suggestion("pass phType=title, body, subtitle, date, footer, slidenum, ...")
         })?;
         let scene = self
-            .slide_scene(slide as usize)?
+            .slide_scene_with_snapshot_budget(slide as usize, native_snapshot_budget(limits))?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         // The new shape's canonical path is its `shape[K]` ordinal, as
         // OfficeCLI returns it and as queries print placeholders.
@@ -151,7 +151,9 @@ impl Pptx {
         }
         let source = self.editable_owner()?;
         let base = Self::eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let _ = edit.add_placeholder(slide as usize, kind, text.as_deref().unwrap_or(""))?;
         let (target, patch) = edit.commit()?.into_parts();
         let target = Arc::new(target);
@@ -161,15 +163,13 @@ impl Pptx {
             Step::new("shape").with(Predicate::Index(Position::new(ordinal))),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }
@@ -186,7 +186,9 @@ impl Pptx {
         let text = super::write::notes_add_text(node.props(), limits)?;
         let source = self.editable_owner()?;
         let base = Self::eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let changed = edit.set_notes_text(slide as usize, &text)?;
         let (target, patch) = edit.commit()?.into_parts();
         let changed = changed && !patch.is_noop();
@@ -201,15 +203,13 @@ impl Pptx {
             Step::new("notes"),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }

@@ -127,6 +127,6 @@ pub(crate) fn merge(
             ));
         }
     }
-    let commit = file.commit_story_text_edits(&slides, &notes)?;
+    let commit = file.commit_story_text_edits(&slides, &notes, limits)?;
     Ok((Some(commit), summary))
 }

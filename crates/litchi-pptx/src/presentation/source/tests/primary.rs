@@ -382,6 +382,20 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
     assert_eq!(text(&source, 0), "original");
 }
 
+#[test]
+fn focused_edit_uses_selected_patch_bound_before_candidate_publication() {
+    let source = package(fixture());
+    let mut edit = source
+        .edit_with_options(super::super::primary::EditOptions::default().max_patch_bytes(1))
+        .unwrap();
+    assert!(matches!(
+        edit.set_shape_text(0, 0_usize, "bounded"),
+        Err(Error::Limit { .. })
+    ));
+    assert!(edit.commit().unwrap().patch().is_noop());
+    assert_eq!(text(&source, 0), "First slide");
+}
+
 fn with_first_slide(xml: &[u8]) -> Vec<u8> {
     let mut package = litchi_opc::OpcPackage::from_bytes(&fixture()).unwrap();
     package
