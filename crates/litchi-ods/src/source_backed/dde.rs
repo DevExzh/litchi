@@ -98,6 +98,15 @@ impl<'source> Snapshot<'source> {
         context: &ExecutionContext,
         enforce_context_lineage: bool,
     ) -> Result<Self> {
+        limits
+            .validate()
+            .map_err(litchi_core::Error::from)
+            .map_err(Error::from)?;
+        context
+            .check()
+            .map_err(crate::dde::map_execution)
+            .map_err(litchi_core::Error::from)
+            .map_err(Error::from)?;
         owner.check_source()?;
         let source_version = owner.source_version()?;
         let source = owner.content_xml_arc()?;
@@ -538,7 +547,32 @@ impl SourceBackedSpreadsheet {
 
 #[cfg(test)]
 mod tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+
     use super::Limits;
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
+        Profile,
+    };
+
+    fn cancelled_context() -> (CancellationSource, ExecutionContext) {
+        let (cancellation, token) = CancellationSource::pair();
+        let context = ExecutionContext::new(
+            Budget::root(
+                "ods-dde-lazy-entry",
+                BudgetLimits::for_profile(Profile::TrustedBatch),
+            ),
+            token,
+            ExecutionLimits::new(
+                NonZeroUsize::new(1).expect("worker"),
+                NonZeroUsize::new(1).expect("task"),
+                NonZeroU64::new(1024).expect("bytes"),
+                0,
+            )
+            .expect("execution limits"),
+        );
+        (cancellation, context)
+    }
 
     #[test]
     fn edit_entry_defers_scan_and_drop_keeps_the_owner_unchanged() {
@@ -556,6 +590,23 @@ mod tests {
         let source = edit.before().source_xml().to_owned();
         drop(edit);
         assert_eq!(owner.content_xml().expect("content.xml"), source);
+    }
+
+    #[test]
+    fn edit_entry_admits_limits_and_cancellation_before_parsing() {
+        let owner = super::super::test_support::owner();
+        assert!(
+            owner
+                .edit_dde_with(
+                    Limits::default().with_links(usize::MAX),
+                    &crate::dde::default_context()
+                )
+                .is_err()
+        );
+
+        let (cancellation, context) = cancelled_context();
+        cancellation.cancel();
+        assert!(owner.edit_dde_with(Limits::default(), &context).is_err());
     }
 
     #[test]
