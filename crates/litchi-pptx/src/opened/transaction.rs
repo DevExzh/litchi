@@ -25,6 +25,8 @@ use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
+pub use litchi_core::edit::Diagnostics;
+
 use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
 use super::patch::Patch;
 use crate::{Error, Result};
@@ -3425,20 +3427,6 @@ fn publish_transfer(
     Ok(())
 }
 
-/// Content-free summary of a committed presentation edit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether any managed OPC resource changed.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
-
 /// Validated immutable package and durable patch from a presentation edit.
 ///
 /// ```
@@ -3505,9 +3493,7 @@ impl Commit {
     /// Content-free commit diagnostics.
     #[must_use]
     pub fn diagnostics(&self) -> Diagnostics {
-        Diagnostics {
-            changed: !self.patch.is_noop(),
-        }
+        Diagnostics::new(!self.patch.is_noop())
     }
 
     #[cfg(test)]
