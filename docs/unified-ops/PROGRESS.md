@@ -2331,3 +2331,40 @@ See [0063](0063-source-pptx-modern-comments.md).
   the other performance returns, corpus dispositions, final inventory/glossary
   and the full assembled gate remain open. Only the comprehensive redaction
   audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete consumer diagnostics and cleanup):
+  The assembly reaches `d686be4af0`. Record 0362uf preserves the fourth
+  and fifth check failures and their private DOCX accessor/ODT error-boundary
+  corrections. The sixth attempt on `a814baa1de` used `--keep-going`, passed
+  the format libraries, and exposed remaining ODF facade/native-test error
+  migrations and invalid nested PPTX refusal guards. Its runner ended without
+  saving a final exit receipt; the retained compiler log establishes failure,
+  not an inferred exit code or duration. The harness was not reached. Two
+  isolated DOCX/IWA test lints are corrected in `d686be4af0`; the other
+  consumer repairs are assigned as 0362ug–0362ui. The last completed
+  1,578-test receipt remains tied to `c2122e2678`.
+
+  XLSX raw aggregate candidate `5726f03c7d` now admits the original ledger
+  before proposed relationship allocations, retains admitted deferred payload
+  lengths, and adds malformed declared-size regressions. Static review and
+  combined runtime checks remain required, along with matched owned-open and
+  first-read costs for the added metadata. OPC constructor and token policy
+  work must preserve captured limits through every existing-owner operation.
+
+  DOCX restored replay is adopting a generic typed artifact-stream bridge
+  so producer errors survive the OPC boundary. Its final-output admission
+  must match the recipient's actual source policy, preserve nested output
+  accounting, and retain both primary freshness and secondary failures.
+  Catalog-only checks and whole-file materialization do not close that work.
+  Signed native no-op budget preservation remains under repair. The iWork
+  retained-header optimization also remains returned: mutations that change
+  nested encoded length must fall back to canonical serialization, and a
+  prior optimized candidate cannot establish that its failures pre-existed.
+
+  The owner requests periodic consolidation and removal of unused leaf
+  worktrees. Cleanup now checks merged ancestry, uncommitted/ignored data,
+  active processes and measurement references before removing source-only
+  checkouts; protected measurement artifacts and branch references remain.
+  All returned performance work, corpus dispositions, final inventory/glossary
+  and the complete assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
