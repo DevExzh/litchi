@@ -26,9 +26,9 @@ pub(super) fn commit(
     workbook: &xlsx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
-    max_patch_bytes: Option<usize>,
+    max_retained_bytes: Option<usize>,
 ) -> Result<(xlsx::Package, Metadata, bool, usize)> {
-    let mut edit = match max_patch_bytes {
+    let mut edit = match max_retained_bytes {
         Some(maximum) => workbook
             .edit_metadata_with_options(
                 xlsx::metadata::EditOptions::new().max_retained_bytes(maximum),

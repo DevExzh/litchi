@@ -236,7 +236,8 @@ impl Package {
     /// Conservative retained-data charge for one immutable package endpoint.
     /// This is used by format adapters when a private signed no-op probe is
     /// discarded after its native identity patch is rebuilt. It does not
-    /// force lazy cell or feature projections.
+    /// force lazy cell or feature projections. Decoded OPC payloads remain
+    /// charged; derived cell and shared-string read caches are excluded.
     pub fn retained_bytes(&self) -> usize {
         let archive_hint = self.opc().exact_source_len().unwrap_or(0);
         crate::workbook::edit::workbook_retained_bytes(self.workbook_ref(), archive_hint)

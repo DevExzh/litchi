@@ -79,3 +79,22 @@ semantic/performance returns.
 [native-check-v4.json](results/0362up/native-check-v4.json) retains the
 failure. [0362upa](0362upa-budget-review-return.md) records the required return
 work; dependent native/facade and no-feature checks were not reached.
+
+## Stable semantic endpoint accounting
+
+Derived parsed cell and shared-string read caches are not semantic snapshot
+payload. Warming those caches must not alter the selected retention budget.
+Decoded OPC payload buffers, physical source archives and fixed package data
+remain charged, and repeated source/target endpoints remain independent.
+The metadata projection therefore uses the same cache-independent endpoint
+metric as the primary editor; the temporary warm-cache subtraction bridge is
+removed. This is not a general allocator or parser-memory limit.
+
+Metadata proposal `c67826a6bf` passes scoped API, provenance, endpoint,
+source-preflight, refusal-order and fidelity review. Rich-transfer successor
+`044c37c519` passes scoped review, including shared-index dependencies,
+picture-only targets and removal followed by another transfer. Facade compiler
+batch `6995c497f5` also passes independent review and its strict compiler run.
+All are composed for diagnostic validation. Cell normalization/atomicity,
+two PPTX runtime failures, strict combined validation and performance gates
+remain required; no full-wave acceptance is inferred.

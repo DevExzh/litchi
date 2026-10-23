@@ -155,7 +155,10 @@ fn owner_admission(package: &Package, snapshot: &Snapshot) -> Result<properties:
     ))
 }
 
-/// Bounds for one metadata edit's retained exact patch.
+/// Bounds for the source package, target package, and exact metadata patch.
+///
+/// Repeated endpoint payloads are charged independently; derived cell and
+/// shared-string read caches are outside this semantic retention budget.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[must_use]
 pub struct EditOptions {
@@ -170,13 +173,13 @@ impl EditOptions {
         }
     }
 
-    /// Sets the exact retained-patch ceiling for this edit.
+    /// Sets the combined source, target, and exact patch retention ceiling.
     pub const fn max_retained_bytes(mut self, maximum: usize) -> Self {
         self.max_retained_bytes = Some(maximum);
         self
     }
 
-    /// Returns the selected retained-patch ceiling.
+    /// Returns the selected semantic retention ceiling.
     #[must_use]
     pub const fn max_retained_bytes_value(self) -> Option<usize> {
         self.max_retained_bytes
@@ -336,7 +339,7 @@ impl Package {
         self.edit_metadata_with_options(EditOptions::default())
     }
 
-    /// Start a metadata edit under an explicit retained-patch ceiling.
+    /// Start a metadata edit under an explicit source, target, and patch ceiling.
     pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
         let snapshot = Snapshot::read(self.opc(), Host::Excel)?;
         let common_options = options

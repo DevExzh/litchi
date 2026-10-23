@@ -98,13 +98,6 @@ impl Dialect {
             Self::Strict => "http://purl.oclc.org/ooxml/package/metadata/core-properties",
         }
     }
-
-    pub(crate) fn relationship_type(self) -> &'static str {
-        match self {
-            Self::Transitional => litchi_opc::constants::relationship_type::CORE_PROPERTIES,
-            Self::Strict => STRICT_CORE_PROPERTIES_RELATIONSHIP,
-        }
-    }
 }
 
 pub(super) fn collapse_xml_whitespace(value: &str) -> String {
