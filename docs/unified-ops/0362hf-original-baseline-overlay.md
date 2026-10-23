@@ -79,12 +79,13 @@ external.
 
 After coordinator review, the only compile candidate is the standalone
 adapter in the external f2 workspace, with one build job and the exact W8
-feature set:
+all-features selection (the probe's 11 format features are enabled by that
+selection):
 
 ```sh
 CARGO_BUILD_JOBS=1 cargo check --offline --locked -p litchi-ops \
   --example file_w8_original_baseline_probe \
-  --features docx,xlsx,xlsb,pptx,doc,xls,ppt,rtf,odt,ods,odp
+  --all-features
 ```
 
 Untimed 109-route validation and quiet-host ABBA timing are separate pending

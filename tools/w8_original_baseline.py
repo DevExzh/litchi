@@ -510,7 +510,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     fixture_artifact = write_new(output_dir / "litchi_w8_fixture_descriptor.json", descriptor)
     mapped = route_map(probe)
     route_artifact = write_new(output_dir / "original-baseline-route-map.json", mapped)
-    projection_args = argparse.Namespace(workspace=workspace, package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE, lock=lock, toolchain=workspace / "rust-toolchain.toml", probe=probe, fixture=Path(fixture_artifact["path"]), features=[",".join(W8_FEATURES)], all_features=False, target=args.target, profile=args.profile)
+    projection_args = argparse.Namespace(workspace=workspace, package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE, lock=lock, toolchain=workspace / "rust-toolchain.toml", probe=probe, fixture=Path(fixture_artifact["path"]), features=[], all_features=True, target=args.target, profile=args.profile)
     projection = provenance.dependency_projection(projection_args)
     projection_artifact = write_new(output_dir / "litchi_w8_dependency_projection.json", projection)
     assembly = {
@@ -520,7 +520,7 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
         "workspace": workspace_info,
         "lock": {"path": LOCK_RELATIVE.as_posix(), "artifact": workspace_info["lock"], "source_commit": args.lock_source_commit, "origin": lock_origin, "intentional_external_delta": True},
         "fixture": fixture_artifact, "route_map": route_artifact, "dependency_projection": projection_artifact,
-        "build_selection": {"features": list(W8_FEATURES), "all_features": False, "target": args.target, "profile": args.profile, "jobs": 1},
+        "build_selection": {"features": projection["features"]["selected"], "all_features": True, "target": args.target, "profile": args.profile, "jobs": 1},
         "provenance_rules": {"no_production_diff": True, "no_workload_substitution": True, "native_compile": "pending", "native_validation": "pending", "performance_qualification": "pending", "acceptance_claim": False},
     }
     assembly_artifact = write_new(output_dir / "original-baseline-assembly.json", assembly)
