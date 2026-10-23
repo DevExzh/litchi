@@ -29,7 +29,9 @@ use quick_xml::events::Event;
 use sha2::{Digest, Sha256};
 
 use crate::core::{PackageWriter, StreamingArchiveLimits};
-use crate::{Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimits};
+use crate::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimits, XmlStreamLimits,
+};
 use litchi_core::{Error as CoreError, Resource, ResourceLimit};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -49,23 +51,30 @@ const SETTINGS: &[&[u8]] = &[b"settings"];
 
 /// The validated policy required by the raw flat-document helpers.
 ///
-/// A flat source has two policy domains.  `SourceLimits` admits the original
-/// XML buffer (and an independently supplied package), while `SemanticLimits`
-/// bounds the XML projection, nesting and publication.  Keeping this focused
-/// carrier separate from [`OpenOptions`] prevents a raw parser from silently
-/// selecting a default owner profile.  Owners construct it from the options
-/// they retained at ingress.
+/// A flat source has three policy domains. `SourceLimits` admits the original
+/// XML buffer (and an independently supplied package), `SemanticLimits` bounds
+/// the XML projection, nesting and publication, and `XmlStreamLimits` bounds
+/// XML member parsing when the projection is handed to a packaged owner.
+/// Keeping this focused carrier separate from [`OpenOptions`] prevents a raw
+/// parser from silently selecting a default owner profile. Owners construct
+/// it from the options they retained at ingress.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     source: SourceLimits,
     semantic: SemanticLimits,
+    xml: XmlStreamLimits,
 }
 
 impl Limits {
-    /// Build flat limits from already validated physical and semantic profiles.
+    /// Build flat limits from already validated physical, semantic and XML
+    /// profiles.
     #[must_use]
-    pub const fn new(source: SourceLimits, semantic: SemanticLimits) -> Self {
-        Self { source, semantic }
+    pub const fn new(source: SourceLimits, semantic: SemanticLimits, xml: XmlStreamLimits) -> Self {
+        Self {
+            source,
+            semantic,
+            xml,
+        }
     }
 
     /// Build flat limits from an already validated owner options envelope.
@@ -74,6 +83,7 @@ impl Limits {
         Self::new(
             options.source_limits_value(),
             options.semantic_limits_value(),
+            options.xml_limits_value(),
         )
     }
 
@@ -87,6 +97,12 @@ impl Limits {
     #[must_use]
     pub const fn semantic_limits_value(self) -> SemanticLimits {
         self.semantic
+    }
+
+    /// The XML stream policy retained for the packaged projection.
+    #[must_use]
+    pub const fn xml_limits_value(self) -> XmlStreamLimits {
+        self.xml
     }
 
     fn check_source_bytes(self, observed: usize) -> Result<()> {
@@ -187,6 +203,7 @@ impl Limits {
         OpenOptions::new()
             .source_limits(SourceLimits::MAXIMUM)
             .semantic_limits(self.semantic)
+            .xml_limits(self.xml)
     }
 }
 
@@ -665,7 +682,9 @@ impl Parts {
             flat,
             package,
             limits,
-            OpenOptions::new().source_limits(limits.source),
+            OpenOptions::new()
+                .source_limits(limits.source)
+                .xml_limits(limits.xml),
         )
     }
 
@@ -940,6 +959,7 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 mod tests {
     use super::{Limits, Parts};
     use crate::Error;
+    use crate::XmlStreamLimits;
     use crate::limits::{
         LimitKind, SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits,
     };
@@ -1125,7 +1145,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let limits = Limits::new(source, semantic);
+        let limits = Limits::new(source, semantic, XmlStreamLimits::default());
         assert!(Parts::split(FLAT.as_bytes(), &limits).is_ok());
 
         let one_under_source = SourceLimits::builder()
@@ -1133,8 +1153,11 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let error =
-            Parts::split(FLAT.as_bytes(), &Limits::new(one_under_source, semantic)).unwrap_err();
+        let error = Parts::split(
+            FLAT.as_bytes(),
+            &Limits::new(one_under_source, semantic, XmlStreamLimits::default()),
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             Error::Limit {
@@ -1149,8 +1172,11 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let error =
-            Parts::split(FLAT.as_bytes(), &Limits::new(source, one_under_content)).unwrap_err();
+        let error = Parts::split(
+            FLAT.as_bytes(),
+            &Limits::new(source, one_under_content, XmlStreamLimits::default()),
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             Error::Limit {
@@ -1168,7 +1194,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let limits = Limits::new(source, SemanticLimits::DEFAULT);
+        let limits = Limits::new(source, SemanticLimits::DEFAULT, XmlStreamLimits::default());
         let parts = Parts::split(FLAT.as_bytes(), &limits).unwrap();
         let package = parts.to_bytes(&limits).unwrap();
         assert!(package.len() > FLAT.len());
@@ -1192,6 +1218,32 @@ mod tests {
     }
 
     #[test]
+    fn projection_retains_xml_policy_and_uses_scratch_source_ceiling() {
+        let xml = XmlStreamLimits::new(8 * 1024 * 1024, 128, 200_000, 512, 1024 * 1024)
+            .expect("finite selected XML policy");
+        let semantic = SemanticLimits::DEFAULT;
+        let limits = Limits::new(SourceLimits::DEFAULT, semantic, xml);
+
+        let projected = limits.projection_options();
+        // The generated ZIP is an internal projection, so it intentionally
+        // uses the hard scratch source ceiling rather than the flat source's
+        // 512 MiB admission bound. The selected XML policy must nevertheless
+        // cross the projection boundary unchanged.
+        assert_eq!(projected.source_limits_value(), SourceLimits::MAXIMUM);
+        assert_eq!(projected.semantic_limits_value(), semantic);
+        assert_eq!(projected.xml_limits_value(), xml);
+
+        let parts = Parts::split(FLAT.as_bytes(), &limits).expect("flat source");
+        let package = parts.to_bytes(&limits).expect("synthetic package");
+        assert_eq!(
+            parts
+                .merge_package_projection(FLAT.as_bytes(), &package, &limits)
+                .expect("projection remains admissible"),
+            FLAT.as_bytes()
+        );
+    }
+
+    #[test]
     fn output_and_depth_limits_fail_before_publication() {
         let unrestricted = Limits::default();
         let parts = Parts::split(FLAT.as_bytes(), &unrestricted).unwrap();
@@ -1201,7 +1253,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let limits = Limits::new(SourceLimits::DEFAULT, output);
+        let limits = Limits::new(SourceLimits::DEFAULT, output, XmlStreamLimits::default());
         let parts = Parts::split(FLAT.as_bytes(), &limits).unwrap();
         // ZIP framing is an internal projection and does not consume the
         // published flat-document output budget.
@@ -1227,8 +1279,11 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let error =
-            Parts::split(FLAT.as_bytes(), &Limits::new(SourceLimits::DEFAULT, depth)).unwrap_err();
+        let error = Parts::split(
+            FLAT.as_bytes(),
+            &Limits::new(SourceLimits::DEFAULT, depth, XmlStreamLimits::default()),
+        )
+        .unwrap_err();
         assert!(matches!(
             error,
             Error::Limit {
@@ -1244,6 +1299,7 @@ mod tests {
                 .unwrap()
                 .build()
                 .unwrap(),
+            XmlStreamLimits::default(),
         );
         // The source was admitted under the loose profile.  Every output
         // route must still recheck its retained proof under the recipient's
@@ -1271,6 +1327,7 @@ mod tests {
                 .unwrap()
                 .build()
                 .unwrap(),
+            XmlStreamLimits::default(),
         );
         assert!(matches!(
             Parts::split(flat.as_bytes(), &limits),
