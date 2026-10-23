@@ -1032,7 +1032,6 @@ impl Edit {
     /// Returns an error when the deferred source slide projection cannot be
     /// materialized under the editing limits or the source fails edit-entry
     /// admission.
-    #[must_use]
     pub fn slides(&self) -> FamilyResult<&[Slide]> {
         self.ensure_entry().map_err(PackageError::from)?;
         match self.draft.as_ref() {
