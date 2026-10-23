@@ -21,6 +21,7 @@ import json
 import os
 import platform
 import resource
+import re
 import signal
 import subprocess
 import sys
@@ -76,6 +77,26 @@ NUMERIC_COLUMNS = (
     "write_ns",
     "read_ns",
     "output_bytes",
+)
+HEAVY_PROCESS_NAMES = {
+    "cargo",
+    "rustc",
+    "rustdoc",
+    "rustfmt",
+    "perf",
+    "heaptrack",
+    "valgrind",
+    "clang",
+    "clang++",
+    "gcc",
+    "cc",
+    "ld.lld",
+    "scoped_patch_probe",
+    "ole_w5_probe",
+}
+HEAVY_PROCESS_WORD = re.compile(
+    r"(?:^|[\s/'\"])(?:cargo|rustc|rustdoc|rustfmt|perf|heaptrack|valgrind|"
+    r"clang(?:\+\+)?|gcc|cc|ld\.lld)(?:$|[\s/'\"])",
 )
 
 
@@ -241,23 +262,42 @@ def parse_cpu_list(value: str) -> set[int]:
     return result
 
 
+def is_heavy_process(executable: str, command: str) -> bool:
+    if executable in HEAVY_PROCESS_NAMES:
+        return True
+    if executable.startswith(("litchi-perf-", "xls_f3_qualification", "xlsx_", "snappy-")):
+        return True
+    for token in command.split():
+        basename = Path(token.strip("'\"")).name
+        if basename in {"scoped_patch_probe", "ole_w5_probe"}:
+            return True
+    return bool(HEAVY_PROCESS_WORD.search(command))
+
+
 def process_scan(cpu: int) -> dict[str, Any]:
     proc = Path("/proc")
     load_path = proc / "loadavg"
     if not proc.is_dir() or not load_path.is_file():
         raise RunnerError("quiet process/load scans require Linux /proc")
     try:
-        load_values = load_path.read_text(encoding="ascii").split()[:3]
-        loadavg = [float(value) for value in load_values]
+        load_fields = load_path.read_text(encoding="ascii").split()
+        loadavg = [float(value) for value in load_fields[:3]]
+        runnable = int(load_fields[3].split("/", 1)[0])
     except (OSError, UnicodeError, ValueError) as error:
         raise RunnerError(f"cannot read /proc/loadavg: {error}") from error
     processes: list[dict[str, Any]] = []
+    heavy_processes: list[dict[str, Any]] = []
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
         try:
             status = (entry / "status").read_text(encoding="ascii")
             comm = (entry / "comm").read_text(encoding="utf-8").strip()
+            command_parts = [
+                part.decode("utf-8", "replace")
+                for part in (entry / "cmdline").read_bytes().split(b"\0")
+                if part
+            ]
         except (FileNotFoundError, PermissionError, OSError, UnicodeError):
             continue
         allowed_text = next(
@@ -274,10 +314,29 @@ def process_scan(cpu: int) -> dict[str, Any]:
             allowed = sorted(parse_cpu_list(allowed_text))
         except ValueError:
             continue
-        processes.append({"pid": int(entry.name), "comm": comm, "affinity": allowed})
+        process = {
+            "pid": int(entry.name),
+            "comm": comm,
+            "affinity": allowed,
+            "command": command_parts,
+        }
+        processes.append(process)
+        if is_heavy_process(comm, " ".join(command_parts)) and int(entry.name) != os.getpid():
+            heavy_processes.append(process)
     processes.sort(key=lambda item: item["pid"])
-    scan = {"cpu": cpu, "loadavg": loadavg, "processes": processes}
+    heavy_processes.sort(key=lambda item: item["pid"])
+    scan = {
+        "cpu": cpu,
+        "loadavg": loadavg,
+        "runnable_processes": runnable,
+        "processes": processes,
+        "heavy_processes": heavy_processes,
+        "quiet": not heavy_processes,
+    }
     scan["scan_sha256"] = sha256_bytes(canonical_json(scan))
+    if heavy_processes:
+        pids = [process["pid"] for process in heavy_processes]
+        raise RunnerError(f"heavy processes present during quiet scan: {pids}")
     return scan
 
 
