@@ -62,5 +62,19 @@ arguments. The captures remain outside the repository.
 | `append_commit_write` | 1,349,361,627 | 1,351,626,925 | 1.001679× |
 | `replay` | 1,349,364,328 | 1,351,598,499 | 1.001656× |
 
+The semantic-read instruction deltas are the bounded-memory path change, not
+an additional repair scan. The e4a baseline reads its retained `content.xml`
+string through `parse_*` and `write_slides_text_to`; the current owner uses
+the reader-backed `*_from_reader` variants and therefore reopens and
+decompresses the member for each uncached query. This accounts for the
+approximately 0.9--2.5% rows above. It also lowers the matched repeat-route
+peaks: `repeat_slide` 1,500,683 to 990,985 bytes, `repeat_text` 1,606,415 to
+1,096,717, and `repeat_write_text` 693,231 to 116,001, with identical output
+lengths and hashes. Retaining the raw string to remove these instructions
+would restore the 0358a +0.5 MiB source-memory residual. The append lifecycle
+does not have this tradeoff: its peak is 612,845 to 612,893 bytes (+48 bytes,
+0.008%), with the same output and hash; no avoidable append scan or freshness
+check was found.
+
 Native timing remains pending a quiet host window; these deterministic
 instruction rows do not make a native-speed claim.
