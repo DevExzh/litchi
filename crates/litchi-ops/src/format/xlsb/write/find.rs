@@ -19,8 +19,9 @@ use super::super::node::{Grid, Item, Node};
 use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
-    Commit, NativeCellOptions, NativeScalar, Reference, caller_value_error, cell_snapshot_budget,
-    cell_transfer_limits, native_error, package_from_editor,
+    Commit, NativeCellOptions, NativeScalar, Reference, caller_value_error,
+    cell_patch_container_bytes, cell_snapshot_budget, cell_transfer_limits, native_error,
+    package_from_editor,
 };
 use crate::error::{Code, Error, Result};
 use crate::find::Spec;
@@ -232,6 +233,7 @@ fn commit(
     };
     let mut package = package;
     let mut patches = Vec::new();
+    let mut retained_snapshot = cell_patch_container_bytes();
     for (sheet, assignments) in by_sheet {
         let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
         let mut edit = package
@@ -262,6 +264,9 @@ fn commit(
             ));
         }
         remaining_snapshot -= retained;
+        retained_snapshot = retained_snapshot
+            .checked_add(retained)
+            .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         package = next;
         patches.push(patch);
     }
@@ -286,6 +291,20 @@ fn commit(
             ));
         };
         let (next, patch) = edit.commit().map_err(native_error)?.into_parts();
+        let retained = patch.retained_bytes();
+        if retained > remaining_snapshot {
+            let consumed = limits
+                .max_snapshot_bytes()
+                .saturating_sub(remaining_snapshot);
+            return Err(super::snapshot_limit(
+                consumed.saturating_add(retained),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        remaining_snapshot -= retained;
+        retained_snapshot = retained_snapshot
+            .checked_add(retained)
+            .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         package = next;
         patches.push(patch);
     }
@@ -296,6 +315,7 @@ fn commit(
         package,
         patches,
         (canonical_sheet, canonical_limits),
+        retained_snapshot,
         limits.max_snapshot_bytes(),
         authored_operations,
     )?;

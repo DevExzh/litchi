@@ -325,6 +325,7 @@ impl Commit {
         package: litchi_xlsb::Package,
         patches: Vec<NativeCellPatch>,
         canonical: (usize, TransferLimits),
+        native_snapshot_bytes: usize,
         max_snapshot_bytes: usize,
         authored_operations: usize,
     ) -> Result<Self> {
@@ -339,7 +340,6 @@ impl Commit {
         let result = (|| {
             let native_patch = Patch::Cells(patches);
             let signed = base.signature() == super::Signature::Signed;
-            let native_snapshot_bytes = native_patch.retained_bytes();
             if native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
@@ -704,6 +704,7 @@ pub(crate) fn remove_with_limits(
     // materialized; the native patch itself supplies the complete semantic
     // cell-delta charge.
     let mut remaining_snapshot = cell_snapshot_budget(limits.max_snapshot_bytes())?;
+    let mut retained_snapshot = cell_patch_container_bytes();
     for (sheet, targets) in grouped {
         let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
         canonical.get_or_insert((sheet, native_limits));
@@ -739,6 +740,9 @@ pub(crate) fn remove_with_limits(
             ));
         }
         remaining_snapshot -= retained;
+        retained_snapshot = retained_snapshot
+            .checked_add(retained)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         package = next;
         patches.push(patch);
     }
@@ -754,6 +758,7 @@ pub(crate) fn remove_with_limits(
         package,
         patches,
         canonical,
+        retained_snapshot,
         limits.max_snapshot_bytes(),
         authored_operations,
     )?;
@@ -1177,6 +1182,7 @@ fn set_cells_with_limits(
         .map_err(|_| allocation("XLSB cell write patches"))?;
     let mut canonical = None;
     let mut remaining_snapshot = cell_snapshot_budget(limits.max_snapshot_bytes())?;
+    let mut retained_snapshot = cell_patch_container_bytes();
     for (sheet, targets) in grouped {
         let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
         canonical.get_or_insert((sheet, native_limits));
@@ -1209,6 +1215,9 @@ fn set_cells_with_limits(
             ));
         }
         remaining_snapshot -= retained;
+        retained_snapshot = retained_snapshot
+            .checked_add(retained)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         package = next;
         patches.push(patch);
     }
@@ -1224,6 +1233,7 @@ fn set_cells_with_limits(
         package,
         patches,
         canonical,
+        retained_snapshot,
         limits.max_snapshot_bytes(),
         authored_operations,
     )?;
@@ -1714,11 +1724,15 @@ fn check_remove_limits(targets: usize, limits: &SemanticLimits) -> Result<()> {
 /// NativeCellPatch::retained_bytes already includes package images and every
 /// owned cell delta; no per-target estimate is permitted here.
 pub(crate) fn cell_snapshot_budget(max_snapshot_bytes: usize) -> Result<usize> {
-    let container = size_of::<Vec<NativeCellPatch>>();
+    let container = cell_patch_container_bytes();
     max_snapshot_bytes
         .checked_sub(container)
         .filter(|budget| *budget > 0)
         .ok_or_else(|| snapshot_limit(max_snapshot_bytes.saturating_add(1), max_snapshot_bytes))
+}
+
+pub(crate) const fn cell_patch_container_bytes() -> usize {
+    size_of::<Vec<NativeCellPatch>>()
 }
 
 pub(crate) fn cell_transfer_limits(

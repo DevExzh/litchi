@@ -13,8 +13,8 @@ use litchi_xlsb::sheet::Selector as NativeSelector;
 
 use super::super::Xlsb;
 use super::{
-    Commit, NativeCellOptions, Reference, cell_snapshot_budget, cell_transfer_limits, native_error,
-    package_from_editor,
+    Commit, NativeCellOptions, Reference, cell_patch_container_bytes, cell_snapshot_budget,
+    cell_transfer_limits, native_error, package_from_editor,
 };
 use crate::calc::{ErrorValue, Status as Calc, Value};
 use crate::refresh::{Field, Options, Status, Summary, formula_report, workbook_summary};
@@ -85,6 +85,7 @@ pub(crate) fn refresh(
         let canonical_sheet = planned.keys().next().copied();
         let mut package = package_from_editor(handle.editor_for_write()?);
         let mut patches = Vec::new();
+        let mut retained_snapshot = cell_patch_container_bytes();
         for (sheet, caches) in planned {
             let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
             let Some(mut edit) = package
@@ -128,6 +129,9 @@ pub(crate) fn refresh(
                 ));
             }
             remaining_snapshot -= retained;
+            retained_snapshot = retained_snapshot
+                .checked_add(retained)
+                .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
             package = next;
             patches.push(patch);
         }
@@ -147,6 +151,7 @@ pub(crate) fn refresh(
             package,
             patches,
             (canonical_sheet, canonical_limits),
+            retained_snapshot,
             limits.max_snapshot_bytes(),
             writes,
         )?;

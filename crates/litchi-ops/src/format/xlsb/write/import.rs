@@ -9,8 +9,8 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeFormat, NativeScalar, NativeSelector, Reference,
-    caller_value_error, cell_snapshot_budget, cell_transfer_limits, native_error,
-    package_from_editor,
+    caller_value_error, cell_patch_container_bytes, cell_snapshot_budget, cell_transfer_limits,
+    native_error, package_from_editor,
 };
 use crate::error::{Code, Error, Result};
 use crate::import::{Origin, Summary, Table, Value, Written, serial};
@@ -156,11 +156,15 @@ pub(crate) fn import(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
+        let retained_snapshot = cell_patch_container_bytes()
+            .checked_add(patch.retained_bytes())
+            .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         let commit = Commit::from_cell_parts(
             file,
             next,
             vec![patch],
             (sheet, native_limits),
+            retained_snapshot,
             limits.max_snapshot_bytes(),
             table.fields().len(),
         )?;
