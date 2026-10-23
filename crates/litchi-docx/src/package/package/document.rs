@@ -52,8 +52,18 @@ impl Package {
     /// Returns a typed snapshot error when package state is stale, malformed,
     /// or outside the document transaction bounds.
     pub fn edit(&self) -> Result<crate::document::Edit, crate::document::Error> {
-        self.document_snapshot()
-            .map(|snapshot| crate::document::Edit::new(self.clone(), snapshot.edit()))
+        self.edit_with_options(crate::document::EditOptions::default())
+    }
+
+    /// Start the ordinary immutable main-document edit under one explicit
+    /// document-edit profile.
+    pub fn edit_with_options(
+        &self,
+        options: crate::document::EditOptions,
+    ) -> Result<crate::document::Edit, crate::document::Error> {
+        self.document_snapshot().map(|snapshot| {
+            crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options)
+        })
     }
 
     /// Start a bounded composition tied to this package's complete artifact.

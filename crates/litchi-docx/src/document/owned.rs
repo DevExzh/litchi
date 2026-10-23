@@ -55,16 +55,18 @@ impl<P: Clone> Edit<P> {
         Self { package, inner }
     }
 
-    /// Apply the unified facade's remaining semantic snapshot ceiling to the
-    /// retained main-document edit. The limit is checked before each native
-    /// projection is retained, while the package owner remains unchanged.
-    pub(crate) fn with_snapshot_budget(mut self, maximum: usize) -> Self {
-        self.inner = self.inner.with_snapshot_budget(maximum);
+    /// Configure the retained main-document XML-pair policy.
+    ///
+    /// The package owner remains unchanged. The bound is checked before each
+    /// native projection is retained.
+    pub fn with_options(mut self, options: super::EditOptions) -> Self {
+        self.inner = self.inner.with_options(options);
         self
     }
 
-    /// The unified facade budget currently attached to this edit.
-    pub(crate) const fn snapshot_budget(&self) -> Option<usize> {
+    /// Return the retained main-document XML-pair bound, if any.
+    #[must_use]
+    pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
         self.inner.snapshot_budget()
     }
 

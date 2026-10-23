@@ -3115,6 +3115,11 @@ impl Edit {
         self
     }
 
+    pub(crate) fn with_options(mut self, options: super::EditOptions) -> Self {
+        self.snapshot_budget = options.max_snapshot_bytes_value();
+        self
+    }
+
     /// The unified facade budget currently attached to this edit.
     pub(crate) const fn snapshot_budget(&self) -> Option<usize> {
         self.snapshot_budget

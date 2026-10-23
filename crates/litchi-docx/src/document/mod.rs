@@ -80,6 +80,42 @@ pub(crate) use transaction::{TransferPart, TransferRelationship, durable_transfe
 pub use blocks::{BlockContentControl, BlockKind, Blocks, IndexedBlock};
 pub(crate) use blocks::{BlockIndex, ContainerRoot, index as index_blocks};
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
+
+/// Options for a primary main-document edit.
+///
+/// The document owner keeps its parser and source policies from the package
+/// that was opened. This option is the one additional semantic admission
+/// policy a caller may attach to the edit: the maximum retained before/after
+/// main-document XML pair. `None` leaves the native document transaction
+/// unbounded by the unified facade's snapshot charge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    max_snapshot_bytes: Option<usize>,
+}
+
+impl EditOptions {
+    /// Construct the default document-edit profile.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_snapshot_bytes: None,
+        }
+    }
+
+    /// Bound the retained before/after main-document XML pair.
+    #[must_use]
+    pub const fn max_snapshot_bytes(mut self, maximum: usize) -> Self {
+        self.max_snapshot_bytes = Some(maximum);
+        self
+    }
+
+    /// Return the selected retained XML-pair bound, if any.
+    #[must_use]
+    pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
+        self.max_snapshot_bytes
+    }
+}
+
 pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Diagnostics, ElementAnchor, ElementPath, ElementStep,
     Error, GraphChange, HyperlinkTextReplacement, MAX_NEW_TABLE_DIMENSION, NewCell, NewParagraph,

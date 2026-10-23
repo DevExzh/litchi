@@ -187,14 +187,12 @@ impl DocxEditor {
     /// XML snapshot. Unsigned owners are converted to their owning edit here,
     /// preserving the existing explicit signature-removal route.
     pub(crate) fn with_snapshot_budget(self, maximum: usize) -> Result<Self> {
+        let options = litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum);
         match self {
-            Self::Edit(edit) => Ok(Self::Edit(Box::new(edit.with_snapshot_budget(maximum)))),
-            Self::Source(edit) => Ok(Self::Source(Box::new(edit.with_snapshot_budget(maximum)))),
+            Self::Edit(edit) => Ok(Self::Edit(Box::new(edit.with_options(options)))),
+            Self::Source(edit) => Ok(Self::Source(Box::new(edit.with_options(options)))),
             Self::Unsigned(package) => Ok(Self::Edit(Box::new(
-                package
-                    .edit()
-                    .map_err(Error::from)?
-                    .with_snapshot_budget(maximum),
+                package.edit_with_options(options).map_err(Error::from)?,
             ))),
         }
     }
