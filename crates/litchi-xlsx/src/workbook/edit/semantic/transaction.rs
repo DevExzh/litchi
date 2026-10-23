@@ -2553,6 +2553,9 @@ impl Edit {
             .get(&sheet.position())
             .and_then(|actions| actions.cells.get(&address))
         {
+            if matches!(action, Action::Remove) {
+                return Ok(None);
+            }
             match action.payload() {
                 Some(Payload::Rich(rich)) => return Ok(Some((**rich).clone())),
                 Some(_) => return Ok(None),
@@ -2571,11 +2574,11 @@ impl Edit {
         Ok(None)
     }
 
-    fn pending_transfer_has_payload(&self, position: usize, address: Address) -> bool {
+    fn pending_transfer_overrides_base_payload(&self, position: usize, address: Address) -> bool {
         self.sheets
             .get(&position)
             .and_then(|actions| actions.cells.get(&address))
-            .is_some_and(|action| action.payload().is_some())
+            .is_some_and(|action| matches!(action, Action::Remove) || action.payload().is_some())
     }
 
     fn transfer_cells<'source, 'range, 'target, 'anchor>(
@@ -2702,10 +2705,14 @@ impl Edit {
         for (&source_address, &target_address) in
             source_addresses.iter().zip(target_addresses.iter())
         {
-            if !self.pending_transfer_has_payload(source_sheet.position(), source_address) {
+            if !self
+                .pending_transfer_overrides_base_payload(source_sheet.position(), source_address)
+            {
                 source_rich_addresses.push(source_address);
             }
-            if !self.pending_transfer_has_payload(target_sheet.position(), target_address) {
+            if !self
+                .pending_transfer_overrides_base_payload(target_sheet.position(), target_address)
+            {
                 target_rich_addresses.push(target_address);
             }
         }
