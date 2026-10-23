@@ -55,8 +55,8 @@ pub(crate) fn import(
             .check_grid(row, column, MAX_ROWS, MAX_COLUMNS)
             .map_err(|error| error.with_format(FileFormat::Xlsx))?;
         let date1904 = file.is_1904_date_system();
-        let source = file.editor_for_write()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(_limits.max_snapshot_bytes())?;
+        let mut edit = super::edit_with_snapshot_limit(&source, _limits.max_snapshot_bytes())?;
         let mut summary = Summary::at(origin, table);
         {
             let mut worksheet = edit.sheet(sheet).map_err(native_error)?.ok_or_else(|| {

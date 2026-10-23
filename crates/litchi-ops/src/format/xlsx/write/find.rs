@@ -70,7 +70,7 @@ impl Xlsx {
             );
         };
         let scopes = scopes(self, target)?;
-        let source = self.editor_for_write()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let workbook = source.workbook();
         let matcher = spec.matcher();
         let mut matches = 0usize;
@@ -176,7 +176,7 @@ impl Xlsx {
                 }
             }
         }
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = super::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut index = 0;
         while index < changes.len() {
             let sheet = changes[index].0;

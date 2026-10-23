@@ -1279,11 +1279,14 @@ where
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
     let before_bytes = file.retained_source_len().unwrap_or(0);
-    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+    let minimum = before_bytes
+        .saturating_mul(2)
+        .saturating_add(size_of::<litchi_ppt::Patch>());
     if minimum > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
     }
-    let package = file.editable_package_for_write()?;
+    let package =
+        file.editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     stage(&mut edit).map_err(native_edit_error)?;
     edit.commit().map_err(native_edit_error)
@@ -1315,11 +1318,13 @@ fn stage_plans(
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
     let before_bytes = file.retained_source_len().unwrap_or(0);
-    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+    let minimum = before_bytes
+        .saturating_mul(2)
+        .saturating_add(size_of::<litchi_ppt::Patch>());
     if minimum > snapshot_budget {
         return Err(snapshot_limit(minimum, snapshot_budget));
     }
-    let package = file.editable_package_for_write()?;
+    let package = file.editable_package_for_write_with_snapshot_limit(snapshot_budget)?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     if plans.len() > 1
         && plans.iter().all(|plan| {
@@ -1410,6 +1415,7 @@ fn finish_commit(
             // signed artifact; otherwise leaf replay would compare against the
             // private unsigned image and the facade would lose content identity.
             let original = file.original_package_for_noop()?;
+            file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
             original
                 .edit()
                 .map_err(native_edit_error)?

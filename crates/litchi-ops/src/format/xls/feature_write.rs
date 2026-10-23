@@ -104,6 +104,17 @@ impl Xls {
                 // Rebuild the exact identity patch over the retained signed
                 // package before publishing the no-op.
                 let original = self.original_package_for_noop()?;
+                let minimum = self
+                    .retained_source_len()
+                    .saturating_mul(2)
+                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
+                    .saturating_add(std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>());
+                if minimum > limits.max_snapshot_bytes() {
+                    return Err(error(
+                        Code::LimitExceeded,
+                        "the worksheet-feature identity patch exceeds the snapshot budget",
+                    ));
+                }
                 let empty = original
                     .edit_sheet_features()
                     .map_err(native)?
@@ -148,8 +159,12 @@ impl Xls {
         })
     }
 
-    fn feature_edit(&self) -> Result<sf::edit::Edit> {
-        self.editable_package_for_write()?
+    fn feature_edit(&self, maximum: usize) -> Result<sf::edit::Edit> {
+        self.preflight_snapshot_bytes(
+            maximum,
+            std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>(),
+        )?;
+        self.editable_package_for_write_with_snapshot_limit(maximum)?
             .edit_sheet_features()
             .map_err(native)
     }
@@ -158,7 +173,7 @@ impl Xls {
 /// Run one leaf edit and publish it.
 macro_rules! publish {
     ($file:expr, $limits:expr, |$edit:ident| $body:expr) => {{
-        let mut $edit = $file.feature_edit()?;
+        let mut $edit = $file.feature_edit($limits.max_snapshot_bytes())?;
         let value = { $body };
         let commit = $edit.commit().map_err(native)?;
         ($file.publish_features(commit, $limits)?, value)

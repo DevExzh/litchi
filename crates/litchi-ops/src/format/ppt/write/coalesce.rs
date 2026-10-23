@@ -109,14 +109,16 @@ impl Run {
     ) -> Result<Self> {
         base.check_source_for_write()?;
         let before_bytes = base.retained_source_len().unwrap_or(0);
-        let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+        let minimum = before_bytes
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>());
         if minimum > remaining_snapshot {
             return Err(snapshot_limit(minimum, remaining_snapshot));
         }
         let package = if base.signature() == crate::format::signature::Signature::Signed {
-            base.editable_package_for_write()?
+            base.editable_package_for_write_with_snapshot_limit(remaining_snapshot)?
         } else {
-            base.editable_package()?
+            base.editable_package_with_snapshot_limit(remaining_snapshot)?
         };
         let edit = package.edit().map_err(native_edit_error)?;
         base.check_source_for_write()?;
@@ -183,6 +185,23 @@ impl Run {
             .with_format(FileFormat::Ppt));
         }
         self.base.check_source_for_write()?;
+        let authored = plan
+            .text
+            .as_ref()
+            .map_or(0, |text| text.len())
+            .saturating_add(plan.anchor.map_or(0, |_| size_of::<litchi_ppt::Anchor>()));
+        let observed = self
+            .base
+            .retained_source_len()
+            .unwrap_or(0)
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>())
+            .saturating_add(self.staged_bytes.saturating_add(plan.charge()))
+            .saturating_add(authored)
+            .saturating_add(size_of::<Item>());
+        if observed > self.max_snapshot_bytes {
+            return Err(snapshot_limit(observed, self.max_snapshot_bytes));
+        }
         self.items
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
@@ -246,6 +265,7 @@ impl Run {
                 let original = original
                     .as_ref()
                     .ok_or_else(|| Error::signed(FileFormat::Ppt))?;
+                base.preflight_snapshot_bytes(max_snapshot_bytes, 0)?;
                 let empty = original
                     .edit()
                     .map_err(native_edit_error)?

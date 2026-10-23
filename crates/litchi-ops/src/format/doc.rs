@@ -5,6 +5,7 @@
 //! Source release keeps only the detached read projection and metadata.
 
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -483,6 +484,30 @@ impl Doc {
             DocSource::Released => None,
         }
     }
+
+    /// Check the source, edit owner and caller-authored staging against the
+    /// remaining snapshot budget before a DOC body editor can copy the CFB or
+    /// build its immutable body snapshot.  The exact patch charge remains the
+    /// publication check; this bound covers the live native edit handoff too.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let source = self
+            .retained_source_len()
+            .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
+        let observed = source
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_doc::Patch>())
+            .saturating_add(size_of::<litchi_doc::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
+    }
 }
 
 /// The patch a DOC write step retains: a body edit or a metadata edit.
@@ -502,20 +527,18 @@ fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOp
     litchi_doc::EditOptions::default().transaction_limits(transaction_limits)
 }
 
-fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
-    BodyTransactionLimits::new(limits.max_operations(), usize::MAX, usize::MAX)
-        .with_max_retained_render_bytes(limits.max_snapshot_bytes())
-}
-
-/// The retained-render ceiling for a coalesced run after earlier transaction
-/// steps have charged their snapshots.  The native editor must see this
-/// remaining budget before it captures its body image.
-fn body_transaction_limits_with_snapshot(
+/// Keep the native DOC render handoff inside the transaction's remaining
+/// snapshot budget. The body editor retains its source image while a rendered
+/// candidate is live, so giving it the complete remaining ceiling would allow
+/// the source and candidate to coexist above the facade limit before commit's
+/// exact patch check runs.
+pub(crate) fn body_transaction_limits_with_source(
     limits: SemanticLimits,
-    remaining_snapshot: usize,
+    source_bytes: usize,
+    snapshot_budget: usize,
 ) -> BodyTransactionLimits {
     BodyTransactionLimits::new(limits.max_operations(), usize::MAX, usize::MAX)
-        .with_max_retained_render_bytes(remaining_snapshot)
+        .with_max_retained_render_bytes(snapshot_budget.saturating_sub(source_bytes))
 }
 
 impl std::fmt::Debug for Doc {

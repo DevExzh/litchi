@@ -2,6 +2,7 @@
 //! (record 0254).
 
 use litchi_core::{FileFormat, Metadata};
+use std::mem::size_of;
 
 use super::{Doc, StepPatch, WriteCommit};
 use crate::Props;
@@ -37,6 +38,10 @@ impl Doc {
             }
             .into());
         }
+        self.preflight_snapshot_bytes(
+            limits.max_snapshot_bytes(),
+            size_of::<litchi_doc::package::metadata::Edit>(),
+        )?;
         let Some(package) = self.editable_package_for_write()? else {
             return Err(Error::new(
                 Code::UnsupportedCapability,
@@ -61,6 +66,10 @@ impl Doc {
                 // an identity metadata patch over the retained signed owner
                 // so replay and the facade have the same physical base.
                 let original = self.original_package_for_noop()?;
+                self.preflight_snapshot_bytes(
+                    limits.max_snapshot_bytes(),
+                    size_of::<litchi_doc::package::metadata::Edit>(),
+                )?;
                 let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
                 let canonical_snapshot_bytes =
                     ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());

@@ -13,7 +13,7 @@ use litchi_xlsx::{self as xlsx, Name};
 
 use super::node::Node;
 use super::spec::{Kind, SHEET_WRITE_TABLE, SheetSetter};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::props::Props;
@@ -71,8 +71,8 @@ pub(crate) fn try_set_sheet(
         // The native edit validates signed/encrypted/retained-source policy
         // and keeps rename/visibility changes in one atomic workbook edit.
         let names = file.worksheet_names()?;
-        let source = file.editor_for_write()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         for position in positions {
             let Some(mut tab) = edit.tab(position).map_err(native_error)? else {
                 return Err(Error::new(
@@ -151,8 +151,8 @@ impl Xlsx {
                 None => return Ok(None),
             }
         };
-        let source = self.editor_for_write()?;
-        let base = middle.editor_for_write()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let base = middle.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut edit = base.edit_auto_filter()?;
         for position in positions {
             let value = filter
@@ -180,6 +180,7 @@ impl Xlsx {
             target,
             changed,
             1,
+            0,
             limits.max_snapshot_bytes(),
         )?))
     }

@@ -14,6 +14,7 @@
 //! so the first edit starts from it without reopening it.
 
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -414,6 +415,27 @@ impl Ppt {
         }
     }
 
+    /// Check the retained source and native edit handoff before a PPT edit
+    /// copies the CFB source or builds its immutable slide snapshot. The
+    /// exact patch charge remains authoritative after commit.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let source = self.retained_source_len().unwrap_or(0);
+        let observed = source
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>())
+            .saturating_add(size_of::<litchi_ppt::package::edit::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     /// Admit a primary native PPT edit under the signature, encryption and
     /// source-retention policy shared by the other native formats.
     pub(crate) fn admit_edit(&self) -> Result<()> {
@@ -508,6 +530,23 @@ impl Ppt {
             )?);
         }
         Ok(package.clone())
+    }
+
+    /// Admit the writable package against the remaining snapshot budget
+    /// before signature removal or native edit capture can allocate.
+    pub(crate) fn editable_package_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package_for_write()
+    }
+
+    /// Admit an ordinary unsigned package against the remaining snapshot
+    /// budget before native edit capture can allocate.
+    pub(crate) fn editable_package_with_snapshot_limit(&self, maximum: usize) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package()
     }
 
     /// Return the original native package for a canonical signed no-op edit.

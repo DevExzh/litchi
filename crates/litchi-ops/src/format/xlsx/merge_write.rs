@@ -16,7 +16,7 @@ use litchi_xlsx::{self as xlsx, Area, Rect};
 use super::node::{Grid, Node, SheetHandle};
 use super::sheet_write::{SheetAssignments, admit_sheet_properties};
 use super::spec::{MERGE_WRITE_TABLE, MergeSetter};
-use super::write::{Commit, PreparedCells};
+use super::write::{Commit, PreparedCells, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::props::{Key, Props};
@@ -135,8 +135,8 @@ pub(crate) fn try_set_merge(
         // The native editor performs the protected-sheet, unknown-content,
         // formula, and compatibility checks.  Every merge and any companion
         // cell write is staged in that one transaction.
-        let source = file.editor_for_write()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         apply_merge_targets(&mut edit, &resolved.targets, assignment.mode.adds())?;
         if let Some(cells) = prepared_cells {
             cells.apply(&mut edit)?;

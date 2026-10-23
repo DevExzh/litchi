@@ -26,7 +26,7 @@ use litchi_core::FileFormat;
 use litchi_xlsx::{self as xlsx, Address};
 
 use super::node::{Item, Node, RunItem, SheetHandle};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::node::Value;
@@ -618,14 +618,14 @@ impl Xlsx {
         limits: &SemanticLimits,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
-        let source = self.editor_for_write()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut rich = match read {
             Some(rich) => rich,
             None => editable_runs(&source, sheet, at)?,
         };
         change(&mut rich)?;
         self.check_source_for_replay()?;
-        let mut edit = source.edit().map_err(super::write::native_error)?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut worksheet = edit
             .sheet(sheet)
             .map_err(super::write::native_error)?

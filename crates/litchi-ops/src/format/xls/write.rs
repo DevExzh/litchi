@@ -184,8 +184,9 @@ pub(crate) fn remove_with_limits(
         .with_format(FileFormat::Xls));
     }
 
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
     let mut edit = file
-        .editable_package_for_write()?
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         .edit()
         .map_err(native_edit_error)?;
     for target in targets {
@@ -246,8 +247,9 @@ fn set_sheet_with_limits(
     {
         return no_op(file, limits);
     }
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
     let mut edit = file
-        .editable_package_for_write()?
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         .edit()
         .map_err(native_edit_error)?;
     edit.rename_sheet(Selector::Position(Position::new(position)), &name)
@@ -283,8 +285,9 @@ fn set_cells_with_limits(
     if let CellAssignment::Format(change) = &plan.assignment {
         // Formatting rewrites only the cell's XF reference, so formula cells
         // and absent coordinates are admitted alike.
+        file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
         let mut edit = file
-            .editable_package_for_write()?
+            .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
             .edit()
             .map_err(native_edit_error)?;
         for target in targets {
@@ -315,8 +318,9 @@ fn set_cells_with_limits(
         .with_property(property));
     }
 
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
     let mut edit = file
-        .editable_package_for_write()?
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         .edit()
         .map_err(native_edit_error)?;
     if let CellAssignment::Formula(expression) = &plan.assignment {
@@ -961,6 +965,14 @@ pub(super) fn finish_commit(
         // patch over the retained signed package so native replay and the
         // facade compare the same physical base bytes.
         let original = file.original_package_for_noop()?;
+        let minimum = file
+            .retained_source_len()
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_xls::Patch>())
+            .saturating_add(size_of::<litchi_xls::package::edit::Edit>());
+        if minimum > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+        }
         let (package, patch) = original
             .edit()
             .map_err(native_edit_error)?
@@ -1027,7 +1039,7 @@ fn finish_parts(
 
 fn no_op(file: &Xls, limits: &SemanticLimits) -> Result<WriteCommit> {
     let native = file
-        .editable_package_for_write()?
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         .edit()
         .map_err(native_edit_error)?
         .commit()
@@ -1479,11 +1491,14 @@ pub(crate) mod coalesce {
         ) -> Result<Self> {
             base.check_source_for_write()?;
             let source_bytes = base.retained_source_len();
-            let minimum = source_bytes.saturating_add(size_of::<litchi_xls::Patch>());
+            let minimum = source_bytes
+                .saturating_mul(2)
+                .saturating_add(size_of::<litchi_xls::Patch>())
+                .saturating_add(size_of::<litchi_xls::package::edit::Edit>());
             if minimum > remaining_snapshot {
                 return Err(snapshot_limit(minimum, remaining_snapshot));
             }
-            let source = base.editable_package_for_write()?;
+            let source = base.editable_package_for_write_with_snapshot_limit(remaining_snapshot)?;
             let edit = source.edit().map_err(native_edit_error)?;
             base.check_source_for_write()?;
             Ok(Self {
@@ -1547,6 +1562,21 @@ pub(crate) mod coalesce {
                     "XLS cell coalescing barrier was not flushed",
                 )
                 .with_format(FileFormat::Xls));
+            }
+            let staged = self
+                .staged_bytes
+                .saturating_add(plan.charge())
+                .saturating_add(size_of::<NativeValue>());
+            let observed = self
+                .base
+                .retained_source_len()
+                .saturating_mul(2)
+                .saturating_add(size_of::<litchi_xls::Patch>())
+                .saturating_add(size_of::<litchi_xls::package::edit::Edit>())
+                .saturating_add(staged)
+                .saturating_add(size_of::<Item>());
+            if observed > self.max_snapshot_bytes {
+                return Err(snapshot_limit(observed, self.max_snapshot_bytes));
             }
             // Staging reads no source: the run checks it when it opens and
             // around its commit (record 0337).

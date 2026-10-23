@@ -80,7 +80,7 @@ pub(crate) fn find_replace(
             FileFormat::Ppt,
             "the native PPT editor replaces a shape's text whole",
         )?;
-        file.admit_edit()?;
+        file.admit_edit_for_write()?;
         let mut scopes = Vec::new();
         surface::each_target(Nav::new(file), target, |node: Node<'_>| {
             scopes.push(match node.item() {

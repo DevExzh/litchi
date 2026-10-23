@@ -17,7 +17,7 @@ use litchi_xlsx::{self as xlsx, HeightAt, RowAt, WidthAt};
 
 use super::node::Node;
 use super::spec::{COLUMN_WRITE_TABLE, ColumnSetter, Kind, ROW_WRITE_TABLE, RowSetter};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::props::{Key, Props};
@@ -107,8 +107,8 @@ pub(crate) fn try_set_dimensions(
         };
         check_target_count(resolved.targets.len(), charge, limits)?;
 
-        let source = file.editor_for_write()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         match assignments {
             DimensionAssignments::Row(assignments) => {
                 apply_rows(&mut edit, &resolved.targets, &assignments)?;

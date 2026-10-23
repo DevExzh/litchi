@@ -121,23 +121,13 @@ impl Run {
             }));
         }
         base.check_source_for_write()?;
-        // The native body editor retains the source and a patch-sized handoff.
-        // Check this lower bound before the signed setter materializes its
-        // unsigned private package; the final commit still charges the exact
-        // retained before/after proof.
-        let source_bytes = base
-            .retained_source_len()
-            .map_or(0, |length| usize::try_from(length).unwrap_or(usize::MAX));
-        let minimum = source_bytes
-            .saturating_mul(2)
-            .saturating_add(size_of::<litchi_doc::Patch>());
-        if minimum > remaining_snapshot {
-            return Err(Error::from(TransactionError::Limit {
-                kind: LimitKind::SnapshotBytes,
-                observed: minimum,
-                maximum: remaining_snapshot,
-            }));
-        }
+        // Check the live native edit handoff before the signed setter
+        // materializes its unsigned private package; the final commit still
+        // charges the exact retained before/after proof.
+        base.preflight_snapshot_bytes(
+            remaining_snapshot,
+            size_of::<litchi_doc::body_text::ChangeRef<'static>>(),
+        )?;
         let package = (if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_package_for_write()?
         } else {
@@ -151,8 +141,11 @@ impl Run {
             .with_format(FileFormat::Doc)
             .with_suggestion("reopen the document with source retention enabled")
         })?;
+        let source_bytes = base
+            .retained_source_len()
+            .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
         let edit = package.edit_with_options(super::edit_options(
-            super::body_transaction_limits_with_snapshot(*limits, remaining_snapshot),
+            super::body_transaction_limits_with_source(*limits, source_bytes, remaining_snapshot),
         ))?;
         Ok(Self {
             base: base.clone(),
@@ -230,6 +223,18 @@ impl Run {
         spelling: Option<&str>,
     ) -> Result<bool> {
         self.base.check_source_for_write()?;
+        let prospective = self.snapshot_bytes_for(&plan).ok_or_else(|| {
+            Error::from(TransactionError::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed: usize::MAX,
+                maximum: self.max_snapshot_bytes,
+            })
+        })?;
+        limit(
+            LimitKind::SnapshotBytes,
+            prospective,
+            self.max_snapshot_bytes,
+        )?;
         let changed = match &plan.change {
             Change::Text(text) => {
                 let prior = self
@@ -303,6 +308,30 @@ impl Run {
         Ok(changed)
     }
 
+    fn snapshot_bytes_for(&self, plan: &Plan) -> Option<usize> {
+        let source = self.edit.source_bytes().len().checked_mul(2)?;
+        let text = self
+            .items
+            .iter()
+            .fold(0usize, |total, item| match &item.change {
+                Change::Text(text) => total.saturating_add(text.len().saturating_mul(2)),
+                Change::Toggle { .. } => total,
+            });
+        let incoming = match &plan.change {
+            Change::Text(text) => text.len().saturating_mul(2),
+            Change::Toggle { .. } => 0,
+        };
+        source
+            .checked_add(text.saturating_add(incoming))?
+            .checked_add(size_of::<litchi_doc::Patch>())?
+            .checked_add(
+                self.items
+                    .len()
+                    .saturating_add(1)
+                    .saturating_mul(size_of::<litchi_doc::body_text::ChangeRef<'static>>()),
+            )
+    }
+
     pub(crate) fn commit(self) -> Result<WriteCommit> {
         let Self {
             base,
@@ -333,7 +362,7 @@ impl Run {
             // plan proves cancellation; the retained signed package gets a
             // fresh canonical identity patch of its own.
             let original = base.original_package_for_noop()?;
-            let (_, patch) = empty_commit(&base, &original)?;
+            let (_, patch) = empty_commit(&base, &original, max_snapshot_bytes)?;
             let snapshot_bytes = staged_snapshot_bytes.max(super::patch_snapshot_bytes(&patch));
             (base.clone(), patch, snapshot_bytes)
         } else {
@@ -372,9 +401,19 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
 fn empty_commit(
     base: &Doc,
     source: &litchi_doc::Package,
+    max_snapshot_bytes: usize,
 ) -> Result<(litchi_doc::Package, litchi_doc::Patch)> {
     base.check_source_for_write()?;
-    let commit = source.edit()?.commit()?;
+    base.preflight_snapshot_bytes(max_snapshot_bytes, 0)?;
+    let source_bytes = base
+        .retained_source_len()
+        .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
+    let transaction_limits =
+        litchi_doc::body_text::TransactionLimits::new(1, usize::MAX, usize::MAX)
+            .with_max_retained_render_bytes(max_snapshot_bytes.saturating_sub(source_bytes));
+    let commit = source
+        .edit_with_options(super::edit_options(transaction_limits))?
+        .commit()?;
     base.check_source_for_write()?;
     Ok(commit.into_parts())
 }

@@ -3,6 +3,7 @@
 
 use litchi_core::{FileFormat, Metadata};
 use litchi_ppt::Package;
+use std::mem::size_of;
 
 use super::Ppt;
 use super::write::{StepPatch, WriteCommit};
@@ -41,6 +42,10 @@ impl Ppt {
             }
             .into());
         }
+        self.preflight_snapshot_bytes(
+            limits.max_snapshot_bytes(),
+            size_of::<litchi_ppt::package::metadata::Edit>(),
+        )?;
         let package = self.editable_package_for_write()?;
         let mut edit = package.edit_metadata()?;
         let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Ppt)?;
@@ -57,6 +62,10 @@ impl Ppt {
                 // Re-root a signed no-op on the original signed package; the
                 // writable probe above intentionally edits an unsigned copy.
                 let original = self.original_package_for_noop()?;
+                self.preflight_snapshot_bytes(
+                    limits.max_snapshot_bytes(),
+                    size_of::<litchi_ppt::package::metadata::Edit>(),
+                )?;
                 let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
                 let canonical_snapshot_bytes =
                     ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());

@@ -26,7 +26,7 @@ pub(super) fn commit(
     workbook: &xlsx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
-) -> Result<(xlsx::Package, Metadata, bool)> {
+) -> Result<(xlsx::Package, Metadata, bool, usize)> {
     let mut edit = workbook.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
@@ -36,9 +36,10 @@ pub(super) fn commit(
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
     let commit = edit.commit().map_err(native)?;
+    let patch_bytes = commit.patch().retained_bytes();
     let changed = commit.diagnostics().changed();
     let after = commit.into_package();
-    Ok((after, metadata, changed))
+    Ok((after, metadata, changed, patch_bytes))
 }
 
 impl Xlsx {
@@ -67,8 +68,8 @@ impl Xlsx {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        let source = self.editor_for_write()?;
-        let (target, metadata, changed) =
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let (target, metadata, changed, native_patch_bytes) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)
@@ -83,6 +84,7 @@ impl Xlsx {
             target,
             changed,
             authored_operations,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )
     }
@@ -108,7 +110,7 @@ impl Xlsx {
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
 pub(super) fn create(workbook: xlsx::Package, metadata: &Metadata) -> Result<Xlsx> {
-    let (workbook, metadata, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
+    let (workbook, metadata, _, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }
 

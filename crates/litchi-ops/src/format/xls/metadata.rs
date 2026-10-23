@@ -41,7 +41,12 @@ impl Xls {
             }
             .into());
         }
-        let package = self.editable_package_for_write()?;
+        self.preflight_snapshot_bytes(
+            limits.max_snapshot_bytes(),
+            std::mem::size_of::<litchi_xls::package::metadata::Edit>(),
+        )?;
+        let package =
+            self.editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut edit = package.edit_metadata()?;
         let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Xls)?;
         let commit = edit.commit()?;
@@ -57,6 +62,19 @@ impl Xls {
                 // Re-root the identity patch on the retained signed package;
                 // the writable probe used an unsigned private package.
                 let original = self.original_package_for_noop()?;
+                let minimum = self
+                    .retained_source_len()
+                    .saturating_mul(2)
+                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
+                    .saturating_add(std::mem::size_of::<litchi_xls::package::metadata::Edit>());
+                if minimum > limits.max_snapshot_bytes() {
+                    return Err(TransactionError::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: minimum,
+                        maximum: limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
                 let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
                 let canonical_snapshot_bytes =
                     ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());

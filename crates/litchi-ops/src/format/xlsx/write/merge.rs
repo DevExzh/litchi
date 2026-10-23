@@ -26,7 +26,7 @@ pub(crate) fn merge(
 ) -> Result<(Option<Commit>, Summary)> {
     file.check_source()?;
     let result = (|| {
-        let source = file.editor_for_write()?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let workbook = source.workbook();
         let mut planner = Planner::new(record, options, limits);
         // (worksheet position, address, new text)
@@ -107,7 +107,7 @@ pub(crate) fn merge(
         if cells.is_empty() {
             return Ok((None, summary));
         }
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = super::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut index = 0;
         while index < cells.len() {
             let position = cells[index].0;

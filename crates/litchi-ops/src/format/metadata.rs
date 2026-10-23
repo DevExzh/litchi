@@ -500,7 +500,13 @@ pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Erro
             format!("metadata {kind:?} limit exceeded: {observed} > {maximum}"),
         ),
         properties::Error::Signed => crate::format::signature::refusal(format),
-        properties::Error::Conflict(message) => Error::new(Code::ValidationError, message),
+        // A metadata patch conflict is a stale/foreign replay, not malformed
+        // document content. Keep the reason fixed and content-free while
+        // exposing the unified invalid-input classification.
+        properties::Error::Conflict(_) => Error::new(
+            Code::InvalidInput,
+            "the metadata patch does not match the package",
+        ),
         other => Error::new(Code::CorruptFile, other.to_string()),
     };
     error.with_format(format)

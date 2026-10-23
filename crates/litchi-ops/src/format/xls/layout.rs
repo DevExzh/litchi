@@ -109,7 +109,7 @@ pub(crate) fn add_axis(
             "XLS adds sheet tabs under the workbook and rows or columns under a sheet",
         ));
     };
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     if !node.props().is_empty() {
         return Err(refusal(
             Code::UnsupportedCapability,
@@ -158,7 +158,11 @@ pub(crate) fn add_axis(
         ));
     }
     admit(limits)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 1)?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     let selector = Selector::Position(Position::new(sheet));
     match axis {
         Axis::Row => edit.insert_rows(selector, index as u16, 1),
@@ -206,7 +210,11 @@ pub(crate) fn remove_axis(
         - 1;
     let sheet = node.sheet_position();
     admit(limits)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 1)?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     let selector = Selector::Position(Position::new(sheet));
     match axis {
         Axis::Row => edit.delete_rows(selector, index as u16, 1),
@@ -406,7 +414,7 @@ pub(crate) fn set_layout(
     let assignments = admit_layout(axis, props)?;
     if assignments.size.is_none() && assignments.hidden.is_none() || targets.is_empty() {
         let native = file
-            .editable_package()?
+            .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
             .edit()
             .map_err(native_edit_error)?
             .commit()
@@ -423,7 +431,11 @@ pub(crate) fn set_layout(
         })
         .with_format(FileFormat::Xls));
     }
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     for target in targets {
         match target {
             LayoutTarget::Row { sheet, row } => {

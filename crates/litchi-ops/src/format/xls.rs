@@ -6,6 +6,7 @@
 //! and delegates semantic reads to the native Workbook projection.
 
 use std::io::Cursor;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -110,7 +111,7 @@ impl Xls {
     /// copy of the exact source. Ordinary unsigned handles retain the native
     /// owner and therefore retain its source policy and lazy route.
     pub(crate) fn editable_package(&self) -> Result<Package> {
-        self.admit_edit()?;
+        self.admit_edit_for_write()?;
         if self.signature() == Signature::RemovalAuthorized {
             let bytes = signature::unsign_compound_file(
                 self.owner().source_bytes()?,
@@ -122,6 +123,13 @@ impl Xls {
             )?);
         }
         Ok(self.owner().clone())
+    }
+
+    /// Admit an ordinary unsigned native edit against the remaining
+    /// before/after snapshot budget before its package owner is cloned.
+    pub(crate) fn editable_package_with_snapshot_limit(&self, maximum: usize) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package()
     }
 
     /// Return the retained package for a setter that may prove an exact
@@ -144,6 +152,39 @@ impl Xls {
             )?);
         }
         Ok(self.owner().clone())
+    }
+
+    /// Admit the native before/after package capture against the transaction's
+    /// remaining snapshot budget before signature removal or package cloning
+    /// can allocate its private edit owner.
+    pub(crate) fn editable_package_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package_for_write()
+    }
+
+    /// Check the native package, edit handoff and caller-authored staging
+    /// against the remaining snapshot budget before a private XLS edit owner
+    /// can be materialized. The patch's exact retained charge is still
+    /// authoritative after commit.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let observed = self
+            .retained_source_len()
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_xls::Patch>())
+            .saturating_add(size_of::<litchi_xls::package::edit::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
     }
 
     /// Return the original native package for a canonical signed no-op patch.

@@ -8,6 +8,7 @@
 
 use litchi_core::{FileFormat, Position};
 use litchi_xls::cell_values::{Reference, Selector, Storage, Value as NativeValue};
+use std::mem::size_of;
 
 use super::super::node::Item;
 use super::super::{Nav, Xls};
@@ -58,7 +59,7 @@ pub(crate) fn import(
     table: &Table,
     limits: &SemanticLimits,
 ) -> Result<(Vec<WriteCommit>, Summary)> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let origin = origin(file, path)?;
     let Origin {
         sheet, row, column, ..
@@ -73,7 +74,26 @@ pub(crate) fn import(
         let base = commits
             .last()
             .map_or_else(|| file.clone(), |commit| commit.after.clone());
-        let mut edit = base.editable_package()?.edit().map_err(native_edit_error)?;
+        let used = commits.iter().fold(0usize, |total, commit| {
+            total.saturating_add(commit.snapshot_bytes)
+        });
+        let remaining = limits.max_snapshot_bytes().saturating_sub(used);
+        let chunk_limits = limits.with_snapshot_budget(remaining);
+        let additional = chunk.iter().fold(0usize, |total, field| {
+            let payload = match &field.value {
+                Value::Text(text) | Value::Formula(text) => table.text(text).len(),
+                Value::Date { text, .. } => table.text(text).len(),
+                Value::Empty | Value::Number { .. } | Value::Bool(_) => 0,
+            };
+            total
+                .saturating_add(payload)
+                .saturating_add(size_of::<NativeValue>())
+        });
+        base.preflight_snapshot_bytes(remaining, additional)?;
+        let mut edit = base
+            .editable_package_for_write_with_snapshot_limit(remaining)?
+            .edit()
+            .map_err(native_edit_error)?;
         for field in chunk {
             let reference = Reference::new(row + field.row, column + field.column)
                 .map_err(native_value_error)?;
@@ -125,7 +145,7 @@ pub(crate) fn import(
             summary.count(written);
         }
         let native = edit.commit().map_err(native_edit_error)?;
-        commits.push(finish_commit(&base, native, 1, limits)?);
+        commits.push(finish_commit(&base, native, 1, &chunk_limits)?);
     }
     file.check_source()?;
     Ok((commits, summary))

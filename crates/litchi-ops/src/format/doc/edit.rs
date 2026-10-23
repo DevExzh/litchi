@@ -509,9 +509,17 @@ impl Doc {
     }
 
     pub(super) fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit> {
-        Ok(self
-            .edit_source()?
-            .edit_with_options(super::edit_options(super::body_transaction_limits(*limits)))?)
+        self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+        let source_bytes = self
+            .retained_source_len()
+            .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
+        Ok(self.edit_source()?.edit_with_options(super::edit_options(
+            super::body_transaction_limits_with_source(
+                *limits,
+                source_bytes,
+                limits.max_snapshot_bytes(),
+            ),
+        ))?)
     }
 
     /// Commit a staged native edit into a write step. An edit that changed
@@ -538,6 +546,7 @@ impl Doc {
             // Rebuild an identity patch over the retained signed package so
             // native replay sees the same physical base as the facade.
             let original = self.original_package_for_noop()?;
+            self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
             original.edit()?.commit()?.into_parts()
         } else {
             commit.into_parts()

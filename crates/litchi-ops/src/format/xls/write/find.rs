@@ -14,6 +14,7 @@
 //! to such a string.
 
 use std::collections::{BTreeMap, HashSet};
+use std::mem::size_of;
 
 use litchi_core::sheet::CellValue;
 use litchi_core::{FileFormat, Position};
@@ -57,7 +58,7 @@ pub(crate) fn find_replace(
             FileFormat::Xls,
             "a spreadsheet find replaces cell text",
         )?;
-        file.admit_edit()?;
+        file.admit_edit_for_write()?;
         let mut scopes: Vec<(usize, Area)> = Vec::new();
         surface::each_target(Nav::new(file), target, |node: Node<'_>| {
             let sheet = node.sheet_position();
@@ -223,7 +224,21 @@ fn commit(
         let base = commits
             .last()
             .map_or_else(|| file.clone(), |commit| commit.after.clone());
-        let mut edit = base.editable_package()?.edit().map_err(native_edit_error)?;
+        let used = commits.iter().fold(0usize, |total, commit| {
+            total.saturating_add(commit.snapshot_bytes)
+        });
+        let remaining = limits.max_snapshot_bytes().saturating_sub(used);
+        let chunk_limits = limits.with_snapshot_budget(remaining);
+        let additional = chunk.iter().fold(0usize, |total, (_, _, text)| {
+            total
+                .saturating_add(text.len())
+                .saturating_add(size_of::<NativeValue>())
+        });
+        base.preflight_snapshot_bytes(remaining, additional)?;
+        let mut edit = base
+            .editable_package_for_write_with_snapshot_limit(remaining)?
+            .edit()
+            .map_err(native_edit_error)?;
         for (sheet, reference, text) in chunk {
             edit.set_value(
                 Selector::Position(Position::new(*sheet)),
@@ -233,7 +248,7 @@ fn commit(
             .map_err(native_edit_error)?;
         }
         let native = edit.commit().map_err(native_edit_error)?;
-        commits.push(finish_commit(&base, native, chunk.len(), limits)?);
+        commits.push(finish_commit(&base, native, chunk.len(), &chunk_limits)?);
     }
     Ok(commits)
 }

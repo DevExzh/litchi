@@ -39,6 +39,7 @@
 //! [`crate::view::sheet`] types, and its errors are typed [`crate::Error`]
 //! values.
 
+use std::mem::size_of;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -601,6 +602,50 @@ impl Xlsx {
             return Err(source_released());
         }
         self.editor_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    /// Admit the native promotion against the transaction's remaining
+    /// snapshot budget before it can copy the source archive or build the
+    /// owning workbook graph. Eager owners can use the native endpoint
+    /// census directly; deferred owners use the source archive plus the
+    /// fixed owning-package/workbook handoff that promotion must retain.
+    pub(crate) fn editor_with_snapshot_limit(&self, maximum: usize) -> Result<xlsx::Package> {
+        self.preflight_editor_snapshot(maximum)?;
+        self.editor()
+    }
+
+    /// Signed/removal-authorized variant of [`Self::editor_with_snapshot_limit`].
+    pub(crate) fn editor_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<xlsx::Package> {
+        self.preflight_editor_snapshot(maximum)?;
+        self.editor_for_write()
+    }
+
+    fn preflight_editor_snapshot(&self, maximum: usize) -> Result<()> {
+        let endpoint = match &self.0.owner {
+            XlsxOwner::Eager(package) => package.retained_bytes(),
+            XlsxOwner::Source(workbook) => workbook.retained_bytes_for_edit()?,
+        };
+        // This mirrors the native workbook editor's CaptureBudget::new:
+        // promotion must retain the source and target endpoints, the edit's
+        // action state, and both patch/commit owners before any family route
+        // can stage a changed worksheet or feature buffer.
+        let observed = endpoint
+            .saturating_mul(2)
+            .saturating_add(size_of::<xlsx::workbook::Edit>())
+            .saturating_add(size_of::<xlsx::workbook::Patch>())
+            .saturating_add(size_of::<xlsx::workbook::Commit>());
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
     }
 
     /// Materialize the original native package for a canonical signed no-op

@@ -788,6 +788,18 @@ impl Edit {
         if matches!(self.current, File::Keynote(_)) {
             return self.add_keynote(_parent, _node);
         }
+        // The leaf must receive the snapshot remainder after any coalesced
+        // run has been published.  Passing the transaction-wide maximum here
+        // lets a native add allocate its complete before/after capture and
+        // only then fail in `execute`, which is too late for bounded-memory
+        // admission.
+        self.check()?;
+        self.flush_pending()?;
+        let operation_limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
@@ -802,7 +814,6 @@ impl Edit {
             odf_objects,
             feature = "iwork-adapter"
         ))]
-        let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
@@ -811,44 +822,65 @@ impl Edit {
             },
             #[cfg(feature = "xls")]
             File::Xls(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xlsx(handle, commit, path)
             },
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_pptx(handle, commit, path)
             },
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xlsb(handle, commit, path)
             },
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_rtf(handle, commit, path)
             },
             #[cfg(feature = "ods")]
             File::Ods(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_ods(handle, commit, path)
             },
             #[cfg(feature = "odt")]
             File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_odt(handle, commit, path)
             },
 
@@ -858,32 +890,47 @@ impl Edit {
             | File::Odi(handle)
             | File::Odb(handle)
             | File::Odf(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_object(handle, commit, path)
             },
             #[cfg(feature = "iwork-adapter")]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_iwork(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_doc(handle, commit, path)
             },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_ppt(handle, commit, path)
             },
             #[cfg(feature = "odp")]
             File::Odp(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_odp(handle, commit, path)
             },
             #[allow(unreachable_patterns)]
@@ -895,9 +942,21 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
+        // Command batches share the same transaction budget as the public
+        // route.  Flush a preceding coalesced step before deriving the
+        // remainder so native add capture cannot temporarily exceed the
+        // outer limit.
+        self.check()?;
+        self.flush_pending()?;
+        let operation_limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
+            feature = "xlsx",
             feature = "xlsb",
             feature = "rtf",
             feature = "ppt",
@@ -908,7 +967,6 @@ impl Edit {
             odf_objects,
             feature = "iwork-adapter"
         ))]
-        let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
@@ -918,43 +976,65 @@ impl Edit {
             },
             #[cfg(feature = "xls")]
             File::Xls(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
-                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xlsx(handle, commit, path)
             },
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_pptx(handle, commit, path)
             },
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_xlsb(handle, commit, path)
             },
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_rtf(handle, commit, path)
             },
             #[cfg(feature = "ods")]
             File::Ods(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_ods(handle, commit, path)
             },
             #[cfg(feature = "odt")]
             File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_odt(handle, commit, path)
             },
 
@@ -964,32 +1044,47 @@ impl Edit {
             | File::Odi(handle)
             | File::Odb(handle)
             | File::Odf(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_object(handle, commit, path)
             },
             #[cfg(feature = "iwork-adapter")]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_iwork(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_doc(handle, commit, path)
             },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_ppt(handle, commit, path)
             },
             #[cfg(feature = "odp")]
             File::Odp(handle) => {
-                let (commit, path) =
-                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap_odp(handle, commit, path)
             },
             #[allow(unreachable_patterns)]
@@ -3306,7 +3401,16 @@ impl Edit {
             Ok(Err(request)) => request,
             Err(error) => return Err(self.poison(error, index)),
         };
-        let limits = self.limits;
+        // A native fallback is still one operation in this transaction.  The
+        // staged Keynote run may already have published earlier work, so its
+        // native before/after capture must receive the post-flush remainder
+        // rather than the transaction-wide ceiling.
+        self.flush_pending()?;
+        let limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         self.execute(|file| match file {
             File::Keynote(handle) => {
                 let (commit, path) = handle.add_with_limits(parent, node, &limits)?;
