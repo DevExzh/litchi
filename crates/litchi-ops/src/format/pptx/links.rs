@@ -342,7 +342,7 @@ impl Pptx {
         }
         let shape = tree.handle.position().get();
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match owner {
             Owner::Shape(_) => native.set_shape_hyperlink(slide as usize, shape, link)?,

@@ -1261,13 +1261,12 @@ mod tests {
         let mut replayed = source.clone();
         super::super::apply(&mut replayed, &decoded, true).unwrap();
         let mut overlay = source.clone();
-        let token = overlay
-            .source_content_types(litchi_opc::SourceLimits::default())
-            .unwrap();
+        let token = overlay.source_content_types(overlay.read_limits()).unwrap();
         let mut xml = token.bytes().to_vec();
         xml.extend_from_slice(b"<!--unrelated trailing comment-->");
+        let limits = overlay.read_limits();
         overlay
-            .try_replace_content_types_bytes(token.bytes(), Arc::new(xml), SourceLimits::default())
+            .try_replace_content_types_bytes(token.bytes(), Arc::new(xml), limits)
             .unwrap();
         let original = litchi_opc::PackageWriter::to_bytes(&overlay).unwrap();
         assert!(super::super::apply(&mut overlay, &decoded, true).is_err());

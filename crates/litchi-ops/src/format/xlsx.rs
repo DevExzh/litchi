@@ -132,6 +132,9 @@ struct XlsxState {
     /// Both owner states already hold everything an edit needs, so this
     /// releases nothing; it only refuses.
     retain_source: bool,
+    /// The OPC read limits admitted with this handle. Raw facade operations
+    /// re-index published bytes under this same policy.
+    ooxml_limits: litchi_opc::SourceLimits,
     /// A successfully promoted source-backed workbook. The lock is initialized
     /// lazily so read-only opens do not pay for an edit cache, and failed
     /// promotions are never retained.
@@ -290,6 +293,7 @@ impl Xlsx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
+        let ooxml_limits = package.read_limits();
         let (metadata, metadata_repairs) =
             read_source_backed_metadata(&package).map_err(metadata_error)?;
         let owner = if options.source_mode == SourceMode::Eager {
@@ -299,7 +303,10 @@ impl Xlsx {
                 package,
             )?)
         };
-        Ok(Self::with_owner(owner, metadata, metadata_repairs, options).with_origin(origin))
+        Ok(
+            Self::with_owner(owner, metadata, metadata_repairs, options, ooxml_limits)
+                .with_origin(origin),
+        )
     }
 
     /// Build the owning snapshot from the OPC package the byte detector
@@ -314,6 +321,7 @@ impl Xlsx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
+        let ooxml_limits = package.read_limits();
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata =
             litchi_ooxml_common::properties::read_with_report(&package, &mut metadata_repairs)
@@ -326,6 +334,7 @@ impl Xlsx {
             metadata,
             metadata_repairs,
             options,
+            ooxml_limits,
         )
         .with_origin(origin))
     }
@@ -347,6 +356,7 @@ impl Xlsx {
             Metadata::default(),
             MetadataRepairs::default(),
             options,
+            options.ooxml_limits.unwrap_or_default(),
         )
         .with_origin(origin))
     }
@@ -383,6 +393,7 @@ impl Xlsx {
             metadata,
             metadata_repairs,
             options,
+            options.ooxml_limits.unwrap_or_default(),
         )
         .with_origin(origin))
     }
@@ -392,6 +403,7 @@ impl Xlsx {
         metadata: Metadata,
         metadata_repairs: MetadataRepairs,
         options: &OpenOptions,
+        ooxml_limits: litchi_opc::SourceLimits,
     ) -> Self {
         Self(Opened::new(XlsxState {
             owner,
@@ -399,6 +411,7 @@ impl Xlsx {
             metadata,
             metadata_repairs,
             retain_source: options.retain_source,
+            ooxml_limits,
             promotion: OnceLock::new(),
             unsigned_promotion: OnceLock::new(),
         }))
@@ -436,6 +449,7 @@ impl Xlsx {
             self.0.metadata.clone(),
             self.0.metadata_repairs.clone(),
             &options,
+            self.0.ooxml_limits,
         )
         .with_origin(self.origin())
         .with_signature(signature)
@@ -450,6 +464,11 @@ impl Xlsx {
     #[must_use]
     pub const fn format(&self) -> FileFormat {
         FileFormat::Xlsx
+    }
+
+    /// The OPC ingress policy retained by this handle for raw re-admission.
+    pub(crate) const fn ooxml_read_limits(&self) -> litchi_opc::SourceLimits {
+        self.0.ooxml_limits
     }
 
     /// Whether the owner defers worksheet payloads to the retained source,

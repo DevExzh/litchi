@@ -196,7 +196,9 @@ impl Pptx {
         let slide = Position::new(located.slide);
         let body = located.body;
         let owner = match (&source, located.notes()) {
-            (Editable::Source(_), true) => Editable::Eager(super::smartart::eager(&source)?),
+            (Editable::Source(_), true) => {
+                Editable::Eager(super::smartart::eager(&source, self.0.ooxml_limits)?)
+            },
             _ => source.clone(),
         };
         let (target, proof) = match &owner {

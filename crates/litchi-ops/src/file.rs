@@ -245,6 +245,28 @@ const _: () = {
 const _: () = assert!(size_of::<File>() == 16);
 
 impl File {
+    /// The retained OPC ingress policy for a package-backed handle.
+    ///
+    /// Raw package reads and validation publish the handle first and then
+    /// re-index those bytes.  Reusing the handle's policy keeps that second
+    /// admission from widening a caller-selected source bound.
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+    pub(crate) fn ooxml_read_limits(&self) -> litchi_opc::SourceLimits {
+        match self {
+            #[cfg(feature = "docx")]
+            Self::Docx(handle) => handle.ooxml_read_limits(),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(handle) => handle.ooxml_read_limits(),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(handle) => handle.ooxml_read_limits(),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle.ooxml_read_limits(),
+            Self::Signed(signed) => signed.file().ooxml_read_limits(),
+            #[allow(unreachable_patterns, reason = "the helper is feature-gated")]
+            _ => litchi_opc::SourceLimits::default(),
+        }
+    }
+
     /// The object-tree handle of an ODG, ODC, ODI, ODB or ODF formula file.
     #[cfg(odf_objects)]
     pub(crate) fn odf_tree(&self) -> Option<&OdfTree> {

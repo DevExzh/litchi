@@ -27,12 +27,12 @@ const DEFAULT_THEME_DIRECTORY: &str = "/xl/theme";
 const DEFAULT_THEME_STEM: &str = "theme";
 const DEFAULT_THEME_EXTENSION: &str = "xml";
 
-fn relationship_output_limit() -> usize {
-    litchi_opc::SourceLimits::default().max_relationship_xml_bytes()
+fn relationship_output_limit(limits: litchi_opc::SourceLimits) -> usize {
+    limits.max_relationship_xml_bytes()
 }
 
-fn content_types_output_limit() -> usize {
-    litchi_opc::SourceLimits::default().max_content_types_bytes()
+fn content_types_output_limit(limits: litchi_opc::SourceLimits) -> usize {
+    limits.max_content_types_bytes()
 }
 
 /// An eager snapshot of the optional Workbook-owned Theme part.
@@ -440,6 +440,7 @@ struct CreationPlan {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct OwnerSource {
+    opc_limits: litchi_opc::SourceLimits,
     workbook_name: String,
     workbook_relationships: Vec<RelationshipState>,
     part_names: Vec<String>,
@@ -468,7 +469,8 @@ enum ThemeRelationships {
 
 impl OwnerSource {
     fn same_source(&self, other: &Self) -> bool {
-        if self.workbook_name != other.workbook_name
+        if self.opc_limits != other.opc_limits
+            || self.workbook_name != other.workbook_name
             || self.workbook_relationships != other.workbook_relationships
             || self.part_names != other.part_names
             || self.workbook_relationship_xml != other.workbook_relationship_xml
@@ -492,7 +494,7 @@ impl OwnerSource {
                 &plan.relationship.target_ref,
                 &plan.relationship.id,
                 plan.relationship.target_mode,
-                relationship_output_limit(),
+                relationship_output_limit(self.opc_limits),
             )?;
         }
         workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
@@ -503,7 +505,7 @@ impl OwnerSource {
             let theme_name = PackURI::new(&plan.theme_name)?;
             content_types = content_types.with_part_overrides(
                 &[(&theme_name, CONTENT_TYPE)],
-                content_types_output_limit(),
+                content_types_output_limit(self.opc_limits),
             )?;
         }
         part_names.sort();
@@ -550,13 +552,14 @@ impl OwnerSource {
                 part_names.push(name.clone());
             }
         }
-        let workbook_relationship_xml = self
-            .workbook_relationship_xml
-            .without_relationship(&plan.relationship.id, relationship_output_limit())?;
+        let workbook_relationship_xml = self.workbook_relationship_xml.without_relationship(
+            &plan.relationship.id,
+            relationship_output_limit(self.opc_limits),
+        )?;
         let theme_name = PackURI::new(&plan.theme_name)?;
         let content_types = self.content_types.without_parts(
             std::slice::from_ref(&theme_name),
-            content_types_output_limit(),
+            content_types_output_limit(self.opc_limits),
         )?;
         Ok(Self {
             workbook_name: self.workbook_name.clone(),
@@ -593,7 +596,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     }
     workbook_relationships.sort_by(|left, right| left.id.cmp(&right.id));
     let part_names = collect_part_names(package)?;
-    let opc_limits = litchi_opc::SourceLimits::default();
+    let opc_limits = package.read_limits();
     let workbook_relationship_xml =
         package.source_relationships(workbook.partname(), opc_limits)?;
     let content_types = package.source_content_types(opc_limits)?;
@@ -628,6 +631,7 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
         None => plan_absent(package, workbook, &workbook_relationships)?,
     };
     let source = OwnerSource {
+        opc_limits,
         workbook_name: workbook.partname().as_str().to_owned(),
         workbook_relationships,
         part_names,
@@ -874,7 +878,7 @@ fn materialize(
 }
 
 fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Result<()> {
-    let limits = litchi_opc::SourceLimits::default();
+    let limits = package.read_limits();
     let workbook_name = PackURI::new(&source.workbook_name)?;
     let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != source.workbook_relationship_xml {

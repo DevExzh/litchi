@@ -227,7 +227,8 @@ pub(crate) fn load_eager<'a>(
     else {
         return Ok(None);
     };
-    let processed = super::process_eager_part(part, comments::MAX_PART_BYTES)?;
+    let processed =
+        super::process_eager_part(part, comments::MAX_PART_BYTES, package.read_limits())?;
     if !part.rels().is_empty() {
         return Err(Error::Relationship(
             "comments part must not have relationships".into(),
@@ -291,7 +292,8 @@ fn selected_eager_authors(
         .get_part(&target)
         .map_err(|_| Error::Relationship("comment-author target part is missing".into()))?;
     crate::parts::validate_content_type(part, comments::AUTHORS_CONTENT_TYPE)?;
-    let processed = super::process_eager_part(part, comments::MAX_PART_BYTES)?;
+    let processed =
+        super::process_eager_part(part, comments::MAX_PART_BYTES, package.read_limits())?;
     if !part.rels().is_empty() {
         return Err(Error::Relationship(
             "comment-author part must not have relationships".into(),

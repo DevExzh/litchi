@@ -280,42 +280,26 @@ fn restore_lexical_tokens_from_parts(
     let root_name = PackURIRef::new("/")?;
     let current_root = package.source_relationships(&root_name, limits)?;
     if current_root != *root_relationships {
-        package.try_replace_relationships(
-            &current_root,
-            root_relationships,
-            litchi_opc::SourceLimits::default(),
-        )?;
+        package.try_replace_relationships(&current_root, root_relationships, limits)?;
     }
 
     let workbook_name = package.main_document_part()?.partname().clone();
     let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != *workbook_relationships {
-        package.try_replace_relationships(
-            &current_workbook,
-            workbook_relationships,
-            litchi_opc::SourceLimits::default(),
-        )?;
+        package.try_replace_relationships(&current_workbook, workbook_relationships, limits)?;
     }
 
     if let Some(owner_relationships) = owner_relationships {
         let owner_name = owner_relationships.owner().clone();
         let current_owner = package.source_relationships(&owner_name, limits)?;
         if current_owner != *owner_relationships {
-            package.try_replace_relationships(
-                &current_owner,
-                owner_relationships,
-                litchi_opc::SourceLimits::default(),
-            )?;
+            package.try_replace_relationships(&current_owner, owner_relationships, limits)?;
         }
     }
 
     let current_content_types = package.source_content_types(limits)?;
     if current_content_types != *content_types {
-        package.try_replace_content_types(
-            current_content_types.bytes(),
-            content_types,
-            litchi_opc::SourceLimits::default(),
-        )?;
+        package.try_replace_content_types(current_content_types.bytes(), content_types, limits)?;
     }
     Ok(())
 }

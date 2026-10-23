@@ -1255,12 +1255,12 @@ fn preflight_delta(
     maximum: usize,
 ) -> std::result::Result<(), PatchError> {
     let before_content = before
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1390,7 +1390,7 @@ fn part_member_size(
     }
     let part = decoded_part(package, name)?;
     let relationships = package
-        .source_relationships(name, litchi_opc::SourceLimits::default())
+        .source_relationships(name, package.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable relationship token",
         })?;
@@ -1416,12 +1416,12 @@ fn parts_equal(
             let left = decoded_part(before, name)?;
             let right = decoded_part(after, name)?;
             let left_relationships = before
-                .source_relationships(name, litchi_opc::SourceLimits::default())
+                .source_relationships(name, before.read_limits())
                 .map_err(|_| PatchError::InvalidText {
                     field: "Ink durable relationship token",
                 })?;
             let right_relationships = after
-                .source_relationships(name, litchi_opc::SourceLimits::default())
+                .source_relationships(name, after.read_limits())
                 .map_err(|_| PatchError::InvalidText {
                     field: "Ink durable relationship token",
                 })?;
@@ -1546,12 +1546,12 @@ fn collect_records(
     after: &OpcPackage,
 ) -> std::result::Result<Vec<Record>, PatchError> {
     let before_content = before
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1655,7 +1655,7 @@ fn capture_part(
     }
     let part = decoded_part(package, name)?;
     let relationships = package
-        .source_relationships(name, litchi_opc::SourceLimits::default())
+        .source_relationships(name, package.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable relationship token",
         })?;
@@ -1695,7 +1695,7 @@ fn clone_durable_text(text: &str, _field: &'static str) -> std::result::Result<S
 
 fn root_relationships(package: &OpcPackage) -> Result<OwnedRelationships> {
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    Ok(package.source_relationships(&root, litchi_opc::SourceLimits::default())?)
+    Ok(package.source_relationships(&root, package.read_limits())?)
 }
 
 #[derive(Clone, Copy)]
@@ -1759,7 +1759,7 @@ fn package_fingerprint_with_bounds(
         }
     }
     let content = package
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(package.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable content types",
         })?;
@@ -1785,7 +1785,7 @@ fn package_fingerprint_with_bounds(
     }
     for (name, part) in parts {
         let relationships = package
-            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
+            .source_relationships(part.partname(), package.read_limits())
             .map_err(|_| PatchError::InvalidText {
                 field: "Ink durable relationship token",
             })?;
@@ -2193,7 +2193,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
         }
         match record.kind {
             0 => {
-                let current = package.source_content_types(litchi_opc::SourceLimits::default())?;
+                let current = package.source_content_types(package.read_limits())?;
                 let expected = record
                     .before
                     .as_ref()
@@ -2243,8 +2243,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
                         let Some((present, relationships)) = expected.relationships.as_ref() else {
                             return Err(invalid_durable("missing source part relationship token"));
                         };
-                        let current = package
-                            .source_relationships(&name, litchi_opc::SourceLimits::default())?;
+                        let current = package.source_relationships(&name, package.read_limits())?;
                         if expected.content_type.as_deref() != Some(part.content_type())
                             || expected.payload.as_slice() != part.blob()
                             || *present != current.member_present()
@@ -2284,7 +2283,7 @@ fn apply_delta(
         None
     };
     let target_content_bytes = target_content.map(|member| member.payload.as_slice());
-    let source_content = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let source_content = package.source_content_types(package.read_limits())?;
 
     let mut part_records = Vec::new();
     for record in records.iter().filter(|record| record.kind == 2) {
@@ -2346,8 +2345,7 @@ fn apply_delta(
     let mut processed_owners = BTreeSet::new();
     for (owner_name, additions) in &additions_by_owner {
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current_owner =
-            package.source_relationships(&owner, litchi_opc::SourceLimits::default())?;
+        let current_owner = package.source_relationships(&owner, package.read_limits())?;
         let replacement_owner = relationship_targets
             .get(owner_name)
             .ok_or_else(|| invalid_durable("missing Ink owner relationship target"))?;
@@ -2391,15 +2389,14 @@ fn apply_delta(
         )?;
         for record in additions {
             let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-            let target_relationships =
-                proof.source_relationships(&name, litchi_opc::SourceLimits::default())?;
+            let target_relationships = proof.source_relationships(&name, proof.read_limits())?;
             let current_relationships =
-                package.source_relationships(&name, litchi_opc::SourceLimits::default())?;
+                package.source_relationships(&name, package.read_limits())?;
             if current_relationships != target_relationships {
                 package.try_replace_relationships(
                     &current_relationships,
                     &target_relationships,
-                    litchi_opc::SourceLimits::default(),
+                    package.read_limits(),
                 )?;
             }
         }
@@ -2413,13 +2410,9 @@ fn apply_delta(
             continue;
         }
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current = package.source_relationships(&owner, litchi_opc::SourceLimits::default())?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current != *replacement {
-            package.try_replace_relationships(
-                &current,
-                replacement,
-                litchi_opc::SourceLimits::default(),
-            )?;
+            package.try_replace_relationships(&current, replacement, package.read_limits())?;
         }
     }
 
@@ -2465,23 +2458,19 @@ fn apply_delta(
     }
 
     if let Some(target) = target_content_bytes {
-        let replacement = proof.source_content_types(litchi_opc::SourceLimits::default())?;
+        let replacement = proof.source_content_types(proof.read_limits())?;
         if replacement.bytes() != target {
             return Err(invalid_durable(
                 "Ink durable proof content types changed during OPC parsing",
             ));
         }
-        let current_token = package.source_content_types(litchi_opc::SourceLimits::default())?;
+        let current_token = package.source_content_types(package.read_limits())?;
         package.try_replace_content_types(
             current_token.bytes(),
             &replacement,
-            litchi_opc::SourceLimits::default(),
+            package.read_limits(),
         )?;
-        if package
-            .source_content_types(litchi_opc::SourceLimits::default())?
-            .bytes()
-            != target
-        {
+        if package.source_content_types(package.read_limits())?.bytes() != target {
             return Err(invalid_durable(
                 "content-types transition is not source-preserving",
             ));
@@ -2547,8 +2536,7 @@ fn exact_transition_proof_package(
         proof_maximum,
     )?;
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    let root_relationships =
-        package.source_relationships(&root, litchi_opc::SourceLimits::default())?;
+    let root_relationships = package.source_relationships(&root, package.read_limits())?;
     if root_relationships.member_present() {
         proof_add_metadata(
             &mut total,
@@ -2636,10 +2624,7 @@ fn exact_transition_proof_package(
         }
     }
     let proof = writer.finish()?;
-    Ok(OpcPackage::from_bytes(
-        &proof,
-        litchi_opc::SourceLimits::default(),
-    )?)
+    Ok(OpcPackage::from_bytes(&proof, package.read_limits())?)
 }
 
 enum ProofRelationships<'a> {
@@ -2702,7 +2687,7 @@ fn final_proof_part<'a>(
     }
     let name = PackURI::new(name.to_owned()).map_err(Error::Uri)?;
     let part = package.get_part(&name)?;
-    let relationships = package.source_relationships(&name, litchi_opc::SourceLimits::default())?;
+    let relationships = package.source_relationships(&name, package.read_limits())?;
     Ok(ProofPart {
         content_type: part.content_type(),
         payload: &[],
@@ -2843,7 +2828,7 @@ fn relationship_tokens(
         let Some((after_present, after_bytes)) = after.relationships.as_ref() else {
             return Err(invalid_durable("missing target owner relationships"));
         };
-        let current = package.source_relationships(&owner, litchi_opc::SourceLimits::default())?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current.member_present() != *before_present || current.bytes() != before_bytes {
             return Err(invalid_durable("relationship owner source is stale"));
         }
@@ -2864,7 +2849,7 @@ fn relationship_tokens(
                 return Err(invalid_durable("relationship retargeting is not admitted"));
             }
         }
-        let token = proof.source_relationships(&owner, litchi_opc::SourceLimits::default())?;
+        let token = proof.source_relationships(&owner, proof.read_limits())?;
         if token.bytes() != after_bytes || token.member_present() != *after_present {
             return Err(invalid_durable(
                 "relationship proof token does not match target",

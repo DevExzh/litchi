@@ -1884,9 +1884,9 @@ pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
         let table_relationships_source =
-            package.source_relationships(&table_part_name, litchi_opc::SourceLimits::default())?;
+            package.source_relationships(&table_part_name, package.read_limits())?;
         let survey_relationships_source =
-            package.source_relationships(part.partname(), litchi_opc::SourceLimits::default())?;
+            package.source_relationships(part.partname(), package.read_limits())?;
         values.push(Part {
             survey: Arc::new(survey),
             table_part_name,
@@ -3303,8 +3303,7 @@ impl Snapshot {
             Arc::from(incoming_relationships(package, &entries)?.into_boxed_slice());
         Ok(Self {
             entries,
-            source_content_types: package
-                .source_content_types(litchi_opc::SourceLimits::default())?,
+            source_content_types: package.source_content_types(package.read_limits())?,
             incoming_relationships,
             limits: *limits,
         })
@@ -3632,6 +3631,7 @@ impl Edit {
             &self.before.source_content_types,
             self.before.entries(),
             &self.draft,
+            self.target.read_limits().max_content_types_bytes(),
         )?;
         apply_entries(
             &mut candidate,
@@ -3943,11 +3943,11 @@ fn apply_entries(
         }
         add_entry(package, entry, limits)?;
     }
-    let current_content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
     package.try_replace_content_types(
         current_content_types.bytes(),
         content_types,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     Ok(())
 }
@@ -3956,6 +3956,7 @@ fn transition_content_types(
     before: &OwnedContentTypes,
     before_entries: &[Part],
     after_entries: &[Part],
+    maximum: usize,
 ) -> Result<OwnedContentTypes> {
     let mut removed = Vec::new();
     for entry in before_entries {
@@ -3975,7 +3976,6 @@ fn transition_content_types(
             additions.push((&entry.part_name, CONTENT_TYPE));
         }
     }
-    let maximum = litchi_opc::SourceLimits::default().max_content_types_bytes();
     let mut result = before.without_parts(&removed, maximum)?;
     if !additions.is_empty() {
         result = result.with_part_overrides(&additions, maximum)?;
@@ -4031,8 +4031,8 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // Capture the complete owner member before adding the new edge. The
     // relationship token keeps comments, PIs, prefixes, attribute order and
     // explicit empty-member presence when the edge is spliced in.
-    let table_relationships = package
-        .source_relationships(&entry.table_part_name, litchi_opc::SourceLimits::default())?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     if let Some(proof) = &entry.source_proof {
         package.try_add_owned_xml_part(proof.as_ref().clone())?;
     } else {
@@ -4053,12 +4053,11 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     package.try_replace_relationships(
         &table_relationships,
         &table_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     if let Some(source) = entry.survey_relationships_source.as_ref() {
-        let current =
-            package.source_relationships(&entry.part_name, litchi_opc::SourceLimits::default())?;
-        package.try_replace_relationships(&current, source, litchi_opc::SourceLimits::default())?;
+        let current = package.source_relationships(&entry.part_name, package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
     }
     Ok(())
 }
@@ -4076,14 +4075,14 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
     if relationship.target_ref() != entry.relationship_target {
         return Err(invalid("Survey owner relationship lexical target changed"));
     }
-    let table_relationships = package
-        .source_relationships(&entry.table_part_name, litchi_opc::SourceLimits::default())?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     let table_replacement =
         table_relationships.without_relationship(&entry.relationship_id, usize::MAX)?;
     package.try_replace_relationships(
         &table_relationships,
         &table_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     if part_is_referenced(package, &entry.part_name) {
         return Err(invalid("Survey part has an unexpected relationship owner"));
@@ -4114,9 +4113,8 @@ fn part_is_referenced(package: &OpcPackage, part_name: &PackURI) -> bool {
 
 fn restore_relationship_provenance(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()> {
     let restore = |package: &mut OpcPackage, source: &OwnedRelationships| -> Result<()> {
-        let current =
-            package.source_relationships(source.owner(), litchi_opc::SourceLimits::default())?;
-        package.try_replace_relationships(&current, source, litchi_opc::SourceLimits::default())?;
+        let current = package.source_relationships(source.owner(), package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
         Ok(())
     };
     for entry in snapshot.entries.iter() {

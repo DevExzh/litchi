@@ -605,8 +605,12 @@ impl SourceBackedWorkbook {
         let mut tolerance = ToleranceReport::default();
         tolerance.append_package(package.tolerance_report());
         let catalog_bytes = workbook.data()?;
-        let catalog =
-            raw::parse_catalog_repairing(catalog_bytes.as_bytes(), leniency, &mut tolerance)?;
+        let catalog = raw::parse_catalog_repairing(
+            catalog_bytes.as_bytes(),
+            &package.read_limits(),
+            leniency,
+            &mut tolerance,
+        )?;
         check_execution(execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
         check_execution(execution.as_ref())?;

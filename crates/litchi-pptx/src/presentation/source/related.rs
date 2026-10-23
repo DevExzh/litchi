@@ -311,14 +311,18 @@ pub(super) fn load_part(
 /// used by [`load_part`]. The returned blob is suitable for a leaf parser;
 /// callers retain the original package part separately when they need raw
 /// related-part bytes for the detached snapshot.
-pub(super) fn process_eager_part(part: &dyn Part, maximum: usize) -> Result<BlobPart> {
+pub(super) fn process_eager_part(
+    part: &dyn Part,
+    maximum: usize,
+    source_limits: SourceLimits,
+) -> Result<BlobPart> {
     if part.blob().len() > maximum {
         return Err(Error::Limit {
             resource: "source related part bytes",
             limit: maximum,
         });
     }
-    crate::source_limits::validate_xml_limits(part.blob(), SourceLimits::default())?;
+    crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
     let limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: maximum,
         max_output_bytes: maximum,

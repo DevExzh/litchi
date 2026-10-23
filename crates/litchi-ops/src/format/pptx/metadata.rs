@@ -64,7 +64,10 @@ impl Pptx {
                     _ => {
                         let mut bytes = Vec::new();
                         package.write_to(&mut bytes)?;
-                        opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())?
+                        opc::OpcPackage::from_bytes(
+                            &bytes,
+                            package.source_backed_package().read_limits(),
+                        )?
                     },
                 };
                 let built = Arc::new(pptx::Package::from_opc_package(graph)?);

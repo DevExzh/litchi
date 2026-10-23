@@ -110,10 +110,10 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: SemanticLimits) -
     // `max_part_bytes` is enforced against the Workbook/owner and captured
     // source tokens after graph discovery; using it here would make a small
     // stream limit reject ordinary package metadata before the more useful
-    // stream-specific error is reported.  The OPC metadata profile itself is
-    // still finite and is the same default profile used for in-memory
-    // authored metadata.
-    let opc_limits = litchi_opc::SourceLimits::default();
+    // stream-specific error is reported.  Preserve the package's retained
+    // OPC metadata profile so a package admitted under a tighter policy is
+    // never widened while its metadata is preflighted.
+    let opc_limits = package.read_limits();
     let part_count = package.part_count();
     if part_count > limits.max_graph_parts {
         return Err(Error::limit(

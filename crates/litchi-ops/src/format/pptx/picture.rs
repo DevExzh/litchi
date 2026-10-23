@@ -199,9 +199,9 @@ impl Pptx {
         let source = self.editable_owner()?;
         let base = match &source {
             Editable::Eager(package) => Arc::clone(package),
-            Editable::Source(package) => Arc::new(litchi_pptx::Package::from_reader(
-                std::io::Cursor::new(package.to_bytes()?),
-            )?),
+            Editable::Source(package) => {
+                super::eager_package_from_source(package.to_bytes()?, self.0.ooxml_limits)?
+            },
         };
         let link = click.for_add(self.slides_in_catalog()?)?;
         let mut edit = base.edit()?;
@@ -354,7 +354,7 @@ impl Pptx {
         let slide = slide as usize;
         let shape = tree.handle.position().get();
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut edit = base.edit()?;
         let mut operations = 0;
         if let Some(bounds) = bounds {

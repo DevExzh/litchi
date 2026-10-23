@@ -258,8 +258,11 @@ fn acquire(owner: &SourceInner, slide: &SourceSlide) -> Result<Option<List>> {
     Ok(Some(list))
 }
 
-fn eager_processed_part(part: &dyn Part) -> Result<BlobPart> {
-    super::related::process_eager_part(part, codec::MAX_BYTES)
+fn eager_processed_part(
+    part: &dyn Part,
+    source_limits: litchi_opc::SourceLimits,
+) -> Result<BlobPart> {
+    super::related::process_eager_part(part, codec::MAX_BYTES, source_limits)
 }
 
 fn eager_target_part<'a>(
@@ -346,7 +349,7 @@ fn selected_eager_authors_part<'a>(
             "modern-comment author part must not have relationships",
         ));
     }
-    let processed = eager_processed_part(part)?;
+    let processed = eager_processed_part(part, package.read_limits())?;
     let authors = Authors::from_processed(processed.blob())
         .map_err(|error| redact_codec_error(error, "modern-comment authors"))?;
     Ok(Some((relationship_id, part, authors)))
@@ -370,7 +373,7 @@ pub(crate) fn acquire_eager(
             "modern-comment part must not have relationships",
         ));
     }
-    let processed = eager_processed_part(comments_part)?;
+    let processed = eager_processed_part(comments_part, package.read_limits())?;
     let comments = ParsedList::from_processed(processed.blob())
         .map_err(|error| redact_codec_error(error, "modern comments"))?;
     validate_unique_ids(&comments, || Ok(()), "modern comment IDs")?;

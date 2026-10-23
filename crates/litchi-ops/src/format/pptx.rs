@@ -98,6 +98,19 @@ pub(crate) use spec::{
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
+/// Materialize a source-backed presentation under the owner's retained OPC
+/// policy. Native edits need an owning package, but reopening the published
+/// bytes must not widen the source admission bound.
+pub(super) fn eager_package_from_source(
+    bytes: Vec<u8>,
+    limits: opc::SourceLimits,
+) -> Result<Arc<litchi_pptx::Package>> {
+    Ok(Arc::new(litchi_pptx::Package::from_reader_with_options(
+        std::io::Cursor::new(bytes),
+        litchi_pptx::OpenOptions::default().source_limits(limits),
+    )?))
+}
+
 /// The elements `set` writes (the capability report's `set` flag).
 pub(crate) const SETTABLE: &[&str] = &[
     "slide",
@@ -500,13 +513,23 @@ impl Pptx {
         self.0.retain_source
     }
 
-    fn new(owner: PptxOwner, metadata: OnceLock<Option<Metadata>>, options: &OpenOptions) -> Self {
+    /// The OPC ingress policy retained by this handle for raw re-admission.
+    pub(crate) const fn ooxml_read_limits(&self) -> opc::SourceLimits {
+        self.0.ooxml_limits
+    }
+
+    fn new(
+        owner: PptxOwner,
+        metadata: OnceLock<Option<Metadata>>,
+        options: &OpenOptions,
+        ooxml_limits: opc::SourceLimits,
+    ) -> Self {
         Self(Opened::new(PptxState {
             owner,
             source_guard: None,
             metadata,
             retain_source: options.retain_source,
-            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
+            ooxml_limits,
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: owner::Related::default(),
@@ -585,7 +608,13 @@ impl Pptx {
         presentation: pptx::SourceBackedPresentation,
         options: &OpenOptions,
     ) -> Self {
-        Self::new(PptxOwner::Source(presentation), OnceLock::new(), options)
+        let ooxml_limits = presentation.source_backed_package().read_limits();
+        Self::new(
+            PptxOwner::Source(presentation),
+            OnceLock::new(),
+            options,
+            ooxml_limits,
+        )
     }
 
     /// Builds the source-backed presentation over the OPC package indexed by
@@ -605,6 +634,7 @@ impl Pptx {
         package: opc::OpcPackage,
         options: &OpenOptions,
     ) -> Result<Self> {
+        let ooxml_limits = package.read_limits();
         // `Package::from_opc_package` reads the same core properties and
         // folds their repairs into its own report, so this read's report is
         // not kept.
@@ -621,6 +651,7 @@ impl Pptx {
             PptxOwner::Eager(Arc::new(package)),
             OnceLock::from(metadata),
             options,
+            ooxml_limits,
         ))
     }
 
@@ -629,6 +660,7 @@ impl Pptx {
     /// Creation adopts its canonical native graph here. `Locked::unlock`
     /// also uses this route, retaining the leaf's encryption provenance.
     pub(crate) fn from_package(package: pptx::Package, options: &OpenOptions) -> Result<Self> {
+        let ooxml_limits = package.opc()?.read_limits();
         let metadata = litchi_ooxml_common::properties::read_with_report(
             package.opc()?,
             &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
@@ -644,6 +676,7 @@ impl Pptx {
             PptxOwner::Eager(Arc::new(package)),
             OnceLock::from(metadata),
             options,
+            ooxml_limits,
         ))
     }
 }

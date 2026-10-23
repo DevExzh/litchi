@@ -14,7 +14,7 @@ use litchi_drawingml::ink as shared;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, PackURI,
-    Relationships, SourceLimits, TargetMode,
+    Relationships, TargetMode,
 };
 
 use super::{CONTENT_TYPE, Limits};
@@ -70,7 +70,7 @@ impl Binding {
         preflight_graph(package, limits)?;
 
         let mut token_bytes = 0usize;
-        let content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
+        let content_types = package.source_content_types(package.read_limits())?;
         charge_token_bytes(&mut token_bytes, content_types.bytes().len(), limits)?;
         let content_types = BlobId::of(content_types.bytes());
         let root_owner = root_uri()?;
@@ -152,7 +152,7 @@ fn capture_token(
     total: &mut usize,
     limits: Limits,
 ) -> Result<RelationshipTokenBinding> {
-    let token = package.source_relationships(owner, litchi_opc::SourceLimits::default())?;
+    let token = package.source_relationships(owner, package.read_limits())?;
     charge_token_bytes(total, token.bytes().len(), limits)?;
     Ok(RelationshipTokenBinding {
         bytes: BlobId::of(token.bytes()),
@@ -223,10 +223,8 @@ impl Delta {
         preflight_graph(package, limits)?;
         let owner_name = canonical_owner(package, owner)?;
         let owner_relationships = owner_relationships(package, &owner_name)?;
-        let owner_before =
-            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
-        let content_types_before =
-            package.source_content_types(litchi_opc::SourceLimits::default())?;
+        let owner_before = package.source_relationships(&owner_name, package.read_limits())?;
+        let content_types_before = package.source_content_types(package.read_limits())?;
         let selected_ids = selected_ids(ids, limits)?;
 
         if selected_ids.is_empty() {
@@ -289,8 +287,8 @@ impl Delta {
             check_payload(payload.len(), limits, &mut total_payload)?;
             validate_target_payload(part.content_type(), payload.as_slice())?;
             let relationships = capture_relationships(part.rels())?;
-            let relationship_token = package
-                .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?;
+            let relationship_token =
+                package.source_relationships(part.partname(), package.read_limits())?;
             let removed = if remaining_incoming == 0 {
                 if !part.rels().is_empty() {
                     return Err(unsupported(
@@ -338,18 +336,14 @@ impl Delta {
         }
         let content_types_after = content_types_before.without_parts(
             &removed_names,
-            SourceLimits::default().max_content_types_bytes(),
+            package.read_limits().max_content_types_bytes(),
         )?;
 
         let mut owner_after = owner_before.clone();
         for id in &selected_ids {
             owner_after = owner_after.without_relationship(id, MAX_RELATIONSHIP_XML_BYTES)?;
         }
-        package.try_replace_relationships(
-            &owner_before,
-            &owner_after,
-            litchi_opc::SourceLimits::default(),
-        )?;
+        package.try_replace_relationships(&owner_before, &owner_after, package.read_limits())?;
         for target in &targets {
             if target.removed.is_some() && !package.remove_part(&target.guard.part) {
                 return Err(Error::Invalid(
@@ -383,8 +377,7 @@ impl Delta {
                 &self.inner.content_types_after,
             )
         };
-        let current_content_types =
-            package.source_content_types(litchi_opc::SourceLimits::default())?;
+        let current_content_types = package.source_content_types(package.read_limits())?;
         if current_content_types.bytes() != expected_content.bytes() {
             return Err(Error::Invalid(
                 "DOCX Ink graph content-types source is stale".into(),
@@ -395,8 +388,7 @@ impl Delta {
         } else {
             (&self.inner.owner_before, &self.inner.owner_after)
         };
-        if package
-            .source_relationships(expected_owner.owner(), litchi_opc::SourceLimits::default())?
+        if package.source_relationships(expected_owner.owner(), package.read_limits())?
             != *expected_owner
         {
             return Err(Error::Invalid(
@@ -410,13 +402,13 @@ impl Delta {
             package.try_replace_relationships(
                 expected_owner,
                 replacement_owner,
-                litchi_opc::SourceLimits::default(),
+                package.read_limits(),
             )?;
         } else {
             package.try_replace_relationships(
                 expected_owner,
                 replacement_owner,
-                litchi_opc::SourceLimits::default(),
+                package.read_limits(),
             )?;
             for target in &self.inner.targets {
                 if target.removed.is_some() && !package.remove_part(&target.guard.part) {
@@ -427,18 +419,14 @@ impl Delta {
             }
         }
         replace_content_types(package, replacement_content)?;
-        if package.source_relationships(
-            replacement_owner.owner(),
-            litchi_opc::SourceLimits::default(),
-        )? != *replacement_owner
+        if package.source_relationships(replacement_owner.owner(), package.read_limits())?
+            != *replacement_owner
         {
             return Err(Error::Invalid(
                 "DOCX Ink graph delta result is stale".into(),
             ));
         }
-        if package
-            .source_content_types(litchi_opc::SourceLimits::default())?
-            .bytes()
+        if package.source_content_types(package.read_limits())?.bytes()
             != replacement_content.bytes()
         {
             return Err(Error::Invalid(
@@ -530,8 +518,7 @@ impl Delta {
                 || (!std::ptr::eq(part.blob(), target.guard.payload.as_slice())
                     && part.blob() != target.guard.payload.as_slice())
                 || !same_relationships(part.rels(), &target.guard.relationships)
-                || package
-                    .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?
+                || package.source_relationships(part.partname(), package.read_limits())?
                     != target.guard.relationship_token
             {
                 return Err(Error::Invalid(
@@ -556,13 +543,13 @@ impl Delta {
                     Arc::clone(&target.guard.payload),
                 )))?;
             }
-            let current = package
-                .source_relationships(&target.guard.part, litchi_opc::SourceLimits::default())?;
+            let current =
+                package.source_relationships(&target.guard.part, package.read_limits())?;
             if current != removed.relationship_token {
                 package.try_replace_relationships(
                     &current,
                     &removed.relationship_token,
-                    litchi_opc::SourceLimits::default(),
+                    package.read_limits(),
                 )?;
             }
         }
@@ -918,16 +905,12 @@ fn add_topology(total: &mut usize, amount: usize, limits: Limits) -> Result<()> 
 }
 
 fn replace_content_types(package: &mut OpcPackage, replacement: &OwnedContentTypes) -> Result<()> {
-    let current = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let current = package.source_content_types(package.read_limits())?;
     if current.bytes() == replacement.bytes() {
         return Ok(());
     }
     let expected = current.bytes().to_vec();
-    package.try_replace_content_types(
-        &expected,
-        replacement,
-        litchi_opc::SourceLimits::default(),
-    )?;
+    package.try_replace_content_types(&expected, replacement, package.read_limits())?;
     Ok(())
 }
 

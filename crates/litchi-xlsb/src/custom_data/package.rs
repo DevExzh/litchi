@@ -1598,13 +1598,13 @@ fn connection_edits_between(
 
 fn package_size(package: &OpcPackage) -> Result<usize> {
     let mut total = package
-        .source_content_types(litchi_opc::SourceLimits::default())?
+        .source_content_types(package.read_limits())?
         .bytes()
         .len();
     total = total
         .checked_add(
             package
-                .source_relationships(&PackURI::new("/")?, litchi_opc::SourceLimits::default())?
+                .source_relationships(&PackURI::new("/")?, package.read_limits())?
                 .bytes()
                 .len(),
         )
@@ -1620,7 +1620,7 @@ fn package_size(package: &OpcPackage) -> Result<usize> {
         total = total
             .checked_add(
                 package
-                    .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?
+                    .source_relationships(part.partname(), package.read_limits())?
                     .bytes()
                     .len(),
             )
@@ -1692,7 +1692,7 @@ fn capture_source(
     }
     let workbook_name = workbook.partname().clone();
     let workbook_bytes = workbook.blob_arc();
-    let content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let content_types = package.source_content_types(package.read_limits())?;
     if content_types.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(Error::limit(
             LimitKind::RelationshipXmlBytes,
@@ -1701,7 +1701,7 @@ fn capture_source(
         ));
     }
     let root_relationships =
-        package.source_relationships(&PackURI::new("/")?, litchi_opc::SourceLimits::default())?;
+        package.source_relationships(&PackURI::new("/")?, package.read_limits())?;
     if root_relationships.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(Error::limit(
             LimitKind::RelationshipXmlBytes,
@@ -1710,7 +1710,7 @@ fn capture_source(
         ));
     }
     let workbook_relationships =
-        package.source_relationships(&workbook_name, litchi_opc::SourceLimits::default())?;
+        package.source_relationships(&workbook_name, package.read_limits())?;
     if workbook_relationships.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(Error::limit(
             LimitKind::RelationshipXmlBytes,
@@ -1959,14 +1959,10 @@ fn capture_member_proofs(
             .identity();
         let properties = package.get_part(&identity.properties_part_name)?;
         let data = package.get_part(&identity.data_part_name)?;
-        let properties_relationships = package.source_relationships(
-            &identity.properties_part_name,
-            litchi_opc::SourceLimits::default(),
-        )?;
-        let data_relationships = package.source_relationships(
-            &identity.data_part_name,
-            litchi_opc::SourceLimits::default(),
-        )?;
+        let properties_relationships =
+            package.source_relationships(&identity.properties_part_name, package.read_limits())?;
+        let data_relationships =
+            package.source_relationships(&identity.data_part_name, package.read_limits())?;
         if properties_relationships.bytes().len() > limits.max_relationship_xml_bytes()
             || data_relationships.bytes().len() > limits.max_relationship_xml_bytes()
         {
@@ -2324,7 +2320,7 @@ fn capture_connection(
         references.push(binding.client_cube_urn().to_owned());
     }
     let part_relationships =
-        package.source_relationships(part.partname(), litchi_opc::SourceLimits::default())?;
+        package.source_relationships(part.partname(), package.read_limits())?;
     let mut inbound = capture_inbound_proofs(
         package,
         std::slice::from_ref(part.partname()),
@@ -2580,7 +2576,7 @@ fn restore_content_types_template_if_scoped(
     after: &Snapshot,
     limits: Limits,
 ) -> Result<()> {
-    let current = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let current = package.source_content_types(package.read_limits())?;
     if current == after.source.content_types {
         return Ok(());
     }
@@ -2635,7 +2631,7 @@ fn restore_content_types_template_if_scoped(
     package.try_replace_content_types(
         current.bytes(),
         &after.source.content_types,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     Ok(())
 }
@@ -2655,8 +2651,7 @@ fn restore_relationship_templates_if_scoped(
         .min(limits.max_temporary_bytes())
         .min(limits.max_output_bytes());
     let workbook_name = package.main_document_part()?.partname().clone();
-    let current_workbook =
-        package.source_relationships(&workbook_name, litchi_opc::SourceLimits::default())?;
+    let current_workbook = package.source_relationships(&workbook_name, package.read_limits())?;
     let mut workbook_ids = Vec::new();
     workbook_ids
         .try_reserve(
@@ -2706,8 +2701,8 @@ fn restore_relationship_templates_if_scoped(
                 data_ids.push(identity.data_relationship_id.clone());
             }
         }
-        let current_member = package
-            .source_relationships(&desired_member.name, litchi_opc::SourceLimits::default())?;
+        let current_member =
+            package.source_relationships(&desired_member.name, package.read_limits())?;
         restore_one_relationship_template(
             package,
             &current_member,
@@ -2760,7 +2755,7 @@ fn restore_one_relationship_template(
             output_limit,
         ));
     }
-    package.try_replace_relationships(current, desired, litchi_opc::SourceLimits::default())?;
+    package.try_replace_relationships(current, desired, package.read_limits())?;
     Ok(())
 }
 
@@ -2878,7 +2873,7 @@ fn apply_draft(
     }
 
     apply_connection_edits(package, before, connection_edits, limits, context)?;
-    let current_content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
     let content_types_limit =
         replacement_output_limit(package, current_content_types.bytes().len(), limits)?;
     let content_types = transition_content_types(
@@ -2891,7 +2886,7 @@ fn apply_draft(
     package.try_replace_content_types(
         current_content_types.bytes(),
         &content_types,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     validate_package_limits(package, limits)?;
     validate_output_limits(package, limits)?;
@@ -2965,7 +2960,7 @@ fn preflight_output_budget(package: &OpcPackage, before: &Snapshot, limits: Limi
         immutable = immutable
             .checked_add(
                 package
-                    .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?
+                    .source_relationships(part.partname(), package.read_limits())?
                     .bytes()
                     .len(),
             )
@@ -3124,7 +3119,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     }
     let workbook_name = package.main_document_part()?.partname().clone();
     let workbook_relationships_before =
-        package.source_relationships(&workbook_name, litchi_opc::SourceLimits::default())?;
+        package.source_relationships(&workbook_name, package.read_limits())?;
     if workbook_relationships_before
         .bytes()
         .len()
@@ -3152,10 +3147,8 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
         entry.value.data.as_ref().clone(),
     )))?;
 
-    let properties_relationships = package.source_relationships(
-        &identity.properties_part_name,
-        litchi_opc::SourceLimits::default(),
-    )?;
+    let properties_relationships =
+        package.source_relationships(&identity.properties_part_name, package.read_limits())?;
     let properties_relationship_output_limit =
         replacement_output_limit(package, properties_relationships.bytes().len(), *limits)?
             .min(limits.max_relationship_xml_bytes())
@@ -3170,10 +3163,10 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     let workbook_relationships =
-        package.source_relationships(&workbook_name, litchi_opc::SourceLimits::default())?;
+        package.source_relationships(&workbook_name, package.read_limits())?;
     let workbook_relationship_output_limit =
         replacement_output_limit(package, workbook_relationships.bytes().len(), *limits)?
             .min(limits.max_relationship_xml_bytes())
@@ -3188,7 +3181,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Storage, limits: &Limits) -> Resu
     package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     Ok(())
 }
@@ -3232,7 +3225,7 @@ fn remove_entry(package: &mut OpcPackage, entry: &Storage, limits: Limits) -> Re
         ));
     }
     let workbook_relationships =
-        package.source_relationships(workbook.partname(), litchi_opc::SourceLimits::default())?;
+        package.source_relationships(workbook.partname(), package.read_limits())?;
     let workbook_relationship_output_limit =
         replacement_output_limit(package, workbook_relationships.bytes().len(), limits)?
             .min(limits.max_relationship_xml_bytes())
@@ -3244,12 +3237,10 @@ fn remove_entry(package: &mut OpcPackage, entry: &Storage, limits: Limits) -> Re
     package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
-    let properties_relationships = package.source_relationships(
-        &identity.properties_part_name,
-        litchi_opc::SourceLimits::default(),
-    )?;
+    let properties_relationships =
+        package.source_relationships(&identity.properties_part_name, package.read_limits())?;
     let properties_relationship_output_limit =
         replacement_output_limit(package, properties_relationships.bytes().len(), limits)?
             .min(limits.max_relationship_xml_bytes())
@@ -3261,7 +3252,7 @@ fn remove_entry(package: &mut OpcPackage, entry: &Storage, limits: Limits) -> Re
     package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     if !package.remove_part(&identity.properties_part_name)
         || !package.remove_part(&identity.data_part_name)

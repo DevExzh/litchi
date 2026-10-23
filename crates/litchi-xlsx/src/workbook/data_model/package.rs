@@ -192,8 +192,7 @@ fn publish_data_model(
             .find(|rel| rel.reltype() == NATIVE_MODEL_RELATIONSHIP_TYPE)
             .map(|rel| rel.r_id().to_owned());
         id.map(|id| -> Result<_> {
-            let before =
-                package.source_relationships(workbook_name, litchi_opc::SourceLimits::default())?;
+            let before = package.source_relationships(workbook_name, package.read_limits())?;
             let after = before.without_relationship(&id, before.bytes().len())?;
             Ok((before, after))
         })
@@ -277,7 +276,7 @@ fn publish_data_model(
         package.try_replace_owned_xml_part(workbook_source.bytes(), updated)?;
     }
     if let Some((before, after)) = relationship_update {
-        package.try_replace_relationships(&before, &after, litchi_opc::SourceLimits::default())?;
+        package.try_replace_relationships(&before, &after, package.read_limits())?;
     }
     if let Some(removal) = removal {
         removal.publish(package)?;
@@ -1309,11 +1308,11 @@ fn capture_source(
         })
         .transpose()?;
     Ok(SourceState {
-        content_types: package.source_content_types(litchi_opc::SourceLimits::default())?,
+        content_types: package.source_content_types(package.read_limits())?,
         workbook_blob: workbook.blob_arc(),
         workbook_proof: package.source_xml_part(workbook_name)?,
         workbook_relationships: package
-            .source_relationships(workbook_name, litchi_opc::SourceLimits::default())?,
+            .source_relationships(workbook_name, package.read_limits())?,
         model_part,
         model_incoming_relationships,
         connections_part,
@@ -1325,8 +1324,7 @@ fn source_part(package: &OpcPackage, part: &dyn Part) -> Result<SourcePart> {
         name: part.partname().clone(),
         content_type: part.content_type().into(),
         blob: part.blob_arc(),
-        relationships: package
-            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?,
+        relationships: package.source_relationships(part.partname(), package.read_limits())?,
         xml: (part.content_type() == CONNECTIONS_CONTENT_TYPE)
             .then(|| package.source_xml_part(part.partname()))
             .transpose()?,
@@ -1385,12 +1383,12 @@ fn publish_snapshot(
 ) -> Result<()> {
     let current = package.get_part(&snapshot.workbook_name)?.blob_arc();
     package.try_replace_owned_xml_part(&current, snapshot.source.workbook_proof.clone())?;
-    let current_relationships = package
-        .source_relationships(&snapshot.workbook_name, litchi_opc::SourceLimits::default())?;
+    let current_relationships =
+        package.source_relationships(&snapshot.workbook_name, package.read_limits())?;
     package.try_replace_relationships(
         &current_relationships,
         &snapshot.source.workbook_relationships,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     let model_uri = PackURI::new(DATA_MODEL_PART_NAME).map_err(invalid)?;
     match snapshot.source.model_part.as_ref() {
@@ -1417,11 +1415,11 @@ fn publish_snapshot(
         },
         (None, None) => {},
     }
-    let current_content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
     package.try_replace_content_types(
         current_content_types.bytes(),
         &snapshot.source.content_types,
-        litchi_opc::SourceLimits::default(),
+        package.read_limits(),
     )?;
     Ok(())
 }
@@ -1455,12 +1453,8 @@ fn publish_source_part(package: &mut OpcPackage, part: &SourcePart) -> Result<()
             Arc::clone(&part.blob),
         )))?;
     }
-    let current = package.source_relationships(&part.name, litchi_opc::SourceLimits::default())?;
-    package.try_replace_relationships(
-        &current,
-        &part.relationships,
-        litchi_opc::SourceLimits::default(),
-    )?;
+    let current = package.source_relationships(&part.name, package.read_limits())?;
+    package.try_replace_relationships(&current, &part.relationships, package.read_limits())?;
     Ok(())
 }
 

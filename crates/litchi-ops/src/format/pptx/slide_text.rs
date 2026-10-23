@@ -150,7 +150,7 @@ impl Pptx {
             .with_suggestion("set the existing title placeholder's text instead"));
         }
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let _ = edit.add_placeholder(slide as usize, kind, text.as_deref().unwrap_or(""))?;
         let (target, patch) = edit.commit()?.into_parts();
@@ -183,7 +183,7 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let text = super::write::notes_add_text(node.props(), limits)?;
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let changed = edit.set_notes_text(slide as usize, &text)?;
         let (target, patch) = edit.commit()?.into_parts();

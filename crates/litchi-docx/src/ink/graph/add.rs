@@ -151,10 +151,8 @@ impl AddDelta {
         let relationship_count = preflight_graph(package, limits)?;
         let owner_name = canonical_owner(package, owner)?;
         let owner_relationships = owner_relationships(package, &owner_name)?;
-        let owner_before =
-            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
-        let content_types_before =
-            package.source_content_types(litchi_opc::SourceLimits::default())?;
+        let owner_before = package.source_relationships(&owner_name, package.read_limits())?;
+        let content_types_before = package.source_content_types(package.read_limits())?;
         if inputs.is_empty() {
             return Ok((
                 Vec::new(),
@@ -315,11 +313,10 @@ impl AddDelta {
                 payload: part.blob_arc(),
                 relationships: capture_relationships(part.rels())?,
                 relationship_token: package
-                    .source_relationships(&target.part, litchi_opc::SourceLimits::default())?,
+                    .source_relationships(&target.part, package.read_limits())?,
             });
         }
-        let owner_after_token =
-            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
+        let owner_after_token = package.source_relationships(&owner_name, package.read_limits())?;
         debug_assert_eq!(owner_after_token, owner_after);
         Ok((
             targets,
@@ -350,10 +347,7 @@ impl AddDelta {
                 &self.inner.content_types_after,
             )
         };
-        if package
-            .source_content_types(litchi_opc::SourceLimits::default())?
-            .bytes()
-            != expected_content.bytes()
+        if package.source_content_types(package.read_limits())?.bytes() != expected_content.bytes()
         {
             return Err(Error::Invalid(
                 "DOCX Ink add content-types source is stale".into(),
@@ -364,8 +358,7 @@ impl AddDelta {
         } else {
             (&self.inner.owner_before, &self.inner.owner_after)
         };
-        if package
-            .source_relationships(expected_owner.owner(), litchi_opc::SourceLimits::default())?
+        if package.source_relationships(expected_owner.owner(), package.read_limits())?
             != *expected_owner
         {
             return Err(Error::Invalid(
@@ -378,7 +371,7 @@ impl AddDelta {
             package.try_replace_relationships(
                 expected_owner,
                 replacement_owner,
-                litchi_opc::SourceLimits::default(),
+                package.read_limits(),
             )?;
             for target in &self.inner.targets {
                 if !package.remove_part(&target.target.part) {
@@ -412,14 +405,10 @@ impl AddDelta {
                 parts,
             )?;
         }
-        if package
-            .source_content_types(litchi_opc::SourceLimits::default())?
-            .bytes()
+        if package.source_content_types(package.read_limits())?.bytes()
             != replacement_content.bytes()
-            || package.source_relationships(
-                replacement_owner.owner(),
-                litchi_opc::SourceLimits::default(),
-            )? != *replacement_owner
+            || package.source_relationships(replacement_owner.owner(), package.read_limits())?
+                != *replacement_owner
         {
             return Err(Error::Invalid("DOCX Ink add result is stale".into()));
         }
@@ -478,10 +467,8 @@ impl AddDelta {
                     || (part.blob() != target.payload.as_slice()
                         && !std::ptr::eq(part.blob(), target.payload.as_slice()))
                     || !same_relationships(part.rels(), &target.relationships)
-                    || package.source_relationships(
-                        part.partname(),
-                        litchi_opc::SourceLimits::default(),
-                    )? != target.relationship_token
+                    || package.source_relationships(part.partname(), package.read_limits())?
+                        != target.relationship_token
                 {
                     return Err(Error::Invalid("DOCX Ink add target is stale".into()));
                 }

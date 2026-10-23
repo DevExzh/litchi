@@ -125,12 +125,13 @@ fn parse_outline(layout: Layout, value: &str) -> Result<Spec> {
 }
 
 /// The eager package of an editable owner, promoting a source owner.
-pub(super) fn eager(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
+pub(super) fn eager(
+    source: &Editable,
+    limits: litchi_opc::SourceLimits,
+) -> Result<Arc<litchi_pptx::Package>> {
     Ok(match source {
         Editable::Eager(package) => Arc::clone(package),
-        Editable::Source(package) => Arc::new(litchi_pptx::Package::from_reader(
-            std::io::Cursor::new(package.to_bytes()?),
-        )?),
+        Editable::Source(package) => super::eager_package_from_source(package.to_bytes()?, limits)?,
     })
 }
 

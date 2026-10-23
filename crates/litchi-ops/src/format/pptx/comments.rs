@@ -123,12 +123,12 @@ fn validate_date_time(value: &str, property: &'static str) -> Result<()> {
 impl Pptx {
     /// The eager base for an edit of separate parts: the eager owner itself,
     /// or the source owner's current bytes promoted to an eager package.
-    pub(super) fn eager_base(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
+    pub(super) fn eager_base(&self, source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
         Ok(match source {
             Editable::Eager(package) => Arc::clone(package),
-            Editable::Source(package) => Arc::new(litchi_pptx::Package::from_reader(
-                std::io::Cursor::new(package.to_bytes()?),
-            )?),
+            Editable::Source(package) => {
+                super::eager_package_from_source(package.to_bytes()?, self.0.ooxml_limits)?
+            },
         })
     }
 
@@ -151,7 +151,7 @@ impl Pptx {
             },
         };
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let mut changed = edit.set_comment_at(
             slide as usize,
@@ -229,7 +229,7 @@ impl Pptx {
             text.insert(0, RIGHT_TO_LEFT_MARK);
         }
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let position = edit.add_comment_text(
             slide,
@@ -307,7 +307,7 @@ impl Pptx {
         drop(node);
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let changed = match target {
             Target::Legacy(slide, index) => edit.remove_comment_at(slide, Position::new(index))?,
@@ -456,7 +456,7 @@ impl Pptx {
         drop(node);
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let change = litchi_pptx::opened::ModernCommentChange {
             text: values.text.as_deref(),
@@ -566,7 +566,7 @@ impl Pptx {
         };
         let text = values.text.unwrap_or_default();
         let source = self.editable_owner()?;
-        let base = Self::eager_base(&source)?;
+        let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let slide_step = Step::new("slide").with(Predicate::Index(Position::new(slide as usize)));
         let path = match thread {

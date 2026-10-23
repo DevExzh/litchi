@@ -109,8 +109,7 @@ impl SourceState {
 
     fn capture(package: &OpcPackage, owner: &dyn OpcPart) -> Result<Self> {
         let part_name = owner.partname().clone();
-        let relationships =
-            package.source_relationships(&part_name, litchi_opc::SourceLimits::default())?;
+        let relationships = package.source_relationships(&part_name, package.read_limits())?;
         Ok(Self {
             part: Some(SourcePart {
                 name: part_name.clone(),

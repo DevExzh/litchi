@@ -171,7 +171,7 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), after)
             },
             Editable::Eager(_) | Editable::Source(_) => {
-                let package = super::smartart::eager(&source)?;
+                let package = super::smartart::eager(&source, self.0.ooxml_limits)?;
                 let mut edit = package.edit()?;
                 let _ =
                     edit.add_text_box(Position::new(slide), text.as_deref().unwrap_or(""), bounds)?;

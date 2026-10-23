@@ -2221,7 +2221,7 @@ impl OpcPackage {
         let replacement_relationships_parsed = PackageReader::parse_owned_relationships(
             replacement_relationships.bytes(),
             replacement_relationships.owner(),
-            SourceLimits::default(),
+            self.read_limits,
         )?;
         let replacement_relationship_binding =
             RelationshipBinding::from_relationships(&replacement_relationships_parsed)?;
@@ -4773,6 +4773,73 @@ mod tests {
                 .source_relationships(&owner, SourceLimits::default())
                 .unwrap()
                 .member_present()
+        );
+    }
+
+    #[test]
+    fn batch_source_token_replacement_honors_relationship_limit_atomically() {
+        let owner = PackURI::new("/word/document.xml").unwrap();
+        let mut original = OpcPackage::new();
+        original.add_part(Box::new(BlobPart::new(
+            owner.clone(),
+            "application/xml".to_owned(),
+            b"<document/>".to_vec(),
+        )));
+        let source = crate::PackageWriter::to_bytes(&original).unwrap();
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap();
+        let content_types = package.source_content_types(package.read_limits()).unwrap();
+        let expected_relationships = package
+            .source_relationships(&owner, package.read_limits())
+            .unwrap();
+        assert!(!expected_relationships.member_present());
+
+        let mut replacement_source = OpcPackage::new();
+        replacement_source.add_part(Box::new(BlobPart::new(
+            owner.clone(),
+            "application/xml".to_owned(),
+            b"<document/>".to_vec(),
+        )));
+        replacement_source
+            .get_part_mut(&owner)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test:replacement".to_owned(),
+                "https://example.test/target".to_owned(),
+                "rId1".to_owned(),
+                crate::TargetMode::External,
+            )
+            .unwrap();
+        let replacement_relationships = replacement_source
+            .source_relationships(&owner, replacement_source.read_limits())
+            .unwrap();
+        assert!(replacement_relationships.member_present());
+        assert!(replacement_relationships.bytes().len() > 1);
+
+        let tight = SourceLimits::builder()
+            .max_relationship_xml_bytes(replacement_relationships.bytes().len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        package.read_limits = tight;
+        assert!(matches!(
+            package.try_add_parts_with_source_tokens(
+                content_types.bytes(),
+                &content_types,
+                &expected_relationships,
+                &replacement_relationships,
+                Vec::new(),
+            ),
+            Err(OpcError::Limit {
+                kind: crate::SourceLimitKind::RelationshipXmlBytes,
+                ..
+            })
+        ));
+        assert_eq!(crate::PackageWriter::to_bytes(&package).unwrap(), source);
+        assert!(package.is_unmodified_owned_source());
+        assert_eq!(
+            package.exact_source_shared().unwrap().as_slice(),
+            source.as_slice()
         );
     }
 

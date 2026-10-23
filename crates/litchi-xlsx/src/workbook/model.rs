@@ -607,7 +607,12 @@ impl Workbook {
                     workbook.content_type()
                 ))
             })?;
-            let catalog = raw::parse_catalog_repairing(workbook.blob(), leniency, &mut tolerance)?;
+            let catalog = raw::parse_catalog_repairing(
+                workbook.blob(),
+                &package.read_limits(),
+                leniency,
+                &mut tolerance,
+            )?;
             let sheet_parts = package::validate_sheet_graph(&package, workbook, &catalog.sheets)?;
             let shared_strings_uri = package::validate_shared_strings(&package, workbook)?;
             let styles_uri = package::validate_styles(&package, workbook)?;

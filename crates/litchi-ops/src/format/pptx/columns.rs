@@ -102,7 +102,7 @@ impl Pptx {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match change {
             Change::Width { column, width } => {

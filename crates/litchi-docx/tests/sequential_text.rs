@@ -1260,7 +1260,9 @@ fn effective_main_donor_cancellation_during_output_keeps_progress() {
             false,
         ))),
         SourceLimits::default(),
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut base = litchi_opc::OpcPackage::new();

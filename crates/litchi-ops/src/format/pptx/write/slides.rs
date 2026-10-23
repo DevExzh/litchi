@@ -168,7 +168,7 @@ impl Pptx {
         // source-backed slide edit does not stage: a source owner is promoted
         // (record 0346).
         let promoted = match (&source, &layout) {
-            (Editable::Source(_), Some(_)) => Some(Editable::Eager(Self::eager_base(&source)?)),
+            (Editable::Source(_), Some(_)) => Some(Editable::Eager(self.eager_base(&source)?)),
             _ => None,
         };
         let owner = promoted.as_ref().unwrap_or(&source);
