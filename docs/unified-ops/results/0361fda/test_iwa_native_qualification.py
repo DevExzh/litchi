@@ -276,6 +276,7 @@ class NativeQualificationTests(unittest.TestCase):
         snap_version: str = "1.1.2",
         snap_source: str = RUNNER.REGISTRY_SOURCE,
         snap_checksum: str = "a" * 64,
+        extra_local_edge: bool = False,
     ) -> None:
         dependencies = ["litchi-iwa-common"]
         if not omit_snap_edge:
@@ -320,6 +321,7 @@ class NativeQualificationTests(unittest.TestCase):
                         'version = "0.1.0"',
                         'dependencies = [',
                         ' "litchi-iwa-core",',
+                        *([' "litchi-iwa-common",'] if extra_local_edge else []),
                         "]",
                     ]
                 )
@@ -561,8 +563,12 @@ class NativeQualificationTests(unittest.TestCase):
         base_lock = self.directory / "owner-base.lock"
         candidate_lock = self.directory / "owner-candidate.lock"
         seed_lock = self.directory / "owner-seed.lock"
-        self._write_dependency_lock(base_lock, candidate=False, owner=True)
-        self._write_dependency_lock(candidate_lock, candidate=True, owner=True)
+        self._write_dependency_lock(
+            base_lock, candidate=False, owner=True, extra_local_edge=True
+        )
+        self._write_dependency_lock(
+            candidate_lock, candidate=True, owner=True, extra_local_edge=True
+        )
         self._write_seed_lock(seed_lock)
         delta = RUNNER.lock_delta_manifest(
             "owner", base_source, candidate_source, base_lock, candidate_lock, seed_lock

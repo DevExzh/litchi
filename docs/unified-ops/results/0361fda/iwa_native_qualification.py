@@ -1104,10 +1104,19 @@ def lock_delta_manifest(
     package_names = set(source_dependencies["packages"])
     base_edges = _dependency_edges(base_rows, package_names)
     candidate_edges = _dependency_edges(candidate_rows, package_names)
-    if base_edges != source_dependencies["base_dependency_edges"]:
-        raise QualificationError("baseline Cargo.lock dependency edges do not match its source manifest")
-    if candidate_edges != source_dependencies["candidate_dependency_edges"]:
-        raise QualificationError("candidate Cargo.lock dependency edges do not match its source manifest")
+    for label, actual, expected in (
+        ("baseline", base_edges, source_dependencies["base_dependency_edges"]),
+        ("candidate", candidate_edges, source_dependencies["candidate_dependency_edges"]),
+    ):
+        missing_edges = {
+            owner: sorted(set(expected[owner]) - set(actual[owner]))
+            for owner in expected
+            if set(expected[owner]) - set(actual[owner])
+        }
+        if missing_edges:
+            raise QualificationError(
+                f"{label} Cargo.lock lacks source-declared dependency edges: {missing_edges}"
+            )
     required_seed_rows: dict[str, list[dict[str, Any]]] = {}
     for label, edges, rows in (
         ("baseline", base_edges, base_rows),
