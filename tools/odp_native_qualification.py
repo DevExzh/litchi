@@ -31,6 +31,7 @@ import subprocess
 import sys
 import time
 from typing import Any, Iterable, Mapping
+import zipfile
 
 
 INPUT_SCHEMA = "litchi.odp.native-qualification.input.v1"
@@ -250,10 +251,51 @@ def load_manifest(path: Path) -> InputManifest:
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except (OSError, ValueError) as error:
+        raise RunFailure(f"cannot hash file {path}: {error}") from error
     return digest.hexdigest()
+
+
+def _sha256_stream(stream: Any) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            total += len(chunk)
+            digest.update(chunk)
+    except (OSError, ValueError) as error:
+        raise RunFailure(f"cannot hash fixture content stream: {error}") from error
+    return {"bytes": total, "sha256": digest.hexdigest()}
+
+
+def _fixture_content_identity(path: Path) -> dict[str, Any]:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            entries = [entry for entry in archive.infolist() if entry.filename == "content.xml"]
+            if len(entries) != 1:
+                raise RunFailure(
+                    f"fixture must contain exactly one content.xml entry, observed {len(entries)}"
+                )
+            with archive.open(entries[0], "r") as stream:
+                identity = _sha256_stream(stream)
+    except RunFailure:
+        raise
+    except (
+        OSError,
+        EOFError,
+        KeyError,
+        RuntimeError,
+        ValueError,
+        zipfile.BadZipFile,
+    ) as error:
+        raise RunFailure(f"cannot read fixture content.xml: {error}") from error
+    if identity["bytes"] <= 0:
+        raise RunFailure("fixture content.xml is empty")
+    return identity
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:
@@ -300,8 +342,15 @@ def resolve_endpoint(endpoint: Endpoint, source_roots: Iterable[Path]) -> Resolv
     if status:
         raise RunFailure(f"{endpoint.name}.root is dirty; qualification requires a clean worktree")
     resolved_ref = _run_git(endpoint.root, "rev-parse", "--verify", f"{endpoint.requested_ref}^{{commit}}")
-    if REVISION.fullmatch(resolved_ref) is None:
-        raise RunFailure(f"{endpoint.name}.ref resolved to an invalid revision {resolved_ref!r}")
+    head = _run_git(endpoint.root, "rev-parse", "--verify", "HEAD")
+    if REVISION.fullmatch(resolved_ref) is None or REVISION.fullmatch(head) is None:
+        raise RunFailure(
+            f"{endpoint.name}: ref/head resolved to invalid revisions {resolved_ref!r}/{head!r}"
+        )
+    if head != resolved_ref:
+        raise RunFailure(
+            f"{endpoint.name}: clean worktree HEAD {head} does not match requested ref {resolved_ref}"
+        )
     if not endpoint.binary.is_file() or not os.access(endpoint.binary, os.X_OK):
         raise RunFailure(f"{endpoint.name}.binary is not an executable regular file: {endpoint.binary}")
     if not endpoint.target_dir.is_dir():
@@ -309,27 +358,33 @@ def resolve_endpoint(endpoint: Endpoint, source_roots: Iterable[Path]) -> Resolv
     _validate_external_target(endpoint.target_dir, source_roots, f"{endpoint.name}.target_dir")
     if not is_relative_to(endpoint.binary, endpoint.target_dir):
         raise RunFailure(f"{endpoint.name}.binary must be below its declared target_dir")
+    identity = binary_identity(endpoint.binary)
     return ResolvedEndpoint(
         endpoint=endpoint,
         resolved_ref=resolved_ref,
-        binary_bytes=endpoint.binary.stat().st_size,
-        binary_sha256=sha256_file(endpoint.binary),
+        binary_bytes=identity["bytes"],
+        binary_sha256=identity["sha256"],
     )
 
 
 def validate_fixture(fixture: Fixture) -> dict[str, Any]:
     if not fixture.path.is_file():
         raise RunFailure(f"fixture is not a regular file: {fixture.path}")
-    actual_bytes = fixture.path.stat().st_size
+    try:
+        actual_bytes = fixture.path.stat().st_size
+    except (OSError, ValueError) as error:
+        raise RunFailure(f"cannot stat fixture {fixture.path}: {error}") from error
     actual_sha256 = sha256_file(fixture.path)
     if actual_bytes != fixture.bytes:
         raise RunFailure(f"fixture byte count changed: manifest {fixture.bytes}, observed {actual_bytes}")
     if actual_sha256 != fixture.sha256:
         raise RunFailure(f"fixture SHA-256 changed: manifest {fixture.sha256}, observed {actual_sha256}")
+    content = _fixture_content_identity(fixture.path)
     return {
         "path": str(fixture.path),
         "bytes": actual_bytes,
         "sha256": actual_sha256,
+        "content": content,
         "provenance": fixture.provenance,
     }
 
@@ -337,7 +392,11 @@ def validate_fixture(fixture: Fixture) -> dict[str, Any]:
 def binary_identity(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise RunFailure(f"binary is not a regular file: {path}")
-    return {"path": str(path), "bytes": path.stat().st_size, "sha256": sha256_file(path)}
+    try:
+        bytes_value = path.stat().st_size
+    except (OSError, ValueError) as error:
+        raise RunFailure(f"cannot stat binary {path}: {error}") from error
+    return {"path": str(path), "bytes": bytes_value, "sha256": sha256_file(path)}
 
 
 def is_heavy_process(executable: str, command: str) -> bool:
@@ -350,16 +409,41 @@ def is_heavy_process(executable: str, command: str) -> bool:
     return bool(HEAVY_WORD.search(command))
 
 
+def _read_process_cmdline(entry: Path, pid: int) -> bytes | None:
+    try:
+        return (entry / "cmdline").read_bytes()
+    except FileNotFoundError as error:
+        # A PID that vanished between enumeration and read is benign, but only
+        # after an explicit second stat confirms that it really vanished.
+        try:
+            entry.stat()
+        except FileNotFoundError:
+            return None
+        except OSError as stat_error:
+            raise RunFailure(f"cannot recheck /proc/{pid} after cmdline race: {stat_error}") from stat_error
+        raise RunFailure(f"/proc/{pid}/cmdline disappeared without the process vanishing") from error
+    except PermissionError as error:
+        raise RunFailure(f"cannot read /proc/{pid}/cmdline: permission denied") from error
+    except OSError as error:
+        raise RunFailure(f"cannot read /proc/{pid}/cmdline: {error}") from error
+
+
 def process_scan() -> list[dict[str, Any]]:
     processes: list[dict[str, Any]] = []
     proc_root = Path("/proc")
-    for entry in proc_root.glob("[0-9]*"):
+    try:
+        entries = list(proc_root.glob("[0-9]*"))
+    except OSError as error:
+        raise RunFailure(f"cannot enumerate /proc: {error}") from error
+    for entry in entries:
         try:
             pid = int(entry.name)
-            if pid == os.getpid():
-                continue
-            raw = (entry / "cmdline").read_bytes()
-        except (FileNotFoundError, PermissionError, ValueError):
+        except ValueError as error:
+            raise RunFailure(f"/proc contained a non-numeric process entry {entry.name!r}") from error
+        if pid == os.getpid():
+            continue
+        raw = _read_process_cmdline(entry, pid)
+        if raw is None:
             continue
         parts = [part.decode("utf-8", errors="replace") for part in raw.split(b"\0") if part]
         if not parts:
@@ -447,8 +531,19 @@ def _probe_command(
 def _parse_child_json(stdout: bytes, label: str) -> dict[str, Any]:
     if len(stdout) > MAX_CHILD_OUTPUT:
         raise RunFailure(f"{label}: child output exceeds {MAX_CHILD_OUTPUT} bytes")
+
+    def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise RunFailure(f"{label}: child JSON contains duplicate key {key!r}")
+            result[key] = value
+        return result
+
     try:
-        value = json.loads(stdout.decode("utf-8"))
+        value = json.loads(
+            stdout.decode("utf-8"), object_pairs_hook=reject_duplicate_keys
+        )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RunFailure(f"{label}: child did not produce one JSON object: {error}") from error
     if not isinstance(value, dict):
@@ -527,19 +622,20 @@ def _digest_object(value: Any, location: str) -> dict[str, Any]:
     return {"bytes": bytes_value, "sha256": digest}
 
 
-def _assert_endpoint_unchanged(endpoint: ResolvedEndpoint) -> None:
+def _assert_endpoint_unchanged(endpoint: ResolvedEndpoint) -> dict[str, Any]:
     status = _run_git(endpoint.endpoint.root, "status", "--porcelain", "--untracked-files=all")
     if status:
-        raise RunFailure(f"{endpoint.name}: source worktree became dirty before timing")
+        raise RunFailure(f"{endpoint.endpoint.name}: source worktree became dirty before timing")
     current_ref = _run_git(
         endpoint.endpoint.root,
         "rev-parse",
         "--verify",
         f"{endpoint.endpoint.requested_ref}^{{commit}}",
     )
-    if current_ref != endpoint.resolved_ref:
+    current_head = _run_git(endpoint.endpoint.root, "rev-parse", "--verify", "HEAD")
+    if current_ref != endpoint.resolved_ref or current_head != endpoint.resolved_ref:
         raise RunFailure(
-            f"{endpoint.name}: requested ref changed from {endpoint.resolved_ref} to {current_ref}"
+            f"{endpoint.endpoint.name}: ref/head changed from {endpoint.resolved_ref} to {current_ref}/{current_head}"
         )
     identity = binary_identity(endpoint.endpoint.binary)
     expected = {
@@ -548,22 +644,53 @@ def _assert_endpoint_unchanged(endpoint: ResolvedEndpoint) -> None:
         "sha256": endpoint.binary_sha256,
     }
     if identity != expected:
-        raise RunFailure(f"{endpoint.name}: executable changed after identity capture")
+        raise RunFailure(f"{endpoint.endpoint.name}: executable changed after identity capture")
+    return {"head": current_head, "binary": identity}
+
+
+def _revalidate_run_identity(
+    manifest: InputManifest,
+    endpoints: Mapping[str, ResolvedEndpoint],
+    phase: str,
+) -> dict[str, Any]:
+    fixture = validate_fixture(manifest.fixture)
+    endpoint_identity = {
+        name: _assert_endpoint_unchanged(endpoints[name])
+        for name in ("baseline", "candidate")
+    }
+    return {
+        "phase": phase,
+        "checked_unix_ns": time.time_ns(),
+        "fixture": fixture,
+        "endpoints": endpoint_identity,
+    }
 
 
 def validate_correctness_report(
-    report: Mapping[str, Any], fixture: Fixture, label: str
+    report: Mapping[str, Any],
+    fixture: Fixture,
+    fixture_identity: Mapping[str, Any],
+    label: str,
 ) -> dict[str, dict[str, Any]]:
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "verify":
         raise RunFailure(f"{label}: invalid correctness report identity")
     fixture_report = _digest_object(report.get("fixture"), f"{label}.fixture")
     if fixture_report != {"bytes": fixture.bytes, "sha256": fixture.sha256}:
         raise RunFailure(f"{label}: probe fixture identity differs from manifest")
+    content_report = _digest_object(
+        _object(report.get("fixture"), f"{label}.fixture").get("content"),
+        f"{label}.fixture.content",
+    )
+    expected_content = _digest_object(fixture_identity.get("content"), f"{label}.fixture.content")
+    if content_report != expected_content:
+        raise RunFailure(f"{label}: probe content.xml identity differs from the fixture")
     checks = _object(report.get("checks"), f"{label}.checks")
     expected_checks = {
         "no_op_exact_source",
         "read_semantics",
         "append_changed",
+        "patch_source_matches_fixture",
+        "append_output_changed",
         "same_owner_replay_exact",
         "content_matching_forward_exact",
         "inverse_exact_source",
@@ -582,6 +709,8 @@ def validate_correctness_report(
     )
     if source_content_sha256 == target_content_sha256:
         raise RunFailure(f"{label}: append patch content proof did not change")
+    if source_content_sha256 != expected_content["sha256"]:
+        raise RunFailure(f"{label}: patch source hash differs from fixture content.xml")
     read = _object(report.get("read"), f"{label}.read")
     if _positive_int(read.get("slide_count"), f"{label}.read.slide_count") <= 0:
         raise RunFailure(f"{label}: read route reported no slides")
@@ -608,10 +737,38 @@ def validate_correctness_report(
         raise RunFailure(f"{label}: source output digest differs from the fixture")
     if outputs["no_op"] != outputs["source"] or outputs["inverse"] != outputs["source"]:
         raise RunFailure(f"{label}: no-op or inverse output is not the exact source")
+    if outputs["append"] == outputs["source"]:
+        raise RunFailure(f"{label}: appended output is identical to the source")
     for name in ("same_owner_replay", "content_matching_replay"):
         if outputs[name] != outputs["append"]:
             raise RunFailure(f"{label}: {name} output differs from append output")
     return outputs
+
+
+def _route_proofs(correctness: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    outputs = _object(correctness.get("outputs"), "correctness.outputs")
+    read = _object(correctness.get("read"), "correctness.read")
+    return {
+        "open": {"kind": "open", "source": outputs["source"]},
+        "read": {
+            "kind": "read",
+            "slide_count": read["slide_count"],
+            "text": {
+                "bytes": read["text_bytes"],
+                "sha256": read["text_sha256"],
+            },
+        },
+        "write": {"kind": "package", "output": outputs["no_op"]},
+        "append": {"kind": "package", "output": outputs["append"]},
+        "replay": {"kind": "package", "output": outputs["content_matching_replay"]},
+    }
+
+
+def _route_output_bytes(route: str, proofs: Mapping[str, Mapping[str, Any]]) -> int:
+    if route in ("open", "read"):
+        return 0
+    output = _object(proofs[route].get("output"), f"proofs.{route}.output")
+    return _positive_int(output.get("bytes"), f"proofs.{route}.output.bytes")
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -636,16 +793,27 @@ def _stats(values: list[float]) -> dict[str, Any]:
     }
 
 
-def validate_calibration(report: Mapping[str, Any], route: str, protocol: Protocol, label: str) -> int:
+def validate_calibration(
+    report: Mapping[str, Any],
+    route: str,
+    protocol: Protocol,
+    expected_proof: Mapping[str, Any],
+    label: str,
+) -> int:
     if report.get("mode") != "calibrate" or report.get("route") != route:
         raise RunFailure(f"{label}: calibration identity mismatch")
     if report.get("target_ns") != protocol.target_ns:
         raise RunFailure(f"{label}: calibration target differs from the manifest")
+    if report.get("proof") != expected_proof:
+        raise RunFailure(f"{label}: calibration output proof differs from correctness preflight")
     iterations = _positive_int(report.get("iterations"), f"{label}.iterations")
     elapsed_ns = _positive_int(report.get("elapsed_ns"), f"{label}.elapsed_ns")
     if iterations > protocol.max_iterations or elapsed_ns < protocol.target_ns:
         raise RunFailure(f"{label}: calibration did not satisfy its target")
-    _nonnegative_int(report.get("output_bytes"), f"{label}.output_bytes")
+    output_bytes = _nonnegative_int(report.get("output_bytes"), f"{label}.output_bytes")
+    expected_bytes = _route_output_bytes(route, {route: expected_proof})
+    if output_bytes != expected_bytes:
+        raise RunFailure(f"{label}: calibration output byte proof differs from correctness preflight")
     attempts = report.get("attempts")
     if not isinstance(attempts, list) or not attempts:
         raise RunFailure(f"{label}: calibration attempts are missing")
@@ -658,7 +826,13 @@ def validate_calibration(report: Mapping[str, Any], route: str, protocol: Protoc
         attempt_elapsed = _positive_int(
             attempt.get("elapsed_ns"), f"{label}.attempts[{index}].elapsed_ns"
         )
-        _nonnegative_int(attempt.get("output_bytes"), f"{label}.attempts[{index}].output_bytes")
+        attempt_output_bytes = _nonnegative_int(
+            attempt.get("output_bytes"), f"{label}.attempts[{index}].output_bytes"
+        )
+        if attempt_output_bytes != expected_bytes:
+            raise RunFailure(
+                f"{label}: calibration attempt output proof differs from correctness preflight"
+            )
         if attempt_iterations <= previous_iterations or attempt_iterations > protocol.max_iterations:
             raise RunFailure(f"{label}: calibration iterations are not strictly increasing")
         previous_iterations = attempt_iterations
@@ -670,12 +844,19 @@ def validate_calibration(report: Mapping[str, Any], route: str, protocol: Protoc
 
 
 def validate_timed(
-    report: Mapping[str, Any], route: str, iterations: int, protocol: Protocol, label: str
+    report: Mapping[str, Any],
+    route: str,
+    iterations: int,
+    protocol: Protocol,
+    expected_proof: Mapping[str, Any],
+    label: str,
 ) -> tuple[float, int]:
     if report.get("mode") != "timed" or report.get("route") != route:
         raise RunFailure(f"{label}: timed identity mismatch")
     if report.get("iterations") != iterations or report.get("warmups") != protocol.warmups:
         raise RunFailure(f"{label}: timed normalization mismatch")
+    if report.get("proof") != expected_proof:
+        raise RunFailure(f"{label}: timed output proof differs from correctness preflight")
     samples = report.get("samples")
     if not isinstance(samples, list) or len(samples) != 1:
         raise RunFailure(f"{label}: timed child must return one sample")
@@ -683,6 +864,9 @@ def validate_timed(
     if elapsed_ns < protocol.minimum_ns:
         raise RunFailure(f"{label}: timed batch is shorter than minimum_ns")
     output_bytes = _nonnegative_int(report.get("output_bytes"), f"{label}.output_bytes")
+    expected_bytes = _route_output_bytes(route, {route: expected_proof})
+    if output_bytes != expected_bytes:
+        raise RunFailure(f"{label}: timed output byte proof differs from correctness preflight")
     return elapsed_ns / iterations, output_bytes
 
 
@@ -741,6 +925,7 @@ def _endpoint_metadata(endpoint: ResolvedEndpoint) -> dict[str, Any]:
         "root": str(endpoint.endpoint.root),
         "requested_ref": endpoint.endpoint.requested_ref,
         "resolved_ref": endpoint.resolved_ref,
+        "head": endpoint.resolved_ref,
         "binary": {
             "path": str(endpoint.endpoint.binary),
             "bytes": endpoint.binary_bytes,
@@ -753,6 +938,7 @@ def _endpoint_metadata(endpoint: ResolvedEndpoint) -> dict[str, Any]:
 def _run_correctness(
     manifest: InputManifest,
     endpoints: Mapping[str, ResolvedEndpoint],
+    fixture_identity: Mapping[str, Any],
     out_dir: Path,
     tmp_dir: Path,
 ) -> dict[str, Any]:
@@ -765,7 +951,10 @@ def _run_correctness(
             endpoints[name], manifest, "verify", tmp_dir=tmp_dir
         )
         outputs[name] = validate_correctness_report(
-            report, manifest.fixture, f"correctness.{name}"
+            report,
+            manifest.fixture,
+            fixture_identity,
+            f"correctness.{name}",
         )
         read = _object(report["read"], f"correctness.{name}.read")
         patch = _object(report["patch"], f"correctness.{name}.patch")
@@ -799,12 +988,17 @@ def _run_correctness(
 def _run_timing(
     manifest: InputManifest,
     endpoints: Mapping[str, ResolvedEndpoint],
+    fixture_identity: Mapping[str, Any],
+    correctness: Mapping[str, Any],
     out_dir: Path,
     tmp_dir: Path,
 ) -> dict[str, Any]:
-    validate_fixture(manifest.fixture)
-    for name in ("baseline", "candidate"):
-        _assert_endpoint_unchanged(endpoints[name])
+    identity_before_timing = _revalidate_run_identity(
+        manifest, endpoints, "before_calibration"
+    )
+    if identity_before_timing["fixture"] != fixture_identity:
+        raise RunFailure("fixture identity changed before calibration")
+    proofs = _route_proofs(correctness)
     calibration: dict[str, dict[str, int]] = {"baseline": {}, "candidate": {}}
     calibration_events = []
     for name in ("baseline", "candidate"):
@@ -820,11 +1014,27 @@ def _run_timing(
                 guard=guard,
             )
             calibration[name][route] = validate_calibration(
-                report, route, manifest.protocol, f"calibration.{name}.{route}"
+                report,
+                route,
+                manifest.protocol,
+                proofs[route],
+                f"calibration.{name}.{route}",
             )
             event["guard"] = guard
             calibration_events.append(event)
-    _write_json(out_dir / "calibration.json", {"iterations": calibration, "events": calibration_events})
+    identity_after_calibration = _revalidate_run_identity(
+        manifest, endpoints, "after_calibration"
+    )
+    if identity_after_calibration["fixture"] != fixture_identity:
+        raise RunFailure("fixture identity changed during calibration")
+    _write_json(
+        out_dir / "calibration.json",
+        {
+            "iterations": calibration,
+            "events": calibration_events,
+            "identity_after_calibration": identity_after_calibration,
+        },
+    )
 
     routes: dict[str, Any] = {}
     for route in ROUTES:
@@ -853,6 +1063,7 @@ def _run_timing(
                     route,
                     calibration[endpoint_name][route],
                     manifest.protocol,
+                    proofs[route],
                     f"timed.{route}.{role}.{block}",
                 )
                 after_leg_guard = quiet_guard(
@@ -899,7 +1110,18 @@ def _run_timing(
             ),
             "output_bytes": blocks[0]["legs"][0]["output_bytes"],
         }
-    return {"calibration": calibration, "routes": routes}
+    identity_after_abba = _revalidate_run_identity(manifest, endpoints, "after_abba")
+    if identity_after_abba["fixture"] != fixture_identity:
+        raise RunFailure("fixture identity changed during ABBA")
+    return {
+        "calibration": calibration,
+        "routes": routes,
+        "identity": {
+            "before_calibration": identity_before_timing,
+            "after_calibration": identity_after_calibration,
+            "after_abba": identity_after_abba,
+        },
+    }
 
 
 def _prepare_output(path: Path, roots: Iterable[Path]) -> Path:
@@ -925,6 +1147,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="validate the manifest shape and write a plan without touching binaries or timing",
     )
     return parser.parse_args(argv)
+
+
+def _write_failure_receipt(path: Path, error: BaseException) -> None:
+    try:
+        out_dir = path.resolve()
+        if out_dir.is_dir():
+            _write_json(
+                out_dir / "failure.json",
+                {
+                    "schema": REPORT_SCHEMA,
+                    "status": "failed",
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                },
+            )
+    except Exception:
+        # A receipt cannot be written when the requested directory itself is
+        # inaccessible.  The caller still returns a failed process status and
+        # emits the original structured error text without a traceback.
+        return
+
+
+def _fail(args: argparse.Namespace, error: BaseException) -> int:
+    _write_failure_receipt(args.out_dir, error)
+    print(f"ODP native qualification failed: {error}", file=sys.stderr)
+    return 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -978,8 +1226,17 @@ def main(argv: list[str] | None = None) -> int:
         endpoints = runtime["endpoints"]
         tmp_dir = out_dir / "tmp"
         tmp_dir.mkdir()
-        correctness = _run_correctness(manifest, endpoints, out_dir, tmp_dir)
-        timing = _run_timing(manifest, endpoints, out_dir, tmp_dir)
+        correctness = _run_correctness(
+            manifest, endpoints, runtime["fixture"], out_dir, tmp_dir
+        )
+        timing = _run_timing(
+            manifest,
+            endpoints,
+            runtime["fixture"],
+            correctness,
+            out_dir,
+            tmp_dir,
+        )
         report = {
             "schema": REPORT_SCHEMA,
             "status": "complete",
@@ -1008,19 +1265,17 @@ def main(argv: list[str] | None = None) -> int:
             "correctness": correctness,
             "calibration": timing["calibration"],
             "routes": timing["routes"],
+            "identity": timing["identity"],
             "started_unix_ns": time.time_ns(),
         }
         _write_json(out_dir / "report.json", report)
         return 0
     except RunFailure as error:
-        try:
-            out_dir = args.out_dir.resolve()
-            if out_dir.is_dir():
-                _write_json(out_dir / "failure.json", {"schema": REPORT_SCHEMA, "status": "failed", "error": str(error)})
-        except (OSError, ValueError):
-            pass
-        print(f"ODP native qualification failed: {error}", file=sys.stderr)
-        return 1
+        return _fail(args, error)
+    except Exception as error:
+        # Filesystem, hashing, JSON, subprocess, and directory failures must
+        # remain structured failed receipts rather than leaking tracebacks.
+        return _fail(args, error)
 
 
 if __name__ == "__main__":

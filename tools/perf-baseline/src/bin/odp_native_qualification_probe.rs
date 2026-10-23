@@ -22,6 +22,7 @@ use litchi_core::{OwnedSource, ReadAt};
 use litchi_odp::SourceBackedPresentation;
 use serde_json::{Value, json};
 use sha2::{Digest as Sha2Digest, Sha256};
+use soapberry_zip::office::ArchiveReader;
 
 const SCHEMA: &str = "litchi.odp.native-qualification.probe.v1";
 const ROUTES: &[&str] = &["open", "read", "write", "append", "replay"];
@@ -276,6 +277,12 @@ fn sha256_hex(bytes: &[u8]) -> String {
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
+fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
+    let mut archive = ArchiveReader::new(fixture)?;
+    let content = archive.read("content.xml")?;
+    Ok(Digest::from_bytes(&content))
+}
+
 fn source_for_fixture(bytes: &[u8]) -> Arc<dyn ReadAt> {
     Arc::new(OwnedSource::new(bytes.to_vec()))
 }
@@ -306,6 +313,54 @@ fn append_commit(
     body: &str,
 ) -> Result<litchi_odp::tail_append::Commit, Box<dyn Error>> {
     Ok(presentation.edit_tail_append(title, body)?.commit()?)
+}
+
+fn route_proof(
+    route: &str,
+    fixture: &[u8],
+    title: &str,
+    body: &str,
+) -> Result<Value, Box<dyn Error>> {
+    match route {
+        "open" => {
+            let presentation = owner(fixture)?;
+            std::hint::black_box(presentation);
+            Ok(json!({"kind": "open", "source": Digest::from_bytes(fixture).json()}))
+        },
+        "read" => {
+            let presentation = owner(fixture)?;
+            let slide_count = presentation.slide_count()?;
+            let text = presentation.text()?;
+            Ok(json!({
+                "kind": "read",
+                "slide_count": slide_count,
+                "text": Digest::from_bytes(text.as_bytes()).json(),
+            }))
+        },
+        "write" => {
+            let presentation = owner(fixture)?;
+            Ok(json!({"kind": "package", "output": write_owner(&presentation)?.json()}))
+        },
+        "append" => {
+            let presentation = owner(fixture)?;
+            let commit = append_commit(&presentation, title, body)?;
+            Ok(json!({
+                "kind": "package",
+                "output": write_owner(commit.package())?.json(),
+            }))
+        },
+        "replay" => {
+            let presentation = owner(fixture)?;
+            let commit = append_commit(&presentation, title, body)?;
+            let independent = owner(fixture)?;
+            let replayed = independent.apply_tail_append(commit.patch())?;
+            Ok(json!({
+                "kind": "package",
+                "output": write_owner(replayed.package())?.json(),
+            }))
+        },
+        other => Err(io::Error::other(format!("unknown route {other:?}")).into()),
+    }
 }
 
 /// Run one complete lifecycle and return the number of bytes accepted by its
@@ -406,6 +461,7 @@ fn timed(args: &Args, fixture: &[u8]) -> Result<Value, Box<dyn Error>> {
         .route
         .as_deref()
         .ok_or_else(|| io::Error::other("timed route is missing"))?;
+    let proof = route_proof(route, fixture, &args.title, &args.body)?;
     for _ in 0..args.warmups {
         let _ = timed_batch(route, fixture, &args.title, &args.body, args.iterations)?;
     }
@@ -435,6 +491,7 @@ fn timed(args: &Args, fixture: &[u8]) -> Result<Value, Box<dyn Error>> {
         "schema": SCHEMA,
         "mode": "timed",
         "route": route,
+        "proof": proof,
         "iterations": args.iterations,
         "warmups": args.warmups,
         "samples": elapsed_ns,
@@ -447,6 +504,7 @@ fn calibrate(args: &Args, fixture: &[u8]) -> Result<Value, Box<dyn Error>> {
         .route
         .as_deref()
         .ok_or_else(|| io::Error::other("calibrate route is missing"))?;
+    let proof = route_proof(route, fixture, &args.title, &args.body)?;
     let mut iterations = 1_usize;
     let mut attempts = Vec::new();
     loop {
@@ -462,6 +520,7 @@ fn calibrate(args: &Args, fixture: &[u8]) -> Result<Value, Box<dyn Error>> {
                 "schema": SCHEMA,
                 "mode": "calibrate",
                 "route": route,
+                "proof": proof,
                 "target_ns": args.target_ns,
                 "iterations": iterations,
                 "elapsed_ns": elapsed,
@@ -482,6 +541,7 @@ fn calibrate(args: &Args, fixture: &[u8]) -> Result<Value, Box<dyn Error>> {
 
 fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Error>> {
     let source_digest = Digest::from_bytes(fixture);
+    let content_digest = fixture_content_digest(fixture)?;
     let presentation = owner(fixture)?;
 
     let no_op_digest = write_owner(&presentation)?;
@@ -521,10 +581,15 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     );
 
     let patch_changed = patch.source_content_sha256() != patch.target_content_sha256();
+    let patch_source_matches_fixture =
+        hex_bytes(&patch.source_content_sha256()) == content_digest.sha256;
+    let append_output_changed = append_digest != source_digest;
     let checks = json!({
         "no_op_exact_source": no_op_exact_source,
         "read_semantics": slide_count > 0 && first_slide_present,
-        "append_changed": patch_changed,
+        "append_changed": patch_changed && patch_source_matches_fixture && append_output_changed,
+        "patch_source_matches_fixture": patch_source_matches_fixture,
+        "append_output_changed": append_output_changed,
         "same_owner_replay_exact": same_owner_digest == append_digest,
         "content_matching_forward_exact": matching_digest == append_digest,
         "inverse_exact_source": inverse_digest == source_digest,
@@ -544,7 +609,11 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     Ok(json!({
         "schema": SCHEMA,
         "mode": "verify",
-        "fixture": source_digest.json(),
+        "fixture": {
+            "bytes": source_digest.bytes,
+            "sha256": source_digest.sha256,
+            "content": content_digest.json(),
+        },
         "checks": checks,
         "read": {
             "slide_count": slide_count,

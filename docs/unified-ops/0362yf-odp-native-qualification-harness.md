@@ -21,11 +21,13 @@ sample count all come from command-line arguments. The routes are:
 | `replay` | create the append patch, open an equal independent source, replay it by content, and write |
 
 `--mode verify` is untimed and must run before calibration. It checks exact
-source/no-op bytes, semantic reading, append change, same-owner replay,
-equal-content cross-copy replay, inverse restoration, and refusal of a changed
-recipient. Every output is reported as a byte count and SHA-256 digest. The
-timed mode only reports bounded sink lengths; its exact digest precondition is
-the verify result.
+source/no-op bytes, semantic reading, append change, the patch's source
+`content.xml` hash against an independently read fixture member, appended
+output change, same-owner replay, equal-content cross-copy replay, inverse
+restoration, and refusal of a changed recipient. Every output is reported as a
+byte count and SHA-256 digest. Calibration and timed reports carry a route
+proof matching this preflight, so timing validation does not rely on output
+length alone.
 
 `--mode calibrate` doubles the per-child operation batch until a caller-set
 target duration is reached, with a finite maximum. `--mode timed` performs
@@ -41,8 +43,9 @@ embedding a baseline or candidate revision. The manifest supplies, for each
 endpoint, a source worktree, requested Git ref, executable path and external
 target directory; it also supplies the fixture byte count/SHA-256/provenance,
 CPU, load ceiling, warmups, blocks, calibration targets and timeout. At run
-time the runner resolves both refs, requires clean worktrees, hashes both
-executables, verifies the frozen fixture, and records all resolved identities.
+time the runner resolves both refs, binds each clean worktree `HEAD` to that
+immutable commit, hashes both executables, verifies the archive and
+`content.xml` fixture identities, and records all resolved identities.
 No source-specific historical hash is compiled into the probe or runner.
 
 The runner performs the following sequence:
@@ -54,15 +57,19 @@ The runner performs the following sequence:
    blocks, pinned with `taskset` to the manifest CPU.
 4. Before calibration and every ABBA leg, fail closed if `/proc/loadavg`
    exceeds the manifest ceiling or a compiler/profiler/benchmark process is
-   present. Each timed child must return a positive batch no shorter than the
-   manifest minimum.
+   present; inaccessible `/proc` reads are failures. Each timed child must
+   return a positive batch no shorter than the manifest minimum and must repeat
+   its exact route proof.
 5. Write raw child reports, correctness receipts, calibration, per-block
    checkpoints and the final report atomically under the caller's external
    artifact directory. Existing non-empty output directories are rejected.
 
 Target and artifact directories below either source worktree are rejected.
-The runner invokes children without a shell and supplies an external
-`TMPDIR`; no Cargo command is run by the runner.
+Fixture, worktree `HEAD`/ref, executable size/hash, and source cleanliness are
+revalidated after calibration and after the ABBA routes. Filesystem, hashing,
+JSON, and directory failures produce a structured `failure.json` receipt. The
+runner invokes children without a shell and supplies an external `TMPDIR`; no
+Cargo command is run by the runner.
 
 An execution is prepared with:
 
@@ -84,7 +91,7 @@ The runner's standard-library contract tests pass:
 
 ```text
 python3 -m py_compile tools/odp_native_qualification.py tools/test_odp_native_qualification.py
-python3 -m unittest tools/test_odp_native_qualification.py
+python3 -m unittest tools/test_odp_native_qualification.py  # 13 tests
 ```
 
 No Cargo/build/timing slot was used for this source-only harness commit. A

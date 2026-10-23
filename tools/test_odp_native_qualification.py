@@ -10,6 +10,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
+import zipfile
 
 
 MODULE_PATH = Path(__file__).with_name("odp_native_qualification.py")
@@ -30,11 +32,13 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
     return {
         "schema": RUNNER.PROBE_SCHEMA,
         "mode": "verify",
-        "fixture": source,
+        "fixture": {**source, "content": source},
         "checks": {
             "no_op_exact_source": True,
             "read_semantics": True,
             "append_changed": True,
+            "patch_source_matches_fixture": True,
+            "append_output_changed": True,
             "same_owner_replay_exact": True,
             "content_matching_forward_exact": True,
             "inverse_exact_source": True,
@@ -136,6 +140,21 @@ class OdpNativeQualificationTests(unittest.TestCase):
             with self.assertRaises(RUNNER.RunFailure):
                 RUNNER.validate_fixture(expected)
 
+    def test_fixture_identity_records_archive_and_content_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "fixture.odp"
+            content = b"<office:document-content/>"
+            with zipfile.ZipFile(fixture, "w") as archive:
+                archive.writestr("content.xml", content)
+            expected = RUNNER.Fixture(
+                path=fixture,
+                bytes=fixture.stat().st_size,
+                sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
+                provenance="test",
+            )
+            identity = RUNNER.validate_fixture(expected)
+            self.assertEqual(identity["content"], digest(content))
+
     def test_correctness_report_requires_all_checks_and_exact_digests(self) -> None:
         fixture = b"fixture"
         report = correctness_report(fixture)
@@ -147,6 +166,7 @@ class OdpNativeQualificationTests(unittest.TestCase):
                 sha256=hashlib.sha256(fixture).hexdigest(),
                 provenance="test",
             ),
+            {"content": digest(fixture)},
             "candidate",
         )
         self.assertEqual(outputs["source"], outputs["inverse"])
@@ -161,6 +181,7 @@ class OdpNativeQualificationTests(unittest.TestCase):
                     sha256=hashlib.sha256(fixture).hexdigest(),
                     provenance="test",
                 ),
+                {"content": digest(fixture)},
                 "candidate",
             )
 
@@ -182,21 +203,95 @@ class OdpNativeQualificationTests(unittest.TestCase):
             "iterations": 2,
             "elapsed_ns": 100,
             "output_bytes": 4,
+            "proof": {"kind": "package", "output": digest(b"1234")},
             "attempts": [
                 {"iterations": 1, "elapsed_ns": 40, "output_bytes": 4},
                 {"iterations": 2, "elapsed_ns": 100, "output_bytes": 4},
             ],
         }
         self.assertEqual(
-            RUNNER.validate_calibration(calibration, "append", protocol, "calibration"),
+            RUNNER.validate_calibration(
+                calibration,
+                "append",
+                protocol,
+                calibration["proof"],
+                "calibration",
+            ),
             2,
         )
-        timed = {"mode": "timed", "route": "append", "iterations": 2, "warmups": 0, "samples": [40], "output_bytes": 4}
+        timed = {
+            "mode": "timed",
+            "route": "append",
+            "iterations": 2,
+            "warmups": 0,
+            "samples": [40],
+            "output_bytes": 4,
+            "proof": calibration["proof"],
+        }
         with self.assertRaises(RUNNER.RunFailure):
-            RUNNER.validate_timed(timed, "append", 2, protocol, "timed")
+            RUNNER.validate_timed(
+                timed, "append", 2, protocol, calibration["proof"], "timed"
+            )
+        timed["samples"] = [100]
+        timed["proof"] = {"kind": "package", "output": digest(b"5678")}
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_timed(
+                timed, "append", 2, protocol, calibration["proof"], "timed"
+            )
         calibration["iterations"] = 11
         with self.assertRaises(RUNNER.RunFailure):
-            RUNNER.validate_calibration(calibration, "append", protocol, "calibration")
+            RUNNER.validate_calibration(
+                calibration,
+                "append",
+                protocol,
+                calibration["proof"],
+                "calibration",
+            )
+
+    def test_resolve_endpoint_rejects_clean_head_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            target = Path(directory) / "target"
+            root.mkdir()
+            target.mkdir()
+            binary = target / "probe"
+            binary.write_bytes(b"probe")
+            binary.chmod(0o755)
+            endpoint = RUNNER.Endpoint(
+                name="baseline",
+                root=root,
+                requested_ref="frozen-ref",
+                binary=binary,
+                target_dir=target,
+            )
+            with mock.patch.object(
+                RUNNER,
+                "_run_git",
+                side_effect=["", "a" * 40, "b" * 40],
+            ), self.assertRaises(RUNNER.RunFailure):
+                RUNNER.resolve_endpoint(endpoint, (root.parent,))
+
+    def test_postrun_binary_identity_change_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "source"
+            target = Path(directory) / "target"
+            root.mkdir()
+            target.mkdir()
+            binary = target / "probe"
+            binary.write_bytes(b"before")
+            binary.chmod(0o755)
+            endpoint = RUNNER.Endpoint("baseline", root, "frozen-ref", binary, target)
+            resolved = RUNNER.ResolvedEndpoint(
+                endpoint,
+                "a" * 40,
+                binary.stat().st_size,
+                RUNNER.sha256_file(binary),
+            )
+            binary.write_bytes(b"after")
+            with mock.patch.object(
+                RUNNER, "_run_git", side_effect=["", "a" * 40, "a" * 40]
+            ), self.assertRaises(RUNNER.RunFailure):
+                RUNNER._assert_endpoint_unchanged(resolved)
 
     def test_process_scan_classification_is_narrow_and_explicit(self) -> None:
         self.assertTrue(RUNNER.is_heavy_process("cargo", "cargo check"))
@@ -204,6 +299,41 @@ class OdpNativeQualificationTests(unittest.TestCase):
             RUNNER.is_heavy_process("python3", "python3 /tmp/odp_native_qualification_probe.py")
         )
         self.assertFalse(RUNNER.is_heavy_process("python3", "python3 harmless.py"))
+
+    def test_process_guard_rejects_busy_or_opaque_state(self) -> None:
+        protocol = RUNNER.Protocol(0, 1, 0, 100, 50, 1.0, 10, 1.0)
+        with mock.patch.object(RUNNER, "load_average", return_value=0.0), mock.patch.object(
+            RUNNER,
+            "process_scan",
+            return_value=[{"pid": 7, "executable": "rustc", "command": ["rustc"]}],
+        ), self.assertRaises(RUNNER.RunFailure):
+            RUNNER.quiet_guard(protocol, "test-busy")
+        with mock.patch.object(
+            RUNNER.Path, "read_bytes", side_effect=PermissionError("opaque")
+        ), self.assertRaises(RUNNER.RunFailure):
+            RUNNER.process_scan()
+        with mock.patch.object(
+            RUNNER.Path, "read_bytes", side_effect=FileNotFoundError("vanished")
+        ), mock.patch.object(
+            RUNNER.Path, "stat", side_effect=FileNotFoundError("vanished")
+        ):
+            self.assertIsNone(RUNNER._read_process_cmdline(Path("/proc/999999"), 999999))
+
+    def test_malformed_manifest_writes_structured_failure_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "input.json"
+            output = root / "run"
+            output.mkdir()
+            manifest.write_text("{", encoding="utf-8")
+            self.assertEqual(
+                RUNNER.main(["--manifest", str(manifest), "--out-dir", str(output)]),
+                1,
+            )
+            receipt = json.loads((output / "failure.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], RUNNER.REPORT_SCHEMA)
+            self.assertEqual(receipt["status"], "failed")
+            self.assertIn("error_type", receipt)
 
     def test_external_artifact_guard_rejects_source_subdirectories(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
