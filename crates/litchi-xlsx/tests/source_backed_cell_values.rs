@@ -963,7 +963,7 @@ fn merge_markup_is_refused_at_source_open() {
         false,
     );
     let result = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes)))
-        .and_then(|editor| editor.edit("Sheet1"));
+        .and_then(|editor| editor.edit("Sheet1").and_then(|edit| edit.commit()));
     assert!(matches!(
         result,
         Err(Error::Invalid(message))
@@ -1801,6 +1801,7 @@ fn multi_sheet_selector_bounds_and_semantic_duplicates_are_atomic() {
     assert!(
         editor
             .edit_sheets(vec!["Sheet1".into(), 0usize.into()])
+            .and_then(|edit| edit.commit())
             .is_err()
     );
 }
@@ -1851,7 +1852,12 @@ fn mce_relationships_and_signed_changes_are_refused() {
         let editor =
             SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(fixture(xml, false))))
                 .unwrap();
-        assert!(editor.edit("Sheet1").is_err());
+        assert!(
+            editor
+                .edit("Sheet1")
+                .and_then(|edit| edit.commit())
+                .is_err()
+        );
     }
 
     let mut shared =
@@ -1949,7 +1955,9 @@ fn source_version_flip_after_selected_read_rejects_single_and_multi_snapshots() 
     let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
     source.flip_after_read_at(worksheet_data_offset);
     assert!(matches!(
-        editor.edit_sheets(["Sheet1".into()]),
+        editor
+            .edit_sheets(["Sheet1".into()])
+            .and_then(|edit| edit.commit()),
         Err(Error::Package(OpcError::SourceChanged { .. }))
     ));
 }
@@ -1969,7 +1977,12 @@ fn exact_noop_publication_does_not_reparse_an_oversized_selected_worksheet() {
 
     source.reject_read_at(worksheet_data_offset);
     let uncached_reload = SourceBackedEditor::from_read_at(source.clone()).unwrap();
-    assert!(uncached_reload.edit_sheets(["Sheet1".into()]).is_err());
+    assert!(
+        uncached_reload
+            .edit_sheets(["Sheet1".into()])
+            .and_then(|edit| edit.commit())
+            .is_err()
+    );
     let rejected_reads = source.rejected_read_count();
     assert!(rejected_reads > 0);
 
@@ -2236,7 +2249,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let opened = editor.cache_diagnostics().successful_loads;
     // Only the workbook catalog is pinned at open.
     assert!(budget.used(Resource::Memory) <= workbook_bytes);
-    let result = editor.edit("Sheet1");
+    let result = editor.edit("Sheet1").and_then(|edit| edit.commit());
     assert!(matches!(
         result,
         Err(Error::Package(OpcError::Execution(
