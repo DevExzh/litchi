@@ -15,6 +15,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import shutil
 import stat
 import subprocess
@@ -29,6 +30,7 @@ W4B_PROBE = Path("crates/litchi-ops/examples/xlsb_w4b_probe.rs")
 W4B_CRUD = Path("tools/perf-baseline/src/bin/xlsb_crud.rs")
 W5_PROBE = Path("crates/litchi-ops/examples/legacy_w5_source_probe.rs")
 W5_ROUTES = Path("docs/unified-ops/results/0359a/routes_before.rs")
+_FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
 
 
 class PreparationError(RuntimeError):
@@ -157,6 +159,42 @@ def _write_text_exact(destination: Path, content: str, source: Path) -> dict[str
     }
 
 
+def _transform_text_exact(
+    destination: Path, expected_before: str, content: str, source: Path
+) -> dict[str, Any]:
+    """Apply a guarded known transformation to an existing regular file."""
+
+    source = _resolve_no_symlink(source)
+    destination = _resolve_no_symlink(destination)
+    expected_bytes = expected_before.encode("utf-8")
+    encoded = content.encode("utf-8")
+    source_hash, source_bytes = _sha256(source)
+    before_hash = hashlib.sha256(expected_bytes).hexdigest()
+    if destination.is_symlink() or not destination.is_file():
+        raise PreparationError(f"expected existing regular transformation target: {destination}")
+    actual_before_hash, actual_before_bytes = _sha256(destination)
+    if (actual_before_hash, actual_before_bytes) != (before_hash, len(expected_bytes)):
+        raise PreparationError(
+            f"transformation target changed unexpectedly: {destination}"
+        )
+    after_hash = hashlib.sha256(encoded).hexdigest()
+    destination.write_bytes(encoded)
+    actual_after_hash, actual_after_bytes = _sha256(destination)
+    if (actual_after_hash, actual_after_bytes) != (after_hash, len(encoded)):
+        raise PreparationError(f"transformation target was not written exactly: {destination}")
+    return {
+        "source": str(source.resolve()),
+        "destination": str(destination.resolve()),
+        "source_sha256": source_hash,
+        "source_bytes": source_bytes,
+        "before_sha256": actual_before_hash,
+        "before_bytes": actual_before_bytes,
+        "after_sha256": actual_after_hash,
+        "after_bytes": actual_after_bytes,
+        "bytes": actual_after_bytes,
+    }
+
+
 def _adapt_w4b_crud(baseline_crud: str) -> str:
     """Apply only the recorded trait import to the historical CRUD source."""
 
@@ -188,8 +226,7 @@ def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
     # needs the one-line trait import recorded in 0360b §6.
     candidate_hash, candidate_bytes = _sha256(crud_source)
     crud_text = _adapt_w4b_crud(baseline_crud)
-    crud = _write_text_exact(crud_destination, crud_text, crud_source)
-    crud["baseline_sha256"] = hashlib.sha256(baseline_crud.encode("utf-8")).hexdigest()
+    crud = _transform_text_exact(crud_destination, baseline_crud, crud_text, crud_source)
     crud["candidate_sha256"] = candidate_hash
     crud["candidate_bytes"] = candidate_bytes
     crud["adaptation"] = "recorded one-line litchi_core::sheet::Cell import"
@@ -255,12 +292,25 @@ def _analyzer(path: Path) -> dict[str, Any]:
     return {"path": str(path.resolve()), "sha256": digest, "bytes": size}
 
 
+def _require_candidate_ref(root: Path, state: dict[str, Any], expected: str, label: str) -> str:
+    if not _FULL_COMMIT.fullmatch(expected):
+        raise PreparationError(f"{label} candidate ref must be a full 40-digit commit SHA")
+    resolved = _git(root, "rev-parse", "--verify", f"{expected}^{{commit}}")
+    if state["head"] != resolved:
+        raise PreparationError(
+            f"{label} candidate HEAD is {state['head']}, expected selected ref {resolved}"
+        )
+    return resolved
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--w4b-before", type=Path, required=True)
     parser.add_argument("--w4b-after", type=Path, required=True)
+    parser.add_argument("--w4b-after-ref", required=True, help="full selected W4b candidate commit SHA")
     parser.add_argument("--w5-before", type=Path, required=True)
     parser.add_argument("--w5-after", type=Path, required=True)
+    parser.add_argument("--w5-after-ref", required=True, help="full selected W5 candidate commit SHA")
     parser.add_argument("--output", type=Path, required=True, help="external provenance JSON path")
     return parser.parse_args(argv)
 
@@ -285,6 +335,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         if output.is_symlink() or output.exists():
             raise PreparationError(f"refusing to overwrite or follow provenance output: {output}")
+        w4b_after_state = _source_state(w4b_after)
+        w5_after_state = _source_state(w5_after)
+        w4b_candidate_ref = _require_candidate_ref(
+            w4b_after, w4b_after_state, args.w4b_after_ref, "W4b"
+        )
+        w5_candidate_ref = _require_candidate_ref(
+            w5_after, w5_after_state, args.w5_after_ref, "W5"
+        )
         # Validate all immutable inputs before touching either baseline.  This
         # keeps a typo in an analyzer path from leaving a half-prepared pair.
         w4b_analyzer = _analyzer(w4b_after / "docs/unified-ops/results/0360b/analyze.py")
@@ -297,12 +355,14 @@ def main(argv: list[str] | None = None) -> int:
                 **w4b,
                 "analyzer": w4b_analyzer,
                 "baseline_tree": W4B_BASE_TREE,
+                "selected_candidate_ref": w4b_candidate_ref,
             },
             "w5": {
                 **w5,
                 "analyzer": w5_analyzer,
                 "baseline_head": W5_BASE_HEAD,
                 "routes_before_sha256": W5_ROUTES_BEFORE_SHA256,
+                "selected_candidate_ref": w5_candidate_ref,
             },
         }
         output.parent.mkdir(parents=True, exist_ok=True)

@@ -8,12 +8,15 @@ Rust, a benchmark binary, or a timing workload.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -306,6 +309,68 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             after.mkdir()
             with self.assertRaisesRegex(source_prep.PreparationError, "pairwise disjoint"):
                 source_prep._require_disjoint_sources(before, after, before / "provenance.json")
+
+    def test_w4b_preparation_transforms_existing_baseline_crud(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-prep-crud-") as directory:
+            root = Path(directory)
+            before = root / "before"
+            after = root / "after"
+            baseline_crud = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
+            candidate_crud = baseline_crud + "// candidate API body\n"
+
+            def git(repo: Path, *args: str) -> str:
+                result = subprocess.run(
+                    ["git", "-C", str(repo), *args],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                return result.stdout.strip()
+
+            for repo, crud in ((before, baseline_crud), (after, candidate_crud)):
+                repo.mkdir()
+                git(repo, "init", "--quiet")
+                git(repo, "config", "user.email", "native-qualification@test.invalid")
+                git(repo, "config", "user.name", "native qualification test")
+                crud_path = repo / source_prep.W4B_CRUD
+                crud_path.parent.mkdir(parents=True)
+                crud_path.write_text(crud, encoding="utf-8")
+                probe_path = repo / source_prep.W4B_PROBE
+                probe_path.parent.mkdir(parents=True, exist_ok=True)
+                probe_path.write_text("fn main() {}\n", encoding="utf-8")
+                git(repo, "add", ".")
+                git(repo, "commit", "--quiet", "-m", "source pair")
+
+            baseline_tree = git(before, "rev-parse", "HEAD^{tree}")
+            with mock.patch.object(source_prep, "W4B_BASE_TREE", baseline_tree):
+                prepared = source_prep._prepare_w4b(before, after)
+
+            adapted = (before / source_prep.W4B_CRUD).read_text(encoding="utf-8")
+            self.assertEqual(adapted, source_prep._adapt_w4b_crud(baseline_crud))
+            crud_overlay = prepared["overlays"][1]
+            self.assertEqual(
+                crud_overlay["before_sha256"],
+                hashlib.sha256(baseline_crud.encode()).hexdigest(),
+            )
+            self.assertEqual(
+                crud_overlay["after_sha256"],
+                source_prep._sha256(before / source_prep.W4B_CRUD)[0],
+            )
+            self.assertEqual(
+                crud_overlay["adaptation"],
+                "recorded one-line litchi_core::sheet::Cell import",
+            )
+
+            unrelated = root / "unrelated.rs"
+            unrelated.write_text("changed\n", encoding="utf-8")
+            with self.assertRaisesRegex(source_prep.PreparationError, "changed unexpectedly"):
+                source_prep._transform_text_exact(
+                    unrelated,
+                    baseline_crud,
+                    source_prep._adapt_w4b_crud(baseline_crud),
+                    after / source_prep.W4B_CRUD,
+                )
 
     def test_symlink_artifact_is_never_hashed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-link-") as directory:

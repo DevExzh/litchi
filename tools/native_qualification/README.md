@@ -23,9 +23,11 @@ recorded W4-XLSX ref `635b884c7c5372a4aa05ea3f13c77eccc0469598` with the
 recorded trunk ref `f2bbbc8d07ab5da26c180f1ff74813d39f632d54`.  The historical
 measured heads are W5 `e3e805f2dd26db78b8e951fa920275760e87a22b` and W4b
 `1af8b42cb6c4a12c3a048cc36b6342ef07498d1d`.  The current clean source refs
-available for a final rerun are W5 `83bfc60b42ad7b6830c81bbc30e1238efadef907`
-and W4b `b2e21c0ab481ed7ff8e3ce07e50fcb3c9572fc90`; substitute the final clean
-candidate refs selected by the coordinator if they advance.
+from the individual wave closures (`83bfc60b42ad7b6830c81bbc30e1238efadef907`
+for W5 and `b2e21c0ab481ed7ff8e3ce07e50fcb3c9572fc90` for W4b) are historical
+provenance only, not final candidates.  The coordinator must select repaired,
+assembled candidate commits after the final merge; the preparer requires each
+selected candidate's full commit SHA and records it in its provenance.
 
 The baseline trees intentionally predate their wave probe consumers.  Create
 the W4b synthetic worktree, create a detached W5 worktree at the accepted
@@ -43,17 +45,20 @@ W4B_COMMIT=$(printf '%s\n' 'record-0360b synthetic baseline' | \
   git commit-tree "$W4B_TREE" -p 635b884c7c5372a4aa05ea3f13c77eccc0469598 \
   -p f2bbbc8d07ab5da26c180f1ff74813d39f632d54)
 git worktree add --detach /external/sources/w4b-before "$W4B_COMMIT"
-git worktree add --detach /external/sources/w4b-after b2e21c0ab481ed7ff8e3ce07e50fcb3c9572fc90
+: "${W4B_AFTER_REF:?set to the coordinator-selected full repaired assembled W4b candidate SHA}"
+: "${W5_AFTER_REF:?set to the coordinator-selected full repaired assembled W5 candidate SHA}"
+git worktree add --detach /external/sources/w4b-after "$W4B_AFTER_REF"
 git worktree add --detach /external/sources/w5-before \
   7afba5f146aa1a16eba73ebed2144dd041b33fb5
-git worktree add --detach /external/sources/w5-after \
-  83bfc60b42ad7b6830c81bbc30e1238efadef907
+git worktree add --detach /external/sources/w5-after "$W5_AFTER_REF"
 
 python3 tools/native_qualification/prepare_w4b_w5_inputs.py \
   --w4b-before /external/sources/w4b-before \
   --w4b-after /external/sources/w4b-after \
+  --w4b-after-ref "$W4B_AFTER_REF" \
   --w5-before /external/sources/w5-before \
   --w5-after /external/sources/w5-after \
+  --w5-after-ref "$W5_AFTER_REF" \
   --output /external/native-final/source-preparation.json
 ```
 
