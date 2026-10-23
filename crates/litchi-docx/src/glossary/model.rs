@@ -17,10 +17,10 @@
 //! Typed semantic glossary catalog and failure-atomic in-memory CRUD.
 
 use super::codec::{
-    GALLERIES, add_sizes, authored_analysis, authored_analysis_with_limits,
-    background_analysis_with_limits, bounded, canonical_id, entry_analysis_with_limits, invalid,
-    name_key, replace_sizes, validate_authored_name, validate_catalog_limits,
-    validate_catalog_sizes, validate_catalog_sizes_with_limits, validate_name,
+    GALLERIES, add_sizes, authored_analysis_with_limits, background_analysis_with_limits, bounded,
+    canonical_id, entry_analysis_with_limits, invalid, name_key, name_key_with_limits,
+    replace_sizes, validate_authored_name, validate_catalog_limits,
+    validate_catalog_sizes_with_limits, validate_entry_limits, validate_name,
 };
 use super::graph::raw;
 use super::{Arc, Error, HashMap, MAX_PARTS, R, REL, RS, Result, STRICT_REL, W, WS};
@@ -283,6 +283,7 @@ pub struct Catalog {
     pub(in crate::glossary) entries: Vec<Entry>,
     /// Physical resource binding captured by package-aware loads.
     pub(in crate::glossary) binding: Option<Box<Binding>>,
+    pub(in crate::glossary) selected_limits: Option<super::Limits>,
     pub(in crate::glossary) state: CatalogState,
 }
 
@@ -359,11 +360,6 @@ impl PartialEq for Entry {
 impl Eq for Entry {}
 
 impl CatalogState {
-    fn offset(&self, name: &str) -> Result<Option<usize>> {
-        let key = name_key(name)?;
-        self.offset_key(&key, name)
-    }
-
     fn offset_key(&self, key: &str, display: &str) -> Result<Option<usize>> {
         match self.names.get(key) {
             None => Ok(None),
@@ -531,6 +527,19 @@ impl CatalogState {
 }
 
 impl Catalog {
+    pub(in crate::glossary) fn bind_limits(&mut self, limits: &super::Limits) {
+        self.selected_limits = Some(*limits);
+    }
+
+    fn effective_limits(&self) -> super::Limits {
+        self.selected_limits.unwrap_or(super::Limits::DEFAULT)
+    }
+
+    fn offset_with_limits(&self, name: &str, limits: &super::Limits) -> Result<Option<usize>> {
+        let key = name_key_with_limits(name, limits)?;
+        self.state.offset_key(&key, name)
+    }
+
     pub(in crate::glossary) fn validate_for_limits(&self, limits: &super::Limits) -> Result<()> {
         validate_catalog_limits(self, limits)?;
         validate_catalog_sizes_with_limits(
@@ -561,6 +570,7 @@ impl Catalog {
             limits,
         )?;
         self.state = state;
+        self.selected_limits = Some(*limits);
         Ok(())
     }
 
@@ -582,6 +592,7 @@ impl Catalog {
             limits,
         )?;
         self.state = state;
+        self.selected_limits = Some(*limits);
         Ok(())
     }
 
@@ -593,6 +604,7 @@ impl Catalog {
             background_lineage: None,
             entries: Vec::new(),
             binding: None,
+            selected_limits: None,
             state: CatalogState::default(),
         }
     }
@@ -650,6 +662,7 @@ impl Catalog {
     ) -> Result<Option<Vec<u8>>> {
         super::graph::raw::admit_xml(&xml, limits)?;
         if self.background.as_ref() == Some(&xml) {
+            self.selected_limits = Some(*limits);
             return Ok(self.background.replace(xml));
         }
         let analysis = background_analysis_with_limits(Some(&xml), limits)?;
@@ -658,7 +671,13 @@ impl Catalog {
                 "relationship-bearing background requires glossary::raw graph publication",
             ));
         }
-        validate_catalog_sizes(self.state.entry_bytes, analysis.sizes, self.entries.len())?;
+        validate_catalog_sizes_with_limits(
+            self.state.entry_bytes,
+            analysis.sizes,
+            self.entries.len(),
+            limits,
+        )?;
+        self.selected_limits = Some(*limits);
         let previous = self.background.replace(xml);
         self.background_refs = analysis.refs;
         self.background_lineage = None;
@@ -699,9 +718,9 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn get(&self, name: &str) -> Result<Option<&Entry>> {
+        let limits = self.effective_limits();
         Ok(self
-            .state
-            .offset(name)?
+            .offset_with_limits(name, &limits)?
             .and_then(|offset| self.entries.get(offset)))
     }
 
@@ -724,7 +743,17 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add(&mut self, entry: Entry) -> Result<usize> {
+        let limits = self.effective_limits();
+        self.add_with_limits(entry, &limits)
+    }
+
+    pub(in crate::glossary) fn add_with_limits(
+        &mut self,
+        entry: Entry,
+        limits: &super::Limits,
+    ) -> Result<usize> {
         validate_authored_name(&entry)?;
+        validate_entry_limits(&entry, limits)?;
         self.validate_entry_lineage(&entry)?;
         let name = entry
             .name()
@@ -740,13 +769,21 @@ impl Catalog {
         if self.state.offset_key(key.as_ref(), name)?.is_some() {
             return Err(invalid(format!("building block '{name}' already exists")));
         }
-        if self.entries.len() >= MAX_PARTS {
+        let entry_limit = limits.values().min(MAX_PARTS);
+        if self.entries.len() >= entry_limit {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::Entry,
                 actual: (self.entries.len()).saturating_add(1),
-                maximum: MAX_PARTS,
+                maximum: entry_limit,
             });
         }
+        let candidate_bytes = add_sizes(self.state.entry_bytes, entry.sizes)?;
+        validate_catalog_sizes_with_limits(
+            candidate_bytes,
+            self.state.background_bytes,
+            self.entries.len() + 1,
+            limits,
+        )?;
         self.entries
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
@@ -760,12 +797,6 @@ impl Catalog {
                 resource: "glossary semantic-name index",
                 source,
             })?;
-        let candidate_bytes = add_sizes(self.state.entry_bytes, entry.sizes)?;
-        validate_catalog_sizes(
-            candidate_bytes,
-            self.state.background_bytes,
-            self.entries.len() + 1,
-        )?;
         let index = self.entries.len();
         self.entries.push(entry);
         self.state.names.insert(
@@ -785,6 +816,15 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn put(&mut self, entry: Entry) -> Result<Option<Entry>> {
+        let limits = self.effective_limits();
+        self.put_with_limits(entry, &limits)
+    }
+
+    pub(in crate::glossary) fn put_with_limits(
+        &mut self,
+        entry: Entry,
+        limits: &super::Limits,
+    ) -> Result<Option<Entry>> {
         let name = entry
             .name()
             .ok_or_else(|| invalid("authored building block requires a name"))?;
@@ -796,9 +836,9 @@ impl Catalog {
             .ok_or_else(|| invalid("authored building block requires a name"))?;
         let offset = self.state.offset_key(key, name)?;
         if let Some(offset) = offset {
-            return self.replace_at(offset, entry).map(Some);
+            return self.replace_at_with_limits(offset, entry, limits).map(Some);
         }
-        self.add(entry)?;
+        self.add_with_limits(entry, limits)?;
         Ok(None)
     }
 
@@ -808,10 +848,20 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn replace(&mut self, name: &str, entry: Entry) -> Result<Option<Entry>> {
-        let Some(index) = self.state.offset(name)? else {
+        let limits = self.effective_limits();
+        self.replace_with_limits(name, entry, &limits)
+    }
+
+    pub(in crate::glossary) fn replace_with_limits(
+        &mut self,
+        name: &str,
+        entry: Entry,
+        limits: &super::Limits,
+    ) -> Result<Option<Entry>> {
+        let Some(index) = self.offset_with_limits(name, limits)? else {
             return Ok(None);
         };
-        self.replace_at(index, entry).map(Some)
+        self.replace_at_with_limits(index, entry, limits).map(Some)
     }
 
     /// Checked numeric fallback for replacement and ambiguous-name repair.
@@ -820,7 +870,18 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn replace_at(&mut self, index: usize, entry: Entry) -> Result<Entry> {
+        let limits = self.effective_limits();
+        self.replace_at_with_limits(index, entry, &limits)
+    }
+
+    pub(in crate::glossary) fn replace_at_with_limits(
+        &mut self,
+        index: usize,
+        entry: Entry,
+        limits: &super::Limits,
+    ) -> Result<Entry> {
         validate_authored_name(&entry)?;
+        validate_entry_limits(&entry, limits)?;
         self.validate_entry_lineage(&entry)?;
         let previous = self.entries.get(index).ok_or(Error::OutOfBounds {
             object: "glossary entry",
@@ -844,6 +905,13 @@ impl Catalog {
             new_key.as_ref(),
             new_name,
         )?;
+        let candidate_bytes = replace_sizes(self.state.entry_bytes, previous.sizes, entry.sizes)?;
+        validate_catalog_sizes_with_limits(
+            candidate_bytes,
+            self.state.background_bytes,
+            self.entries.len(),
+            limits,
+        )?;
         self.state
             .names
             .try_reserve(1)
@@ -851,12 +919,6 @@ impl Catalog {
                 resource: "glossary semantic-name index",
                 source,
             })?;
-        let candidate_bytes = replace_sizes(self.state.entry_bytes, previous.sizes, entry.sizes)?;
-        validate_catalog_sizes(
-            candidate_bytes,
-            self.state.background_bytes,
-            self.entries.len(),
-        )?;
         let slot = self
             .entries
             .get_mut(index)
@@ -874,10 +936,11 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn rename(&mut self, name: &str, replacement: Name) -> Result<bool> {
-        let Some(index) = self.state.offset(name)? else {
+        let limits = self.effective_limits();
+        let Some(index) = self.offset_with_limits(name, &limits)? else {
             return Ok(false);
         };
-        self.rename_at_with_limits(index, replacement, &super::Limits::DEFAULT)
+        self.rename_at_with_limits(index, replacement, &limits)
     }
 
     /// Checked numeric fallback for renaming an ambiguous producer entry.
@@ -886,7 +949,8 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn rename_at(&mut self, index: usize, replacement: Name) -> Result<bool> {
-        self.rename_at_with_limits(index, replacement, &super::Limits::DEFAULT)
+        let limits = self.effective_limits();
+        self.rename_at_with_limits(index, replacement, &limits)
     }
 
     pub(in crate::glossary) fn rename_with_limits(
@@ -895,7 +959,7 @@ impl Catalog {
         replacement: Name,
         limits: &super::Limits,
     ) -> Result<bool> {
-        let Some(index) = self.state.offset(name)? else {
+        let Some(index) = self.offset_with_limits(name, limits)? else {
             return Ok(false);
         };
         self.rename_at_with_limits(index, replacement, limits)
@@ -920,6 +984,7 @@ impl Catalog {
         if current == &replacement {
             return Ok(false);
         }
+        validate_selected_name(&replacement, limits)?;
         let old_key = Arc::clone(&current.key);
         let new_key = Arc::clone(&replacement.key);
         self.state.validate_replacement_key(
@@ -972,7 +1037,12 @@ impl Catalog {
         };
         let candidate_bytes = match replace_sizes(self.state.entry_bytes, old_sizes, analysis.sizes)
             .and_then(|bytes| {
-                validate_catalog_sizes(bytes, self.state.background_bytes, self.entries.len())?;
+                validate_catalog_sizes_with_limits(
+                    bytes,
+                    self.state.background_bytes,
+                    self.entries.len(),
+                    limits,
+                )?;
                 Ok(bytes)
             }) {
             Ok(bytes) => bytes,
@@ -1002,7 +1072,8 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn remove(&mut self, name: &str) -> Result<Option<Entry>> {
-        let Some(offset) = self.state.offset(name)? else {
+        let limits = self.effective_limits();
+        let Some(offset) = self.offset_with_limits(name, &limits)? else {
             return Ok(None);
         };
         self.remove_at(offset).map(Some)
@@ -1047,7 +1118,8 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn move_to(&mut self, name: &str, to: usize) -> Result<bool> {
-        let Some(from) = self.state.offset(name)? else {
+        let limits = self.effective_limits();
+        let Some(from) = self.offset_with_limits(name, &limits)? else {
             return Ok(false);
         };
         self.move_at(from, to)?;
@@ -1103,6 +1175,17 @@ pub(in crate::glossary) fn entry_key(entry: &Entry) -> Option<&str> {
         .map(Name::key)
 }
 
+fn validate_selected_name(name: &Name, limits: &super::Limits) -> Result<()> {
+    if name.as_str().len() > limits.name_bytes() || name.key.len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: name.as_str().len().max(name.key.len()),
+            maximum: limits.name_bytes(),
+        });
+    }
+    Ok(())
+}
+
 pub(in crate::glossary) fn restore_name(
     entry: &mut Entry,
     name: Name,
@@ -1132,7 +1215,13 @@ impl Entry {
     /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>, body_xml: Vec<u8>, limits: &super::Limits) -> Result<Self> {
         super::graph::raw::admit_xml(&body_xml, limits)?;
-        let name = Name::new(name)?;
+        let name = name.into();
+        validate_name(&name)?;
+        let name = Name {
+            key: Arc::from(name_key_with_limits(&name, limits)?),
+            value: name,
+            decorated: None,
+        };
         let entry = Self {
             props: Some(Props::new(name)),
             body: Some(body_xml),
@@ -1169,12 +1258,12 @@ impl Entry {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn with_props(mut self, props: Props) -> Result<Self> {
+    pub fn with_props(mut self, props: Props, limits: &super::Limits) -> Result<Self> {
         if self.props.as_ref() != Some(&props) {
             self.producer = None;
         }
         self.props = Some(props);
-        let analysis = authored_analysis(&self)?;
+        let analysis = authored_analysis_with_limits(&self, limits)?;
         self.sizes = analysis.sizes;
         self.refs = analysis.refs;
         Ok(self)

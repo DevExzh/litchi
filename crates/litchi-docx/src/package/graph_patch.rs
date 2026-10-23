@@ -199,6 +199,41 @@ impl GraphPatch {
         Ok(())
     }
 
+    /// Validate every payload the patch would add or replace without
+    /// applying the graph mutation. Family-specific callers use this to
+    /// enforce their selected raw policy before `apply_to` allocates new
+    /// package parts.
+    pub(crate) fn validate_after_parts(
+        &self,
+        mut validate: impl FnMut(&PackURI, &str, &[u8], &Relationships) -> Result<()>,
+    ) -> Result<()> {
+        for change in self.parts.iter() {
+            if let Some(after) = change.after.as_ref() {
+                validate(
+                    &change.name,
+                    &after.content_type,
+                    after.blob.as_slice(),
+                    &after.rels,
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate the after-state relationship sets without applying the patch.
+    pub(crate) fn validate_after_relationships(
+        &self,
+        mut validate: impl FnMut(&Relationships) -> Result<()>,
+    ) -> Result<()> {
+        if let Some((_, after)) = self.package_rels.as_deref() {
+            validate(after)?;
+        }
+        for (_, rels) in self.owners.iter() {
+            validate(&rels.1)?;
+        }
+        Ok(())
+    }
+
     /// Write the after state into `package`, which holds the before state.
     pub(crate) fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
         for change in self.parts.iter() {

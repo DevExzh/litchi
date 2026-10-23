@@ -47,14 +47,6 @@ pub(in crate::glossary) fn replace_sizes(
     ])
 }
 
-pub(in crate::glossary) fn validate_catalog_sizes(
-    entry_bytes: [usize; 2],
-    background_bytes: [usize; 2],
-    entry_count: usize,
-) -> Result<()> {
-    validate_catalog_sizes_with_limits(entry_bytes, background_bytes, entry_count, &Limits::DEFAULT)
-}
-
 pub(in crate::glossary) fn validate_catalog_sizes_with_limits(
     entry_bytes: [usize; 2],
     background_bytes: [usize; 2],

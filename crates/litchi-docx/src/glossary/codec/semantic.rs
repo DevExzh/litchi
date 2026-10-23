@@ -15,7 +15,7 @@ use super::super::{MAX, MAX_PARTS, MC, VML};
 use super::validation::{
     INSERT_VALUES, KIND_VALUES, bounded_with_limits, expect, expect_w, invalid, kids, leaf,
     name_key_with_limits, noattrs, onoff_with_limits, parse_behavior, parse_type,
-    validate_catalog_fields, validate_entry_fields, validate_name, wattr_get_with_limits,
+    validate_catalog_fields, validate_entry_limits, validate_name, wattr_get_with_limits,
     wval_with_limits, xml_error,
 };
 use super::xml::{
@@ -32,6 +32,7 @@ pub(in crate::glossary) fn project(
     noattrs(n)?;
     let c = kids(n)?;
     let mut out = Catalog::default();
+    out.bind_limits(limits);
     let mut semantic_bytes = 0usize;
     if let Some(producers) = producer_entries {
         for producer in producers {
@@ -41,7 +42,7 @@ pub(in crate::glossary) fn project(
     let mut index = 0;
     if let Some(background) = c.first().filter(|node| node.l == "background") {
         expect(background, "background")?;
-        let xml = node_xml_with_limits(background, false, limits)?;
+        let xml = node_xml_with_limits(background, false, limits, semantic_bytes)?;
         add_semantic_xml_bytes(&mut semantic_bytes, xml.len(), limits)?;
         out.background = Some(xml);
         out.background_refs = super::super::graph::relationship_references(background)?;
@@ -66,6 +67,18 @@ pub(in crate::glossary) fn project(
             .ok_or_else(|| invalid("glossary child index is out of bounds"))?;
         expect(parts, "docParts")?;
         noattrs(parts)?;
+        let part_count = parts
+            .content
+            .iter()
+            .filter(|content| matches!(content, Content::Node(_)))
+            .count();
+        if part_count > limits.values() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Entry,
+                actual: part_count,
+                maximum: limits.values(),
+            });
+        }
         let part_nodes = kids(parts)?;
         if part_nodes.len() > limits.values() {
             return Err(crate::Error::GlossaryLimit {
@@ -155,11 +168,11 @@ pub(in crate::glossary) fn extract_producer_entries(
             Content::Node(node)
                 if node.ns.as_ref() == conformance.word() && node.l == "docPart" =>
             {
-                if producer_nodes.len() >= MAX_PARTS {
+                if producer_nodes.len() >= limits.values().min(MAX_PARTS) {
                     return Err(crate::Error::GlossaryLimit {
                         kind: crate::glossary::LimitKind::ProducerEntry,
                         actual: (producer_nodes.len()).saturating_add(1),
-                        maximum: MAX_PARTS,
+                        maximum: limits.values().min(MAX_PARTS),
                     });
                 }
                 producer_nodes
@@ -223,6 +236,7 @@ pub(in crate::glossary) fn extract_producer_entries(
             &node,
             conformance == Conformance::Strict,
             limits,
+            total_bytes,
         )?)
         .map_err(xml_error)?;
         total_bytes = total_bytes
@@ -312,7 +326,7 @@ pub(in crate::glossary) fn parse_entry(
             .copied()
             .ok_or_else(|| invalid("document-part child index is out of bounds"))?;
         expect(body_candidate, "docPartBody")?;
-        let xml = node_xml_with_limits(body_candidate, false, limits)?;
+        let xml = node_xml_with_limits(body_candidate, false, limits, *semantic_bytes)?;
         add_semantic_xml_bytes(semantic_bytes, xml.len(), limits)?;
         body = Some(xml);
         body_node = Some(body_candidate);
@@ -487,7 +501,7 @@ pub(in crate::glossary) fn entry_analysis_with_limits(
     entry: &Entry,
     limits: &Limits,
 ) -> Result<EntryAnalysis> {
-    validate_entry_fields(entry)?;
+    validate_entry_limits(entry, limits)?;
     let body = entry
         .body
         .as_deref()
@@ -647,10 +661,6 @@ pub(in crate::glossary) fn validate_authored_name(entry: &Entry) -> Result<()> {
         ));
     };
     validate_name(name.as_str())
-}
-
-pub(in crate::glossary) fn authored_analysis(entry: &Entry) -> Result<EntryAnalysis> {
-    authored_analysis_with_limits(entry, &Limits::DEFAULT)
 }
 
 pub(in crate::glossary) fn authored_analysis_with_limits(

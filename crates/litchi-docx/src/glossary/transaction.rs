@@ -206,6 +206,7 @@ impl Transaction {
         let changed = self.update_catalog(|catalog| {
             let changed = *catalog != value;
             *catalog = value;
+            catalog.bind_limits(&limits);
             catalog.rebuild_state(&limits)?;
             Ok(changed)
         })?;
@@ -234,7 +235,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_entry(&mut self, value: Entry) -> Result<usize> {
-        self.update_catalog(|catalog| catalog.add(value))
+        let limits = self.limits;
+        self.update_catalog(|catalog| catalog.add_with_limits(value, &limits))
     }
 
     /// Insert or replace one entry selected by its semantic name.
@@ -243,7 +245,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn put_entry(&mut self, value: Entry) -> Result<Option<Entry>> {
-        self.update_catalog(|catalog| catalog.put(value))
+        let limits = self.limits;
+        self.update_catalog(|catalog| catalog.put_with_limits(value, &limits))
     }
 
     /// Replace one uniquely selected entry.
@@ -252,7 +255,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn replace_entry(&mut self, name: &str, value: Entry) -> Result<Option<Entry>> {
-        self.update_catalog(|catalog| catalog.replace(name, value))
+        let limits = self.limits;
+        self.update_catalog(|catalog| catalog.replace_with_limits(name, value, &limits))
     }
 
     /// Rename one uniquely selected entry without rebuilding its body.
@@ -511,9 +515,12 @@ impl Transaction {
     }
 
     fn candidate_graph(&self) -> raw::Graph {
-        self.draft
+        let mut graph = self
+            .draft
             .clone()
-            .unwrap_or_else(|| raw::Graph::new(Catalog::new(), self.before.conformance))
+            .unwrap_or_else(|| raw::Graph::new(Catalog::new(), self.before.conformance));
+        graph.catalog.bind_limits(&self.limits);
+        graph
     }
 
     fn update_catalog<T>(&mut self, edit: impl FnOnce(&mut Catalog) -> Result<T>) -> Result<T> {

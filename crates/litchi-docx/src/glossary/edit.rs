@@ -257,8 +257,131 @@ impl crate::Package {
     /// Returns [`crate::Error::PatchConflict`] for a package that does not
     /// hold the before state.
     pub fn apply_glossary(&self, patch: &Patch) -> Result<Commit> {
+        let limits = *self.semantic_limits().glossary_value();
+        let main_name = self.opc_package().main_document_part()?.partname().clone();
+        // Admit the current owner graph and check the patch base before any
+        // graph allocation. Changed payloads are then bounded before the
+        // generic graph patch can add or replace package parts.
+        patch.0.check(self.opc_package(), "apply_glossary")?;
+        raw::admit_package(self.opc_package(), &limits)?;
+        let mut relationship_count = 0usize;
+        let mut relationship_metadata = 0usize;
+        patch
+            .0
+            .validate_after_parts(|name, content_type, data, relationships| {
+                if name.as_str().len() > limits.name_bytes() {
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: LimitKind::StringBytes,
+                        actual: name.as_str().len(),
+                        maximum: limits.name_bytes(),
+                    });
+                }
+                if content_type.len() > limits.string_bytes() {
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: LimitKind::StringBytes,
+                        actual: content_type.len(),
+                        maximum: limits.string_bytes(),
+                    });
+                }
+                if data.len() > limits.graph_bytes() {
+                    return Err(crate::Error::GlossaryLimit {
+                        kind: LimitKind::GraphBytes,
+                        actual: data.len(),
+                        maximum: limits.graph_bytes(),
+                    });
+                }
+                admit_patch_relationships(
+                    relationships,
+                    &limits,
+                    &mut relationship_count,
+                    &mut relationship_metadata,
+                )?;
+                if content_type == super::CT {
+                    super::codec::read_with_limits(data, &limits)?;
+                } else if content_type.ends_with("+xml")
+                    || content_type.eq_ignore_ascii_case("application/xml")
+                    || content_type.eq_ignore_ascii_case("text/xml")
+                {
+                    // A glossary replay can also carry the main document
+                    // part's relationship-only state. Its document XML is
+                    // not glossary content and must not be charged to this
+                    // family's policy; owned XML parts are admitted here
+                    // and checked again by the final closure load below.
+                    if name != &main_name {
+                        raw::admit_xml(data, &limits)?;
+                    }
+                }
+                Ok(())
+            })?;
+        patch.0.validate_after_relationships(|relationships| {
+            admit_patch_relationships(
+                relationships,
+                &limits,
+                &mut relationship_count,
+                &mut relationship_metadata,
+            )
+        })?;
         let commit = apply_patch(self, patch, "apply_glossary")?;
         commit.package().glossary_graph()?;
         Ok(commit)
     }
+}
+
+fn admit_patch_relationships(
+    relationships: &litchi_opc::rel::Relationships,
+    limits: &super::Limits,
+    count: &mut usize,
+    metadata: &mut usize,
+) -> Result<()> {
+    if relationships.len() > limits.values() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::Relationship,
+            actual: relationships.len(),
+            maximum: limits.values(),
+        });
+    }
+    *count = count
+        .checked_add(relationships.len())
+        .ok_or(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphWideRelationship,
+            actual: usize::MAX,
+            maximum: limits.values(),
+        })?;
+    if *count > limits.values() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphWideRelationship,
+            actual: *count,
+            maximum: limits.values(),
+        });
+    }
+    for relationship in relationships.iter() {
+        for value in [
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        ] {
+            if value.len() > limits.string_bytes() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: LimitKind::StringBytes,
+                    actual: value.len(),
+                    maximum: limits.string_bytes(),
+                });
+            }
+            *metadata = metadata
+                .checked_add(value.len())
+                .ok_or(crate::Error::GlossaryLimit {
+                    kind: LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+        }
+    }
+    if *metadata > limits.metadata_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphMetadataBytes,
+            actual: *metadata,
+            maximum: limits.metadata_bytes(),
+        });
+    }
+    Ok(())
 }

@@ -63,7 +63,8 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
     };
     let mut catalog = Catalog::new();
     catalog.add(
-        Entry::new("Litchi AutoText", body.into_bytes(), &Limits::DEFAULT)?.with_props(props)?,
+        Entry::new("Litchi AutoText", body.into_bytes(), &Limits::DEFAULT)?
+            .with_props(props, &Limits::DEFAULT)?,
     )?;
     let _ = {
         let mut edit = package.edit_glossary();

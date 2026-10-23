@@ -32,7 +32,7 @@ fn entry(name: &str, relationship_id: Option<&str>) -> Entry {
         ..Props::new(Name::new(name).expect("name").with_decorated(false))
     };
     Entry::new(name, body, &Limits::DEFAULT)
-        .and_then(|entry| entry.with_props(props))
+        .and_then(|entry| entry.with_props(props, &Limits::DEFAULT))
         .expect("entry")
 }
 

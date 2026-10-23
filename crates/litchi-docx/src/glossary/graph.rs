@@ -25,8 +25,8 @@
 //! Low-level glossary OPC graph vocabulary and relationship closure validation.
 
 use super::codec::{
-    Content, Node, bounded, invalid, read_with_limits, valid_ncname, validate_physical_part,
-    validate_raw_part, write_with_limits,
+    Content, Node, bounded, invalid, read_with_limits, valid_ncname, validate_catalog_limits,
+    validate_physical_part, validate_raw_part, write_with_limits,
 };
 use super::model::{Catalog, Conformance};
 use super::package::Owner;
@@ -420,6 +420,7 @@ pub mod raw {
     }
 
     pub(in crate::glossary) fn admit_graph(graph: &Graph, limits: &Limits) -> Result<()> {
+        super::validate_catalog_limits(&graph.catalog, limits)?;
         admit_catalog(&graph.catalog, limits)?;
         if graph.parts.len() > limits.parts().min(MAX_VALUES) {
             return Err(Error::GlossaryLimit {

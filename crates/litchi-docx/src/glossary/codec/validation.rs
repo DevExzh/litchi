@@ -50,50 +50,16 @@ pub(in crate::glossary) fn validate_catalog_limits(value: &Catalog, limits: &Lim
         }
     }
     for entry in &value.entries {
+        validate_entry_limits(entry, limits)?;
         if let Some(body) = &entry.body {
-            if body.len() > limits.xml_bytes() {
-                return Err(crate::Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::XmlBytes,
-                    actual: body.len(),
-                    maximum: limits.xml_bytes(),
-                });
-            }
             retained = retained
                 .checked_add(body.len())
                 .ok_or_else(|| invalid("glossary retained semantic bytes overflow"))?;
         }
         if let Some(producer) = &entry.producer {
-            if producer.xml.len() > limits.xml_bytes() {
-                return Err(crate::Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::XmlBytes,
-                    actual: producer.xml.len(),
-                    maximum: limits.xml_bytes(),
-                });
-            }
             retained = retained
                 .checked_add(producer.xml.len())
                 .ok_or_else(|| invalid("glossary producer bytes overflow"))?;
-        }
-        let Some(props) = &entry.props else {
-            continue;
-        };
-        if let Some(name) = &props.name {
-            selected_name(name.as_str(), name.key(), limits)?;
-        }
-        for value in [
-            props.style.as_deref(),
-            props.category.as_ref().map(Category::name),
-            props
-                .category
-                .as_ref()
-                .map(|category| category.gallery.as_str()),
-            props.description.as_deref(),
-            props.id.as_ref().map(|id| id.as_str()),
-        ]
-        .into_iter()
-        .flatten()
-        {
-            selected_string(value, limits)?;
         }
     }
     if retained > limits.graph_bytes() {
@@ -102,6 +68,66 @@ pub(in crate::glossary) fn validate_catalog_limits(value: &Catalog, limits: &Lim
             actual: retained,
             maximum: limits.graph_bytes(),
         });
+    }
+    Ok(())
+}
+
+/// Validate one authored entry before any selected-policy-dependent parsing
+/// or derived-state allocation occurs.
+pub(in crate::glossary) fn validate_entry_limits(entry: &Entry, limits: &Limits) -> Result<()> {
+    validate_entry_fields(entry)?;
+    if let Some(body) = &entry.body {
+        if body.len() > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: body.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+        if body.len() > limits.graph_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: body.len(),
+                maximum: limits.graph_bytes(),
+            });
+        }
+    }
+    if let Some(producer) = &entry.producer {
+        if producer.xml.len() > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: producer.xml.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+        if producer.xml.len() > limits.graph_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: producer.xml.len(),
+                maximum: limits.graph_bytes(),
+            });
+        }
+    }
+    let Some(props) = &entry.props else {
+        return Ok(());
+    };
+    if let Some(name) = &props.name {
+        selected_name(name.as_str(), name.key(), limits)?;
+    }
+    for value in [
+        props.style.as_deref(),
+        props.category.as_ref().map(Category::name),
+        props
+            .category
+            .as_ref()
+            .map(|category| category.gallery.as_str()),
+        props.description.as_deref(),
+        props.id.as_ref().map(|id| id.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        selected_string(value, limits)?;
     }
     Ok(())
 }
@@ -268,6 +294,13 @@ pub(in crate::glossary) fn name_key_with_limits(value: &str, limits: &Limits) ->
                 maximum: limits.name_bytes(),
             });
         }
+        if key.capacity() < len {
+            key.try_reserve(character.len_utf8())
+                .map_err(|source| Error::Allocation {
+                    resource: "glossary semantic-name key",
+                    source,
+                })?;
+        }
         key.push(character);
     }
     Ok(key)
@@ -321,7 +354,17 @@ pub(in crate::glossary) fn is_ncname_char(character: char) -> bool {
 }
 
 pub(in crate::glossary) fn kids(n: &Node) -> Result<Vec<&Node>> {
+    let count = n
+        .content
+        .iter()
+        .filter(|content| matches!(content, Content::Node(_)))
+        .count();
     let mut v = Vec::new();
+    v.try_reserve_exact(count)
+        .map_err(|source| Error::Allocation {
+            resource: "glossary child-node projection",
+            source,
+        })?;
     for c in &n.content {
         match c {
             Content::Node(x) => v.push(x),

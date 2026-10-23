@@ -187,7 +187,11 @@ fn compact_option_flags_collapse_duplicates_and_reject_unknown_or_empty_values()
 
     let mut props = Props::new(Name::new("Unknown flag").unwrap());
     props.kinds = Kind::from_bits_retain(0x80);
-    assert!(entry("Unknown flag").with_props(props).is_err());
+    assert!(
+        entry("Unknown flag")
+            .with_props(props, &Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -201,7 +205,11 @@ fn xml_forbidden_metadata_is_rejected_without_catalog_mutation() {
     let before = catalog.clone();
     let mut invalid = Props::new(Name::new("Invalid").unwrap());
     invalid.description = Some("bad\0description".to_owned());
-    assert!(entry("Invalid").with_props(invalid).is_err());
+    assert!(
+        entry("Invalid")
+            .with_props(invalid, &Limits::DEFAULT)
+            .is_err()
+    );
     assert_eq!(catalog, before);
 }
 
@@ -371,6 +379,7 @@ fn opaque_namespace_mapping_does_not_rewrite_literal_values() {
         background_lineage: None,
         entries: vec![Entry::new("Literal", body.into_bytes(), &Limits::DEFAULT).unwrap()],
         binding: None,
+        selected_limits: None,
         state: CatalogState::default(),
     };
     let strict = String::from_utf8(write(&catalog, Conformance::Strict).unwrap()).unwrap();
@@ -434,7 +443,9 @@ fn unrelated_crud_retains_ignorable_producer_content() {
     let keep = catalog.remove("Keep").unwrap().unwrap();
     let mut props = keep.props().unwrap().clone();
     props.description = Some("changed".to_owned());
-    catalog.add(keep.with_props(props).unwrap()).unwrap();
+    catalog
+        .add(keep.with_props(props, &Limits::DEFAULT).unwrap())
+        .unwrap();
     let targeted = String::from_utf8(write(&catalog, conformance).unwrap()).unwrap();
     assert!(!targeted.contains("producerExtension"), "{targeted}");
     assert!(targeted.contains(r#"w:description w:val="changed""#));
@@ -1957,7 +1968,7 @@ fn aggregate_catalog_budget_is_checked_atomically() {
             ..Props::new(Name::new(&name).unwrap())
         };
         catalog
-            .add(entry(&name).with_props(props).unwrap())
+            .add(entry(&name).with_props(props, &Limits::DEFAULT).unwrap())
             .unwrap();
     }
     let before = catalog.len();
@@ -1967,7 +1978,11 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ..Props::new(Name::new(rejected_name).unwrap())
     };
     let error = catalog
-        .add(entry(rejected_name).with_props(rejected_props).unwrap())
+        .add(
+            entry(rejected_name)
+                .with_props(rejected_props, &Limits::DEFAULT)
+                .unwrap(),
+        )
         .unwrap_err()
         .to_string();
     assert!(error.contains("exceeds 32 MiB"), "{error}");
@@ -1980,7 +1995,11 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         ..Props::new(Name::new("Large 0").unwrap())
     };
     let replacement_error = catalog
-        .put(entry("Large 0").with_props(replacement_props).unwrap())
+        .put(
+            entry("Large 0")
+                .with_props(replacement_props, &Limits::DEFAULT)
+                .unwrap(),
+        )
         .unwrap_err()
         .to_string();
     assert!(

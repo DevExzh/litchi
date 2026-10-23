@@ -562,6 +562,7 @@ pub(in crate::glossary) fn node_xml_with_limits(
     n: &Node,
     s: bool,
     limits: &Limits,
+    retained: usize,
 ) -> Result<Vec<u8>> {
     let mut size = XmlSize::default();
     node_write(&mut size, n, s)?;
@@ -570,6 +571,20 @@ pub(in crate::glossary) fn node_xml_with_limits(
             kind: crate::glossary::LimitKind::XmlBytes,
             actual: size.bytes,
             maximum: limits.xml_bytes(),
+        });
+    }
+    let aggregate = retained
+        .checked_add(size.bytes)
+        .ok_or(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: usize::MAX,
+            maximum: limits.graph_bytes(),
+        })?;
+    if aggregate > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: aggregate,
+            maximum: limits.graph_bytes(),
         });
     }
     let mut x = String::new();
