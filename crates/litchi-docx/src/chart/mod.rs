@@ -8,7 +8,8 @@ mod edit;
 pub(crate) mod inline;
 mod limit;
 mod model;
-mod package;
+pub(crate) mod package;
+pub mod raw;
 #[allow(
     dead_code,
     unreachable_pub,
@@ -21,8 +22,8 @@ mod tests;
 
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use inline::InlineChart;
+pub use limit::Limits;
 pub use model::{
     Companion, Conformance, EmbeddedWorkbook, EmbeddedWorkbookContentType, Graph, Resource,
 };
-pub use package::{load, store};
 pub use transaction::{Revision, Snapshot};

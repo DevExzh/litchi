@@ -32,11 +32,18 @@ use quick_xml::reader::NsReader;
 use std::fmt::Write as _;
 
 impl Settings {
-    fn encode(&self, conformance: Conformance) -> Result<Vec<u8>> {
+    fn encode(&self, conformance: Conformance, limits: &super::super::Limits) -> Result<Vec<u8>> {
         if conformance == Conformance::Strict && self.rely_on_vml.is_some() {
             return Err(invalid("relyOnVML is not valid in Strict web settings"));
         }
         let capacity = validate_value(self)?;
+        if capacity > limits.xml_bytes() {
+            return Err(Error::WebLimit {
+                kind: crate::web::LimitKind::XmlBytes,
+                actual: capacity,
+                maximum: limits.xml_bytes(),
+            });
+        }
         let mut xml = String::new();
         xml.try_reserve_exact(capacity)
             .map_err(|source| Error::Allocation {
@@ -93,10 +100,12 @@ impl Settings {
         write_optional_on_off(&mut xml, "saveSmartTagsAsXml", self.save_smart_tags_as_xml)?;
 
         xml.push_str("</w:webSettings>");
-        if xml.len() > MAX_XML_BYTES {
-            return Err(invalid(format!(
-                "web-settings XML exceeds {MAX_XML_BYTES} bytes"
-            )));
+        if xml.len() > limits.xml_bytes() {
+            return Err(Error::WebLimit {
+                kind: crate::web::LimitKind::XmlBytes,
+                actual: xml.len(),
+                maximum: limits.xml_bytes(),
+            });
         }
         Ok(xml.into_bytes())
     }
@@ -236,15 +245,27 @@ impl Settings {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse(xml: &[u8]) -> Result<(Settings, Conformance)> {
-    let processed = process_web_xml(xml)?;
+pub(crate) fn parse(xml: &[u8], limits: &super::super::Limits) -> Result<(Settings, Conformance)> {
+    super::super::raw::admit_xml(xml, limits)?;
+    let processed = process_web_xml(xml, limits)?;
+    super::super::raw::admit_xml(processed.as_ref(), limits)?;
     Settings::parse_xml(processed.as_ref())
 }
 
-pub(super) fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
+pub(super) fn process_web_xml<'a>(
+    xml: &'a [u8],
+    limits: &super::super::Limits,
+) -> Result<std::borrow::Cow<'a, [u8]>> {
     let limits = litchi_ooxml_common::mce::Limits {
-        max_input_bytes: MAX_XML_BYTES,
-        max_output_bytes: MAX_XML_BYTES,
+        max_input_bytes: limits.xml_bytes(),
+        max_output_bytes: limits.xml_bytes(),
+        max_depth: limits.depth(),
+        max_namespace_bindings: limits.attributes(),
+        max_directive_tokens: limits.events(),
+        max_choices_per_alternate: limits.nodes(),
+        max_attributes_per_element: limits
+            .attributes()
+            .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
         ..litchi_ooxml_common::mce::Limits::default()
     };
     litchi_ooxml_common::mce::process_markup_compatibility(
@@ -261,8 +282,18 @@ pub(super) fn process_web_xml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> 
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
-    value.encode(conformance)
+pub(crate) fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
+    write_with_limits(value, conformance, &super::super::Limits::DEFAULT)
+}
+
+/// Serialize a checked model while bounding the output allocation before it
+/// is created.
+pub(crate) fn write_with_limits(
+    value: &Settings,
+    conformance: Conformance,
+    limits: &super::super::Limits,
+) -> Result<Vec<u8>> {
+    value.encode(conformance, limits)
 }
 
 fn write_value_element(xml: &mut String, name: &str, value: &str) -> Result<()> {

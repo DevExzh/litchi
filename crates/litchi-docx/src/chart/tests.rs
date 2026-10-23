@@ -2,8 +2,9 @@ use super::model::{
     A, C, CHART_CT, COLOR_STYLE_CT, COLOR_STYLE_REL, Conformance, DOCUMENT_CT, MAX_WORKBOOK_BYTES,
     STYLE_CT, STYLE_REL, WORKBOOK_CT,
 };
+use super::raw::{load, store};
 use super::transaction::{Patch, Transaction};
-use super::{Snapshot, load, store};
+use super::{Limits, Snapshot};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
@@ -101,13 +102,13 @@ fn poi_and_libreoffice_internal_charts_round_trip_deterministically() {
         let mut package =
             OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = document();
-        let graph = load(&package, &name).unwrap();
+        let graph = load(&package, &name, &Limits::DEFAULT).unwrap();
         assert_eq!(graph.charts.len(), count);
         assert!(graph.charts.iter().all(|chart| chart.workbook.is_some()));
-        store(&mut package, &name, &graph).unwrap();
-        assert_eq!(load(&package, &name).unwrap(), graph);
-        store(&mut package, &name, &graph).unwrap();
-        assert_eq!(load(&package, &name).unwrap(), graph);
+        store(&mut package, &name, &graph, &Limits::DEFAULT).unwrap();
+        assert_eq!(load(&package, &name, &Limits::DEFAULT).unwrap(), graph);
+        store(&mut package, &name, &graph, &Limits::DEFAULT).unwrap();
+        assert_eq!(load(&package, &name, &Limits::DEFAULT).unwrap(), graph);
     }
 }
 
@@ -185,32 +186,32 @@ fn synthetic(conformance: Conformance) -> (OpcPackage, PackURI) {
 #[test]
 fn strict_mce_graph_round_trips_without_opening_workbook() {
     let (mut package, name) = synthetic(Conformance::Strict);
-    let graph = load(&package, &name).unwrap();
+    let graph = load(&package, &name, &Limits::DEFAULT).unwrap();
     assert_eq!(
         graph.charts[0].workbook.as_ref().unwrap().data,
         b"PK opaque workbook"
     );
-    store(&mut package, &name, &graph).unwrap();
-    assert_eq!(load(&package, &name).unwrap(), graph);
+    store(&mut package, &name, &graph, &Limits::DEFAULT).unwrap();
+    assert_eq!(load(&package, &name, &Limits::DEFAULT).unwrap(), graph);
 }
 
 #[test]
 fn rejects_external_ole_malformed_orphan_unsupported_and_caps_before_mutation() {
     let package = OpcPackage::from_bytes(LO_EXTERNAL, litchi_opc::SourceLimits::default()).unwrap();
-    assert!(load(&package, &document()).is_err());
+    assert!(load(&package, &document(), &Limits::DEFAULT).is_err());
     let (mut package, name) = synthetic(Conformance::Transitional);
     package
         .get_part_mut(&PackURI::new("/word/charts/chart1.xml").unwrap())
         .unwrap()
         .set_blob(format!(r#"<c:wrong xmlns:c="{C}"/>"#).into_bytes());
-    assert!(load(&package, &name).is_err());
+    assert!(load(&package, &name, &Limits::DEFAULT).is_err());
     let (mut package, name) = synthetic(Conformance::Transitional);
     package.add_part(Box::new(BlobPart::new(
         PackURI::new("/word/charts/orphan.xml").unwrap(),
         CHART_CT.into(),
         format!(r#"<c:chartSpace xmlns:c="{C}"><c:chart></c:chart></c:chartSpace>"#).into_bytes(),
     )));
-    assert!(load(&package, &name).is_err());
+    assert!(load(&package, &name, &Limits::DEFAULT).is_err());
     let (mut package, name) = synthetic(Conformance::Transitional);
     package
         .get_part_mut(&PackURI::new("/word/charts/chart1.xml").unwrap())
@@ -222,19 +223,19 @@ fn rejects_external_ole_malformed_orphan_unsupported_and_caps_before_mutation() 
             "rIdImage".into(),
             false,
         );
-    assert!(load(&package, &name).is_err());
+    assert!(load(&package, &name, &Limits::DEFAULT).is_err());
     let (mut package, name) = synthetic(Conformance::Transitional);
-    let mut graph = load(&package, &name).unwrap();
+    let mut graph = load(&package, &name, &Limits::DEFAULT).unwrap();
     graph.charts[0].workbook.as_mut().unwrap().data = vec![0; MAX_WORKBOOK_BYTES + 1];
     let before = package.get_part(&name).unwrap().blob().to_vec();
-    assert!(store(&mut package, &name, &graph).is_err());
+    assert!(store(&mut package, &name, &graph, &Limits::DEFAULT).is_err());
     assert_eq!(package.get_part(&name).unwrap().blob(), before);
 }
 
 #[test]
 fn transaction_noop_keeps_exact_source_bytes_and_relationship_topology() {
     let (mut package, name) = synthetic(Conformance::Transitional);
-    let graph = Snapshot::load(&package, &name).unwrap();
+    let graph = Snapshot::load(&package, &name, &Limits::DEFAULT).unwrap();
     let document_before = package.get_part(&name).unwrap().blob().to_vec();
     let chart_name = PackURI::new("/word/charts/chart1.xml").unwrap();
     let chart_before = package.get_part(&chart_name).unwrap().blob().to_vec();
@@ -282,7 +283,7 @@ fn transaction_noop_keeps_exact_source_bytes_and_relationship_topology() {
 #[test]
 fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
     let (mut package, name) = synthetic(Conformance::Transitional);
-    let source = Snapshot::load(&package, &name).unwrap();
+    let source = Snapshot::load(&package, &name, &Limits::DEFAULT).unwrap();
     let mut transaction = Transaction::new(&package, &name).unwrap();
     transaction
         .edit_graph(|graph| {
@@ -303,7 +304,7 @@ fn transaction_publishes_opaque_workbook_edits_and_inverse_patch() {
         b"changed workbook"
     );
     assert_eq!(
-        load(&package, &name).unwrap(),
+        load(&package, &name, &Limits::DEFAULT).unwrap(),
         commit.snapshot().graph().clone()
     );
     let workbook_name = PackURI::new("/word/embeddings/data1.xlsx").unwrap();

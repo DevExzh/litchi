@@ -236,7 +236,7 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn open_type(&self) -> Result<OpenType> {
         let _parser_admission = self.parser_admission()?;
-        OpenType::parse(self.xml_bytes())
+        OpenType::parse(self.xml_bytes(), &crate::font::open_type::Limits::DEFAULT)
     }
 
     /// Capture a source-preserving OpenType snapshot for an isolated edit.
@@ -246,7 +246,10 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn open_type_snapshot(&self) -> Result<OpenTypeSnapshot> {
         let _parser_admission = self.parser_admission()?;
-        OpenTypeSnapshot::from_xml(self.xml_bytes().to_vec())
+        OpenTypeSnapshot::from_xml(
+            self.xml_bytes().to_vec(),
+            &crate::font::open_type::Limits::DEFAULT,
+        )
     }
 
     /// Replace the modeled OpenType features while preserving every other run
@@ -384,7 +387,8 @@ impl Run {
         }
 
         props.effects = Effects::parse(self.xml_bytes())?;
-        props.open_type = OpenType::parse(self.xml_bytes())?;
+        props.open_type =
+            OpenType::parse(self.xml_bytes(), &crate::font::open_type::Limits::DEFAULT)?;
         Ok((text, props))
     }
 
@@ -450,7 +454,8 @@ impl Run {
         }
 
         props.effects = Effects::parse(self.xml_bytes())?;
-        props.open_type = OpenType::parse(self.xml_bytes())?;
+        props.open_type =
+            OpenType::parse(self.xml_bytes(), &crate::font::open_type::Limits::DEFAULT)?;
         Ok(props)
     }
 

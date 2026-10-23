@@ -10,7 +10,7 @@
 
 use super::codec::{
     div_position, parse_i64, validate_border_style, validate_divs, validate_encoding,
-    validate_pixels_per_inch, validate_relationship_id, validate_text, validate_word_color, write,
+    validate_pixels_per_inch, validate_relationship_id, validate_text, validate_word_color,
 };
 use super::{
     STRICT_WEB_SETTINGS_RELATIONSHIP, STRICT_WORD_NAMESPACE, WORD_NAMESPACE, invalid, reserve_one,
@@ -572,7 +572,7 @@ impl Frame {
 
     /// Return the focused low-level frame relationship ID, if present.
     ///
-    /// Prefer package-level [`crate::web::load`] and [`crate::web::put`], which validate this identifier
+    /// Prefer package-level [`crate::web::load`] and [`crate::web::raw::put`], which validate this identifier
     /// against the part relationship graph.
     #[must_use]
     pub fn rel(&self) -> Option<&str> {
@@ -1677,7 +1677,7 @@ impl Settings {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        write(self, conformance)
+    pub fn xml(&self, conformance: Conformance, limits: &super::Limits) -> Result<Vec<u8>> {
+        super::raw::write(self, conformance, limits)
     }
 }

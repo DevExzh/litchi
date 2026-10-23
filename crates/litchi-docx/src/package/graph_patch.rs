@@ -199,6 +199,51 @@ impl GraphPatch {
         Ok(())
     }
 
+    /// Visit every changed part's before and after state without applying the
+    /// graph mutation. Family-specific callers use this to validate a final
+    /// closure ledger before `apply_to` allocates new package parts.
+    pub(crate) fn for_each_part_delta(
+        &self,
+        mut visit: impl FnMut(
+            &PackURI,
+            Option<(&str, &[u8], &Relationships)>,
+            Option<(&str, &[u8], &Relationships)>,
+        ) -> Result<()>,
+    ) -> Result<()> {
+        for change in self.parts.iter() {
+            let before = change.before.as_ref().map(|state| {
+                (
+                    state.content_type.as_ref(),
+                    state.blob.as_slice(),
+                    state.rels.as_ref(),
+                )
+            });
+            let after = change.after.as_ref().map(|state| {
+                (
+                    state.content_type.as_ref(),
+                    state.blob.as_slice(),
+                    state.rels.as_ref(),
+                )
+            });
+            visit(&change.name, before, after)?;
+        }
+        Ok(())
+    }
+
+    /// Validate the after-state relationship sets without applying the patch.
+    pub(crate) fn validate_after_relationships(
+        &self,
+        mut validate: impl FnMut(Option<&PackURI>, &Relationships) -> Result<()>,
+    ) -> Result<()> {
+        if let Some((_, after)) = self.package_rels.as_deref() {
+            validate(None, after)?;
+        }
+        for (owner, rels) in self.owners.iter() {
+            validate(owner.as_ref(), &rels.1)?;
+        }
+        Ok(())
+    }
+
     /// Write the after state into `package`, which holds the before state.
     pub(crate) fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
         for change in self.parts.iter() {

@@ -10,7 +10,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::result::Result;
 
-use litchi_docx::styles::effects::{Owner, Patch, Resource, Snapshot};
+use litchi_docx::styles::effects::{Limits, Owner, Patch, Resource, Snapshot};
 use litchi_docx::{Package, SourceLimits};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -225,7 +225,7 @@ fn package_bytes(package: &mut Package) -> Vec<u8> {
 fn fixture_resource(relative: &str, member: &str) -> FixtureResult<Resource> {
     let bytes = fixture_bytes(relative)?;
     let xml = archive_member(&bytes, member)?;
-    Resource::from_xml(xml)
+    Resource::new(xml, &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("parse fixture resource {member}: {error}")))
 }
 
@@ -241,7 +241,7 @@ fn changed_resource(snapshot: &Snapshot) -> Resource {
         br#"<w:extensibilityMarker data="changed"/></w:styles>"#,
     )
     .expect("fixture effects root");
-    let resource = Resource::from_xml(xml).expect("changed effects resource is valid");
+    let resource = Resource::new(xml, &Limits::DEFAULT).expect("changed effects resource is valid");
     assert_eq!(resource.conformance(), snapshot.conformance());
     resource
 }
@@ -1215,10 +1215,10 @@ fn effects_resource_limits_and_malformed_grammar_fail_closed() -> FixtureResult<
     );
 
     let malformed = b"<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:style></w:styles>";
-    assert!(Resource::from_xml(malformed.to_vec()).is_err());
+    assert!(Resource::new(malformed.to_vec(), &Limits::DEFAULT).is_err());
     let wrong_root =
         b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"/>";
-    assert!(Resource::from_xml(wrong_root.to_vec()).is_err());
+    assert!(Resource::new(wrong_root.to_vec(), &Limits::DEFAULT).is_err());
     Ok(())
 }
 
@@ -1246,7 +1246,7 @@ fn effects_resource_rejects_malformed_opaque_xml() {
         let xml = format!(
             "{prolog}<w:styles xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"{attributes}>{body}</w:styles>"
         );
-        if Resource::from_xml(xml.into_bytes()).is_ok() {
+        if Resource::new(xml.into_bytes(), &Limits::DEFAULT).is_ok() {
             accepted.push(label);
         }
     }
@@ -1361,7 +1361,14 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
     for limit in limits {
         let package = litchi_opc::OpcPackage::from_vec(bytes.clone(), limit)
             .expect("native OPC package fits ingress limits");
-        assert!(litchi_docx::styles::effects::load(&package, Owner::MainDocument).is_err());
+        assert!(
+            litchi_docx::styles::effects::raw::load(
+                &package,
+                Owner::MainDocument,
+                &Limits::DEFAULT
+            )
+            .is_err()
+        );
     }
     Ok(())
 }
@@ -1452,7 +1459,7 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
         b"xmlns:w=",
         b"xmlns:x=",
     )?;
-    let parsed = Resource::from_xml(prefixed.clone())
+    let parsed = Resource::new(prefixed.clone(), &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("namespace-prefix parse: {error}")))?;
     assert_eq!(parsed.xml_bytes(), prefixed);
 
@@ -1461,7 +1468,7 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
         b"</w:styles>",
         br#"<w:unknownExtension xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" data="preserve"/></w:styles>"#,
     )?;
-    let resource = Resource::from_xml(unknown.clone())
+    let resource = Resource::new(unknown.clone(), &Limits::DEFAULT)
         .map_err(|error| FixtureError(format!("unknown-extension parse: {error}")))?;
     let mut package = Package::from_reader(Cursor::new(base)).expect("open source fixture");
     put_effects(&mut package, Owner::MainDocument, resource)
@@ -1483,8 +1490,11 @@ fn effects_namespace_prefix_and_unknown_xml_are_source_preserving() -> FixtureRe
 #[test]
 fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse effects addition resource: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse effects addition resource: {error}")))?;
     let source = fixture_without_main_effects("poi/test-data/document/Bug54849.docx")?;
     let source_metrics = package_metrics(&source)?;
 
@@ -1593,8 +1603,11 @@ fn effects_addition_honors_public_package_caps_atomically() -> FixtureResult<()>
 fn effects_addition_honors_relationship_part_and_graph_caps_with_source_less_owner()
 -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse effects source-less addition: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse effects source-less addition: {error}")))?;
     let source = fixture_without_main_effects_or_owner_relationships(
         "ooxml/docx/ComplexNumberedLists.docx",
     )?;
@@ -1893,8 +1906,11 @@ fn existing_owner_replacement_honors_exact_and_one_under_total_part_bytes_caps()
 #[test]
 fn absent_owner_inverse_rejects_candidate_with_different_relationship_id() -> FixtureResult<()> {
     let native = fixture_bytes("poi/test-data/document/Bug54849.docx")?;
-    let resource = Resource::from_xml(archive_member(&native, "word/stylesWithEffects.xml")?)
-        .map_err(|error| FixtureError(format!("parse stale inverse resource: {error}")))?;
+    let resource = Resource::new(
+        archive_member(&native, "word/stylesWithEffects.xml")?,
+        &Limits::DEFAULT,
+    )
+    .map_err(|error| FixtureError(format!("parse stale inverse resource: {error}")))?;
     let source = fixture_without_main_effects("ooxml/docx/ComplexNumberedLists.docx")?;
     let mut package = Package::from_reader(Cursor::new(source))
         .map_err(|error| FixtureError(format!("open stale inverse source: {error}")))?;

@@ -6,11 +6,12 @@
 //!
 //! The historical `crate::web` module remains the public facade.
 
-mod codec;
+pub(crate) mod codec;
 mod edit;
 mod limit;
 mod model;
-mod package;
+pub(crate) mod package;
+pub mod raw;
 #[allow(
     dead_code,
     unreachable_pub,
@@ -21,15 +22,15 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{parse, read, write};
 pub(crate) use edit::Result;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use limit::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 pub use model::{
     Border, BorderSide, Borders, Child, Color, Conformance, Div, Frame, Frameset, Id, Key, Layout,
     Screen, Scrollbar, Settings, SplitBar, Twips,
 };
-pub use package::{load, load_snapshot, put, remove};
+pub use package::{load, load_snapshot};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;

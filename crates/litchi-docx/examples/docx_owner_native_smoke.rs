@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use litchi_docx::Package;
 use litchi_docx::glossary::{
     Catalog, Category, Conformance as GlossaryConformance, Entry, Gallery, Id as GlossaryId,
-    Insert, Kind, Name, Props,
+    Insert, Kind, Limits, Name, Props,
 };
 use litchi_docx::web::{Div, Id as DivId, Screen};
 
@@ -62,7 +62,10 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
         ..Props::new(Name::new("Litchi AutoText")?)
     };
     let mut catalog = Catalog::new();
-    catalog.add(Entry::new("Litchi AutoText", body.into_bytes())?.with_props(props)?)?;
+    catalog.add(
+        Entry::new("Litchi AutoText", body.into_bytes(), &Limits::DEFAULT)?
+            .with_props(props, &Limits::DEFAULT)?,
+    )?;
     let _ = {
         let mut edit = package.edit_glossary();
         let value = edit.put(catalog, GlossaryConformance::Transitional)?;

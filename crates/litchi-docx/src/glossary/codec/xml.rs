@@ -12,11 +12,9 @@
 )]
 //! XML syntax, bounded DOM, and canonical opaque-content emission for glossaries.
 
+use super::super::limit::Limits;
 use super::super::{Arc, BytesStart, Decoder, Error, Event, HashMap, Reader, Result, XmlVersion};
-use super::super::{
-    MAX, MAX_DEPTH, MAX_DOM_ATTRIBUTES, MAX_DOM_BYTES, MAX_DOM_CONTENT, MAX_DOM_TOKENS, MAX_NODES,
-    MAX_VALUES, R, RS, W, WS,
-};
+use super::super::{MAX, MAX_DEPTH, MAX_VALUES, R, RS, W, WS};
 use super::validation::{invalid, split, xml_char, xml_error};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::mem::size_of;
@@ -54,6 +52,7 @@ pub(in crate::glossary) struct Node {
 
 #[derive(Default)]
 pub(in crate::glossary) struct DomBudget {
+    limits: Limits,
     pub(in crate::glossary) bytes: usize,
     pub(in crate::glossary) nodes: usize,
     pub(in crate::glossary) attributes: usize,
@@ -62,15 +61,24 @@ pub(in crate::glossary) struct DomBudget {
 }
 
 impl DomBudget {
+    fn new(limits: Limits) -> Self {
+        Self {
+            limits,
+            ..Self::default()
+        }
+    }
+
     fn charge(&mut self, bytes: usize) -> Result<()> {
         self.bytes = self
             .bytes
             .checked_add(bytes)
             .ok_or_else(|| invalid("glossary DOM allocation budget overflow"))?;
-        if self.bytes > MAX_DOM_BYTES {
-            return Err(invalid(
-                "glossary DOM exceeds the 64 MiB owned-allocation budget",
-            ));
+        if self.bytes > self.limits.dom_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::DomBytes,
+                actual: self.bytes,
+                maximum: self.limits.dom_bytes(),
+            });
         }
         Ok(())
     }
@@ -80,11 +88,11 @@ impl DomBudget {
             .tokens
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML token count overflow"))?;
-        if self.tokens > MAX_DOM_TOKENS {
+        if self.tokens > self.limits.tokens() {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::XmlToken,
                 actual: self.tokens,
-                maximum: MAX_DOM_TOKENS,
+                maximum: self.limits.tokens(),
             });
         }
         Ok(())
@@ -95,11 +103,11 @@ impl DomBudget {
             .nodes
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML node count overflow"))?;
-        if self.nodes > MAX_NODES {
+        if self.nodes > self.limits.nodes() {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::XmlNode,
                 actual: self.nodes,
-                maximum: MAX_NODES,
+                maximum: self.limits.nodes(),
             });
         }
         self.charge(size_of::<Node>() + size_of::<NamespaceFrame>())
@@ -128,11 +136,11 @@ impl DomBudget {
             .attributes
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML attribute count overflow"))?;
-        if self.attributes > MAX_DOM_ATTRIBUTES {
+        if self.attributes > self.limits.attributes() {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::XmlAggregateAttribute,
                 actual: self.attributes,
-                maximum: MAX_DOM_ATTRIBUTES,
+                maximum: self.limits.attributes(),
             });
         }
         self.charge(
@@ -149,11 +157,11 @@ impl DomBudget {
             .contents
             .checked_add(1)
             .ok_or_else(|| invalid("glossary XML content count overflow"))?;
-        if self.contents > MAX_DOM_CONTENT {
+        if self.contents > self.limits.content() {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::XmlContentToken,
                 actual: self.contents,
-                maximum: MAX_DOM_CONTENT,
+                maximum: self.limits.content(),
             });
         }
         let owned = match content {
@@ -245,13 +253,17 @@ pub(in crate::glossary) fn validate_xml_value(value: &str, context: &str) -> Res
 }
 
 pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
+    parse_dom_with_limits(xml, &Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn parse_dom_with_limits(xml: &[u8], limits: &Limits) -> Result<Node> {
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut rd = Reader::from_reader(xml);
-    let mut budget = DomBudget::default();
+    let mut budget = DomBudget::new(*limits);
     let mut resolver = NamespaceResolver::default();
     let mut stack: Vec<Node> = Vec::new();
     stack
-        .try_reserve_exact(MAX_DEPTH)
+        .try_reserve_exact(limits.depth().saturating_add(1))
         .map_err(|source| Error::Allocation {
             resource: "glossary XML stack",
             source,
@@ -266,18 +278,18 @@ pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
         match event {
             Event::Start(e) => {
                 budget.node()?;
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= limits.depth() {
                     return Err(crate::Error::GlossaryLimit {
                         kind: crate::glossary::LimitKind::XmlDepth,
                         actual: (stack.len()).saturating_add(1),
-                        maximum: MAX_DEPTH,
+                        maximum: limits.depth(),
                     });
                 }
-                stack.push(make(&e, d, &stack, &mut resolver, &mut budget)?);
+                stack.push(make(&e, d, &stack, &mut resolver, &mut budget, limits)?);
             },
             Event::Empty(e) => {
                 budget.node()?;
-                let n = make(&e, d, &stack, &mut resolver, &mut budget)?;
+                let n = make(&e, d, &stack, &mut resolver, &mut budget, limits)?;
                 resolver.pop(&n.bindings.local)?;
                 attach(&mut stack, &mut root, n, &mut budget)?;
             },
@@ -344,11 +356,19 @@ pub(in crate::glossary) fn make(
     stack: &[Node],
     resolver: &mut NamespaceResolver,
     budget: &mut DomBudget,
+    limits: &Limits,
 ) -> Result<Node> {
     let q = std::str::from_utf8(e.name().as_ref())
         .map_err(xml_error)?
         .to_string();
     validate_xml_value(&q, "qualified name")?;
+    if q.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: q.len(),
+            maximum: limits.string_bytes(),
+        });
+    }
     let parent = stack.last().map(|node| Arc::clone(&node.bindings));
     let mut raw = Vec::new();
     for a in e.checked_attributes() {
@@ -371,6 +391,22 @@ pub(in crate::glossary) fn make(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, d)
             .map_err(xml_error)?
             .into_owned();
+        if key.len() > limits.string_bytes() || value.len() > limits.string_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: key.len().max(value.len()),
+                maximum: limits.string_bytes(),
+            });
+        }
+        if key == "w:name" || key == "name" {
+            if value.len() > limits.name_bytes() {
+                return Err(crate::Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::StringBytes,
+                    actual: value.len(),
+                    maximum: limits.name_bytes(),
+                });
+            }
+        }
         validate_xml_value(&key, "attribute name")?;
         validate_xml_value(&value, "attribute value")?;
         raw.push((key, value));
@@ -393,11 +429,11 @@ pub(in crate::glossary) fn make(
         .map_or(0, |frame| frame.declaration_count)
         .checked_add(local_bindings.len())
         .ok_or_else(|| invalid("glossary namespace binding count overflow"))?;
-    if declaration_count > MAX_VALUES {
+    if declaration_count > limits.values() {
         return Err(crate::Error::GlossaryLimit {
             kind: crate::glossary::LimitKind::NamespaceBinding,
             actual: declaration_count,
-            maximum: MAX_VALUES,
+            maximum: limits.values(),
         });
     }
     let bindings = Arc::new(NamespaceFrame {
@@ -522,9 +558,35 @@ impl XmlSink for String {
     }
 }
 
-pub(in crate::glossary) fn node_xml(n: &Node, s: bool) -> Result<Vec<u8>> {
+pub(in crate::glossary) fn node_xml_with_limits(
+    n: &Node,
+    s: bool,
+    limits: &Limits,
+    retained: usize,
+) -> Result<Vec<u8>> {
     let mut size = XmlSize::default();
     node_write(&mut size, n, s)?;
+    if size.bytes > limits.xml_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::XmlBytes,
+            actual: size.bytes,
+            maximum: limits.xml_bytes(),
+        });
+    }
+    let aggregate = retained
+        .checked_add(size.bytes)
+        .ok_or(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: usize::MAX,
+            maximum: limits.graph_bytes(),
+        })?;
+    if aggregate > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: aggregate,
+            maximum: limits.graph_bytes(),
+        });
+    }
     let mut x = String::new();
     x.try_reserve_exact(size.bytes)
         .map_err(|source| Error::Allocation {

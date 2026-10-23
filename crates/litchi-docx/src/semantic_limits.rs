@@ -38,6 +38,7 @@ pub struct SemanticLimits {
     paragraph_copy: crate::source_backed::paragraph_copy::raw::Limits,
     tail_append: crate::source_backed::tail_append::Limits,
     embedded: litchi_ooxml_common::embedded::Limits,
+    glossary: crate::glossary::Limits,
 }
 
 macro_rules! copy_limit {
@@ -147,6 +148,12 @@ impl SemanticLimits {
         embedded_value,
         litchi_ooxml_common::embedded::Limits,
         "embedded-object discovery"
+    );
+    copy_limit!(
+        glossary,
+        glossary_value,
+        crate::glossary::Limits,
+        "glossary and building-block reads and edits"
     );
 
     /// Bound task-pane and web-extension reads by `limits`.
