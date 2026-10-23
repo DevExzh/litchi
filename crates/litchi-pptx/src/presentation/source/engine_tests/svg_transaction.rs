@@ -184,8 +184,7 @@ fn package_with_orphan_relationship_member() -> Vec<u8> {
 
 fn package_with_unselected_dangling_picture() -> Vec<u8> {
     let mut package =
-        OpcPackage::from_bytes(&source_package(false), litchi_opc::SourceLimits::default())
-            .unwrap();
+        OpcPackage::from_bytes(&source_package(false), SourceLimits::default()).unwrap();
     let slide_uri = PackURI::new(SLIDE).unwrap();
     let slide = package.get_part_mut(&slide_uri).unwrap();
     let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
@@ -206,8 +205,7 @@ fn open_editor(bytes: &[u8]) -> SourceBackedPresentationEditor {
 
 fn external_svg_package() -> Vec<u8> {
     let mut package =
-        OpcPackage::from_bytes(&source_package(false), litchi_opc::SourceLimits::default())
-            .unwrap();
+        OpcPackage::from_bytes(&source_package(false), SourceLimits::default()).unwrap();
     let slide_uri = PackURI::new(SLIDE).unwrap();
     let slide = package.get_part_mut(&slide_uri).unwrap();
     let xml = String::from_utf8(slide.blob().to_vec())
@@ -229,8 +227,7 @@ fn external_svg_package() -> Vec<u8> {
 
 fn non_png_raster_package() -> Vec<u8> {
     let mut package =
-        OpcPackage::from_bytes(&source_package(false), litchi_opc::SourceLimits::default())
-            .unwrap();
+        OpcPackage::from_bytes(&source_package(false), SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(RASTER).unwrap())
         .unwrap()
@@ -242,8 +239,7 @@ fn non_png_raster_package() -> Vec<u8> {
 #[test]
 fn svg_transaction_retargets_media_and_preserves_opaque_slide_bytes() {
     let source = source_package(false);
-    let source_package =
-        OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let source_package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let source_slide = source_package
         .get_part(&PackURI::new(SLIDE).unwrap())
         .unwrap()
@@ -278,7 +274,7 @@ fn svg_transaction_retargets_media_and_preserves_opaque_slide_bytes() {
     editor
         .publish_svg_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let slide = package.get_part(&PackURI::new(SLIDE).unwrap()).unwrap();
     assert_eq!(slide.blob(), source_slide.as_slice());
     assert_eq!(
@@ -388,7 +384,7 @@ fn svg_transaction_noop_inverse_stale_and_signed_are_atomic() {
 #[test]
 fn svg_transaction_refuses_shared_media_before_output() {
     let source = source_package(false);
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let second = PackURI::new("/ppt/slides/slide2.xml").unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(

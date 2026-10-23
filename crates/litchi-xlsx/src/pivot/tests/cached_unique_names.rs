@@ -750,7 +750,7 @@ impl Fixture {
     }
 
     fn package(&self) -> OpcPackage {
-        OpcPackage::from_bytes(&self.bytes, litchi_opc::SourceLimits::default()).unwrap()
+        OpcPackage::from_bytes(&self.bytes, SourceLimits::default()).unwrap()
     }
 }
 
@@ -2409,10 +2409,9 @@ fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_revers
     let restored = patch.inverse().apply(committed.package()).unwrap();
     let restored_bytes = restored.package().to_bytes().unwrap();
     assert_eq!(restored_bytes, base_bytes);
-    let base_package =
-        OpcPackage::from_bytes(&base_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let base_package = OpcPackage::from_bytes(&base_bytes, SourceLimits::default()).unwrap();
     let restored_package =
-        OpcPackage::from_bytes(&restored_bytes, litchi_opc::SourceLimits::default()).unwrap();
+        OpcPackage::from_bytes(&restored_bytes, SourceLimits::default()).unwrap();
     assert_eq!(
         base_package
             .get_part(&PackURI::new(WORKBOOK_URI).unwrap())

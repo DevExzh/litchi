@@ -400,7 +400,7 @@ impl Fixture {
     }
 
     fn package(&self) -> OpcPackage {
-        OpcPackage::from_bytes(&self.bytes, litchi_opc::SourceLimits::default()).unwrap()
+        OpcPackage::from_bytes(&self.bytes, SourceLimits::default()).unwrap()
     }
 }
 
@@ -414,8 +414,7 @@ fn with_unaudited_table(archive: Vec<u8>, published: &str, table_xml: &str) -> V
         WORKSHEET_TABLE_URI.trim_start_matches('/'),
     ];
     let reader =
-        litchi_opc::phys_pkg::PhysPkgReader::new(&archive, litchi_opc::SourceLimits::default())
-            .unwrap();
+        litchi_opc::phys_pkg::PhysPkgReader::new(&archive, SourceLimits::default()).unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let data = if tables.contains(&name.as_str()) {
@@ -1098,7 +1097,7 @@ fn relationship_inventory(package: &OpcPackage) -> RelationshipInventory {
         }
 
         let source = package
-            .source_relationships(&owner, litchi_opc::SourceLimits::default())
+            .source_relationships(&owner, SourceLimits::default())
             .unwrap();
         if source.member_present() {
             inventory.parts += 1;

@@ -176,7 +176,7 @@ fn package_from_strict_raster() -> Vec<u8> {
         .into_bytes();
     let mut package = OpcPackage::from_bytes(
         &source_package(slide, false, false),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
     )
     .unwrap();
     let slide = package.get_part_mut(&PackURI::new(SLIDE).unwrap()).unwrap();
@@ -310,21 +310,21 @@ fn open_editor(bytes: &[u8]) -> SourceBackedPresentationEditor {
 }
 
 fn physical_member(bytes: &[u8], name: &str) -> Vec<u8> {
-    PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .unwrap()
         .read_member(name)
         .unwrap()
 }
 
 fn physical_member_names(bytes: &[u8]) -> Vec<String> {
-    PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .unwrap()
         .member_names()
         .unwrap()
 }
 
 fn physical_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -450,7 +450,7 @@ fn package_from_raster_with_namespace_only_selfclosing_ext_lst() -> Vec<u8> {
 
 fn package_from_bom_raster() -> Vec<u8> {
     let source = source_package(raster_slide_xml(true, false), false, false);
-    let reader = PhysPkgReader::new(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let reader = PhysPkgReader::new(&source, SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     for member in reader.member_names().unwrap() {
         let uri = PackURI::new(format!("/{member}")).unwrap();
@@ -510,7 +510,7 @@ fn package_from_pair_with_uri(self_closing: bool, svg_uri: &str) -> Vec<u8> {
 }
 
 fn rewrite_slide_member(source: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     let uri = PackURI::new(SLIDE).unwrap();
     let slide = package.get_part_mut(&uri).unwrap();
     let xml = String::from_utf8(slide.blob().to_vec()).unwrap();
@@ -520,7 +520,7 @@ fn rewrite_slide_member(source: &[u8], rewrite: impl FnOnce(String) -> String) -
 
 fn external_svg_package() -> Vec<u8> {
     let source = package_from_pair(true);
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let slide_uri = PackURI::new(SLIDE).unwrap();
     let slide = package.get_part_mut(&slide_uri).unwrap();
     let xml = String::from_utf8(slide.blob().to_vec())
@@ -541,7 +541,7 @@ fn external_svg_package() -> Vec<u8> {
 
 fn missing_svg_target_package() -> Vec<u8> {
     let source = package_from_pair(true);
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SLIDE).unwrap())
         .unwrap()
@@ -620,11 +620,8 @@ fn wrong_namespace_package(prefix: &str, namespace: &str) -> Vec<u8> {
 }
 
 fn shared_svg_package() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(
-        &package_from_pair(true),
-        litchi_opc::SourceLimits::default(),
-    )
-    .unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&package_from_pair(true), SourceLimits::default()).unwrap();
     let slide2 = PackURI::new("/ppt/slides/slide2.xml").unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
@@ -1402,7 +1399,7 @@ fn svg_uri_profile_collapses_xml_whitespace_but_not_nbsp() {
 #[test]
 fn raster_fixture_has_no_svg_owner_and_preserves_physical_catalog() {
     let source = package_from_raster(false, true);
-    let reader = PhysPkgReader::new(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let reader = PhysPkgReader::new(&source, SourceLimits::default()).unwrap();
     assert!(
         reader
             .member_names()

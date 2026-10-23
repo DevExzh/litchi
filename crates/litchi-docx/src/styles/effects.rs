@@ -3082,7 +3082,7 @@ mod tests {
                 .expect("stored owner payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+        OpcPackage::from_vec(bytes, SourceLimits::default())
             .expect("corruption is deferred to first decode")
     }
 

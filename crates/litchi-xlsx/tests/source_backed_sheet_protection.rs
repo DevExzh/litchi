@@ -169,7 +169,7 @@ fn ordinary_fixture(workbook_suffix: &str, signed: bool) -> Vec<u8> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -261,8 +261,7 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::sheet_protection::Snapshot::load(&replay, "Sheet1")
@@ -276,7 +275,7 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -288,9 +287,8 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
     let published = commit.patch().after().clone();
     assert_eq!(published.metadata(), &target_metadata());
 
-    let source =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -347,13 +345,12 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     drop(snapshot);
 
     let commit = changed_commit(&editor);
-    let mut replay =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let published = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::sheet_protection::Snapshot::load(&published, "Sheet1")
             .unwrap()
@@ -365,7 +362,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
@@ -398,7 +395,7 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let published = remove.patch().after().clone();
     assert_eq!(published.metadata(), &Metadata::new());
     assert!(
-        !OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
+        !OpcPackage::from_bytes(&output, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -479,8 +476,7 @@ fn foreign_changed_and_retargeted_sources_are_rejected() {
     ));
     assert!(output.is_empty());
 
-    let mut retargeted =
-        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut retargeted = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let workbook = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap();
@@ -497,8 +493,7 @@ fn foreign_changed_and_retargeted_sources_are_rejected() {
     // An owner refuses the retargeted graph at open.
     assert!(replay_patch(&mut retargeted, commit.patch()).is_err());
 
-    let mut relationship_changed =
-        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut relationship_changed = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     relationship_changed
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -572,11 +567,8 @@ fn chartsheet_selection_is_refused() {
     const CHARTSHEET_CT: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
-    let mut package = OpcPackage::from_bytes(
-        &ordinary_fixture("", false),
-        litchi_opc::SourceLimits::default(),
-    )
-    .unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&ordinary_fixture("", false), SourceLimits::default()).unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&sheet_uri).unwrap();
     sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
@@ -614,6 +606,6 @@ fn replay_patch(
         .apply_sheet_protection(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
     Ok(())
 }

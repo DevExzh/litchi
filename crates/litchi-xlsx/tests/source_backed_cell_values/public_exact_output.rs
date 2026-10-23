@@ -92,8 +92,8 @@ fn public_multi_edit_publishes_a_producer_formatted_worksheet_verbatim() {
         editor
             .publish_multi_commit_to_stream(&mut published, &commit)
             .expect("a source-derived replacement publishes");
-        let package = OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default())
-            .expect("published package");
+        let package =
+            OpcPackage::from_bytes(&published, SourceLimits::default()).expect("published package");
         let worksheet = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .expect("published worksheet");
@@ -134,8 +134,8 @@ fn a_source_backed_replacement_still_fails_closed_on_malformed_xml() {
     ] {
         let package = SourceBackedPackage::from_read_at(
             Arc::new(VersionedSource::new(bytes.clone())),
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             None,
         )

@@ -224,7 +224,10 @@ fn raw_slicer_rejects_an_over_limit_baseline_before_source_capture() {
 fn raw_slicer_rejects_lazy_baseline_without_decoding_payloads() {
     let (package, _) = package();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let source = litchi_xlsx::Package::from_opc(OpcPackage::from_vec(bytes).unwrap()).unwrap();
+    let source = litchi_xlsx::Package::from_opc(
+        OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap(),
+    )
+    .unwrap();
     let before = source.clone().into_plain_opc().deferred_decode_counters();
     let limits = SourceLimits::builder()
         .max_total_part_bytes(1)
@@ -255,7 +258,10 @@ fn raw_slicer_rejects_a_misdeclared_lazy_member_without_mutation() {
     let (package, _) = package();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let bytes = misdeclare_member(bytes, "xl/worksheets/sheet1.xml");
-    let source = litchi_xlsx::Package::from_opc(OpcPackage::from_vec(bytes).unwrap()).unwrap();
+    let source = litchi_xlsx::Package::from_opc(
+        OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap(),
+    )
+    .unwrap();
     let before = PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap();
     let before_counters = source.clone().into_plain_opc().deferred_decode_counters();
 

@@ -35,7 +35,7 @@ fn source_bytes(slide_ids: &str) -> Vec<u8> {
     }
     let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let uri = PackURI::new("/ppt/presentation.xml").unwrap();
     let part = opc.get_part_mut(&uri).unwrap();
     let xml = String::from_utf8(part.blob().to_vec()).unwrap();
@@ -111,7 +111,7 @@ fn unknown_section_slide_id_is_refused_without_native_id_fallback() {
 #[test]
 fn wrong_section_namespace_is_refused_strictly() {
     let bytes = valid_source_bytes();
-    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let uri = PackURI::new("/ppt/presentation.xml").unwrap();
     let part = opc.get_part_mut(&uri).unwrap();
     let xml = String::from_utf8(part.blob().to_vec()).unwrap();

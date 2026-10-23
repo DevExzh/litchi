@@ -398,7 +398,7 @@ fn rewrite_physical_member(
     wanted: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let reader = PhysPkgReader::new(bytes, SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     let mut rewrite = Some(rewrite);
     for member in reader.member_names().unwrap() {
@@ -732,7 +732,7 @@ fn nested_xdr14_group_content_part_is_not_inferred_as_core_owner() {
 fn worksheet_content_part_facade_pairs_source_typed_geometry_and_borrowed_payload() {
     for strict in [false, true] {
         let bytes = content_part_package(strict, PackageFault::None, 3);
-        let before = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let before = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         let unrelated_before = before
             .get_part(&PackURI::new(UNRELATED).unwrap())
             .unwrap()
@@ -820,8 +820,7 @@ fn worksheet_content_part_facade_pairs_source_typed_geometry_and_borrowed_payloa
         }
 
         let after_bytes = workbook.to_plain_bytes().unwrap();
-        let after =
-            OpcPackage::from_bytes(&after_bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let after = OpcPackage::from_bytes(&after_bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             after
                 .get_part(&PackURI::new(UNRELATED).unwrap())

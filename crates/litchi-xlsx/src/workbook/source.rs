@@ -32,7 +32,7 @@ use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, Str
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
-    SourceLimits, VerifiedDecodedReaderError,
+    SourceLimits, SourceReadPolicy, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
@@ -505,7 +505,7 @@ impl SourceBackedWorkbook {
     /// its hierarchical memory budget; managed [`litchi_opc::PartData`]
     /// handles never escape as unbudgeted `Arc` allocations through this
     /// facade. Without one, the deferred-payload cache is bounded by the
-    /// selected [`litchi_opc::SourceCacheLimits`] (or the OPC default) but unmanaged.
+    /// selected [`SourceCacheLimits`] (or the OPC default) but unmanaged.
     pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
@@ -536,14 +536,14 @@ impl SourceBackedWorkbook {
                 source,
                 limits,
                 cache_limits,
-                litchi_opc::SourceReadPolicy::exact(),
+                SourceReadPolicy::exact(),
                 Some(context),
             )?,
             None => SourceBackedPackage::from_read_at(
                 source,
                 limits,
                 cache_limits,
-                litchi_opc::SourceReadPolicy::exact(),
+                SourceReadPolicy::exact(),
                 None,
             )?,
         };
@@ -2488,7 +2488,7 @@ mod tests {
     }
 
     fn part_len(bytes: &[u8], member: &str) -> u64 {
-        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
         package
             .get_part(&PackURI::new(member).unwrap())
             .unwrap()
@@ -2939,7 +2939,7 @@ mod tests {
             source.clone(),
             SourceLimits::default(),
             cache_limits,
-            litchi_opc::SourceReadPolicy::exact(),
+            SourceReadPolicy::exact(),
             Some(context),
         )
         .unwrap();
@@ -2967,8 +2967,14 @@ mod tests {
     fn externally_opened_package_preserves_custom_cache_after_commit() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         // A facade option cannot replace the cache policy already admitted by
         // an externally supplied package. Use the OPC default here so a
         // regression would visibly widen the one-entry cache.
@@ -3015,14 +3021,14 @@ mod tests {
     fn externally_opened_managed_package_context_survives_commit() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
         let mut edit = workbook.edit_tab_state().unwrap();
         assert!(edit.hide("First").unwrap());
@@ -3054,14 +3060,14 @@ mod tests {
     fn external_package_and_facade_contexts_both_survive_commit() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let (package_budget, _package_cancellation, package_context) = managed_context(u64::MAX);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
-                package_context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(package_context),
+        )
+        .unwrap();
         let (facade_budget, facade_cancellation, facade_context) = managed_context(u64::MAX);
         let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
             package,
@@ -3090,9 +3096,12 @@ mod tests {
     #[test]
     fn cancelled_facade_fences_uncached_deferred_view_and_write() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
-        let package = SourceBackedPackage::from_read_at_with_cache_limits(
+        let package = SourceBackedPackage::from_read_at(
             source,
+            SourceLimits::default(),
             SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
@@ -4395,7 +4404,7 @@ mod tests {
                 source,
                 SourceLimits::default(),
                 SourceCacheLimits::new(256 * 1024, 4).unwrap(),
-                litchi_opc::SourceReadPolicy::exact(),
+                SourceReadPolicy::exact(),
                 Some(context),
             )
             .unwrap();
@@ -4428,8 +4437,8 @@ mod tests {
             let package = SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
-                litchi_opc::SourceReadPolicy::exact(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
                 Some(context),
             )
             .unwrap();

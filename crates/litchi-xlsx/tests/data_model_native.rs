@@ -8,7 +8,7 @@ const SOURCE: &[u8] = include_bytes!("data/data_model/tdf167689_x15_namespace.xl
 
 #[test]
 fn unknown_model_profile_is_retained_on_package_write() {
-    let mut raw = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
+    let mut raw = OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap();
     let name = PackURI::new("/xl/model/item.data").unwrap();
     let mut unknown = raw.get_part(&name).unwrap().blob().to_vec();
     replace_utf16(&mut unknown[..4096], ">150<", ">151<");
@@ -35,7 +35,7 @@ fn unknown_model_profile_is_retained_on_package_write() {
     ));
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
-    let reopened = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(reopened.get_part(&name).unwrap().blob(), source.blob());
     // Failed feature access must also retain the source descriptor and its
     // linked-table connection, including unsupported extension declarations.
@@ -68,14 +68,14 @@ fn replace_utf16(bytes: &mut [u8], before: &str, after: &str) {
 #[test]
 fn native_model_read_descriptor_edit_reopen_and_exact_inverse() {
     check_native_model_descriptor_round_trip(
-        OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap(),
+        OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap(),
     );
 }
 
 #[test]
 fn borrowed_native_model_preserves_relationship_xml_through_edit_and_inverse() {
     check_native_model_descriptor_round_trip(
-        OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap(),
+        OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap(),
     );
 }
 
@@ -85,12 +85,12 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
     let edge = r#"<Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData" Target="model/item.data"/>"#;
     for owned in [false, true] {
         let mut package = if owned {
-            OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap()
+            OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap()
         } else {
-            OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap()
+            OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap()
         };
         let before = package
-            .source_relationships(&owner, litchi_opc::SourceLimits::default())
+            .source_relationships(&owner, SourceLimits::default())
             .unwrap();
         let after = before
             .without_relationship("rId6", before.bytes().len())
@@ -104,23 +104,22 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
         );
         assert!(
             package
-                .try_replace_relationships(&before, &after, litchi_opc::SourceLimits::default())
+                .try_replace_relationships(&before, &after, SourceLimits::default())
                 .unwrap()
         );
         // This exercises the OPC primitive; complete model removal also owns
         // workbook definitions, connections, names, and vendor metadata.
         let output = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_vec(output, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened
-                .source_relationships(&owner, litchi_opc::SourceLimits::default())
+                .source_relationships(&owner, SourceLimits::default())
                 .unwrap(),
             after
         );
         assert!(
             reopened
-                .try_replace_relationships(&after, &before, litchi_opc::SourceLimits::default())
+                .try_replace_relationships(&after, &before, SourceLimits::default())
                 .unwrap()
         );
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
@@ -129,7 +128,7 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
             archive.read("xl/_rels/workbook.xml.rels").unwrap(),
             before.bytes()
         );
-        let original = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
+        let original = OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap();
         for part in original
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -168,8 +167,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
         writer.write_deflated(member, &bytes).unwrap();
     }
     let changed = writer.finish_to_bytes().unwrap();
-    let mut target =
-        OpcPackage::from_vec(changed.clone(), litchi_opc::SourceLimits::default()).unwrap();
+    let mut target = OpcPackage::from_vec(changed.clone(), SourceLimits::default()).unwrap();
     assert!(matches!(
         apply_patch(&patch, &mut target),
         Err(Error::PatchConflict { .. })
@@ -248,9 +246,9 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
         };
         for owned in [false, true] {
             let raw = if owned {
-                OpcPackage::from_vec(source.clone(), litchi_opc::SourceLimits::default()).unwrap()
+                OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap()
             } else {
-                OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap()
+                OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap()
             };
             let mut package = Package::from_opc(raw.clone()).unwrap();
             let mut edit = package.edit_data_model().unwrap();
@@ -334,8 +332,7 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
             "id=\"\" model=\"1\" autoDelete=\"true\"",
         )
     });
-    let original =
-        OpcPackage::from_vec(source.clone(), litchi_opc::SourceLimits::default()).unwrap();
+    let original = OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap();
     let workbook = PackURI::new("/xl/workbook.xml").unwrap();
     let connections_name = PackURI::new("/xl/connections.xml").unwrap();
     let original_connections = String::from_utf8(
@@ -357,7 +354,7 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
         &original_connections[removed_end..]
     );
     let before_relationships = original
-        .source_relationships(&workbook, litchi_opc::SourceLimits::default())
+        .source_relationships(&workbook, SourceLimits::default())
         .unwrap();
     let expected_relationships = before_relationships
         .without_relationship("rId6", before_relationships.bytes().len())
@@ -396,7 +393,7 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
     );
     assert_eq!(
         reopened
-            .source_relationships(&workbook, litchi_opc::SourceLimits::default())
+            .source_relationships(&workbook, SourceLimits::default())
             .unwrap()
             .bytes(),
         expected_relationships.bytes()
@@ -454,8 +451,7 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
                 "id=\"\" model=\"1\" autoDelete=\"true\"",
             )
         });
-        let original =
-            OpcPackage::from_vec(source.clone(), litchi_opc::SourceLimits::default()).unwrap();
+        let original = OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap();
         let mut package = Package::from_bytes(&source).unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
@@ -511,8 +507,7 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
 #[test]
 fn native_model_removal_refuses_query_pivot_and_cube_dependencies_atomically() {
     for consumer in 0..5 {
-        let mut raw =
-            OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
+        let mut raw = OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap();
         if consumer == 0 {
             let name = PackURI::new("/xl/queryTables/queryTable1.xml").unwrap();
             let source = String::from_utf8(raw.get_part(&name).unwrap().blob().to_vec()).unwrap();
@@ -559,8 +554,7 @@ fn native_model_removal_refuses_query_pivot_and_cube_dependencies_atomically() {
 
 #[test]
 fn native_removal_patch_rechecks_changed_dependent_parts_before_publication() {
-    let mut original =
-        OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
+    let mut original = OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap();
     let name = PackURI::new("/xl/pivotCache/pivotCacheDefinition1.xml").unwrap();
     original.try_add_part(Box::new(litchi_opc::BlobPart::new(name.clone(), "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml".into(), br#"<pivotCacheDefinition xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cacheSource type="external" connectionId="1"/></pivotCacheDefinition>"#.to_vec()))).unwrap();
     let package = Package::from_opc(original.clone()).unwrap();
@@ -735,7 +729,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
 fn native_workbook_relationship_compatibility_has_exact_owner_and_target() {
     const REL: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData";
-    let source = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap();
     let workbook = PackURI::new("/xl/workbook.xml").unwrap();
     let edge_id = source
         .get_part(&workbook)
@@ -807,7 +801,7 @@ fn repair_native_crc(bytes: &mut [u8], start: usize, end: usize) {
 #[test]
 fn native_profile_rejects_corrupt_boundaries_frames_and_log_bindings() {
     use litchi_xlsx::package::xldm;
-    let raw = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
+    let raw = OpcPackage::from_bytes(SOURCE, SourceLimits::default()).unwrap();
     let bytes = raw
         .get_part(&PackURI::new("/xl/model/item.data").unwrap())
         .unwrap()
@@ -896,8 +890,7 @@ fn native_removal_refuses_named_extension_and_attribute_formula_consumers() {
         ),
     ];
     for (name, kind, xml) in cases {
-        let mut raw =
-            OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
+        let mut raw = OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap();
         raw.try_add_part(Box::new(litchi_opc::BlobPart::new(
             PackURI::new(format!("/xl/{name}")).unwrap(),
             format!("application/vnd.openxmlformats-officedocument.spreadsheetml.{kind}+xml"),
@@ -981,9 +974,9 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
     let name = PackURI::new("/xl/connections.xml").unwrap();
     for borrowed in [false, true] {
         let original = if borrowed {
-            OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap()
+            OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap()
         } else {
-            OpcPackage::from_vec(source.clone(), litchi_opc::SourceLimits::default()).unwrap()
+            OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap()
         };
         let mut package = Package::from_opc(original.clone()).unwrap();
         let mut edit = package.edit_data_model().unwrap();
@@ -992,8 +985,7 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
         package = package_after;
         let mut output = Vec::new();
         package.write_to(&mut output).unwrap();
-        let mut reopened =
-            OpcPackage::from_vec(output, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
         assert!(reopened.get_part(&name).is_err());
         let workbook = PackURI::new("/xl/workbook.xml").unwrap();
         assert!(
@@ -1061,7 +1053,7 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
         } else {
             source.clone()
         };
-        let mut raw = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let mut raw = OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/connections.xml").unwrap();
         if case == 1 || case == 5 {
             raw.rels_mut().add_relationship(
@@ -1127,7 +1119,7 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
 #[test]
 fn connections_owner_removal_patch_rechecks_new_foreign_references() {
     let source = all_auto_delete_connections_source();
-    let original = OpcPackage::from_vec(source, litchi_opc::SourceLimits::default()).unwrap();
+    let original = OpcPackage::from_vec(source, SourceLimits::default()).unwrap();
     let package = Package::from_opc(original.clone()).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
@@ -1194,7 +1186,7 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
     let inverse = patch.inverse();
     let mut target = package.into_plain_opc();
     let manifest = target
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(SourceLimits::default())
         .unwrap();
     let name = PackURI::new("/xl/connections.cnx").unwrap();
     target
@@ -1206,7 +1198,7 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
         .unwrap();
     assert_eq!(
         target
-            .source_content_types(litchi_opc::SourceLimits::default())
+            .source_content_types(SourceLimits::default())
             .unwrap(),
         manifest
     );
@@ -1265,10 +1257,10 @@ fn connections_owner_inverse_rejects_new_incoming_edges_to_absent_uri() {
         assert!(target.get_part(&name).is_err());
         assert_eq!(
             target
-                .source_content_types(litchi_opc::SourceLimits::default())
+                .source_content_types(SourceLimits::default())
                 .unwrap(),
             removed
-                .source_content_types(litchi_opc::SourceLimits::default())
+                .source_content_types(SourceLimits::default())
                 .unwrap()
         );
         let before = target.clone();
@@ -1301,7 +1293,7 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
     package = package_after;
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
-    let mut reopened = OpcPackage::from_vec(output, litchi_opc::SourceLimits::default()).unwrap();
+    let mut reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
     assert!(
         reopened
             .get_part(&PackURI::new("/xl/connections.xml").unwrap())
@@ -1323,8 +1315,7 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
 #[test]
 fn native_model_rejects_case_equivalent_foreign_targets() {
     for from_root in [false, true] {
-        let mut raw =
-            OpcPackage::from_vec(SOURCE.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
+        let mut raw = OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap();
         if from_root {
             raw.rels_mut().add_relationship(
                 "urn:vendor".into(),
@@ -1360,7 +1351,7 @@ fn native_model_workbook_edge_resolves_case_equivalent_target() {
     let inverse = patch.inverse();
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
-    let mut reopened = OpcPackage::from_vec(output, litchi_opc::SourceLimits::default()).unwrap();
+    let mut reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
     apply_patch(&inverse, &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
     let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();

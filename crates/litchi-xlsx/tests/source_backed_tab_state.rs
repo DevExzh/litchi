@@ -259,7 +259,7 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -268,7 +268,7 @@ fn part_len(bytes: &[u8], member: &str) -> u64 {
 }
 
 fn padded_workbook_fixture(source: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let workbook = PackURI::new(MAIN).unwrap();
     let original = package.get_part(&workbook).unwrap().blob().to_vec();
     let closing = b"</workbook>";
@@ -339,8 +339,8 @@ fn visibility_operations_use_one_part_and_preserve_every_unrelated_member() {
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let before = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
-    let after = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let before = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
+    let after = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     for part in before
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -395,8 +395,7 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
         assert_eq!(commit.package().active_sheet_position(), Some(2));
         assert_eq!(editor.cache_diagnostics().successful_loads, opened + 2);
 
-        let mut replay =
-            OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+        let mut replay = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
         replay_patch(&mut replay, commit.patch()).unwrap();
         assert_eq!(
             litchi_xlsx::tab_state::Snapshot::load(&replay)
@@ -418,8 +417,7 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
         assert!(!one.contains("tabSelected=\"1\""));
         assert!(three.contains("tabSelected=\"1\""));
         replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
-        let original =
-            OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+        let original = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
         for name in [MAIN, ONE, THREE] {
             let uri = PackURI::new(name).unwrap();
             assert_eq!(
@@ -435,7 +433,7 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
             published.workbook_ref().active_sheet().unwrap().name(),
             "Three"
         );
-        let output = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+        let output = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         for name in [TWO, MEDIA] {
             let uri = PackURI::new(name).unwrap();
             assert_eq!(
@@ -543,8 +541,7 @@ fn source_snapshot_public_accessors_survive_owner_drop() {
 #[test]
 fn proof_backed_reopen_shares_deferred_defined_name_storage() {
     let source = fixture(Fixture {
-        workbook_prefix:
-            "<definedNames><definedName name=\"Rate\">One!$A$1</definedName></definedNames>",
+        workbook_prefix: "<definedNames><definedName name=\"Rate\">One!$A$1</definedName></definedNames>",
         ..Fixture::default()
     });
     let editor = open_editor(source);
@@ -795,7 +792,7 @@ fn protection_mce_dtd_pi_owner_and_sheet_kind_refusals_are_typed_or_closed() {
             workbook_prefix: "",
             ..Fixture::default()
         });
-        let package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+        let package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
         let workbook = package.get_part(&PackURI::new(MAIN).unwrap()).unwrap();
         let mut bytes = prefix.as_bytes().to_vec();
         bytes.extend_from_slice(workbook.blob());
@@ -828,7 +825,7 @@ fn protection_mce_dtd_pi_owner_and_sheet_kind_refusals_are_typed_or_closed() {
 
     for prefix in ["<!DOCTYPE worksheet>", "<?audit refuse?>"] {
         let source = fixture(Fixture::default());
-        let package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+        let package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
         let worksheet = package.get_part(&PackURI::new(ONE).unwrap()).unwrap();
         let mut bytes = prefix.as_bytes().to_vec();
         bytes.extend_from_slice(worksheet.blob());
@@ -905,7 +902,7 @@ fn relationship_source_version_limits_foreign_closure_and_partial_sink_are_check
         commit.package().to_bytes().unwrap()
     );
 
-    let mut foreign = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut foreign = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     foreign
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -922,8 +919,7 @@ fn relationship_source_version_limits_foreign_closure_and_partial_sink_are_check
         Err(Error::PatchConflict { .. })
     ));
 
-    let mut foreign_owner =
-        OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut foreign_owner = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let owner_id = foreign_owner
         .rels()
         .iter()
@@ -981,7 +977,7 @@ fn relationship_source_version_limits_foreign_closure_and_partial_sink_are_check
 #[test]
 fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused() {
     let source = fixture(Fixture::default());
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let rels = package
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -1001,7 +997,7 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
             .is_err()
     );
 
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let rels = package
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -1023,8 +1019,7 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
 
     let editor = open_editor(source.clone());
     let commit = active_commit(&editor, "Three");
-    let mut retargeted =
-        OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut retargeted = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let rels = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -1041,7 +1036,7 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
     assert!(replay_patch(&mut retargeted, commit.patch()).is_err());
 
     let mut touched_relationship =
-        OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+        OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     touched_relationship
         .get_part_mut(&PackURI::new(ONE).unwrap())
         .unwrap()
@@ -1061,11 +1056,8 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
 
 #[test]
 fn source_tab_edit_keeps_strict_catalog_recheck_after_open_repair() {
-    let mut package = OpcPackage::from_bytes(
-        &fixture(Fixture::default()),
-        litchi_opc::SourceLimits::default(),
-    )
-    .unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(Fixture::default()), SourceLimits::default()).unwrap();
     let workbook = package.get_part_mut(&PackURI::new(MAIN).unwrap()).unwrap();
     let mut workbook_xml = workbook.blob().to_vec();
     let replaced = workbook_xml
@@ -1105,7 +1097,7 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     assert!(edit.show("Two").unwrap());
     let commit = edit.commit().unwrap();
 
-    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert_eq!(PackageWriter::to_bytes(&replay).unwrap(), bytes);
@@ -1200,6 +1192,6 @@ fn replay_patch(
     let workbook =
         SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
     let next = workbook.apply_tab_state(patch)?.into_package().to_bytes()?;
-    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
     Ok(())
 }

@@ -529,8 +529,8 @@ fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
         checked_scalar(Checked::Unchecked),
     );
     let forward = replay_bytes(&source, changed.patch()).expect("apply forward patch");
-    let package = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())
-        .expect("forward OPC package");
+    let package =
+        OpcPackage::from_bytes(&forward, SourceLimits::default()).expect("forward OPC package");
     assert_eq!(
         package
             .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
@@ -540,8 +540,8 @@ fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
     );
     let inverse = changed.patch().inverse();
     let restored = replay_bytes(&forward, &inverse).expect("apply inverse patch");
-    let package = OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default())
-        .expect("restored OPC package");
+    let package =
+        OpcPackage::from_bytes(&restored, SourceLimits::default()).expect("restored OPC package");
     assert_eq!(
         package
             .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
@@ -975,9 +975,8 @@ fn source_patch_rejects_changed_incoming_readset_and_signed_mutation() {
             "<!-- incoming graph changed after candidate capture --></Relationships>",
         )
     });
-    let mut package =
-        OpcPackage::from_bytes(&incoming_changed, litchi_opc::SourceLimits::default())
-            .expect("incoming candidate package");
+    let mut package = OpcPackage::from_bytes(&incoming_changed, SourceLimits::default())
+        .expect("incoming candidate package");
     let serialized_before =
         PackageWriter::to_bytes(&package).expect("serialize incoming package snapshot");
     assert!(matches!(
@@ -1497,7 +1496,7 @@ fn paired_patch_rejects_each_stale_member_without_mutating_the_package() {
 
     for stale_member in [CONTROL_PROPERTIES_MEMBER, VML_MEMBER] {
         let stale = rewrite_member(&source, stale_member, |xml| format!("{xml} "));
-        let mut package = OpcPackage::from_bytes(&stale, litchi_opc::SourceLimits::default())
+        let mut package = OpcPackage::from_bytes(&stale, SourceLimits::default())
             .expect("open stale paired package");
         let before = PackageWriter::to_bytes(&package).expect("serialize stale package");
         assert!(
@@ -1536,9 +1535,8 @@ fn empty_patch_still_checks_the_complete_source_read_set() {
             "<!-- changed after no-op capture --></Relationships>",
         )
     });
-    let mut package =
-        OpcPackage::from_bytes(&changed_read_set, litchi_opc::SourceLimits::default())
-            .expect("open changed read set");
+    let mut package = OpcPackage::from_bytes(&changed_read_set, SourceLimits::default())
+        .expect("open changed read set");
     let before = PackageWriter::to_bytes(&package).expect("serialize changed read set");
     assert!(
         matches!(
@@ -1640,7 +1638,7 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
 
     let forward = replay_bytes(&source, commit.patch()).expect("apply forward pair");
     let restored = replay_bytes(&forward, &commit.patch().inverse()).expect("apply inverse pair");
-    let package = OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default())
+    let package = OpcPackage::from_bytes(&restored, SourceLimits::default())
         .expect("open restored OPC package");
     let restored_properties = package
         .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
@@ -2133,6 +2131,6 @@ fn replay_patch(
         .apply_form_controls(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
     Ok(())
 }

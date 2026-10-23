@@ -189,7 +189,7 @@ fn svg_transition_fixture() -> Vec<u8> {
         r#"<p:sld xmlns:p="{PML}" xmlns:a="{DRAWINGML}" xmlns:r="{REL}" xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main"><p:cSld><p:spTree><p:nvGrpSpPr/><p:grpSpPr/><p:pic><p:nvPicPr><p:cNvPr id="42" name="SVG Photo"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdRaster"><a:extLst><a:ext uri="{SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext></a:extLst></a:blip><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm><a:off x="1" y="2"/><a:ext cx="3" cy="4"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic></p:spTree></p:cSld><p:clrMapOvr/>{morph}</p:sld>"#
     );
     let source = fixture("", slide, false);
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/ppt/media/raster.png").unwrap(),
@@ -348,7 +348,7 @@ fn multi_fixture_with_lexical_order_trivia() -> Vec<u8> {
 }
 
 fn with_presentation_xml(source: &[u8], presentation_xml: String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     let main = PackURI::new(MAIN).unwrap();
     package
         .get_part_mut(&main)
@@ -363,7 +363,7 @@ fn multi_fixture_with_presentation_suffix(
     suffix: &str,
 ) -> Vec<u8> {
     let source = multi_fixture(slide_count, signed);
-    let package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let main = PackURI::new(MAIN).unwrap();
     let presentation = String::from_utf8(package.get_part(&main).unwrap().blob().to_vec()).unwrap();
     let presentation = presentation.replacen(
@@ -376,7 +376,7 @@ fn multi_fixture_with_presentation_suffix(
 
 fn multi_fixture_with_ignorable_root(slide_count: usize) -> Vec<u8> {
     let source = multi_fixture(slide_count, false);
-    let package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let main = PackURI::new(MAIN).unwrap();
     let presentation = String::from_utf8(package.get_part(&main).unwrap().blob().to_vec()).unwrap();
     let start = format!(r#"<p:presentation xmlns:p="{PML}" xmlns:r="{REL}""#);
@@ -389,7 +389,7 @@ fn multi_fixture_with_ignorable_root(slide_count: usize) -> Vec<u8> {
 
 fn multi_fixture_with_metadata(view_xml: Option<&str>, presentation_xml: Option<&str>) -> Vec<u8> {
     let source = multi_fixture(3, false);
-    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
     let main = PackURI::new(MAIN).unwrap();
     if let Some(xml) = view_xml {
         let uri = PackURI::new("/ppt/viewProps.xml").unwrap();
@@ -579,9 +579,8 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
         .publish_slide_commit_to_stream(&mut output, &commit)
         .unwrap();
 
-    let source =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -669,9 +668,8 @@ fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
     assert!(commit.patch().inverse().apply(&published).is_ok());
     assert!(commit.patch().apply(&published).is_err());
 
-    let source =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -881,8 +879,8 @@ fn atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part() {
     assert_eq!(reverse_materializations, 2);
     assert_eq!(first, second);
 
-    let before = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
-    let after = OpcPackage::from_bytes(&first, litchi_opc::SourceLimits::default()).unwrap();
+    let before = OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap();
+    let after = OpcPackage::from_bytes(&first, SourceLimits::default()).unwrap();
     for part in before
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1171,7 +1169,7 @@ fn direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay() {
             );
         }
     }
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let changed_slide = package.get_part(&PackURI::new(SLIDE).unwrap()).unwrap();
     let changed_xml = std::str::from_utf8(changed_slide.blob()).unwrap();
     let fragment = crate::transition::write(&requested).unwrap();
@@ -1249,7 +1247,7 @@ fn direct_transition_supports_strict_and_noncanonical_prefixes() {
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let xml = std::str::from_utf8(
         package
             .get_part(&PackURI::new(SLIDE).unwrap())
@@ -1293,8 +1291,7 @@ fn source_backed_transition_alias_and_default_namespaces_are_rewritten_qname_saf
     alias_editor
         .publish_slide_commit_to_stream(&mut alias_output, &alias_commit)
         .unwrap();
-    let alias_package =
-        OpcPackage::from_bytes(&alias_output, litchi_opc::SourceLimits::default()).unwrap();
+    let alias_package = OpcPackage::from_bytes(&alias_output, SourceLimits::default()).unwrap();
     let alias_xml = std::str::from_utf8(
         alias_package
             .get_part(&PackURI::new(SLIDE).unwrap())
@@ -1327,8 +1324,7 @@ fn source_backed_transition_alias_and_default_namespaces_are_rewritten_qname_saf
     default_editor
         .publish_slide_commit_to_stream(&mut default_output, &default_commit)
         .unwrap();
-    let default_package =
-        OpcPackage::from_bytes(&default_output, litchi_opc::SourceLimits::default()).unwrap();
+    let default_package = OpcPackage::from_bytes(&default_output, SourceLimits::default()).unwrap();
     let default_xml = std::str::from_utf8(
         default_package
             .get_part(&PackURI::new(SLIDE).unwrap())
@@ -1376,9 +1372,8 @@ fn source_backed_extension_transition_edit_reopens_and_preserves_opaque_package_
         .publish_slide_commit_to_stream(&mut output, &commit)
         .unwrap();
 
-    let source =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -1518,7 +1513,7 @@ fn transition_choice_edit_resolves_ancestor_namespaces_and_keeps_inactive_bindin
     editor
         .publish_slide_commit_to_stream(&mut output, &edit.commit())
         .unwrap();
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let xml = package
         .get_part(&PackURI::new(SLIDE).unwrap())
         .unwrap()
@@ -1642,10 +1637,8 @@ fn source_backed_transition_edit_preserves_svg_resource_inventory_and_inactive_m
         .publish_slide_commit_to_stream(&mut output, &commit)
         .unwrap();
 
-    let source_package =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let output_package =
-        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source_package = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let output_package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let source_slide_part = source_package
         .get_part(&PackURI::new(SLIDE).unwrap())
         .unwrap();
@@ -1997,7 +1990,7 @@ fn source_slide_order_composes_current_positions_and_preserves_lazy_payloads() {
 #[test]
 fn source_slide_order_manages_candidate_memory_before_rewrite_and_releases_it() {
     let source = multi_fixture(3, false);
-    let root = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default())
+    let root = OpcPackage::from_bytes(&source, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -2029,7 +2022,7 @@ fn source_slide_order_manages_candidate_memory_before_rewrite_and_releases_it() 
 #[test]
 fn source_slide_order_retains_candidate_charge_through_patch_clones() {
     let source = multi_fixture(3, false);
-    let root = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default())
+    let root = OpcPackage::from_bytes(&source, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -2355,7 +2348,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         .publish_slide_order_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(slide_ids(&output), vec![257, 258, 256]);
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let root = std::str::from_utf8(
         package
             .get_part(&PackURI::new(MAIN).unwrap())

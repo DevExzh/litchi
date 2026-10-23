@@ -1588,11 +1588,7 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(
-            &writer.finish_to_bytes().unwrap(),
-            litchi_opc::SourceLimits::default(),
-        )
-        .unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     fn model() -> Model {
@@ -1761,12 +1757,11 @@ mod tests {
         assert!(xml.contains(r#"xmlns:q="urn:source""#));
         assert!(xml.contains(r#"xmlns="""#));
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&reopened).unwrap().same_source(&after));
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -1827,15 +1822,14 @@ mod tests {
         let commit = transaction.commit().unwrap();
         let patch = commit.patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&workbook).unwrap().blob(),
             xml.replace("= '7'", "= '8'").as_bytes()
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&workbook).unwrap().blob(), xml.as_bytes());
     }
@@ -2161,8 +2155,7 @@ mod tests {
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
         assert_eq!(after, before);
-        let mut reopened =
-            OpcPackage::from_bytes(&after, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&after, SourceLimits::default()).unwrap();
         assert_eq!(
             load_model(&reopened, &workbook)
                 .unwrap()
@@ -2214,8 +2207,7 @@ mod tests {
         );
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_bytes(&after, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_bytes(&after, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         assert_eq!(
             litchi_opc::PackageWriter::to_bytes(&reopened).unwrap(),
@@ -2682,7 +2674,7 @@ mod tests {
         .unwrap();
         let commit = edit.commit().unwrap();
         let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
+        let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
         assert!(
             Snapshot::load(&reopened)
                 .unwrap()
@@ -2698,7 +2690,7 @@ mod tests {
         commit.patch().inverse().apply(&mut package).unwrap();
         let restored = OpcPackage::from_bytes(
             &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
         assert_eq!(
@@ -2735,8 +2727,7 @@ mod tests {
             .unwrap();
             let commit = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened =
-                OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
+            let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2755,7 +2746,7 @@ mod tests {
             commit.patch().inverse().apply(&mut package).unwrap();
             let restored = OpcPackage::from_bytes(
                 &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
-                litchi_opc::SourceLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap();
             assert_eq!(
@@ -2792,8 +2783,7 @@ mod tests {
             edit.set(value).unwrap();
             let inserted = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened =
-                OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
+            let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2806,7 +2796,7 @@ mod tests {
             inserted.patch().inverse().apply(&mut package).unwrap();
             let restored = OpcPackage::from_bytes(
                 &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
-                litchi_opc::SourceLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap();
             assert!(Snapshot::load(&restored).unwrap().same_source(&before));
@@ -2816,14 +2806,14 @@ mod tests {
             let removed = remove.commit().unwrap();
             let reopened = OpcPackage::from_bytes(
                 &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
-                litchi_opc::SourceLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap();
             assert!(Snapshot::load(&reopened).unwrap().is_empty());
             removed.patch().inverse().apply(&mut package).unwrap();
             let restored = OpcPackage::from_bytes(
                 &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
-                litchi_opc::SourceLimits::default(),
+                SourceLimits::default(),
             )
             .unwrap();
             assert!(

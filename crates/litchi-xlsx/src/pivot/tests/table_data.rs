@@ -585,7 +585,7 @@ impl Fixture {
     }
 
     fn package(&self) -> OpcPackage {
-        OpcPackage::from_bytes(&self.bytes, litchi_opc::SourceLimits::default()).unwrap()
+        OpcPackage::from_bytes(&self.bytes, SourceLimits::default()).unwrap()
     }
 }
 
@@ -599,12 +599,12 @@ fn table_blob(package: &OpcPackage) -> Vec<u8> {
 
 fn workbook_table_blob(workbook: &crate::Package) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
-    table_blob(&OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap())
+    table_blob(&OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap())
 }
 
 fn workbook_blob(workbook: &crate::Package) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
-    OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+    OpcPackage::from_bytes(&bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(WORKBOOK_URI).unwrap())
         .unwrap()
@@ -614,7 +614,7 @@ fn workbook_blob(workbook: &crate::Package) -> Vec<u8> {
 
 fn workbook_member_blob(workbook: &crate::Package, uri: &str) -> Vec<u8> {
     let bytes = workbook.to_bytes().unwrap();
-    OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+    OpcPackage::from_bytes(&bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(uri).unwrap())
         .unwrap()
@@ -1244,11 +1244,8 @@ fn external_cache_without_f057_or_connection_id_ignores_unrelated_connections() 
     let committed = edit.commit().unwrap();
     let patch = committed.patch().clone();
 
-    let mut candidate_package = OpcPackage::from_bytes(
-        &source.to_bytes().unwrap(),
-        litchi_opc::SourceLimits::default(),
-    )
-    .unwrap();
+    let mut candidate_package =
+        OpcPackage::from_bytes(&source.to_bytes().unwrap(), SourceLimits::default()).unwrap();
     let candidate_connections = String::from_utf8(
         candidate_package
             .get_part(&PackURI::new(CONNECTIONS_URI).unwrap())
@@ -1411,7 +1408,7 @@ fn c444_value_cdata_is_readable_source_preserving_and_scalar_editable() {
         table_blob(
             &OpcPackage::from_bytes(
                 &noop_commit.package().to_bytes().unwrap(),
-                litchi_opc::SourceLimits::default()
+                SourceLimits::default()
             )
             .unwrap()
         ),
@@ -2085,7 +2082,7 @@ fn workbook_patch_apply_binds_to_reopened_source_and_inverse() {
     let patch = committed.patch().clone();
 
     let mut candidate_package =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     candidate_package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/opaque.bin").unwrap(),
@@ -2853,7 +2850,7 @@ fn invalid_extra_edit_is_atomic_on_low_level_and_workbook_transactions() {
 fn low_level_package_ingress_refuses_an_encrypted_pivot_table_entry() {
     let fixture = Fixture::build(FixtureOptions::default());
     let encrypted = mark_zip_entry_encrypted(fixture.bytes, "xl/pivotTables/pivotTable1.xml");
-    let result = OpcPackage::from_bytes(&encrypted, litchi_opc::SourceLimits::default());
+    let result = OpcPackage::from_bytes(&encrypted, SourceLimits::default());
     assert!(
         matches!(result, Err(litchi_opc::OpcError::ZipError(_))),
         "encrypted pivotTable Part was admitted by low-level OPC ingress"
