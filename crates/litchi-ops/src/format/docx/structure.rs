@@ -78,14 +78,6 @@ impl Docx {
         self.owner().finish(result)
     }
 
-    pub(crate) fn add_command<'p, 'n>(
-        &self,
-        parent: PathArg<'p>,
-        node: NewNode<'n>,
-    ) -> Result<(Commit, Path<'static>)> {
-        self.add_command_with_limits(parent, node, &SemanticLimits::default())
-    }
-
     pub(crate) fn add_command_with_limits<'p, 'n>(
         &self,
         parent: PathArg<'p>,

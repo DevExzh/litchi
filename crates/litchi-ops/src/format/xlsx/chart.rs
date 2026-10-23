@@ -1126,7 +1126,10 @@ impl Xlsx {
             .checked_mul(size_of::<f64>())
             .ok_or_else(|| staged_limit(usize::MAX, staged.maximum))?;
         staged.ensure(minimum_values, "dataRange")?;
-        let cell = |row: u32, column: u32| -> Result<(Option<String>, Option<f64>)> {
+        let cell = |row: u32,
+                    column: u32,
+                    staged: &StageLedger|
+         -> Result<(Option<String>, Option<f64>)> {
             let address = xlsx::Address::at(row, column)
                 .map_err(|_| invalid("dataRange is outside the worksheet"))?;
             Ok(match worksheet.cell(address)?.stored() {
@@ -1151,7 +1154,7 @@ impl Xlsx {
         let mut categories = Vec::new();
         if props.categories.is_none() {
             for row in first_row + 1..=last_row {
-                let (label, value) = cell(row, first_column)?;
+                let (label, value) = cell(row, first_column, staged)?;
                 let value = label
                     .or_else(|| value.map(|value| value.to_string()))
                     .unwrap_or_default();
@@ -1161,7 +1164,7 @@ impl Xlsx {
         }
         let mut series = Vec::new();
         for column in first_column + 1..=last_column {
-            let (header, value) = cell(first_row, column)?;
+            let (header, value) = cell(first_row, column, staged)?;
             let name = header
                 .or_else(|| value.map(|value| value.to_string()))
                 .unwrap_or_else(|| format!("Series {}", column - first_column));

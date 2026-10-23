@@ -301,7 +301,6 @@ fn commit(
                 limits.max_snapshot_bytes(),
             ));
         }
-        remaining_snapshot -= retained;
         retained_snapshot = retained_snapshot
             .checked_add(retained)
             .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;

@@ -200,26 +200,6 @@ impl Xlsb {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Return the exact retained archive length when the owner exposes one.
-    /// This O(1) lower bound is checked before a native editor is
-    /// materialized; the native patch and semantic payload remain the hard
-    /// post-commit snapshot charge.
-    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
-        match &self.0.owner {
-            XlsbOwner::Source(workbook) => Ok(Some(
-                usize::try_from(
-                    workbook
-                        .workbook()
-                        .source_backed_package()
-                        .source_artifact()
-                        .len(),
-                )
-                .unwrap_or(usize::MAX),
-            )),
-            XlsbOwner::Eager(package) => Ok(package.opc_package().exact_source_len()),
-        }
-    }
-
     /// Adopt a validated native package without serializing and reopening it.
     /// The unified handle retains the source policy, metadata sidecar, origin,
     /// and signature transition of the input. A removal-authorized edit has

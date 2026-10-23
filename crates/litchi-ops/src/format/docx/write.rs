@@ -156,12 +156,7 @@ pub(super) enum WorkEdit {
 }
 
 impl Docx {
-    /// Apply ordered properties to one path or every match of a scoped query.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed target, registry, leaf, protection or source-freshness
-    /// error.  A failed operation never publishes a partial edit.
+    #[cfg(test)]
     pub(crate) fn set<'p, 'v>(
         &self,
         target: &TargetArg<'p>,
@@ -271,14 +266,6 @@ impl Docx {
             editor.apply_with_policy(&target, assignment, false)?;
         }
         editor.commit_file(self)
-    }
-
-    pub(crate) fn set_command<'p, 'v>(
-        &self,
-        target: &TargetArg<'p>,
-        props: impl IntoProps<'v>,
-    ) -> Result<Commit> {
-        self.set_command_with_limits(target, props, &SemanticLimits::default())
     }
 
     pub(crate) fn set_command_with_limits<'p, 'v>(

@@ -6,6 +6,7 @@
 //! for the complete operation.
 
 use std::collections::HashSet;
+use std::mem::size_of;
 
 use litchi_core::{FileFormat, Position};
 use litchi_xls::cell_values::{Reference, Selector, Value as NativeValue};
@@ -1347,7 +1348,7 @@ pub(crate) mod coalesce {
                     };
                     (original_target, original)
                 } else {
-                    (target, signed.then(|| current.clone()))
+                    (target, signed.then(|| current.clone()).flatten())
                 };
                 // Formula cells are deliberately left to the ordinary setter,
                 // which reports the dependency-aware unsupported capability.
@@ -1450,7 +1451,7 @@ pub(crate) mod coalesce {
                     };
                     (original_target, original)
                 } else {
-                    (target, signed.then(|| current.clone()))
+                    (target, signed.then(|| current.clone()).flatten())
                 };
                 if target.formula {
                     return Ok(None);

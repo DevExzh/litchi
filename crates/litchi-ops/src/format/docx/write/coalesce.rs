@@ -14,6 +14,7 @@ use super::{
     admit_assignments, admit_targets,
 };
 use crate::registry::Operation;
+#[cfg(test)]
 use crate::transaction::SemanticLimits;
 use crate::{Code, Error, Props, Result, TargetArg};
 
@@ -153,6 +154,7 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
 }
 
 impl Run {
+    #[cfg(test)]
     pub(crate) fn new(base: &Docx) -> Result<Self> {
         Self::new_with_snapshot_budget(base, SemanticLimits::default().max_snapshot_bytes())
     }
@@ -312,6 +314,7 @@ impl Run {
     }
 }
 
+#[cfg(test)]
 fn replay(base: &Docx, items: &[Item]) -> Result<Commit> {
     replay_with_snapshot_budget(base, items, SemanticLimits::default().max_snapshot_bytes())
 }

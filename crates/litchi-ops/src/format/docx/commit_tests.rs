@@ -505,8 +505,8 @@ fn find_main_story_admits_the_snapshot_budget_before_rewrite() {
     let source_bytes = xml(&original).len();
     let replacement = "X".repeat(source_bytes);
     let props = crate::Props::from_props([
-        (Key::from("find"), "FIRST_PRIVATE".into()),
-        (Key::from("replace"), replacement.as_str().into()),
+        (Key::from("find"), String::from("FIRST_PRIVATE")),
+        (Key::from("replace"), replacement.clone()),
     ])
     .unwrap();
     let spec = crate::find::Spec::admit(&props).unwrap();

@@ -163,17 +163,6 @@ impl TargetClass {
 /// covers only the resolved structural target list.
 const STRUCTURAL_TARGET_BYTES: usize = size_of::<usize>();
 
-/// Admit one PPT shape or slide property call and publish it through the
-/// native immutable package owner.
-pub(crate) fn set_with_limits<'p, 'v>(
-    file: &Ppt,
-    target: TargetArg<'p>,
-    props: impl IntoProps<'v>,
-    limits: &SemanticLimits,
-) -> Result<WriteCommit> {
-    set_with_snapshot_budget(file, target, props, limits, limits.max_snapshot_bytes())
-}
-
 /// Set one PPT target with the snapshot budget left by an outer transaction.
 /// The budget is threaded to the native editor preflight so a previous leaf
 /// cannot consume the full per-transaction limit before this editor captures
@@ -1295,7 +1284,7 @@ where
 fn stage_plans(
     file: &Ppt,
     plans: Vec<Plan>,
-    limits: &SemanticLimits,
+    _limits: &SemanticLimits,
     snapshot_budget: usize,
 ) -> Result<litchi_ppt::Commit> {
     let operations = plans

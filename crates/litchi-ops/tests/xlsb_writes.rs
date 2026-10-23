@@ -6,8 +6,8 @@ use std::io::Cursor;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{
-    BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, Overwrite, Props, SaveOptions,
-    SaveTo, SourceMode, props,
+    BatchItem, BatchMode, Code, EditOptions, File, ItemResult, OpenOptions, Overwrite, Props,
+    SaveOptions, SaveTo, SourceMode, props,
 };
 
 const FIRST: &str = "/sheet[1]";
@@ -620,7 +620,7 @@ fn transaction_operation_and_snapshot_limits_leave_xlsb_input_unchanged() {
             .expect("operation profile");
         let operation_error = original
             .edit_with_options(
-                litchi_ops::EditOptions::new().semantic_limits(operation_limits),
+                EditOptions::new().semantic_limits(operation_limits),
                 |edit| {
                     edit.set(FIRST, props! { "name" => "Input" })?;
                     edit.set(SECOND, props! { "name" => "Archive 2026" })
@@ -637,7 +637,7 @@ fn transaction_operation_and_snapshot_limits_leave_xlsb_input_unchanged() {
             .expect("snapshot profile");
         let snapshot_error = original
             .edit_with_options(
-                litchi_ops::EditOptions::new().semantic_limits(snapshot_limits),
+                EditOptions::new().semantic_limits(snapshot_limits),
                 |edit| edit.set(FIRST, props! { "name" => "Input" }),
             )
             .expect_err("worksheet patch exceeds snapshot limit");

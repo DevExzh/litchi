@@ -3,6 +3,7 @@
 
 use litchi_core::{FileFormat, Metadata};
 use litchi_xls::Package;
+use std::mem::size_of;
 
 use super::Xls;
 use super::write::{StepPatch, WriteCommit};
@@ -43,7 +44,7 @@ impl Xls {
         }
         self.preflight_snapshot_bytes(
             limits.max_snapshot_bytes(),
-            std::mem::size_of::<litchi_xls::package::metadata::Edit>(),
+            size_of::<litchi_xls::package::metadata::Edit>(),
         )?;
         let package =
             self.editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
@@ -65,8 +66,8 @@ impl Xls {
                 let minimum = self
                     .retained_source_len()
                     .saturating_mul(2)
-                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
-                    .saturating_add(std::mem::size_of::<litchi_xls::package::metadata::Edit>());
+                    .saturating_add(size_of::<litchi_xls::Patch>())
+                    .saturating_add(size_of::<litchi_xls::package::metadata::Edit>());
                 if minimum > limits.max_snapshot_bytes() {
                     return Err(TransactionError::Limit {
                         kind: LimitKind::SnapshotBytes,

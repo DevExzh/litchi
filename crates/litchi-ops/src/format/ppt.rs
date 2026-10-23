@@ -558,7 +558,7 @@ impl Ppt {
         match &self.0.owner {
             PptOwner::Source(package) | PptOwner::Eager(package) => Ok(package.clone()),
             PptOwner::Released => Err(crate::Error::new(
-                crate::Code::UnsupportedCapability,
+                Code::UnsupportedCapability,
                 "the PPT source was released before signed no-op replay",
             )
             .with_format(FileFormat::Ppt)

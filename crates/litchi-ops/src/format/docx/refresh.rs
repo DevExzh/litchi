@@ -36,9 +36,9 @@ fn refresh_inner(
     options: &Options,
     limits: &SemanticLimits,
 ) -> Result<(Option<Commit>, Summary)> {
-    let options = litchi_docx::document::EditOptions::default()
+    let edit_options = litchi_docx::document::EditOptions::default()
         .max_snapshot_bytes(limits.max_snapshot_bytes());
-    let editor = super::merge::owning_editor(file, options)?;
+    let editor = super::merge::owning_editor(file, edit_options)?;
     let levels = match &editor {
         DocxEditor::Unsigned(package) => style_levels(package)?,
         _ => match file.owner() {

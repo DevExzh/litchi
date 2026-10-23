@@ -26,6 +26,7 @@ use litchi_core::FileFormat;
 use litchi_core::metadata::{Metadata, Timestamp};
 use litchi_ooxml_common::custom;
 use litchi_ooxml_common::properties;
+#[cfg(test)]
 use std::mem::size_of;
 
 use crate::error::{Code, Error, Result};
@@ -240,6 +241,7 @@ impl Assignments {
     /// This is used before the leaf metadata editor materializes its before /
     /// after property scope; it includes names, authored text and the
     /// structural descriptors retained by the patch.
+    #[cfg(test)]
     pub(crate) fn retained_bytes(&self) -> usize {
         let fields =
             self.fields

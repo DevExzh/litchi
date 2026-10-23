@@ -23,6 +23,7 @@ use sf::edit::{
     Picture as PictureSpec, Shape as ShapeSpec, ShapeGeometry, Style as StyleSpec,
     Threshold as Cfvo, Validation as ValidationSpec,
 };
+use std::mem::size_of;
 
 use super::features::{
     self, AutofilterKey, BreakKey, CfKey, CommentKey, Data, Feature, HyperlinkKey, PictureKey,
@@ -107,8 +108,8 @@ impl Xls {
                 let minimum = self
                     .retained_source_len()
                     .saturating_mul(2)
-                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
-                    .saturating_add(std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>());
+                    .saturating_add(size_of::<litchi_xls::Patch>())
+                    .saturating_add(size_of::<litchi_xls::sheet_features::edit::Edit>());
                 if minimum > limits.max_snapshot_bytes() {
                     return Err(error(
                         Code::LimitExceeded,
@@ -162,7 +163,7 @@ impl Xls {
     fn feature_edit(&self, maximum: usize) -> Result<sf::edit::Edit> {
         self.preflight_snapshot_bytes(
             maximum,
-            std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>(),
+            size_of::<litchi_xls::sheet_features::edit::Edit>(),
         )?;
         self.editable_package_for_write_with_snapshot_limit(maximum)?
             .edit_sheet_features()
