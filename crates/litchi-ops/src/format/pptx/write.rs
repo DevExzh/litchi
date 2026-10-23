@@ -65,8 +65,19 @@ impl Commit {
 
     /// Return the already-accounted snapshot charge. The native proof walk is
     /// cached per commit so signed and unsigned writes pay it at most once.
-    pub(crate) const fn snapshot_bytes(&self) -> usize {
-        self.snapshot_bytes
+    pub(crate) fn snapshot_bytes(&self) -> usize {
+        // Older native families initialize this field to zero while they
+        // construct the proof.  The proof is the authoritative retained
+        // charge, so expose its cached measurement to the transaction
+        // wrapper as well as to the setters that call
+        // `measure_snapshot_bytes` directly.  This keeps structural,
+        // ordering, comments, media, and other native routes from bypassing
+        // the facade snapshot budget merely because they do not have a
+        // format-specific preflight hook.
+        let measured = *self
+            .retained_cache
+            .get_or_init(|| self.proof.retained_bytes());
+        self.snapshot_bytes.max(measured)
     }
 
     /// Measure the native proof for a hard snapshot check, caching the result
