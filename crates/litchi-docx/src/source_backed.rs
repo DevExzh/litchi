@@ -1987,7 +1987,9 @@ impl Package {
                 .main_document_part()
                 .map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
-            if let Some(options) = edit_options {
+            if let Some(options) = edit_options
+                && options.max_snapshot_bytes_value().is_some()
+            {
                 options
                     .admit_source_bytes(main.declared_uncompressed_size().map_err(Error::from)?)?;
             }
