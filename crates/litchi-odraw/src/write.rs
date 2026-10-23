@@ -67,11 +67,7 @@ use zerocopy::{
 };
 use zerocopy_derive::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-use crate::{
-    Limits, Record, RecordKind,
-    prop::Id,
-    shape::{Flags, Native},
-};
+use crate::{Limits, Record, RecordKind, prop::Id, shape::Flags};
 
 /// Property flag indicating that a simple value is a BLIP-store identifier.
 pub const BLIP_ID: u16 = 0x4000;
