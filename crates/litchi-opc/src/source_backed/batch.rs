@@ -1282,7 +1282,7 @@ fn batch_refusal(reason: &'static str) -> OpcError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SourceLimits;
+    use crate::{SourceCacheLimits, SourceLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
     fn archive_bytes() -> Vec<u8> {

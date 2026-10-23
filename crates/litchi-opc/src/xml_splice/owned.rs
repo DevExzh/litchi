@@ -406,6 +406,7 @@ impl OwnedXmlPart {
         })
     }
 
+    #[cfg(test)]
     pub(crate) fn capture(
         name: PackURI,
         content_type: String,

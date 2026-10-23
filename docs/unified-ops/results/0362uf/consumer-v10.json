@@ -1,0 +1,28 @@
+{
+  "source": "2b42e80421f0db6d1f5058871868bc100e234794",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 101,
+      "seconds": 33.89951954499975,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v10/check-0.log",
+      "bytes": 4523,
+      "sha256": "76b88754b2de876820f4bc93307aaab6e4b031b6ecff30bdfbb336b8400ec0a9",
+      "target_bytes_before": 18305348933,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "scope": "Focused OPC/ZIP check failed; workspace and harness groups not reached."
+}

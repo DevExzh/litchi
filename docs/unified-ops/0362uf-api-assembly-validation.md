@@ -127,3 +127,15 @@ Record 0362uk preserves the repair: a narrow private preflight method keeps
 the retained XML private and enforces the same limits; tests use the canonical
 imports without changing their assertions. The next attempt starts with a
 focused OPC/ZIP all-target check before the complete consumer checks.
+
+## Focused OPC/ZIP follow-up
+
+The tenth attempt on `2b42e80421` stopped in the focused OPC/ZIP group with
+exit 101 after 33.90 seconds. A private default-policy XML capture convenience
+is now used only by tests, so it is compiled only for tests. The remaining
+errors are one missing cache-policy test import and four redundant test
+qualifications. Their correction preserves the required-policy production
+path and all assertions.
+
+[consumer-v10.json](results/0362uf/consumer-v10.json) records the source and
+log hash. Workspace and harness checks were not reached.

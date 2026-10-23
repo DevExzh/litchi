@@ -1829,7 +1829,7 @@ mod tests {
                 .unwrap();
         }
         let expected = legacy.to_xml().into_bytes();
-        let exact = crate::SourceLimits::builder()
+        let exact = SourceLimits::builder()
             .max_content_types_bytes(expected.len())
             .unwrap()
             .max_content_type_mappings(5)
@@ -1840,7 +1840,7 @@ mod tests {
             authored_content_types_xml_with_limits(&package, exact).unwrap(),
             expected
         );
-        let too_small = crate::SourceLimits::builder()
+        let too_small = SourceLimits::builder()
             .max_content_types_bytes(expected.len() - 1)
             .unwrap()
             .build()
@@ -1852,7 +1852,7 @@ mod tests {
                 ..
             })
         ));
-        let too_few = crate::SourceLimits::builder()
+        let too_few = SourceLimits::builder()
             .max_content_type_mappings(4)
             .unwrap()
             .build()
@@ -1876,7 +1876,7 @@ mod tests {
                 Vec::new(),
             )))
             .unwrap();
-        let limits = crate::SourceLimits::builder()
+        let limits = SourceLimits::builder()
             .max_content_types_bytes(1024)
             .unwrap()
             .build()
