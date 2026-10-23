@@ -4534,41 +4534,64 @@ fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
 /// projection, and draft are still deferred to [`Edit::ensure_draft`].
 fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
     let xml = presentation.content_xml();
-    let mut offset = 0;
-    while let Some(relative) = xml.get(offset..).and_then(|rest| rest.find("<?")) {
-        let start = offset.saturating_add(relative);
-        if !xml
-            .get(start..)
-            .is_some_and(|instruction| instruction.starts_with("<?xml"))
-        {
-            return invalid("ODP editing refuses active processing instructions");
-        }
-        offset = start.saturating_add(2);
-    }
+    let scan_processing_instructions = xml_contains_possible_processing_instruction(xml);
 
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
+    let mut root_checked = false;
     loop {
         let event = reader
             .read_event()
             .map_err(|error| invalid_error(format!("invalid ODP content.xml: {error}")))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let (resolved, local) = reader.resolver().resolve_element(element.name());
-                let expected = matches!(resolved, ResolveResult::Bound(Namespace(uri))
-                    if uri == OFFICE_NAMESPACE
-                        && local.as_ref() == b"document-content");
-                if !expected {
-                    return invalid("ODP editing requires an office:document-content root");
+                if !root_checked {
+                    let (resolved, local) = reader.resolver().resolve_element(element.name());
+                    let expected = matches!(resolved, ResolveResult::Bound(Namespace(uri))
+                        if uri == OFFICE_NAMESPACE
+                            && local.as_ref() == b"document-content");
+                    if !expected {
+                        return invalid("ODP editing requires an office:document-content root");
+                    }
+                    root_checked = true;
+                    if !scan_processing_instructions {
+                        return Ok(());
+                    }
                 }
-                return Ok(());
             },
-            Event::Eof => return invalid("ODP editing requires an office:document-content root"),
-            Event::PI(_) => return invalid("ODP editing refuses active processing instructions"),
+            Event::Eof => {
+                return if root_checked {
+                    Ok(())
+                } else {
+                    invalid("ODP editing requires an office:document-content root")
+                };
+            },
+            Event::PI(_) if scan_processing_instructions => {
+                return invalid("ODP editing refuses active processing instructions");
+            },
             _ => {},
         }
     }
+}
+
+fn xml_contains_possible_processing_instruction(xml: &str) -> bool {
+    let Some(first) = xml.find("<?") else {
+        return false;
+    };
+    let after_target = xml.get(first.saturating_add(5)..);
+    let first_is_declaration = xml
+        .get(first..)
+        .is_some_and(|instruction| instruction.starts_with("<?xml"))
+        && after_target.is_some_and(|rest| {
+            rest.as_bytes()
+                .first()
+                .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'?'))
+        });
+    !first_is_declaration
+        || xml
+            .get(first.saturating_add(2)..)
+            .is_some_and(|rest| rest.contains("<?"))
 }
 
 fn package_security_policy(package: &OwnedPackage) -> CoreResult<SecurityPolicy> {
