@@ -128,19 +128,8 @@ impl From<litchi_ole_common::Error> for Error {
 /// A metadata transaction result.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// What a metadata commit did.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the committed package differs from its source.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
+/// Content-free diagnostics of one metadata commit.
+pub use litchi_core::edit::Diagnostics;
 
 /// An exact-source, reversible metadata patch.
 #[derive(Clone, PartialEq, Eq)]
@@ -188,55 +177,9 @@ impl Patch {
     }
 }
 
-/// A published metadata transaction.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Commit {
-    /// The published package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// The reversible patch from the source package.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit did.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit into its package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
+/// A published metadata transaction: the new package, exact patch and
+/// content-free diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
@@ -317,18 +260,17 @@ impl Edit {
         let (_, patch) = transaction.commit()?.into_parts();
         let before: Arc<[u8]> = Arc::from(patch.source());
         let after: Arc<[u8]> = Arc::from(patch.replacement());
-        let package = if before == after {
-            base
-        } else {
+        let changed = before != after;
+        let package = if changed {
             reopen(&base, &after)?
+        } else {
+            base
         };
-        Ok(Commit {
+        Ok(Commit::new(
             package,
-            diagnostics: Diagnostics {
-                changed: before != after,
-            },
-            patch: Patch { before, after },
-        })
+            Patch { before, after },
+            Diagnostics::new(changed),
+        ))
     }
 }
 
@@ -354,31 +296,30 @@ impl Package {
         if bytes.as_slice() != patch.before_bytes() {
             return Err(Error::PatchConflict);
         }
-        let package = if patch.is_noop() {
-            self.clone()
-        } else {
+        let changed = !patch.is_noop();
+        let package = if changed {
             reopen(self, patch.after_bytes())?
+        } else {
+            self.clone()
         };
-        Ok(Commit {
+        Ok(Commit::new(
             package,
-            diagnostics: Diagnostics {
-                changed: !patch.is_noop(),
-            },
-            patch: patch.clone(),
-        })
+            patch.clone(),
+            Diagnostics::new(changed),
+        ))
     }
 }
 
 fn unchanged(base: Package) -> Result<Commit> {
     let bytes: Arc<[u8]> = Arc::from(base.to_bytes()?);
-    Ok(Commit {
-        package: base,
-        diagnostics: Diagnostics { changed: false },
-        patch: Patch {
+    Ok(Commit::new(
+        base,
+        Patch {
             before: Arc::clone(&bytes),
             after: bytes,
         },
-    })
+        Diagnostics::UNCHANGED,
+    ))
 }
 
 fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
