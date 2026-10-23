@@ -1260,6 +1260,18 @@ impl Classify for litchi_docx::Error {
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            // A nonempty accepted prefix means the sink observed a partial
+            // publication, regardless of whether the producer or OPC layer
+            // raised the secondary cause. A zero-prefix stream preserves the
+            // original typed producer/OPC classification.
+            Self::ArtifactStream(error) if error.written().is_some_and(|written| written != 0) => {
+                Class::of(Code::IoError)
+            },
+            Self::ArtifactStream(error) => error
+                .opc_error()
+                .map(|error| error.classify())
+                .or_else(|| error.producer_error().map(|error| error.classify()))
+                .unwrap_or_else(|| Class::of(Code::InternalError)),
             Self::InkLimit { .. }
             | Self::AltChunkLimit { .. }
             | Self::GlossaryLimit { .. }

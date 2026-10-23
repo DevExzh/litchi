@@ -35,7 +35,9 @@ impl Change for VariablesChange {
         }
         let base = package.clone();
         let (partname, xml) = target;
-        package.deferred(move |writer| base.write_part_overlay(writer, &partname, &xml))
+        package.deferred(move |writer, policy| {
+            base.write_part_overlay(writer, &partname, &xml, policy)
+        })
     }
 }
 

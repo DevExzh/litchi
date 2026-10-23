@@ -56,8 +56,8 @@ impl Change for RedactionChange {
                 }
                 let base = package.clone();
                 let commit = Arc::clone(commit);
-                package.deferred(move |writer| {
-                    base.write_external_hyperlink_redaction(writer, &main, &commit)
+                package.deferred(move |writer, policy| {
+                    base.write_external_hyperlink_redaction(writer, &main, &commit, policy)
                 })
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),

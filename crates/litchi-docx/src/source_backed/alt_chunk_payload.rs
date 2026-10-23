@@ -52,7 +52,8 @@ impl Change for PayloadChange {
         }
         let base = package.clone();
         let (part, after) = (self.part.clone(), Arc::clone(&self.after));
-        package.deferred(move |writer| base.write_part_overlay(writer, &part, &after))
+        package
+            .deferred(move |writer, policy| base.write_part_overlay(writer, &part, &after, policy))
     }
 }
 

@@ -122,8 +122,8 @@ impl Change for StreamChange {
                 if prepared.is_noop() {
                     return Ok(package.clone());
                 }
-                Ok(package.deferred(move |writer| {
-                    prepared.write(writer).map_err(|error| match error {
+                Ok(package.deferred(move |writer, policy| {
+                    prepared.write(writer, policy).map_err(|error| match error {
                         stream::Error::TailAppend(
                             crate::source_backed::tail_append::Error::Document(error),
                         ) => error,

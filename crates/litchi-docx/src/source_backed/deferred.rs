@@ -12,13 +12,22 @@ use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
 use litchi_core::OwnedSource;
-use litchi_opc::{SourceBackedPackage, SourceLimitKind, SourceLimits, SourceReadPolicy};
+use litchi_opc::{
+    ArtifactStream, ArtifactStreamPolicy, SourceBackedPackage, SourceLimitKind, SourceLimits,
+    SourceReadPolicy,
+};
 
 use super::Package;
 use crate::{Error, Result};
 
 /// Writes the committed artifact to a sink.
-pub(crate) type Publish = dyn Fn(&mut dyn Write) -> Result<()> + Send + Sync;
+///
+/// `None` is the ordinary package publication path.  A `Some` policy is used
+/// when an exact cross-owner restore is nested inside another bounded OPC
+/// publication; it must reach the underlying publisher so the producer's
+/// output budget is not charged a second time.
+pub(crate) type Publish =
+    dyn for<'a> Fn(&mut dyn Write, Option<&ArtifactStreamPolicy<'a>>) -> Result<()> + Send + Sync;
 
 /// The pending output of a committed package.
 pub(crate) struct Deferred {
@@ -34,7 +43,7 @@ pub(crate) struct Deferred {
 impl Deferred {
     /// The committed artifact as a physical source, written into memory on
     /// first use.
-    pub(crate) fn materialized(&self) -> litchi_opc::Result<&SourceBackedPackage> {
+    pub(crate) fn materialized(&self) -> Result<&SourceBackedPackage> {
         if let Some(package) = self.materialized.get() {
             return Ok(package);
         }
@@ -42,16 +51,11 @@ impl Deferred {
         // as the stream publishers did, so their memory is free for it.
         self.base.trim_clean_paragraph_index_for_operation();
         let mut bytes = Vec::new();
-        (self.publish)(&mut bytes).map_err(|error| match error {
-            Error::Opc(error) => error,
-            _ => litchi_opc::OpcError::SourceBackedOverlayUnavailable {
-                // The OPC boundary cannot carry a document-family error
-                // without exposing its content-bearing display text. Keep
-                // this refusal fixed and content-free; typed OPC failures
-                // already pass through the branch above.
-                reason: "materializing a committed source-backed package failed".into(),
-            },
-        })?;
+        // Keep the producer's typed error while materializing. This boundary
+        // is used by DOCX readers as well as the artifact-stream adapter, so
+        // converting non-OPC failures into a generic OPC refusal would lose
+        // the operation's limit, refusal, or conflict classification.
+        (self.publish)(&mut bytes, None)?;
         // Preserve a managed recipient's execution context when the deferred
         // artifact is first admitted. The owned-vector constructor is the
         // zero-copy unmanaged path; reopening the same moved bytes through the
@@ -73,14 +77,26 @@ impl Deferred {
 
     /// Write the committed artifact.
     pub(crate) fn write(&self, writer: &mut dyn Write) -> Result<()> {
+        self.write_with_policy(writer, None)
+    }
+
+    /// Write the committed artifact under an enclosing OPC stream policy.
+    pub(crate) fn write_with_policy(
+        &self,
+        writer: &mut dyn Write,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
         match self.materialized.get() {
             // A materialized artifact is the published bytes.
-            Some(package) => Ok(package
-                .clone()
-                .write_topology_to_stream(writer, litchi_opc::SourceTopologyPlan::new())?),
+            Some(package) => match policy {
+                Some(policy) => Ok(package
+                    .clone()
+                    .write_exact_source_with_policy(writer, policy)?),
+                None => Ok(package.clone().write_exact_source(writer)?),
+            },
             None => {
                 self.base.trim_clean_paragraph_index_for_operation();
-                (self.publish)(writer)
+                (self.publish)(writer, policy)
             },
         }
     }
@@ -90,7 +106,10 @@ impl Package {
     /// A committed package over `self` whose artifact `publish` writes.
     pub(crate) fn deferred(
         &self,
-        publish: impl Fn(&mut dyn Write) -> Result<()> + Send + Sync + 'static,
+        publish: impl for<'a> Fn(&mut dyn Write, Option<&ArtifactStreamPolicy<'a>>) -> Result<()>
+        + Send
+        + Sync
+        + 'static,
     ) -> Result<Self> {
         // A changed write of a signed or encrypted source is refused at
         // commit, before any output, as the writer would refuse it.
@@ -120,18 +139,19 @@ impl Package {
     }
 }
 
-/// A sink that hashes and counts what it is given.
-struct Hashing(sha2::Sha256, u64);
+impl ArtifactStream for Package {
+    type Error = Error;
 
-impl Write for Hashing {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        sha2::Digest::update(&mut self.0, bytes);
-        self.1 += bytes.len() as u64;
-        Ok(bytes.len())
+    fn check_fresh(&self) -> std::result::Result<(), Self::Error> {
+        self.check_source()
     }
 
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
+    fn stream_to(
+        &self,
+        writer: &mut dyn Write,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> std::result::Result<(), Self::Error> {
+        self.write_to_with_policy(writer, policy)
     }
 }
 
@@ -157,9 +177,8 @@ impl Package {
                 return Ok((artifact.len(), artifact.fingerprint()?.into_sha256()));
             }
         }
-        let mut sink = Hashing(<sha2::Sha256 as sha2::Digest>::new(), 0);
-        self.write_to(&mut sink)?;
-        let artifact = (sink.1, sha2::Digest::finalize(sink.0).into());
+        let (length, fingerprint) = self.physical.probe_artifact_stream(self, u64::MAX, None)?;
+        let artifact = (length, fingerprint.into_sha256());
         if let (None, Some(deferred)) = (&self.effective, &self.deferred) {
             let _ = deferred.fingerprint.set(artifact);
         }
@@ -183,14 +202,86 @@ impl Package {
     /// authenticated again as they are written (`SourceArtifactMismatch`
     /// before any byte otherwise).
     pub(crate) fn restored(&self, after: &Self) -> Result<Self> {
+        if self.deferred.is_none()
+            && after.deferred.is_none()
+            && self.effective.is_none()
+            && after.effective.is_none()
+        {
+            // Keep the ordinary opened-source path on the original bounded
+            // SourceArtifact restore. It avoids hashing the same source twice
+            // and preserves the established no-allocation fast path. A
+            // nested policy still uses the stream seam below, so an enclosing
+            // recipient publication never charges this producer's output.
+            let current = self.physical.clone();
+            let recipient_read_limits = current.read_limits();
+            let original = after.physical.source_artifact();
+            let original_len = original.len();
+            if original_len > recipient_read_limits.max_input_bytes() {
+                return Err(litchi_opc::OpcError::Limit {
+                    kind: SourceLimitKind::InputBytes,
+                    observed: original_len,
+                    maximum: recipient_read_limits.max_input_bytes(),
+                }
+                .into());
+            }
+            let current_artifact = current.source_artifact();
+            let proof = litchi_opc::SourceArtifactRestoreProof {
+                current_len: current_artifact.len(),
+                current_sha256: current_artifact.fingerprint()?,
+                original_len,
+                original_sha256: original.fingerprint()?,
+            };
+            let max_output_bytes = proof.original_len.max(1);
+            let current_package = self.clone();
+            let original_package = after.clone();
+            let mut next = Self::with_execution(current.clone(), self.execution.clone())?
+                .with_semantic_limits(self.semantic_limits().clone());
+            next.deferred = Some(Arc::new(Deferred {
+                base: self.clone(),
+                publish: Box::new(move |writer, policy| match policy {
+                    Some(policy) => Ok(current.restore_streamed_artifact_to_stream(
+                        &current_package,
+                        &original_package,
+                        proof,
+                        max_output_bytes,
+                        writer,
+                        Some(policy),
+                    )?),
+                    None => Ok(current.restore_source_artifact_to_stream(
+                        &original,
+                        proof,
+                        max_output_bytes,
+                        writer,
+                    )?),
+                }),
+                limits: recipient_read_limits,
+                materialized: OnceLock::new(),
+                fingerprint: OnceLock::from((
+                    proof.original_len,
+                    proof.original_sha256.into_sha256(),
+                )),
+            }));
+            return Ok(next);
+        }
         // Rebuild the deferred owner from the recipient even when either
         // endpoint is already deferred or effective. Cloning `after` here
         // would retain its producer execution context, source limits and
-        // semantic policy, bypassing the recipient boundary.
-        let current = self.physical_source()?.clone();
-        let recipient_read_limits = current.read_limits();
-        let original = after.physical_source()?.source_artifact();
-        let original_len = original.len();
+        // semantic policy, bypassing the recipient boundary. The stream
+        // adapter keeps both endpoints lazy; a deferred/effective package is
+        // never materialized merely to obtain the restore proof.
+        let recipient_read_limits = self.retained_read_limits();
+        let current_package = self.clone();
+        let original_package = after.clone();
+        let (current_len, current_fingerprint) = self.physical.probe_artifact_stream(
+            &current_package,
+            recipient_read_limits.max_input_bytes(),
+            None,
+        )?;
+        let (original_len, original_fingerprint) = self.physical.probe_artifact_stream(
+            &original_package,
+            recipient_read_limits.max_input_bytes(),
+            None,
+        )?;
         if original_len > recipient_read_limits.max_input_bytes() {
             return Err(litchi_opc::OpcError::Limit {
                 kind: SourceLimitKind::InputBytes,
@@ -199,31 +290,43 @@ impl Package {
             }
             .into());
         }
-        let current_artifact = current.source_artifact();
         let proof = litchi_opc::SourceArtifactRestoreProof {
-            current_len: current_artifact.len(),
-            current_sha256: current_artifact.fingerprint()?,
+            current_len,
+            current_sha256: current_fingerprint,
             original_len,
-            original_sha256: original.fingerprint()?,
+            original_sha256: original_fingerprint,
         };
         let max_output_bytes = proof.original_len.max(1);
-        let mut next = Self::with_execution(current.clone(), self.execution.clone())?
+        let recipient = self.physical.clone();
+        let mut next = Self::with_execution(recipient, self.execution.clone())?
             .with_semantic_limits(self.semantic_limits().clone());
         next.deferred = Some(Arc::new(Deferred {
             base: self.clone(),
-            publish: Box::new(move |writer| {
-                Ok(current.restore_source_artifact_to_stream(
-                    &original,
-                    proof,
-                    max_output_bytes,
-                    writer,
-                )?)
+            publish: Box::new(move |writer, policy| {
+                Ok(current_package
+                    .physical
+                    .clone()
+                    .restore_streamed_artifact_to_stream(
+                        &current_package,
+                        &original_package,
+                        proof,
+                        max_output_bytes,
+                        writer,
+                        policy,
+                    )?)
             }),
             limits: recipient_read_limits,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
         }));
         Ok(next)
+    }
+
+    fn retained_read_limits(&self) -> SourceLimits {
+        self.deferred
+            .as_ref()
+            .map(|deferred| deferred.limits)
+            .unwrap_or_else(|| self.physical.read_limits())
     }
 
     /// Whether `self` and `other` are shares of one package (the same source,

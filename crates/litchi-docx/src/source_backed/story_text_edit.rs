@@ -33,7 +33,9 @@ impl Change for StoryTextChange {
             return Ok(package.clone());
         }
         let base = package.clone();
-        Ok(package.deferred(move |writer| base.write_part_overlay(writer, &part, &bytes))?)
+        Ok(package.deferred(move |writer, policy| {
+            base.write_part_overlay(writer, &part, &bytes, policy)
+        })?)
     }
 }
 

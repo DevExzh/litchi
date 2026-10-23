@@ -30,6 +30,11 @@ pub enum Error {
     #[error("OPC error: {0}")]
     Opc(#[from] litchi_opc::error::OpcError),
 
+    /// A source-backed artifact stream failed while preserving the producer's
+    /// typed error and any accepted publication prefix.
+    #[error(transparent)]
+    ArtifactStream(Box<litchi_opc::ArtifactStreamError<Error>>),
+
     /// A requested OPC part is absent.
     #[error("DOCX part not found: {0}")]
     PartNotFound(String),
@@ -437,6 +442,12 @@ impl Error {
             Self::Refused(refusal) => Some(refusal),
             _ => None,
         }
+    }
+}
+
+impl From<litchi_opc::ArtifactStreamError<Error>> for Error {
+    fn from(error: litchi_opc::ArtifactStreamError<Error>) -> Self {
+        Self::ArtifactStream(Box::new(error))
     }
 }
 

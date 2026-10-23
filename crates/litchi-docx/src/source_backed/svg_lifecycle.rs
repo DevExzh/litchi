@@ -1783,6 +1783,7 @@ impl super::Package {
         writer: &mut dyn std::io::Write,
         current: &SourceBackedSvgAttachmentBatchSnapshot,
         target: &SourceBackedSvgAttachmentBatchSnapshot,
+        policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         let plan = build_batch_topology_plan(self.physical_package()?, current, target)?;
         publish_checked_topology(
@@ -1791,6 +1792,7 @@ impl super::Package {
             plan,
             current,
             target,
+            policy,
         )?;
         Ok(())
     }
@@ -1806,6 +1808,7 @@ fn publish_checked_topology<W: std::io::Write>(
     plan: SourceTopologyPlan,
     before: &SourceBackedSvgAttachmentBatchSnapshot,
     expected: &SourceBackedSvgAttachmentBatchSnapshot,
+    policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
 ) -> Result<SourceArtifactFingerprint> {
     let prepared = package.prepare_topology(plan)?;
     prepared.with_candidate(|candidate| {
@@ -1815,7 +1818,10 @@ fn publish_checked_topology<W: std::io::Write>(
         inner: writer,
         hasher: Sha256::new(),
     };
-    prepared.publish_to_stream(&mut output)?;
+    match policy {
+        Some(policy) => prepared.publish_to_stream_with_policy(&mut output, policy)?,
+        None => prepared.publish_to_stream(&mut output)?,
+    }
     Ok(SourceArtifactFingerprint::from_sha256(
         output.hasher.finalize().into(),
     ))

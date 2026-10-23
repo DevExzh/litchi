@@ -1,7 +1,7 @@
 //! Logical owner boundary over a retained effective graph.
 
 use super::*;
-use litchi_opc::PreparedTopology;
+use litchi_opc::{ArtifactStreamPolicy, PreparedTopology};
 
 impl Package {
     /// Adopt a validated effective topology derived from this physical source.
@@ -79,6 +79,22 @@ impl Package {
                 .physical
                 .clone()
                 .write_topology_to_stream(writer, SourceTopologyPlan::new())?),
+        }
+    }
+
+    /// Publish through an enclosing OPC artifact-stream policy.
+    pub(crate) fn write_to_with_policy(
+        &self,
+        writer: &mut dyn Write,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        match (&self.effective, &self.deferred) {
+            (Some(topology), _) => Ok(topology.publish_to_stream_with_policy(writer, policy)?),
+            (None, Some(deferred)) => deferred.write_with_policy(writer, Some(policy)),
+            (None, None) => Ok(self
+                .physical
+                .clone()
+                .write_exact_source_with_policy(writer, policy)?),
         }
     }
 

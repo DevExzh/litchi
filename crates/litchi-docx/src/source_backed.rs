@@ -73,8 +73,8 @@ use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resourc
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    BlobPart, PackURI, Part, PartData, PartView, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceCacheDiagnostics, SourceTopologyPlan,
+    ArtifactStreamPolicy, BlobPart, PackURI, Part, PartData, PartView, SourceArtifactFingerprint,
+    SourceBackedPackage, SourceCacheDiagnostics, SourceTopologyPlan,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -241,22 +241,24 @@ impl<W: Write> Write for FingerprintingWriter<W> {
 impl Package {
     /// Central boundary for operations that require the original OPC graph.
     fn physical_package(&self) -> Result<&SourceBackedPackage> {
-        Ok(self.physical_opc_package()?)
+        self.physical_opc_package()
     }
 
-    fn physical_opc_package(&self) -> litchi_opc::Result<&SourceBackedPackage> {
+    fn physical_opc_package(&self) -> Result<&SourceBackedPackage> {
         if let Some(effective) = &self.effective {
             effective.check_source()?;
-            return Err(litchi_opc::OpcError::SourceBackedOverlayUnavailable {
-                reason: "this DOCX operation requires migration to the effective graph".into(),
-            });
+            return Err(Error::Opc(
+                litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+                    reason: "this DOCX operation requires migration to the effective graph".into(),
+                },
+            ));
         }
         self.physical_source()
     }
 
     /// The physical source: the opened archive, or the materialized output
     /// of a committed package (record 0355a).
-    fn physical_source(&self) -> litchi_opc::Result<&SourceBackedPackage> {
+    fn physical_source(&self) -> Result<&SourceBackedPackage> {
         match &self.deferred {
             Some(deferred) => deferred.materialized(),
             None => Ok(&self.physical),
@@ -1324,10 +1326,22 @@ impl Package {
         writer: &mut dyn Write,
         partname: &PackURI,
         payload: &Arc<Vec<u8>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
-        self.physical_package()?
-            .clone()
-            .write_part_overlay_shared_to_stream(writer, partname, Arc::clone(payload))?;
+        let package = self.physical_package()?.clone();
+        match policy {
+            Some(policy) => package.write_part_overlay_shared_to_stream_with_policy(
+                writer,
+                partname,
+                Arc::clone(payload),
+                policy,
+            )?,
+            None => package.write_part_overlay_shared_to_stream(
+                writer,
+                partname,
+                Arc::clone(payload),
+            )?,
+        }
         Ok(())
     }
 
@@ -1557,16 +1571,26 @@ impl Package {
         writer: &mut dyn Write,
         main: &PackURI,
         commit: &redact::Commit,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         let (replacement, removed_ids) = redact::publication_parts(commit);
-        self.physical_package()?
-            .clone()
-            .write_part_overlay_with_external_relationship_removals_to_stream(
+        let package = self.physical_package()?.clone();
+        match policy {
+            Some(policy) => package
+                .write_part_overlay_with_external_relationship_removals_to_stream_with_policy(
+                    writer,
+                    main,
+                    replacement,
+                    removed_ids,
+                    policy,
+                )?,
+            None => package.write_part_overlay_with_external_relationship_removals_to_stream(
                 writer,
                 main,
                 replacement,
                 removed_ids,
-            )?;
+            )?,
+        }
         Ok(())
     }
 
@@ -1636,11 +1660,18 @@ impl Package {
         &self,
         writer: &mut dyn Write,
         commit: &crate::story_hyperlinks::Commit,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         let parts = crate::story_hyperlinks::publication_parts(commit)?;
-        self.physical_package()?
-            .clone()
-            .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;
+        let package = self.physical_package()?.clone();
+        match policy {
+            Some(policy) => package
+                .write_part_overlays_with_external_relationship_removals_to_stream_with_policy(
+                    writer, parts, policy,
+                )?,
+            None => package
+                .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?,
+        }
         Ok(())
     }
 

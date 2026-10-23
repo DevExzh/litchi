@@ -45,7 +45,8 @@ impl Change for SvgChange {
             return Ok(package.clone());
         }
         let base = package.clone();
-        package.deferred(move |writer| base.write_svg_batch(writer, &current, &target))
+        package
+            .deferred(move |writer, policy| base.write_svg_batch(writer, &current, &target, policy))
     }
 }
 

@@ -47,12 +47,12 @@ impl Change for LayoutChange {
             return Ok(package.clone());
         }
         let base = package.clone();
-        package.deferred(move |writer| {
+        package.deferred(move |writer, _policy| {
             // The committed target was derived from this complete artifact.
             if base.source_artifact_fingerprint()? != fingerprint {
                 return Err(crate::Error::SectionLayoutFingerprintConflict);
             }
-            base.write_part_overlay(writer, &main, &target)
+            base.write_part_overlay(writer, &main, &target, _policy)
         })
     }
 }

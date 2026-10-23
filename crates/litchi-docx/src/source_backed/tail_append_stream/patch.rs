@@ -1562,6 +1562,17 @@ pub enum PatchError {
     /// OPC rejected or interrupted an exact restore.
     #[error(transparent)]
     Opc(#[from] litchi_opc::error::OpcError),
+    /// The owning DOCX source boundary failed before exact restoration.
+    /// Preserve the typed owner error instead of collapsing it into a generic
+    /// OPC refusal.
+    #[error("DOCX source error while applying stream patch")]
+    Document(#[source] Box<crate::Error>),
+}
+
+impl From<crate::Error> for PatchError {
+    fn from(error: crate::Error) -> Self {
+        Self::Document(Box::new(error))
+    }
 }
 
 #[cfg(test)]

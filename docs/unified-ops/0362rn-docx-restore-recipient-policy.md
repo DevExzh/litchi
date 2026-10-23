@@ -37,16 +37,35 @@ uses the same generic path; the main-document owner path had the same bypass.
 - An internal regression test asserts that same-owner inverse replay leaves
   the deferred artifact unmaterialized. The content-free OPC fallback reason
   also no longer interpolates document-family error text.
+- Every deferred publisher now accepts an optional `ArtifactStreamPolicy` and
+  forwards it through part overlays, relationship-removal overlays, SVG
+  topology publication, and paragraph/tail splice publication. The DOCX
+  package implements the OPC artifact-stream adapter, so cross-owner restore
+  can authenticate lazy physical, deferred, and effective endpoints without
+  wrapping the output sink and charging producer output twice. Ordinary
+  opened-source restore retains the existing `SourceArtifact` fast path.
+- The DOCX artifact-stream adapter now declares `Error` as its producer error
+  and returns it without a lossy OPC conversion. The OPC seam wraps failures
+  as `ArtifactStreamError<docx::Error>`: embedded `OpcError` values retain
+  cancellation, source-change and limit classification, DOCX semantic
+  limits/refusals/patch errors remain inspectable producer causes, and
+  publication records the accepted prefix plus any secondary failure. The
+  DOCX error envelope boxes this recursive stream error while keeping its
+  content-free display text.
 
 ## Remaining bounded-streaming follow-up
 
-Cross-owner replay whose `before` or `after` endpoint is already deferred or
-effective still needs an OPC streaming artifact publisher. The current
-opened-source restore path is bounded, but a deferred/effective endpoint must
-preflight its streamed length and digest without materializing a full archive
-at apply time, then publish under the recipient context. This remains an
-engineering follow-up coordinated with the OPC contract; it is not accepted
-as a source-backed exception.
+The generic OPC artifact-stream hooks are now available in the isolated OPC
+source tree, but the final changed-plan census is still being completed on the
+assembled branch. The DOCX preflight and policy path must prove recipient part
+and aggregate-part bytes, part count, content-types bytes/mappings,
+relationship part/XML/count/graph/event/depth/attribute ceilings, and ZIP
+aggregate limits before accepting a deferred restore. Focused tests use
+same-size equal copies with tight `max_parts` and part-byte ceilings; the
+relationship, deferred/effective forward and inverse, output-limit,
+freshness, cancellation, and exact-byte cases remain queued for the assembled
+policy census. This remains an engineering follow-up, not an accepted
+source-backed exception.
 
 ## Validation
 

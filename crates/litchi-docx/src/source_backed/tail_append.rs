@@ -496,8 +496,12 @@ pub(crate) struct PreparedTail {
 }
 
 impl PreparedTail {
-    fn write(&self, writer: &mut dyn Write) -> Result<()> {
-        publish_splice(self.splice.duplicate(), &self.options, writer)
+    fn write(
+        &self,
+        writer: &mut dyn Write,
+        policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
+        publish_splice(self.splice.duplicate(), &self.options, writer, policy)
     }
 }
 
@@ -560,7 +564,9 @@ impl crate::source_backed::deferred::Change for TailChange {
             return Ok(package.clone());
         }
         package
-            .deferred(move |writer| prepared.write(writer).map_err(tail_to_document))
+            .deferred(move |writer, policy| {
+                prepared.write(writer, policy).map_err(tail_to_document)
+            })
             .map_err(Error::Document)
     }
 }
@@ -869,10 +875,17 @@ fn publish_splice(
     splice: SourcePartSplicePlan<'_>,
     options: &EditOptions,
     writer: &mut dyn Write,
+    policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
 ) -> Result<()> {
     check_options(options)?;
     let guarded_result = if options.execution.is_none() && options.cancellation.is_none() {
-        (splice.write_to(writer), None)
+        (
+            match policy {
+                Some(policy) => splice.write_to_with_policy(writer, policy),
+                None => splice.write_to(writer),
+            },
+            None,
+        )
     } else {
         let failure = Arc::new(Mutex::new(None));
         let guarded = PublicationCheckedWriter {
@@ -881,7 +894,10 @@ fn publish_splice(
             cancellation: options.cancellation.clone(),
             failure: Arc::clone(&failure),
         };
-        let result = splice.write_to(guarded);
+        let result = match policy {
+            Some(policy) => splice.write_to_with_policy(guarded, policy),
+            None => splice.write_to(guarded),
+        };
         let failure = failure
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())

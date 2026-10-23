@@ -52,8 +52,9 @@ impl Change for StoryRedactionChange {
                 }
                 let base = package.clone();
                 let commit = Arc::clone(commit);
-                package
-                    .deferred(move |writer| base.write_story_hyperlink_redaction(writer, &commit))
+                package.deferred(move |writer, policy| {
+                    base.write_story_hyperlink_redaction(writer, &commit, policy)
+                })
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(crate::Error::ExternalHyperlinkRedactionConflict),

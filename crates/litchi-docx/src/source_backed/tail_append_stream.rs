@@ -1666,17 +1666,32 @@ impl PreparedStream {
         self.splice.is_noop()
     }
 
-    pub(super) fn write(&self, writer: &mut dyn Write) -> Result<()> {
+    pub(super) fn write(
+        &self,
+        writer: &mut dyn Write,
+        policy: Option<&litchi_opc::ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
         let splice = self.splice.duplicate();
-        let publication = match self.expected_candidate_archive {
-            Some(expected) => splice
+        let publication = match (self.expected_candidate_archive, policy) {
+            (Some(expected), Some(policy)) => splice
+                .write_to_with_expected_artifact_with_policy(
+                    writer,
+                    expected.len,
+                    SourceArtifactFingerprint::from_sha256(expected.sha256),
+                    policy,
+                )
+                .map_err(Error::Opc)?,
+            (Some(expected), None) => splice
                 .write_to_with_expected_artifact(
                     writer,
                     expected.len,
                     SourceArtifactFingerprint::from_sha256(expected.sha256),
                 )
                 .map_err(Error::Opc)?,
-            None => splice.write_to(writer).map_err(Error::Opc)?,
+            (None, Some(policy)) => splice
+                .write_to_with_policy(writer, policy)
+                .map_err(Error::Opc)?,
+            (None, None) => splice.write_to(writer).map_err(Error::Opc)?,
         };
         let _ = self.written.set(patch::ArtifactProof::new(
             publication.candidate_artifact_len(),
