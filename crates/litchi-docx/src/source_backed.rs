@@ -1304,8 +1304,17 @@ impl Package {
     ///
     /// Returns the same failures as [`Self::document_snapshot`].
     pub fn edit(&self) -> TransactionResult<crate::document::Edit<Self>> {
+        self.edit_with_options(crate::document::EditOptions::default())
+    }
+
+    /// Start an isolated semantic edit under one explicit document-edit
+    /// profile while retaining this complete source owner.
+    pub fn edit_with_options(
+        &self,
+        options: crate::document::EditOptions,
+    ) -> TransactionResult<crate::document::Edit<Self>> {
         let (_, snapshot) = self.main_document_snapshot("edit", true)?;
-        Ok(crate::document::Edit::new(self.clone(), snapshot.edit()))
+        Ok(crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options))
     }
 
     /// Publish one joined document composition through this source owner. The

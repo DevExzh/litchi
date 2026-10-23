@@ -543,7 +543,7 @@ impl Docx {
     pub(super) fn eager_editor(&self, editor: DocxEditor) -> Result<DocxEditor> {
         match editor {
             DocxEditor::Source(source_edit) => {
-                let snapshot_budget = source_edit.snapshot_budget();
+                let snapshot_budget = source_edit.max_snapshot_bytes_value();
                 let super::DocxOwner::Source(package) = self.owner() else {
                     return Err(Error::new(
                         Code::InternalError,
@@ -551,11 +551,13 @@ impl Docx {
                     ));
                 };
                 let owned = self.promoted(package)?;
-                let edit = owned.edit()?;
-                Ok(DocxEditor::Edit(Box::new(match snapshot_budget {
-                    Some(maximum) => edit.with_snapshot_budget(maximum),
-                    None => edit,
-                })))
+                let edit = match snapshot_budget {
+                    Some(maximum) => owned.edit_with_options(
+                        litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+                    )?,
+                    None => owned.edit()?,
+                };
+                Ok(DocxEditor::Edit(Box::new(edit)))
             },
             editor => Ok(editor),
         }
