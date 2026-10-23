@@ -710,7 +710,7 @@ fn sheet_auto_filter_snapshot_limit_covers_native_patch() {
 }
 
 #[test]
-fn combined_sheet_rename_and_auto_filter_snapshot_limit_is_exact() {
+fn combined_sheet_rename_shrinking_and_auto_filter_snapshot_limit_is_exact() {
     let original = workbook();
     let probe = original
         .edit(|transaction| {
@@ -753,6 +753,59 @@ fn combined_sheet_rename_and_auto_filter_snapshot_limit_is_exact() {
         .unwrap();
     assert_eq!(
         prop(committed.file(), "/Data/autofilter", "range").as_deref(),
+        Some("A1:B5")
+    );
+}
+
+#[test]
+fn combined_sheet_rename_expanding_and_auto_filter_snapshot_limit_is_exact() {
+    let original = workbook();
+    let probe = original
+        .edit(|transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "FilteredDataSheet", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap();
+    let charge = probe.diagnostics().snapshot_bytes();
+    assert!(charge > 0);
+
+    let strict = SemanticLimits::builder()
+        .max_snapshot_bytes(charge - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = original
+        .edit_with_options(EditOptions::new().semantic_limits(strict), |transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "FilteredDataSheet", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::LimitExceeded);
+
+    let exact = SemanticLimits::builder()
+        .max_snapshot_bytes(charge)
+        .unwrap()
+        .build()
+        .unwrap();
+    let committed = original
+        .edit_with_options(EditOptions::new().semantic_limits(exact), |transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "FilteredDataSheet", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        prop(
+            committed.file(),
+            "/FilteredDataSheet/autofilter",
+            "range"
+        )
+        .as_deref(),
         Some("A1:B5")
     );
 }
