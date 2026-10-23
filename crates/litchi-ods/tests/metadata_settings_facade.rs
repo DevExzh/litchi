@@ -213,7 +213,6 @@ fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
     let malformed_meta = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:user-defined>missing name</meta:user-defined></office:meta></office:document-meta>"#;
     assert!(
         Package::from_bytes(&package(CONTENT, Some(malformed_meta), None))
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );
@@ -224,7 +223,6 @@ fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
     );
     assert!(
         Package::from_bytes(&package(&malformed_content, Some(META), None))
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );
@@ -235,7 +233,6 @@ fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
     );
     assert!(
         Package::from_bytes(&package(&invalid_iteration, Some(META), None))
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );
@@ -246,7 +243,6 @@ fn malformed_metadata_and_settings_are_rejected_at_package_boundary() {
     );
     assert!(
         Package::from_bytes(&package(&unknown_owned_attribute, Some(META), None))
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

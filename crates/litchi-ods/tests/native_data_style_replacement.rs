@@ -1,4 +1,5 @@
-use litchi_core::{Error, Result};
+use litchi_core::Error as CoreError;
+use litchi_odf_common::Error;
 use litchi_ods::{
     Package,
     document::{NumberStyleNode, StyleGraph},
@@ -9,7 +10,8 @@ const FORMATS: &[u8] =
     include_bytes!("../../../test-data/libreoffice-core/sc/qa/unit/data/ods/formats.ods");
 
 #[test]
-fn native_scientific_style_cannot_be_discarded_by_legacy_decimal_replacement() -> Result<()> {
+fn native_scientific_style_cannot_be_discarded_by_legacy_decimal_replacement() -> Result<(), Error>
+{
     let original = Package::from_bytes(FORMATS)?.workbook()?;
     assert!(original.content_xml().contains("number:scientific-number"));
     let snapshot = Package::from_bytes(FORMATS)?;
@@ -28,7 +30,10 @@ fn native_scientific_style_cannot_be_discarded_by_legacy_decimal_replacement() -
         .replace_style_graph(&graph)
         .expect_err("a scientific body is outside the legacy decimal replacement envelope");
     assert!(
-        matches!(error, Error::Unsupported(_) | Error::Refused(_)),
+        matches!(
+            error,
+            Error::Core(CoreError::Unsupported(_)) | Error::Refused(_)
+        ),
         "{error}"
     );
     assert_eq!(edit.as_bytes(), FORMATS);
@@ -39,7 +44,7 @@ fn native_scientific_style_cannot_be_discarded_by_legacy_decimal_replacement() -
 }
 
 #[test]
-fn unresolved_entity_in_style_text_never_becomes_a_rewrite_target() -> Result<()> {
+fn unresolved_entity_in_style_text_never_becomes_a_rewrite_target() -> Result<(), Error> {
     let xml = br#"<office:document-content
         xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
         xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"

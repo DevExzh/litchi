@@ -241,7 +241,6 @@ fn terminal_encryption_is_bounded_machine_readable_and_password_reopenable() -> 
     assert!(Package::from_bytes(&encrypted).is_err());
     assert!(
         Package::from_bytes_with_password(&encrypted, "wrong-password")
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

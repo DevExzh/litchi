@@ -1349,14 +1349,12 @@ mod tests {
             litchi_odf_common::detect::prepared(bytes, litchi_odf_common::SourceLimits::default())
                 .expect("test fixture or operation should succeed");
         let spreadsheet = crate::Package::from_prepared_package(prepared)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
 
         // Path-based open and the positional source-backed facade.
         let spreadsheet = crate::Package::open(&path)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
@@ -1499,7 +1497,7 @@ mod tests {
         let error = bounded.cell_batch(&selectors).expect_err("bound must fail");
         assert!(matches!(
             error,
-            litchi_core::Error::InvalidFormat(message)
+            PackageError::Core(CoreError::InvalidFormat(message))
                 if message.contains("selector safety limit")
         ));
         assert!(bounded.inner.cell_locator.get().is_none());

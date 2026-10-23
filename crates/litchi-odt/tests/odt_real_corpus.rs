@@ -111,7 +111,7 @@ fn real_xxe_package_is_rejected_without_resolution() -> Result<(), Error> {
     let file = "writer-minimal-nasty.odt";
     let document = match Package::open(corpus().join(file)).and_then(|package| package.document()) {
         Ok(document) => document,
-        Err(litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(_))) => return Ok(()),
+        Err(litchi_odf_common::Error::Core(Error::InvalidFormat(_))) => return Ok(()),
         Err(error) => panic!("open produced a non-format error for {file}: {error:?}"),
     };
     assert_invalid(document.text(), file, "text");

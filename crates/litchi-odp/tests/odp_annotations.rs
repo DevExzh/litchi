@@ -28,8 +28,8 @@ fn presentation() -> Package {
 /// Apply one staged operation through the primary edit and adopt the commit.
 fn edit_with<T>(
     package: &mut Package,
-    operation: impl FnOnce(&mut litchi_odp::edit::Edit) -> litchi_core::Result<T>,
-) -> litchi_core::Result<T> {
+    operation: impl FnOnce(&mut litchi_odp::edit::Edit) -> Result<T, litchi_odp::Error>,
+) -> Result<T, litchi_odp::Error> {
     let mut edit = package.edit()?;
     let value = operation(&mut edit)?;
     *package = edit.commit()?.into_package();

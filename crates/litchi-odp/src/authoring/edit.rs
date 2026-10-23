@@ -5003,10 +5003,10 @@ mod tests {
         MAX_PACKAGE_BYTES, Package, bounded_candidate, projected_size, validate_package_size,
     };
     use crate::Builder;
-    use litchi_core::Result;
 
     #[test]
-    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing() -> CoreResult<()> {
+    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing()
+    -> Result<(), litchi_odf_common::Error> {
         let package = Builder::new().build()?;
         let file = tempfile::NamedTempFile::new()?;
         package.save(file.path())?;
@@ -5029,7 +5029,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            litchi_odf_common::CoreError::Limit {
+            litchi_odf_common::Error::Limit {
                 kind: litchi_odf_common::LimitKind::Source(
                     litchi_odf_common::SourceLimitKind::InputBytes
                 ),
@@ -5040,7 +5040,7 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> CoreResult<()> {
+    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> litchi_core::Result<()> {
         assert_eq!(bounded_candidate(3, 0, 1, 4)?, 4);
         assert!(bounded_candidate(3, 0, 2, 4).is_err());
         assert_eq!(projected_size(3, 2, 2, 1, 4)?, 4);
@@ -5049,14 +5049,15 @@ mod tests {
     }
 
     #[test]
-    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> CoreResult<()> {
+    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> litchi_core::Result<()> {
         validate_package_size(MAX_PACKAGE_BYTES)?;
         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
         Ok(())
     }
 
     #[test]
-    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> CoreResult<()> {
+    fn changed_slide_commit_reports_the_authored_audit_fast_path()
+    -> Result<(), litchi_odf_common::Error> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
         let source = builder.build()?;
@@ -5068,7 +5069,8 @@ mod tests {
     }
 
     #[test]
-    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> CoreResult<()> {
+    fn later_rdf_rewrite_clears_the_serialization_audit_proof()
+    -> Result<(), litchi_odf_common::Error> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
         let source = builder.build()?;

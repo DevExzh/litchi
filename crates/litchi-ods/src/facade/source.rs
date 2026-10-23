@@ -1555,19 +1555,19 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.sheet_count(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.text(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.member_data("Pictures/sample.bin"),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
         assert!(matches!(
             spreadsheet.materialize(),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 
@@ -1796,7 +1796,7 @@ mod tests {
         let error = bounded.cell_batch(&selectors).expect_err("bound must fail");
         assert!(matches!(
             error,
-            litchi_core::Error::InvalidFormat(message)
+            OdfError::Core(CoreError::InvalidFormat(message))
                 if message.contains("selector safety limit")
         ));
         assert_eq!(bounded_source.reads(), bounded_reads);
@@ -1813,7 +1813,7 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.cell_batch(&selectors),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
 
         let source = Arc::new(MutableSource::new(package()));
@@ -1822,7 +1822,7 @@ mod tests {
         source.flip_after_next_version();
         assert!(matches!(
             spreadsheet.cell_batch(&selectors),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 
@@ -1973,7 +1973,7 @@ mod tests {
         source.bump();
         assert!(matches!(
             spreadsheet.cell("Sheet1", 0, 0),
-            Err(litchi_core::Error::SourceChanged { .. })
+            Err(OdfError::Core(CoreError::SourceChanged { .. }))
         ));
     }
 

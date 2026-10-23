@@ -33,8 +33,8 @@ use crate::{
     sheet_metadata as metadata,
 };
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
-    OwnedSource, Position, Profile, ReadAt, Resource, SourceVersion,
+    Budget, CancellationSource, Error as CoreError, ExecutionContext, ExecutionLimits,
+    Limits as BudgetLimits, OwnedSource, Position, Profile, ReadAt, Resource, SourceVersion,
 };
 use litchi_odf_common::{
     core::{
@@ -1422,7 +1422,8 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
         .expect_err("ordinary signed metadata edit");
     assert!(matches!(
         error,
-        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
+        litchi_odf_common::Error::Core(CoreError::Unsupported(_))
+            | litchi_odf_common::Error::Refused(_)
     ));
     assert_eq!(signed.workbook().content_xml(), before);
 

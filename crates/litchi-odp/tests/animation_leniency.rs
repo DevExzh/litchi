@@ -205,7 +205,6 @@ fn disallowed_known_children_and_broken_xml_stay_hard_errors() {
     });
     assert!(
         Package::from_bytes(&unterminated)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.presentation())
             .and_then(|presentation| presentation.slides())
             .is_err()

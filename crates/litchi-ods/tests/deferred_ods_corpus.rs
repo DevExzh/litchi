@@ -15,7 +15,6 @@ fn real_calc_packages_parse_and_expose_typed_content() {
     ];
     for (file, count) in cases {
         let spreadsheet = Package::open(corpus().join(file))
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .unwrap_or_else(|error| panic!("{file}: open failed: {error:?}"));
         assert_eq!(spreadsheet.sheets().len(), count, "{file}: sheet count");

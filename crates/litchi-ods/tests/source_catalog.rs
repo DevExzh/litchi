@@ -4,7 +4,7 @@ use std::sync::{
     atomic::{AtomicU64, Ordering},
 };
 
-use litchi_core::{Error, OwnedSource, ReadAt, SourceVersion};
+use litchi_core::{Error as CoreError, OwnedSource, ReadAt, SourceVersion};
 use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
 use litchi_ods::{Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
@@ -377,11 +377,11 @@ fn catalog_preserves_limits_and_source_version_lifecycle() {
     source.bump();
     assert!(matches!(
         catalog.sheet_count(),
-        Err(Error::SourceChanged { .. })
+        Err(litchi_ods::Error::Core(CoreError::SourceChanged { .. }))
     ));
     assert!(matches!(
         catalog.sheet_at(0),
-        Err(Error::SourceChanged { .. })
+        Err(litchi_ods::Error::Core(CoreError::SourceChanged { .. }))
     ));
 }
 
@@ -393,7 +393,7 @@ fn source_owners_reject_oversized_content_before_payload_read() {
         .expect_err("full source owner must reject oversized content");
     assert!(matches!(
         error,
-        litchi_ods::Error::Core(Error::InvalidFormat(message))
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
             if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
@@ -410,7 +410,7 @@ fn source_owners_reject_oversized_content_before_payload_read() {
         .expect_err("catalog source owner must reject oversized content");
     assert!(matches!(
         error,
-        litchi_ods::Error::Core(Error::InvalidFormat(message))
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
             if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
@@ -428,7 +428,7 @@ fn source_owners_reject_oversized_content_before_payload_read() {
             .expect_err("full source owner must reject oversized encrypted content");
     assert!(matches!(
         error,
-        litchi_ods::Error::Core(Error::InvalidFormat(message))
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
             if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
@@ -448,7 +448,7 @@ fn source_owners_reject_oversized_content_before_payload_read() {
     .expect_err("catalog source owner must reject oversized encrypted content");
     assert!(matches!(
         error,
-        litchi_ods::Error::Core(Error::InvalidFormat(message))
+        litchi_ods::Error::Core(CoreError::InvalidFormat(message))
             if message == "ODS content.xml exceeds the family limit"
     ));
     assert!(
@@ -556,7 +556,7 @@ fn catalog_preserves_validation_precedence_for_malformed_xml() {
     )))
     .expect_err("malformed content must be refused");
     assert!(
-        matches!(error, litchi_ods::Error::Core(Error::InvalidFormat(message)) if message.contains("invalid ODS content.xml"))
+        matches!(error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("invalid ODS content.xml"))
     );
 }
 
@@ -570,7 +570,7 @@ fn catalog_rejects_duplicate_and_nested_worksheet_entries() {
     )))
     .expect_err("duplicate sheet names must be refused");
     assert!(
-        matches!(duplicate_error, litchi_ods::Error::Core(Error::InvalidFormat(message)) if message.contains("duplicated"))
+        matches!(duplicate_error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("duplicated"))
     );
 
     let nested = format!(
@@ -581,6 +581,6 @@ fn catalog_rejects_duplicate_and_nested_worksheet_entries() {
     )))
     .expect_err("nested worksheet entries must be refused");
     assert!(
-        matches!(nested_error, litchi_ods::Error::Core(Error::InvalidFormat(message)) if message.contains("direct child"))
+        matches!(nested_error, litchi_ods::Error::Core(CoreError::InvalidFormat(message)) if message.contains("direct child"))
     );
 }

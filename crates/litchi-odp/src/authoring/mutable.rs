@@ -3089,7 +3089,10 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_slide_with_title("First", "First body")?;
         builder.add_slide_with_title("Second", "Second body")?;
-        builder.build()?.presentation()
+        builder
+            .build()?
+            .presentation()
+            .map_err(litchi_core::Error::from)
     }
 
     #[test]

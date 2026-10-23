@@ -29,7 +29,7 @@ fn package(
     if let Some(meta_xml) = meta_xml {
         writer.add_file("meta.xml", meta_xml.as_bytes())?;
     }
-    writer.finish_to_bytes()
+    writer.finish_to_bytes().map_err(Error::from)
 }
 
 fn exercise_odt(content_xml: &[u8]) -> Option<Error> {

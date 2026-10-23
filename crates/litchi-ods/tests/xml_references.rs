@@ -144,7 +144,6 @@ fn unknown_and_illegal_numeric_references_are_rejected_by_both_open_paths() {
         let bytes = raw_package(&content).expect("raw ODS package");
         assert!(
             Package::from_bytes(&bytes)
-                .map_err(litchi_core::Error::from)
                 .and_then(|package| package.workbook())
                 .is_err(),
             "fused parser accepted {reference}"
