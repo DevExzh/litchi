@@ -10007,11 +10007,12 @@ mod tests {
         FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
         MESSAGE_INFO_CONSTRUCTIONS, MessageInfo, MessageInfoCollection, ObjectReferenceTransition,
         RawMessage, UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec,
-        check_archive_info_constructor, encode_archive_info, encode_varint,
-        encode_varint_with_width, encoded_field_info_length, encoded_field_path_length,
-        encoded_message_info_length, field_info_header_field_count, field_info_memory,
-        field_path_memory, message_info_header_field_count, message_info_header_nesting,
-        message_info_memory, minimal_message_info_encoded_length, varint_len,
+        check_archive_info_constructor, default_archive_info_bounds_are_safe, encode_archive_info,
+        encode_varint, encode_varint_with_width, encoded_field_info_length,
+        encoded_field_path_length, encoded_message_info_length, field_info_header_field_count,
+        field_info_memory, field_path_memory, message_info_header_field_count,
+        message_info_header_nesting, message_info_memory, minimal_message_info_encoded_length,
+        varint_len,
     };
     use crate::{LimitKind, Limits, Result};
     use litchi_iwa_protos::archive_codec;
