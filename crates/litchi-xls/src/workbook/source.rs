@@ -1914,14 +1914,9 @@ impl SourceInner {
             encoding: self.encoding.clone(),
             limits: self.limits,
             leniency: self.leniency,
-            query_cache: Arc::new(QueryIndexCache::new(
-                self.limits.max_query_index_bytes,
-                self.sheets.len(),
-            )),
+            query_cache: Arc::clone(&self.query_cache),
             tolerance: Mutex::new(tolerance),
-            cursor_checks: (0..self.sheets.len())
-                .map(|_| std::sync::OnceLock::new())
-                .collect(),
+            cursor_checks: Box::new([]),
             pending: Some(pending),
             materialized: std::sync::OnceLock::new(),
             deferred: true,
