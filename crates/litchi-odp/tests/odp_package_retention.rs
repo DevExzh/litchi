@@ -243,3 +243,28 @@ fn password_opened_editing_and_chart_snapshots_drop_credentials_after_validation
     assert!(charts.charts().is_empty());
     assert!(charts.to_presentation().is_err());
 }
+
+#[test]
+fn signed_policy_precedes_deferred_processing_instruction_validation() {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    writer.set_mimetype(MIME).unwrap();
+    writer
+        .add_file(
+            "content.xml",
+            format!(
+                r#"<office:document-content xmlns:office="{OFFICE}"><office:body><?producer retained?><office:presentation/></office:body></office:document-content>"#
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    writer
+        .add_file(
+            "META-INF/documentsignatures.xml",
+            br#"<dsig:document-signatures xmlns:dsig="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
+        )
+        .unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+
+    let error = source.edit().unwrap().commit().unwrap_err();
+    assert!(error.to_string().contains("signed packages"));
+}

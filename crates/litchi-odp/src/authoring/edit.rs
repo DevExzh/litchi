@@ -1047,9 +1047,12 @@ impl Edit {
         if self.entry_validated.get().is_some() {
             return Ok(());
         }
+        // Preserve the edit-boundary admission order: security policy was
+        // historically checked before semantic XML validation. Both are
+        // deferred now, and success is cached only after both pass.
+        ensure_editable_source(&self.source.package)?;
         let presentation = self.source.projection()?;
         validate_edit_entry(presentation)?;
-        ensure_editable_source(&self.source.package)?;
         let _ = self.entry_validated.set(());
         Ok(())
     }
@@ -1955,6 +1958,7 @@ impl Edit {
     /// authored-XML audit refuses, or a result the presentation parser
     /// rejects. A refusal leaves the transaction unchanged.
     pub fn splice_scene(&mut self, changes: &[crate::scene::Change]) -> FamilyResult<bool> {
+        self.ensure_entry().map_err(PackageError::from)?;
         if changes.is_empty() {
             return Ok(false);
         }
