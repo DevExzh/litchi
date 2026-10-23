@@ -740,6 +740,35 @@ class NativeQualificationTests(unittest.TestCase):
         self.assertTrue(receipt["timed_out"])
         self.assertEqual(receipt["timeout_s"], 0.05)
 
+    def test_endpoint_lock_preparation_uses_metadata_not_refresh(self) -> None:
+        self.assertEqual(
+            RUNNER.LOCK_PREPARATION_COMMAND,
+            ("cargo", "metadata", "--offline", "--format-version=1"),
+        )
+        self.assertNotIn("--locked", RUNNER.LOCK_PREPARATION_COMMAND)
+        with mock.patch.object(RUNNER, "run_command", return_value={}) as run:
+            result = RUNNER.prepare_endpoint_lock(self.directory, self.directory, {})
+        self.assertEqual(result, {})
+        run.assert_called_once_with(
+            self.directory,
+            "metadata",
+            list(RUNNER.LOCK_PREPARATION_COMMAND),
+            self.directory,
+            {},
+        )
+
+        RUNNER.verify_lock_preparation_command(
+            [{"command": list(RUNNER.LOCK_PREPARATION_COMMAND)}]
+        )
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.verify_lock_preparation_command(
+                [{"command": ["cargo", "generate-lockfile", "--offline"]}]
+            )
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.verify_lock_preparation_command(
+                [{"command": [*RUNNER.LOCK_PREPARATION_COMMAND, "--locked"]}]
+            )
+
     def test_generator_timeout_uses_coordinated_process_cleanup(self) -> None:
         child = mock.Mock()
         child.pid = 12345

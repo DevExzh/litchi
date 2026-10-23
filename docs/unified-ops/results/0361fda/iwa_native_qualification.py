@@ -88,6 +88,11 @@ FIXED_WARMUPS = 2
 FIXED_GROWTH = 1.2
 FIXED_TIMEOUT_S = 120.0
 COMMAND_TIMEOUT_S = 900.0
+# This first metadata pass is intentionally unlocked only so Cargo can add the
+# external probe package and source-local edges to the copied seed lock.  It
+# must not be replaced with generate-lockfile: lock_delta_manifest rejects any
+# registry refresh before a release build is allowed to start.
+LOCK_PREPARATION_COMMAND = ("cargo", "metadata", "--offline", "--format-version=1")
 # The generator has its own 900-second Cargo child bound.  Keep the outer
 # wrapper bound slightly longer so its normal timeout handler can reap that
 # child before the runner has to tear down both process groups.
@@ -529,6 +534,16 @@ def verify_command_receipt(row: Mapping[str, Any]) -> None:
     ):
         if saved.get(key) != row.get(key):
             raise QualificationError(f"retained command receipt field changed: {key}")
+
+
+def verify_lock_preparation_command(commands: Any) -> None:
+    """Require seed-preserving metadata preparation before toolchain checks."""
+
+    if not isinstance(commands, list) or not commands:
+        raise QualificationError("missing endpoint lock-preparation receipt")
+    first = commands[0]
+    if not isinstance(first, Mapping) or first.get("command") != list(LOCK_PREPARATION_COMMAND):
+        raise QualificationError("endpoint lock was not prepared with seed-preserving metadata")
 
 
 def git_revision(ref: str) -> str:
@@ -1213,6 +1228,20 @@ panic = "abort"
 """
 
 
+def prepare_endpoint_lock(
+    receipts: Path, project: Path, env: Mapping[str, str]
+) -> dict[str, Any]:
+    """Resolve only the probe/local closure while retaining the copied seed pins."""
+
+    return run_command(
+        receipts,
+        "metadata",
+        list(LOCK_PREPARATION_COMMAND),
+        project,
+        env,
+    )
+
+
 def build(args: argparse.Namespace) -> None:
     family = require_family(args.family)
     output = new_external_directory(args.output)
@@ -1266,15 +1295,7 @@ def build(args: argparse.Namespace) -> None:
         receipts.mkdir()
         env = dict(os.environ, CARGO_INCREMENTAL="0", CARGO_BUILD_JOBS="1")
         shutil.copyfile(lock, project / "Cargo.lock")
-        rows = [
-            run_command(
-                receipts,
-                "generate-lock",
-                ["cargo", "generate-lockfile", "--offline"],
-                project,
-                env,
-            )
-        ]
+        rows = [prepare_endpoint_lock(receipts, project, env)]
         rows.append(run_command(receipts, "rustc", ["rustc", "-Vv"], project, env))
         rows.append(run_command(receipts, "cargo", ["cargo", "--version"], project, env))
         endpoint: dict[str, Any] = {
@@ -1388,8 +1409,7 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
         if endpoint.get("registry") != registry(lock_path):
             raise QualificationError(f"retained {label} registry identity does not match its lock")
         commands = endpoint.get("commands")
-        if not isinstance(commands, list) or not commands:
-            raise QualificationError(f"missing retained command receipts: {label}")
+        verify_lock_preparation_command(commands)
         for command in commands:
             verify_command_receipt(command)
         for key in ("native", "allocation"):

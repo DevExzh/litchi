@@ -19,8 +19,10 @@ The probes do all semantic and byte checks before starting their timed loops:
 `integrated-route` source delta containing the full resolved baseline and
 candidate commit ids plus every changed, added, or removed archived source
 file with its byte count and SHA-256. Build admission verifies this delta
-before starting Cargo. Each endpoint then generates and retains its own exact
-offline lockfile from the recorded seed; before release builds, the runner
+before starting Cargo. Each endpoint copies the recorded seed and runs
+`cargo metadata --offline --format-version=1` once to add only the external
+probe package and source-local closure; this deliberately unlocked preparation
+must preserve the seed's registry pins. Before any release build, the runner
 requires every common registry identity, and every registry identity required
 by the selected source closure, to match the pinned seed by name, version,
 source, and checksum. It also requires identical endpoint common identities
@@ -28,7 +30,8 @@ and every added/removed registry package and local edge/feature to match the
 selected source dependency delta. The required registry edges and complete
 selected local closure must be present in both endpoint locks and the pinned
 seed; the reviewed `smallvec` addition is pinned to version 1.16.3 and its
-recorded crates.io checksum. Validation, timing, and collection
+recorded crates.io checksum. Release builds use `--locked`; validation, timing,
+and collection
 recompute both comparisons from retained source and lock artifacts. There is
 no shared-prefix or blanket lock-drift exception. The runner also freezes the
 lockfile identities, records toolchain and binary hashes,
