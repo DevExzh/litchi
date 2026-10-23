@@ -14,7 +14,7 @@ After the adapter change its source-file SHA-256 is
 `df7f749961c2d0f27abff803298a8a2f697d2789cdf25dd890cf3dc26000b6f5`; the
 adapter block (the `open_opc` documentation, both cfg branches, and the
 unselected-policy guard) is
-`81ec9925bb5a065753c3d7cd84cec0126cca92050f7b43d313ea4cf36a15e818`.
+`6709476271f311aee6d35a1c4c788b4f4bee2aedec34d5517b1b4b8abd39b65e`.
 The native v1 source files at both historical revisions have SHA-256
 `6f5e5606afa342f87a7c1e93538b7302878a6b45113cef7b6514f62a7f1cdb34`.
 Do not reuse a 5726-only result as a performance qualification for the later
