@@ -57,9 +57,9 @@ fn phase_report(name: &str, baseline: usize) {
     }
     let mut log = String::new();
     let count = ALLOC_LOG_LEN.load(Ordering::Relaxed).min(ALLOC_LOG.len());
-    for index in 0..count {
+    for allocation in ALLOC_LOG.iter().take(count) {
         use std::fmt::Write as _;
-        let _ = write!(log, "{}:", ALLOC_LOG[index].load(Ordering::Relaxed));
+        let _ = write!(log, "{}:", allocation.load(Ordering::Relaxed));
     }
     println!(
         "{{\"phase\":\"{name}\",\"peak\":{},\"allocs\":{},\"reallocs\":{},\"allocated\":{},\"live_delta\":{},\"alloc_sizes\":\"{sizes}\",\"alloc_log\":\"{log}\"}}",

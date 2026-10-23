@@ -502,7 +502,7 @@ fn rebase_patch(
     let base = recipient.effective().map_err(Error::Invalid)?;
     let expected = &patch.before_proof;
     let package = Arc::clone(&base.package);
-    let facts = scan_or_cached_source(&base, &package, patch.limits, &patch.options)?;
+    let facts = scan_or_cached_source(base, &package, patch.limits, &patch.options)?;
     if facts.content_bytes != expected.content_bytes
         || facts.insert_at != expected.insert_at
         || facts.slide_count != expected.slide_count
@@ -642,7 +642,7 @@ impl<'a> Edit<'a> {
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
         }
-        let first = scan_or_cached_source(&base, &package, limits, &options)?;
+        let first = scan_or_cached_source(base, &package, limits, &options)?;
         if first.slide_count >= limits.max_slides {
             return Err(invalid("ODP append would exceed the slide-count limit"));
         }
