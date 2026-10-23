@@ -1,0 +1,83 @@
+{
+  "source": "d1a49d80a1c325cceb00273bb9a8359e26c30320",
+  "pid": 1673161,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v6.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21"
+  ],
+  "started_unix_seconds": 1792765732.8227477,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-docx",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 82.22261126900048,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-0.log",
+      "bytes": 347388,
+      "sha256": "943b8a1e6bf21016769bd25adac22d2b8f492e46280c740ebc28c1124bc2db90",
+      "target_bytes_before": 18619750556,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/litchi_docx-67ae2d927f03ad6a",
+          "bytes": 73400464,
+          "sha256": "56a31fd7a8c36b6ccaba6a4f10fd266995066cdbf5addf7320668db2aabcde56"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 0,
+      "seconds": 13.73075887900086,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-1.log",
+      "bytes": 183,
+      "sha256": "c9b7cd49827b50d87c194fbe9b73cd159ed34fcf144d4a55d752742c28d59cfa",
+      "target_bytes_before": 18619724051,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 489.0304346590001,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-2.log",
+      "bytes": 31714,
+      "sha256": "ee36281ed190b9baaca75f958742cae429ec53b5096e43a7fae740933fc9ca1e",
+      "target_bytes_before": 18619724051,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined DOCX library passes 1515 tests; OPC/ZIP all-target/all-feature compilation passes. Workspace exits101 on required ODF policy getter/import and consumer qualification/import errors. Both harness groups are not reached. No final acceptance or native performance claim."
+}

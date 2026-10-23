@@ -289,3 +289,13 @@ new fixture needs the crate error type in scope and a cloned owned source for
 corrected without changing production behavior.
 [consumer-v20.json](results/0362uf/consumer-v20.json) retains the compiler
 receipt; later groups were not reached.
+
+The twenty-first pass on `d1a49d80a1` confirms all 1,515 combined DOCX
+library tests pass, including the independent native/facade execution-context
+regressions. OPC/ZIP all-target/all-feature compilation also passes. Workspace
+checking ends after 489.03 seconds with required ODF policy import/getter
+errors and remaining test import/qualification errors in ODF, DOCX and XLSB.
+The whole diagnosed batch is assigned for consumer repair; no lint allowance
+or default-policy fallback is accepted. Both harness groups remain unreached.
+[consumer-v21.json](results/0362uf/consumer-v21.json) retains exact commands,
+source, logs and hashes.
