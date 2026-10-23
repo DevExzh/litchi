@@ -3073,6 +3073,7 @@ struct PreparedTopologyState {
     retained: Option<Arc<PreparedTopologyRetention>>,
     effective: Option<EffectiveTopologyData>,
     totals: Option<PreparedTopologyTotals>,
+    metadata_lengths: Option<(usize, usize)>,
     _catalog_reservation: Option<Arc<Reservation>>,
     no_op: bool,
 }
@@ -3221,52 +3222,6 @@ impl EffectivePartData<'_> {
 }
 
 impl PreparedTopology {
-    /// Return exact candidate relationship/content-types member lengths without
-    /// materializing unchanged source payloads.
-    pub fn topology_metadata_lengths(&self, presentation_uri: &PackURI) -> Result<(usize, usize)> {
-        let relationships_uri = presentation_uri
-            .rels_uri()
-            .map_err(OpcError::InvalidPackUri)?;
-        let relationships = self
-            .member_length(relationships_uri.membername())
-            .or(self
-                .package
-                .declared_relationships_uncompressed_size(presentation_uri)?)
-            .ok_or_else(|| {
-                overlay_unavailable("topology plan has no presentation relationships")
-            })?;
-        let content_types = self
-            .member_length(&self.package.catalog.content_types_member)
-            .unwrap_or(self.package.declared_content_types_uncompressed_size()?);
-        Ok((
-            usize::try_from(relationships)
-                .map_err(|_| overlay_unavailable("relationship metadata length exceeds usize"))?,
-            usize::try_from(content_types)
-                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?,
-        ))
-    }
-
-    fn member_length(&self, member_name: &str) -> Option<u64> {
-        self.state
-            .changed
-            .iter()
-            .find_map(|overlay| match &overlay.target {
-                ChangedOverlayTarget::Member(name) if name.eq_ignore_ascii_case(member_name) => {
-                    Some(overlay.replacement.len() as u64)
-                },
-                _ => None,
-            })
-            .or_else(|| {
-                self.state
-                    .retained
-                    .as_ref()?
-                    .policy_appended
-                    .iter()
-                    .find(|entry| entry.name.eq_ignore_ascii_case(member_name))
-                    .map(|entry| entry.payload.len() as u64)
-            })
-    }
-
     /// Run a read-only semantic callback over the complete effective OPC
     /// catalog before any external output is accepted.
     ///
@@ -9119,8 +9074,10 @@ impl SourceBackedPackage {
         presentation_uri: &PackURI,
         plan: SourceTopologyPlan,
     ) -> Result<(usize, usize)> {
-        let prepared = self.clone().prepare_topology(plan)?;
-        prepared.topology_metadata_lengths(presentation_uri)
+        let state = self.prepare_topology_state_mode(plan, true, Some(presentation_uri))?;
+        state.metadata_lengths.ok_or_else(|| {
+            overlay_unavailable("topology metadata length planning produced no result")
+        })
     }
 
     /// Validate a complete prepared candidate while borrowing this package.
@@ -9155,6 +9112,15 @@ impl SourceBackedPackage {
     }
 
     fn prepare_topology_state(&self, plan: SourceTopologyPlan) -> Result<PreparedTopologyState> {
+        self.prepare_topology_state_mode(plan, false, None)
+    }
+
+    fn prepare_topology_state_mode(
+        &self,
+        plan: SourceTopologyPlan,
+        metadata_only: bool,
+        metadata_owner: Option<&PackURI>,
+    ) -> Result<PreparedTopologyState> {
         self.disable_read_ahead_for_publication()?;
         if plan.is_empty() {
             self.source.ensure_current()?;
@@ -9164,6 +9130,7 @@ impl SourceBackedPackage {
                 retained: None,
                 effective: None,
                 totals: None,
+                metadata_lengths: None,
                 _catalog_reservation: None,
                 no_op: true,
             });
@@ -10831,6 +10798,65 @@ impl SourceBackedPackage {
         content_type_memory_reservations.extend(content_types_replacement.1.take());
         let content_types_replacement = content_types_replacement.0.take();
 
+        if metadata_only {
+            let materialized_content_types_summary =
+                if let Some(replacement) = content_types_replacement.as_ref() {
+                    Some(ContentTypesPublicationSummary {
+                        bytes: replacement.len() as u64,
+                        mappings: candidate_content_type_mapping_count.ok_or_else(|| {
+                            overlay_unavailable(
+                                "content-types replacement is missing its planned mapping count",
+                            )
+                        })? as u64,
+                    })
+                } else {
+                    None
+                };
+            self.validate_topology_limits(
+                &pending_replacements,
+                &pending_removals,
+                &additions,
+                &relationship_publications,
+                materialized_content_types_summary,
+                &raw_relationship_removed_entries,
+            )?;
+            let metadata_owner = metadata_owner
+                .ok_or_else(|| overlay_unavailable("topology metadata owner is unavailable"))?;
+            let presentation_relationships = relationship_publications
+                .iter()
+                .find(|publication| publication.owner.is_equivalent_to(metadata_owner))
+                .map(|publication| {
+                    publication
+                        .raw_xml
+                        .as_ref()
+                        .map_or(publication.xml.len(), |xml| xml.len())
+                })
+                .or(self
+                    .declared_relationships_uncompressed_size(metadata_owner)?
+                    .and_then(|length| usize::try_from(length).ok()))
+                .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
+            let content_types = content_types_replacement.as_ref().map_or_else(
+                || {
+                    self.declared_content_types_uncompressed_size()
+                        .and_then(|length| {
+                            usize::try_from(length).map_err(|_| {
+                                overlay_unavailable("content-types metadata length exceeds usize")
+                            })
+                        })
+                },
+                |replacement| Ok(replacement.len()),
+            )?;
+            return Ok(PreparedTopologyState {
+                changed: Vec::new(),
+                retained: None,
+                effective: None,
+                totals: None,
+                metadata_lengths: Some((presentation_relationships, content_types)),
+                _catalog_reservation: None,
+                no_op: true,
+            });
+        }
+
         // Check bounded byte resources before auditing authored XML so a
         // payload that violates both limits reports the deterministic policy
         // refusal without first parsing attacker-controlled data.
@@ -11084,6 +11110,7 @@ impl SourceBackedPackage {
                 retained: None,
                 effective: None,
                 totals: None,
+                metadata_lengths: None,
                 _catalog_reservation: None,
                 no_op: true,
             });
@@ -11540,6 +11567,7 @@ impl SourceBackedPackage {
             })),
             effective: Some(effective),
             totals: Some(totals),
+            metadata_lengths: None,
             _catalog_reservation: catalog_reservation,
             no_op: false,
         })
