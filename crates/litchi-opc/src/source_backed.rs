@@ -3260,10 +3260,10 @@ impl PreparedTopology {
                 self.state
                     .retained
                     .as_ref()?
-                    .appended_metadata
+                    .policy_appended
                     .iter()
-                    .find(|(name, _)| name.eq_ignore_ascii_case(member_name))
-                    .map(|(_, bytes)| bytes.len() as u64)
+                    .find(|entry| entry.name.eq_ignore_ascii_case(member_name))
+                    .map(|entry| entry.payload.len() as u64)
             })
     }
 
