@@ -3612,64 +3612,46 @@ impl Edit {
         }
 
         let added_offset = self.added.len();
-        let joined_capture_budget = match (&self.capture_budget, &other.capture_budget) {
-            (Some(left), Some(right)) => match left.joined(right, added_offset) {
-                Ok(joined) => Some(joined),
-                Err((observed, maximum)) => {
-                    reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                        observed, maximum,
-                    )));
-                },
-            },
+        let joined_capture_budget_result = match (&self.capture_budget, &other.capture_budget) {
+            (Some(left), Some(right)) => left
+                .joined(right, added_offset)
+                .map(Some)
+                .map_err(|error| error),
             (Some(left), None) => {
-                let derived = match CaptureBudget::from_staged(
+                let derived = CaptureBudget::from_staged(
                     &other.base,
                     left.maximum,
                     &other.sheets,
                     &other.added,
-                ) {
-                    Ok(derived) => derived,
-                    Err(_error) => {
-                        reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                            usize::MAX,
-                            left.maximum,
-                        )));
-                    },
-                };
-                match left.joined(&derived, added_offset) {
-                    Ok(joined) => Some(joined),
-                    Err((observed, maximum)) => {
-                        reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                            observed, maximum,
-                        )));
-                    },
+                )
+                .map_err(|_error| (usize::MAX, left.maximum));
+                match derived {
+                    Ok(derived) => left.joined(&derived, added_offset).map(Some),
+                    Err(error) => Err(error),
                 }
             },
             (None, Some(right)) => {
-                let derived = match CaptureBudget::from_staged(
+                let derived = CaptureBudget::from_staged(
                     &self.base,
                     right.maximum,
                     &self.sheets,
                     &self.added,
-                ) {
-                    Ok(derived) => derived,
-                    Err(_error) => {
-                        reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                            usize::MAX,
-                            right.maximum,
-                        )));
-                    },
-                };
-                match derived.joined(right, added_offset) {
-                    Ok(joined) => Some(joined),
-                    Err((observed, maximum)) => {
-                        reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                            observed, maximum,
-                        )));
-                    },
+                )
+                .map_err(|_error| (usize::MAX, right.maximum));
+                match derived {
+                    Ok(derived) => derived.joined(right, added_offset).map(Some),
+                    Err(error) => Err(error),
                 }
             },
-            (None, None) => None,
+            (None, None) => Ok(None),
+        };
+        let joined_capture_budget = match joined_capture_budget_result {
+            Ok(joined) => joined,
+            Err((observed, maximum)) => {
+                reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
+                    observed, maximum,
+                )));
+            },
         };
 
         let other_cross_workbook_scalar = other.cross_workbook_scalar;
