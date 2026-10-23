@@ -115,14 +115,9 @@ REVIEWED_REGISTRY_ADDITIONS = {
             "checksum": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
         }
     ],
-    "owner": [
-        {
-            "name": "smallvec",
-            "version": "1.16.3",
-            "source": REGISTRY_SOURCE,
-            "checksum": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
-        }
-    ],
+    # The owner source adds the edge, but its baseline closure already carries
+    # this exact identity through another selected local package.
+    "owner": [],
 }
 OWNER_FIXTURES = (
     "basic.numbers",
@@ -1068,8 +1063,22 @@ def lock_delta_manifest(
     candidate_registry = _registry_rows(candidate_rows)
     seed_registry = _registry_rows(seed_rows)
     registry_delta = _registry_comparison(base_registry, candidate_registry)
-    expected_added = set(source_dependencies["registry_added"])
-    expected_removed = set(source_dependencies["registry_removed"])
+    base_by_name: dict[str, set[tuple[str, str, str, str]]] = {}
+    candidate_by_name: dict[str, set[tuple[str, str, str, str]]] = {}
+    for row in base_registry:
+        base_by_name.setdefault(row["name"], set()).add(_registry_identity(row))
+    for row in candidate_registry:
+        candidate_by_name.setdefault(row["name"], set()).add(_registry_identity(row))
+    expected_added = {
+        name
+        for name in source_dependencies["registry_added"]
+        if candidate_by_name.get(name, set()) - base_by_name.get(name, set())
+    }
+    expected_removed = {
+        name
+        for name in source_dependencies["registry_removed"]
+        if base_by_name.get(name, set()) - candidate_by_name.get(name, set())
+    }
     actual_added = {row["name"] for row in registry_delta["added"]}
     actual_removed = {row["name"] for row in registry_delta["removed"]}
     if actual_added != expected_added or actual_removed != expected_removed:

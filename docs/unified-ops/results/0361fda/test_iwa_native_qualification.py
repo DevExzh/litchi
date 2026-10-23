@@ -324,7 +324,7 @@ class NativeQualificationTests(unittest.TestCase):
                     ]
                 )
             rows.extend(owner_rows)
-        if candidate:
+        if candidate or owner:
             rows.extend(
                 [
                     "",
@@ -568,6 +568,8 @@ class NativeQualificationTests(unittest.TestCase):
             "owner", base_source, candidate_source, base_lock, candidate_lock, seed_lock
         )
         self.assertEqual(delta["source_dependencies"]["registry_added"], ["smallvec"])
+        self.assertEqual(delta["registry"]["added"], [])
+        self.assertEqual(delta["reviewed_registry_additions"], [])
         self.assertNotIn("litchi-ops", delta["source_dependencies"]["packages"])
         RUNNER.verify_lock_delta(
             delta, "owner", base_source, candidate_source, base_lock, candidate_lock, seed_lock

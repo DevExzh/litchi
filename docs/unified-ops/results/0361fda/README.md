@@ -29,9 +29,11 @@ source, and checksum. It also requires identical endpoint common identities
 and every added/removed registry package and local edge/feature to match the
 selected source dependency delta. The required registry edges and complete
 selected local closure must be present in both endpoint locks and the pinned
-seed; the reviewed `smallvec` addition is pinned to version 1.16.3 and its
-recorded crates.io checksum. Release builds use `--locked`; validation, timing,
-and collection
+seed; the constructor's reviewed `smallvec` lock addition is pinned to
+version 1.16.3 and its recorded crates.io checksum. The owner source adds the
+same edge but already has that identity in its baseline closure, so its lock
+delta records no registry addition while still checking the exact required
+identity. Release builds use `--locked`; validation, timing, and collection
 recompute both comparisons from retained source and lock artifacts. There is
 no shared-prefix or blanket lock-drift exception. The runner also freezes the
 lockfile identities, records toolchain and binary hashes,
