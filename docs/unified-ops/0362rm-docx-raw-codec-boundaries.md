@@ -71,11 +71,10 @@ event, text, graph, and metadata bounds.
 - `git diff --check` passed.
 - Static searches found no tracked consumer of the removed public free codec
   exports or `Resource::from_xml`.
-- Cargo, rustdoc, the API glossary capture, and native performance runs were
-  intentionally not started while the coordinator's target and host-disk hold
-  was active. The coordinator must run the full all-feature DOCX consumers,
-  glossary/inventory capture, Clippy, and the paired raw lifecycle probes
-  before acceptance.
+- The bounded Cargo receipt below covers the glossary raw-helper focus and the
+  complete `litchi-docx` library. The coordinator must still run the full
+  all-feature DOCX consumers, glossary/inventory capture, Clippy, and paired
+  raw lifecycle probes before acceptance.
 
 ## Runtime receipt
 
@@ -86,25 +85,27 @@ are intentionally not tracked.
 
 | Run | Source commit / tree | Command | Exit | Tests | Log size / SHA-256 |
 | --- | --- | --- | ---: | ---: | --- |
-| Glossary focus | `7fb00ee4ad2f6229613b58ad78d548bc116f0a6d` / `9e8e69f0529f5e2e639fa6361412f508200615dd` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 55 passed | 5,178 bytes / `e187a2fa98baa8dd2800d83b150bc0c3088466a2d95953fedbe27c6beff1f18b` |
-| DOCX library | `d331043548139488f0127e245b945ba6dedf1b0b` / `52f0673013ea98a3793d162de2420af1cfbe8f2c` | `cargo test -p litchi-docx --lib -- --test-threads=1` | 0 | 1,487 passed | 133,008 bytes / `15f8474416a1330e11cb0eaa818c3115f7cb4d0cb3be2774fd2681ff03367306` |
+| Glossary focus | `e2c7bf5808b12262a8d1640a44060fe82dabf135` / `c86d4f5d01c9c9c68fbecceb5734d1a0c8d11896` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 56 passed | 5,268 bytes / `a068fd70b38a9710cc90437733abc144ff396f7492a2a374901101429ebf3a82` |
+| DOCX library | `e2c7bf5808b12262a8d1640a44060fe82dabf135` / `c86d4f5d01c9c9c68fbecceb5734d1a0c8d11896` | `cargo test -p litchi-docx --lib -- --test-threads=1` | 0 | 1,488 passed | 133,098 bytes / `1806f5df52d0402ed73549c27cbb648e45f14b70caf88fd0e8c380702c6dba88` |
 
 Both commands used `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH`,
 `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-docx-p0/target`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`,
 `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
 `RUST_TEST_THREADS=1`, `LITCHI_MEM_MAX=20G`, and an external `TMPDIR`.
-The focused run used `TMPDIR=/tmp/litchi-docx-glossary-7fb00ee4ad`; the
-library run used `TMPDIR=/tmp/litchi-docx-lib-54d6037fcc`.
+The focused run used `TMPDIR=/tmp/litchi-docx-glossary-e2c7bf5808`; the
+library run used `TMPDIR=/tmp/litchi-docx-lib-e2c7bf5808`.
 The focused log is
-`glossary-55.cargo.log` (`/tmp/litchi-docx-glossary-7fb00ee4ad/cargo.log`)
+`glossary-56.cargo.log`
+(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-56.cargo.log`)
 and the library log is
-`docx-lib-1487.cargo.log` (`/tmp/litchi-docx-lib-54d6037fcc/cargo.log`).
-The final target directory measured 2,195,105,726 bytes (2.1G).
+`docx-lib-1488.cargo.log`
+(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/docx-lib-1488.cargo.log`).
+The final target directory measured 2,195,122,790 bytes (2.1G).
 
-After the full-library receipt, the source advanced through
-`4e447dd42e`, `1a567f58c0`, and `7fb00ee4ad`; the final-source focused receipt
-above covers those admission/validator-only changes. No test was rerun for
-this record-only update.
+Both final runs used the same source commit and tree shown above; no source
+changes were made after either test. These rows supersede the earlier 55-test
+focused and 1,487-test library receipts while their copied logs remain
+available for historical comparison in the same evidence directory.
 
 No executable, fixture, or large performance artifact is part of this record.
