@@ -2117,7 +2117,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("named-sheet-views.xlsx");
         package.save(&path).unwrap();
-        let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
+        let reopened = OpcPackage::open(&path, SourceLimits::default()).unwrap();
         assert_eq!(
             load_worksheet_named_sheet_views(&reopened, &worksheet).unwrap(),
             Some(value)
@@ -2152,7 +2152,7 @@ mod tests {
     fn poi_fixture_has_no_named_sheet_views_relationship() {
         let package = OpcPackage::from_bytes(
             include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx"),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
         let sheet = package

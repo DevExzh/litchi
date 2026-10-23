@@ -171,7 +171,7 @@ fn replace_same_width(mut bytes: Vec<u8>, from: &[u8], to: &[u8]) -> Vec<u8> {
 
 fn with_unused_relationship(bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let payload = b"unused relationship resource".to_vec();
-    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(format!("/{UNUSED_MEDIA}")).unwrap(),

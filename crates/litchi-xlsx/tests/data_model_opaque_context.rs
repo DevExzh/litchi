@@ -116,8 +116,7 @@ fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_over
 #[test]
 fn public_model_context_capture_survives_descriptor_edit_and_exact_inverse() {
     let source_bytes = source_with_context(SOURCE, SOURCE_BASE);
-    let original =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let original = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     let original_workbook = original
         .get_part(&PackURI::new(WORKBOOK).unwrap())
         .unwrap()

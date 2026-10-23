@@ -659,10 +659,9 @@ mod revisions_family {
 
     #[test]
     fn a_signed_fixture_refuses_a_store_and_keeps_exact_noops() {
-        let mut value =
-            load_workbook_revisions(&open(&read(TRACKED)), &litchi_opc::SourceLimits::default())
-                .unwrap()
-                .expect("tracked revisions");
+        let mut value = load_workbook_revisions(&open(&read(TRACKED)), &SourceLimits::default())
+            .unwrap()
+            .expect("tracked revisions");
         value.users_relationship_id = "rIdRevisionUsers".into();
         value.headers_relationship_id = "rIdRevisionHeaders".into();
         let options = EditOptions::default().conformance(RevisionConformance::Transitional);
@@ -688,10 +687,9 @@ mod revisions_family {
             assert!(edit.replace(Some(value.clone())).unwrap());
             let output = bytes(&edit.commit().unwrap().into_package());
             assert!(!carries_signature(&output), "{name}");
-            let stored =
-                load_workbook_revisions(&open(&output), &litchi_opc::SourceLimits::default())
-                    .unwrap()
-                    .unwrap();
+            let stored = load_workbook_revisions(&open(&output), &SourceLimits::default())
+                .unwrap()
+                .unwrap();
             assert_eq!(stored.headers, value.headers, "{name}");
             assert_eq!(stored.logs.len(), value.logs.len(), "{name}");
         }
@@ -730,7 +728,7 @@ mod revisions_family {
                 .package(),
         );
         assert!(!carries_signature(&output));
-        let users = load_workbook_revisions(&open(&output), &litchi_opc::SourceLimits::default())
+        let users = load_workbook_revisions(&open(&output), &SourceLimits::default())
             .unwrap()
             .unwrap()
             .users

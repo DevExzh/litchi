@@ -82,7 +82,7 @@ fn rich_deck() -> Vec<u8> {
     edit.add(0_usize, &chart).unwrap();
     let package = edit.commit().unwrap().into_package();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
 
     opc.try_add_part(Box::new(BlobPart::new(
         PackURI::new(COMMENTS).unwrap(),
@@ -132,7 +132,7 @@ fn open(bytes: &[u8]) -> SourceBackedPresentation {
 }
 
 fn rewrite(bytes: &[u8], edit: impl FnOnce(&mut OpcPackage)) -> Vec<u8> {
-    let mut opc = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut opc = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     edit(&mut opc);
     PackageWriter::to_bytes(&opc).unwrap()
 }

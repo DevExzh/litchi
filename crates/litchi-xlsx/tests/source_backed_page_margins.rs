@@ -189,7 +189,7 @@ fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::page_margins::s
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -231,14 +231,14 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     assert_eq!(budget.used(Resource::Memory), part_len(&bytes, MAIN));
     let commit = changed_commit(&editor);
     assert_eq!(budget.used(Resource::Memory), exact);
-    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     assert_eq!(
         litchi_xlsx::page_margins::Snapshot::load(
-            &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap(),
+            &OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap(),
             "Sheet1",
         )
         .unwrap()
@@ -278,8 +278,7 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::page_margins::Snapshot::load(&replay, "Sheet1")
@@ -293,7 +292,7 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -305,9 +304,8 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
     let published = commit.patch().after().clone();
     assert_eq!(published.page_margins(), Some(&target_margins()));
 
-    let source =
-        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
-    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -447,8 +445,7 @@ fn foreign_changed_and_retargeted_sources_are_rejected() {
     ));
     assert!(output.is_empty());
 
-    let mut retargeted =
-        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut retargeted = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
     let workbook = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap();
@@ -519,11 +516,8 @@ fn chartsheet_selection_is_refused() {
     const CHARTSHEET_CT: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
-    let mut package = OpcPackage::from_bytes(
-        &ordinary_fixture("", false),
-        litchi_opc::SourceLimits::default(),
-    )
-    .unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&ordinary_fixture("", false), SourceLimits::default()).unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&sheet_uri).unwrap();
     sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
@@ -561,6 +555,6 @@ fn replay_patch(
         .apply_page_margins(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
     Ok(())
 }

@@ -69,7 +69,7 @@ fn transported(patch: &Patch) -> Patch {
 
 fn with_unused_relationship(bytes: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let payload = b"unused slide-properties resource".to_vec();
-    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(format!("/{UNUSED_PART}")).unwrap(),

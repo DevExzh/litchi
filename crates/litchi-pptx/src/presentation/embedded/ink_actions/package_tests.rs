@@ -2012,17 +2012,17 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
 fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
     let seed = package_with_presentation();
     let bytes = serialized_opc(&seed);
-    let base = OpcPackage::from_vec(bytes.clone(), litchi_opc::SourceLimits::default()).unwrap();
+    let base = OpcPackage::from_vec(bytes.clone(), SourceLimits::default()).unwrap();
     let slide_name = PackURI::new(SLIDE_NAME).unwrap();
     let root = PackURI::new("/").unwrap();
     let owner_rels_member = "ppt/slides/_rels/slide1.xml.rels";
     let root_rels_member = "_rels/.rels";
 
     let base_owner_source = base
-        .source_relationships(&slide_name, litchi_opc::SourceLimits::default())
+        .source_relationships(&slide_name, SourceLimits::default())
         .unwrap();
     let base_root_source = base
-        .source_relationships(&root, litchi_opc::SourceLimits::default())
+        .source_relationships(&root, SourceLimits::default())
         .unwrap();
     assert!(base_owner_source.member_present());
     assert!(base_root_source.member_present());
@@ -2040,15 +2040,14 @@ fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
 
     for member in [owner_rels_member, root_rels_member] {
         let mutated_bytes = with_relationship_source_markers(&bytes, &[member]);
-        let mut mutated =
-            OpcPackage::from_vec(mutated_bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let mut mutated = OpcPackage::from_vec(mutated_bytes, SourceLimits::default()).unwrap();
         let changed_source = if member == owner_rels_member {
             mutated
-                .source_relationships(&slide_name, litchi_opc::SourceLimits::default())
+                .source_relationships(&slide_name, SourceLimits::default())
                 .unwrap()
         } else {
             mutated
-                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .source_relationships(&root, SourceLimits::default())
                 .unwrap()
         };
         let original_source = if member == owner_rels_member {

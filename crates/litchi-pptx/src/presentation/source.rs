@@ -775,7 +775,7 @@ fn source_backed_package(
         (None, None) => SourceBackedPackage::from_read_at(
             source,
             source_limits,
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             None,
         )?,
@@ -789,7 +789,7 @@ fn source_backed_package(
         (None, Some(context)) => SourceBackedPackage::from_read_at(
             source,
             source_limits,
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             Some(context),
         )?,
@@ -1372,12 +1372,7 @@ impl SourceBackedPresentation {
         options.check_owning()?;
         let limits = options.source_limits;
         Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_reader(
-                reader,
-                limits,
-                litchi_opc::SourceCacheLimits::default(),
-                None,
-            )?,
+            SourceBackedPackage::from_reader(reader, limits, SourceCacheLimits::default(), None)?,
             limits,
         )
     }
@@ -6366,8 +6361,8 @@ mod tests {
     fn source_backed_root_and_second_slide_bytes() -> (u64, u64) {
         let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_backed_pptx())),
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             None,
         )
@@ -6406,8 +6401,8 @@ mod tests {
         ));
         let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             None,
         )
@@ -6895,7 +6890,7 @@ mod tests {
     fn managed_selected_slide_payload_is_evictable_after_view_drop() {
         let source = Arc::new(CountingSource::new(source_backed_pptx()));
         let (_budget, _cancel, context) = source_backed_context(u64::MAX);
-        let cache_limits = litchi_opc::SourceCacheLimits::new(usize::MAX, 2).unwrap();
+        let cache_limits = SourceCacheLimits::new(usize::MAX, 2).unwrap();
         let presentation = SourceBackedPresentation::from_read_at_with_options(
             source,
             crate::OpenOptions::default()
@@ -7590,7 +7585,7 @@ mod tests {
             SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 litchi_opc::SourceReadPolicy::exact(),
                 Some(context)
             ),
@@ -7627,7 +7622,7 @@ mod tests {
         let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             Some(context),
         )
@@ -7688,7 +7683,7 @@ mod tests {
     fn filesystem_path_constructors_keep_the_source_positional() {
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
-        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
+        let cache = SourceCacheLimits::new(archive.len(), 8).unwrap();
 
         assert_eq!(
             SourceBackedPresentation::open(file.path())
@@ -7867,7 +7862,7 @@ mod tests {
         let archive = source_backed_pptx();
         let file = temporary_source(&archive);
         let (budget, _cancellation_source, context) = source_backed_context(u64::MAX);
-        let cache = litchi_opc::SourceCacheLimits::new(archive.len(), 8).unwrap();
+        let cache = SourceCacheLimits::new(archive.len(), 8).unwrap();
         let presentation = SourceBackedPresentation::open_with_options(
             file.path(),
             crate::OpenOptions::default()
@@ -7917,12 +7912,9 @@ mod tests {
             .unwrap();
         assert_ne!(output, archive);
 
-        let source =
-            litchi_opc::OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())
-                .unwrap();
+        let source = litchi_opc::OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap();
         let candidate =
-            litchi_opc::OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
-                .unwrap();
+            litchi_opc::OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         for part in source
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -8028,10 +8020,7 @@ mod picture_fragment_tests {
     /// source-backed editor passes: the part-byte ceiling of the default read
     /// policy.
     fn parse_picture_relationship(xml: &[u8]) -> crate::Result<super::PictureRelationship> {
-        super::parse_picture_relationship_with_limit(
-            xml,
-            litchi_opc::SourceLimits::default().max_part_bytes(),
-        )
+        super::parse_picture_relationship_with_limit(xml, SourceLimits::default().max_part_bytes())
     }
 
     const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

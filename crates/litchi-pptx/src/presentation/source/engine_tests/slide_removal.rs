@@ -110,7 +110,7 @@ fn rewrite_archive(
 }
 
 fn rewrite_package(source: &[u8], edit: impl FnOnce(&mut OpcPackage)) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     edit(&mut package);
     PackageWriter::to_bytes(&package).unwrap()
 }
@@ -187,7 +187,7 @@ fn with_unknown_presentation_metadata(source: &[u8]) -> Vec<u8> {
 
 fn with_custom_show_reference(source: &[u8]) -> Vec<u8> {
     let main_uri = PackURI::new(MAIN).unwrap();
-    let package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     let presentation = package.get_part(&main_uri).unwrap();
     let relationship_id = presentation
         .rels()
@@ -209,7 +209,7 @@ fn with_custom_show_reference(source: &[u8]) -> Vec<u8> {
 }
 
 fn with_presentation_properties(source: &[u8], xml: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     let properties_uri = PackURI::new("/ppt/presProps.xml").unwrap();
     package
         .get_part_mut(&properties_uri)
@@ -237,7 +237,7 @@ fn selected_binding_fragment(xml: &[u8], relationship_id: &str) -> Vec<u8> {
 
 fn with_lexical_presentation_root(source: &[u8]) -> (Vec<u8>, Vec<u8>) {
     let main = member(source, MAIN);
-    let package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(source, SourceLimits::default()).unwrap();
     let main_part = package.get_part(&PackURI::new(MAIN).unwrap()).unwrap();
     let relationship_id = main_part
         .rels()
@@ -464,7 +464,7 @@ fn managed_context() -> (CancellationSource, ExecutionContext) {
 fn removes_one_slide_and_its_owned_relationship_member() {
     let source = fixture();
     let output = write_removal(&source, 1).unwrap();
-    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let main = package.get_part(&PackURI::new(MAIN).unwrap()).unwrap();
     assert_eq!(
         SourceBackedPresentationEditor::from_read_at(Arc::new(OwnedSource::new(output.clone())))
@@ -538,7 +538,7 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
         .unwrap()
         .write_to(&mut output)
         .unwrap();
-    let removed = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
+    let removed = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     assert!(
         removed
             .get_part(&PackURI::new("/ppt/media/dependency.bin").unwrap())

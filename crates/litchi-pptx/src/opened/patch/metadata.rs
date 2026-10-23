@@ -1228,7 +1228,7 @@ mod tests {
         use super::super::Patch;
         let source = OpcPackage::from_bytes(
             &crate::Package::new().unwrap().to_bytes().unwrap(),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .unwrap();
         let mut target = source.clone();

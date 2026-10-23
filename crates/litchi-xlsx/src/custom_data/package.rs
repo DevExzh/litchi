@@ -2899,11 +2899,7 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(
-            &writer.finish_to_bytes().unwrap(),
-            litchi_opc::SourceLimits::default(),
-        )
-        .unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     #[test]
@@ -3031,8 +3027,7 @@ mod tests {
                 .any(|window| window == b"/xl/customData/data1.bin")
         );
 
-        let mut reopened =
-            OpcPackage::from_vec(removed_bytes, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed_bytes, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored_bytes = PackageWriter::to_bytes(&reopened).unwrap();
         let restored_archive = soapberry_zip::office::ArchiveReader::new(&restored_bytes).unwrap();
@@ -3362,8 +3357,7 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_vec(removed, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
 
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
@@ -3386,7 +3380,7 @@ mod tests {
                 .unwrap(),
             data_relationships
         );
-        let restored = OpcPackage::from_vec(restored, litchi_opc::SourceLimits::default()).unwrap();
+        let restored = OpcPackage::from_vec(restored, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -3425,8 +3419,7 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened =
-            OpcPackage::from_vec(removed, litchi_opc::SourceLimits::default()).unwrap();
+        let mut reopened = OpcPackage::from_vec(removed, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
         let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
@@ -3470,7 +3463,7 @@ mod tests {
             archive.read("xl/connections.xml").unwrap(),
             before_connections
         );
-        let restored = OpcPackage::from_vec(restored, litchi_opc::SourceLimits::default()).unwrap();
+        let restored = OpcPackage::from_vec(restored, SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
