@@ -21,7 +21,8 @@ fn deck() -> Result<Package> {
 }
 
 fn slide_xml(package: &Package) -> Result<Vec<u8>> {
-    let part = package.edit()?.slides()[0].part_name().clone();
+    let mut edit = package.edit()?;
+    let part = edit.slides()?[0].part_name().clone();
     Ok(package.opc()?.get_part(&part)?.blob().to_vec())
 }
 

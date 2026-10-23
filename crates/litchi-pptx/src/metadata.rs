@@ -226,7 +226,7 @@ impl Package {
     fn with_metadata_opc(&self, opc: litchi_opc::OpcPackage) -> Self {
         Self {
             opc: std::sync::Arc::new(opc),
-            part_digests: std::sync::OnceLock::new(),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),
             #[cfg(feature = "encryption")]

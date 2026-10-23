@@ -305,7 +305,7 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     let mut edit = pkg.edit()?;
 
     // Retitle the closing slide and append a closing note to it.
-    let closing = edit.slides().len() - 1;
+    let closing = edit.slides()?.len() - 1;
     edit.set_shape_text(closing, 0_usize, "Financial Performance — Q4 Final")?;
     edit.add_text_box(
         closing,
