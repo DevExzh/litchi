@@ -759,12 +759,10 @@ impl Package {
         // edit boundary.  The semantic projection and mutable staging are
         // deliberately deferred until the first operation that needs them.
         ensure_editable_source(&self.package)?;
-        if let Some(presentation) = self.presentation.get() {
-            validate_edit_entry(presentation)?;
-        }
         Ok(Edit {
             source: self.clone(),
             draft: None,
+            entry_validated: false,
             changed: false,
             rdf: None,
             charts: None,
@@ -829,6 +827,7 @@ impl<'a> From<&'a str> for Selector<'a> {
 pub struct Edit {
     source: Package,
     draft: Option<MutablePresentation>,
+    entry_validated: bool,
     changed: bool,
     rdf: Option<RdfDraft>,
     charts: Option<ChartDraft>,
@@ -1034,7 +1033,18 @@ impl Edit {
             .unwrap_or_else(|| self.source.slides().unwrap_or(&[]))
     }
 
+    fn ensure_entry(&mut self) -> CoreResult<()> {
+        if self.entry_validated {
+            return Ok(());
+        }
+        let presentation = self.source.projection()?;
+        validate_edit_entry(presentation)?;
+        self.entry_validated = true;
+        Ok(())
+    }
+
     fn ensure_draft(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.draft.is_some() {
             return Ok(());
         }
@@ -2988,7 +2998,11 @@ impl Edit {
         Ok(self.commit_core()?)
     }
 
-    pub(crate) fn commit_core(self) -> CoreResult<Commit> {
+    pub(crate) fn commit_core(mut self) -> CoreResult<Commit> {
+        // Edit construction is intentionally O(1).  Validate the source XML
+        // only when the transaction is first observed or published, so a
+        // deferred no-op still refuses malformed content before publication.
+        self.ensure_entry()?;
         let rdf_changed = self
             .rdf
             .as_ref()
@@ -3333,6 +3347,7 @@ impl Edit {
     }
 
     fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> CoreResult<()> {
+        self.ensure_entry()?;
         self.check_no_slide_order_change("drawing-layer")?;
         let baseline = self.layer_base_package()?;
         let package = self.layer_package()?;
@@ -3353,6 +3368,7 @@ impl Edit {
     }
 
     fn ensure_rdf(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.rdf.is_none() {
             let package = self.source.package.clone();
             let graphs = crate::rdf::graphs(&package)?;
@@ -3401,6 +3417,7 @@ impl Edit {
     }
 
     fn ensure_charts(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.charts.is_none() {
             let limits = crate::charts::Limits::default();
             let snapshot =
@@ -3472,6 +3489,7 @@ impl Edit {
     }
 
     fn ensure_design(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.design.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
@@ -3546,6 +3564,7 @@ impl Edit {
     }
 
     fn ensure_annotations(&mut self) -> CoreResult<()> {
+        self.ensure_entry()?;
         if self.annotations.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
@@ -3588,6 +3607,7 @@ impl Edit {
     }
 
     fn content_bytes(&mut self) -> CoreResult<Arc<Vec<u8>>> {
+        self.ensure_entry()?;
         if let Some(content) = &self.content {
             return Ok(Arc::clone(&content.bytes));
         }
@@ -4527,14 +4547,11 @@ fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
     }
 }
 
-/// Preserve the edit-entry refusals that are independent of mutable draft
-/// materialization.  Opened and byte-adopted packages already retain their
-/// validated semantic projection, so this only checks the first XML root and
-/// active processing-instruction policy.  The full source scanner, slide
-/// projection, and draft are still deferred to [`Edit::ensure_draft`].
+/// Preserve the edit-entry refusals without doing source work at `Package::edit()`.
+/// This check runs when a transaction is first observed or published, after
+/// the immutable source projection is already needed for that operation.
 fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
     let xml = presentation.content_xml();
-    let scan_processing_instructions = xml_contains_possible_processing_instruction(xml);
 
     let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
@@ -4555,9 +4572,6 @@ fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
                         return invalid("ODP editing requires an office:document-content root");
                     }
                     root_checked = true;
-                    if !scan_processing_instructions {
-                        return Ok(());
-                    }
                 }
             },
             Event::Eof => {
@@ -4567,31 +4581,12 @@ fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
                     invalid("ODP editing requires an office:document-content root")
                 };
             },
-            Event::PI(_) if scan_processing_instructions => {
+            Event::PI(_) => {
                 return invalid("ODP editing refuses active processing instructions");
             },
             _ => {},
         }
     }
-}
-
-fn xml_contains_possible_processing_instruction(xml: &str) -> bool {
-    let Some(first) = xml.find("<?") else {
-        return false;
-    };
-    let after_target = xml.get(first.saturating_add(5)..);
-    let first_is_declaration = xml
-        .get(first..)
-        .is_some_and(|instruction| instruction.starts_with("<?xml"))
-        && after_target.is_some_and(|rest| {
-            rest.as_bytes()
-                .first()
-                .is_some_and(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n' | b'?'))
-        });
-    !first_is_declaration
-        || xml
-            .get(first.saturating_add(2)..)
-            .is_some_and(|rest| rest.contains("<?"))
 }
 
 fn package_security_policy(package: &OwnedPackage) -> CoreResult<SecurityPolicy> {

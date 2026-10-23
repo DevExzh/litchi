@@ -452,7 +452,9 @@ fn protected_and_opaque_selected_owners_allow_noops_but_refuse_changes() {
         },
     );
     let active = Package::from_bytes(&active_xml).unwrap();
-    assert!(active.edit().is_err());
+    // Processing-instruction refusal is deferred out of the O(1) edit entry.
+    let transaction = active.edit().unwrap();
+    assert!(transaction.commit().is_err());
 }
 
 #[test]

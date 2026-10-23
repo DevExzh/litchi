@@ -263,7 +263,10 @@ fn incomplete_source_page_coverage_is_refused_without_panicking() {
     writer.add_file("content.xml", content).unwrap();
     let snapshot = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(snapshot.slides().unwrap().len(), 1);
-    assert!(snapshot.edit().is_err());
+    // Edit construction is O(1); the source-coverage refusal is deferred
+    // until the transaction is first published.
+    let transaction = snapshot.edit().unwrap();
+    assert!(transaction.commit().is_err());
 }
 
 #[test]

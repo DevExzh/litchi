@@ -19,19 +19,19 @@ the first real replacement clones it, and reset drops the draft back to the
 source.  A no-op replace therefore does not allocate a second slide vector,
 and a no-op commit still returns the exact source bytes and an unchanged patch.
 
-The edit boundary still rejects the established signed/encrypted policy and
-the existing active-processing-instruction and invalid-root refusal cases.
-For opened/adopted projections, a bounded root/PI preflight preserves those
-entry errors without retaining a mutable draft; full source staging remains in
-the first operation's fallible materialization path.  Generated builder
-packages, whose projection is not yet cached, remain fully lazy until their
-first operation.
+The edit boundary still rejects the established signed/encrypted policy.  The
+active-processing-instruction and invalid-root refusal cases are deferred out
+of `Package::edit()` and run on the first fallible operation or commit, so a
+malformed source is refused before publication without adding source-sized
+work to edit construction.  Generated builder packages, whose projection is
+not yet cached, therefore remain fully lazy until their first operation or
+commit.
 
 Focused unit coverage asserts that a packaged edit starts with no mutable
-draft, that an exact no-op commit does not materialize one, and that the first
-slide operation does.  The existing flat replacement/no-op/inverse suite and
-all ODP CRUD, source-backed, replay, limit, refusal, fidelity and streaming
-tests remain green.
+draft, that an exact no-op commit does not materialize one, that the first
+slide operation does, and that root/PI refusal is deferred until commit.  The
+existing flat replacement/no-op/inverse suite and all ODP CRUD, source-backed,
+replay, limit, refusal, fidelity and streaming tests remain green.
 
 ## Validation
 
