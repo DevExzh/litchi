@@ -293,6 +293,8 @@ class PolicyTests(unittest.TestCase):
             [{"path": "fixture::shared_core::Commit"}],
             [{"path": "other::Commit", "target": "litchi_core::edit::Commit"}],
             [{"path": "fixture::shared_core::Commit", "target": "other::Commit"}],
+            [{"path": "fixture::shared_core::Commit", "target": []}],
+            [{"path": "fixture::shared_core::Commit", "target": {}}],
             [{"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"},
              {"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Diagnostics"}],
         ):
@@ -641,6 +643,28 @@ class RustdocTests(unittest.TestCase):
             "fixture::shared_core::Commit must resolve nominally to "
             "litchi_core::edit::Commit (record 0351)",
         ])
+
+    def test_shared_type_rows_fail_closed_for_unresolved_and_cyclic_aliases(self):
+        row = {"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"}
+        alias_id = next(
+            item_id for item_id, entry in self.document["paths"].items()
+            if entry["path"] == ["fixture", "shared_core", "Commit"]
+        )
+        for mutation in ("missing", "cycle"):
+            document = copy.deepcopy(self.document)
+            alias = document["index"][alias_id]["inner"]["type_alias"]
+            alias["type"] = {"resolved_path": {
+                "id": alias_id if mutation == "cycle" else "missing-shared-type",
+                "args": None,
+            }}
+            if mutation == "missing":
+                with self.assertRaisesRegex(ValueError, "missing rustdoc item"):
+                    gate.violations(document, profile(shared_types=[row]))
+                continue
+            self.assertEqual(gate.violations(document, profile(shared_types=[row])), [
+                "fixture::shared_core::Commit must resolve nominally to "
+                "litchi_core::edit::Commit (record 0351)",
+            ])
 
     def test_unresolved_and_recursive_result_aliases_fail_closed(self):
         for mutation in ("missing", "cycle"):

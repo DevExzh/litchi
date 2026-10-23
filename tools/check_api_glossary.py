@@ -190,7 +190,8 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             if (not isinstance(shared, dict) or set(shared) != {"path", "target"}):
                 raise ValueError("shared type requires exactly path and target")
             check_path(shared["path"])
-            if shared["target"] not in SHARED_TYPE_TARGETS:
+            if (not isinstance(shared["target"], str)
+                    or shared["target"] not in SHARED_TYPE_TARGETS):
                 raise ValueError("shared type target must be a canonical litchi_core::edit type")
             if shared["path"] in seen_shared_paths:
                 raise ValueError("duplicate shared type path")
