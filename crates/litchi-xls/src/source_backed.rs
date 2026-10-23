@@ -225,7 +225,9 @@ impl SourceBackedWorkbook {
     /// The source-backed package view of this workbook, the staging base of
     /// a source-backed family edit.
     fn staging_package(&self) -> crate::Result<crate::Package> {
-        let owner = self.materialized().map_err(crate::scoped::package_error)?;
+        let owner = self
+            .materialized()
+            .map_err(|error| crate::scoped::package_error(error.into()))?;
         crate::Package::from_source(owner).map_err(crate::scoped::package_error)
     }
 }
