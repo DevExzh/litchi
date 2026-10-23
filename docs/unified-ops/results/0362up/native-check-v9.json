@@ -1,0 +1,47 @@
+{
+  "source": "a5afb3245369a50dea6a1303ff12e2720527250b",
+  "pid": 3228667,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v9-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v9"
+  ],
+  "started_unix_seconds": 1792774803.9569693,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-xlsx",
+        "-p",
+        "litchi-xlsb",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-xls"
+      ],
+      "exit": 101,
+      "seconds": 107.94666071100073,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v9/check-0.log",
+      "bytes": 31666,
+      "sha256": "fd06eb83c1363c24753af762a38df8fc3abf7e97f86c04a4c830006d60f98c10",
+      "target_bytes_before": 1211793930,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Combined native compilation reaches the facade:45 lib and49 lib-test diagnostics include imports/qualifications, DOCX bounded XML view consumers, PPTX coalescer conversions, XLS optional source values, chart borrow scopes and tests. The full batch is assigned from this exact source. No-feature and runtime groups were not reached."
+}
