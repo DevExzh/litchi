@@ -2661,3 +2661,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   combined runtime validation, native qualification, corpus dispositions,
   inventory/glossary and the complete gate remain required. Only the
   comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, workspace Clippy pass and budget review):
+  Workspace Clippy with all targets/features and warnings denied passes on
+  `c3a9a0cef4` in 213.64 seconds. Its preceding run found an internal raw
+  container size lint and a nested Numbers test import. The container keeps
+  the complete ODF policy on the stack without an extra allocation; its
+  narrow expectation applies only when both variants exist. The Numbers
+  library run is still active on this same frozen source.
+
+  Diagnostic budget composition reaches `62c11a3dde`. The reviewed combined
+  XLSX sheet-property/filter repair `750d918386` charges the peak of sequential
+  discarded native proofs and final endpoints, including shrinking and
+  expanding edits. Common metadata `1929682421` passes scoped API/fidelity
+  review for prepared layout reuse, escaping, relationship-ID release and
+  no-op identity. Default-path overhead still needs performance qualification.
+  Shared XLSX cell fidelity/accounting and metadata endpoint admission remain
+  returned engineering work, assigned to separate workers. No diagnostic
+  source has been accepted into the main integration or trunk.
+
+  XLS source-freshness repair `c2ca0efbe8` passed static review and is composed
+  with current immutable OLE policies. Combined compilation exposed regression
+  test coordinate types and stale helper/API references; narrow fixes are
+  committed and the seventh native check is active. Runtime source-fence and
+  fresh F3 qualification remain required. The complete gate, native measures,
+  corpus replay/dispositions and final inventory/glossary remain open.
+  Only the comprehensive redaction audit is deferred. Nothing has been pushed.
