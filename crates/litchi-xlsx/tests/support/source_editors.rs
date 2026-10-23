@@ -155,7 +155,7 @@ impl RowVisibilityEditor {
         &self,
         selector: impl Into<Selector<'a>>,
     ) -> Result<row_visibility::Snapshot> {
-        Ok(self.edit(selector)?.before()?.clone())
+        Ok(self.edit(selector)?.before().clone())
     }
 
     pub fn edit<'a>(
