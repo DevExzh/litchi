@@ -322,6 +322,9 @@ def _validate_preparation(
         raise RunnerError("preparation candidate root differs")
     if candidate.get("commit") != candidate_commit or candidate_commit == shared.HISTORICAL_CANDIDATE:
         raise RunnerError("preparation candidate commit is stale or differs from selected candidate")
+    manifest_candidate = manifest.get("candidate_commit")
+    if manifest_candidate is not None and manifest_candidate != candidate_commit:
+        raise RunnerError("selected candidate differs from the manifest candidate")
     candidate_probe = candidate.get("probe")
     candidate_lock = candidate.get("lock")
     if not isinstance(candidate_probe, Mapping) or not isinstance(candidate_lock, Mapping):
