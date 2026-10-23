@@ -144,11 +144,9 @@ fn owner_family(
 }
 
 fn owner_admission(package: &Package, snapshot: &Snapshot) -> Result<properties::OwnerAdmission> {
-    let (source_bytes, discarded_target_bytes) = package.retained_bytes_for_metadata_admission();
     Ok(properties::OwnerAdmission::new(
-        source_bytes,
+        package.retained_bytes(),
         package.opc().exact_source_len().unwrap_or(0),
-        discarded_target_bytes,
         [
             owner_family(package, snapshot, Family::Core)?,
             owner_family(package, snapshot, Family::App)?,
@@ -600,13 +598,14 @@ mod tests {
     }
 
     #[test]
-    fn bounded_metadata_admission_projects_warm_target_boundaries() {
+    fn bounded_metadata_admission_is_cache_independent_at_boundaries() {
         let long = title_commit(&Package::new().unwrap(), &"long title ".repeat(64)).into_package();
         warm_cells(&long);
-        let (_, warm_cache_bytes) = long.retained_bytes_for_metadata_admission();
-        assert!(
-            warm_cache_bytes > 0,
-            "the source must carry a warm cell cache"
+        let cold_long = Package::from_opc(long.opc().clone()).unwrap();
+        assert_eq!(
+            long.retained_bytes(),
+            cold_long.retained_bytes(),
+            "warming a semantic read cache must not change the retained charge"
         );
         let shrinking = title_commit(&long, "short");
         let shrinking_required = long
@@ -668,6 +667,8 @@ mod tests {
 
         let noop = warm_package();
         warm_cells(&noop);
+        let cold_noop = Package::from_opc(noop.opc().clone()).unwrap();
+        assert_eq!(noop.retained_bytes(), cold_noop.retained_bytes());
         let expected_noop = noop.edit_metadata().unwrap().commit().unwrap();
         let noop_required = noop
             .retained_bytes()

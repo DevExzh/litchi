@@ -242,20 +242,6 @@ impl Package {
         crate::workbook::edit::workbook_retained_bytes(self.workbook_ref(), archive_hint)
     }
 
-    /// Count this package and the warm semantic caches that a changed
-    /// document-properties target drops while reopening its workbook.
-    ///
-    /// Both values come from one endpoint walk: metadata admission must keep
-    /// the source census before capture without repeating it merely to learn
-    /// how much of the target is intentionally cold.
-    pub(crate) fn retained_bytes_for_metadata_admission(&self) -> (usize, usize) {
-        let archive_hint = self.opc().exact_source_len().unwrap_or(0);
-        crate::workbook::edit::workbook_retained_bytes_with_warm_cache(
-            self.workbook_ref(),
-            archive_hint,
-        )
-    }
-
     /// Whether the package carries OPC digital-signature parts or
     /// relationships. Nothing is verified.
     #[must_use]

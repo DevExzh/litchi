@@ -93,11 +93,11 @@ impl EditOptions {
 pub(crate) fn attach_worksheet_drawing(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
     drawing_transfer::attach_worksheet(xml, relationship_id)
 }
+pub(crate) use model::workbook_retained_bytes;
 pub use model::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,
 };
-pub(crate) use model::{workbook_retained_bytes, workbook_retained_bytes_with_warm_cache};
 pub use planning::{MergeChoice, MergeLimits, ThreeWayPlan};
 pub use semantic::{Column, Defaults, Edit, FormControl, NewSheet, Row, Sheet, Tab};
 pub use svg::{PictureSelector, SvgInput};
