@@ -2695,7 +2695,10 @@ mod tests {
         }))
         .unwrap();
 
-        let error = edit.commit().unwrap_err();
+        let error = match edit.commit() {
+            Ok(_) => panic!("over-limit section output must be refused"),
+            Err(error) => error,
+        };
         assert!(matches!(
             error,
             crate::Error::SectionInventoryLimit {

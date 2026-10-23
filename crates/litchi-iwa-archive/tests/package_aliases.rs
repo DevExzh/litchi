@@ -18,7 +18,7 @@ fn archive_aliases_reach_neutral_package_primitives_directly() {
     )])
     .unwrap_or_else(|error| panic!("valid target entry should be accepted: {error}"));
 
-    let patch: litchi_iwa_package::Patch = Patch::between(&source, &target);
+    let patch: Patch = Patch::between(&source, &target);
     assert_eq!(patch.version(), Patch::VERSION);
     assert_eq!(patch.changes().len(), 1);
     assert_eq!(patch.changes()[0].kind(), PackageEntryChangeKind::Replaced);

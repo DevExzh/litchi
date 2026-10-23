@@ -56,18 +56,6 @@ type name, without changing runtime behavior.
 receipt. The harness group was not reached; consumer and semantic validation
 remain pending.
 
-## ODT durable replay error conversion
-
-The fifth check ran on `7e2dacd743`, passed the DOCX library, and reached
-ODT. Two return expressions in durable replay still returned the common-core
-error after the function moved to the ODF family error. The correction uses
-the existing `PackageError::from` conversion for restored ingress and wraps
-the unchanged invalid-target cause. It preserves the recipient XML limits,
-typed limit conversion, and separate stale-base `PatchConflict` path.
-
-[consumer-v5.json](results/0362uf/consumer-v5.json) preserves the failure
-receipt. The harness and affected semantic checks remain pending.
-
 ## Graph memo cleanup
 
 The fourth check ran on `d797add634` after integrating the reviewed external
@@ -80,3 +68,32 @@ metadata fields. Removing that private accessor retains the separate
 [consumer-v4.json](results/0362uf/consumer-v4.json) records the stopped
 command. The harness was not reached, and the assembled semantic checks
 remain pending.
+
+## ODT durable replay error conversion
+
+The fifth check ran on `7e2dacd743`, passed the DOCX library, and reached
+ODT. Two return expressions in durable replay still returned the common-core
+error after the function moved to the ODF family error. The correction uses
+the existing `PackageError::from` conversion for restored ingress and wraps
+the unchanged invalid-target cause. It preserves the recipient XML limits,
+typed limit conversion, and separate stale-base `PatchConflict` path.
+
+[consumer-v5.json](results/0362uf/consumer-v5.json) preserves the failure
+receipt. The harness and affected semantic checks remain pending.
+
+## Complete consumer diagnostic pass
+
+The sixth attempt ran on `a814baa1de` with `--keep-going`. The format
+libraries reached the facade, and the compiler reported remaining ODF
+error-type migrations in facade and native tests, nested PPTX refusal guards
+that require stable outer match guards, and two isolated DOCX/IWA test lints.
+The runner ended without saving its final exit receipt. The retained log
+proves these compilation failures; it does not establish an exact exit code
+or duration, and the performance-harness command was not reached.
+
+[consumer-v6.json](results/0362uf/consumer-v6.json) records the source, command
+and log size/hash. Separate consumer repairs retain the typed causes and
+assertions. The DOCX section assertion now explicitly extracts its error
+without requiring Debug on the private success type. The IWA assertion uses
+the directly re-exported Patch name without a denied redundant qualification.
+No public behavior changes in those two corrections.
