@@ -76,6 +76,25 @@ enum CorpusChoice {
     All,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Implementation {
+    Baseline,
+    Candidate,
+}
+
+impl Implementation {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "baseline" => Ok(Self::Baseline),
+            "candidate" => Ok(Self::Candidate),
+            _ => Err(format!(
+                "unknown XLS F3 implementation {value:?}; expected baseline or candidate"
+            )
+            .into()),
+        }
+    }
+}
+
 impl CorpusChoice {
     fn parse(value: &str) -> Result<Self> {
         match value {
@@ -879,7 +898,7 @@ fn build_fixtures(choice: CorpusChoice) -> Result<Vec<Fixture>> {
     Ok(fixtures)
 }
 
-fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
+fn verify_noop_and_unsupported(fixture: &Fixture, implementation: Implementation) -> Result<()> {
     let source = source_workbook(&fixture.archive)?;
     let noop = source.edit_cells()?.commit()?;
     let diagnostics = noop.diagnostics();
@@ -920,11 +939,10 @@ fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
                 },
                 Err(error) => error,
             };
-            require_refusal(
+            require_unsupported_target_commit(
                 error,
                 &format!("{} unsupported target commit", fixture.name),
-                RefusalKind::UnsupportedOperation,
-                "source-backed numeric plan accepts no structural or resource edits",
+                implementation,
             )?;
         },
     }
@@ -942,23 +960,55 @@ fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
                 },
                 Err(error) => error,
             };
-        let expected = format!(
+        let legacy_expected = format!(
             "cell ({}, {}) is not encoded as a standalone BIFF8 Number record",
             first.reference.row(),
             first.reference.column()
         );
-        match error {
-            litchi_xls::Error::UnsupportedFeature(message) if message == expected => {},
-            other => {
-                return Err(format!(
-                    "XLS F3 {} wrong-family refusal was not the exact typed error: {other:?}",
-                    fixture.name
-                )
-                .into());
+        match implementation {
+            Implementation::Baseline => match error {
+                litchi_xls::Error::UnsupportedFeature(message) if message == legacy_expected => {},
+                other => {
+                    return Err(format!(
+                        "XLS F3 {} baseline wrong-family disposition changed: {other:?}",
+                        fixture.name
+                    )
+                    .into());
+                },
             },
+            Implementation::Candidate => require_refusal(
+                error,
+                &format!("{} wrong-family", fixture.name),
+                RefusalKind::UnsupportedTarget,
+                "the selected cell is not an existing standalone BIFF8 Number",
+            )?,
         }
     }
     Ok(())
+}
+
+fn require_unsupported_target_commit(
+    error: litchi_xls::Error,
+    label: &str,
+    implementation: Implementation,
+) -> Result<()> {
+    match implementation {
+        Implementation::Baseline => match error {
+            litchi_xls::Error::UnsupportedFeature(message)
+                if message
+                    == "source-backed numeric plan accepts no structural or resource edits" =>
+            {
+                Ok(())
+            },
+            other => Err(format!("XLS F3 {label} baseline disposition changed: {other:?}").into()),
+        },
+        Implementation::Candidate => require_refusal(
+            error,
+            label,
+            RefusalKind::UnsupportedOperation,
+            "source-backed numeric plan accepts no structural or resource edits",
+        ),
+    }
 }
 
 fn require_refusal(
@@ -1052,8 +1102,10 @@ enum SecurityOpenError {
     Edit(litchi_xls::Error),
 }
 
-const EXPECTED_PROTECTED_REFUSAL: &str =
+const EXPECTED_TYPED_PROTECTED_REFUSAL: &str =
     "signed, encrypted, or DRM containers are not eligible for source-backed editing";
+const EXPECTED_LEGACY_PROTECTED_REFUSAL: &str =
+    "signed, encrypted, or DRM containers are not eligible for object editing";
 
 fn require_signed_marker(bytes: &[u8]) -> Result<()> {
     let mut ole = OleFile::open(Cursor::new(bytes))?;
@@ -1113,19 +1165,32 @@ fn require_encrypted_marker(bytes: &[u8]) -> Result<()> {
     Err("XLS F3 encrypted fixture lacks a BIFF FILEPASS marker".into())
 }
 
-fn require_signed_refusal(error: SecurityOpenError, label: &str) -> Result<()> {
-    match error {
-        SecurityOpenError::Edit(litchi_xls::Error::Refused(refusal))
-            if refusal.kind() == RefusalKind::Protected
-                && refusal.operation() == "edit cells"
-                && refusal.reason() == EXPECTED_PROTECTED_REFUSAL =>
-        {
-            Ok(())
+fn require_signed_refusal(
+    error: SecurityOpenError,
+    label: &str,
+    implementation: Implementation,
+) -> Result<()> {
+    match implementation {
+        Implementation::Baseline => match error {
+            SecurityOpenError::Edit(litchi_xls::Error::Object(litchi_ole_common::Error::Cfb(
+                litchi_cfb::OleError::InvalidFormat(message),
+            ))) if message == EXPECTED_LEGACY_PROTECTED_REFUSAL => Ok(()),
+            other => {
+                Err(format!("XLS F3 {label} baseline signed disposition changed: {other:?}").into())
+            },
         },
-        other => Err(format!(
-            "XLS F3 {label} fixture returned an unexpected security refusal: {other:?}"
-        )
-        .into()),
+        Implementation::Candidate => match error {
+            SecurityOpenError::Edit(litchi_xls::Error::Refused(refusal))
+                if refusal.kind() == RefusalKind::Protected
+                    && refusal.operation() == "edit cells"
+                    && refusal.reason() == EXPECTED_TYPED_PROTECTED_REFUSAL =>
+            {
+                Ok(())
+            },
+            other => Err(
+                format!("XLS F3 {label} candidate signed disposition changed: {other:?}").into(),
+            ),
+        },
     }
 }
 
@@ -1144,6 +1209,7 @@ fn verify_security_refusal(
     bytes: &[u8],
     label: &str,
     expectation: SecurityExpectation,
+    implementation: Implementation,
 ) -> Result<()> {
     match expectation {
         SecurityExpectation::RefuseEdit { kind, reason } => {
@@ -1161,7 +1227,7 @@ fn verify_security_refusal(
                 });
             match opened {
                 Ok(()) => Err(format!("XLS F3 {label} fixture unexpectedly opened").into()),
-                Err(error) => require_signed_refusal(error, label),
+                Err(error) => require_signed_refusal(error, label, implementation),
             }
         },
         SecurityExpectation::RefuseEncryptedOpen => {
@@ -1233,7 +1299,7 @@ fn verify_policy_refusal(
     }
 }
 
-fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
+fn verify_security_fixtures(fixture: &Fixture, implementation: Implementation) -> Result<()> {
     verify_security_refusal(
         &protected_fixture()?,
         "protected",
@@ -1241,11 +1307,13 @@ fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
             kind: RefusalKind::Protected,
             reason: "protected worksheets are not eligible for source-backed numeric edits",
         },
+        implementation,
     )?;
     verify_security_refusal(
         &add_stream(&fixture.archive, &["DigitalSignature"], b"signature")?,
         "signed",
         SecurityExpectation::RefuseSignedOpen,
+        implementation,
     )?;
     verify_security_refusal(
         &macro_fixture(&fixture.archive)?,
@@ -1254,11 +1322,13 @@ fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
             kind: RefusalKind::UnsupportedOperation,
             reason: "macro-bearing XLS sources are not eligible for source-backed numeric edits",
         },
+        implementation,
     )?;
     verify_security_refusal(
         &encrypted_fixture()?,
         "encrypted",
         SecurityExpectation::RefuseEncryptedOpen,
+        implementation,
     )?;
     Ok(())
 }
@@ -1312,6 +1382,7 @@ fn verify_real_producer() -> Result<()> {
 
 #[derive(Clone, Copy, Debug)]
 struct Options {
+    implementation: Implementation,
     route: Route,
     corpus: CorpusChoice,
     warmup: usize,
@@ -1324,6 +1395,7 @@ where
     I: IntoIterator<Item = String>,
 {
     let mut route = None;
+    let mut implementation = Implementation::Candidate;
     let mut corpus = CorpusChoice::All;
     let mut warmup = 20;
     let mut samples = 40;
@@ -1331,6 +1403,11 @@ where
     let mut arguments = arguments.into_iter();
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
+            "--implementation" => {
+                implementation = Implementation::parse(
+                    &arguments.next().ok_or("--implementation needs a value")?,
+                )?
+            },
             "--route" => {
                 route = Some(Route::parse(
                     &arguments.next().ok_or("--route needs a value")?,
@@ -1344,7 +1421,7 @@ where
             "--batch" => batch = arguments.next().ok_or("--batch needs a value")?.parse()?,
             "--help" | "-h" => {
                 println!(
-                    "usage: xls_f3_qualification --route <write-only|first-read|read-after-write> [--corpus <number|rk-mulrk|all>] [--warmup N] [--samples N] [--batch N]"
+                    "usage: xls_f3_qualification --implementation <baseline|candidate> --route <write-only|first-read|read-after-write> [--corpus <number|rk-mulrk|all>] [--warmup N] [--samples N] [--batch N]"
                 );
                 std::process::exit(0);
             },
@@ -1356,6 +1433,7 @@ where
         return Err("--samples and --batch must be nonzero".into());
     }
     Ok(Options {
+        implementation,
         route,
         corpus,
         warmup,
@@ -1448,8 +1526,8 @@ where
     // sample and therefore never enter route timing.
     for fixture in &fixtures {
         verify_source_freshness(fixture)?;
-        verify_noop_and_unsupported(fixture)?;
-        verify_security_fixtures(fixture)?;
+        verify_noop_and_unsupported(fixture, options.implementation)?;
+        verify_security_fixtures(fixture, options.implementation)?;
     }
     verify_real_producer()?;
     println!(

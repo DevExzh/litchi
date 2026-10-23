@@ -35,6 +35,7 @@ SCHEMA = "litchi.xls.f3.abba.v2"
 ROLES = ("A1", "B1", "B2", "A2")
 ROUTES = ("write-only", "first-read", "read-after-write")
 CORPORA = ("number", "rk-mulrk")
+IMPLEMENTATIONS = ("baseline", "candidate")
 HEX_DIGEST_LENGTH = 64
 MIN_LEG_NS = 250_000_000
 DEFAULT_MEMORY_LIMIT_BYTES = 2 * 1024**3
@@ -56,6 +57,27 @@ CANDIDATE_PRODUCTION_COMMITS = (
     "157eb7c8d250568acb9dbc83bbeb0f9e675d1ea5",
     "c7ed9d3abdc3f9e3ee152c12129f194d82b66042",
 )
+# These are the only historical baseline deviations admitted by the shared
+# probe.  Each is matched by an exact error variant and message in the probe;
+# this receipt record makes the compatibility decision auditable and prevents
+# a broad "any error" fallback from becoming a qualification exception.
+BASELINE_LEGACY_DISPOSITIONS = {
+    "signed_edit_cells": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "error": "litchi_xls::Error::Object(litchi_ole_common::Error::Cfb(litchi_cfb::OleError::InvalidFormat))",
+        "message": "signed, encrypted, or DRM containers are not eligible for object editing",
+    },
+    "unsupported_numeric_target_commit": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "error": "litchi_xls::Error::UnsupportedFeature",
+        "message": "source-backed numeric plan accepts no structural or resource edits",
+    },
+    "set_number_wrong_family": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "error": "litchi_xls::Error::UnsupportedFeature",
+        "message_template": "cell ({row}, {column}) is not encoded as a standalone BIFF8 Number record",
+    },
+}
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",
     "tools/perf-baseline/src/xls_f3_corpus.rs",
@@ -792,6 +814,7 @@ def parse_probe_output(
 def run_leg(
     *,
     role: str,
+    implementation: str,
     binary: Path,
     route: str,
     corpus: str,
@@ -808,6 +831,8 @@ def run_leg(
     stderr_path = output_dir / f"{stem}.stderr.log"
     command = [
         str(binary.resolve()),
+        "--implementation",
+        implementation,
         "--route",
         route,
         "--corpus",
@@ -884,6 +909,7 @@ def run_leg(
         {
             "phase": phase,
             "role": role,
+            "implementation": implementation,
             "route": route,
             "corpus": corpus,
             "command": command,
@@ -913,6 +939,7 @@ def calibrate(
     while batch <= options.calibration_max_batch:
         attempt = run_leg(
             role=f"calibration-{side}-{len(attempts) + 1}",
+            implementation="baseline" if side == "control" else "candidate",
             binary=binary,
             route=route,
             corpus=corpus,
@@ -1030,8 +1057,10 @@ def main() -> int:
                 }
                 cell_legs: list[dict[str, Any]] = []
                 for role in ROLES:
+                    implementation = "baseline" if role in ("A1", "A2") else "candidate"
                     leg = run_leg(
                         role=role,
+                        implementation=implementation,
                         binary=binaries[role],
                         route=route,
                         corpus=corpus,
@@ -1075,6 +1104,11 @@ def main() -> int:
                 "overlay_manifest_sha256": expected_overlay_manifest,
                 "overlay_paths": list(PROBE_PATHS),
                 "candidate_production_commits": list(options.candidate_production_commits),
+                "probe_implementations": {
+                    "control": "baseline",
+                    "candidate": "candidate",
+                },
+                "baseline_legacy_dispositions": BASELINE_LEGACY_DISPOSITIONS,
             },
             "binaries": {"control": control_binary, "candidate": candidate_binary},
             "driver": driver,
