@@ -8876,7 +8876,7 @@ impl<'a> CanonicalHeaderProbe<'a> {
     }
 
     fn is_comparing(&self) -> bool {
-        self.target.is_some()
+        self.target.is_some() && self.matches
     }
 
     /// Read a canonical length from the target without doing a second walk of
@@ -8904,23 +8904,23 @@ impl<'a> CanonicalHeaderProbe<'a> {
     }
 
     fn resolve_length(&mut self, computed: Option<usize>) -> Result<usize> {
-        match (self.target, computed) {
-            (None, Some(length)) => Ok(length),
-            (Some(_), None) => {
-                let length = self
-                    .target_varint()
-                    .and_then(|length| usize::try_from(length).ok());
-                if let Some(length) = length {
-                    return Ok(length);
-                }
-                self.matches = false;
-                Ok(0)
-            },
-            _ => Err(Error::invalid_archive(
-                0,
-                "canonical header length source is missing",
-            )),
+        if let Some(length) = computed {
+            return Ok(length);
         }
+        if self.matches {
+            let length = self
+                .target_varint()
+                .and_then(|length| usize::try_from(length).ok());
+            if let Some(length) = length {
+                return Ok(length);
+            }
+            self.matches = false;
+        }
+        // A comparison that already diverged only needs a placeholder wide
+        // enough to keep counting while the current payload is emitted. The
+        // length_delimited_field caller replaces this prefix width with the
+        // current payload width after the closure returns.
+        Ok(0)
     }
 
     fn varint(&mut self, value: u64) -> Result<()> {
@@ -8947,6 +8947,7 @@ impl<'a> CanonicalHeaderProbe<'a> {
         F: FnOnce(&mut Self) -> Result<()>,
     {
         self.field_key(number, 2)?;
+        let length_start = self.offset;
         let payload_length = self.resolve_length(payload_length)?;
         self.varint(
             u64::try_from(payload_length)
@@ -8954,11 +8955,16 @@ impl<'a> CanonicalHeaderProbe<'a> {
         )?;
         let payload_start = self.offset;
         write_payload(self)?;
-        if self.offset.checked_sub(payload_start) != Some(payload_length) {
-            return Err(Error::invalid_archive(
-                0,
-                "ArchiveInfo nested encoded length mismatch",
-            ));
+        let emitted_payload_length = self.offset.checked_sub(payload_start).ok_or_else(|| {
+            Error::invalid_archive(0, "ArchiveInfo nested encoded length overflow")
+        })?;
+        if emitted_payload_length != payload_length {
+            self.matches = false;
+            let current_length_prefix = varint_len(emitted_payload_length)?;
+            self.offset = length_start
+                .checked_add(current_length_prefix)
+                .and_then(|offset| offset.checked_add(emitted_payload_length))
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo encoded length overflow"))?;
         }
         Ok(())
     }
@@ -11402,6 +11408,36 @@ mod tests {
         assert_eq!(edited.to_bytes(Default::default())?, source);
         assert!(edited.objects[0].source_header().is_none());
         assert!(edited.objects[0].source_canonical_header().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn retained_probe_falls_back_after_packed_field_length_changes() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            1,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![3],
+            }],
+            Default::default(),
+        )?;
+        object.archive_info.message_infos[0].object_references = vec![10];
+        let source = Archive {
+            objects: vec![object],
+        }
+        .to_bytes(Default::default())?;
+
+        let mut parsed = Archive::parse(&source, Default::default())?;
+        parsed.objects[0].archive_info.message_infos[0].object_references = vec![10, 11];
+        let encoded = parsed.to_bytes(Default::default())?;
+        assert_ne!(encoded, source);
+
+        let reparsed = Archive::parse(&encoded, Default::default())?;
+        assert_eq!(
+            reparsed.objects[0].archive_info.message_infos[0].object_references,
+            [10, 11]
+        );
+        assert_eq!(reparsed.to_bytes(Default::default())?, encoded);
         Ok(())
     }
 
