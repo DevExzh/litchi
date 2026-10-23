@@ -1,0 +1,45 @@
+{
+  "source": "55051a8e4f6fd94e9fb82418ad93336369e3ab59",
+  "pid": 1471518,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v12-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v12"
+  ],
+  "started_unix_seconds": 1792780604.7612803,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 211.5842210789997,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v12/check-0.log",
+      "bytes": 417648,
+      "sha256": "b5109a0395afc1c9948020f3f48e8f46e5216afd596b8dd63433adb5e7241934",
+      "target_bytes_before": 3259690234,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_ops-1281d387699cc94f",
+          "bytes": 279816072,
+          "sha256": "e69a9c4abe9b92aebb1abd145ee258bd87ff86b35177bb2123381974708abaff"
+        }
+      ]
+    }
+  ],
+  "note": "Full all-feature facade library:993 passed,9 failed. Complete diagnosed groups assigned independently: DOCX replay classification, retained hyperlinks and signed no-op; ODP/ODS typed malformed-source chains; signed DOC no-op, XLS cancellation/eager-edit policy, PPTX cancellation. The runner stopped after facade failure; XLSB runtime group was not reached. No test or capability requirement is waived."
+}

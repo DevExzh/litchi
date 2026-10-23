@@ -59,3 +59,33 @@ boundaries fail. The transfer and ledger owners must repair behavior while
 preserving these existing assertions. The source remains diagnostic.
 [xls-xlsx-runtime-v2.json](results/0362up/xls-xlsx-runtime-v2.json) retains
 both commands, summaries and external log hashes.
+
+## Complete facade runtime return
+
+On `55051a8e4f`, the full all-feature `litchi-ops` library suite passes
+993 tests and fails nine (211.58 seconds including compilation; 72.90
+seconds in tests). The complete batch is returned by scope:
+
+- DOCX: recorded replay refusal classification, retained-hyperlink access,
+  and exact signed paragraph no-op behavior.
+- ODP/ODS: malformed-input tests no longer find their expected typed cause
+  through the new crate-owned error chain, despite `CorruptFile` classification.
+- DOC: a signed paragraph no-op reports corrupt input.
+- XLS: signed edit entry and cancellation disagree with the explicit policy.
+- PPTX: a signed cancelling leaf edit still reports document protection.
+
+The repair must distinguish stale assertions from lost capabilities using
+the confirmed contract. Exact signed no-ops/cancellation, changed-edit
+refusal, typed causes and content-free refusal reasons remain required. The
+XLSB runtime group was not reached after the facade failure.
+[facade-xlsb-runtime-v12.json](results/0362up/facade-xlsb-runtime-v12.json)
+retains the source, command, complete log and debug executable hashes.
+
+The separate cell proposal `06afe43fa0` is also returned. It conflates
+explicit empty creation with clear-if-present, loses exact shared/inline
+string representation, scans rich XML repeatedly, mutates staged removal
+before fallible typed admission, clones complete edit payloads during joins,
+and flattens normalization errors into strings. A current-source repair leaf
+`b2a1e6e735` composes the proposal with the reviewed rich-transfer and metadata
+work solely to repair this full batch without temporary compiler overlays.
+It is not accepted into this diagnostic branch or the main integration.
