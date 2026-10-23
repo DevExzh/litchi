@@ -2816,3 +2816,70 @@ See [0063](0063-source-pptx-modern-comments.md).
   replay/dispositions and fresh inventory/glossary validation remain open.
   Source integration is staging, not accepted into trunk. Only the
   comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete facade/XLSX passes and original baselines):
+  Main integration reaches `a658b88ee3`. The complete all-feature facade
+  library passes all 1,002 tests on diagnostic source `bf09ddfd9c`, closing
+  the nine v12 failures. The full all-feature XLSX library passes 1,871 tests
+  on `a58dbaceb3`; representation-aware normalization, atomic joins and typed
+  failure sources passed independent review. Unbounded rich setters avoid
+  eager source reads, and join refusal restores both edits without cloning
+  whole edits or retained action payloads. Record 0362upe retains source,
+  commands, hashes and durable external log mirrors; native performance
+  qualification remains open.
+
+  Diagnostic composition reaches `47caed4627`. The complete DOCX library
+  passes all 1,519 tests on this source. A preceding full run exposed bookmark
+  loss risk in whole-cell replacement. The corrected shared scanner keeps
+  whole-cell operations strict, while paragraph writers, readback and replay
+  preconditions consistently preserve markers. New direct, nested-cell and
+  content-control proofs cover changed text, durable replay and inverse
+  restoration. The workspace all-target/all-feature Clippy run is active.
+  Signed DOC fallback now preflights the original CFB under caller limits
+  before private signature removal; exact DOC/XLS no-ops and cancellation
+  pass the complete facade suite. These source repairs are reviewed and
+  composed, not accepted as performance exceptions.
+
+  XLSB now passes 771 library tests with one remaining transitive replay
+  fixture assertion: both retained original content-types images can differ
+  from the effective publication after different edit generations. Its owner
+  is running the focused cases while preserving exact archive, effective
+  graph and untouched payload/relationship checks. Records 0362up/0362upa
+  retain all complete runtime failures and successes. The full assembled
+  gate remains required.
+
+  DOCX Ink matched correctness and allocation preflight passes all six routes;
+  candidate allocations are lower or equal, with native timing unclaimed.
+  ODP's original e4a baseline now builds and passes its six untimed legacy
+  proofs on the frozen fixture. Its adapter preserves the actual legacy
+  materialize/write and plan/publication lifecycle. Shared timing routes are
+  open, read, write and append; candidate-only patch/inverse/scoped correctness
+  remains strict. A final candidate build and paired qualification are pending.
+
+  IWork qualification now preserves the original constructor/owner baselines
+  and the exact seed registry resolutions. Initial metadata preparation
+  preserves all common identities and admits only the reviewed SmallVec
+  addition; release builds remain locked. Producer, validator, runner and
+  collector bindings passed review. Fresh matched builds and untimed
+  preflights are active. W8's baseline tool now verifies the complete pristine
+  f2 source tree and uses only four probe consumer adaptations; all 109 route
+  bindings retain native/facade workloads and publication boundaries. The
+  original-baseline build is active; no new timing result is claimed.
+
+  The final inventory runner is merged. It captures all 68 direct library
+  packages with all features and hidden items, validates source/lock/toolchain
+  stability around captures, records capped execution and peak RSS, uses
+  external temporary storage, and leaves disposition decisions for review.
+  Fresh final-source inventory and glossary validation have not run yet.
+
+  The eleventh cleanup removes one clean inactive merged worktree without
+  force, retaining its branch and quarantining its 139,553-byte lockfile.
+  The removed checkout represented 6,257,821,238 apparent bytes. An abandoned
+  1,060,162,316-byte ODF partial checkout was relocated with a complete external
+  manifest and restore helper; that relocation is not counted as disk space
+  freed. Protected targets, measurements and active leaves remain untouched.
+
+  Final runtime/gates, quiet-host native qualification, corpus dispositions
+  and fresh inventory/glossary validation remain required. Source integration
+  is staging, not accepted into trunk. Only the comprehensive redaction audit
+  is deferred. Nothing has been pushed.
