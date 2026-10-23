@@ -362,6 +362,7 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),
@@ -626,6 +627,7 @@ impl Pptx {
         Ok(Some(match first {
             None => second,
             Some(first) => Commit {
+                snapshot_bytes: 0,
                 after: second.after,
                 source: first.source,
                 target: second.target,

@@ -96,7 +96,7 @@ pub(super) fn set_merges_with_limits(
         })?;
     }
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(commit.patch(), limits)?;
     Ok(Some(commit))
 }

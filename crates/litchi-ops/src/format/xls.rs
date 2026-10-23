@@ -146,6 +146,14 @@ impl Xls {
         Ok(self.owner().clone())
     }
 
+    /// Return the original native package for a canonical signed no-op patch.
+    /// The ordinary write owner is unsigned before staging a changed edit;
+    /// an empty cancellation patch must retain the signed CFB source instead.
+    pub(crate) fn original_package_for_noop(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        Ok(self.owner().clone())
+    }
+
     /// Carry one native package publication back into the immutable facade
     /// while retaining origin and the explicit signature disposition.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
@@ -211,7 +219,7 @@ impl Xls {
         self.check_source()?;
         let result = write::remove_with_limits(self, target, limits);
         self.check_source()?;
-        result
+        self.enforce_signed_noop(result)
     }
 
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {

@@ -344,10 +344,10 @@ impl Xlsb {
         target: crate::target::TargetArg<'_>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = write::remove_with_limits(self, target, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_replay()?;
+        self.enforce_signed_noop(result)
     }
 
     /// Move one complete-catalog tab using the unified placement contract.
@@ -370,10 +370,10 @@ impl Xlsb {
         placement: crate::placement::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = write::move_to_with_limits(self, path, placement, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_replay()?;
+        self.enforce_signed_noop(result)
     }
 
     /// Swap two complete-catalog tabs in one native structural edit.
@@ -392,10 +392,20 @@ impl Xlsb {
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = write::swap_with_limits(self, left, right, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_replay()?;
+        self.enforce_signed_noop(result)
+    }
+
+    fn enforce_signed_noop(&self, result: Result<write::Commit>) -> Result<write::Commit> {
+        result.and_then(|commit| {
+            if self.signature() != Signature::Signed || commit.is_noop() {
+                Ok(commit)
+            } else {
+                Err(Error::signed(FileFormat::Xlsb))
+            }
+        })
     }
 
     /// Stream this immutable snapshot to a sequential sink.
@@ -659,6 +669,23 @@ impl Xlsb {
             .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
         }
         self.editor_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    /// Materialize the original native package for a canonical signed no-op
+    /// patch. The normal write editor explicitly removes signature parts;
+    /// this identity patch must instead be rooted in the exact source bytes.
+    pub(crate) fn original_package_for_noop(&self) -> Result<xlsb::Package> {
+        self.admit_edit_for_write()?;
+        match &self.0.owner {
+            XlsbOwner::Source(workbook) => {
+                let bytes = signature::exact_source(workbook.workbook().source_backed_package())?;
+                Ok(xlsb::Package::from_bytes_with_options(
+                    &bytes,
+                    litchi_xlsb::OpenOptions::new().source_limits(self.0.ooxml_limits),
+                )?)
+            },
+            XlsbOwner::Eager(package) => Ok((**package).clone()),
+        }
     }
 
     fn editor_after_source_check(&self, allow_signed: bool) -> Result<XlsbEditor<'_>> {

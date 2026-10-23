@@ -277,9 +277,27 @@ impl Run {
         let Self {
             base, edit, items, ..
         } = self;
+        let authored_operations = items.len();
         let result = base.owner().finish(edit.commit(&base));
         match result {
-            Ok(commit) => Ok((base, commit)),
+            Ok(commit)
+                if base.signature() == crate::format::signature::Signature::Signed
+                    && commit.patch.is_noop() =>
+            {
+                // The staged patch may contain cancelled native operations.
+                // Replace that operation-bearing patch with a fresh empty
+                // edit over the original signed owner, so the leaf history,
+                // inverse and unified facade all carry the same canonical
+                // no-op endpoint.  The staged commit remains the validation
+                // proof; only its no-op patch is discarded.
+                let mut empty = WorkEdit::from(base.edit_for_write()?)?.commit(&base)?;
+                empty.operations = authored_operations;
+                Ok((base, empty))
+            },
+            Ok(mut commit) => {
+                commit.operations = authored_operations;
+                Ok((base, commit))
+            },
             Err(error) => Err(locate_failure(&base, &items, error)),
         }
     }

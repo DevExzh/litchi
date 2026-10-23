@@ -112,6 +112,7 @@ impl Pptx {
             self.clone()
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),

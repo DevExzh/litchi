@@ -105,6 +105,27 @@ impl TextValues {
             && self.geometry.is_none()
     }
 
+    /// Whether this assignment changes only the target text.  The signed
+    /// cancellation proof can track text plans by their native value; rich
+    /// formatting remains eligible for the native patch's own no-op proof.
+    pub(in crate::format::pptx) fn is_text_only(&self) -> bool {
+        self.text.is_some()
+            && self.bold.is_none()
+            && self.italic.is_none()
+            && self.size.is_none()
+            && self.color.is_none()
+            && self.font.is_none()
+            && self.latin.is_none()
+            && self.align.is_none()
+            && self.underline.is_none()
+            && self.strike.is_none()
+            && self.fill.is_none()
+            && self.valign.is_none()
+            && self.margins.iter().all(Option::is_none)
+            && self.shape_fill.is_none()
+            && self.geometry.is_none()
+    }
+
     /// Whether a coalesced formatting run can stage these assignments and
     /// tell their change from the reader's model (record 0333): run and
     /// paragraph character formatting, alignment and run text, but no
@@ -898,6 +919,7 @@ impl Pptx {
             self.clone()
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target,

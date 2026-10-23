@@ -277,6 +277,7 @@ impl Run {
             edit,
             items,
             signed,
+            limits,
             ..
         } = self;
         base.check_source_for_write()?;
@@ -285,6 +286,7 @@ impl Run {
         let commit = edit.commit()?;
         base.check_source_for_write()?;
         let changed = commit.diagnostics().changed();
+        let staged_snapshot_bytes = super::patch_snapshot_bytes(commit.patch());
         // A native DOC edit may rewrite the compound stream even when a
         // sequence of paragraph assignments returns every touched value to
         // its original state.  Signed transactions must publish the exact
@@ -292,12 +294,30 @@ impl Run {
         // against the immutable base rather than relying on stream bytes.
         let logical_noop = signed && logical_noop(&base, &items)?;
         let (package, patch) = commit.into_parts();
-        let snapshot_bytes = super::patch_snapshot_bytes(&patch);
-        let after = if changed && !logical_noop {
-            base.with_package(package)
+        let (after, patch, snapshot_bytes) = if logical_noop {
+            // The staged edit was still committed above, so native refusal
+            // and invalid intermediate operations retain their normal error
+            // semantics.  Its changed patch is discarded after the authored
+            // plan proves cancellation; the retained signed package gets a
+            // fresh canonical identity patch of its own.
+            let original = base.original_package_for_noop()?;
+            let (_, patch) = empty_commit(&base, &original)?;
+            let snapshot_bytes = staged_snapshot_bytes.max(super::patch_snapshot_bytes(&patch));
+            (base.clone(), patch, snapshot_bytes)
         } else {
-            base.clone()
+            let snapshot_bytes = staged_snapshot_bytes.max(super::patch_snapshot_bytes(&patch));
+            let after = if changed {
+                base.with_package(package)
+            } else {
+                base.clone()
+            };
+            (after, patch, snapshot_bytes)
         };
+        limit(
+            LimitKind::SnapshotBytes,
+            snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        )?;
         base.check_source_for_write()?;
         Ok(WriteCommit {
             before,
@@ -307,6 +327,16 @@ impl Run {
             snapshot_bytes,
         })
     }
+}
+
+fn empty_commit(
+    base: &Doc,
+    source: &litchi_doc::Package,
+) -> Result<(litchi_doc::Package, litchi_doc::Patch)> {
+    base.check_source_for_write()?;
+    let commit = source.edit()?.commit()?;
+    base.check_source_for_write()?;
+    Ok(commit.into_parts())
 }
 
 /// Whether every coalesced paragraph assignment leaves the base's authored

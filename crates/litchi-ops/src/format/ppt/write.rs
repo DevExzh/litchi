@@ -1371,15 +1371,45 @@ fn finish_commit(
     file.check_source_for_write()?;
     let changed = !native.patch().is_noop();
     let operations = native.patch().operation_count().max(usize::from(changed));
+    let native_snapshot_bytes = native
+        .patch()
+        .before()
+        .len()
+        .saturating_add(native.patch().after().len())
+        .saturating_add(size_of::<litchi_ppt::Patch>());
+    if native_snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(
+            native_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        ));
+    }
     if 1 > limits.max_operations() {
         return Err(operation_limit(1, limits.max_operations()));
     }
-    let (package, patch) = native.into_parts();
-    let snapshot_bytes = patch
-        .before()
-        .len()
-        .saturating_add(patch.after().len())
-        .saturating_add(size_of::<litchi_ppt::Patch>());
+    let (package, patch) =
+        if !changed && file.signature() == crate::format::signature::Signature::Signed {
+            // The ordinary writer edits an unsigned private package so a changed
+            // publication can never carry signature streams forward.  A true
+            // no-op must retain a native patch whose before image is the original
+            // signed artifact; otherwise leaf replay would compare against the
+            // private unsigned image and the facade would lose content identity.
+            let original = file.original_package_for_noop()?;
+            original
+                .edit()
+                .map_err(native_edit_error)?
+                .commit()
+                .map_err(native_edit_error)?
+                .into_parts()
+        } else {
+            native.into_parts()
+        };
+    let snapshot_bytes = native_snapshot_bytes.max(
+        patch
+            .before()
+            .len()
+            .saturating_add(patch.after().len())
+            .saturating_add(size_of::<litchi_ppt::Patch>()),
+    );
     if snapshot_bytes > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
     }

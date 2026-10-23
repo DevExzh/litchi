@@ -156,7 +156,7 @@ fn commit(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let native = edit.commit().map_err(name_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(commit.patch(), limits)?;
     Ok(commit)
 }

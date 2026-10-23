@@ -167,7 +167,13 @@ pub(crate) fn import(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
-        let commit = Commit::from_cell_parts(file, next, vec![patch])?;
+        let commit = Commit::from_cell_parts(
+            file,
+            next,
+            vec![patch],
+            (sheet, native_limits),
+            limits.max_snapshot_bytes(),
+        )?;
         check_snapshot_limits(commit.patch(), limits)?;
         Ok((commit, summary))
     })();

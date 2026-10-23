@@ -1081,6 +1081,24 @@ impl Pptx {
         self.editable_owner_after_source_check(self.0.signature() == Signature::Signed)
     }
 
+    /// Return the original native owner for a canonical signed no-op patch.
+    /// Changed writes use the unsigned promotion above; the identity patch
+    /// must retain the signature parts and exact source binding.
+    pub(crate) fn original_owner_for_noop(&self) -> Result<Editable> {
+        if !self.0.retain_source {
+            return Err(source_not_retained());
+        }
+        self.check_source_for_replay()?;
+        match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                pptx::source::Package::from_presentation(presentation)
+                    .map(Editable::Source)
+                    .map_err(Error::from)
+            },
+            PptxOwner::Eager(package) => Ok(Editable::Eager(Arc::clone(package))),
+        }
+    }
+
     fn editable_owner_after_source_check(&self, allow_signed: bool) -> Result<Editable> {
         if !self.0.retain_source {
             return Err(source_not_retained());

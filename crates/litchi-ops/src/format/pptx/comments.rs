@@ -181,6 +181,7 @@ impl Pptx {
             self.clone()
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),
@@ -248,6 +249,7 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -328,6 +330,7 @@ impl Pptx {
             self.clone()
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),
@@ -479,6 +482,7 @@ impl Pptx {
             self.clone()
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),
@@ -606,6 +610,7 @@ impl Pptx {
         let after = self.adopt_eager(Arc::clone(&target));
         Ok((
             Commit {
+                snapshot_bytes: 0,
                 after,
                 source,
                 target: Editable::Eager(target),

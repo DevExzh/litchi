@@ -118,7 +118,7 @@ pub(crate) fn try_set_dimensions(
             },
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(file, source, native).map(Some)
+        Commit::from_native_with_limit(file, source, native, limits.max_snapshot_bytes()).map(Some)
     })();
     file.check_source_for_replay()?;
     result

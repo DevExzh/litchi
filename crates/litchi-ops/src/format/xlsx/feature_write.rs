@@ -46,6 +46,7 @@ use crate::placement::Placement as NodePlacement;
 use crate::props::Props;
 use crate::registry::{Operation, Table};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 use crate::value::{Color, ColorContext, Length, Scalar};
 
 fn error(code: Code, message: impl Into<String>) -> Error {
@@ -242,6 +243,7 @@ impl Xlsx {
         kind: Kind,
         implied: Option<&'static str>,
         node: NewNode<'_>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
         if !matches!(node.placement(), None | Some(NodePlacement::End)) {
             return Err(error(
@@ -253,7 +255,7 @@ impl Xlsx {
         let parent = parent(parent_node)?;
         match kind {
             Kind::Comment => self.add_comment(&parent, node.props()),
-            Kind::Hyperlink => self.add_hyperlink(&parent, node.props()),
+            Kind::Hyperlink => self.add_hyperlink(&parent, node.props(), limits),
             Kind::Picture => self.add_picture(&parent, node.props()),
             Kind::Shape => self.add_shape(&parent, node.props()),
             Kind::Cf => self.add_cf(&parent, implied, node.props()),
@@ -293,6 +295,7 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let Some(node) = self.feature_target(target)? else {
             return Ok(None);
@@ -303,7 +306,7 @@ impl Xlsx {
         let sheet = node.sheet_position();
         Ok(Some(match feature.kind {
             Kind::Comment => self.set_comment(sheet, feature, props)?,
-            Kind::Hyperlink => self.set_hyperlink(sheet, feature, props)?,
+            Kind::Hyperlink => self.set_hyperlink(sheet, feature, props, limits)?,
             Kind::Picture | Kind::Shape => self.set_drawing(sheet, feature, props)?,
             Kind::Cf => self.set_cf(sheet, feature, props)?,
             Kind::DataValidation => self.set_validation(sheet, feature, props)?,
@@ -313,7 +316,11 @@ impl Xlsx {
     }
 
     /// Remove the feature a path names; `None` for other targets.
-    pub(super) fn try_remove_feature(&self, target: &TargetArg<'_>) -> Result<Option<Commit>> {
+    pub(super) fn try_remove_feature(
+        &self,
+        target: &TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
         let Some(node) = self.feature_target(target)? else {
             return Ok(None);
         };
@@ -332,7 +339,12 @@ impl Xlsx {
                 let mut edit = source.edit()?;
                 edit.remove_hyperlink(sheet, link.reference().clone())?;
                 let native = edit.commit()?;
-                return Ok(Some(Commit::from_native(self, source, native)?));
+                return Ok(Some(Commit::from_native_with_limit(
+                    self,
+                    source,
+                    native,
+                    limits.max_snapshot_bytes(),
+                )?));
             },
             Data::Drawing(_) => {
                 let kind = if feature.kind == Kind::Picture {
@@ -771,7 +783,12 @@ impl Xlsx {
             .ok_or_else(|| error(Code::InternalError, "the added hyperlink did not read back"))
     }
 
-    fn add_hyperlink(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
+    fn add_hyperlink(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
         let mut reference = parent.reference.clone();
         let mut location = None;
         let mut url = None;
@@ -804,12 +821,19 @@ impl Xlsx {
         let mut edit = source.edit()?;
         edit.put_hyperlink(parent.sheet, link).map_err(authored)?;
         let native = edit.commit()?;
-        let commit = Commit::from_native(self, source, native)?;
+        let commit =
+            Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())?;
         let index = commit_file(&commit).hyperlink_position(parent.sheet, reference.as_str())?;
         Ok((commit, feature_path(parent.sheet, "hyperlink", Some(index))))
     }
 
-    fn set_hyperlink(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_hyperlink(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let Data::Hyperlink(link) = &feature.data else {
             return Err(error(
                 Code::InternalError,
@@ -851,7 +875,7 @@ impl Xlsx {
         }
         edit.put_hyperlink(sheet, replacement).map_err(authored)?;
         let native = edit.commit()?;
-        Commit::from_native(self, source, native)
+        Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())
     }
 
     /// Stage a cell `set`'s hyperlink properties into the cell edit.

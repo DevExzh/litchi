@@ -141,6 +141,13 @@ impl Patch {
 pub(crate) struct Commit {
     after: Xlsb,
     patch: Patch,
+    /// Authored leaf operations, kept separately from the canonical native
+    /// patch. A signed cancellation is represented by a true empty patch, so
+    /// deriving this from `patch` would lose the operation diagnostics.
+    operations: usize,
+    /// Peak retained native proof while a private changed patch was reduced
+    /// to the canonical signed identity patch.
+    snapshot_bytes: usize,
 }
 
 impl Commit {
@@ -151,17 +158,25 @@ impl Commit {
 
     /// Adapt a metadata commit (record 0253).
     pub(super) fn from_metadata(after: Xlsb, images: super::metadata::Images) -> Self {
+        let operations = images.patch.changes().len();
+        let snapshot_bytes = images.retained_bytes();
         Self {
             after,
             patch: Patch::Metadata(Box::new(images)),
+            operations,
+            snapshot_bytes,
         }
     }
 
     /// Adapt a worksheet-feature commit (record 0322).
     pub(super) fn from_feature(after: Xlsb, images: super::feature_write::Images) -> Self {
+        let operations = images.operation_count();
+        let snapshot_bytes = images.retained_bytes();
         Self {
             after,
             patch: Patch::Feature(Box::new(images)),
+            operations,
+            snapshot_bytes,
         }
     }
 
@@ -174,6 +189,14 @@ impl Commit {
         self.patch.is_noop()
     }
 
+    pub(crate) const fn operations(&self) -> usize {
+        self.operations
+    }
+
+    pub(crate) const fn snapshot_bytes(&self) -> usize {
+        self.snapshot_bytes
+    }
+
     /// Consume the result for explicit transaction history.
     pub(crate) fn into_parts(self) -> (Xlsb, Patch) {
         (self.after, self.patch)
@@ -182,11 +205,36 @@ impl Commit {
     pub(super) fn from_native(
         base: &Xlsb,
         native: litchi_xlsb::cell_values::structure::Commit,
+        max_snapshot_bytes: usize,
     ) -> Result<Self> {
         base.check_source_for_replay()?;
         let result = (|| {
             let (package, patch) = native.into_parts();
+            let operations = patch.operation_count();
+            let native_snapshot_bytes = patch.retained_bytes().map_err(native_error)?;
+            if native_snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
+            }
+            let (package, patch) =
+                if patch.is_noop() && base.signature() == super::Signature::Signed {
+                    // Structural writes are staged through an unsigned private
+                    // package. Rebuild the identity patch over the retained
+                    // signed package so the leaf and facade share one base.
+                    let original = base.original_package_for_noop()?;
+                    original
+                        .edit()
+                        .map_err(native_error)?
+                        .commit()
+                        .map_err(native_error)?
+                        .into_parts()
+                } else {
+                    (package, patch)
+                };
             let retained_bytes = patch.retained_bytes().map_err(native_error)?;
+            let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
+            if snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+            }
             // A native edit may retain a semantic operation whose replay is
             // an exact image no-op. Preserve the original immutable handle in
             // that case so source-backed publication never canonicalizes a
@@ -202,23 +250,48 @@ impl Commit {
                     patch,
                     retained_bytes,
                 },
+                operations,
+                snapshot_bytes,
             })
         })();
         base.check_source_for_replay()?;
         result
     }
 
-    fn from_cell_native(base: &Xlsb, native: litchi_xlsb::cell_values::Commit) -> Result<Self> {
+    fn from_cell_native(
+        base: &Xlsb,
+        native: litchi_xlsb::cell_values::Commit,
+        sheet: usize,
+        limits: TransferLimits,
+    ) -> Result<Self> {
         base.check_source_for_replay()?;
         let result = (|| {
             let (package, patch) = native.into_parts();
-            let patch = Patch::Cells(vec![patch]);
+            let operations = patch.changes().len();
+            let native_snapshot_bytes = patch.retained_bytes();
+            if native_snapshot_bytes > limits.bytes() {
+                return Err(snapshot_limit(native_snapshot_bytes, limits.bytes()));
+            }
+            let patch = if patch.is_noop() && base.signature() == super::Signature::Signed {
+                canonical_cell_patch(base, sheet, limits)?
+            } else {
+                Patch::Cells(vec![patch])
+            };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
-            Ok(Self { after, patch })
+            let snapshot_bytes = native_snapshot_bytes.max(patch.retained_bytes());
+            if snapshot_bytes > limits.bytes() {
+                return Err(snapshot_limit(snapshot_bytes, limits.bytes()));
+            }
+            Ok(Self {
+                after,
+                patch,
+                operations,
+                snapshot_bytes,
+            })
         })();
         base.check_source_for_replay()?;
         result
@@ -228,6 +301,8 @@ impl Commit {
         base: &Xlsb,
         package: litchi_xlsb::Package,
         patches: Vec<NativeCellPatch>,
+        canonical: (usize, TransferLimits),
+        max_snapshot_bytes: usize,
     ) -> Result<Self> {
         if patches.is_empty() {
             return Err(Error::new(
@@ -238,17 +313,64 @@ impl Commit {
         }
         base.check_source_for_replay()?;
         let result = (|| {
-            let patch = Patch::Cells(patches);
+            let native_patch = Patch::Cells(patches);
+            let native_snapshot_bytes = native_patch.retained_bytes();
+            if native_snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
+            }
+            let operations = match &native_patch {
+                Patch::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
+                    count.saturating_add(patch.changes().len())
+                }),
+                _ => 0,
+            };
+            let all_noop = match &native_patch {
+                Patch::Cells(patches) => patches.iter().all(NativeCellPatch::is_noop),
+                _ => false,
+            };
+            let patch = if base.signature() == super::Signature::Signed && all_noop {
+                canonical_cell_patch(base, canonical.0, canonical.1)?
+            } else {
+                native_patch
+            };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
-            Ok(Self { after, patch })
+            let snapshot_bytes = native_snapshot_bytes.max(patch.retained_bytes());
+            if snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+            }
+            Ok(Self {
+                after,
+                patch,
+                operations,
+                snapshot_bytes,
+            })
         })();
         base.check_source_for_replay()?;
         result
     }
+}
+
+fn canonical_cell_patch(base: &Xlsb, sheet: usize, limits: TransferLimits) -> Result<Patch> {
+    let original = base.original_package_for_noop()?;
+    let edit = original
+        .edit_cell_values_with_options(
+            NativeSelector::from(sheet),
+            NativeCellOptions::new().transfer_limits(limits),
+        )
+        .map_err(native_error)?
+        .ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedCapability,
+                "the signed no-op cell patch has no worksheet owner",
+            )
+            .with_format(FileFormat::Xlsb)
+        })?;
+    let (_, patch) = edit.commit().map_err(native_error)?.into_parts();
+    Ok(Patch::Cells(vec![patch]))
 }
 
 #[derive(Debug, Default)]
@@ -385,7 +507,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
     edit.insert_sheet(Position::new(position), name, state)
         .map_err(native_error)?;
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok((commit, sheet_path(position)))
 }
@@ -481,7 +603,11 @@ pub(crate) fn remove_with_limits(
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    file.admit_edit()?;
+    // The facade performs the signed admission fence and rejects changed
+    // output after native staging.  Keep the native path open long enough to
+    // prove a real identity patch for signed no-op removals (for example an
+    // unstored cell or an identity sheet selector).
+    file.admit_edit_for_write()?;
     if let Some(commit) = file.try_remove_feature(&target)? {
         return Ok(commit);
     }
@@ -529,6 +655,7 @@ pub(crate) fn remove_with_limits(
     patches
         .try_reserve(grouped.len())
         .map_err(|_| allocation("XLSB cell removal patches"))?;
+    let mut canonical = None;
     let mut remaining_snapshot = limits.max_snapshot_bytes();
     for (sheet, targets) in grouped {
         let semantic_charge = cell_semantic_charge(targets.len(), limits)?;
@@ -543,6 +670,7 @@ pub(crate) fn remove_with_limits(
         }
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        canonical.get_or_insert((sheet, native_limits));
         let mut edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
@@ -581,7 +709,20 @@ pub(crate) fn remove_with_limits(
         package = next;
         patches.push(patch);
     }
-    let commit = Commit::from_cell_parts(file, package, patches)?;
+    let canonical = canonical.ok_or_else(|| {
+        Error::new(
+            Code::InternalError,
+            "XLSB cell removal lost its worksheet owner",
+        )
+        .with_format(FileFormat::Xlsb)
+    })?;
+    let commit = Commit::from_cell_parts(
+        file,
+        package,
+        patches,
+        canonical,
+        limits.max_snapshot_bytes(),
+    )?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
@@ -654,7 +795,7 @@ fn remove_sheets_with_limits(
             .map_err(native_error)?;
     }
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
@@ -671,7 +812,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     placement: Placement<'q>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let source = resolve_sheet_path(file, &path)?;
     let count = file.tab_count()?;
     let destination = move_destination(file, source, count, &placement)?;
@@ -687,7 +828,7 @@ pub(crate) fn swap_with_limits<'p, 'q>(
     right: PathArg<'q>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let left = resolve_sheet_path(file, &left)?;
     let right = resolve_sheet_path(file, &right)?;
     let count = file.tab_count()?;
@@ -730,7 +871,7 @@ fn reorder_with_limits(file: &Xlsb, order: Vec<usize>, limits: &SemanticLimits) 
     );
     edit.reorder_sheets(&selectors).map_err(native_error)?;
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
@@ -927,7 +1068,7 @@ fn set_sheet_with_limits(
         }
     }
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
@@ -1003,6 +1144,7 @@ fn set_cells_with_limits(
     patches
         .try_reserve(grouped.len())
         .map_err(|_| allocation("XLSB cell write patches"))?;
+    let mut canonical = None;
     let mut remaining_snapshot = limits.max_snapshot_bytes();
     for (sheet, targets) in grouped {
         let semantic_charge = cell_semantic_charge(targets.len(), limits)?;
@@ -1017,6 +1159,7 @@ fn set_cells_with_limits(
         }
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        canonical.get_or_insert((sheet, native_limits));
         let mut edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
@@ -1052,7 +1195,20 @@ fn set_cells_with_limits(
         package = next;
         patches.push(patch);
     }
-    let commit = Commit::from_cell_parts(file, package, patches)?;
+    let canonical = canonical.ok_or_else(|| {
+        Error::new(
+            Code::InternalError,
+            "XLSB cell write lost its worksheet owner",
+        )
+        .with_format(FileFormat::Xlsb)
+    })?;
+    let commit = Commit::from_cell_parts(
+        file,
+        package,
+        patches,
+        canonical,
+        limits.max_snapshot_bytes(),
+    )?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(Some(commit))
 }
@@ -2520,14 +2676,18 @@ pub(crate) mod sheet_coalesce {
                 native_limits,
                 ..
             } = self;
+            let authored_operations = items.len();
             base.check_source_for_replay()?;
             let result = edit
                 .commit()
                 .map_err(native_error)
-                .and_then(|native| Commit::from_native(&base, native));
+                .and_then(|native| Commit::from_native(&base, native, native_limits.bytes()));
             let freshness = base.check_source_for_replay();
             match freshness.and(result) {
-                Ok(commit) => Ok((base, commit)),
+                Ok(mut commit) => {
+                    commit.operations = authored_operations;
+                    Ok((base, commit))
+                },
                 Err(error) => Err(locate_failure(
                     &base,
                     &source,
@@ -2909,25 +3069,54 @@ pub(crate) mod coalesce {
                 source,
                 edit,
                 items,
+                sheet,
                 native_limits,
                 allow_repeated,
                 ..
             } = self;
+            let authored_operations = items.len();
             let logical_noop = allow_repeated && logical_noop(&items);
+            let original = if logical_noop {
+                Some(base.original_package_for_noop()?)
+            } else {
+                None
+            };
             base.check_source_for_replay()?;
             let result = edit
                 .commit()
                 .map_err(native_error)
-                .and_then(|native| Commit::from_cell_native(&base, native))
-                .map(|mut commit| {
+                .and_then(|native| Commit::from_cell_native(&base, native, sheet, native_limits))
+                .and_then(|commit| {
                     if logical_noop {
-                        commit.after = base.clone();
+                        let original = original
+                            .as_ref()
+                            .ok_or_else(|| Error::signed(FileFormat::Xlsb))?;
+                        let empty = original
+                            .edit_cell_values_with_options(
+                                NativeSelector::from(sheet),
+                                NativeCellOptions::new().transfer_limits(native_limits),
+                            )
+                            .map_err(native_error)?
+                            .ok_or_else(|| {
+                                Error::new(
+                                    Code::OutOfRange,
+                                    "the XLSB worksheet position is out of range",
+                                )
+                                .with_format(FileFormat::Xlsb)
+                            })?
+                            .commit()
+                            .map_err(native_error)?;
+                        Commit::from_cell_native(&base, empty, sheet, native_limits)
+                    } else {
+                        Ok(commit)
                     }
-                    commit
                 });
             let freshness = base.check_source_for_replay();
             match freshness.and(result) {
-                Ok(commit) => Ok((base, commit)),
+                Ok(mut commit) => {
+                    commit.operations = authored_operations;
+                    Ok((base, commit))
+                },
                 Err(error) => Err(locate_failure(
                     &base,
                     &source,

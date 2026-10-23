@@ -201,7 +201,10 @@ impl Xlsx {
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Commit::from_native(self, source, native)?, matches))
+        Ok((
+            Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())?,
+            matches,
+        ))
     }
 }
 

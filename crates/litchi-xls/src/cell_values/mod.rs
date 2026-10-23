@@ -50,7 +50,7 @@ use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
 /// The object and record limits a cell-value snapshot is read under.
 pub use litchi_ole_common::object::Limits;
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{Edit as PackageEditor, Probe, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -684,6 +684,10 @@ struct Inner {
     xf_records: Arc<Vec<Vec<u8>>>,
     sheets: Vec<SheetData>,
     source_policy: SourcePolicyFacts,
+    /// Signed sources are read through the private, read-only probe.  The
+    /// marker never authorizes changed publication; it only lets a final
+    /// Workbook byte comparison retain the original signed artifact.
+    signed: bool,
 }
 
 /// Immutable, cheaply cloned snapshot of an editable XLS package.
@@ -757,6 +761,27 @@ impl Snapshot {
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
+        let bytes = Self::copy_shared_source(cfb, cfb_limits)?;
+        Self::from_bytes_with_cfb(bytes, limits, cfb_limits)
+    }
+
+    /// Opens a source-backed signed image through the read-only probe while
+    /// retaining the source freshness fence used by the ordinary editor.
+    pub(crate) fn from_shared_probe(
+        cfb: &litchi_cfb::SharedOleFile,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        let bytes = Self::copy_shared_source(cfb, cfb_limits)?;
+        let probe =
+            Probe::open_with_cfb_limits(bytes, limits, cfb_limits).map_err(Error::Object)?;
+        Self::from_probe(probe)
+    }
+
+    fn copy_shared_source(
+        cfb: &litchi_cfb::SharedOleFile,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Vec<u8>> {
         let expected = cfb.source_version()?;
         let length = cfb.file_size();
         if length > cfb_limits.max_input_bytes() {
@@ -794,11 +819,18 @@ impl Snapshot {
                 observed,
             }));
         }
-        Self::from_bytes_with_cfb(bytes, limits, cfb_limits)
+        Ok(bytes)
     }
 
     fn from_package_editor(package: PackageEditor) -> Result<Self> {
         Self::open_package(package, None, None)
+    }
+
+    /// Build a private signed read snapshot from a bounded, read-only probe.
+    /// The returned owner retains the original CFB bytes and signature state;
+    /// changed publication is still refused by [`Edit::commit`].
+    pub(crate) fn from_probe(probe: Probe) -> Result<Self> {
+        Self::open_probe(probe)
     }
 
     /// Opens a captured package, optionally verifying a source-backed numeric
@@ -835,6 +867,52 @@ impl Snapshot {
             Some(rendered) => rendered,
             None => package.finish()?,
         };
+        Self::open_workbook_source(
+            Arc::from(source),
+            workbook_path,
+            workbook_stream,
+            limits,
+            cfb_limits,
+            false,
+            verification,
+        )
+    }
+
+    /// Opens a signed source captured by the read-only OLE probe.  The probe
+    /// retains the original signature streams, while this owner indexes only
+    /// the Workbook stream needed for semantic no-op comparison.
+    fn open_probe(probe: Probe) -> Result<Self> {
+        let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
+            .into_iter()
+            .find(|path| probe.stream(path).is_some())
+            .ok_or_else(|| {
+                Error::InvalidData("XLS package has no Workbook or Book stream".into())
+            })?;
+        let workbook_stream = probe
+            .stream_shared(&workbook_path)
+            .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
+        let limits = probe.limits();
+        let cfb_limits = probe.cfb_limits();
+        Self::open_workbook_source(
+            probe.source_bytes(),
+            workbook_path,
+            workbook_stream,
+            limits,
+            cfb_limits,
+            probe.is_signed(),
+            None,
+        )
+    }
+
+    fn open_workbook_source(
+        source: Arc<[u8]>,
+        workbook_path: Vec<String>,
+        workbook_stream: Arc<[u8]>,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+        signed: bool,
+        verification: Option<NumericTargetVerification<'_>>,
+    ) -> Result<Self> {
         let source_version = fresh_snapshot_source_version();
 
         let (mut sheets, sst_total_offset, xf_records) = parse_workbook_stream(&workbook_stream)?;
@@ -873,7 +951,7 @@ impl Snapshot {
         drop(pending);
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(source),
+                bytes: Arc::clone(&source),
                 source_version,
                 limits,
                 cfb_limits,
@@ -885,6 +963,7 @@ impl Snapshot {
                 xf_records: Arc::new(xf_records),
                 sheets,
                 source_policy,
+                signed,
             }),
         })
     }
@@ -931,6 +1010,7 @@ impl Snapshot {
                 xf_records: Arc::clone(&source_snapshot.inner.xf_records),
                 sheets,
                 source_policy,
+                signed: source_snapshot.inner.signed,
             }),
         })
     }
@@ -961,6 +1041,7 @@ impl Snapshot {
                 xf_records: Arc::clone(&inner.xf_records),
                 sheets: inner.sheets.clone(),
                 source_policy: inner.source_policy,
+                signed: inner.signed,
             }),
         }
     }
@@ -992,6 +1073,11 @@ impl Snapshot {
         let retained_cfb = self.inner.cfb_limits;
         if limits == retained && cfb_limits == retained_cfb {
             return Ok(self.clone());
+        }
+        if self.inner.signed {
+            let probe = Probe::open_with_cfb_limits(self.bytes().to_vec(), limits, cfb_limits)
+                .map_err(Error::Object)?;
+            return Self::from_probe(probe);
         }
         Self::from_slice_with_limits_and_cfb(self.bytes(), limits, cfb_limits)
     }
@@ -4502,6 +4588,52 @@ impl Edit {
             )?;
         }
 
+        if self.source.inner.signed {
+            // A signed owner may stage and validate a logical cell/tab plan,
+            // but it must never enter PackageEditor with a changed Workbook
+            // stream. Equality is checked against the original native
+            // stream, so an unsigned reserialization cannot manufacture a
+            // signed no-op. The original CFB bytes become both patch sides.
+            if workbook_bytes.as_slice() == self.source.inner.workbook_stream.as_ref() {
+                verify_readback(&self.source, &self.changes)?;
+                verify_structural_readback(
+                    &self.source,
+                    &self.source,
+                    &self.structural_changes,
+                    &self.resource_changes,
+                )?;
+                verify_resource_readback(&self.source, &self.resource_changes)?;
+                verify_layout_readback(&self.source, &layout)?;
+                let changed_number_fields = self
+                    .changes
+                    .iter()
+                    .filter(|change| {
+                        change_is_effective(&self.source, change)
+                            && self.source.inner.sheets[change.sheet].entries[change.entry]
+                                .cell
+                                .storage
+                                == Storage::Number
+                    })
+                    .count();
+                let patch = Patch::new(
+                    Arc::clone(&self.source.inner.bytes),
+                    Arc::clone(&self.source.inner.bytes),
+                    semantic,
+                );
+                return Ok(Commit {
+                    snapshot: self.source,
+                    patch,
+                    diagnostics: Diagnostics {
+                        changed: false,
+                        changed_cells,
+                        changed_number_fields,
+                        touched_streams: 0,
+                    },
+                });
+            }
+            return Err(Error::Signed);
+        }
+
         let workbook: Arc<[u8]> = Arc::from(workbook_bytes);
         // Candidate admission must retain both profiles accepted by the
         // immutable source owner.  The CFB profile is part of the source
@@ -4615,6 +4747,21 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
         ..
     } = change;
     let workbook: Arc<[u8]> = Arc::from(workbook);
+    if source.inner.signed {
+        if workbook.as_ref() == source.inner.workbook_stream.as_ref() {
+            let patch = Patch::new(
+                Arc::clone(&source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
+                semantic,
+            );
+            return Ok(Commit {
+                snapshot: source,
+                patch,
+                diagnostics: Diagnostics::default(),
+            });
+        }
+        return Err(Error::Signed);
+    }
     let mut package = PackageEditor::open_with_cfb_limits(
         source.inner.bytes.to_vec(),
         Targets::default(),

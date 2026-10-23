@@ -141,7 +141,10 @@ pub(crate) fn import(
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Commit::from_native(file, source, native)?, summary))
+        Ok((
+            Commit::from_native_with_limit(file, source, native, _limits.max_snapshot_bytes())?,
+            summary,
+        ))
     })();
     let freshness = file.check_source();
     freshness.and(result)

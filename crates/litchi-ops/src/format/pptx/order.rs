@@ -102,6 +102,7 @@ impl Pptx {
             }
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target,
@@ -173,6 +174,7 @@ impl Pptx {
             }
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target,

@@ -227,7 +227,7 @@ fn source_adoption_is_lazy_and_retains_the_original_cfb_identity() {
 }
 
 #[test]
-fn signed_owner_publishes_exactly_but_refuses_editing() {
+fn signed_owner_publishes_exactly_and_allows_identity_editing() {
     let bytes = signed_package();
     let package = Package::from_bytes(&bytes).unwrap();
 
@@ -236,7 +236,13 @@ fn signed_owner_publishes_exactly_but_refuses_editing() {
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
-    assert!(package.edit().is_err());
+    let commit = package.edit().unwrap().commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().operation_count(), 0);
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.patch().before(), bytes.as_slice());
+    assert_eq!(commit.patch().after(), bytes.as_slice());
+    assert_eq!(commit.into_package().to_bytes().unwrap(), bytes);
 }
 
 #[test]
@@ -526,7 +532,20 @@ fn primary_structural_edits_preserve_leaf_dependency_checks() {
 #[test]
 fn primary_signed_and_encrypted_sources_are_refused() {
     let signed = Package::from_bytes(&signed_package()).unwrap();
-    assert!(signed.edit().is_err());
+    let mut unchanged = signed.edit().unwrap();
+    assert!(!unchanged.commit().unwrap().diagnostics().changed());
+    let mut changed = signed.edit().unwrap();
+    changed
+        .set_value(
+            0_usize,
+            litchi_xls::cell_values::Reference::new(3, 2).unwrap(),
+            litchi_xls::cell_values::Value::Number(9.0),
+        )
+        .unwrap();
+    assert!(matches!(
+        changed.commit(),
+        Err(litchi_xls::EditError::CellValues(litchi_xls::Error::Signed))
+    ));
     let bytes = fixture("poi/test-data/spreadsheet/xor-encryption-abc.xls");
     let encrypted =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().password("abc")).unwrap();

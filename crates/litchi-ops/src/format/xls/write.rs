@@ -946,7 +946,56 @@ pub(super) fn finish_commit(
             .diagnostics()
             .operation_count()
             .max(if changed { fallback_operations } else { 0 });
+    let native_snapshot_bytes = native.patch().retained_bytes();
+    if native_snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(
+            native_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        ));
+    }
     let (package, patch) = native.into_parts();
+    if !changed && file.signature() == crate::format::signature::Signature::Signed {
+        // The write owner is an unsigned private copy. Rebuild the identity
+        // patch over the retained signed package so native replay and the
+        // facade compare the same physical base bytes.
+        let original = file.original_package_for_noop()?;
+        let (package, patch) = original
+            .edit()
+            .map_err(native_edit_error)?
+            .commit()
+            .map_err(native_edit_error)?
+            .into_parts();
+        return finish_parts(
+            file,
+            package,
+            patch,
+            operations,
+            fallback_operations,
+            native_snapshot_bytes,
+            limits,
+        );
+    }
+    finish_parts(
+        file,
+        package,
+        patch,
+        operations,
+        fallback_operations,
+        native_snapshot_bytes,
+        limits,
+    )
+}
+
+fn finish_parts(
+    file: &Xls,
+    package: litchi_xls::Package,
+    patch: litchi_xls::Patch,
+    operations: usize,
+    fallback_operations: usize,
+    prior_snapshot_bytes: usize,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    let changed = !patch.is_noop();
     // The public operation bound counts mutation calls, not the native
     // resource/cell operations needed to implement each call.
     if fallback_operations > limits.max_operations() {
@@ -955,7 +1004,7 @@ pub(super) fn finish_commit(
             limits.max_operations(),
         ));
     }
-    let snapshot_bytes = patch.retained_bytes();
+    let snapshot_bytes = prior_snapshot_bytes.max(patch.retained_bytes());
     if snapshot_bytes > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
     }
@@ -1549,16 +1598,34 @@ pub(crate) mod coalesce {
             } else {
                 false
             };
+            let original = if logical_noop {
+                Some(base.original_package_for_noop()?)
+            } else {
+                None
+            };
             base.check_source_for_write()?;
             let result = edit
                 .commit()
                 .map_err(native_edit_error)
                 .and_then(|native| finish_commit(&base, native, items.len(), &limits))
-                .map(|mut commit| {
+                .and_then(|commit| {
                     if logical_noop {
-                        commit.after = base.clone();
+                        let staged_snapshot_bytes = commit.snapshot_bytes;
+                        let original = original
+                            .as_ref()
+                            .ok_or_else(|| Error::signed(FileFormat::Xls))?;
+                        let empty = original
+                            .edit()
+                            .map_err(native_edit_error)?
+                            .commit()
+                            .map_err(native_edit_error)?;
+                        let mut commit = finish_commit(&base, empty, items.len(), &limits)?;
+                        commit.operations = items.len();
+                        commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
+                        Ok(commit)
+                    } else {
+                        Ok(commit)
                     }
-                    commit
                 });
             let freshness = base.check_source_for_write();
             match freshness.and(result) {

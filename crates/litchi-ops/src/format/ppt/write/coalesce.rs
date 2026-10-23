@@ -209,21 +209,42 @@ impl Run {
             items,
             limits,
             allow_repeated,
+            native_operations,
             ..
         } = self;
         let logical_noop = allow_repeated && logical_noop(&items);
+        let authored_operations = native_operations;
+        let original = matches!(
+            base.signature(),
+            crate::format::signature::Signature::Signed
+        )
+        .then(|| base.original_package_for_noop())
+        .transpose()?;
         base.check_source_for_write()?;
         let result = (|| {
             stage_all(&mut edit, &items)?;
             let native = edit.commit().map_err(native_edit_error)?;
-            super::finish_commit(&base, native, &limits)
-        })()
-        .map(|mut commit| {
+            let mut commit = super::finish_commit(&base, native, &limits)?;
+            let staged_snapshot_bytes = commit.snapshot_bytes;
             if logical_noop {
-                commit.after = base.clone();
+                // Keep the staged native commit for validation, then replace
+                // its changed patch with an identity patch over the original
+                // signed package.  The leaf remains a real no-op, while the
+                // authored operation count stays in transaction diagnostics.
+                let original = original
+                    .as_ref()
+                    .ok_or_else(|| Error::signed(FileFormat::Ppt))?;
+                let empty = original
+                    .edit()
+                    .map_err(native_edit_error)?
+                    .commit()
+                    .map_err(native_edit_error)?;
+                commit = super::finish_commit(&base, empty, &limits)?;
+                commit.operations = authored_operations;
+                commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
             }
-            commit
-        });
+            Ok(commit)
+        })();
         let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(commit) => Ok((commit.before.clone(), commit)),

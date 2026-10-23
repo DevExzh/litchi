@@ -145,7 +145,7 @@ pub(crate) fn try_set_merge(
             apply_sheet_assignments(file, &mut edit, &resolved.sheet_positions, &assignments)?;
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(file, source, native).map(Some)
+        Commit::from_native_with_limit(file, source, native, limits.max_snapshot_bytes()).map(Some)
     })();
     file.check_source_for_replay()?;
     result

@@ -498,6 +498,23 @@ impl Ppt {
         Ok(package.clone())
     }
 
+    /// Return the original native package for a canonical signed no-op edit.
+    /// Changed writes use [`Self::editable_package_for_write`] so signature
+    /// storages are removed before publication; the empty patch used for an
+    /// exact cancellation must remain bound to the signed CFB bytes.
+    pub(crate) fn original_package_for_noop(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => Ok(package.clone()),
+            PptOwner::Released => Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the PPT source was released before signed no-op replay",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_suggestion("reopen the presentation with source retention enabled")),
+        }
+    }
+
     /// Adopt a committed native package as an eager immutable handle while
     /// retaining the origin and the explicit signature transition.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {

@@ -223,6 +223,7 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -380,6 +381,7 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),

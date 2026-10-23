@@ -28,5 +28,5 @@ pub use link::Link;
 pub use litchi_cfb::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport};
 pub use model::{Limits, Object, Objects, Storage, Stream};
 pub use patch::{Commit, Diagnostics, Patch};
-pub use snapshot::Snapshot;
+pub use snapshot::{Probe, Snapshot};
 pub use target::{Target, Targets};

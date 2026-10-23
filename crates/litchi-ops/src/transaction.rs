@@ -162,13 +162,6 @@ struct Step {
     snapshot_bytes: usize,
 }
 enum Leaf {
-    /// A native edit whose final logical plan is an exact no-op on a signed
-    /// publication.  The native patch remains retained for diagnostics and
-    /// source accounting, but this wrapper binds the history step to the
-    /// original signed artifact.  Replay and inverse therefore use the same
-    /// endpoint that the public commit returns, including its signature
-    /// parts.
-    ExactNoop(Box<ExactNoopLeaf>),
     #[cfg(feature = "doc")]
     Doc(Box<crate::format::doc::StepPatch>),
     #[cfg(feature = "xlsb")]
@@ -199,10 +192,6 @@ enum Leaf {
     Xlsx(Box<XlsxLeaf>),
 }
 
-struct ExactNoopLeaf {
-    base: File,
-    native: Box<Leaf>,
-}
 // Every variant is one box: a discriminant and a pointer.
 const _: () = assert!(size_of::<Leaf>() <= 16);
 #[cfg(feature = "pptx")]
@@ -331,10 +320,6 @@ impl Patch {
 pub struct Edit {
     identity: Arc<()>,
     current: File,
-    /// Original signed facade retained while native coalescers stage against
-    /// its private leaf owner.  Every flushed exact-no-op step returns to this
-    /// endpoint before the next command resolves.
-    signed_base: Option<File>,
     steps: Vec<Step>,
     limits: SemanticLimits,
     failure: Option<crate::Error>,
@@ -470,12 +455,8 @@ impl File {
                 identity: Arc::clone(&identity),
                 // Coalescers operate on the format leaf.  A signed facade
                 // keeps the same signed disposition on that leaf, while the
-                // outer wrapper is restored by the no-op collapse below.
-                // Keeping the facade variant here would bypass every leaf
-                // coalescer and reject a cancelled edit before its final
-                // content comparison.
+                // outer wrapper remains the immutable transaction endpoint.
                 current: transaction_owner(self),
-                signed_base: self.is_signed().then(|| self.clone()),
                 steps: Vec::new(),
                 limits,
                 failure: None,
@@ -527,14 +508,6 @@ impl File {
                 return Err(Error::PatchConflict.into());
             }
             edit.flush_pending()?;
-            if self.is_signed() {
-                // Coalesced runs are flushed outside `execute_steps`, so
-                // collapse their native cancellation proof here as well.
-                // The marker retains the native patch but makes the exact
-                // signed publication the leaf history's actual no-op
-                // endpoint before `changed` inspects it.
-                collapse_signed_steps(self, &mut edit.steps)?;
-            }
             let changed = changed(&edit.steps)?;
             if changed && self.is_signed() {
                 return Err(crate::Error::signed(self.format().ok_or_else(pending)?));
@@ -806,7 +779,8 @@ impl Edit {
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
-                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_xlsx(handle, commit, path)
             },
             #[cfg(feature = "pptx")]
@@ -1339,7 +1313,7 @@ impl Edit {
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => wrap_xlsx(
                 handle,
-                handle.move_to(_path.into_path()?, _to.into_placement()?)?,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
             #[cfg(feature = "xlsb")]
@@ -1440,9 +1414,11 @@ impl Edit {
                 (),
             ),
             #[cfg(feature = "xlsx")]
-            File::Xlsx(handle) => {
-                wrap_xlsx(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ())
-            },
+            File::Xlsx(handle) => wrap_xlsx(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => wrap_xlsb(
                 handle,
@@ -2560,8 +2536,6 @@ impl Edit {
     }
 
     pub(crate) fn flush_pending(&mut self) -> Result<()> {
-        let signed_base = self.signed_base.clone();
-        let step_start = self.steps.len();
         #[cfg(feature = "doc")]
         if let Some(run) = self.doc.take() {
             let index = run.first_index();
@@ -2999,12 +2973,6 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
-        if let Some(base) = signed_base {
-            let mut tail = self.steps.split_off(step_start);
-            collapse_signed_steps(&base, &mut tail)?;
-            self.steps.extend(tail);
-            self.current = base;
-        }
         Ok(())
     }
 
@@ -3310,23 +3278,7 @@ impl Edit {
                 }
                 .into());
             }
-            let (steps, value) = if let File::Signed(signed) = &self.current {
-                // The signed wrapper is a read facade around the format leaf.
-                // Let the leaf stage a setter so its native commit can prove
-                // whether the request is an exact no-op.  A successful
-                // signed operation must still be byte-identical; retain the
-                // outer wrapper for every resulting endpoint so no step can
-                // publish an unwrapped signature disposition.
-                let outer = self.current.clone();
-                let (steps, value) = operation(signed.file())?;
-                let mut wrapped = Vec::with_capacity(steps.len());
-                for step in steps {
-                    wrapped.push(collapse_signed_step(&outer, step)?);
-                }
-                (wrapped, value)
-            } else {
-                operation(&self.current)?
-            };
+            let (steps, value) = operation(&self.current)?;
             let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
                 bytes.saturating_add(step.snapshot_bytes)
             });
@@ -3371,19 +3323,8 @@ fn wrap<T>(
     commit: crate::format::docx::write::Commit,
     value: T,
 ) -> Result<(Step, T)> {
-    let (after, main, diagnostics) = commit.into_parts();
-    // The DOCX leaf patch compares the original and final native snapshots,
-    // including cancelled operations.  Preserve the complete package owner
-    // when it proves an exact no-op so a signed transaction can retain its
-    // signature parts instead of accepting a normalized reserialization.
-    let after = if before.signature() == crate::format::signature::Signature::Signed
-        && main.is_noop()
-        && !docx_metadata_changed(&File::Docx(before.clone()), &File::Docx(after.clone()))?
-    {
-        before.clone()
-    } else {
-        after
-    };
+    let leaf_operations = commit.operations();
+    let (after, main, _diagnostics) = commit.into_parts();
     let snapshot_bytes = main
         .source()
         .xml_bytes()
@@ -3394,7 +3335,7 @@ fn wrap<T>(
             before: File::Docx(before.clone()),
             after: File::Docx(after),
             leaf: Leaf::Docx(Box::new(main)),
-            leaf_operations: diagnostics.operations(),
+            leaf_operations,
             snapshot_bytes,
         },
         value,
@@ -3432,12 +3373,12 @@ fn wrap_xlsb<T>(
     commit: crate::format::xlsb::write::Commit,
     value: T,
 ) -> Result<(Step, T)> {
+    let leaf_operations = commit.operations();
+    let snapshot_bytes = commit.snapshot_bytes();
     let (after, patch) = commit.into_parts();
-    let leaf_operations = patch.operation_count();
     // Structural and cell-value patches both retain exact package images.
     // Cell selectors spanning worksheets retain every per-worksheet image;
     // structural patches carry the checked native operation charge.
-    let snapshot_bytes = patch.retained_bytes();
     Ok((
         Step {
             before: File::Xlsb(before.clone()),
@@ -3506,9 +3447,9 @@ fn wrap_xlsx<T>(
     commit: crate::format::xlsx::write::Commit,
     value: T,
 ) -> Result<(Step, T)> {
+    let leaf_operations = commit.operations();
+    let snapshot_bytes = commit.snapshot_bytes();
     let (after, source, target, patch) = commit.into_parts();
-    let snapshot_bytes = patch.retained_bytes();
-    let leaf_operations = patch.operation_count();
     Ok((
         Step {
             before: File::Xlsx(before.clone()),
@@ -3531,7 +3472,7 @@ fn wrap_pptx<T>(
     commit: crate::format::pptx::write::Commit,
     value: T,
 ) -> Result<(Step, T)> {
-    let snapshot_bytes = commit.proof.retained_bytes();
+    let snapshot_bytes = commit.snapshot_bytes();
     Ok((
         Step {
             before: File::Pptx(before.clone()),
@@ -3702,13 +3643,6 @@ fn changed(steps: &[Step]) -> Result<bool> {
     let (Some(first), Some(last)) = (steps.first(), steps.last()) else {
         return Ok(false);
     };
-    // Signed cancellation steps are represented by an exact endpoint marker
-    // carrying the native patch.  Their native operation bytes may differ,
-    // but the authored plan has been proven to return to the original signed
-    // artifact, so the complete transaction is unchanged.
-    if steps.iter().all(is_exact_noop_step) {
-        return Ok(false);
-    }
     #[cfg(feature = "ods")]
     if let (File::Ods(before), File::Ods(after)) = (&first.before, &last.after) {
         if let [
@@ -3823,21 +3757,6 @@ fn changed(steps: &[Step]) -> Result<bool> {
         (Leaf::Xlsx(first), Leaf::Xlsx(last)) => Ok(!first.source.same_content(&last.target)?),
         #[allow(unreachable_patterns)]
         _ => Err(Error::PatchConflict.into()),
-    }
-}
-
-fn is_exact_noop_step(step: &Step) -> bool {
-    match &step.leaf {
-        Leaf::ExactNoop(noop) => {
-            // The native proof was byte-checked when this wrapper was made;
-            // keep the marker's endpoints tied to that same signed owner so
-            // a future change cannot reduce it to a signature boolean.
-            let _native = &noop.native;
-            noop.base.is_signed()
-                && same_snapshot(&step.before, &noop.base)
-                && same_snapshot(&step.after, &noop.base)
-        },
-        _ => false,
     }
 }
 
@@ -4080,61 +3999,6 @@ fn transaction_owner(file: &File) -> File {
         File::Signed(signed) => signed.file().clone(),
         _ => file.clone(),
     }
-}
-
-/// Turn one leaf cancellation into a real exact-no-op history step.
-///
-/// Coalescers retain their native operation list even when their final
-/// endpoint is the original unsigned leaf.  That operation list can still
-/// have different `before`/`after` bytes, so comparing it in the transaction
-/// history would incorrectly reject a signed cancellation.  The wrapper
-/// carries the original signed publication and the native patch together;
-/// `changed` sees the wrapper's equal endpoints, while diagnostics and source
-/// accounting still retain the native operation proof.
-fn collapse_signed_step(base: &File, step: Step) -> Result<Step> {
-    if matches!(&step.leaf, Leaf::ExactNoop(_)) {
-        return Ok(step);
-    }
-    // Prove both sides against the recorded signed publication.  Comparing
-    // only the native before/after pair would let a misplaced or normalized
-    // unsigned owner masquerade as a cancellation.
-    if !same_content_for_replay(&step.before, base, true)?
-        || !same_content_for_replay(&step.before, &step.after, true)?
-    {
-        return Err(crate::Error::signed(base.format().ok_or_else(pending)?));
-    }
-    let endpoint = base.clone();
-    let Step {
-        leaf: native,
-        leaf_operations,
-        snapshot_bytes,
-        ..
-    } = step;
-    Ok(Step {
-        before: endpoint.clone(),
-        after: endpoint.clone(),
-        leaf: Leaf::ExactNoop(Box::new(ExactNoopLeaf {
-            base: endpoint,
-            native: Box::new(native),
-        })),
-        leaf_operations,
-        snapshot_bytes,
-    })
-}
-
-fn collapse_signed_steps(base: &File, steps: &mut Vec<Step>) -> Result<()> {
-    if steps.is_empty() {
-        return Ok(());
-    }
-    let mut collapsed = Vec::new();
-    collapsed
-        .try_reserve_exact(steps.len())
-        .map_err(|source| Error::Allocation { source }.into())?;
-    for step in std::mem::take(steps) {
-        collapsed.push(collapse_signed_step(base, step)?);
-    }
-    *steps = collapsed;
-    Ok(())
 }
 
 fn check_source(file: &File) -> Result<()> {

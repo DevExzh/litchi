@@ -37,6 +37,14 @@ impl Proof {
             }),
         }
     }
+
+    pub(crate) fn is_noop(&self) -> bool {
+        match self {
+            Self::Source(patch) => patch.is_noop(),
+            Self::Eager(patch) => patch.is_noop(),
+            Self::Metadata(_) => false,
+        }
+    }
 }
 pub(crate) struct Commit {
     pub(crate) after: Pptx,
@@ -44,10 +52,15 @@ pub(crate) struct Commit {
     pub(crate) target: Editable,
     pub(crate) proof: Proof,
     pub(crate) operations: usize,
+    pub(crate) snapshot_bytes: usize,
 }
 impl Commit {
     pub(crate) fn into_file(self) -> Pptx {
         self.after
+    }
+
+    pub(crate) fn snapshot_bytes(&self) -> usize {
+        self.snapshot_bytes.max(self.proof.retained_bytes())
     }
 }
 impl Editable {
@@ -197,19 +210,35 @@ impl Pptx {
         }
         let result = (|| self.set_inner(target, Props::from_props(props)?, limits))()
             .map_err(|error| error.with_format(FileFormat::Pptx));
-        if self.signature() == crate::format::signature::Signature::Signed {
-            self.check_source_for_replay()?;
-            result.and_then(|commit| {
+        result.and_then(|commit| {
+            let snapshot_bytes = commit.snapshot_bytes();
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+            }
+            if self.signature() == crate::format::signature::Signature::Signed {
+                self.check_source_for_replay()?;
                 if commit.after.same_snapshot(self) {
-                    Ok(commit)
+                    if commit.proof.is_noop() {
+                        let commit = canonical_signed_noop(self, commit.operations)?;
+                        let snapshot_bytes = commit.snapshot_bytes();
+                        if snapshot_bytes > limits.max_snapshot_bytes() {
+                            return Err(snapshot_limit(
+                                snapshot_bytes,
+                                limits.max_snapshot_bytes(),
+                            ));
+                        }
+                        Ok(commit)
+                    } else {
+                        Ok(commit)
+                    }
                 } else {
                     Err(Error::signed(FileFormat::Pptx))
                 }
-            })
-        } else {
-            self.check_source()?;
-            result
-        }
+            } else {
+                self.check_source()?;
+                Ok(commit)
+            }
+        })
     }
     fn set_inner(
         &self,
@@ -479,6 +508,7 @@ impl Pptx {
                 )
             },
         };
+        let snapshot_bytes = proof.retained_bytes();
         let after = if !changed {
             self.clone()
         } else {
@@ -493,7 +523,48 @@ impl Pptx {
             target,
             proof,
             operations,
+            snapshot_bytes,
         })
+    }
+}
+
+fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
+    let source = base.original_owner_for_noop()?;
+    match &source {
+        Editable::Source(package) => {
+            let (target, patch) = package
+                .edit()
+                .map_err(native_error)?
+                .commit()
+                .map_err(native_error)?
+                .into_parts();
+            let snapshot_bytes = patch.retained_bytes();
+            Ok(Commit {
+                after: base.clone(),
+                source,
+                target: Editable::Source(target),
+                proof: Proof::Source(patch),
+                operations,
+                snapshot_bytes,
+            })
+        },
+        Editable::Eager(package) => {
+            let (target, patch) = package
+                .edit()
+                .map_err(native_error)?
+                .commit()
+                .map_err(native_error)?
+                .into_parts();
+            let snapshot_bytes = patch.retained_bytes();
+            Ok(Commit {
+                after: base.clone(),
+                source,
+                target: Editable::Eager(Arc::new(target)),
+                proof: Proof::Eager(patch),
+                operations,
+                snapshot_bytes,
+            })
+        },
     }
 }
 
@@ -650,11 +721,25 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
+
+fn snapshot_limit(observed: usize, maximum: usize) -> Error {
+    TxError::Limit {
+        kind: LimitKind::SnapshotBytes,
+        observed,
+        maximum,
+    }
+    .into()
+}
+
 fn allocation(source: std::collections::TryReserveError) -> Error {
     TxError::Allocation { source }.into()
 }
 fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Pptx)
+}
+
+fn native_error(error: litchi_pptx::Error) -> Error {
+    Error::from(error).with_format(FileFormat::Pptx)
 }
 
 pub(super) fn validate_text(value: &str) -> Result<()> {

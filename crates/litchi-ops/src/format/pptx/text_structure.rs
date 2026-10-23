@@ -252,6 +252,7 @@ impl Pptx {
             Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target,

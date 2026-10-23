@@ -101,6 +101,7 @@ impl Pptx {
         )?;
         if patch.is_noop() {
             return Ok(Commit {
+                snapshot_bytes: 0,
                 after: self.clone(),
                 target: source.clone(),
                 source,
@@ -111,6 +112,7 @@ impl Pptx {
         let after_package = Arc::new(after_package);
         let operations = patch.changes().len();
         Ok(Commit {
+            snapshot_bytes: 0,
             after: self.adopt_metadata(Arc::clone(&after_package), metadata),
             source: Editable::Eager(package),
             target: Editable::Eager(after_package),

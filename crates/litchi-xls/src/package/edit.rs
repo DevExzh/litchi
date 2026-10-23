@@ -1048,6 +1048,12 @@ impl Package {
                 diagnostics: Diagnostics::applied(false, patch.operation_count()),
             });
         }
+        if self.inner.signed {
+            // Stale-base admission above remains first. Once the exact base
+            // matches, a changed patch must be refused before the signed
+            // probe or any target materialization can run.
+            return Err(Error::CellValues(crate::Error::Signed));
+        }
         let options = self.retained_edit_options()?;
         let snapshot = self
             .edit_snapshot_with_options(options)
@@ -1157,6 +1163,7 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
                 encryption,
             },
             policy: source.inner.policy,
+            signed: source.inner.signed,
             metadata: std::sync::OnceLock::from(metadata),
             edit_snapshot: Some(snapshot),
             workbook_stream: std::sync::OnceLock::new(),

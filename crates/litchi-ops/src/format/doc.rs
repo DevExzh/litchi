@@ -417,6 +417,26 @@ impl Doc {
         Ok(Some(package.clone()))
     }
 
+    /// Return the retained native package for a canonical signed no-op patch.
+    ///
+    /// The write editor above deliberately removes signature storages so a
+    /// changed publication can never carry them forward.  An exact logical
+    /// cancellation needs an empty native patch whose source is the original
+    /// signed compound artifact, however; keeping that source identity is
+    /// what lets native replay and the unified history agree.
+    pub(crate) fn original_package_for_noop(&self) -> Result<litchi_doc::Package> {
+        self.check_source_for_write()?;
+        match &self.0.source {
+            DocSource::Retained(package) => Ok(package.clone()),
+            DocSource::Released => Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the DOC source was released before signed no-op replay",
+            )
+            .with_format(FileFormat::Doc)
+            .with_suggestion("reopen the document with source retention enabled")),
+        }
+    }
+
     /// Apply properties to one target or every match of a scoped query in
     /// one native body transaction (see [`edit`]).
     pub(crate) fn set<'p, 'v>(

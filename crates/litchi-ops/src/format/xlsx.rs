@@ -603,6 +603,21 @@ impl Xlsx {
         self.editor_after_source_check(self.0.signature() == Signature::Signed)
     }
 
+    /// Materialize the original native package for a canonical signed no-op
+    /// patch. `editor_for_write` intentionally calls `unsigned_workbook` so a
+    /// changed publication cannot preserve signature parts; the identity
+    /// patch itself must still be anchored to the signed package bytes.
+    pub(crate) fn original_package_for_noop(&self) -> Result<xlsx::Package> {
+        if !self.0.retain_source {
+            return Err(source_released());
+        }
+        self.check_source_for_replay()?;
+        match &self.0.owner {
+            XlsxOwner::Source(workbook) => self.promote_source(workbook),
+            XlsxOwner::Eager(package) => Ok(package.clone()),
+        }
+    }
+
     fn editor_after_source_check(&self, allow_signed: bool) -> Result<xlsx::Package> {
         if !self.0.retain_source {
             return Err(source_released());

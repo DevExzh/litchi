@@ -222,6 +222,7 @@ fn commit(
         })?;
     let native_limits =
         TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+    let canonical_sheet = by_sheet.keys().next().copied();
     let mut package = package;
     let mut patches = Vec::new();
     for (sheet, assignments) in by_sheet {
@@ -260,7 +261,15 @@ fn commit(
         package = next;
         patches.push(patch);
     }
-    let commit = Commit::from_cell_parts(file, package, patches)?;
+    let canonical_sheet = canonical_sheet
+        .ok_or_else(|| Error::new(Code::InternalError, "XLSB find lost its worksheet owner"))?;
+    let commit = Commit::from_cell_parts(
+        file,
+        package,
+        patches,
+        (canonical_sheet, native_limits),
+        limits.max_snapshot_bytes(),
+    )?;
     check_snapshot_limits(commit.patch(), limits)?;
     Ok(commit)
 }

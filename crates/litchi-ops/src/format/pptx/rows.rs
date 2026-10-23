@@ -103,6 +103,7 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Commit {
+            snapshot_bytes: 0,
             after,
             source,
             target: Editable::Eager(target),
@@ -546,6 +547,7 @@ impl Pptx {
             .map_err(|_| error(Code::InternalError, "the table path does not parse"))?;
         Ok((
             Commit {
+                snapshot_bytes: 0,
                 after,
                 source,
                 target: Editable::Eager(target),

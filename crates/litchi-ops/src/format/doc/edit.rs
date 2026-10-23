@@ -524,11 +524,25 @@ impl Doc {
     ) -> Result<WriteCommit> {
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let (package, patch) = commit.into_parts();
+        let staged_snapshot_bytes = super::patch_snapshot_bytes(commit.patch());
+        limit(
+            LimitKind::SnapshotBytes,
+            staged_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        )?;
         if changed && self.signature() == super::Signature::Signed {
             return Err(super::signature::refusal(FileFormat::Doc));
         }
-        let snapshot_bytes = super::patch_snapshot_bytes(&patch);
+        let (package, patch) = if !changed && self.signature() == super::Signature::Signed {
+            // The staged editor intentionally uses an unsigned private copy.
+            // Rebuild an identity patch over the retained signed package so
+            // native replay sees the same physical base as the facade.
+            let original = self.original_package_for_noop()?;
+            original.edit()?.commit()?.into_parts()
+        } else {
+            commit.into_parts()
+        };
+        let snapshot_bytes = staged_snapshot_bytes.max(super::patch_snapshot_bytes(&patch));
         limit(
             LimitKind::SnapshotBytes,
             snapshot_bytes,

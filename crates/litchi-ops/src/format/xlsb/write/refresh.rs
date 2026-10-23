@@ -93,6 +93,7 @@ pub(crate) fn refresh(
             })?;
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        let canonical_sheet = planned.keys().next().copied();
         let mut package = package_from_editor(handle.editor_for_write()?);
         let mut patches = Vec::new();
         for (sheet, caches) in planned {
@@ -133,7 +134,20 @@ pub(crate) fn refresh(
         if patches.is_empty() {
             return Ok((None, summary));
         }
-        let commit = Commit::from_cell_parts(handle, package, patches)?;
+        let canonical_sheet = canonical_sheet.ok_or_else(|| {
+            crate::Error::new(
+                crate::Code::InternalError,
+                "XLSB refresh lost its worksheet owner",
+            )
+            .with_format(litchi_core::FileFormat::Xlsb)
+        })?;
+        let commit = Commit::from_cell_parts(
+            handle,
+            package,
+            patches,
+            (canonical_sheet, native_limits),
+            limits.max_snapshot_bytes(),
+        )?;
         check_snapshot_limits(commit.patch(), limits)?;
         Ok((Some(commit), summary))
     })();

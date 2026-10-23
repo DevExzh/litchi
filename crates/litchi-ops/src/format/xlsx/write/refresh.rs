@@ -100,7 +100,15 @@ pub(crate) fn refresh(
             return Ok((None, summary));
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Some(Commit::from_native(handle, source, native)?), summary))
+        Ok((
+            Some(Commit::from_native_with_limit(
+                handle,
+                source,
+                native,
+                limits.max_snapshot_bytes(),
+            )?),
+            summary,
+        ))
     })();
     let freshness = handle.check_source();
     freshness.and(result)
