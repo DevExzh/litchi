@@ -1969,6 +1969,7 @@ fn deferred_overlay_error(error: litchi_cfb::OverlayError) -> SourceBackedError 
         | litchi_cfb::OverlayError::TargetFingerprintChanged { .. } => {
             SourceBackedError::InvalidData("source-backed overlay identity changed".into())
         },
+        _ => SourceBackedError::InvalidData("source-backed overlay failed".into()),
     }
 }
 
