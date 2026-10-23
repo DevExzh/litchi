@@ -38,9 +38,11 @@ class FinalInventoryTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
+        self.external = tempfile.TemporaryDirectory(dir=Path.cwd())
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
+        self.external.cleanup()
 
     def context(self, root: Path, source: str = "a" * 40) -> inventory.SourceContext:
         return inventory.SourceContext(
@@ -90,6 +92,11 @@ class FinalInventoryTests(unittest.TestCase):
         self.assertEqual(environment["LITCHI_CAPPED"], "")
         receipt = json.loads(Path(first.receipt_path).read_text(encoding="utf-8"))
         self.assertEqual(receipt["resource"]["peak_rss_kib"], 1234)
+
+        external_tmp = Path(self.tmp.name) / "external" / "tmp"
+        self.assertEqual(inventory.capture_env({"TMPDIR": "/tmp", "LITCHI_CAPPED": "1"},
+                                               tmpdir=external_tmp)["TMPDIR"],
+                         str(external_tmp))
 
         def should_not_run(*_args):
             raise AssertionError("matching JSON receipt should be reused")
@@ -155,13 +162,16 @@ class FinalInventoryTests(unittest.TestCase):
     def test_capture_all_marks_inventory_skip_incomplete(self) -> None:
         root = Path(self.tmp.name) / "source"
         root.mkdir()
-        output = Path(self.tmp.name) / "output"
+        output = Path(self.external.name) / "output"
         target = Path(self.tmp.name) / "target"
         context = self.context(root)
         packages = [inventory.Package(f"p{i}", f"p{i}", f"crates/p{i}/Cargo.toml", "d" * 64)
                     for i in range(inventory.DEFAULT_PACKAGE_COUNT)]
 
-        def fake_capture(package, *_args, **_kwargs):
+        tmpdirs = []
+
+        def fake_capture(package, *_args, **kwargs):
+            tmpdirs.append(kwargs["tmpdir"])
             return inventory.CaptureResult(package.name, str(output / f"{package.name}.json"),
                                             str(output / f"{package.name}.receipt.json"),
                                             False, 1, "e" * 64)
@@ -176,7 +186,27 @@ class FinalInventoryTests(unittest.TestCase):
         marker = json.loads((output / "run.json").read_text(encoding="utf-8"))
         self.assertEqual(marker["status"], "incomplete")
         self.assertEqual(marker["phase"], "failed")
+        self.assertEqual(marker["package_count"], inventory.DEFAULT_PACKAGE_COUNT)
+        self.assertEqual(marker["package_names"], [package.name for package in packages])
+        self.assertEqual(tmpdirs, [output / "tmp"] * inventory.DEFAULT_PACKAGE_COUNT)
+        self.assertTrue((output / "tmp").is_dir())
         self.assertGreaterEqual(stable.call_count, 2 * inventory.DEFAULT_PACKAGE_COUNT)
+
+    def test_capture_all_rejects_tmp_output_without_touching_it(self) -> None:
+        root = Path(self.tmp.name) / "source"
+        root.mkdir()
+        output = Path("/tmp") / f"litchi-final-inventory-{self.tmp.name.split('/')[-1]}"
+        output.mkdir()
+        sentinel = output / "keep.me"
+        sentinel.write_text("unrelated\n", encoding="utf-8")
+        try:
+            with self.assertRaisesRegex(inventory.InventoryError, "must not be under /tmp"):
+                inventory.capture_all(root, output, Path(self.tmp.name) / "target")
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "unrelated\n")
+            self.assertFalse((output / "tmp").exists())
+        finally:
+            sentinel.unlink()
+            output.rmdir()
 
     def test_capture_all_requires_the_fixed_68_package_set(self) -> None:
         root = Path(self.tmp.name) / "source"
@@ -187,15 +217,15 @@ class FinalInventoryTests(unittest.TestCase):
                 patch.object(inventory, "enumerate_packages", return_value=[package]), \
                 patch.object(inventory, "verify_cargo_shim") as verify:
             with self.assertRaisesRegex(inventory.InventoryError, "68 direct library packages"):
-                inventory.capture_all(root, Path(self.tmp.name) / "output",
-                                      Path(self.tmp.name) / "target")
+                inventory.capture_all(root, Path(self.external.name) / "output",
+                                      Path(self.external.name) / "target")
         verify.assert_not_called()
 
     def test_capture_all_aborts_on_midrun_source_change(self) -> None:
         root = Path(self.tmp.name) / "source"
         root.mkdir()
-        output = Path(self.tmp.name) / "output"
-        target = Path(self.tmp.name) / "target"
+        output = Path(self.external.name) / "output"
+        target = Path(self.external.name) / "target"
         context = self.context(root)
         packages = [inventory.Package(f"p{i}", f"p{i}", f"crates/p{i}/Cargo.toml", "d" * 64)
                     for i in range(inventory.DEFAULT_PACKAGE_COUNT)]

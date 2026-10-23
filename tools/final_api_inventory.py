@@ -47,7 +47,7 @@ CAPTURE_ENV = {
     "LC_ALL": "C",
 }
 IDENTITY_ENV_KEYS = tuple(CAPTURE_ENV) + (
-    "LITCHI_CAPPED", "RUSTFLAGS", "RUSTDOCFLAGS", "RUSTUP_TOOLCHAIN"
+    "LITCHI_CAPPED", "TMPDIR", "RUSTFLAGS", "RUSTDOCFLAGS", "RUSTUP_TOOLCHAIN"
 )
 RECEIPT_SCHEMA = 1
 
@@ -142,7 +142,8 @@ def enumerate_packages(root: Path) -> list[Package]:
     return packages
 
 
-def source_context(root: Path, *, cargo: str = "cargo", rustc: str = "rustc") -> SourceContext:
+def source_context(root: Path, *, cargo: str = "cargo", rustc: str = "rustc",
+                   tmpdir: Path | None = None) -> SourceContext:
     """Read the source identity without invoking a build."""
     git_env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
     commit = run_text(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=root, env=git_env)
@@ -167,7 +168,7 @@ def source_context(root: Path, *, cargo: str = "cargo", rustc: str = "rustc") ->
     # Use the exact capture environment for tool identity probing too.  In
     # particular, an inherited marker must not be able to make a capped Cargo
     # shim take its uncapped path before captures begin.
-    identity_env = capture_env()
+    identity_env = capture_env(tmpdir=tmpdir)
     return SourceContext(
         root=str(root),
         source_commit=commit,
@@ -224,9 +225,12 @@ def rustdoc_command(package: Package, target: Path, cargo: str = "cargo") -> lis
     ]
 
 
-def capture_env(base: Mapping[str, str] | None = None) -> dict[str, str]:
+def capture_env(base: Mapping[str, str] | None = None, *,
+                tmpdir: Path | None = None) -> dict[str, str]:
     environment = dict(base or os.environ)
     environment.update(CAPTURE_ENV)
+    if tmpdir is not None:
+        environment["TMPDIR"] = str(tmpdir)
     # The coordinator shim deliberately bypasses its cgroup when this inherited
     # marker is nonempty.  Never allow a caller's marker to leak into a run.
     environment.pop("LITCHI_CAPPED", None)
@@ -370,6 +374,7 @@ def capture_package(package: Package, context: SourceContext, output: Path, targ
                     *, cargo: str = "cargo", reuse: bool = True,
                     runner: CommandRunner = default_runner,
                     base_env: Mapping[str, str] | None = None,
+                    tmpdir: Path | None = None,
                     shim_identity: Mapping[str, object] | None = None) -> CaptureResult:
     output.mkdir(parents=True, exist_ok=True)
     inventory_dir = output / "inventory"
@@ -381,7 +386,7 @@ def capture_package(package: Package, context: SourceContext, output: Path, targ
     slug = package.name.replace("-", "_")
     json_path = inventory_dir / f"{slug}.json"
     receipt_path = receipt_dir / f"{slug}.json"
-    environment = capture_env(base_env)
+    environment = capture_env(base_env, tmpdir=tmpdir)
     command = rustdoc_command(package, target, cargo)
     identity = _identity(context, package, command, environment, shim_identity)
     if reuse:
@@ -451,14 +456,23 @@ def package_set_sha256(packages: Sequence[Package]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def package_names(packages: Sequence[Package]) -> list[str]:
+    names = [package.name for package in packages]
+    if len(names) != len(set(names)):
+        raise InventoryError("direct library package list contains duplicate names")
+    return names
+
+
 def write_run_state(path: Path, context: SourceContext, packages: Sequence[Package],
                     *, status: str, **extra: object) -> None:
+    names = package_names(packages)
     _write_json(path, {
         "schema": RECEIPT_SCHEMA,
         "status": status,
         "source_commit": context.source_commit,
         "cargo_lock_sha256": context.lock_sha256,
-        "package_count": len(packages),
+        "package_count": len(names),
+        "package_names": names,
         "package_set_sha256": package_set_sha256(packages),
         "updated": utc_now(),
         **extra,
@@ -514,12 +528,29 @@ def capture_all(root: Path, output: Path, target: Path, *,
         except ValueError:
             continue
         raise InventoryError(f"{label} must be outside the source checkout: {path}")
-    context = source_context(root, cargo=cargo)
-    packages = enumerate_packages(root)
-    if len(packages) != DEFAULT_PACKAGE_COUNT:
-        raise InventoryError(f"expected {DEFAULT_PACKAGE_COUNT} direct library packages, found {len(packages)}")
-    shim_identity = verify_cargo_shim(context.cargo_path, capture_env())
+    root = root.resolve()
+    output = output.resolve()
+    target = target.resolve()
+    system_tmp = Path("/tmp").resolve()
+    try:
+        output.relative_to(system_tmp)
+    except ValueError:
+        pass
+    else:
+        raise InventoryError(f"output/TMPDIR must not be under /tmp: {output}")
     output.mkdir(parents=True, exist_ok=True)
+    tmpdir = output / "tmp"
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    if not tmpdir.is_dir():
+        raise InventoryError(f"capture TMPDIR is not a directory: {tmpdir}")
+    context = source_context(root, cargo=cargo, tmpdir=tmpdir)
+    packages = enumerate_packages(root)
+    names = package_names(packages)
+    if len(names) != DEFAULT_PACKAGE_COUNT:
+        raise InventoryError(
+            f"expected {DEFAULT_PACKAGE_COUNT} direct library packages, found {len(names)}: {names}"
+        )
+    shim_identity = verify_cargo_shim(context.cargo_path, capture_env(tmpdir=tmpdir))
     marker = output / "run.json"
     previous = _read_json(marker)
     package_digest = package_set_sha256(packages)
@@ -527,6 +558,7 @@ def capture_all(root: Path, output: Path, target: Path, *,
         if previous.get("source_commit") != context.source_commit:
             raise InventoryError("output directory belongs to a different source freeze")
         if (previous.get("package_count") != DEFAULT_PACKAGE_COUNT
+                or previous.get("package_names") != names
                 or previous.get("package_set_sha256") != package_digest):
             raise InventoryError("output directory belongs to a different package set")
     write_package_manifest(output, context, packages)
@@ -537,6 +569,7 @@ def capture_all(root: Path, output: Path, target: Path, *,
             source_stable(context)
             captures.append(capture_package(package, context, output, target, cargo=cargo,
                                             reuse=reuse, runner=runner,
+                                            tmpdir=tmpdir,
                                             shim_identity=shim_identity))
             source_stable(context)
         if not run_final_inventory:

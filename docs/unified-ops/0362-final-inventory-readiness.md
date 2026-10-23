@@ -14,7 +14,10 @@ logs and reports outside the checkout:
 FREEZE=$(GIT_OPTIONAL_LOCKS=0 git rev-parse HEAD)
 test -z "$(GIT_OPTIONAL_LOCKS=0 git status --porcelain)"
 OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
-mkdir -p "$OUT"/{glossary,inventory,receipts,target}
+TMPDIR="$OUT/tmp"
+case "$TMPDIR" in /tmp|/tmp/*) echo "TMPDIR must be external: $TMPDIR" >&2; exit 1;; esac
+mkdir -p "$OUT"/{glossary,inventory,receipts,target} "$TMPDIR"
+export TMPDIR
 ```
 
 Each receipt records `FREEZE`, the exact command, `rustc -Vv`, `cargo -V`,
@@ -40,6 +43,7 @@ export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 \
   CARGO_NET_OFFLINE=true RUSTC_BOOTSTRAP=1 LITCHI_MEM_MAX=20G
 export CARGO_TARGET_DIR="$OUT/target"
+export TMPDIR="$OUT/tmp"
 ```
 
 Before each Cargo command, perform the 19,200,000,000-byte decimal target
@@ -116,13 +120,16 @@ python3 tools/final_api_inventory.py \
   --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target
 ```
 
-The wrapper verifies the resolved Cargo shim (including `systemd-run`, the
+The wrapper creates and preflights the external `$OUT/tmp` `TMPDIR` without
+deleting existing files, and rejects output paths under `/tmp`. It verifies
+the resolved Cargo shim (including `systemd-run`, the
 20G `MemoryMax` expression, and an empty inherited `LITCHI_CAPPED` marker),
 measures each command with `/usr/bin/time -v`, and records peak RSS beside
 the JSON size/SHA-256. It rechecks the full source commit, cleanliness,
 lockfile and toolchain identity before and after every package and around the
-final inventory. The wrapper writes `packages.json`, one JSON and receipt per
-package, external stdout/stderr/resource logs, `inventory.tsv`, and an
+final inventory. The wrapper writes `packages.json` (including the actual 68
+package names), one JSON and receipt per package, external
+stdout/stderr/resource logs, `inventory.tsv`, and an
 initially unassigned `disposition.tsv` whose explicit column is `decision`.
 It invokes `api_debt_inventory.py` only after all 68 JSON captures succeed;
 diagnostic/skip paths are marked `incomplete`, never `complete`. Its
