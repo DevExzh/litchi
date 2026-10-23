@@ -50,6 +50,7 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "scoped_inverse_restores_content_scope": True,
             "same_owner_replay_exact": True,
             "content_matching_forward_exact": True,
+            "whole_owner_inverse_exact_source": True,
             "inverse_content_exact_source": True,
             "changed_recipient_refused": True,
         },
@@ -82,6 +83,7 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "append": append,
             "same_owner_replay": append,
             "content_matching_replay": append,
+            "whole_owner_inverse": source,
             "inverse": source,
             "inverse_content": source,
         },
@@ -209,11 +211,26 @@ class OdpNativeQualificationTests(unittest.TestCase):
             "candidate",
         )
         self.assertEqual(outputs["source"], outputs["inverse_content"])
+        self.assertEqual(outputs["source"], outputs["whole_owner_inverse"])
         broken = json.loads(json.dumps(report))
         broken["checks"]["content_matching_forward_exact"] = False
         with self.assertRaises(RUNNER.RunFailure):
             RUNNER.validate_correctness_report(
                 broken,
+                RUNNER.Fixture(
+                    path=Path("fixture.odp"),
+                    bytes=len(fixture),
+                    sha256=hashlib.sha256(fixture).hexdigest(),
+                    provenance="test",
+                ),
+                {"content": digest(fixture)},
+                "candidate",
+            )
+        broken_whole_owner = json.loads(json.dumps(report))
+        broken_whole_owner["checks"]["whole_owner_inverse_exact_source"] = False
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_correctness_report(
+                broken_whole_owner,
                 RUNNER.Fixture(
                     path=Path("fixture.odp"),
                     bytes=len(fixture),

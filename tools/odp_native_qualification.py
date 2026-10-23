@@ -751,6 +751,7 @@ def validate_correctness_report(
         "scoped_inverse_restores_content_scope",
         "same_owner_replay_exact",
         "content_matching_forward_exact",
+        "whole_owner_inverse_exact_source",
         "inverse_content_exact_source",
         "changed_recipient_refused",
     }
@@ -783,6 +784,7 @@ def validate_correctness_report(
         "append",
         "same_owner_replay",
         "content_matching_replay",
+        "whole_owner_inverse",
         "inverse",
         "inverse_content",
     }
@@ -796,6 +798,8 @@ def validate_correctness_report(
         raise RunFailure(f"{label}: source output digest differs from the fixture")
     if outputs["no_op"] != outputs["source"]:
         raise RunFailure(f"{label}: no-op output is not the exact source")
+    if outputs["whole_owner_inverse"] != outputs["source"]:
+        raise RunFailure(f"{label}: same-owner inverse output is not the exact source")
     if outputs["inverse_content"] != expected_content:
         raise RunFailure(f"{label}: inverse replay did not restore content.xml")
     if outputs["append"] == outputs["source"]:
@@ -1024,10 +1028,10 @@ def _run_correctness(
     scoped_receipts: dict[str, dict[str, Any]] = {}
     events = []
     for name in ("baseline", "candidate"):
-        guard = quiet_guard(manifest.protocol, f"correctness-{name}")
-        report, event = run_child(
-            endpoints[name], manifest, "verify", tmp_dir=tmp_dir, guard=guard
-        )
+        # Correctness-only is an untimed proof preflight.  It may run while
+        # unrelated host work is present; strict quiet-host guards remain in
+        # calibration and ABBA timing below.
+        report, event = run_child(endpoints[name], manifest, "verify", tmp_dir=tmp_dir)
         outputs[name] = validate_correctness_report(
             report,
             manifest.fixture,

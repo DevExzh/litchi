@@ -48,10 +48,14 @@ replay, changed-recipient refusal, and the scoped recipient's content/member
 preservation checks. ZIP inspection showed that inverse replay restored the
 exact `content.xml` bytes while the newly published content entry carried
 different ZIP timestamp/attribute metadata. The reviewed receipt therefore
-compares inverse content scope and separately proves opaque-member
-preservation; it does not claim whole-archive byte identity for an inverse
-publication.
+keeps the reopened inverse proof scoped to `content.xml` and separately proves
+opaque-member preservation. The probe also requires a direct inverse applied
+to the committed owner to restore the complete source archive byte-for-byte;
+that whole-owner proof is distinct from the reopened publication proof.
 
-The corrected source is committed in `1b3ec77fa5`. A quiet-host
-`--correctness-only` run against two compatible, clean endpoints remains
-pending; no performance ratio is accepted by this receipt.
+The corrected source is committed in `1b3ec77fa5`; this follow-up adds the
+whole-owner inverse proof and removes the quiet-host rejection from the
+untimed `--correctness-only` path. A correctness-only run against two
+compatible endpoints remains pending; strict quiet-host checks still apply to
+calibration and ABBA timing, and no performance ratio is accepted by this
+receipt.
