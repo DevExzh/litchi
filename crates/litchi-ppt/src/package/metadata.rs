@@ -33,12 +33,14 @@ use std::fmt;
 use std::sync::Arc;
 
 use litchi_cfb::OleError;
+use litchi_core::SourceVersion;
 use litchi_ole_common::property_set::SummaryProperties;
 use litchi_ole_common::property_set::summary_properties::MetadataError;
 
 use super::property_set;
 use super::{Error as PackageError, Package};
 use crate::OpenOptions;
+use crate::scoped::Lazy;
 
 /// A metadata transaction limit dimension.
 ///
@@ -184,6 +186,11 @@ pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
     base: Package,
+    expected_source: SourceVersion,
+    state: Lazy<State>,
+}
+
+struct State {
     transaction: property_set::Transaction,
     initial: SummaryProperties,
     properties: SummaryProperties,
@@ -193,7 +200,13 @@ impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("changed", &(self.initial != self.properties))
+            .field(
+                "changed",
+                &self
+                    .state
+                    .get()
+                    .is_some_and(|state| state.initial != state.properties),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -203,28 +216,55 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::Encrypted);
         }
-        let bytes = base.to_bytes()?;
-        let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
-        let initial = SummaryProperties::from_editor(transaction.editor())?;
+        let expected_source = base.source_version().map_err(Error::Package)?;
         Ok(Self {
             base: base.clone(),
+            expected_source,
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> Result<State> {
+        let bytes = source_bytes(&self.base, self.expected_source)?;
+        let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
+        let initial = SummaryProperties::from_editor(transaction.editor())?;
+        Ok(State {
             transaction,
             properties: initial.clone(),
             initial,
         })
     }
 
+    fn state(&self) -> Result<&State> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> Result<&mut State> {
+        let base = self.base.clone();
+        let expected_source = self.expected_source;
+        self.state.get_or_try_init_mut(|| {
+            let bytes = source_bytes(&base, expected_source)?;
+            let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
+            let initial = SummaryProperties::from_editor(transaction.editor())?;
+            Ok(State {
+                transaction,
+                properties: initial.clone(),
+                initial,
+            })
+        })
+    }
+
     /// The staged presentation properties.
     #[must_use]
-    pub const fn properties(&self) -> &SummaryProperties {
-        &self.properties
+    pub fn properties(&self) -> Result<&SummaryProperties> {
+        Ok(&self.state()?.properties)
     }
 
     /// Mutable access to the staged properties: set or remove one property
     /// by name ([`SummaryProperties::set`], [`SummaryProperties::remove`]),
     /// custom properties, and typed section edits.
-    pub fn properties_mut(&mut self) -> &mut SummaryProperties {
-        &mut self.properties
+    pub fn properties_mut(&mut self) -> Result<&mut SummaryProperties> {
+        Ok(&mut self.state_mut()?.properties)
     }
 
     /// Set every field `metadata` carries, keeping the others.
@@ -236,7 +276,7 @@ impl Edit {
     /// Returns [`Error::Metadata`], leaving the staged properties unchanged,
     /// for a field the property sets cannot store or a refused value.
     pub fn merge_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<bool> {
-        Ok(self.properties.merge_metadata(metadata)?)
+        Ok(self.state_mut()?.properties.merge_metadata(metadata)?)
     }
 
     /// Publish the staged properties as a new package.
@@ -249,15 +289,35 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let Self {
             base,
+            expected_source,
+            state,
+        } = self;
+        ensure_source_version(&base, expected_source)?;
+        state.get_or_try_init(|| {
+            let bytes = source_bytes(&base, expected_source)?;
+            let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
+            let initial = SummaryProperties::from_editor(transaction.editor())?;
+            Ok(State {
+                transaction,
+                properties: initial.clone(),
+                initial,
+            })
+        })?;
+        let State {
             mut transaction,
             initial,
             properties,
-        } = self;
+        } = state.into_inner().ok_or_else(|| {
+            Error::Package(PackageError::Corrupted(
+                "PPT metadata state was not initialized".into(),
+            ))
+        })?;
         if properties == initial {
-            return unchanged(base);
+            return unchanged(base, expected_source);
         }
         properties.stage_changes(&initial, transaction.editor_mut())?;
         let (_, patch) = transaction.commit()?.into_parts();
+        ensure_source_version(&base, expected_source)?;
         let before: Arc<[u8]> = Arc::from(patch.source());
         let after: Arc<[u8]> = Arc::from(patch.replacement());
         let changed = before != after;
@@ -310,8 +370,8 @@ impl Package {
     }
 }
 
-fn unchanged(base: Package) -> Result<Commit> {
-    let bytes: Arc<[u8]> = Arc::from(base.to_bytes()?);
+fn unchanged(base: Package, expected: SourceVersion) -> Result<Commit> {
+    let bytes: Arc<[u8]> = Arc::from(source_bytes(&base, expected)?);
     Ok(Commit::new(
         base,
         Patch {
@@ -322,6 +382,24 @@ fn unchanged(base: Package) -> Result<Commit> {
     ))
 }
 
+fn source_bytes(base: &Package, expected: SourceVersion) -> Result<Vec<u8>> {
+    ensure_source_version(base, expected)?;
+    let bytes = base.to_bytes()?;
+    ensure_source_version(base, expected)?;
+    Ok(bytes)
+}
+
+fn ensure_source_version(base: &Package, expected: SourceVersion) -> Result<()> {
+    let observed = base.source_version().map_err(Error::Package)?;
+    if observed != expected {
+        return Err(Error::Package(PackageError::Ole(OleError::SourceChanged {
+            expected,
+            observed,
+        })));
+    }
+    Ok(())
+}
+
 fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
     Ok(Package::from_bytes_with_options(
         bytes,
@@ -329,4 +407,21 @@ fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
             .source_limits(base.source_limits())
             .leniency(base.leniency()),
     )?)
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "the lazy-entry regression is a direct state assertion"
+)]
+mod tests {
+    use super::{Edit, Package};
+
+    #[test]
+    fn metadata_edit_construction_and_drop_do_not_read_property_streams() {
+        let package = Package::new().unwrap();
+        let edit = Edit::new(&package).unwrap();
+        assert!(edit.state.get().is_none());
+        drop(edit);
+    }
 }

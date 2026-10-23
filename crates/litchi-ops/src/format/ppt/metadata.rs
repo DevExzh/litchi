@@ -48,7 +48,7 @@ impl Ppt {
         )?;
         let package = self.editable_package_for_write()?;
         let mut edit = package.edit_metadata()?;
-        let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Ppt)?;
+        let operations = ole_metadata::apply(edit.properties_mut()?, props, FileFormat::Ppt)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();

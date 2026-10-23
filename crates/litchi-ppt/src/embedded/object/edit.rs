@@ -14,7 +14,7 @@
 //! ```
 //! let package = litchi_ppt::Package::new()?;
 //! let edit = package.edit_objects()?;
-//! assert!(edit.objects().objects.is_empty());
+//! assert!(edit.objects()?.objects.is_empty());
 //! // Nothing staged: the commit is the source package unchanged.
 //! assert!(!edit.commit()?.diagnostics().changed());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
@@ -26,7 +26,7 @@ use super::{Collection, Commit, Editor, Error, ExternalObject, Patch, Result};
 use crate::Package;
 use crate::embedded::storage::Storage;
 use crate::package::Error as PackageError;
-use crate::scoped::{self, Base, Failure};
+use crate::scoped::{self, Base, Failure, Lazy};
 
 const MISSING_OBJECT: &str = "no embedded object has this id";
 const MISSING_STORAGE: &str = "no embedded object references this persist id";
@@ -35,6 +35,10 @@ const MISSING_STORAGE: &str = "no embedded object references this persist id";
 /// immutable [`Package`].
 pub struct Edit {
     base: Base,
+    state: Lazy<State>,
+}
+
+struct State {
     source: Collection,
     inner: Editor,
 }
@@ -43,7 +47,7 @@ impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("objects", &self.inner.objects().objects.len())
+            .field("initialized", &self.state.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -66,25 +70,50 @@ fn staging(operation: &'static str) -> impl FnOnce(PackageError) -> Failure {
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
+        Ok(Self {
+            base,
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> std::result::Result<State, Failure> {
         // A document without an `ExObjListContainer` edits an empty list; a
         // committed change inserts the container ([MS-PPT] 2.4.1).
-        let source = package
-            .presentation()?
+        let source = self
+            .base
+            .package()
+            .presentation()
+            .map_err(Failure::from)?
             .ole_objects()?
             .unwrap_or_else(Collection::empty);
         // A signed package opens for staging; only a changed commit is
         // refused, since it would invalidate the signature.
-        let inner = Editor::open_admitting_signature(base.bytes().to_vec(), source.clone())
+        let inner = Editor::open_admitting_signature(self.base.bytes()?.to_vec(), source.clone())
             .map_err(scoped::publication("embedded_object.edit"))?;
-        Ok(Self {
-            base,
-            source,
-            inner,
+        Ok(State { source, inner })
+    }
+
+    fn state(&self) -> std::result::Result<&State, Failure> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
+        let base = self.base.clone();
+        self.state.get_or_try_init_mut(|| {
+            let source = base
+                .package()
+                .presentation()
+                .map_err(Failure::from)?
+                .ole_objects()?
+                .unwrap_or_else(Collection::empty);
+            let inner = Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
+                .map_err(scoped::publication("embedded_object.edit"))?;
+            Ok(State { source, inner })
         })
     }
 
     fn require_object(&self, operation: &'static str, id: u32) -> Result<()> {
-        if self.inner.objects().get(id).is_some() {
+        if self.state()?.inner.objects().get(id).is_some() {
             Ok(())
         } else {
             Err(scoped::not_found(operation, MISSING_OBJECT).into())
@@ -93,8 +122,8 @@ impl Edit {
 
     /// The staged embedded-object collection.
     #[must_use]
-    pub fn objects(&self) -> &Collection {
-        self.inner.objects()
+    pub fn objects(&self) -> Result<&Collection> {
+        Ok(self.state()?.inner.objects())
     }
 
     /// Stage a new external object and its persisted storage record,
@@ -109,10 +138,11 @@ impl Edit {
     /// or beyond the signed seed domain, or the storage cannot be stored,
     /// leaving the edit unchanged.
     pub fn add(&mut self, object: ExternalObject, storage: Storage) -> Result<u32> {
-        let seed = self.inner.collection.id_seed;
-        self.inner.collection.id_seed = seed.max(object.id());
-        self.inner.add(object, storage).map_err(|error| {
-            self.inner.collection.id_seed = seed;
+        let state = self.state_mut()?;
+        let seed = state.inner.collection.id_seed;
+        state.inner.collection.id_seed = seed.max(object.id());
+        state.inner.add(object, storage).map_err(|error| {
+            state.inner.collection.id_seed = seed;
             Error::from(staging("embedded_object.add")(error))
         })
     }
@@ -126,6 +156,7 @@ impl Edit {
     /// storage cannot be stored, leaving the edit unchanged.
     pub fn replace_storage(&mut self, persist_id: u32, storage: Storage) -> Result<()> {
         if !self
+            .state()?
             .inner
             .objects()
             .objects
@@ -137,6 +168,7 @@ impl Edit {
             );
         }
         Ok(self
+            .state_mut()?
             .inner
             .replace_storage(persist_id, storage)
             .map_err(staging("embedded_object.replace_storage"))?)
@@ -152,6 +184,7 @@ impl Edit {
     pub fn remove(&mut self, id: u32) -> Result<ExternalObject> {
         self.require_object("embedded_object.remove", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .remove(id)
             .map_err(staging("embedded_object.remove"))?)
@@ -170,6 +203,7 @@ impl Edit {
             self.require_object("embedded_object.reorder", *id)?;
         }
         Ok(self
+            .state_mut()?
             .inner
             .reorder(ids)
             .map_err(staging("embedded_object.reorder"))?)
@@ -185,16 +219,31 @@ impl Edit {
     /// cannot preserve and [`Error::Package`] when the result cannot be
     /// republished.
     pub fn commit(self) -> Result<Commit> {
-        let Self {
-            base,
-            source,
-            inner,
-        } = self;
+        let Self { base, state } = self;
+        state
+            .get_or_try_init(|| {
+                let source = base
+                    .package()
+                    .presentation()
+                    .map_err(Failure::from)?
+                    .ole_objects()?
+                    .unwrap_or_else(Collection::empty);
+                let inner =
+                    Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
+                        .map_err(scoped::publication("embedded_object.edit"))?;
+                Ok(State { source, inner })
+            })
+            .map_err(Error::from)?;
+        let State { source, inner } = state.into_inner().ok_or_else(|| {
+            Failure::Package(PackageError::Corrupted(
+                "PPT embedded-object edit state was not initialized".into(),
+            ))
+        })?;
         if !inner
             .has_net_change(&source)
             .map_err(scoped::publication("embedded_object.commit"))?
         {
-            return Ok(super::published(base.unchanged()));
+            return Ok(super::published(base.unchanged()?));
         }
         let after = match inner.finish() {
             Ok(bytes) => bytes,
@@ -212,10 +261,11 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Package`] for an encrypted presentation or one whose
-    /// object list cannot be read. A presentation without an external-object
-    /// list edits an empty one; a signed presentation opens, and its changed
-    /// commit is [`Error::Signed`].
+    /// An encrypted presentation is refused immediately. An object list that
+    /// cannot be read is reported by the first projection, staging operation,
+    /// or commit. A presentation without an external-object list edits an
+    /// empty one; a signed presentation opens, and its changed commit is
+    /// [`Error::Signed`].
     pub fn edit_objects(&self) -> Result<Edit> {
         Edit::new(self)
     }

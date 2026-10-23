@@ -11,7 +11,7 @@ use super::transaction::{RecordEdit, Snapshot};
 use super::{Change, ClientData, ClientDataChild, Commit, Patch, Result};
 use crate::Package;
 use crate::record_wire as wire;
-use crate::scoped::{self, Base, Failure};
+use crate::scoped::{self, Base, Failure, Lazy};
 use crate::slide_order::{self, records::Owner};
 use crate::text_edit::Target;
 
@@ -22,8 +22,12 @@ const MISSING_CHILD: &str = "the client data has no child at this index";
 /// [`Package`].
 pub struct Edit {
     base: Base,
-    native: slide_order::Snapshot,
     target: Target,
+    state: Lazy<State>,
+}
+
+struct State {
+    native: slide_order::Snapshot,
     shape_id: u32,
     slide: Vec<u8>,
     source: Snapshot,
@@ -35,7 +39,7 @@ impl std::fmt::Debug for Edit {
         formatter
             .debug_struct("Edit")
             .field("target", &self.target)
-            .field("changes", &self.inner.changes().len())
+            .field("initialized", &self.state.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -59,17 +63,27 @@ fn client_data_index(shape: &[u8]) -> std::result::Result<Option<usize>, Failure
 impl Edit {
     fn new(package: &Package, target: Target) -> Result<Self> {
         let base = Base::capture(package)?;
-        let native = base.native()?;
-        let slide = base.owner_record(&native, Owner::Slide(target.slide()))?;
+        Ok(Self {
+            base,
+            target,
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> std::result::Result<State, Failure> {
+        let native = self.base.native()?;
+        let slide = self
+            .base
+            .owner_record(&native, Owner::Slide(self.target.slide()))?;
         let shape_id = {
-            let presentation = package.presentation()?;
+            let presentation = self.base.package().presentation()?;
             let slides = presentation.slides()?;
             let selected = slides
-                .get(target.slide().get())
+                .get(self.target.slide().get())
                 .ok_or_else(|| scoped::not_found(OPERATION, "no slide is at this position"))?;
             let shapes = selected.shapes()?;
             let shape = shapes
-                .get(target.shape().get())
+                .get(self.target.shape().get())
                 .ok_or_else(|| scoped::not_found(OPERATION, "the slide has no shape here"))?;
             crate::text_edit::native_shape_id(shape)
         };
@@ -91,10 +105,8 @@ impl Edit {
             .ok_or_else(|| scoped::unsupported_target(OPERATION, "the shape has no client data"))?;
         let source = Snapshot::parse(&record).map_err(scoped::publication(OPERATION))?;
         let inner = source.edit();
-        Ok(Self {
-            base,
+        Ok(State {
             native,
-            target,
             shape_id,
             slide,
             source,
@@ -102,8 +114,60 @@ impl Edit {
         })
     }
 
+    fn state(&self) -> std::result::Result<&State, Failure> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
+        let base = self.base.clone();
+        let target = self.target;
+        self.state.get_or_try_init_mut(|| {
+            // Rebuild the deferred source state at the first mutable use.
+            let native = base.native()?;
+            let slide = base.owner_record(&native, Owner::Slide(target.slide()))?;
+            let shape_id = {
+                let presentation = base.package().presentation()?;
+                let slides = presentation.slides()?;
+                let selected = slides
+                    .get(target.slide().get())
+                    .ok_or_else(|| scoped::not_found(OPERATION, "no slide is at this position"))?;
+                let shapes = selected.shapes()?;
+                let shape = shapes
+                    .get(target.shape().get())
+                    .ok_or_else(|| scoped::not_found(OPERATION, "the slide has no shape here"))?;
+                crate::text_edit::native_shape_id(shape)
+            };
+            let mut record = None;
+            let mut failure = None;
+            crate::hyperlink::edit::rewrite_slide_shape(&slide, shape_id, &mut |shape| {
+                match client_data_index(shape) {
+                    Ok(Some(index)) => record = Some(wire::child_list(shape)?[index].to_vec()),
+                    Ok(None) => {},
+                    Err(error) => failure = Some(error),
+                }
+                Ok(shape.to_vec())
+            })
+            .map_err(Failure::from)?;
+            if let Some(failure) = failure {
+                return Err(failure);
+            }
+            let record = record.ok_or_else(|| {
+                scoped::unsupported_target(OPERATION, "the shape has no client data")
+            })?;
+            let source = Snapshot::parse(&record).map_err(scoped::publication(OPERATION))?;
+            let inner = source.edit();
+            Ok(State {
+                native,
+                shape_id,
+                slide,
+                source,
+                inner,
+            })
+        })
+    }
+
     fn require_child(&self, operation: &'static str, index: usize) -> Result<()> {
-        if index < self.inner.children().len() {
+        if index < self.state()?.inner.children().len() {
             Ok(())
         } else {
             Err(scoped::not_found(operation, MISSING_CHILD).into())
@@ -118,20 +182,20 @@ impl Edit {
 
     /// The staged client data.
     #[must_use]
-    pub const fn client_data(&self) -> &ClientData {
-        self.inner.client_data()
+    pub fn client_data(&self) -> Result<&ClientData> {
+        Ok(self.state()?.inner.client_data())
     }
 
     /// The staged client-data children, in order.
     #[must_use]
-    pub fn children(&self) -> &[ClientDataChild] {
-        self.inner.children()
+    pub fn children(&self) -> Result<&[ClientDataChild]> {
+        Ok(self.state()?.inner.children())
     }
 
     /// The staged operations, in order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
-        self.inner.changes()
+    pub fn changes(&self) -> Result<&[Change]> {
+        Ok(self.state()?.inner.changes())
     }
 
     /// Insert one child at `index` (at most the child count).
@@ -142,6 +206,7 @@ impl Edit {
     /// the record grammar refuses the child, leaving the edit unchanged.
     pub fn insert(&mut self, index: usize, child: ClientDataChild) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .insert(index, child)
             .map_err(scoped::staging("client_data.insert"))?)
@@ -155,6 +220,7 @@ impl Edit {
     /// child, leaving the edit unchanged.
     pub fn append(&mut self, child: ClientDataChild) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .append(child)
             .map_err(scoped::staging("client_data.append"))?)
@@ -175,6 +241,7 @@ impl Edit {
     ) -> Result<ClientDataChild> {
         self.require_child("client_data.replace", index)?;
         Ok(self
+            .state_mut()?
             .inner
             .replace(index, replacement)
             .map_err(scoped::staging("client_data.replace"))?)
@@ -191,6 +258,7 @@ impl Edit {
     pub fn remove(&mut self, index: usize) -> Result<ClientDataChild> {
         self.require_child("client_data.remove", index)?;
         Ok(self
+            .state_mut()?
             .inner
             .remove(index)
             .map_err(scoped::staging("client_data.remove"))?)
@@ -205,21 +273,31 @@ impl Edit {
     /// package and [`super::Error::Package`] when the result cannot be
     /// republished.
     pub fn commit(self) -> Result<Commit> {
+        self.state
+            .get_or_try_init(|| self.initialize_state())
+            .map_err(Error::from)?;
         let Self {
             base,
-            native,
             target,
+            state,
+        } = self;
+        let State {
+            native,
             shape_id,
             slide,
             source,
             inner,
-        } = self;
+        } = state.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT client-data edit state was not initialized".into(),
+            ))
+        })?;
         let (record, _) = inner
             .commit()
             .map_err(scoped::publication("client_data.commit"))?
             .into_parts();
         if record.bytes() == source.bytes() {
-            return Ok(super::published(base.unchanged()));
+            return Ok(super::published(base.unchanged()?));
         }
         let after = crate::hyperlink::edit::rewrite_slide_shape(&slide, shape_id, &mut |shape| {
             let children = wire::child_list(shape)?;
@@ -248,12 +326,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error::Refused`] with
-    /// [`litchi_core::edit::RefusalKind::NotFound`] when the slide or shape
-    /// does not exist, with
-    /// [`litchi_core::edit::RefusalKind::UnsupportedTarget`] when the shape
-    /// has no client data (none is created), and [`super::Error::Package`]
-    /// for an encrypted or unreadable presentation.
+    /// An encrypted presentation is refused immediately. Missing slides or
+    /// shapes, absent client data, and unreadable records are reported by the
+    /// first projection, staging operation, or commit.
     pub fn edit_client_data(&self, target: Target) -> Result<Edit> {
         Edit::new(self, target)
     }

@@ -11,24 +11,42 @@ use super::model::{DiffFlags, DiffTree10, Limits, Review, ReviewingToolbarStates
 use super::package::{Editor as RecordEdit, Snapshot as PackageSnapshot};
 use super::{Change, Commit, Error, Patch, Result};
 use crate::Package;
-use crate::scoped::{self, Base};
+use crate::scoped::{self, Base, Failure, Lazy};
 
 /// A staged document-comparison edit over one immutable [`Package`].
 #[derive(Debug)]
 pub struct Edit {
     base: Base,
-    inner: RecordEdit,
+    inner: Lazy<RecordEdit>,
 }
 
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
-        let snapshot =
-            PackageSnapshot::from_bytes_with_limits(base.bytes().to_vec(), Limits::default())
-                .map_err(scoped::publication("edit_document_comparison"))?;
         Ok(Self {
-            inner: snapshot.edit(),
+            inner: Lazy::new(),
             base,
+        })
+    }
+
+    fn initialize_inner(&self) -> std::result::Result<RecordEdit, Failure> {
+        let snapshot =
+            PackageSnapshot::from_bytes_with_limits(self.base.bytes()?.to_vec(), Limits::default())
+                .map_err(scoped::publication("edit_document_comparison"))?;
+        Ok(snapshot.edit())
+    }
+
+    fn inner(&self) -> std::result::Result<&RecordEdit, Failure> {
+        self.inner.get_or_try_init(|| self.initialize_inner())
+    }
+
+    fn inner_mut(&mut self) -> std::result::Result<&mut RecordEdit, Failure> {
+        let base = self.base.clone();
+        self.inner.get_or_try_init_mut(|| {
+            let snapshot =
+                PackageSnapshot::from_bytes_with_limits(base.bytes()?.to_vec(), Limits::default())
+                    .map_err(scoped::publication("edit_document_comparison"))?;
+            Ok(snapshot.edit())
         })
     }
 
@@ -40,7 +58,7 @@ impl Edit {
     /// read.
     pub fn review(&self) -> Result<Review> {
         Ok(self
-            .inner
+            .inner()?
             .review()
             .map_err(scoped::publication("document_comparison.review"))?)
     }
@@ -53,7 +71,7 @@ impl Edit {
     /// read.
     pub fn toolbar(&self) -> Result<Option<ReviewingToolbarStates>> {
         Ok(self
-            .inner
+            .inner()?
             .toolbar()
             .map_err(scoped::publication("document_comparison.toolbar"))?)
     }
@@ -66,15 +84,15 @@ impl Edit {
     /// read.
     pub fn diff_tree(&self, index: usize) -> Result<Option<DiffTree10>> {
         Ok(self
-            .inner
+            .inner()?
             .diff_tree(index)
             .map_err(scoped::publication("document_comparison.diff_tree"))?)
     }
 
     /// The staged semantic changes, in order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
-        self.inner.changes()
+    pub fn changes(&self) -> Result<&[Change]> {
+        Ok(self.inner()?.changes())
     }
 
     fn require_tree(&self, operation: &'static str, tree_index: usize) -> Result<()> {
@@ -97,7 +115,7 @@ impl Edit {
     /// review payload to hold the state, leaving the edit unchanged.
     pub fn set_toolbar(&mut self, value: ReviewingToolbarStates) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .set_toolbar(value)
             .map_err(target("document_comparison.set_toolbar"))?)
     }
@@ -111,7 +129,7 @@ impl Edit {
     /// rewritten, leaving the edit unchanged.
     pub fn clear_toolbar(&mut self) -> Result<bool> {
         Ok(self
-            .inner
+            .inner_mut()?
             .clear_toolbar()
             .map_err(target("document_comparison.clear_toolbar"))?)
     }
@@ -128,7 +146,7 @@ impl Edit {
     pub fn set_reviewer_name(&mut self, tree_index: usize, value: impl Into<String>) -> Result<()> {
         self.require_tree("document_comparison.set_reviewer_name", tree_index)?;
         Ok(self
-            .inner
+            .inner_mut()?
             .set_reviewer_name(tree_index, value)
             .map_err(scoped::staging("document_comparison.set_reviewer_name"))?)
     }
@@ -147,7 +165,7 @@ impl Edit {
     pub fn set_document_flags(&mut self, tree_index: usize, value: DiffFlags) -> Result<()> {
         self.require_tree("document_comparison.set_document_flags", tree_index)?;
         Ok(self
-            .inner
+            .inner_mut()?
             .set_document_flags(tree_index, value)
             .map_err(scoped::staging("document_comparison.set_document_flags"))?)
     }
@@ -163,6 +181,21 @@ impl Edit {
     /// republished.
     pub fn commit(self) -> Result<Commit> {
         let Self { base, inner } = self;
+        inner
+            .get_or_try_init(|| {
+                let snapshot = PackageSnapshot::from_bytes_with_limits(
+                    base.bytes()?.to_vec(),
+                    Limits::default(),
+                )
+                .map_err(scoped::publication("edit_document_comparison"))?;
+                Ok(snapshot.edit())
+            })
+            .map_err(Error::from)?;
+        let inner = inner.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT document-comparison edit state was not initialized".into(),
+            ))
+        })?;
         let after = match inner.commit() {
             Ok(commit) => commit.snapshot().bytes().to_vec(),
             // The publisher refuses the signature storages a changed write
@@ -193,9 +226,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Package`] for an encrypted presentation or a package
-    /// whose live document cannot be read, and [`Error::Refused`] when its
-    /// review metadata is not losslessly representable.
+    /// An encrypted presentation is refused immediately. A live document
+    /// that cannot be read or losslessly represent review metadata is
+    /// reported by the first projection, staging operation, or commit.
     pub fn edit_document_comparison(&self) -> Result<Edit> {
         Edit::new(self)
     }

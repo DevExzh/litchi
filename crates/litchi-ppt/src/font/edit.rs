@@ -11,7 +11,7 @@
 //!
 //! let package = litchi_ppt::Package::new()?;
 //! let mut edit = package.edit_fonts()?;
-//! let font = edit.fonts().collection(Scope::Base).unwrap().get(0).unwrap().clone();
+//! let font = edit.fonts()?.collection(Scope::Base).unwrap().get(0).unwrap().clone();
 //! edit.replace_font(Scope::Base, 0, font)?;
 //! let commit = edit.commit()?;
 //! assert!(!commit.diagnostics().changed());
@@ -26,36 +26,53 @@ use super::{
     Result, Scope, SharedFontData, Snapshot,
 };
 use crate::Package;
-use crate::scoped::{self, Base};
+use crate::scoped::{self, Base, Failure, Lazy};
 
 /// A staged font edit over one immutable [`Package`].
 #[derive(Debug)]
 pub struct Edit {
     base: Base,
-    inner: RecordEdit,
+    inner: Lazy<RecordEdit>,
 }
 
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
-        let snapshot = Snapshot::from_arc(base.shared_bytes(), PackageLimits::default())
-            .map_err(scoped::publication("edit_fonts"))?;
         Ok(Self {
-            inner: RecordEdit::new(snapshot),
+            inner: Lazy::new(),
             base,
+        })
+    }
+
+    fn initialize_inner(&self) -> std::result::Result<RecordEdit, Failure> {
+        let snapshot = Snapshot::from_arc(self.base.shared_bytes()?, PackageLimits::default())
+            .map_err(scoped::publication("edit_fonts"))?;
+        Ok(RecordEdit::new(snapshot))
+    }
+
+    fn inner(&self) -> std::result::Result<&RecordEdit, Failure> {
+        self.inner.get_or_try_init(|| self.initialize_inner())
+    }
+
+    fn inner_mut(&mut self) -> std::result::Result<&mut RecordEdit, Failure> {
+        let base = self.base.clone();
+        self.inner.get_or_try_init_mut(|| {
+            let snapshot = Snapshot::from_arc(base.shared_bytes()?, PackageLimits::default())
+                .map_err(scoped::publication("edit_fonts"))?;
+            Ok(RecordEdit::new(snapshot))
         })
     }
 
     /// The staged font collections.
     #[must_use]
-    pub const fn fonts(&self) -> &FontCollections {
-        self.inner.fonts()
+    pub fn fonts(&self) -> Result<&FontCollections> {
+        Ok(self.inner()?.fonts())
     }
 
     /// The staged operations, in order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
-        self.inner.changes()
+    pub fn changes(&self) -> Result<&[Change]> {
+        Ok(self.inner()?.changes())
     }
 
     /// Stage a replacement of the font at `index` in the collection for
@@ -67,7 +84,7 @@ impl Edit {
     /// the font cannot be stored, leaving the edit unchanged.
     pub fn replace_font(&mut self, scope: Scope, index: u16, font: Font) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .replace_font(scope, index, font)
             .map_err(scoped::staging("font.replace_font"))?)
     }
@@ -81,7 +98,7 @@ impl Edit {
     /// the font cannot be stored.
     pub fn append_font(&mut self, scope: Scope, font: Font) -> Result<u16> {
         Ok(self
-            .inner
+            .inner_mut()?
             .append_font(scope, font)
             .map_err(scoped::staging("font.append_font"))?)
     }
@@ -101,7 +118,7 @@ impl Edit {
         data: impl Into<SharedFontData>,
     ) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .set_facet(scope, index, facet, data)
             .map_err(scoped::staging("font.set_facet"))?)
     }
@@ -123,7 +140,7 @@ impl Edit {
         limits: super::EotLimits,
     ) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .set_prepared_facet(scope, index, font, intent, limits)
             .map_err(scoped::staging("font.set_prepared_facet"))?)
     }
@@ -136,7 +153,7 @@ impl Edit {
     /// Returns [`Error::Refused`] when the collection or ordinal is absent.
     pub fn remove_facet(&mut self, scope: Scope, index: u16, facet: Facet) -> Result<bool> {
         Ok(self
-            .inner
+            .inner_mut()?
             .remove_facet(scope, index, facet)
             .map_err(scoped::staging("font.remove_facet"))?)
     }
@@ -148,7 +165,7 @@ impl Edit {
     /// Returns [`Error::Refused`] when the flags cannot be stored.
     pub fn set_embedding_flags(&mut self, flags: Option<FontEmbeddingFlags>) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .set_embedding_flags(flags)
             .map_err(scoped::staging("font.set_embedding_flags"))?)
     }
@@ -194,6 +211,18 @@ impl Edit {
     /// republished.
     pub fn commit(self) -> Result<Commit> {
         let Self { base, inner } = self;
+        inner
+            .get_or_try_init(|| {
+                let snapshot = Snapshot::from_arc(base.shared_bytes()?, PackageLimits::default())
+                    .map_err(scoped::publication("edit_fonts"))?;
+                Ok(RecordEdit::new(snapshot))
+            })
+            .map_err(Error::from)?;
+        let inner = inner.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT font edit state was not initialized".into(),
+            ))
+        })?;
         let after = match inner.commit() {
             Ok(commit) => commit.into_parts().0.bytes().to_vec(),
             // The publisher refuses the signature storages a changed write
@@ -210,9 +239,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Package`] for an encrypted presentation or a package
-    /// whose live font owner cannot be read, and [`Error::Refused`] when the
-    /// owner is not losslessly representable.
+    /// An encrypted presentation is refused immediately. A live font owner
+    /// that cannot be read or losslessly represented is reported by the first
+    /// projection, staging operation, or commit.
     pub fn edit_fonts(&self) -> Result<Edit> {
         Edit::new(self)
     }

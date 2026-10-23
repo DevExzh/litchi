@@ -21,6 +21,8 @@ pub use litchi_core::Position;
 use litchi_core::SourceVersion;
 use std::fmt;
 
+use crate::scoped::Lazy;
+
 /// The finite operation dimension of the primary PPT edit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -527,7 +529,7 @@ impl Commit {
 /// Detached primary PPT edit backed by the checked native slide-order owner.
 pub struct Edit {
     package: Package,
-    inner: slide_order::Transaction,
+    inner: Lazy<slide_order::Transaction>,
     options: EditOptions,
     operation_count: usize,
     expected_source: SourceVersion,
@@ -553,22 +555,44 @@ impl Edit {
             return Err(Error::Package(PackageError::EncryptionPolicy));
         }
         let expected_source = package.source_version().map_err(Error::Package)?;
-        let bytes = package.to_encrypted_bytes().map_err(Error::Package)?;
-        ensure_source_version(&package, expected_source)?;
-        let snapshot =
-            slide_order::Snapshot::from_bytes_with_options(bytes, open_options(&package));
-        ensure_source_version(&package, expected_source)?;
-        let inner = snapshot?.edit();
-        ensure_source_version(&package, expected_source)?;
-        // The package's own projection was parsed from exactly these bytes;
-        // target resolution reuses its parsed slides (record 0260).
-        let inner = inner?.with_opened_projection(package.presentation().map_err(Error::Package)?);
         Ok(Self {
             package,
-            inner,
+            inner: Lazy::new(),
             options,
             operation_count: 0,
             expected_source,
+        })
+    }
+
+    fn initialize_inner(&self) -> Result<slide_order::Transaction> {
+        let bytes = self.package.to_encrypted_bytes().map_err(Error::Package)?;
+        ensure_source_version(&self.package, self.expected_source)?;
+        let snapshot =
+            slide_order::Snapshot::from_bytes_with_options(bytes, open_options(&self.package));
+        ensure_source_version(&self.package, self.expected_source)?;
+        let inner = snapshot?.edit();
+        ensure_source_version(&self.package, self.expected_source)?;
+        // The package's own projection was parsed from exactly these bytes;
+        // target resolution reuses its parsed slides (record 0260).
+        Ok(inner?.with_opened_projection(self.package.presentation().map_err(Error::Package)?))
+    }
+
+    fn inner(&self) -> Result<&slide_order::Transaction> {
+        self.inner.get_or_try_init(|| self.initialize_inner())
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut slide_order::Transaction> {
+        let package = self.package.clone();
+        let expected_source = self.expected_source;
+        self.inner.get_or_try_init_mut(|| {
+            let bytes = package.to_encrypted_bytes().map_err(Error::Package)?;
+            ensure_source_version(&package, expected_source)?;
+            let snapshot =
+                slide_order::Snapshot::from_bytes_with_options(bytes, open_options(&package));
+            ensure_source_version(&package, expected_source)?;
+            let inner = snapshot?.edit();
+            ensure_source_version(&package, expected_source)?;
+            Ok(inner?.with_opened_projection(package.presentation().map_err(Error::Package)?))
         })
     }
 
@@ -907,12 +931,17 @@ impl Edit {
     }
 
     fn commit_with(
-        self,
+        mut self,
         native: impl FnOnce(slide_order::Transaction) -> slide_order::Result<slide_order::Commit>,
     ) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;
-        let verified = self.inner.verified_shapes();
-        let native_commit = native(self.inner);
+        let verified = self.inner()?.verified_shapes();
+        let inner = self.inner.into_inner().ok_or_else(|| {
+            Error::Package(PackageError::Corrupted(
+                "PPT edit native state was not initialized".into(),
+            ))
+        })?;
+        let native_commit = native(inner);
         ensure_source_version(&self.package, self.expected_source)?;
         let native_commit = native_commit?;
         let operation_count = self.operation_count;
@@ -946,13 +975,13 @@ impl Edit {
     ) -> Result<T> {
         ensure_source_version(&self.package, self.expected_source)?;
         self.reserve_operations(charge)?;
-        let mut candidate = self.inner.clone();
+        let mut candidate = self.inner()?.clone();
         let result = operation(&mut candidate);
         // Check the retained source even when the native operation failed.
         // A source change must never be hidden by a later semantic refusal.
         ensure_source_version(&self.package, self.expected_source)?;
         let result = result.map_err(Error::from)?;
-        self.inner = candidate;
+        *self.inner_mut()? = candidate;
         self.operation_count = self
             .operation_count
             .checked_add(charge)
@@ -1199,4 +1228,21 @@ fn ensure_source_version(package: &Package, expected: SourceVersion) -> Result<(
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    reason = "the lazy-entry regression is a direct state assertion"
+)]
+mod tests {
+    use super::{Edit, EditOptions, Package};
+
+    #[test]
+    fn primary_edit_construction_and_drop_do_not_open_native_state() {
+        let package = Package::new().unwrap();
+        let edit = Edit::from_package_with_options(package, EditOptions::new()).unwrap();
+        assert!(edit.inner.get().is_none());
+        drop(edit);
+    }
 }

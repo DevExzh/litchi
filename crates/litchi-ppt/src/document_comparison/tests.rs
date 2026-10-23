@@ -280,7 +280,7 @@ fn package_document_comparison_edits_publish_replay_and_invert_exactly() {
     edit.set_reviewer_name(0, "Editor").unwrap();
     edit.set_toolbar(ReviewingToolbarStates::new(true, false))
         .unwrap();
-    assert_eq!(edit.changes().len(), 2);
+    assert_eq!(edit.changes().unwrap().len(), 2);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -312,7 +312,7 @@ fn package_document_comparison_edits_publish_replay_and_invert_exactly() {
         panic!("an absent reviewer tree must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
 
     let plain = package_without_review();
     let snapshot = plain.presentation().unwrap().document_comparison().unwrap();

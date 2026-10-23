@@ -13,7 +13,7 @@ use super::{
     Commit, Error, Patch, PictureBullet, PictureBulletChange, PictureBulletCollection, Result,
 };
 use crate::Package;
-use crate::scoped::{self, Base};
+use crate::scoped::{self, Base, Failure, Lazy};
 
 const ABSENT_COLLECTION: &str = "the live document has no picture-bullet collection";
 
@@ -21,38 +21,62 @@ const ABSENT_COLLECTION: &str = "the live document has no picture-bullet collect
 #[derive(Debug)]
 pub struct Edit {
     base: Base,
-    inner: RecordEdit,
+    inner: Lazy<RecordEdit>,
 }
 
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
+        Ok(Self {
+            base,
+            inner: Lazy::new(),
+        })
+    }
+
+    fn initialize_inner(&self) -> std::result::Result<RecordEdit, Failure> {
         let snapshot = PictureBulletSnapshot::from_arc(
-            base.shared_bytes(),
+            self.base.shared_bytes()?,
             PictureBulletPackageLimits::default(),
         )
         .map_err(scoped::publication("edit_picture_bullets"))?;
-        let inner = snapshot
+        snapshot
             .edit()
+            .map_err(scoped::publication("edit_picture_bullets"))
+    }
+
+    fn inner(&self) -> std::result::Result<&RecordEdit, Failure> {
+        self.inner.get_or_try_init(|| self.initialize_inner())
+    }
+
+    fn inner_mut(&mut self) -> std::result::Result<&mut RecordEdit, Failure> {
+        let base = self.base.clone();
+        self.inner.get_or_try_init_mut(|| {
+            let snapshot = PictureBulletSnapshot::from_arc(
+                base.shared_bytes()?,
+                PictureBulletPackageLimits::default(),
+            )
             .map_err(scoped::publication("edit_picture_bullets"))?;
-        Ok(Self { base, inner })
+            snapshot
+                .edit()
+                .map_err(scoped::publication("edit_picture_bullets"))
+        })
     }
 
     /// The staged picture-bullet collection, or `None` when the live
     /// document has none.
     #[must_use]
-    pub fn picture_bullets(&self) -> Option<&PictureBulletCollection> {
-        self.inner.picture_bullets()
+    pub fn picture_bullets(&self) -> Result<Option<&PictureBulletCollection>> {
+        Ok(self.inner()?.picture_bullets())
     }
 
     /// The staged operations, in order.
     #[must_use]
-    pub fn changes(&self) -> &[PictureBulletChange] {
-        self.inner.changes()
+    pub fn changes(&self) -> Result<&[PictureBulletChange]> {
+        Ok(self.inner()?.changes())
     }
 
     fn require_index(&self, operation: &'static str, index: u16) -> Result<()> {
-        let Some(collection) = self.inner.picture_bullets() else {
+        let Some(collection) = self.inner()?.picture_bullets() else {
             return Err(scoped::unsupported_target(operation, ABSENT_COLLECTION).into());
         };
         if collection
@@ -77,7 +101,7 @@ impl Edit {
     pub fn replace_picture_bullet(&mut self, index: u16, bullet: PictureBullet) -> Result<()> {
         self.require_index("picture_bullets.replace_picture_bullet", index)?;
         Ok(self
-            .inner
+            .inner_mut()?
             .replace_picture_bullet(index, bullet)
             .map_err(scoped::staging("picture_bullets.replace_picture_bullet"))?)
     }
@@ -90,7 +114,7 @@ impl Edit {
     /// Returns [`Error::Refused`] when the collection is absent, the index is
     /// already used, or the bullet cannot be stored.
     pub fn append_picture_bullet(&mut self, bullet: PictureBullet) -> Result<u16> {
-        if self.inner.picture_bullets().is_none() {
+        if self.inner()?.picture_bullets().is_none() {
             return Err(scoped::unsupported_target(
                 "picture_bullets.append_picture_bullet",
                 ABSENT_COLLECTION,
@@ -98,7 +122,7 @@ impl Edit {
             .into());
         }
         Ok(self
-            .inner
+            .inner_mut()?
             .append_picture_bullet(bullet)
             .map_err(scoped::staging("picture_bullets.append_picture_bullet"))?)
     }
@@ -114,7 +138,7 @@ impl Edit {
     pub fn remove_picture_bullet(&mut self, index: u16) -> Result<PictureBullet> {
         self.require_index("picture_bullets.remove_picture_bullet", index)?;
         Ok(self
-            .inner
+            .inner_mut()?
             .remove_picture_bullet(index)
             .map_err(scoped::staging("picture_bullets.remove_picture_bullet"))?)
     }
@@ -132,9 +156,9 @@ impl Edit {
     /// when the collection is absent and `order` is not empty.
     pub fn reorder_picture_bullets(&mut self, order: &[u16]) -> Result<()> {
         const OPERATION: &str = "picture_bullets.reorder_picture_bullets";
-        match self.inner.reorder_picture_bullets(order) {
+        match self.inner_mut()?.reorder_picture_bullets(order) {
             Ok(()) => Ok(()),
-            Err(_) if self.inner.picture_bullets().is_none() => {
+            Err(_) if self.inner()?.picture_bullets().is_none() => {
                 Err(scoped::unsupported_target(OPERATION, ABSENT_COLLECTION).into())
             },
             Err(_) => Err(Error::Refused(Refusal::new(
@@ -156,6 +180,23 @@ impl Edit {
     /// republished.
     pub fn commit(self) -> Result<Commit> {
         let Self { base, inner } = self;
+        inner
+            .get_or_try_init(|| {
+                let snapshot = PictureBulletSnapshot::from_arc(
+                    base.shared_bytes()?,
+                    PictureBulletPackageLimits::default(),
+                )
+                .map_err(scoped::publication("edit_picture_bullets"))?;
+                snapshot
+                    .edit()
+                    .map_err(scoped::publication("edit_picture_bullets"))
+            })
+            .map_err(Error::from)?;
+        let inner = inner.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT picture-bullet edit state was not initialized".into(),
+            ))
+        })?;
         let after = match inner.commit() {
             Ok(commit) => commit.snapshot().bytes().to_vec(),
             // The publisher refuses the signature storages a changed write
@@ -174,9 +215,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Package`] for an encrypted presentation or a package
-    /// whose live document owner cannot be read, and [`Error::Refused`] when
-    /// the owner is not losslessly representable.
+    /// An encrypted presentation is refused immediately. A live document
+    /// owner that cannot be read or losslessly represented is reported by the
+    /// first projection, staging operation, or commit.
     pub fn edit_picture_bullets(&self) -> Result<Edit> {
         Edit::new(self)
     }

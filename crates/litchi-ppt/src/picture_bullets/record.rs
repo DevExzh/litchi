@@ -2387,7 +2387,13 @@ mod tests {
         assert_eq!(no_op.package().to_bytes().unwrap(), source_bytes);
 
         let mut edit = source.edit_picture_bullets().unwrap();
-        let mut replacement = edit.picture_bullets().unwrap().get(4).unwrap().clone();
+        let mut replacement = edit
+            .picture_bullets()
+            .unwrap()
+            .unwrap()
+            .get(4)
+            .unwrap()
+            .clone();
         replacement.unused ^= 1;
         edit.replace_picture_bullet(4, replacement.clone()).unwrap();
         drop(edit);
@@ -2397,7 +2403,7 @@ mod tests {
         edit.replace_picture_bullet(4, replacement.clone()).unwrap();
         let removed = edit.remove_picture_bullet(5).unwrap();
         assert_eq!(removed.index, 5);
-        assert_eq!(edit.changes().len(), 2);
+        assert_eq!(edit.changes().unwrap().len(), 2);
         let commit = edit.commit().unwrap();
         assert!(commit.diagnostics().changed());
         assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -2434,11 +2440,11 @@ mod tests {
             panic!("a changed order must be refused");
         };
         assert_eq!(refusal.kind(), RefusalKind::UnsupportedOperation);
-        assert!(edit.changes().is_empty());
+        assert!(edit.changes().unwrap().is_empty());
 
         let empty = crate::Package::from_bytes(&empty_source()).unwrap();
         let mut edit = empty.edit_picture_bullets().unwrap();
-        assert!(edit.picture_bullets().is_none());
+        assert!(edit.picture_bullets().unwrap().is_none());
         let Err(super::super::Error::Refused(refusal)) = edit.append_picture_bullet(replacement)
         else {
             panic!("a document without a picture-bullet collection must be refused");
@@ -2460,7 +2466,13 @@ mod tests {
         assert_eq!(no_op.package().to_bytes().unwrap(), bytes);
 
         let mut edit = package.edit_picture_bullets().unwrap();
-        let mut replacement = edit.picture_bullets().unwrap().get(4).unwrap().clone();
+        let mut replacement = edit
+            .picture_bullets()
+            .unwrap()
+            .unwrap()
+            .get(4)
+            .unwrap()
+            .clone();
         replacement.unused ^= 1;
         edit.replace_picture_bullet(4, replacement).unwrap();
         assert!(matches!(edit.commit(), Err(super::super::Error::Signed)));

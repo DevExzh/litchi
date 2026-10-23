@@ -243,7 +243,7 @@ impl Graph {
     /// is no longer this embedded Graph object, and [`object::Error::Package`]
     /// when the draft cannot be encoded as a storage.
     pub fn replace_package(&self, edit: &mut object::Edit, package: Draft) -> object::Result<()> {
-        validate_replacement_target(edit.objects(), &self.info)?;
+        validate_replacement_target(edit.objects()?, &self.info)?;
         let bytes = package.into_bytes()?;
         let storage = encode_storage(bytes, self.compression)?;
         edit.replace_storage(self.info.persist_id(), storage)

@@ -162,8 +162,8 @@ fn masters_retain_unknown_records_and_package_edits_are_atomic() {
     let mut edit = source
         .edit_master_layout(Kind::Main, Position::new(0))
         .unwrap();
-    assert_eq!(edit.context(), Context::Main);
-    let appended = edit.record().children.len();
+    assert_eq!(edit.context().unwrap(), Context::Main);
+    let appended = edit.record().unwrap().children.len();
     edit.append(Path::root(), opaque.clone()).unwrap();
     let committed = edit.commit().unwrap();
     assert!(committed.diagnostics().changed());
@@ -171,7 +171,7 @@ fn masters_retain_unknown_records_and_package_edits_are_atomic() {
         .package()
         .edit_master_layout(Kind::Main, Position::new(0))
         .unwrap();
-    assert_eq!(published.record().children[appended], opaque);
+    assert_eq!(published.record().unwrap().children[appended], opaque);
 
     // A candidate that is no longer a valid master is refused at commit and
     // leaves the source untouched.
@@ -180,6 +180,7 @@ fn masters_retain_unknown_records_and_package_edits_are_atomic() {
         .unwrap();
     let atom = invalid
         .record()
+        .unwrap()
         .children
         .iter()
         .position(|child| child.record_type == RecordType::SlideAtom)

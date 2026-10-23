@@ -10,7 +10,7 @@
 use super::transaction::{RecordEdit, Snapshot};
 use super::{Change, Collection, Commit, Object, Patch, Playback, Result};
 use crate::Package;
-use crate::scoped::{self, Base};
+use crate::scoped::{self, Base, Failure, Lazy};
 use crate::slide_order::{self, records::Owner};
 
 const MISSING_OBJECT: &str = "no external media object has this id";
@@ -19,6 +19,10 @@ const MISSING_OBJECT: &str = "no external media object has this id";
 /// immutable [`Package`].
 pub struct Edit {
     base: Base,
+    state: Lazy<State>,
+}
+
+struct State {
     native: slide_order::Snapshot,
     source: Snapshot,
     inner: RecordEdit,
@@ -28,7 +32,7 @@ impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("changes", &self.inner.changes().len())
+            .field("initialized", &self.state.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -36,20 +40,51 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     fn new(package: &Package) -> Result<Self> {
         let base = Base::capture(package)?;
-        let native = base.native()?;
+        Ok(Self {
+            base,
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> std::result::Result<State, Failure> {
+        let native = self.base.native()?;
         let source =
             slide_order::external_media_snapshot(&native).map_err(scoped::Failure::from)?;
         let inner = source.edit();
-        Ok(Self {
-            base,
+        Ok(State {
             native,
             source,
             inner,
         })
     }
 
+    fn state(&self) -> std::result::Result<&State, Failure> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
+        let base = self.base.clone();
+        self.state.get_or_try_init_mut(|| {
+            let native = base.native()?;
+            let source =
+                slide_order::external_media_snapshot(&native).map_err(scoped::Failure::from)?;
+            let inner = source.edit();
+            Ok(State {
+                native,
+                source,
+                inner,
+            })
+        })
+    }
+
     fn require_object(&self, operation: &'static str, id: u32) -> Result<()> {
-        if self.inner.objects().iter().any(|object| object.id() == id) {
+        if self
+            .state()?
+            .inner
+            .objects()
+            .iter()
+            .any(|object| object.id() == id)
+        {
             Ok(())
         } else {
             Err(scoped::not_found(operation, MISSING_OBJECT).into())
@@ -59,27 +94,27 @@ impl Edit {
     /// The staged media collection, or `None` when the live document has no
     /// external-object list.
     #[must_use]
-    pub fn collection(&self) -> Option<&Collection> {
-        self.inner.collection()
+    pub fn collection(&self) -> Result<Option<&Collection>> {
+        Ok(self.state()?.inner.collection())
     }
 
     /// The staged media objects, or an empty slice when no list exists.
     #[must_use]
-    pub fn objects(&self) -> &[Object] {
-        self.inner.objects()
+    pub fn objects(&self) -> Result<&[Object]> {
+        Ok(self.state()?.inner.objects())
     }
 
     /// The staged operations, in order.
     #[must_use]
-    pub fn changes(&self) -> &[Change] {
-        self.inner.changes()
+    pub fn changes(&self) -> Result<&[Change]> {
+        Ok(self.state()?.inner.changes())
     }
 
     /// Number of shapes in the source whose `ExObjRefAtom` references the
     /// media object `id`.
     #[must_use]
-    pub fn owner_count(&self, id: u32) -> usize {
-        self.source.owner_count(id)
+    pub fn owner_count(&self, id: u32) -> Result<usize> {
+        Ok(self.state()?.source.owner_count(id))
     }
 
     /// Change or clear the inert path of a movie or linked-audio object.
@@ -93,6 +128,7 @@ impl Edit {
     pub fn set_path(&mut self, id: u32, path: Option<String>) -> Result<()> {
         self.require_object("external_media.set_path", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .set_path(id, path)
             .map_err(scoped::staging("external_media.set_path"))?)
@@ -109,6 +145,7 @@ impl Edit {
     pub fn set_playback(&mut self, id: u32, playback: Playback) -> Result<()> {
         self.require_object("external_media.set_playback", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .set_playback(id, playback)
             .map_err(scoped::staging("external_media.set_playback"))?)
@@ -124,6 +161,7 @@ impl Edit {
     /// object, leaving the edit unchanged.
     pub fn insert(&mut self, object: Object) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .insert(object)
             .map_err(scoped::staging("external_media.insert"))?)
@@ -141,6 +179,7 @@ impl Edit {
     pub fn replace(&mut self, id: u32, replacement: Object) -> Result<Object> {
         self.require_object("external_media.replace", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .replace(id, replacement)
             .map_err(scoped::staging("external_media.replace"))?)
@@ -156,7 +195,7 @@ impl Edit {
     /// shape still references it, leaving the edit unchanged.
     pub fn remove(&mut self, id: u32) -> Result<Object> {
         self.require_object("external_media.remove", id)?;
-        if self.source.owner_count(id) > 0 {
+        if self.state()?.source.owner_count(id) > 0 {
             return Err(scoped::unsupported_target(
                 "external_media.remove",
                 "a shape still references this external media object",
@@ -164,6 +203,7 @@ impl Edit {
             .into());
         }
         Ok(self
+            .state_mut()?
             .inner
             .remove(id)
             .map_err(scoped::staging("external_media.remove"))?)
@@ -178,12 +218,19 @@ impl Edit {
     /// package and [`super::Error::Package`] when the result cannot be
     /// republished.
     pub fn commit(self) -> Result<Commit> {
-        let Self {
-            base,
+        self.state
+            .get_or_try_init(|| self.initialize_state())
+            .map_err(super::Error::from)?;
+        let Self { base, state } = self;
+        let State {
             native,
             source,
             inner,
-        } = self;
+        } = state.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT external-media edit state was not initialized".into(),
+            ))
+        })?;
         let (target, _) = inner
             .commit()
             .map_err(scoped::publication("external_media.commit"))?
@@ -202,8 +249,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error::Package`] for an encrypted or unreadable
-    /// presentation.
+    /// An encrypted presentation is refused immediately. An unreadable
+    /// presentation is reported by the first projection, staging operation,
+    /// or commit.
     pub fn edit_external_media(&self) -> Result<Edit> {
         Edit::new(self)
     }
