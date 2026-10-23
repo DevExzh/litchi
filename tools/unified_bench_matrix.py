@@ -3840,7 +3840,7 @@ def to_md(rows, conflicts, agreements, cur):
     a("")
     a("| format | rows | parsed | curated | meets | miss (open) | miss (superseded) | unqualified | no-budget |")
     a("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
-    tot = [0] * 7
+    tot = [0] * 8
     for f in fmts:
         fr = [r for r in rows if r["format"] == f]
         c = [len(fr),
