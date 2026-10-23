@@ -2546,7 +2546,7 @@ impl Edit {
         &self,
         sheet: &Worksheet,
         address: Address,
-        cache: &mut BTreeMap<(usize, Address), Option<crate::RichText>>,
+        cache: &mut HashMap<(usize, Address), Option<crate::RichText>>,
     ) -> Result<Option<crate::RichText>> {
         if let Some(action) = self
             .sheets
@@ -2563,11 +2563,19 @@ impl Edit {
         if let Some(value) = cache.get(&key) {
             return Ok(value.clone());
         }
-        // The transfer planner seeds every requested source and destination
-        // address through `Worksheet::rich_text_many` before this lookup.
-        // Missing cache entries therefore mean a non-rich cell, not a reason
-        // to restart an XML scan for one address.
+        // The transfer planner seeds every requested base source and
+        // destination address that has no staged payload through
+        // `Worksheet::rich_text_many` before this lookup. Missing cache
+        // entries therefore mean a non-rich cell, not a reason to restart an
+        // XML scan for one address.
         Ok(None)
+    }
+
+    fn pending_transfer_has_payload(&self, position: usize, address: Address) -> bool {
+        self.sheets
+            .get(&position)
+            .and_then(|actions| actions.cells.get(&address))
+            .is_some_and(|action| action.payload().is_some())
     }
 
     fn transfer_cells<'source, 'range, 'target, 'anchor>(
@@ -2641,11 +2649,15 @@ impl Edit {
             .try_reserve_exact(capacity)
             .map_err(|source| allocation("cell-transfer plan", source))?;
 
-        // Prime the rich-text cache from one source-part pass per worksheet.
+        // Prime the rich-text cache from one requested projection pass per
+        // physical source part. Shared strings retain the existing first-use
+        // rich-index census plus the requested payload pass; ordinary shared
+        // transfers pay only that cached census and no payload materialization.
         // `Worksheet::rich_text` is deliberately exact for a single lookup,
         // but restarting its XML reader for every transfer address makes a
         // rich range quadratic. The bulk projection retains only requested
-        // run values; ordinary scalar transfers still avoid part reads.
+        // run values; staged payload actions are handled from the pending map
+        // and never force a read of their superseded base bytes.
         let mut source_addresses = Vec::new();
         source_addresses
             .try_reserve_exact(capacity)
@@ -2656,53 +2668,80 @@ impl Edit {
             .map_err(|source| allocation("cell-transfer target addresses", source))?;
         for row_offset in 0..source_range.rows() {
             for column_offset in 0..source_range.columns() {
-                source_addresses.push(Address::at(
+                let source_address = Address::at(
                     source_range.start().row().get() + row_offset,
                     source_range.start().column().get() + column_offset,
-                )?);
-                target_addresses.push(Address::at(
+                )?;
+                let target_address = Address::at(
                     target_start.row().get() + row_offset,
                     target_start.column().get() + column_offset,
-                )?);
+                )?;
+                if matches!(
+                    self.pending_cell_state(&target_sheet, target_address)?,
+                    State::Cell {
+                        content: Cell::Unknown(_),
+                        ..
+                    }
+                ) {
+                    return Err(Error::Unsupported {
+                        feature: "overwriting unmodeled cell encodings",
+                    });
+                }
+                source_addresses.push(source_address);
+                target_addresses.push(target_address);
             }
         }
-        let mut rich_cache = BTreeMap::new();
-        if source_sheet.position() == target_sheet.position() {
-            let combined = source_addresses
-                .len()
-                .checked_add(target_addresses.len())
-                .ok_or_else(|| invalid("cell-transfer address count overflow"))?;
+        let mut source_rich_addresses = Vec::new();
+        source_rich_addresses
+            .try_reserve_exact(capacity)
+            .map_err(|source| allocation("cell-transfer source rich addresses", source))?;
+        let mut target_rich_addresses = Vec::new();
+        target_rich_addresses
+            .try_reserve_exact(capacity)
+            .map_err(|source| allocation("cell-transfer target rich addresses", source))?;
+        for (&source_address, &target_address) in
+            source_addresses.iter().zip(target_addresses.iter())
+        {
+            if !self.pending_transfer_has_payload(source_sheet.position(), source_address) {
+                source_rich_addresses.push(source_address);
+            }
+            if !self.pending_transfer_has_payload(target_sheet.position(), target_address) {
+                target_rich_addresses.push(target_address);
+            }
+        }
+        let mut rich_cache = HashMap::new();
+        let combined = source_rich_addresses
+            .len()
+            .checked_add(target_rich_addresses.len())
+            .ok_or_else(|| invalid("cell-transfer address count overflow"))?;
+        rich_cache
+            .try_reserve(combined)
+            .map_err(|source| allocation("cell-transfer rich cache", source))?;
+        if source_sheet.position() == target_sheet.position() && combined != 0 {
             let mut addresses = Vec::new();
             addresses
                 .try_reserve_exact(combined)
                 .map_err(|source| allocation("cell-transfer rich addresses", source))?;
-            addresses.extend(source_addresses.iter().copied());
-            addresses.extend(target_addresses.iter().copied());
+            addresses.extend(source_rich_addresses.iter().copied());
+            addresses.extend(target_rich_addresses.iter().copied());
             for (address, value) in source_sheet.rich_text_many(&addresses)? {
                 rich_cache.insert((source_sheet.position(), address), value);
             }
-        } else {
-            for (address, value) in source_sheet.rich_text_many(&source_addresses)? {
-                rich_cache.insert((source_sheet.position(), address), value);
+        } else if source_sheet.position() != target_sheet.position() {
+            if !source_rich_addresses.is_empty() {
+                for (address, value) in source_sheet.rich_text_many(&source_rich_addresses)? {
+                    rich_cache.insert((source_sheet.position(), address), value);
+                }
             }
-            for (address, value) in target_sheet.rich_text_many(&target_addresses)? {
-                rich_cache.insert((target_sheet.position(), address), value);
+            if !target_rich_addresses.is_empty() {
+                for (address, value) in target_sheet.rich_text_many(&target_rich_addresses)? {
+                    rich_cache.insert((target_sheet.position(), address), value);
+                }
             }
         }
         for (&source_address, &target_address) in
             source_addresses.iter().zip(target_addresses.iter())
         {
-            if matches!(
-                self.pending_cell_state(&target_sheet, target_address)?,
-                State::Cell {
-                    content: Cell::Unknown(_),
-                    ..
-                }
-            ) {
-                return Err(Error::Unsupported {
-                    feature: "overwriting unmodeled cell encodings",
-                });
-            }
             let source_state = self.pending_cell_state(&source_sheet, source_address)?;
             let source_styles =
                 self.pending_transfer_styles(source_sheet.position(), source_address);
@@ -2714,7 +2753,21 @@ impl Edit {
             let target_rich =
                 self.pending_transfer_rich_text(&target_sheet, target_address, &mut rich_cache)?;
             let action = if let Some(rich) = source_rich.clone() {
-                transfer_rich_action(rich, &source_state)
+                // A rich shared-string cell still owns the workbook's exact
+                // shared-string dependency. Keep that identity in the
+                // transfer action; only an inline source or a pending rich
+                // payload should become a new inline rich value.
+                if matches!(
+                    &source_state,
+                    State::Cell {
+                        shared_string: Some(_),
+                        ..
+                    }
+                ) {
+                    transfer_action(source_state.clone(), source_address, target_address)?
+                } else {
+                    transfer_rich_action(rich, &source_state)
+                }
             } else {
                 transfer_action(source_state.clone(), source_address, target_address)?
             };
@@ -2823,6 +2876,10 @@ impl Edit {
                 self.stage_transfer_styles(target_sheet.position(), target_address, styles)?;
             }
             if let Some(drawing) = drawing {
+                // A picture-only transfer may have no effective cell action
+                // at the target. Keep an empty sheet entry so commit visits
+                // the target worksheet and publishes the drawing graph.
+                self.sheets.entry(target_sheet.position()).or_default();
                 self.drawings.insert(target_sheet.position(), drawing);
             }
             Ok(())

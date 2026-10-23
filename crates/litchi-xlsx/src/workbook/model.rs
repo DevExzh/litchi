@@ -1648,7 +1648,9 @@ impl Worksheet {
         rich_item(self.owner.package.get_part(uri)?.blob(), index)
     }
 
-    /// Read rich text for a bounded set of cells in one pass per source part.
+    /// Read rich text for a bounded set of cells with one requested payload
+    /// pass per physical source part. Shared-string callers retain the
+    /// existing first-use rich-index census before that payload pass.
     ///
     /// The scalar [`Self::rich_text`] accessor is intentionally exact for one
     /// address, but its inline and shared-string readers both start at the
@@ -1661,14 +1663,32 @@ impl Worksheet {
         &self,
         addresses: &[Address],
     ) -> Result<HashMap<Address, Option<crate::RichText>>> {
-        let mut values = HashMap::with_capacity(addresses.len());
+        let mut values = HashMap::new();
+        values
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich text values",
+                source,
+            })?;
         if addresses.is_empty() {
             return Ok(values);
         }
 
         let store = self.store()?;
-        let mut inline = HashSet::new();
+        let mut inline = HashMap::new();
+        inline
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "inline rich-text addresses",
+                source,
+            })?;
         let mut shared = HashSet::new();
+        shared
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich shared-string indexes",
+                source,
+            })?;
         let mut shared_addresses = Vec::new();
         shared_addresses
             .try_reserve(addresses.len())
@@ -1682,7 +1702,13 @@ impl Worksheet {
                 continue;
             };
             if entry.inline_rich {
-                inline.insert(address);
+                // The scalar reader compares the raw `r` attribute with the
+                // canonical address string. Keep that exact source policy in
+                // the bulk reader instead of normalizing `$A$1` or lowercase
+                // references through `Address::from_a1`.
+                inline
+                    .entry(address.a1().into_bytes().into_boxed_slice())
+                    .or_insert(address);
             } else if let Some(index) = entry.shared_string {
                 shared.insert(index);
                 shared_addresses.push((address, index));
@@ -2109,7 +2135,7 @@ pub(crate) fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichT
                 depth += 1;
                 if depth == 2 && element.local_name().as_ref() == b"si" {
                     if count == wanted {
-                        return read_runs(&mut reader, false);
+                        return read_runs(&mut reader, false).map(RunsRead::into_value);
                     }
                     count += 1;
                 }
@@ -2136,11 +2162,16 @@ pub(crate) fn rich_items_many(
     xml: &[u8],
     wanted: &HashSet<usize>,
 ) -> Result<HashMap<usize, Option<crate::RichText>>> {
-    let mut values = wanted
-        .iter()
-        .copied()
-        .map(|index| (index, None))
-        .collect::<HashMap<_, _>>();
+    let mut values = HashMap::new();
+    values
+        .try_reserve(wanted.len())
+        .map_err(|source| Error::Allocation {
+            resource: "rich shared-string values",
+            source,
+        })?;
+    for &index in wanted {
+        values.insert(index, None);
+    }
     if wanted.is_empty() {
         return Ok(values);
     }
@@ -2160,9 +2191,17 @@ pub(crate) fn rich_items_many(
                     let index = count;
                     count += 1;
                     if wanted.contains(&index) {
-                        let value = read_runs(&mut reader, true)?;
+                        let value = match read_runs(&mut reader, true)? {
+                            RunsRead::Complete(value) => value,
+                            // Scalar lookup returns `None` as soon as it
+                            // sees an unsupported run shape. If the remainder
+                            // is malformed, stop this bulk projection rather
+                            // than turning that established `None` into an
+                            // error while chasing later addresses.
+                            RunsRead::Aborted => return Ok(values),
+                        };
                         values.insert(index, value);
-                        // `read_runs` consumes the closing `</si>`.
+                        // A complete read consumes the closing `</si>`.
                         depth = 1;
                     }
                 }
@@ -2207,7 +2246,7 @@ pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText
                         .is_some_and(|attribute| attribute.value.as_ref() == a1.as_bytes());
                     cell_depth = depth;
                 } else if in_cell && depth == cell_depth + 1 && local.as_ref() == b"is" {
-                    return read_runs(&mut reader, false);
+                    return read_runs(&mut reader, false).map(RunsRead::into_value);
                 }
             },
             Event::End(_) => {
@@ -2227,13 +2266,18 @@ pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText
 /// raw events, preserving the scalar reader's exact run/failure behavior.
 pub(crate) fn inline_rich_many(
     xml: &[u8],
-    wanted: &HashSet<Address>,
+    wanted: &HashMap<Box<[u8]>, Address>,
 ) -> Result<HashMap<Address, Option<crate::RichText>>> {
-    let mut values = wanted
-        .iter()
-        .copied()
-        .map(|address| (address, None))
-        .collect::<HashMap<_, _>>();
+    let mut values = HashMap::new();
+    values
+        .try_reserve(wanted.len())
+        .map_err(|source| Error::Allocation {
+            resource: "inline rich-text values",
+            source,
+        })?;
+    for &address in wanted.values() {
+        values.insert(address, None);
+    }
     if wanted.is_empty() {
         return Ok(values);
     }
@@ -2256,18 +2300,16 @@ pub(crate) fn inline_rich_many(
                         .try_get_attribute("r")
                         .ok()
                         .flatten()
-                        .and_then(|attribute| {
-                            std::str::from_utf8(attribute.value.as_ref())
-                                .ok()
-                                .and_then(|value| Address::from_a1(value).ok())
-                        })
-                        .filter(|address| wanted.contains(address));
+                        .and_then(|attribute| wanted.get(attribute.value.as_ref()).copied());
                     cell_depth = depth;
                 } else if in_cell.is_some() && depth == cell_depth + 1 && local.as_ref() == b"is" {
                     let address = in_cell.expect("inline rich cell is present");
-                    let value = read_runs(&mut reader, true)?;
+                    let value = match read_runs(&mut reader, true)? {
+                        RunsRead::Complete(value) => value,
+                        RunsRead::Aborted => return Ok(values),
+                    };
                     values.insert(address, value);
-                    // `read_runs` consumes the closing `</is>`.
+                    // A complete read consumes the closing `</is>`.
                     depth = cell_depth;
                 }
             },
@@ -2285,10 +2327,21 @@ pub(crate) fn inline_rich_many(
 
 /// Read the runs of the string item whose start tag `reader` just read, up
 /// to its end tag.
-fn read_runs(
-    reader: &mut quick_xml::Reader<&[u8]>,
-    consume_invalid: bool,
-) -> Result<Option<crate::RichText>> {
+enum RunsRead {
+    Complete(Option<crate::RichText>),
+    Aborted,
+}
+
+impl RunsRead {
+    fn into_value(self) -> Option<crate::RichText> {
+        match self {
+            Self::Complete(value) => value,
+            Self::Aborted => None,
+        }
+    }
+}
+
+fn read_runs(reader: &mut quick_xml::Reader<&[u8]>, consume_invalid: bool) -> Result<RunsRead> {
     use quick_xml::events::Event;
     let attributes = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
         let raw = std::str::from_utf8(element.attributes_raw())
@@ -2309,15 +2362,17 @@ fn read_runs(
     let mut place = 0u8;
     let mut valid = true;
     loop {
-        match reader
-            .read_event()
-            .map_err(|error| invalid(format!("malformed string item: {error}")))?
-        {
+        let event = match reader.read_event() {
+            Ok(event) => event,
+            Err(_error) if consume_invalid && !valid => return Ok(RunsRead::Aborted),
+            Err(error) => return Err(invalid(format!("malformed string item: {error}"))),
+        };
+        match event {
             Event::Start(element) => {
                 depth += 1;
                 if !valid {
                     if !consume_invalid {
-                        return Ok(None);
+                        return Ok(RunsRead::Complete(None));
                     }
                     continue;
                 }
@@ -2335,13 +2390,13 @@ fn read_runs(
                     // A plain `t` beside runs, `rPh`, `phoneticPr` or
                     // children with content are not kept by a run rewrite.
                     _ if consume_invalid => valid = false,
-                    _ => return Ok(None),
+                    _ => return Ok(RunsRead::Complete(None)),
                 }
             },
             Event::Empty(element) => {
                 if !valid {
                     if !consume_invalid {
-                        return Ok(None);
+                        return Ok(RunsRead::Complete(None));
                     }
                     continue;
                 }
@@ -2356,7 +2411,7 @@ fn read_runs(
                     },
                     (1, 1) if element.local_name().as_ref() == b"t" => {},
                     _ if consume_invalid => valid = false,
-                    _ => return Ok(None),
+                    _ => return Ok(RunsRead::Complete(None)),
                 }
             },
             Event::Text(value) if valid && place == 3 => text.push_str(
@@ -2374,13 +2429,13 @@ fn read_runs(
             },
             Event::End(_) => {
                 if depth == 0 {
-                    return Ok(
-                        (valid && !runs.is_empty()).then(|| crate::RichText::from_runs(runs))
-                    );
+                    return Ok(RunsRead::Complete(
+                        (valid && !runs.is_empty()).then(|| crate::RichText::from_runs(runs)),
+                    ));
                 }
                 if !valid {
                     if !consume_invalid {
-                        return Ok(None);
+                        return Ok(RunsRead::Complete(None));
                     }
                     depth = depth.saturating_sub(1);
                     continue;
@@ -2399,7 +2454,13 @@ fn read_runs(
                 }
                 depth = depth.saturating_sub(1);
             },
-            Event::Eof => return Ok(None),
+            Event::Eof => {
+                return Ok(if consume_invalid {
+                    RunsRead::Aborted
+                } else {
+                    RunsRead::Complete(None)
+                });
+            },
             _ => {},
         }
     }
@@ -2407,16 +2468,22 @@ fn read_runs(
 
 #[cfg(test)]
 mod rich_item_tests {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     use litchi_sheet::Cell as Address;
 
     #[test]
     fn bulk_rich_readers_keep_requested_runs_only() {
         let inline = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>outside</t></r></is></c><c r="B1" t="inlineStr"><is><r><rPr><i/></rPr><t>inside</t></r></is></c><c r="C1"><v>3</v></c></row></sheetData></worksheet>"#;
-        let requested = HashSet::from([
-            Address::from_a1("B1").expect("B1"),
-            Address::from_a1("C1").expect("C1"),
+        let requested = HashMap::from([
+            (
+                b"B1".to_vec().into_boxed_slice(),
+                Address::from_a1("B1").expect("B1"),
+            ),
+            (
+                b"C1".to_vec().into_boxed_slice(),
+                Address::from_a1("C1").expect("C1"),
+            ),
         ]);
         let values = super::inline_rich_many(inline, &requested).expect("inline values");
         assert_eq!(
@@ -2428,6 +2495,29 @@ mod rich_item_tests {
         );
         assert!(values[&Address::from_a1("C1").expect("C1")].is_none());
         assert!(!values.contains_key(&Address::from_a1("A1").expect("A1")));
+
+        // Bulk lookup keeps the scalar reader's raw-address policy: a
+        // lowercase source attribute is not normalized into the requested
+        // canonical address.
+        let noncanonical = br#"<worksheet><sheetData><row><c r="b1" t="inlineStr"><is><r><t>lowercase</t></r></is></c></row></sheetData></worksheet>"#;
+        let requested = HashMap::from([(
+            b"B1".to_vec().into_boxed_slice(),
+            Address::from_a1("B1").expect("B1"),
+        )]);
+        let values = super::inline_rich_many(noncanonical, &requested).expect("raw addresses");
+        assert!(values[&Address::from_a1("B1").expect("B1")].is_none());
+
+        // An unsupported run shape still yields the scalar reader's `None`
+        // without turning a malformed trailing tail into a new parse error.
+        let malformed_tail =
+            br#"<worksheet><sheetData><row><c r="A1" t="inlineStr"><is><r><rPh/></is></c><broken"#;
+        let requested = HashMap::from([(
+            b"A1".to_vec().into_boxed_slice(),
+            Address::from_a1("A1").expect("A1"),
+        )]);
+        let values = super::inline_rich_many(malformed_tail, &requested)
+            .expect("unsupported rich shape remains non-fatal");
+        assert!(values[&Address::from_a1("A1").expect("A1")].is_none());
 
         let shared = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>outside</t></si><si><r><rPr><b/></rPr><t>inside</t></r></si><si><r><rPr><i/></rPr><t>also outside</t></r></si></sst>"#;
         let requested = HashSet::from([1usize]);
