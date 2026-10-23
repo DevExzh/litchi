@@ -1,4 +1,4 @@
-# 0362uq — Pages shared Commit and Diagnostics types
+# 0362usc — Pages shared Commit and Diagnostics types
 
 - Date: 2026-10-23.
 - Base: `173dd5330476713714871007316794b9a3a1bdaa`.

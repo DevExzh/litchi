@@ -1,4 +1,4 @@
-# 0362uq — PPT/PPTX shared edit types
+# 0362usa — PPT/PPTX shared edit types
 
 This source slice completes record 0351 §2.2 for the remaining minimal
 PowerPoint edit families. It is based on `173dd5330476713714871007316794b9a3a1bdaa`.

@@ -1,4 +1,4 @@
-# 0362uqa — XLSB and XLS shared commit triads
+# 0362usb — XLSB and XLS shared commit triads
 
 - Date: 2026-10-23.
 - Status: static migration complete on frozen base `173dd5330476713714871007316794b9a3a1bdaa`; coordinator integration validation pending.

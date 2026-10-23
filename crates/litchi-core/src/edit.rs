@@ -100,12 +100,25 @@ impl Diagnostics {
 /// A commit is plain data. Constructing one does not apply anything, and a
 /// patch is checked against its base when it is applied, so a commit
 /// assembled outside its format cannot publish an unchecked change.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// Debug output reports only diagnostics; it never formats the retained
+/// package or patch payloads.
+#[derive(Clone, PartialEq, Eq)]
 #[must_use = "a commit holds the new package; dropping it discards the edit"]
 pub struct Commit<P, T, D = Diagnostics> {
     package: P,
     patch: T,
     diagnostics: D,
+}
+
+impl<P, T, D: fmt::Debug> fmt::Debug for Commit<P, T, D> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Owners and patches may retain authored payloads. Only the family's
+        // content-free diagnostics belong in a commit's diagnostic rendering.
+        formatter
+            .debug_struct("Commit")
+            .field("diagnostics", &self.diagnostics)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<P, T, D> Commit<P, T, D> {
@@ -280,6 +293,8 @@ impl std::error::Error for Refusal {}
 
 #[cfg(test)]
 mod tests {
+    use std::fmt;
+
     use super::{Commit, Diagnostics, Refusal, RefusalKind};
 
     #[test]
@@ -312,6 +327,21 @@ mod tests {
         }
         let commit = Commit::new((), (), Counted { touched: 2 });
         assert_eq!(commit.diagnostics().touched, 2);
+    }
+
+    #[test]
+    fn commit_debug_does_not_format_owner_or_patch_payloads() {
+        struct Payload;
+        impl fmt::Debug for Payload {
+            fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+                panic!("commit diagnostics must not format retained payloads")
+            }
+        }
+        let commit = Commit::new(Payload, Payload, Diagnostics::CHANGED);
+        assert_eq!(
+            format!("{commit:?}"),
+            "Commit { diagnostics: Diagnostics { changed: true }, .. }"
+        );
     }
 
     #[test]

@@ -1,0 +1,47 @@
+# 0362us — Close shared-type duplicates in the final sweep
+
+Record 0351 §2.2 requires core Commit aliases for exact triads and shared
+Diagnostics for changed-only summaries. The source audit found remaining
+copies in PPT/PPTX, XLS/XLSB, Pages and ODF. The reviewed migrations and their
+consumer changes are recorded in [0362usa](0362usa-ppt-shared-types.md),
+[0362usb](0362usb-xls-shared-types.md),
+[0362usc](0362usc-pages-shared-types.md), and
+[0362usd](0362usd-odf-shared-types.md). These canonical aliases are the shape
+prescribed by the contract; they do not retain obsolete API names.
+
+PPTX opened commits retain their additional snapshot state. OOXML properties
+and other genuinely richer diagnostics retain their custom types. Pages
+metadata replay now returns its Commit triad, with changed/no-op/replay and
+conflict consumers migrated. ODI flat semantic planning and source provenance
+remain available on its Patch after removal of derived Commit helpers.
+
+The glossary gate now pins 30 nominated shared public type paths to the
+nominal core Commit or Diagnostics identity. It resolves aliases/re-exports
+by rustdoc identity and fails closed on missing, unrelated, ambiguous or
+cyclic targets. Richer custom types are not nominated. The Pages replay rule
+and ODI removed-helper bans remain present after conflict resolution. The
+composed glossary and inventory tool suites pass 54 tests on `ad52437f5e`;
+actual final-source rustdoc captures and the complete gate remain required.
+
+## Preserve the redaction boundary
+
+Adopting core Commit can make a previously non-Debug format commit printable.
+For example, flat ODI Image and Patch already derive Debug over retained
+state. Core Commit's derived Debug would expose those payloads through the
+new alias. Its Debug implementation now renders only the family's existing
+content-free diagnostics, never the package or patch. A regression uses
+payloads whose Debug panics to prove they are not formatted. This is a narrow
+obligation of the changed API; the comprehensive item-22 audit remains deferred.
+The commit data, accessors, equality, cloning and publication behavior do not
+change, and normal editing performs no additional work.
+
+## Remaining qualification
+
+ODM now stores its changed flag during commit instead of computing exact-byte
+equality lazily in diagnostics(). Record 0362usd identifies that moved
+comparison for native qualification. No performance exception is accepted.
+The owner-replay sweep also returned ODG Package::apply_joined plan publication
+for migration into an Edit staging verb (0362ut); that independent correction,
+all 68 final inventory captures/dispositions, the complete gate, corpus and
+native qualification remain required. This record does not claim final
+workspace acceptance.
