@@ -31,7 +31,7 @@ use litchi_cfb::{OleFileLimits, SharedOleFile};
 use litchi_core::SourceVersion;
 use litchi_ole_common::object::Limits as ObjectLimits;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub use crate::error::LimitKind;
 
@@ -419,7 +419,8 @@ impl Commit {
 /// Detached primary XLS edit backed by the checked cell-values snapshot.
 pub struct Edit {
     package: Package,
-    inner: cell_values::Edit,
+    inner: Option<cell_values::Edit>,
+    lazy: LazySnapshot,
     options: EditOptions,
     source_guard: Option<SourceGuard>,
 }
@@ -430,6 +431,7 @@ impl fmt::Debug for Edit {
             .debug_struct("Edit")
             .field("package", &self.package)
             .field("options", &self.options)
+            .field("materialized", &self.inner.is_some())
             .field("source_backed", &self.source_guard.is_some())
             .finish_non_exhaustive()
     }
@@ -441,6 +443,54 @@ struct SourceGuard {
     expected: SourceVersion,
 }
 
+/// Demand-driven semantic snapshot for the primary edit.
+///
+/// Package admission already retains the source owner and its policies, so
+/// constructing an edit only clones those handles.  BIFF validation and the
+/// cell indexes are built on the first source lookup, staged verb, or commit;
+/// a successful snapshot is reused by all later operations.
+struct LazySnapshot {
+    package: Package,
+    options: EditOptions,
+    snapshot: OnceLock<cell_values::Snapshot>,
+}
+
+impl LazySnapshot {
+    fn new(package: Package, options: EditOptions) -> Self {
+        Self {
+            package,
+            options,
+            snapshot: OnceLock::new(),
+        }
+    }
+
+    fn get(&self) -> Result<&cell_values::Snapshot> {
+        if let Some(snapshot) = self.snapshot.get() {
+            return Ok(snapshot);
+        }
+        let snapshot = self
+            .package
+            .edit_snapshot_with_options(self.options)
+            .map_err(Error::Package)?;
+        let _ = self.snapshot.set(snapshot);
+        self.snapshot
+            .get()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "XLS edit snapshot was not retained",
+            )))
+    }
+
+    fn into_edit(self) -> Result<cell_values::Edit> {
+        if let Some(snapshot) = self.snapshot.into_inner() {
+            return Ok(snapshot.edit());
+        }
+        self.package
+            .edit_snapshot_with_options(self.options)
+            .map_err(Error::Package)
+            .map(|snapshot| snapshot.edit())
+    }
+}
+
 impl Edit {
     pub(crate) fn from_package_with_options(
         package: Package,
@@ -448,14 +498,11 @@ impl Edit {
     ) -> Result<Self> {
         super::ensure_publication_allowed(&package.inner).map_err(Error::Package)?;
         let source_guard = capture_source_guard(&package)?;
-        let snapshot = package
-            .edit_snapshot_with_options(options)
-            .map_err(Error::Package)?;
         check_source_guard(source_guard.as_ref())?;
-        let inner = snapshot.edit();
         Ok(Self {
+            lazy: LazySnapshot::new(package.clone(), options),
             package,
-            inner,
+            inner: None,
             options,
             source_guard,
         })
@@ -470,11 +517,24 @@ impl Edit {
     ) -> Result<Self> {
         let source_guard = capture_source_guard(&package)?;
         Ok(Self {
+            lazy: LazySnapshot::new(package.clone(), options),
             package,
-            inner,
+            inner: Some(inner),
             options,
             source_guard,
         })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut cell_values::Edit> {
+        if self.inner.is_none() {
+            let inner = self.lazy.get()?.edit();
+            self.inner = Some(inner);
+        }
+        self.inner
+            .as_mut()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "XLS edit engine was not retained",
+            )))
     }
 
     /// Join another edit of the same source package when the two are provably
@@ -488,7 +548,16 @@ impl Edit {
         &mut self,
         incoming: Self,
     ) -> std::result::Result<&mut Self, cell_values::JoinError> {
-        self.inner.join(incoming.inner)?;
+        let incoming = match incoming.inner {
+            Some(inner) => inner,
+            None => incoming
+                .lazy
+                .into_edit()
+                .map_err(|_| cell_values::JoinError::Allocation)?,
+        };
+        self.inner_mut()
+            .map_err(|_| cell_values::JoinError::Allocation)?
+            .join(incoming)?;
         Ok(self)
     }
 
@@ -534,7 +603,8 @@ impl Edit {
     ) -> Result<Option<&cell_values::Cell>> {
         check_source_guard(self.source_guard.as_ref())?;
         let result = self
-            .inner
+            .lazy
+            .get()?
             .source_cell(selector.into(), reference)
             .map_err(Error::from);
         check_source_guard(self.source_guard.as_ref())?;
@@ -548,7 +618,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_numeric(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -560,7 +630,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_number(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -577,7 +647,7 @@ impl Edit {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
         let donor = donor.edit_snapshot_with_options(options)?;
-        let mut candidate = self.inner.clone();
+        let mut candidate = self.inner_mut()?.clone();
         let copied = candidate
             .copy_scalar_cells_from(
                 &donor,
@@ -590,7 +660,7 @@ impl Edit {
             .is_some();
         check_source_guard(guard.as_ref())?;
         if copied {
-            self.inner = candidate;
+            self.inner = Some(candidate);
         }
         Ok(copied.then_some(self))
     }
@@ -607,7 +677,7 @@ impl Edit {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
         let donor = donor.edit_snapshot_with_options(options)?;
-        let mut candidate = self.inner.clone();
+        let mut candidate = self.inner_mut()?.clone();
         let copied = candidate
             .copy_scalar_cell_from(
                 &donor,
@@ -620,7 +690,7 @@ impl Edit {
             .is_some();
         check_source_guard(guard.as_ref())?;
         if copied {
-            self.inner = candidate;
+            self.inner = Some(candidate);
         }
         Ok(copied.then_some(self))
     }
@@ -632,7 +702,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: cell_values::Value,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_value(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -643,7 +713,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         reference: cell_values::Reference,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .clear_cell(selector.into(), reference)
             .map_err(Error::from)
     }
@@ -655,7 +725,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: cell_values::Value,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_cell(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -668,7 +738,7 @@ impl Edit {
         value: cell_values::Value,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_cell_with_style(selector.into(), reference, value, style)
             .map_err(Error::from)
     }
@@ -681,7 +751,7 @@ impl Edit {
         text: String,
         formatting_runs: Vec<crate::records::SharedStringFormatRun>,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_rich_text_cell(selector.into(), reference, text, formatting_runs)
             .map_err(Error::from)
     }
@@ -693,7 +763,7 @@ impl Edit {
         reference: cell_values::Reference,
         expression: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_formula(selector.into(), reference, expression)
             .map_err(Error::from)
     }
@@ -706,7 +776,7 @@ impl Edit {
         expression: &str,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_formula_with_style(selector.into(), reference, expression, style)
             .map_err(Error::from)
     }
@@ -723,7 +793,7 @@ impl Edit {
         reference: cell_values::Reference,
         expression: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_formula(selector.into(), reference, expression)
             .map_err(Error::from)
     }
@@ -739,7 +809,7 @@ impl Edit {
         row: u16,
         twips: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_row_height(selector.into(), row, twips)
             .map_err(Error::from)
     }
@@ -755,7 +825,7 @@ impl Edit {
         row: u16,
         hidden: bool,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_row_hidden(selector.into(), row, hidden)
             .map_err(Error::from)
     }
@@ -772,7 +842,7 @@ impl Edit {
         column: u8,
         width: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_column_width(selector.into(), column, width)
             .map_err(Error::from)
     }
@@ -789,7 +859,7 @@ impl Edit {
         column: u8,
         hidden: bool,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_column_hidden(selector.into(), column, hidden)
             .map_err(Error::from)
     }
@@ -806,7 +876,7 @@ impl Edit {
         reference: cell_values::Reference,
         change: &cell_values::FormatChange,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_cell_format(selector.into(), reference, change)
             .map_err(Error::from)
     }
@@ -817,7 +887,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         reference: cell_values::Reference,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_cell(selector.into(), reference)
             .map_err(Error::from)
     }
@@ -829,7 +899,7 @@ impl Edit {
         reference: cell_values::Reference,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_style(selector.into(), reference, style)
             .map_err(Error::from)
     }
@@ -839,12 +909,14 @@ impl Edit {
         &mut self,
         source: cell_values::StyleIndex,
     ) -> Result<cell_values::StyleIndex> {
-        self.inner.duplicate_style(source).map_err(Error::from)
+        self.inner_mut()?
+            .duplicate_style(source)
+            .map_err(Error::from)
     }
 
     /// Author one validated workbook XF resource for later style operations.
     pub fn author_style(&mut self, payload: &[u8]) -> Result<cell_values::StyleIndex> {
-        self.inner.author_style(payload).map_err(Error::from)
+        self.inner_mut()?.author_style(payload).map_err(Error::from)
     }
 
     /// Insert rows and shift the checked worksheet closure.
@@ -854,7 +926,7 @@ impl Edit {
         start: u16,
         count: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_rows(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -866,7 +938,7 @@ impl Edit {
         start: u16,
         count: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .delete_rows(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -878,7 +950,7 @@ impl Edit {
         start: u8,
         count: u8,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_columns(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -890,7 +962,7 @@ impl Edit {
         start: u8,
         count: u8,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .delete_columns(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -901,7 +973,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         name: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .rename_sheet(selector.into(), name)
             .map_err(Error::from)
     }
@@ -933,7 +1005,7 @@ impl Edit {
     /// Returns a typed selector, protection, dependency-closure or
     /// exclusivity refusal without staging.
     pub fn reorder_sheets(&mut self, order: &[cell_values::Selector<'_>]) -> Result<()> {
-        self.inner.reorder_sheets(order).map_err(Error::from)
+        self.inner_mut()?.reorder_sheets(order).map_err(Error::from)
     }
 
     /// Insert one empty worksheet at a complete-catalog position.
@@ -943,7 +1015,9 @@ impl Edit {
     /// Returns a typed name, uniqueness, position, protection, macro-project
     /// or dependency-closure refusal without staging.
     pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
-        self.inner.insert_sheet(position, name).map_err(Error::from)
+        self.inner_mut()?
+            .insert_sheet(position, name)
+            .map_err(Error::from)
     }
 
     /// Remove one ordinary worksheet tab.
@@ -956,7 +1030,7 @@ impl Edit {
         &mut self,
         selector: impl Into<cell_values::Selector<'a>>,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_sheet(selector.into())
             .map_err(Error::from)
     }
@@ -965,7 +1039,11 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         check_source_guard(self.source_guard.as_ref())?;
         let source = self.package.clone();
-        let leaf_commit = self.inner.commit().map_err(Error::from)?;
+        let inner = match self.inner {
+            Some(inner) => inner,
+            None => self.lazy.into_edit()?,
+        };
+        let leaf_commit = inner.commit().map_err(Error::from)?;
         check_source_guard(self.source_guard.as_ref())?;
         let leaf_diagnostics = leaf_commit.diagnostics();
         let (leaf_snapshot, leaf_patch) = leaf_commit.into_parts();
@@ -1165,9 +1243,9 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             },
             policy: source.inner.policy,
             signed: source.inner.signed,
-            metadata: std::sync::OnceLock::from(metadata),
+            metadata: OnceLock::from(metadata),
             edit_snapshot: Some(snapshot),
-            workbook_stream: std::sync::OnceLock::new(),
+            workbook_stream: OnceLock::new(),
         }),
     })
 }

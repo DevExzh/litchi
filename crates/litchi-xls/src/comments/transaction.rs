@@ -228,10 +228,12 @@ impl Snapshot {
         self.edit_based(None)
     }
 
+    #[cfg(test)]
     fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
             base,
-            source: self.clone(),
+            package: None,
+            source: Some(self.clone()),
             changes: Vec::new(),
         }
     }
@@ -331,11 +333,26 @@ struct Change {
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    source: Snapshot,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
     changes: Vec<Change>,
 }
 
 impl Edit {
+    fn source_ref(&mut self) -> Result<&Snapshot> {
+        if self.source.is_none() {
+            let package = self
+                .package
+                .clone()
+                .ok_or_else(|| Error::InvalidData("comment edit lost its source package".into()))?;
+            let (_, bytes) = crate::scoped::capture(&package)?;
+            self.source = Some(Snapshot::from_bytes(bytes)?);
+        }
+        self.source
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("comment edit source was not retained".into()))
+    }
+
     /// Replaces the complete text and author of one existing comment.
     ///
     /// # Errors
@@ -349,7 +366,7 @@ impl Edit {
         value: Value,
     ) -> Result<()> {
         let sheet = self
-            .source
+            .source_ref()?
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("comment edit worksheet selector".into()))?;
         self.stage(sheet, reference, value)
@@ -367,7 +384,7 @@ impl Edit {
         updates: impl IntoIterator<Item = Update>,
     ) -> Result<()> {
         let sheet = self
-            .source
+            .source_ref()?
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("comment edit worksheet selector".into()))?;
         let mut staged = self.clone();
@@ -401,15 +418,11 @@ impl Edit {
 
     fn stage(&mut self, sheet: usize, reference: Reference, value: Value) -> Result<()> {
         validate_value(&value)?;
-        let owner = self
-            .source
-            .inner
-            .sheets
-            .get(sheet)
-            .ok_or(Error::PatchConflict {
-                operation: "edit comments",
-                reason: "comment worksheet inventory is stale",
-            })?;
+        let source = self.source_ref()?.clone();
+        let owner = source.inner.sheets.get(sheet).ok_or(Error::PatchConflict {
+            operation: "edit comments",
+            reason: "comment worksheet inventory is stale",
+        })?;
         let entry = unique_entry_index(&owner.entries, reference)?.ok_or_else(|| {
             Error::UnsupportedFeature(format!(
                 "cell ({}, {}) has no existing BIFF8 NOTE comment",
@@ -486,10 +499,11 @@ impl Edit {
         visibility: Visibility,
     ) -> Result<()> {
         let sheet = self
-            .source
+            .source_ref()?
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("comment edit worksheet selector".into()))?;
-        let owner = &self.source.inner.sheets[sheet];
+        let source = self.source_ref()?.clone();
+        let owner = &source.inner.sheets[sheet];
         let entry = unique_entry(&owner.entries, reference)?.ok_or_else(|| {
             Error::UnsupportedFeature(format!(
                 "cell ({}, {}) has no existing BIFF8 NOTE comment",
@@ -520,7 +534,8 @@ impl Edit {
         Ok(Commit::new(package, record.patch, record.diagnostics))
     }
 
-    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
+    pub(crate) fn commit_record(mut self) -> Result<RecordCommit> {
+        let source = self.source_ref()?.clone();
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -528,12 +543,12 @@ impl Edit {
             .collect();
         if effective.is_empty() {
             let patch = Patch::new(
-                Arc::clone(&self.source.inner.bytes),
-                Arc::clone(&self.source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
                 Vec::new(),
             );
             return Ok(RecordCommit {
-                snapshot: self.source,
+                snapshot: source.clone(),
                 patch,
                 diagnostics: Diagnostics::default(),
             });
@@ -541,7 +556,7 @@ impl Edit {
 
         let mut replacements = Vec::new();
         for change in &effective {
-            let entry = &self.source.inner.sheets[change.sheet].entries[change.entry];
+            let entry = &source.inner.sheets[change.sheet].entries[change.entry];
             if change.before.author != change.after.author {
                 replacements.push((
                     entry.site.note.start,
@@ -560,7 +575,7 @@ impl Edit {
                     first.start,
                     last.end,
                     encode_txo_family(
-                        &self.source.inner.workbook_stream,
+                        &source.inner.workbook_stream,
                         entry,
                         &change.after.text,
                         None,
@@ -570,28 +585,28 @@ impl Edit {
         }
         replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.0));
         ensure_disjoint(&replacements)?;
-        let mut workbook = self.source.inner.workbook_stream.to_vec();
+        let mut workbook = source.inner.workbook_stream.to_vec();
         crate::cell_values::replace_workbook_ranges_and_adjust_bounds(
             &mut workbook,
             &replacements,
         )?;
 
         let package = ObjectPackage::open_with_options(
-            self.source.inner.bytes.to_vec(),
+            source.inner.bytes.to_vec(),
             OpenOptions::new()
                 .targets(Targets::default())
                 .limits(Limits::default()),
         )?;
         let mut editor = package.edit()?;
-        editor.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
+        editor.put_stream_shared(&source.inner.workbook_path, Arc::from(workbook))?;
         let snapshot = Snapshot::open_package(editor.commit()?.into_package())?;
-        verify_readback(&snapshot, &self.source, &effective)?;
+        verify_readback(&snapshot, &source, &effective)?;
         let mut operations = Vec::new();
         operations
             .try_reserve_exact(effective.len())
             .map_err(|_error| Error::Allocation("retaining XLS comment patch operations"))?;
         for change in &effective {
-            let sheet = &self.source.inner.sheets[change.sheet];
+            let sheet = &source.inner.sheets[change.sheet];
             let comment = &sheet.entries[change.entry].comment;
             operations.push(Operation {
                 sheet_position: sheet.workbook_position,
@@ -601,7 +616,7 @@ impl Edit {
             });
         }
         let patch = Patch::new(
-            Arc::clone(&self.source.inner.bytes),
+            Arc::clone(&source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
             operations,
         );
@@ -629,7 +644,8 @@ impl Edit {
     /// Returns a typed refusal for protected CFB markers, stale or malformed
     /// source state, unsupported encoding transitions, length/topology changes,
     /// overlapping NOTE/TXO ownership, or failed semantic readback.
-    pub(crate) fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit_source_backed(mut self) -> Result<SourceBackedCommit> {
+        let source_snapshot = self.source_ref()?.clone();
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -648,15 +664,15 @@ impl Edit {
             .try_reserve_exact(replacement_capacity)
             .map_err(|_error| Error::Allocation("retaining source-backed XLS comment ranges"))?;
         for change in &effective {
-            let sheet = self
-                .source
-                .inner
-                .sheets
-                .get(change.sheet)
-                .ok_or(Error::PatchConflict {
-                    operation: "edit comments",
-                    reason: "source-backed comment sheet is stale",
-                })?;
+            let sheet =
+                source_snapshot
+                    .inner
+                    .sheets
+                    .get(change.sheet)
+                    .ok_or(Error::PatchConflict {
+                        operation: "edit comments",
+                        reason: "source-backed comment sheet is stale",
+                    })?;
             let entry = sheet
                 .entries
                 .get(change.entry)
@@ -667,7 +683,7 @@ impl Edit {
 
             if change.before.author != change.after.author {
                 let compressed = ensure_author_encoding_width(
-                    &self.source.inner.workbook_stream,
+                    &source_snapshot.inner.workbook_stream,
                     entry,
                     &change.after.author,
                 )?;
@@ -682,7 +698,7 @@ impl Edit {
             }
             if change.before.text != change.after.text {
                 let compressed = ensure_text_encoding_width(
-                    &self.source.inner.workbook_stream,
+                    &source_snapshot.inner.workbook_stream,
                     entry,
                     &change.after.text,
                 )?;
@@ -693,7 +709,7 @@ impl Edit {
                     Error::InvalidData("comment TXO source family is empty".into())
                 })?;
                 let replacement = encode_txo_family(
-                    &self.source.inner.workbook_stream,
+                    &source_snapshot.inner.workbook_stream,
                     entry,
                     &change.after.text,
                     Some(compressed),
@@ -713,8 +729,7 @@ impl Edit {
         let mut replacement_bytes = 0_u64;
         for (start, end, replacement) in replacements {
             ensure_equal_range_length(start, end, &replacement)?;
-            let expected = self
-                .source
+            let expected = source_snapshot
                 .inner
                 .workbook_stream
                 .get(start..end)
@@ -736,7 +751,7 @@ impl Edit {
                     Error::InvalidData("source-backed comment replacement bytes overflow".into())
                 })?;
             splices.push(SameLengthStreamSplice::new(
-                self.source.inner.workbook_path.clone(),
+                source_snapshot.inner.workbook_path.clone(),
                 offset,
                 Arc::from(expected),
                 Arc::from(replacement),
@@ -748,7 +763,7 @@ impl Edit {
         // and the checked composed view, direct sequential publication and
         // atomic save do not re-hash bytes that cannot change. Candidate
         // reopen, owner validation and atomic durability remain intact.
-        let source = Arc::clone(&self.source.inner.bytes);
+        let source = Arc::clone(&source_snapshot.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
         let publisher = SourceBackedOverlayPublisher::open_owned(
@@ -759,18 +774,18 @@ impl Edit {
         .map_err(overlay_to_error)?;
         let (plan, owner_validated) = publisher
             .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
-                verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
+                verify_source_backed_candidate(candidate.clone(), &source_snapshot, &effective)
                     .map_err(CommentOwnerError::Owner)
             })
             .map_err(CommentOwnerError::into_error)?;
         if owner_validated.is_none() && !effective.is_empty() {
-            verify_source_backed_readback(&plan, &self.source, &effective)?;
+            verify_source_backed_readback(&plan, &source_snapshot, &effective)?;
         }
 
-        let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
+        let source_workbook_bytes = u64::try_from(source_snapshot.inner.workbook_stream.len())
             .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
         let target_workbook_bytes = source_workbook_bytes;
-        let source_bytes = u64::try_from(self.source.inner.bytes.len())
+        let source_bytes = u64::try_from(source_snapshot.inner.bytes.len())
             .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
         let diagnostics = SourceBackedDiagnostics {
             changed_comments: effective.len(),
@@ -785,7 +800,7 @@ impl Edit {
             target_fingerprint: plan.target_fingerprint(),
         };
         Ok(SourceBackedCommit {
-            source: self.source,
+            source: source_snapshot,
             plan,
             diagnostics,
         })
@@ -1004,8 +1019,19 @@ impl crate::Package {
     ///
     /// Returns an error for an encrypted, protected or unsupported workbook.
     pub fn edit_comments(&self) -> Result<Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Ok(Snapshot::from_bytes(bytes)?.edit_based(base))
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit comments",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Edit {
+            base: Some(self.clone()),
+            package: Some(self.clone()),
+            source: None,
+            changes: Vec::new(),
+        })
     }
 
     /// Replay a comment patch onto the exact package it was made from.

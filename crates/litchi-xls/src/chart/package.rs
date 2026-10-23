@@ -74,11 +74,12 @@ pub(crate) fn unsupported_embedded_mutation<T>() -> Result<T> {
 /// [`Edit::commit`] publishes a new package. Dropping it discards it.
 pub struct Edit {
     base: crate::scoped::Base,
-    pub(super) package: ObjectEditor,
+    pub(super) package: Option<ObjectEditor>,
     pub(super) workbook_path: Vec<String>,
     pub(super) workbook: Arc<[u8]>,
     limits: Limits,
     charts: Vec<StoredChart>,
+    lazy: Option<(crate::scoped::Base, crate::Package, Limits)>,
 }
 
 impl Edit {
@@ -113,18 +114,55 @@ impl Edit {
         let charts = parse_workbook_charts(&workbook, limits)?;
         Ok(Self {
             base,
-            package,
+            package: Some(package),
             workbook_path,
             workbook,
             limits,
             charts,
+            lazy: None,
         })
+    }
+
+    fn lazy(base: crate::scoped::Base, package: crate::Package, limits: Limits) -> Result<Self> {
+        validate_limits(limits)?;
+        if package.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit chart",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Self {
+            base,
+            package: None,
+            workbook_path: Vec::new(),
+            workbook: Arc::new([]),
+            limits,
+            charts: Vec::new(),
+            lazy: Some((None, package, limits)),
+        })
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        let Some((_, package, limits)) = self.lazy.take() else {
+            return Ok(());
+        };
+        let (base, bytes) = crate::scoped::capture(&package)?;
+        let eager = Self::open_based(base, bytes, limits)?;
+        self.base = eager.base;
+        self.package = eager.package;
+        self.workbook_path = eager.workbook_path;
+        self.workbook = eager.workbook;
+        self.limits = eager.limits;
+        self.charts = eager.charts;
+        Ok(())
     }
 
     /// Iterates borrowed chart entries in workbook drawing order.
     #[must_use]
-    pub fn charts(&self) -> impl ExactSizeIterator<Item = &Entry> {
-        self.charts.iter().map(|value| &value.entry)
+    pub fn charts(&mut self) -> Result<impl ExactSizeIterator<Item = &Entry>> {
+        self.ensure_open()?;
+        Ok(self.charts.iter().map(|value| &value.entry))
     }
 
     /// Validates the known MS-XLS chart semantics in every discovered chart.
@@ -138,7 +176,8 @@ impl Edit {
     ///
     /// Returns the first semantic validation error found in the discovered
     /// chart entries.
-    pub fn validate_semantics(&self) -> Result<()> {
+    pub fn validate_semantics(&mut self) -> Result<()> {
+        self.ensure_open()?;
         for value in &self.charts {
             value.entry.chart.validate_semantics(self.limits)?;
         }
@@ -287,28 +326,34 @@ impl Edit {
 
     /// Consume the editor and return the parsed chart inventory without persisting.
     #[must_use]
-    pub fn into_charts(self) -> Vec<Entry> {
-        self.charts.into_iter().map(|value| value.entry).collect()
+    pub fn into_charts(mut self) -> Result<Vec<Entry>> {
+        self.ensure_open()?;
+        Ok(self.charts.into_iter().map(|value| value.entry).collect())
     }
 
     /// Looks up a chart by worksheet name and semantic position.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn get(&self, selector: Selector<'_>) -> Result<Option<&Chart>> {
+    pub fn get(&mut self, selector: Selector<'_>) -> Result<Option<&Chart>> {
         let Some(location) = self.resolve(selector)? else {
             return Ok(None);
         };
-        Ok(self.at(&location))
+        self.at(&location)
     }
 
     /// Looks up a chart using a checked low-level host location.
-    #[must_use]
-    pub fn at(&self, location: &Location) -> Option<&Chart> {
-        self.charts
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the deferred chart inventory cannot be opened.
+    pub fn at(&mut self, location: &Location) -> Result<Option<&Chart>> {
+        self.ensure_open()?;
+        Ok(self
+            .charts
             .iter()
             .find(|value| &value.entry.location == location)
-            .map(|value| &value.entry.chart)
+            .map(|value| &value.entry.chart))
     }
 
     /// Refuses fresh embedded-chart authoring until its complete BIFF grammar is available.
@@ -347,6 +392,7 @@ impl Edit {
         index: usize,
         chart: Chart,
     ) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -418,6 +464,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_sheet_at(&mut self, sheet_index: usize) -> Result<Chart> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -448,6 +495,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets(&mut self, order: &[&str]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         if order.len() != sheets.len() {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -475,6 +523,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_sheets_at(&mut self, order: &[usize]) -> Result<()> {
+        self.ensure_open()?;
         let count = bindings(&self.workbook)?.1.len();
         if order.len() != count {
             return invalid(BOUNDSHEET, "sheet reorder must contain every tab");
@@ -542,6 +591,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_at(&mut self, location: &Location) -> Result<Chart> {
+        self.ensure_open()?;
         if let Location::ChartSheet { sheet_index } = location {
             return self.remove_sheet_at(*sheet_index);
         }
@@ -563,6 +613,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder(&mut self, sheet: &str, order: &[usize]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()
@@ -672,8 +723,13 @@ impl Edit {
     }
 
     /// The rewritten compound-file allocation (the codec-level output).
-    pub(crate) fn finish(self) -> Result<Vec<u8>> {
-        crate::scoped::object_editor_bytes(&self.package)
+    pub(crate) fn finish(mut self) -> Result<Vec<u8>> {
+        self.ensure_open()?;
+        let package = self
+            .package
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?;
+        crate::scoped::object_editor_bytes(package)
     }
 
     /// Validate the staged chart edits and publish them as a new package.
@@ -682,9 +738,14 @@ impl Edit {
     ///
     /// Returns an error when the edited compound file cannot be rendered or
     /// republished, or [`Error::Signed`] for a changed signed workbook.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_open()?;
         let base = self.base.clone();
-        let before = self.package.source_shared();
+        let before = self
+            .package
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
+            .source_shared();
         let after = self.finish()?;
         let package = crate::scoped::publish(base, &before, &after)?;
         let patch = Patch {
@@ -711,6 +772,8 @@ impl Edit {
         }
         let workbook: Arc<[u8]> = workbook.into();
         self.package
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
             .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
         self.charts = reparsed;
@@ -724,12 +787,15 @@ impl Edit {
         let charts = parse_workbook_charts(&workbook, self.limits)?;
         let workbook: Arc<[u8]> = workbook.into();
         self.package
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("chart edit lost its object package".into()))?
             .put_stream_shared(&self.workbook_path, Arc::clone(&workbook))?;
         self.workbook = workbook;
         Ok(std::mem::replace(&mut self.charts, charts))
     }
 
-    pub(crate) fn resolve(&self, selector: Selector<'_>) -> Result<Option<Location>> {
+    pub(crate) fn resolve(&mut self, selector: Selector<'_>) -> Result<Option<Location>> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         match selector {
             Selector::Sheet(name) => Ok(sheets
@@ -867,8 +933,7 @@ impl crate::Package {
     /// Returns the same errors as [`Self::edit_charts`], or a limit error
     /// when the package exceeds `options`.
     pub fn edit_charts_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Edit::open_based(base, bytes, options.limits_value())
+        Edit::lazy(Some(self.clone()), self.clone(), options.limits_value())
     }
 
     /// Replay a chart patch onto the exact package it was made from.

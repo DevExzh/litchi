@@ -38,8 +38,7 @@ impl crate::Package {
     ///
     /// Returns an error for an encrypted workbook or malformed pivot records.
     pub fn edit_pivot_views(&self) -> Result<Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Edit::open(base, bytes)
+        Edit::lazy(Some(self.clone()), self.clone())
     }
 
     /// Replay a pivot-view patch onto the exact package it was made from.
@@ -68,6 +67,7 @@ pub struct Edit {
     original_caches: Vec<PivotCache>,
     caches: Vec<PivotCache>,
     cache_stream_ids: Vec<u16>,
+    lazy: Option<(crate::scoped::Base, Vec<u8>)>,
 }
 
 impl Edit {
@@ -97,17 +97,58 @@ impl Edit {
             original_caches: caches.clone(),
             caches,
             cache_stream_ids,
+            lazy: None,
         })
     }
 
+    fn lazy(base: crate::scoped::Base, package: crate::Package) -> Result<Self> {
+        if package.is_encrypted() {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::Protected,
+                "edit pivot views",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Self {
+            base,
+            original: Vec::new(),
+            original_tables: Vec::new(),
+            tables: Vec::new(),
+            original_caches: Vec::new(),
+            caches: Vec::new(),
+            cache_stream_ids: Vec::new(),
+            lazy: Some((Some(package), Vec::new())),
+        })
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        let Some((base, _)) = self.lazy.take() else {
+            return Ok(());
+        };
+        let package = base
+            .clone()
+            .ok_or_else(|| Error::InvalidData("pivot-view edit lost its source package".into()))?;
+        let (_, bytes) = crate::scoped::capture(&package)?;
+        let eager = Self::open(base, bytes)?;
+        self.original = eager.original;
+        self.original_tables = eager.original_tables;
+        self.tables = eager.tables;
+        self.original_caches = eager.original_caches;
+        self.caches = eager.caches;
+        self.cache_stream_ids = eager.cache_stream_ids;
+        Ok(())
+    }
+
     #[must_use]
-    pub fn worksheet_count(&self) -> usize {
-        self.tables.len()
+    pub fn worksheet_count(&mut self) -> Result<usize> {
+        self.ensure_open()?;
+        Ok(self.tables.len())
     }
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn pivot_tables(&self, worksheet: usize) -> Result<&[PivotTable]> {
+    pub fn pivot_tables(&mut self, worksheet: usize) -> Result<&[PivotTable]> {
+        self.ensure_open()?;
         self.tables
             .get(worksheet)
             .map(Vec::as_slice)
@@ -307,6 +348,7 @@ impl Edit {
         field_index: u16,
         grouping: Option<PivotCacheGrouping>,
     ) -> Result<()> {
+        self.ensure_open()?;
         let stream_id = *self
             .cache_stream_ids
             .get(usize::from(cache_index))
@@ -347,7 +389,8 @@ impl Edit {
     ///
     /// Returns an error if validation or encoding fails, or
     /// [`Error::Signed`] for a changed signed workbook.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_open()?;
         let base = self.base.clone();
         let before = self.original.clone();
         let after = self.finish()?;
@@ -412,7 +455,7 @@ impl Edit {
         Ok(output.into_inner())
     }
 
-    fn index_by_name(&self, worksheet: usize, name: &str) -> Result<usize> {
+    fn index_by_name(&mut self, worksheet: usize, name: &str) -> Result<usize> {
         self.pivot_tables(worksheet)?
             .iter()
             .position(|table| table.view.name == name)
@@ -423,6 +466,7 @@ impl Edit {
     where
         F: FnOnce(&mut Vec<Vec<PivotTable>>, &mut Vec<PivotCache>) -> Result<()>,
     {
+        self.ensure_open()?;
         let mut tables = self.tables.clone();
         let mut caches = self.caches.clone();
         edit(&mut tables, &mut caches)?;

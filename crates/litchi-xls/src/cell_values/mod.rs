@@ -1259,6 +1259,25 @@ impl Snapshot {
             },
         }
     }
+
+    /// Resolves one cell against this immutable source inventory.
+    ///
+    /// The package edit facade uses this read-only helper while its mutable
+    /// edit engine is still lazy.  Keeping the lookup on the snapshot avoids
+    /// forcing a mutable borrow merely to inspect the original source.
+    pub(crate) fn source_cell(
+        &self,
+        selector: Selector<'_>,
+        reference: Reference,
+    ) -> Result<Option<&Cell>> {
+        let sheet = self.resolve_sheet(selector)?.ok_or_else(|| {
+            Error::WorksheetNotFound("cell-value source lookup worksheet selector".into())
+        })?;
+        let sheet_data = &self.inner.sheets[sheet];
+        Ok(sheet_data
+            .unique_entry_index(reference)?
+            .map(|index| &sheet_data.entries[index].cell))
+    }
 }
 
 impl fmt::Debug for Snapshot {
@@ -1942,26 +1961,6 @@ pub enum JoinError {
 }
 
 impl Edit {
-    /// Resolves one cell against the immutable pre-edit source inventory.
-    ///
-    /// This is crate-private so the unified facade can perform one fenced
-    /// coordinate lookup without decoding a second public cell payload.  It
-    /// deliberately does not observe staged values; callers needing staged
-    /// semantics must commit and read the resulting snapshot.
-    pub(crate) fn source_cell(
-        &self,
-        selector: Selector<'_>,
-        reference: Reference,
-    ) -> Result<Option<&Cell>> {
-        let sheet = self.source.resolve_sheet(selector)?.ok_or_else(|| {
-            Error::WorksheetNotFound("cell-value source lookup worksheet selector".into())
-        })?;
-        let sheet_data = &self.source.inner.sheets[sheet];
-        Ok(sheet_data
-            .unique_entry_index(reference)?
-            .map(|index| &sheet_data.entries[index].cell))
-    }
-
     fn fixed_overlaps_structural(&self, change: &StructuralChange) -> bool {
         let sheet = operation_sheet_index(change);
         match change {
@@ -3064,6 +3063,23 @@ impl Edit {
         storage: Storage,
         value: Value,
     ) -> Result<()> {
+        if self.resource_changes.iter().any(|resource| {
+            matches!(
+                resource,
+                ResourceChange::FormulaCell {
+                    sheet: resource_sheet,
+                    reference: resource_reference,
+                    insert: true,
+                    ..
+                } if *resource_sheet == sheet && *resource_reference == reference
+            )
+        }) {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit cells",
+                "a cell with an authored Formula cannot receive another staged value",
+            ));
+        }
         let index = self
             .structural_index
             .cell(sheet, reference)

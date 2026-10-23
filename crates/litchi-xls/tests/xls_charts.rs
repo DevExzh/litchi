@@ -100,14 +100,14 @@ fn clean_inventory_replay_and_existing_sheet_reorder_remain_available() {
         .unwrap()
         .edit_charts()
         .unwrap();
-    assert_eq!(editor.charts().len(), 0);
+    assert_eq!(editor.charts().unwrap().len(), 0);
     editor.reorder_sheets(&["S"]).unwrap();
     let finished = editor.commit().unwrap().patch().after().to_vec();
-    let reopened = litchi_xls::Package::from_bytes(&finished)
+    let mut reopened = litchi_xls::Package::from_bytes(&finished)
         .unwrap()
         .edit_charts()
         .unwrap();
-    assert_eq!(reopened.charts().len(), 0);
+    assert_eq!(reopened.charts().unwrap().len(), 0);
 }
 
 #[test]
@@ -120,6 +120,7 @@ fn real_embedded_chart_mutations_are_typed_atomic_refusals() {
         .edit_charts()
         .expect("bundled POI three-chart fixture must remain readable")
         .charts()
+        .unwrap()
         .map(|entry| entry.location.clone())
         .collect::<Vec<_>>();
     let (sheet_index, object_ids) = inventory
@@ -191,8 +192,8 @@ fn bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated() {
             .unwrap()
             .edit_charts()
         {
-            Ok(editor) => {
-                let count = editor.charts().len();
+            Ok(mut editor) => {
+                let count = editor.charts().unwrap().len();
                 let finished = editor
                     .commit()
                     .expect("finish clean fixture editor")
@@ -200,11 +201,11 @@ fn bundled_poi_and_libreoffice_chart_fixtures_are_strictly_gated() {
                     .after()
                     .to_vec();
                 assert_eq!(finished, original, "clean finish must preserve exact bytes");
-                let reopened = litchi_xls::Package::from_bytes(&finished)
+                let mut reopened = litchi_xls::Package::from_bytes(&finished)
                     .unwrap()
                     .edit_charts()
                     .expect("reopen clean fixture editor");
-                assert_eq!(reopened.charts().len(), count);
+                assert_eq!(reopened.charts().unwrap().len(), count);
             },
             Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
         }
