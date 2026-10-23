@@ -2876,6 +2876,10 @@
    "reason": "iWork branch integration and retained Snappy policy review. Owner before/after callgrind, dhat and ABBA evidence compares trunk with the integrated branch, not a leaf-versus-facade pair."
   },
   {
+   "record": "0361fda",
+   "reason": "Integrated iWork qualification build stopped at the exact endpoint-lock gate before candidate compilation. The receipt records source and dependency deltas, failed commands and artifact identities; it contains no paired performance measurement. Fresh matched builds and qualification remain required."
+  },
+  {
    "record": "0361g",
    "reason": "Canonical raw text-wire naming/required-argument migration. Source-body equivalence and validation receipts contain no new paired performance measurement."
   },
