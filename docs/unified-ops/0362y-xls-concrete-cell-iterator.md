@@ -20,3 +20,159 @@ against the former forward-only plan before claiming the F3 saving.
 Validation was limited to formatting and static diff/artifact guards in this
 leaf. The coordinator should run the XLS and unified-ops checks on the merged
 assembly.
+
+## F3 qualification lane (prepared, not measured)
+
+The fair implementation comparison is the source snapshot at `9b1f96d6dc`
+(the concrete eager-cell iterator is already present, but the deferred
+source-backed cell reopen is not) against the source-backed-cell candidate.
+For an implementation-only comparison the candidate is `f05a395359`; the
+assembled candidate currently under qualification is `8acd229235`. If the
+assembled candidate is used, the receipt must retain its full source hash and
+list the post-`f05a395359` XLS changes; no result may be attributed solely to
+F3 without that control. The harness source
+`tools/perf-baseline/src/xls_numeric.rs` is byte-for-byte unchanged between
+`9b1f96d6dc` and `8acd229235`.
+
+The existing six opt-in numeric selectors remain the source of the corpus and
+fidelity oracles:
+
+```text
+xls_numeric_eager_number_edit_save
+xls_numeric_source_backed_number_edit_save
+xls_numeric_eager_rk_mulrk_edit_save
+xls_numeric_source_backed_rk_mulrk_edit_save
+xls_numeric_plan_only_number_edit_save
+xls_numeric_plan_only_rk_mulrk_edit_save
+```
+
+The Number corpus edits `Untouched!E21`, `Number 42` to `43`; the native
+RK/MulRK corpus edits one RK and two MulRK values with fixed-width integer
+replacements. Every fresh sample opens a new owner and stages the same edit.
+The existing source-backed selector is the **write-only** route: it commits
+and immediately calls `commit.package().write_to(&mut sink)` without a semantic
+read of the committed owner. It already records separate edit, set, commit,
+publication and total vectors. The plan-only selector is not a first-read
+control; it is another write-only publication contract.
+
+The F3 probe must add three explicit route labels over this same preparation:
+
+| route | timed sequence | route-specific oracle |
+| --- | --- | --- |
+| `write-only` | edit, stage, commit, `write_to` | no semantic call on the committed owner before publication |
+| `first-read` | edit, stage, commit, one `cell_value_by_name`/`cell_value_by_index` on the committed owner | the first read returns the replacement and a second untimed read returns the same value, proving the materialized owner is cached |
+| `read-after-write` | edit, stage, commit, `write_to`, then one semantic read on that same committed owner | the output is complete before the first read, and the read still returns the replacement |
+
+The first-read route must write and verify its output outside the timed
+sequence; the read-after-write route includes both write and first read in the
+timed sequence. This keeps the write-only result honest while measuring where
+the candidate moves the target reopen. A fresh source owner and a fresh
+committed owner are required for every sample; no route may reuse a
+materialized owner across samples. The source-backed baseline already opens
+the composed target during commit, so its first-read cost is expected to be
+paid in the commit phase; the candidate pays it at the first semantic read.
+
+All three routes retain the existing untimed gates: exact output digest and
+bounded sink byte/write-call counts; untouched CFB streams and topology;
+selected value and storage-family readback through `cell_values`; raw
+`litchi_xls::raw::Reader` readback; forward replay and inverse replay to the
+original bytes; refusal when applying a patch to its committed owner; partial
+sink failure; exact no-op and fingerprint behavior; protected, signed, macro,
+encrypted and unsupported-value refusals; and the real-producer `54016.xls`
+RK/MulRK forward and inverse gate. Any route that omits one of these checks is
+diagnostic only and cannot qualify F3.
+
+The old external W5 probe at
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`
+is a method template only: its `xls_cells` and `xls_cells_stage` routes use
+`litchi_xls::Package` and are eager. It must not be used as the deferred F3
+binary. Keep all new source snapshots, binaries, captures and reports outside
+the checkout, for example:
+
+```text
+/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/
+  source-base-9b1f96d6dc/
+  source-candidate-8acd229235/
+  target-base-release/
+  target-candidate-release/
+  target-base-alloc/
+  target-candidate-alloc/
+  binaries/
+  abba/
+  heap/
+```
+
+Build each source snapshot with a distinct target and one worker after the
+coordinator grants the slot (the command is recorded here, but was not run in
+this leaf):
+
+```sh
+source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/env.sh
+CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-base-release \
+  cargo build --offline --locked --release \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc/tools/perf-baseline/Cargo.toml \
+  --example xls_f3_qualification
+CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
+  cargo build --offline --locked --release \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235/tools/perf-baseline/Cargo.toml \
+  --example xls_f3_qualification
+```
+
+The F3 probe binary name above is the reserved qualification entry point; it
+must implement the three route labels before these commands are run. The
+existing numeric selectors remain the retained corpus/oracle control and are
+run separately with the README command. No evidence belongs under
+`docs/performance/results/` until a reduced receipt is ready.
+
+The native run is four process legs per route in strict A-B-B-A order, with
+baseline A and candidate B using the same route, sink and affinity. Calibrate
+the batch independently for each endpoint, then use the larger admitted batch
+for both sides; reject a leg shorter than 250 ms, retain every raw leg, and
+record host quiet checks before and after each child. A coordinator-granted
+quiet CPU is represented below as `${CPU}` and must be fixed in the manifest:
+
+```sh
+BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
+CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
+OUT=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/abba
+for route in write-only first-read read-after-write; do
+  taskset -c "${CPU}" "$BASE" --route "$route" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/base-${route}.csv"
+  taskset -c "${CPU}" "$CAND" --route "$route" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/candidate-${route}.csv"
+done
+```
+
+The loop is only a command shape: the actual runner must emit A1/B1/B2/A2,
+calibrate `BATCH` per route, and store its script hash, binary hashes, source
+hashes, CPU, memory scope, raw stdout/stderr and discarded attempts in
+`$OUT`. It must not report a speedup from the old eager `ole_w5_probe`.
+
+For resource evidence, build the same probe separately with the counting
+allocator feature into `target-base-alloc` and `target-candidate-alloc`, then
+run direct heaptrack children (not a wrapper hidden behind `taskset`) in fresh
+directories:
+
+```sh
+HEAPTRACK=$(command -v heaptrack)
+HEAPTRACK_PRINT=$(command -v heaptrack_print)
+for side in base candidate; do
+  binary=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/$side-alloc/xls_f3_qualification
+  for route in write-only first-read read-after-write; do
+    dir=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/heap/$side/$route
+    mkdir -p "$dir"
+    "$HEAPTRACK" --record-only --output "$dir/heaptrack" "$binary" \
+      --route "$route" --warmup 0 --samples 1 --batch 1 \
+      > "$dir/probe.stdout" 2> "$dir/heaptrack.stderr"
+    capture=$(find "$dir" -maxdepth 1 -type f \( -name 'heaptrack.*.zst' -o -name 'heaptrack.*.gz' \) -print)
+    "$HEAPTRACK_PRINT" -f "$capture" -l -H "$dir/histogram.tsv" \
+      > "$dir/heaptrack-print.txt" 2> "$dir/heaptrack-print.stderr"
+  done
+done
+```
+
+Heaptrack output is whole-process allocation evidence with instrumentation
+overhead, not native timing. The receipt must include allocation calls,
+histogram bytes, peak heap/RSS, retained bytes, route output hash, binary and
+probe hashes, and all failed or discarded captures. These artifacts remain in
+the external qualification directory; none is committed here.
