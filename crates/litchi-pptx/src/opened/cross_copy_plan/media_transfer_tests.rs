@@ -23,9 +23,21 @@ use soapberry_zip::ZipArchive;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 use crate::media_parts::Resource;
-use crate::{DurablePatchFormat, Error, Package, Result};
+use crate::{Error, Package, Result};
 use litchi_opc::PackURI;
 use litchi_opc::constants::content_type as ct;
+
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
 
 const PHOTO: &str = "/ppt/media/transfer-photo.png";
 const FLAT: &str = "/ppt/media/transfer-flat.png";
@@ -423,12 +435,10 @@ fn an_svg_picture_is_still_refused_before_any_encoding_is_chosen() -> Result<()>
         &pictures,
     )?))?;
     let destination = Package::from_reader(std::io::Cursor::new(authored("destination", 2)?))?;
-    assert!(matches!(
+    assert_refused_kind!(
         plan_copy(&source, &destination),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == crate::SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        crate::SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
     Ok(())
 }
 
