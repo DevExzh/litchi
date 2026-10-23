@@ -28,7 +28,8 @@ and ordinary preparation/read methods are unaffected.
 This is a name-based guard, not proof that every possible publication bypass
 has been removed. The final workspace inventory and semantic review remain
 required. An exploratory pass over the already available rustdoc files found
-the two OLE methods above; it is not a fresh whole-workspace acceptance run.
+the then-present two OLE methods above; it is not a fresh whole-workspace
+acceptance run.
 
 Real-rustdoc fixtures cover the single-stream and batch handoffs, ordinary
 output methods, a consuming stream publisher, a public re-export, private
