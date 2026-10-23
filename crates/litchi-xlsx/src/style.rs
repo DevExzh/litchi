@@ -396,6 +396,17 @@ impl FontChange {
             || (self.charset.is_some() && other.charset.is_some())
             || (self.scheme.is_some() && other.scheme.is_some())
     }
+
+    /// Logical bytes retained by this authored font request while it waits
+    /// for stylesheet lowering.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(
+            self.name
+                .as_ref()
+                .and_then(|value| value.as_ref())
+                .map_or(0, |value| value.len()),
+        )
+    }
 }
 
 /// Typed changes to an authored fill.
@@ -988,6 +999,11 @@ impl BorderChange {
             || self.outline.is_some() && other.outline.is_some()
     }
 
+    /// Logical bytes retained by this typed border request.
+    pub(crate) const fn retained_bytes(&self) -> usize {
+        size_of::<Self>()
+    }
+
     fn edge_mut(&mut self, edge: BorderEdge) -> &mut Option<BorderSideChange> {
         match edge {
             BorderEdge::Start => &mut self.start,
@@ -1221,6 +1237,11 @@ impl AlignmentChange {
             || (self.shrink_to_fit.is_some() && other.shrink_to_fit.is_some())
             || (self.reading_order.is_some() && other.reading_order.is_some())
     }
+
+    /// Logical bytes retained by this typed alignment request.
+    pub(crate) const fn retained_bytes(&self) -> usize {
+        size_of::<Self>()
+    }
 }
 
 /// Typed changes to authored cell protection properties.
@@ -1286,6 +1307,11 @@ impl ProtectionChange {
     pub(crate) const fn overlaps(&self, other: &Self) -> bool {
         (self.locked.is_some() && other.locked.is_some())
             || (self.hidden.is_some() && other.hidden.is_some())
+    }
+
+    /// Logical bytes retained by this typed protection request.
+    pub(crate) const fn retained_bytes(&self) -> usize {
+        size_of::<Self>()
     }
 }
 

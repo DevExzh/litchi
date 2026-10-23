@@ -658,6 +658,7 @@ impl Edit {
             self.flush_pending()?;
             #[cfg(any(
                 feature = "doc",
+                feature = "docx",
                 feature = "ppt",
                 feature = "xlsx",
                 feature = "pptx",
@@ -802,6 +803,7 @@ impl Edit {
         );
         #[cfg(any(
             feature = "doc",
+            feature = "docx",
             feature = "pptx",
             feature = "xlsx",
             feature = "xlsb",
@@ -955,6 +957,7 @@ impl Edit {
         );
         #[cfg(any(
             feature = "doc",
+            feature = "docx",
             feature = "pptx",
             feature = "xlsx",
             feature = "xlsb",
@@ -1133,6 +1136,7 @@ impl Edit {
             self.flush_pending()?;
             #[cfg(any(
                 feature = "doc",
+                feature = "docx",
                 feature = "xlsx",
                 feature = "xlsb",
                 feature = "xls",
@@ -1428,8 +1432,16 @@ impl Edit {
         _path: impl IntoPath<'p>,
         _to: impl IntoPlacement<'q>,
     ) -> Result<()> {
+        self.check()?;
+        self.flush_pending()?;
+        let remaining_snapshot = self
+            .limits
+            .max_snapshot_bytes()
+            .saturating_sub(self.snapshot_bytes);
+        let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         #[cfg(any(
             feature = "doc",
+            feature = "docx",
             feature = "pptx",
             feature = "xlsx",
             feature = "xlsb",
@@ -1442,7 +1454,6 @@ impl Edit {
             odf_objects,
             feature = "iwork-adapter"
         ))]
-        let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(
@@ -1453,49 +1464,81 @@ impl Edit {
             #[cfg(feature = "xls")]
             File::Xls(handle) => wrap_xls(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => wrap_xlsx(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => wrap_xlsb(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => wrap_ppt(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => wrap_pptx(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => wrap_rtf(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "ods")]
             File::Ods(handle) => wrap_ods(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "odt")]
             File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
 
@@ -1506,25 +1549,41 @@ impl Edit {
             | File::Odb(handle)
             | File::Odf(handle) => wrap_object(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "iwork-adapter")]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "doc")]
             File::Doc(handle) => wrap_doc(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "odp")]
             File::Odp(handle) => wrap_odp(
                 handle,
-                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[allow(unreachable_patterns)]
@@ -1536,8 +1595,16 @@ impl Edit {
     /// # Errors
     /// As [`File::swap`], with the mutation's item index and transaction limits.
     pub fn swap<'p, 'q>(&mut self, _a: impl IntoPath<'p>, _b: impl IntoPath<'q>) -> Result<()> {
+        self.check()?;
+        self.flush_pending()?;
+        let remaining_snapshot = self
+            .limits
+            .max_snapshot_bytes()
+            .saturating_sub(self.snapshot_bytes);
+        let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         #[cfg(any(
             feature = "doc",
+            feature = "docx",
             feature = "pptx",
             feature = "xlsx",
             feature = "xlsb",
@@ -1550,56 +1617,55 @@ impl Edit {
             odf_objects,
             feature = "iwork-adapter"
         ))]
-        let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ()),
             #[cfg(feature = "xls")]
             File::Xls(handle) => wrap_xls(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => wrap_xlsx(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => wrap_xlsb(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => wrap_ppt(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => wrap_pptx(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => wrap_rtf(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "ods")]
             File::Ods(handle) => wrap_ods(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "odt")]
             File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
 
@@ -1610,25 +1676,25 @@ impl Edit {
             | File::Odb(handle)
             | File::Odf(handle) => wrap_object(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "iwork-adapter")]
             File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "doc")]
             File::Doc(handle) => wrap_doc(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[cfg(feature = "odp")]
             File::Odp(handle) => wrap_odp(
                 handle,
-                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
                 (),
             ),
             #[allow(unreachable_patterns)]

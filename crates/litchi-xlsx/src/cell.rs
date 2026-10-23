@@ -2,7 +2,7 @@
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
-use std::mem::size_of;
+use std::mem::{size_of, size_of_val};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -464,6 +464,32 @@ impl Number {
             )));
         }
         Ok(())
+    }
+
+    /// Conservative logical bytes retained by this authored rich string.
+    ///
+    /// The transaction capture budget accounts for the run text and the
+    /// lexical run properties that are copied into the pending cell action;
+    /// allocator capacity is deliberately not folded into the package/cache
+    /// census.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.runs.iter().fold(size_of::<Self>(), |bytes, run| {
+            let properties = run.properties.as_deref().map_or(0, |items| {
+                items
+                    .iter()
+                    .fold(size_of_val(items), |bytes, (name, value)| {
+                        bytes
+                            .saturating_add(size_of_val(name.as_ref()))
+                            .saturating_add(name.len())
+                            .saturating_add(size_of_val(value.as_ref()))
+                            .saturating_add(value.len())
+                    })
+            });
+            bytes
+                .saturating_add(size_of::<RichRun>())
+                .saturating_add(run.text.len())
+                .saturating_add(properties)
+        })
     }
 }
 

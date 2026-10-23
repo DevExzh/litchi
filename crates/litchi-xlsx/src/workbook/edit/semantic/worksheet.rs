@@ -42,7 +42,7 @@ use super::super::{
 use super::super::{codec, package};
 
 use super::layout::{Column, Defaults, Row};
-use super::transaction::Edit;
+use super::transaction::{CaptureBudget, Edit};
 
 /// Transaction-scoped state editor for any workbook sheet tab.
 #[derive(Debug)]
@@ -300,6 +300,8 @@ impl Sheet<'_> {
             .name
             .as_str();
         ensure_merge_area(sheet, range)?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<MergeIntent>())?;
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
@@ -335,6 +337,8 @@ impl Sheet<'_> {
         let Some(range) = range else {
             return Ok(self);
         };
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<MergeIntent>())?;
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
@@ -378,6 +382,8 @@ impl Sheet<'_> {
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         text.validate_for_write()?;
+        self.edit
+            .preflight_cell_capture(self.position, text.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::rich(text));
@@ -447,6 +453,8 @@ impl Sheet<'_> {
         if !scalar {
             return Err(invalid("a formula cache needs a stored scalar formula"));
         }
+        self.edit
+            .preflight_cell_capture(self.position, value.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::cache(value));
@@ -583,6 +591,8 @@ impl Sheet<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<StyleEffect>())?;
         // An explicit shared-style assignment is the later, complete style
         // operation. It supersedes any deferred property-level style request
         // staged for the same cell.
@@ -633,6 +643,8 @@ impl Sheet<'_> {
     /// A missing cell remains missing and resolves as a no-op at commit.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<StyleEffect>())?;
         self.edit.discard_fill(self.position, address)?;
         self.edit.discard_border(self.position, address)?;
         self.edit
@@ -685,6 +697,8 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
+            .preflight_cell_capture(self.position, change.retained_bytes())?;
+        self.edit
             .sheets
             .entry(self.position)
             .or_default()
@@ -710,6 +724,8 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
+        self.edit
+            .preflight_cell_capture(self.position, change.retained_bytes())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -752,6 +768,8 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
+        self.edit
+            .preflight_cell_capture(self.position, change.retained_bytes())?;
         self.edit.stage_border(self.position, address, change)?;
         Ok(self)
     }
@@ -807,6 +825,8 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
+        self.edit
+            .preflight_cell_capture(self.position, change.retained_bytes())?;
         self.edit.stage_fill(self.position, address, change)?;
         Ok(self)
     }
@@ -826,6 +846,8 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
+            .preflight_cell_capture(self.position, change.retained_bytes())?;
+        self.edit
             .sheets
             .entry(self.position)
             .or_default()
@@ -844,6 +866,8 @@ impl Sheet<'_> {
         value: Option<bool>,
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<Option<bool>>())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -877,6 +901,11 @@ impl Sheet<'_> {
         let code = code
             .map(crate::style::validate_number_format_code)
             .transpose()?;
+        self.edit.preflight_cell_capture(
+            self.position,
+            size_of::<Option<Arc<str>>>()
+                .saturating_add(code.as_ref().map_or(0, |value| value.len())),
+        )?;
         self.edit
             .sheets
             .entry(self.position)
@@ -889,6 +918,8 @@ impl Sheet<'_> {
     /// Remove the cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<Action>())?;
         self.edit.discard_fill(self.position, address)?;
         self.edit.discard_border(self.position, address)?;
         self.edit
@@ -936,11 +967,19 @@ pub struct NewSheet<'a> {
     pub(super) added: &'a mut Added,
     pub(super) active: &'a mut Option<Target>,
     pub(super) style_lineage: &'a Arc<StyleLineage>,
+    pub(super) capture_budget: &'a mut Option<CaptureBudget>,
     pub(super) index: usize,
     pub(super) position: usize,
 }
 
 impl NewSheet<'_> {
+    fn preflight_capture(&mut self, authored_bytes: usize) -> Result<()> {
+        if let Some(budget) = self.capture_budget.as_mut() {
+            budget.charge_new_sheet(authored_bytes)?;
+        }
+        Ok(())
+    }
+
     /// Current checked zero-based projected position.
     ///
     /// A later tab move or insertion in this transaction can shift it. The
@@ -962,7 +1001,9 @@ impl NewSheet<'_> {
         T: TryInto<Name>,
         Error: From<T::Error>,
     {
-        self.added.name = name.try_into().map_err(Error::from)?;
+        let name = name.try_into().map_err(Error::from)?;
+        self.preflight_capture(name.as_str().len())?;
+        self.added.name = name;
         Ok(self)
     }
 
@@ -1043,6 +1084,7 @@ impl NewSheet<'_> {
     pub fn merge<'b>(&mut self, area: impl Into<Area<'b>>) -> Result<&mut Self> {
         let range = area.into().resolve()?;
         ensure_merge_area(self.added.name.as_str(), range)?;
+        self.preflight_capture(size_of::<MergeIntent>())?;
         self.added
             .actions
             .merges
@@ -1058,6 +1100,7 @@ impl NewSheet<'_> {
         let Some(range) = pending_merge(&[], &self.added.actions.merges, address) else {
             return Ok(self);
         };
+        self.preflight_capture(size_of::<MergeIntent>())?;
         self.added
             .actions
             .merges
@@ -1076,6 +1119,7 @@ impl NewSheet<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
+        self.preflight_capture(content.retained_bytes())?;
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
@@ -1089,6 +1133,7 @@ impl NewSheet<'_> {
     /// previous operation in this transaction created it.
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.preflight_capture(size_of::<Content>())?;
         let actions = &mut self.added.actions.cells;
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
@@ -1120,6 +1165,7 @@ impl NewSheet<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
+        self.preflight_capture(size_of::<StyleEffect>())?;
         let effect = StyleEffect::Set(style.raw());
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
@@ -1133,6 +1179,7 @@ impl NewSheet<'_> {
     /// Remove an explicit local style reference from the pending cell.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.preflight_capture(size_of::<StyleEffect>())?;
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::reset_style());
@@ -1145,6 +1192,7 @@ impl NewSheet<'_> {
     /// Remove the pending cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.preflight_capture(size_of::<Action>())?;
         self.added.actions.cells.insert(address, Action::Remove);
         Ok(self)
     }

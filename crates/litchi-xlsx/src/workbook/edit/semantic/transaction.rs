@@ -346,7 +346,7 @@ pub struct Edit {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct CaptureBudget {
+pub(super) struct CaptureBudget {
     maximum: usize,
     reserved: usize,
 }
@@ -375,6 +375,17 @@ impl CaptureBudget {
         }
         self.reserved = observed;
         Ok(())
+    }
+
+    pub(super) fn charge_new_sheet(&mut self, authored_bytes: usize) -> Result<()> {
+        self.charge(
+            authored_bytes
+                .saturating_add(size_of::<super::super::validation::Added>())
+                .saturating_add(size_of::<super::super::validation::SheetActions>())
+                .saturating_add(size_of::<Action>())
+                .saturating_add(size_of::<Change>())
+                .saturating_add(size_of::<PartChange>()),
+        )
     }
 }
 
@@ -3816,6 +3827,9 @@ impl Edit {
                 reason: TabEditBlock::SheetLimit,
             });
         }
+        if let Some(budget) = &mut self.capture_budget {
+            budget.charge_new_sheet(name.as_str().len())?;
+        }
         self.added
             .try_reserve(1)
             .map_err(|source| allocation("worksheet creation", source))?;
@@ -3850,10 +3864,12 @@ impl Edit {
             .added
             .get_mut(index)
             .ok_or_else(|| invalid("worksheet creation plan disappeared after validation"))?;
+        let capture_budget = &mut self.capture_budget;
         Ok(NewSheet {
             added,
             active: &mut self.active,
             style_lineage: &self.base.inner.style_lineage,
+            capture_budget,
             index,
             position,
         })
@@ -3956,16 +3972,38 @@ impl Edit {
     ) -> Result<()> {
         let key = crate::hyperlinks::model::reference_key(hyperlink.reference().range());
         let source = self.source_hyperlink(position, key)?;
-        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
         if source.as_ref() == Some(&hyperlink) {
-            actions.remove(&key);
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
         } else {
-            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+            let already_staged = self
+                .sheets
+                .get(&position)
+                .is_some_and(|actions| actions.hyperlinks.contains_key(&key));
+            let staged_count = self
+                .sheets
+                .get(&position)
+                .map_or(0, |actions| actions.hyperlinks.len());
+            if !already_staged && staged_count >= MAX_HYPERLINK_EDITS {
                 return Err(invalid(format!(
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            actions.insert(key, HyperlinkAction::Put(hyperlink));
+            let authored_bytes = hyperlink.reference().as_str().len()
+                + hyperlink.location().map_or(0, str::len)
+                + hyperlink.external_target().map_or(0, str::len)
+                + hyperlink.display().map_or(0, str::len)
+                + hyperlink.tooltip().map_or(0, str::len)
+                + size_of::<crate::hyperlinks::Hyperlink>();
+            self.preflight_cell_capture(position, authored_bytes)?;
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .insert(key, HyperlinkAction::Put(hyperlink));
         }
         Ok(())
     }
@@ -3981,16 +4019,35 @@ impl Edit {
             return Ok(None);
         };
         let source = self.source_hyperlink(position, key)?;
-        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
         if source.is_none() {
-            actions.remove(&key);
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
         } else {
-            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+            let already_staged = self
+                .sheets
+                .get(&position)
+                .is_some_and(|actions| actions.hyperlinks.contains_key(&key));
+            let staged_count = self
+                .sheets
+                .get(&position)
+                .map_or(0, |actions| actions.hyperlinks.len());
+            if !already_staged && staged_count >= MAX_HYPERLINK_EDITS {
                 return Err(invalid(format!(
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            actions.insert(key, HyperlinkAction::Remove(reference));
+            self.preflight_cell_capture(
+                position,
+                reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
+            )?;
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .insert(key, HyperlinkAction::Remove(reference));
         }
         Ok(Some(current))
     }

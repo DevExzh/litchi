@@ -64,6 +64,11 @@ impl Commit {
                 // no-op patch must instead be rooted in the retained
                 // signed package so native replay and File use identical
                 // physical base bytes.
+                // Release the staged package and proof before promoting the
+                // signed owner. The final charge intentionally remains
+                // max(staged, canonical), but the two endpoint graphs must
+                // never be live together while the canonical probe is built.
+                drop((source, target, native_patch));
                 let original = base.original_package_for_noop()?;
                 let (target, native_patch) =
                     edit_with_snapshot_limit(&original, max_snapshot_bytes)?
@@ -71,7 +76,12 @@ impl Commit {
                         .map_err(native_error)?
                         .into_parts();
                 let canonical_snapshot_bytes = native_patch.retained_bytes();
-                (original, target, native_patch, canonical_snapshot_bytes)
+                (
+                    original,
+                    target,
+                    native_patch,
+                    canonical_snapshot_bytes,
+                )
             } else {
                 (source, target, native_patch, native_snapshot_bytes)
             };
@@ -126,6 +136,7 @@ impl Commit {
             // primary workbook editor. Rebuild a genuine identity workbook
             // patch over the retained signed owner instead of publishing the
             // unsigned private probe as the replay base.
+            drop((source, target));
             let original = base.original_package_for_noop()?;
             let (target, native_patch) = edit_with_snapshot_limit(&original, max_snapshot_bytes)?
                 .commit()
