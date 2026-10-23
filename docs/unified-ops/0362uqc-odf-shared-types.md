@@ -30,8 +30,32 @@ this commit. No deprecated spelling or compatibility alias remains.
 
 ## Validation
 
-This was a static-only leaf change while the coordinator's build slot was
-reserved. The changed Rust files pass Rustfmt (`rustfmt --edition 2024 --check`)
-and `git diff --check`; no Cargo command, benchmark, fixture, or evidence
-artifact was added. The source base and resulting immutable commit SHA are
-reported by the worker handoff.
+The source validated here is `15ab9324ef4f8c927acd6ecfc19d9707c3f886ee`,
+the amended successor of this slice's original base
+`173dd5330476713714871007316794b9a3a1bdaa`. With the memory-capped cargo
+shim, one build job, `CARGO_INCREMENTAL=0`, debug information disabled and
+`TMPDIR=/tmp/claude-1001/uo-t/odf-shared-types`, these commands passed:
+
+```text
+cargo check --offline --locked --all-targets --all-features \
+  -p litchi-odc -p litchi-odi -p litchi-odm -p litchi-oth
+cargo clippy --offline --locked --all-targets --all-features \
+  -p litchi-odc -p litchi-odi -p litchi-odm -p litchi-oth -- -D warnings
+```
+
+Both used `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target`,
+which measured 4,330,035,351 bytes (4.2G) after validation. The concise
+external receipts are retained outside the checkout:
+
+| Command | Receipt | Size | SHA-256 |
+|---|---|---:|---|
+| `cargo check` | `.coord/odf-shared-types-v2/check.log` | 820 bytes | `250d42c6c9859f1ab84646ba2bf0473ad4dac84b900585b6a94a3bc043abdfda` |
+| strict `cargo clippy` | `.coord/odf-shared-types-v2/clippy.log` | 836 bytes | `6ccfea6a4d032e972f40ee61879faf0cde9ebd0608de371c873f76b0d2fd1759` |
+
+Rustfmt (`rustfmt --edition 2024 --check`), `git diff --check`, and the
+repository artifact guards also passed. The ODM transaction now evaluates
+the exact-byte changed flag once while constructing the commit, rather than
+computing it lazily in `diagnostics()`. Final native qualification must cover
+that moved comparison; this record makes no global scan-free performance
+claim. No benchmark, fixture, binary, or large repository evidence artifact
+was added.

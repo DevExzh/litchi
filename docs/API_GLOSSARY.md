@@ -2448,6 +2448,7 @@ Ingress applies `litchi_odf_common::OpenOptions` through the additive
 | `litchi_oth::Template`, `litchi_odm::Master`, `litchi_odg::Package*` root aliases, `Snapshot`, `Transaction` | removed and banned (profiles `oth`, `odm`, `odg`) |
 | projection state verbs (`Drawing::open`, `Chart::from_bytes`, `Image::edit`, `Database::into_bytes`, …) | removed and banned |
 | `Commit::{changed, template, master, snapshot, chart, image, database, formula}` | removed and banned per profile |
+| `litchi_odi::flat::Commit::{semantic_patch, source}` | removed and banned; semantic planning and source provenance are on `litchi_odi::flat::Patch` (0362uqc) |
 | metadata `edit_metadata`/`apply_metadata` family on these crates | not adopted (gap; metadata writes stay in the primary `Edit` where the crate has them) |
 | flat `Flat*` owners, ODC `Definition*`, history/merge vocabularies | unchanged (out of scope, record 0282 gaps); ODI flat semantic planning now lives on `flat::Patch::semantic_patch` (0362uqc) |
 
