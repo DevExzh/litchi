@@ -1,0 +1,34 @@
+{
+  "source": "18983596a3a1b0f2ab937f4fb1f7d9ef29f18f4c",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 101,
+      "seconds": 0.12674979100029304,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v11/check-0.log",
+      "bytes": 276,
+      "sha256": "d87f847102ad06f8bd586b06457d5a500770488479de9c805352a179f9426c2a",
+      "target_bytes_before": 18345263112,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Locked preflight stopped before compilation after the SmallVec dependency merge. Offline cargo metadata refreshed the generated workspace lock; no Rust result is inferred.",
+  "refreshed_workspace_lock": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/assembly-v11-workspace-Cargo.lock",
+    "bytes": 139591,
+    "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+    "command": "cargo metadata --offline --all-features --format-version 1"
+  }
+}

@@ -139,3 +139,11 @@ path and all assertions.
 
 [consumer-v10.json](results/0362uf/consumer-v10.json) records the source and
 log hash. Workspace and harness checks were not reached.
+
+The eleventh attempt on `18983596a3` stopped before compilation because the
+generated workspace lock lacked the newly merged iWork SmallVec dependency
+edge. Offline Cargo metadata refreshed that ignored lock.
+[consumer-v11.json](results/0362uf/consumer-v11.json) retains the failure and
+refreshed lock hash; it establishes no Rust compilation result. The isolated
+XLSX raw harness now also has a tracked offline-generated lock for reproducible
+`--locked` qualification.
