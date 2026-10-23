@@ -23,7 +23,10 @@ before starting Cargo. Each endpoint then generates and retains its own exact
 offline lockfile from the recorded seed; before release builds, the runner
 requires identical common registry names, versions, sources, and checksums and
 requires every added/removed registry package and local edge/feature to match
-the selected source dependency delta. Validation, timing, and collection
+the selected source dependency delta. The required registry edges and complete
+selected local closure must be present in both endpoint locks and the pinned
+seed; the reviewed `smallvec` addition is pinned to version 1.16.3 and its
+recorded crates.io checksum. Validation, timing, and collection
 recompute both comparisons from retained source and lock artifacts. There is
 no shared-prefix or blanket lock-drift exception. The runner also freezes the
 lockfile identities, records toolchain and binary hashes,

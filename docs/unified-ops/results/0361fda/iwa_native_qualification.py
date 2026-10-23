@@ -96,10 +96,29 @@ FIXTURE_GENERATOR_OUTER_GRACE_S = 30.0
 FIXTURE_GENERATOR_OUTER_TIMEOUT_S = (
     FIXTURE_GENERATOR_TIMEOUT_S + FIXTURE_GENERATOR_OUTER_GRACE_S
 )
-SCHEMA = "litchi.iwa.native-qualification.v3"
+SCHEMA = "litchi.iwa.native-qualification.v4"
 COMPARISON = "integrated-route"
 SOURCE_DELTA_SCHEMA = "litchi.iwa.source-delta.v1"
-LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v1"
+LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v2"
+REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
+REVIEWED_REGISTRY_ADDITIONS = {
+    "constructor": [
+        {
+            "name": "smallvec",
+            "version": "1.16.3",
+            "source": REGISTRY_SOURCE,
+            "checksum": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
+        }
+    ],
+    "owner": [
+        {
+            "name": "smallvec",
+            "version": "1.16.3",
+            "source": REGISTRY_SOURCE,
+            "checksum": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
+        }
+    ],
+}
 OWNER_FIXTURES = (
     "basic.numbers",
     "media-replacement-native.key",
@@ -659,6 +678,21 @@ def _source_dependency_entries(root: Path) -> tuple[dict[str, dict[str, Any]], s
     manifests = sorted(path for path in root.rglob("Cargo.toml") if path.is_file())
     if not manifests:
         raise QualificationError(f"source snapshot has no Cargo manifests: {root}")
+    workspace_dependencies: dict[str, Mapping[str, Any]] = {}
+    for path in manifests:
+        document = _toml_file(path, "Cargo manifest")
+        workspace = document.get("workspace")
+        if not isinstance(workspace, Mapping):
+            continue
+        dependencies = workspace.get("dependencies", {})
+        if dependencies and not isinstance(dependencies, Mapping):
+            raise QualificationError(f"{path} has malformed workspace dependencies")
+        for dependency, specification in dependencies.items():
+            if not isinstance(specification, (str, Mapping)):
+                raise QualificationError(
+                    f"{path} has malformed workspace dependency {dependency}"
+                )
+            workspace_dependencies[dependency] = specification
     for path in manifests:
         document = _toml_file(path, "Cargo manifest")
         package = document.get("package")
@@ -691,8 +725,32 @@ def _source_dependency_entries(root: Path) -> tuple[dict[str, dict[str, Any]], s
                     features: list[str] = []
                 elif isinstance(specification, Mapping):
                     normalized = _json_value(specification)
-                    package_name = specification.get("package", dependency)
-                    raw_features = specification.get("features", [])
+                    workspace_specification = None
+                    if specification.get("workspace") is True:
+                        workspace_specification = workspace_dependencies.get(dependency)
+                        if workspace_specification is None:
+                            raise QualificationError(
+                                f"{path} references missing workspace dependency {dependency}"
+                            )
+                        normalized["workspace_resolved"] = _json_value(workspace_specification)
+                        if (
+                            isinstance(workspace_specification, Mapping)
+                            and "optional" in workspace_specification
+                            and "optional" not in normalized
+                        ):
+                            normalized["optional"] = workspace_specification["optional"]
+                    effective = (
+                        {"version": workspace_specification}
+                        if isinstance(workspace_specification, str)
+                        else workspace_specification or specification
+                    )
+                    package_name = effective.get("package", dependency)
+                    workspace_features = (
+                        workspace_specification.get("features", [])
+                        if isinstance(workspace_specification, Mapping)
+                        else []
+                    )
+                    raw_features = list(workspace_features) + list(specification.get("features", []))
                     if not isinstance(package_name, str) or not isinstance(raw_features, list):
                         raise QualificationError(
                             f"{path} has malformed dependency declaration {dependency}"
@@ -720,6 +778,26 @@ def _source_dependency_entries(root: Path) -> tuple[dict[str, dict[str, Any]], s
     return entries, packages
 
 
+def _source_dependency_active(entry: Mapping[str, Any]) -> bool:
+    """Keep lock checks faithful to the host's active target dependencies."""
+
+    specification = entry.get("spec")
+    if isinstance(specification, Mapping) and specification.get("optional") is True:
+        return False
+    scope = entry.get("scope")
+    if not isinstance(scope, str) or not scope.startswith("target:"):
+        return True
+    target = scope.split(":", 2)[1]
+    if target == "cfg(unix)":
+        return os.name == "posix"
+    if target == "cfg(windows)":
+        return os.name == "nt"
+    # Unknown target expressions are not proven active by this host-only
+    # harness; accepting them would permit a lock edge that Cargo will not
+    # resolve for the measured target.
+    return False
+
+
 def _source_dependency_delta(
     base_source: Path, candidate_source: Path, family: str
 ) -> dict[str, Any]:
@@ -738,17 +816,21 @@ def _source_dependency_delta(
             entry["package"]
             for entries in (base_entries, candidate_entries)
             for entry in entries.values()
-            if entry["owner"] in closure and entry["package"] in local_packages
+            if (
+                entry["owner"] in closure
+                and entry["package"] in local_packages
+                and _source_dependency_active(entry)
+            )
         }
         expanded = closure | discovered
         if expanded == closure:
             break
         closure = expanded
 
-    def edge_map(entries: Mapping[str, Mapping[str, Any]]) -> dict[str, list[str]]:
+    def dependency_edge_map(entries: Mapping[str, Mapping[str, Any]]) -> dict[str, list[str]]:
         result: dict[str, set[str]] = {owner: set() for owner in sorted(closure)}
         for entry in entries.values():
-            if entry["owner"] in closure and entry["package"] in local_packages:
+            if entry["owner"] in closure and _source_dependency_active(entry):
                 result[entry["owner"]].add(entry["package"])
         return {owner: sorted(values) for owner, values in result.items()}
 
@@ -783,19 +865,30 @@ def _source_dependency_delta(
             {
                 row["package"]
                 for row in rows
-                if row["package"] not in local_packages
+                if row["package"] not in local_packages and _source_dependency_active(row)
             }
         )
 
+    base_dependency_edges = dependency_edge_map(base_entries)
+    candidate_dependency_edges = dependency_edge_map(candidate_entries)
+
     return {
-        "schema": "litchi.iwa.dependency-delta.v1",
+        "schema": "litchi.iwa.dependency-delta.v2",
         "family": family,
         "packages": sorted(closure),
         "added": added,
         "removed": removed,
         "changed": changed,
-        "base_local_edges": edge_map(base_entries),
-        "candidate_local_edges": edge_map(candidate_entries),
+        "base_dependency_edges": base_dependency_edges,
+        "candidate_dependency_edges": candidate_dependency_edges,
+        "base_local_edges": {
+            owner: sorted(set(values) & local_packages)
+            for owner, values in base_dependency_edges.items()
+        },
+        "candidate_local_edges": {
+            owner: sorted(set(values) & local_packages)
+            for owner, values in candidate_dependency_edges.items()
+        },
         "registry_added": registry_names(added),
         "registry_removed": registry_names(removed),
         "registry_changed": sorted(
@@ -844,7 +937,7 @@ def _lock_rows(path: Path) -> tuple[int, list[dict[str, Any]]]:
 
 def _registry_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     result = []
-    seen: set[tuple[str, str, str, str]] = set()
+    seen: dict[tuple[str, str, str], str] = {}
     for row in rows:
         source = row.get("source")
         if not isinstance(source, str) or not source.startswith("registry+"):
@@ -852,10 +945,15 @@ def _registry_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
         checksum = row.get("checksum")
         if not isinstance(checksum, str):
             raise QualificationError(f"registry package has no checksum: {row['name']}")
-        identity = (row["name"], row["version"], source, checksum)
-        if identity in seen:
+        identity = (row["name"], row["version"], source)
+        previous = seen.get(identity)
+        if previous is not None:
+            if previous != checksum:
+                raise QualificationError(
+                    f"Cargo.lock has conflicting checksums for {row['name']} {row['version']}"
+                )
             raise QualificationError(f"Cargo.lock has a duplicate registry package: {row['name']}")
-        seen.add(identity)
+        seen[identity] = checksum
         result.append(
             {
                 "name": row["name"],
@@ -867,7 +965,7 @@ def _registry_rows(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return sorted(result, key=lambda row: (row["name"], row["version"], row["source"]))
 
 
-def _local_edges(rows: Iterable[Mapping[str, Any]], package_names: set[str]) -> dict[str, list[str]]:
+def _dependency_edges(rows: Iterable[Mapping[str, Any]], package_names: set[str]) -> dict[str, list[str]]:
     result: dict[str, list[str]] = {}
     for row in rows:
         if row["name"] not in package_names or row.get("source") is not None:
@@ -877,51 +975,49 @@ def _local_edges(rows: Iterable[Mapping[str, Any]], package_names: set[str]) -> 
         dependencies = {
             dependency.split(" ", 1)[0]
             for dependency in row["dependencies"]
-            if dependency.split(" ", 1)[0] in package_names
         }
         result[row["name"]] = sorted(dependencies)
     if set(result) != package_names:
         missing = sorted(package_names - set(result))
-        raise QualificationError(f"Cargo.lock lacks selected local packages: {missing}")
+        raise QualificationError(f"Cargo.lock lacks selected source packages: {missing}")
     return result
 
 
 def _registry_comparison(
     base: list[dict[str, Any]], candidate: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    def by_name(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
-        result: dict[str, list[dict[str, Any]]] = {}
+    def by_identity(
+        rows: Iterable[Mapping[str, Any]],
+    ) -> dict[tuple[str, str, str], dict[str, Any]]:
+        result: dict[tuple[str, str, str], dict[str, Any]] = {}
         for row in rows:
-            result.setdefault(row["name"], []).append(dict(row))
-        for values in result.values():
-            values.sort(key=lambda row: (row["version"], row["source"]))
+            result[(row["name"], row["version"], row["source"])] = dict(row)
         return result
 
-    base_by_name = by_name(base)
-    candidate_by_name = by_name(candidate)
+    base_by_identity = by_identity(base)
+    candidate_by_identity = by_identity(candidate)
     added = [
-        row
-        for name in sorted(set(candidate_by_name) - set(base_by_name))
-        for row in candidate_by_name[name]
+        candidate_by_identity[key]
+        for key in sorted(set(candidate_by_identity) - set(base_by_identity))
     ]
     removed = [
-        row
-        for name in sorted(set(base_by_name) - set(candidate_by_name))
-        for row in base_by_name[name]
+        base_by_identity[key]
+        for key in sorted(set(base_by_identity) - set(candidate_by_identity))
     ]
     changed = [
         {
-            "name": name,
-            "base": base_by_name[name],
-            "candidate": candidate_by_name[name],
+            "name": key[0],
+            "version": key[1],
+            "source": key[2],
+            "base": base_by_identity[key],
+            "candidate": candidate_by_identity[key],
         }
-        for name in sorted(set(base_by_name) & set(candidate_by_name))
-        if base_by_name[name] != candidate_by_name[name]
+        for key in sorted(set(base_by_identity) & set(candidate_by_identity))
+        if base_by_identity[key] != candidate_by_identity[key]
     ]
     common = [
-        row
-        for name in sorted(set(base_by_name) & set(candidate_by_name))
-        for row in base_by_name[name]
+        base_by_identity[key]
+        for key in sorted(set(base_by_identity) & set(candidate_by_identity))
     ]
     return {
         "base": base,
@@ -939,14 +1035,17 @@ def lock_delta_manifest(
     candidate_source: Path,
     base_lock: Path,
     candidate_lock: Path,
+    seed_lock: Path,
 ) -> dict[str, Any]:
     """Bind exact endpoint locks to the source-declared dependency delta."""
 
     source_dependencies = _source_dependency_delta(base_source, candidate_source, family)
     base_version, base_rows = _lock_rows(base_lock)
     candidate_version, candidate_rows = _lock_rows(candidate_lock)
+    seed_version, seed_rows = _lock_rows(seed_lock)
     base_registry = _registry_rows(base_rows)
     candidate_registry = _registry_rows(candidate_rows)
+    seed_registry = _registry_rows(seed_rows)
     registry_delta = _registry_comparison(base_registry, candidate_registry)
     expected_added = set(source_dependencies["registry_added"])
     expected_removed = set(source_dependencies["registry_removed"])
@@ -958,22 +1057,59 @@ def lock_delta_manifest(
         )
     if registry_delta["changed"]:
         raise QualificationError("common Cargo.lock registry identities changed")
+    reviewed_additions = REVIEWED_REGISTRY_ADDITIONS[family]
+    if registry_delta["added"] != reviewed_additions:
+        raise QualificationError("Cargo.lock additions do not match reviewed registry identities")
+    seed_identities = {
+        (row["name"], row["version"], row["source"], row["checksum"])
+        for row in seed_registry
+    }
+    for row in reviewed_additions:
+        identity = (row["name"], row["version"], row["source"], row["checksum"])
+        if identity not in seed_identities:
+            raise QualificationError("reviewed registry addition is absent from the seed lock")
     package_names = set(source_dependencies["packages"])
-    base_edges = _local_edges(base_rows, package_names)
-    candidate_edges = _local_edges(candidate_rows, package_names)
-    if base_edges != source_dependencies["base_local_edges"]:
-        raise QualificationError("baseline Cargo.lock local edges do not match its source manifest")
-    if candidate_edges != source_dependencies["candidate_local_edges"]:
-        raise QualificationError("candidate Cargo.lock local edges do not match its source manifest")
+    seed_names = {row["name"] for row in seed_registry}
+    base_edges = _dependency_edges(base_rows, package_names)
+    candidate_edges = _dependency_edges(candidate_rows, package_names)
+    if base_edges != source_dependencies["base_dependency_edges"]:
+        raise QualificationError("baseline Cargo.lock dependency edges do not match its source manifest")
+    if candidate_edges != source_dependencies["candidate_dependency_edges"]:
+        raise QualificationError("candidate Cargo.lock dependency edges do not match its source manifest")
+    for label, edges, rows in (
+        ("baseline", base_edges, base_rows),
+        ("candidate", candidate_edges, candidate_rows),
+    ):
+        available_registry = {row["name"] for row in _registry_rows(rows)}
+        required = {dependency for values in edges.values() for dependency in values}
+        missing_seed = sorted(
+            dependency
+            for dependency in required
+            if dependency not in package_names and dependency not in seed_names
+        )
+        if missing_seed:
+            raise QualificationError(
+                f"{label} source dependency is absent from the pinned seed lock: {missing_seed}"
+            )
+        missing = sorted(
+            dependency
+            for dependency in required
+            if dependency not in package_names and dependency not in available_registry
+        )
+        if missing:
+            raise QualificationError(f"{label} lock lacks required dependency packages: {missing}")
     return {
         "schema": LOCK_DELTA_SCHEMA,
         "family": family,
         "source_dependencies": source_dependencies,
+        "reviewed_registry_additions": reviewed_additions,
         "locks": {
             "base": artifact(base_lock),
             "candidate": artifact(candidate_lock),
+            "seed": artifact(seed_lock),
             "base_version": base_version,
             "candidate_version": candidate_version,
+            "seed_version": seed_version,
         },
         "registry": registry_delta,
         "local_edges": {"base": base_edges, "candidate": candidate_edges},
@@ -987,11 +1123,12 @@ def verify_lock_delta(
     candidate_source: Path,
     base_lock: Path,
     candidate_lock: Path,
+    seed_lock: Path,
 ) -> None:
     if not isinstance(value, Mapping):
         raise QualificationError("missing endpoint lock comparison")
     expected = lock_delta_manifest(
-        family, base_source, candidate_source, base_lock, candidate_lock
+        family, base_source, candidate_source, base_lock, candidate_lock, seed_lock
     )
     if dict(value) != expected:
         raise QualificationError("endpoint lock comparison does not match retained artifacts")
@@ -1150,6 +1287,7 @@ def build(args: argparse.Namespace) -> None:
         snapshots["candidate"][0],
         Path(base["lock"]["path"]),
         Path(candidate["lock"]["path"]),
+        lock,
     )
     verify_lock_delta(
         manifest["lock_delta"],
@@ -1158,6 +1296,7 @@ def build(args: argparse.Namespace) -> None:
         snapshots["candidate"][0],
         Path(base["lock"]["path"]),
         Path(candidate["lock"]["path"]),
+        lock,
     )
     # Endpoint lockfiles are now independently pinned and admitted.  Only
     # after the source/lock/toolchain comparison passes may release binaries
@@ -1258,6 +1397,7 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
         output / "source-candidate",
         Path(base["lock"]["path"]),
         Path(candidate["lock"]["path"]),
+        Path(data["input_lock"]["path"]),
     )
     return data
 

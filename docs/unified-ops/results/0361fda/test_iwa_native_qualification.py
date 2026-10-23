@@ -264,9 +264,19 @@ class NativeQualificationTests(unittest.TestCase):
             path.write_text(contents, encoding="utf-8")
 
     def _write_dependency_lock(
-        self, path: Path, *, candidate: bool, owner: bool = False, rogue: bool = False
+        self,
+        path: Path,
+        *,
+        candidate: bool,
+        owner: bool = False,
+        rogue: bool = False,
+        omit_snap_edge: bool = False,
+        omit_snap_registry: bool = False,
+        duplicate_smallvec: bool = False,
     ) -> None:
-        dependencies = ["litchi-iwa-common", "snap"]
+        dependencies = ["litchi-iwa-common"]
+        if not omit_snap_edge:
+            dependencies.append("snap")
         if candidate:
             dependencies.append("smallvec")
         if rogue:
@@ -285,12 +295,17 @@ class NativeQualificationTests(unittest.TestCase):
             *[f' "{dependency}",' for dependency in dependencies],
             "]",
             "",
-            "[[package]]",
-            'name = "snap"',
-            'version = "1.1.2"',
-            'source = "registry+https://github.com/rust-lang/crates.io-index"',
-            'checksum = "' + "a" * 64 + '"',
         ]
+        if not omit_snap_registry:
+            rows.extend(
+                [
+                    "[[package]]",
+                    'name = "snap"',
+                    'version = "1.1.2"',
+                    'source = "registry+https://github.com/rust-lang/crates.io-index"',
+                    'checksum = "' + "a" * 64 + '"',
+                ]
+            )
         if owner:
             owner_rows = []
             for name in ("litchi-numbers", "litchi-keynote", "litchi-pages"):
@@ -314,9 +329,22 @@ class NativeQualificationTests(unittest.TestCase):
                     'name = "smallvec"',
                     'version = "1.16.3"',
                     'source = "registry+https://github.com/rust-lang/crates.io-index"',
-                    'checksum = "' + "b" * 64 + '"',
+                    'checksum = "'
+                    + RUNNER.REVIEWED_REGISTRY_ADDITIONS["constructor"][0]["checksum"]
+                    + '"',
                 ]
             )
+            if duplicate_smallvec:
+                rows.extend(
+                    [
+                        "",
+                        "[[package]]",
+                        'name = "smallvec"',
+                        'version = "1.16.3"',
+                        'source = "registry+https://github.com/rust-lang/crates.io-index"',
+                        'checksum = "' + "c" * 64 + '"',
+                    ]
+                )
         if rogue:
             rows.extend(
                 [
@@ -330,6 +358,23 @@ class NativeQualificationTests(unittest.TestCase):
             )
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
+    def _write_seed_lock(self, path: Path) -> None:
+        checksum = RUNNER.REVIEWED_REGISTRY_ADDITIONS["constructor"][0]["checksum"]
+        path.write_text(
+            "version = 3\n\n"
+            "[[package]]\n"
+            'name = "snap"\n'
+            'version = "1.1.2"\n'
+            'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+            'checksum = "' + "a" * 64 + '"\n\n'
+            "[[package]]\n"
+            'name = "smallvec"\n'
+            'version = "1.16.3"\n'
+            'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+            f'checksum = "{checksum}"\n',
+            encoding="utf-8",
+        )
+
     def test_endpoint_lock_delta_binds_source_edges_registry_and_features(self) -> None:
         base_source = self.directory / "constructor-base"
         candidate_source = self.directory / "constructor-candidate"
@@ -337,10 +382,12 @@ class NativeQualificationTests(unittest.TestCase):
         self._write_dependency_source(candidate_source, candidate=True, owner=False)
         base_lock = self.directory / "constructor-base.lock"
         candidate_lock = self.directory / "constructor-candidate.lock"
+        seed_lock = self.directory / "seed.lock"
         self._write_dependency_lock(base_lock, candidate=False)
         self._write_dependency_lock(candidate_lock, candidate=True)
+        self._write_seed_lock(seed_lock)
         delta = RUNNER.lock_delta_manifest(
-            "constructor", base_source, candidate_source, base_lock, candidate_lock
+            "constructor", base_source, candidate_source, base_lock, candidate_lock, seed_lock
         )
         self.assertEqual(delta["registry"]["added"][0]["name"], "smallvec")
         self.assertEqual(delta["source_dependencies"]["registry_added"], ["smallvec"])
@@ -348,27 +395,117 @@ class NativeQualificationTests(unittest.TestCase):
             delta["source_dependencies"]["added"][0]["features"], ["union"]
         )
         RUNNER.verify_lock_delta(
-            delta, "constructor", base_source, candidate_source, base_lock, candidate_lock
+            delta,
+            "constructor",
+            base_source,
+            candidate_source,
+            base_lock,
+            candidate_lock,
+            seed_lock,
         )
 
         tampered = copy.deepcopy(delta)
         tampered["registry"]["common"][0]["checksum"] = "0" * 64
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.verify_lock_delta(
-                tampered, "constructor", base_source, candidate_source, base_lock, candidate_lock
+                tampered,
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                candidate_lock,
+                seed_lock,
             )
         tampered = copy.deepcopy(delta)
         tampered["source_dependencies"]["added"][0]["features"] = []
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.verify_lock_delta(
-                tampered, "constructor", base_source, candidate_source, base_lock, candidate_lock
+                tampered,
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                candidate_lock,
+                seed_lock,
             )
 
         rogue_lock = self.directory / "constructor-rogue.lock"
         self._write_dependency_lock(rogue_lock, candidate=True, rogue=True)
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.lock_delta_manifest(
-                "constructor", base_source, candidate_source, base_lock, rogue_lock
+                "constructor", base_source, candidate_source, base_lock, rogue_lock, seed_lock
+            )
+        for suffix, old, new in (
+            ("wrong-version", 'version = "1.16.3"', 'version = "9.9.9"'),
+            (
+                "wrong-checksum",
+                "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b",
+                "d" * 64,
+            ),
+        ):
+            bad_identity_lock = self.directory / f"constructor-{suffix}.lock"
+            contents = candidate_lock.read_text(encoding="utf-8").replace(old, new, 1)
+            bad_identity_lock.write_text(contents, encoding="utf-8")
+            with self.assertRaises(RUNNER.QualificationError):
+                RUNNER.lock_delta_manifest(
+                    "constructor",
+                    base_source,
+                    candidate_source,
+                    base_lock,
+                    bad_identity_lock,
+                    seed_lock,
+                )
+        bad_seed = self.directory / "bad-seed.lock"
+        bad_seed.write_text(
+            seed_lock.read_text(encoding="utf-8").replace(
+                RUNNER.REVIEWED_REGISTRY_ADDITIONS["constructor"][0]["checksum"],
+                "e" * 64,
+                1,
+            ),
+            encoding="utf-8",
+        )
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                candidate_lock,
+                bad_seed,
+            )
+
+        missing_edge_lock = self.directory / "constructor-missing-edge.lock"
+        self._write_dependency_lock(missing_edge_lock, candidate=True, omit_snap_edge=True)
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                missing_edge_lock,
+                seed_lock,
+            )
+        missing_package_lock = self.directory / "constructor-missing-package.lock"
+        self._write_dependency_lock(missing_package_lock, candidate=True, omit_snap_registry=True)
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                missing_package_lock,
+                seed_lock,
+            )
+        duplicate_lock = self.directory / "constructor-duplicate.lock"
+        self._write_dependency_lock(duplicate_lock, candidate=True, duplicate_smallvec=True)
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                duplicate_lock,
+                seed_lock,
             )
 
     def test_owner_lock_delta_uses_owner_closure_not_unrelated_workspace_edges(self) -> None:
@@ -378,15 +515,17 @@ class NativeQualificationTests(unittest.TestCase):
         self._write_dependency_source(candidate_source, candidate=True, owner=True)
         base_lock = self.directory / "owner-base.lock"
         candidate_lock = self.directory / "owner-candidate.lock"
+        seed_lock = self.directory / "owner-seed.lock"
         self._write_dependency_lock(base_lock, candidate=False, owner=True)
         self._write_dependency_lock(candidate_lock, candidate=True, owner=True)
+        self._write_seed_lock(seed_lock)
         delta = RUNNER.lock_delta_manifest(
-            "owner", base_source, candidate_source, base_lock, candidate_lock
+            "owner", base_source, candidate_source, base_lock, candidate_lock, seed_lock
         )
         self.assertEqual(delta["source_dependencies"]["registry_added"], ["smallvec"])
         self.assertNotIn("litchi-ops", delta["source_dependencies"]["packages"])
         RUNNER.verify_lock_delta(
-            delta, "owner", base_source, candidate_source, base_lock, candidate_lock
+            delta, "owner", base_source, candidate_source, base_lock, candidate_lock, seed_lock
         )
 
     def test_validation_report_requires_all_routes_and_typed_boundaries(self) -> None:
