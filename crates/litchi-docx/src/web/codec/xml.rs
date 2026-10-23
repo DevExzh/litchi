@@ -266,7 +266,6 @@ pub(super) fn process_web_xml<'a>(
         max_attributes_per_element: limits
             .attributes()
             .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
-        ..litchi_ooxml_common::mce::Limits::default()
     };
     litchi_ooxml_common::mce::process_markup_compatibility(
         xml,

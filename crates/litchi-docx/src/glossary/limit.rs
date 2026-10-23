@@ -27,6 +27,24 @@ pub struct Limits {
     metadata_bytes: usize,
 }
 
+/// The two aggregate byte budgets for the auxiliary glossary graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GraphLimits {
+    graph_bytes: usize,
+    metadata_bytes: usize,
+}
+
+impl GraphLimits {
+    /// Group the graph and graph-metadata byte budgets.
+    #[must_use]
+    pub const fn new(graph_bytes: usize, metadata_bytes: usize) -> Self {
+        Self {
+            graph_bytes,
+            metadata_bytes,
+        }
+    }
+}
+
 impl Limits {
     /// The standard bounded raw glossary policy.
     pub const DEFAULT: Self = Self {
@@ -59,8 +77,7 @@ impl Limits {
         values: usize,
         string_bytes: usize,
         name_bytes: usize,
-        graph_bytes: usize,
-        metadata_bytes: usize,
+        graph: GraphLimits,
     ) -> Option<Self> {
         if xml_bytes == 0
             || xml_bytes > MAX
@@ -84,10 +101,10 @@ impl Limits {
             || string_bytes > MAX_STRING
             || name_bytes == 0
             || name_bytes > MAX_NAME_KEY
-            || graph_bytes == 0
-            || graph_bytes > MAX_GRAPH_BYTES
-            || metadata_bytes == 0
-            || metadata_bytes > MAX_GRAPH_METADATA_BYTES
+            || graph.graph_bytes == 0
+            || graph.graph_bytes > MAX_GRAPH_BYTES
+            || graph.metadata_bytes == 0
+            || graph.metadata_bytes > MAX_GRAPH_METADATA_BYTES
         {
             None
         } else {
@@ -103,8 +120,8 @@ impl Limits {
                 values,
                 string_bytes,
                 name_bytes,
-                graph_bytes,
-                metadata_bytes,
+                graph_bytes: graph.graph_bytes,
+                metadata_bytes: graph.metadata_bytes,
             })
         }
     }

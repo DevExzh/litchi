@@ -125,7 +125,7 @@ pub(in crate::glossary) fn write_plan_with_limits(
             resource: "glossary XML",
             source,
         })?;
-    emit_catalog(&mut xml, value, conformance, &plan)?;
+    emit_catalog(&mut xml, value, conformance, plan)?;
     if xml.len() != plan.bytes {
         return Err(invalid("glossary XML write plan did not match output"));
     }
