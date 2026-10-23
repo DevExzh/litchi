@@ -5,7 +5,8 @@
 
 use std::io::Cursor;
 
-use litchi_ops::{Code, File, OpenOptions, Props, SourceMode, props};
+use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::{Code, EditOptions, File, OpenOptions, Props, SourceMode, props};
 
 fn fixture() -> Vec<u8> {
     use litchi_xlsb::builder::{self, Builder};
@@ -433,6 +434,23 @@ fn signed_workbooks_refuse_every_p0_write_until_unsigned() {
             property(&edited, "/Data/A1", "font.bold").as_deref(),
             Some("true")
         );
+    }
+}
+
+#[test]
+fn unsigned_metadata_snapshot_charge_is_enforced() {
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(1)
+        .expect("snapshot limit")
+        .build()
+        .expect("semantic limits");
+    for file in owners(&fixture()) {
+        let error = file
+            .edit_with_options(EditOptions::new().semantic_limits(limits), |edit| {
+                edit.set("/metadata", props! { "title" => "bounded" })
+            })
+            .expect_err("metadata publication must charge its retained patch");
+        assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
     }
 }
 

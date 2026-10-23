@@ -3116,6 +3116,7 @@ pub(crate) mod coalesce {
                 })
                 .and_then(|commit| {
                     if logical_noop {
+                        let staged_snapshot_bytes = commit.snapshot_bytes;
                         let original = original
                             .as_ref()
                             .ok_or_else(|| Error::signed(FileFormat::Xlsb))?;
@@ -3134,13 +3135,21 @@ pub(crate) mod coalesce {
                             })?
                             .commit()
                             .map_err(native_error)?;
-                        Commit::from_cell_native(
+                        let mut canonical = Commit::from_cell_native(
                             &base,
                             empty,
                             sheet,
                             native_limits,
                             authored_operations,
-                        )
+                        )?;
+                        // The native changed probe may retain more than the
+                        // canonical signed identity patch.  Keep the peak
+                        // staged charge when replacing it with that genuine
+                        // empty patch, otherwise a signed cancellation would
+                        // under-report its snapshot budget.
+                        canonical.snapshot_bytes =
+                            canonical.snapshot_bytes.max(staged_snapshot_bytes);
+                        Ok(canonical)
                     } else {
                         Ok(commit)
                     }

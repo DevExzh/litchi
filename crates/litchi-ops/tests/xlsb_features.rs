@@ -5,7 +5,8 @@
 #![cfg(feature = "xlsb")]
 
 use litchi_core::FileFormat;
-use litchi_ops::{Code, File, NewNode, OpenOptions, SourceMode, props};
+use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::{Code, EditOptions, File, NewNode, OpenOptions, SourceMode, props};
 
 fn prop(file: &File, path: &str, key: &str) -> Option<String> {
     file.get(path)
@@ -31,6 +32,26 @@ fn reopen(file: &File, eager: bool) -> File {
 
 fn workbook() -> File {
     litchi_ops::create(FileFormat::Xlsb).unwrap()
+}
+
+#[test]
+fn unsigned_feature_snapshot_charge_is_enforced() {
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(1)
+        .expect("snapshot limit")
+        .build()
+        .expect("semantic limits");
+    let error = workbook()
+        .edit_with_options(EditOptions::new().semantic_limits(limits), |edit| {
+            edit.add(
+                "/Sheet1",
+                NewNode::new("comment")
+                    .prop("ref", "A1")
+                    .prop("text", "bounded"),
+            )
+        })
+        .expect_err("feature publication must charge its retained patch");
+    assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
 }
 
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";

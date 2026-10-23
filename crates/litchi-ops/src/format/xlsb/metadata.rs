@@ -79,6 +79,18 @@ fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize,
     ))
 }
 
+/// The properties patch already owns the complete before/after payload for
+/// each changed family.  Charge those bytes for unsigned publication instead
+/// of treating the operation as a zero-sized snapshot.  This mirrors the
+/// native metadata history proof without serializing the whole workbook.
+fn patch_retained_bytes(patch: &xlsb::metadata::Patch) -> usize {
+    patch.changes().iter().fold(0usize, |bytes, change| {
+        bytes
+            .saturating_add(change.before().map_or(0, <[u8]>::len))
+            .saturating_add(change.after().map_or(0, <[u8]>::len))
+    })
+}
+
 fn native(error: xlsb::metadata::Error) -> crate::Error {
     metadata::native_error(error, FileFormat::Xlsb)
 }
@@ -141,7 +153,11 @@ impl Xlsb {
         if !patch.is_noop() && self.signature() == super::Signature::Signed {
             return Err(crate::Error::signed(FileFormat::Xlsb));
         }
-        let (staged_retained, signed_before) = staged_retained_bytes(self, &target)?;
+        let (staged_retained, signed_before) = if self.signature() == super::Signature::Signed {
+            staged_retained_bytes(self, &target)?
+        } else {
+            (patch_retained_bytes(&patch), 0)
+        };
         drop(editor);
         let (target, patch, retained) =
             if patch.is_noop() && self.signature() == super::Signature::Signed {
@@ -197,7 +213,7 @@ impl Xlsb {
         source: &super::source::SourceWorkbook,
         assignments: &Assignments,
         authored_operations: usize,
-        _limits: &SemanticLimits,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         self.check_source_for_replay()?;
         let mut edit = source.workbook().edit_metadata().map_err(native)?;
@@ -210,9 +226,13 @@ impl Xlsb {
         // The staged value is the committed one; no second read of the parts.
         let metadata = edit.metadata().map_err(native)?;
         let (workbook, patch) = edit.commit().map_err(native)?.into_parts();
-        // Source-backed metadata is used only for unsigned owners above, so
-        // its endpoint images remain lazy and uncharged here.
-        let (staged_retained, signed_before) = (0usize, 0usize);
+        // Source-backed metadata is used only for unsigned owners above. The
+        // native patch already owns the changed property payloads, so charge
+        // that proof without materializing or serializing the whole source.
+        let retained = patch_retained_bytes(&patch);
+        if retained > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(retained, limits.max_snapshot_bytes()));
+        }
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -237,7 +257,7 @@ impl Xlsb {
                 after_file,
                 before: OnceLock::new(),
                 after: OnceLock::new(),
-                retained: staged_retained.max(signed_before.saturating_mul(2)),
+                retained,
                 authored_operations,
                 patch,
             },

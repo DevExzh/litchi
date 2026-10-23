@@ -253,7 +253,15 @@ impl Xlsb {
             }
             (package, Some(native), retained)
         } else {
-            (commit.into_package(), None, 0)
+            // Native feature patches retain their changed part payloads even
+            // for an unsigned publication.  Keep that cheap, already-cached
+            // charge in the facade diagnostics so a snapshot limit cannot be
+            // bypassed by the ordinary unsigned route.
+            let retained = commit.retained_bytes();
+            if retained > max_snapshot_bytes {
+                return Err(snapshot_limit(retained, max_snapshot_bytes));
+            }
+            (commit.into_package(), None, retained)
         };
         let after_file = if parts == 0 {
             None
