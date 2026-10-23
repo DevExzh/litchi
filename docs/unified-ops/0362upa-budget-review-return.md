@@ -101,3 +101,12 @@ without weakening exact retention limits, source fidelity or projection
 validation. The runner stopped before the queued PPTX/ODF group.
 [xlsb-pptx-odf-runtime-v13.json](results/0362up/xlsb-pptx-odf-runtime-v13.json)
 retains source, command, complete log and completed executable identities.
+
+The first XLSB fixture correction passes the metadata boundary. On
+`dfd7edc65f`, 770 library tests pass and the two OPC projection tests still
+fail: retained content-types source bytes differ after reopened replay
+(1,113/1,110 versus 1,024 bytes). The remaining repair must distinguish
+original physical provenance from effective publication while preserving
+exact output and untouched payload fidelity. DOCX was not reached after
+the runner stopped. [xlsb-docx-runtime-v15.json](results/0362up/xlsb-docx-runtime-v15.json)
+retains the complete failure receipt.

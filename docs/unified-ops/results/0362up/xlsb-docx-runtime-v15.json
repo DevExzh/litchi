@@ -1,0 +1,48 @@
+{
+  "source": "dfd7edc65fa7c7475142b79130adf2fa21791d79",
+  "pid": 2631821,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-docx-runtime-v15-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-docx-runtime-v15"
+  ],
+  "started_unix_seconds": 1792784569.3213727,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 42.89521726499515,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-docx-runtime-v15/check-0.log",
+      "bytes": 226908,
+      "sha256": "f5ee2ca7bf3a02566816f9b91501727c60c878c999b669a66262acb278964945",
+      "target_bytes_before": 3393442677,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsb-a78e52581af29829",
+          "bytes": 47843096,
+          "sha256": "6fbcaaf31d4d7c9f4a54627f3b4444e9b2baf13c7d86793b228b46a5b2c7b3eb"
+        }
+      ]
+    }
+  ],
+  "test_summaries": [
+    "test result: FAILED. 770 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.98s"
+  ],
+  "note": "All-feature XLSB library:770passed2failed. Metadata boundary passes. Both OPC tests now reach source byte equality and differ between retained original content-types bytes and reopened publication bytes (1113/1110 versus1024). The complete provenance comparison remains returned for diagnosis preserving effective artifact and untouched payload fidelity. DOCX group was not reached after runner stopped."
+}
