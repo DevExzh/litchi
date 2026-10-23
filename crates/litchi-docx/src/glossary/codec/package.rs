@@ -90,6 +90,7 @@ pub(in crate::glossary) fn write_catalog_open<X: XmlSink>(
     x.push_str(r#"">"#)
 }
 
+#[cfg(test)]
 pub(in crate::glossary) fn plan_write(
     value: &Catalog,
     conformance: Conformance,

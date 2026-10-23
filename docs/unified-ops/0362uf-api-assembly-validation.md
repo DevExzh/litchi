@@ -250,3 +250,17 @@ The eight Python tooling unittest modules pass all 1,340 tests on
 boundary checks. [python-assembly-v2.json](results/0362uf/python-assembly-v2.json)
 records the source and full log hash. Standalone boundary/rustdoc gates and
 combined Rust validation remain required.
+
+The eighteenth consumer pass on `c9e8d8dfbf` passes OPC/ZIP, then stops
+production DOCX compilation on four private glossary default-policy wrappers
+used only by unit tests (`read`, `write`, `plan_write`, `parse_dom`). They are
+now compiled only for tests; production retains the explicit selected-limit
+helpers, with no dead-code allowance.
+[consumer-v18.json](results/0362uf/consumer-v18.json) records the failure and
+full log hash. Harness checks were not reached.
+
+All four standalone Python checks on the same source pass: benchmark matrix,
+capability delta, corpus manifest, and the complete crate-boundary checker
+(280.83 seconds). [python-assembly-gates-v2.json](results/0362uf/python-assembly-gates-v2.json)
+records their exact outcomes. These are tooling checks, not native corpus
+replay or the final rustdoc/format API gate.

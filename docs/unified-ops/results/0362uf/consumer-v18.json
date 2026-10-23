@@ -1,0 +1,47 @@
+{
+  "source": "c9e8d8dfbfe51edb89c3672969ed443cf0a85059",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 0,
+      "seconds": 0.34789207099856867,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v18/check-0.log",
+      "bytes": 60,
+      "sha256": "f1d0e587f4eaf9c5f6803d3e9210c0e1b536942252f03191c763f7b78b97cc4a",
+      "target_bytes_before": 18615776501,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 67.35746007499984,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v18/check-1.log",
+      "bytes": 1407,
+      "sha256": "0be179583b36249062325bb156b1a461b982b3f17f32ab1c7654a3f13e38275e",
+      "target_bytes_before": 18615776501,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Focused OPC/ZIP passed. Workspace stopped on four private glossary default-policy helpers used only in unit tests. The helpers are scoped cfg(test); production keeps explicit selected-limit helpers. Harness checks not reached."
+}

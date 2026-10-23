@@ -252,6 +252,7 @@ pub(in crate::glossary) fn validate_xml_value(value: &str, context: &str) -> Res
     }
 }
 
+#[cfg(test)]
 pub(in crate::glossary) fn parse_dom(xml: &[u8]) -> Result<Node> {
     parse_dom_with_limits(xml, &Limits::DEFAULT)
 }
