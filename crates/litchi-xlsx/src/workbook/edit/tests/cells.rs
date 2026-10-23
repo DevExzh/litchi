@@ -1482,6 +1482,70 @@ fn inline_rich_range_transfer_preserves_runs_and_noop_identity() {
 }
 
 #[test]
+fn moved_rich_source_does_not_reappear_in_later_copy() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>moved</t></r></is></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("rich source workbook");
+    let source_bytes = source.to_bytes().expect("source bytes");
+
+    let mut edit = source.edit().expect("edit");
+    edit.move_cells("Sheet1", "A1", "Sheet1", "B1")
+        .expect("move rich source")
+        .expect("move selectors");
+    edit.copy_cells("Sheet1", "A1", "Sheet1", "C1")
+        .expect("copy removed source")
+        .expect("copy selectors");
+    let committed = edit.commit().expect("commit move and copy");
+    let sheet = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    assert!(
+        sheet
+            .rich_text("A1")
+            .expect("removed source rich text")
+            .is_none()
+    );
+    assert_eq!(
+        sheet
+            .rich_text("B1")
+            .expect("moved rich text")
+            .expect("moved runs")
+            .text(),
+        "moved"
+    );
+    assert!(
+        sheet
+            .rich_text("C1")
+            .expect("copied removed source rich text")
+            .is_none()
+    );
+
+    let replayed = source
+        .apply(committed.patch())
+        .expect("replay move and copy");
+    assert_eq!(
+        replayed.package().to_bytes().expect("replayed bytes"),
+        committed.package().to_bytes().expect("committed bytes")
+    );
+    let restored = committed
+        .package()
+        .apply(&committed.patch().inverse())
+        .expect("inverse move and copy");
+    assert_eq!(
+        restored.package().to_bytes().expect("restored bytes"),
+        source_bytes
+    );
+}
+
+#[test]
 fn hyperlink_ranges_with_one_start_keep_independent_captures() {
     let source = crate::Package::new().expect("source workbook");
     let mut edit = source
