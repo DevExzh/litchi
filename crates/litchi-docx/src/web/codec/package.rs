@@ -39,6 +39,9 @@ impl Settings {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn read(part: &dyn Part, limits: &super::super::Limits) -> Result<(Settings, Conformance)> {
+pub(super) fn read(
+    part: &dyn Part,
+    limits: &super::super::Limits,
+) -> Result<(Settings, Conformance)> {
     Settings::read_part(part, limits)
 }

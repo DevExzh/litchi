@@ -170,10 +170,6 @@ pub(crate) fn validate_graph_value_with_limits(
     Ok(())
 }
 
-pub(crate) fn document_references(xml: &[u8]) -> Result<(Conformance, Vec<String>)> {
-    document_references_with_limits(xml, &super::Limits::DEFAULT)
-}
-
 pub(crate) fn document_references_with_limits(
     xml: &[u8],
     policy: &super::Limits,
@@ -286,10 +282,6 @@ fn scan_document_xml(
         return Err(invalid("missing or unterminated document root"));
     }
     Ok(references)
-}
-
-pub(crate) fn scan_chart_xml(xml: &[u8], conformance: Conformance) -> Result<ChartScan> {
-    scan_chart_xml_with_limits(xml, conformance, &super::Limits::DEFAULT)
 }
 
 pub(crate) fn scan_chart_xml_with_limits(
@@ -414,15 +406,6 @@ fn inspect_chart_element(
         }
     }
     Ok(())
-}
-
-pub(crate) fn validate_companion_xml(
-    xml: &[u8],
-    max: usize,
-    root_name: &str,
-    label: &str,
-) -> Result<()> {
-    validate_companion_xml_with_limits(xml, max, root_name, label, &super::Limits::DEFAULT)
 }
 
 pub(crate) fn validate_companion_xml_with_limits(

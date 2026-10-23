@@ -20,7 +20,8 @@ use super::codec::{
     GALLERIES, add_sizes, authored_analysis_with_limits, background_analysis_with_limits, bounded,
     canonical_id, entry_analysis_with_limits, invalid, name_key, name_key_with_limits,
     replace_sizes, validate_authored_name, validate_catalog_limits,
-    validate_catalog_sizes_with_limits, validate_entry_limits, validate_name,
+    validate_catalog_limits_with_background, validate_catalog_sizes_with_limits,
+    validate_entry_limits, validate_name,
 };
 use super::graph::raw;
 use super::{Arc, Error, HashMap, MAX_PARTS, R, REL, RS, Result, STRICT_REL, W, WS};
@@ -677,7 +678,7 @@ impl Catalog {
             // Re-selecting a policy is still an admission operation.  The
             // unchanged-byte fast path must not install a narrower policy
             // until every retained entry and its derived XML has passed it.
-            validate_catalog_limits(self, limits)?;
+            validate_catalog_limits_with_background(self, Some(&xml), limits)?;
             let background = background_analysis_with_limits(self.background.as_deref(), limits)?;
             let mut entry_bytes = [0usize; 2];
             for entry in &self.entries {
@@ -695,6 +696,11 @@ impl Catalog {
             self.selected_limits = Some(*limits);
             return Ok(self.background.replace(xml));
         }
+        // Validate the complete retained semantic payload against the
+        // replacement background before rebinding the selected policy.  In
+        // particular, this charges existing entry bodies and producer XML as
+        // well as the new background against the aggregate graph budget.
+        validate_catalog_limits_with_background(self, Some(&xml), limits)?;
         let analysis = background_analysis_with_limits(Some(&xml), limits)?;
         if self.binding.is_some() && !analysis.refs.is_empty() {
             return Err(invalid(

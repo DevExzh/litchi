@@ -9,8 +9,8 @@ mod rewrite;
 mod semantic;
 mod xml;
 
-pub use package::read;
-pub use xml::{parse, write};
+pub(super) use package::read;
+pub(super) use xml::{parse, write};
 
 pub(super) use xml::write_with_limits;
 

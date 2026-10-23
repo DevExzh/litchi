@@ -498,7 +498,7 @@ impl Style {
 // leaking the retired monolith vocabulary into rustdoc or downstream code.
 
 /// Low-level, lossless XML details that normal font authoring can ignore.
-pub mod raw {
+pub(super) mod raw {
     use super::{bounded, validate_attr_name};
     use crate::Result;
 

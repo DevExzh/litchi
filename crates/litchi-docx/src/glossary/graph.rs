@@ -407,19 +407,6 @@ pub mod raw {
         Ok(())
     }
 
-    pub(in crate::glossary) fn admit_package(package: &OpcPackage, limits: &Limits) -> Result<()> {
-        let _ = admit_package_closure(package, limits)?;
-        Ok(())
-    }
-
-    pub(in crate::glossary) fn admit_package_closure(
-        package: &OpcPackage,
-        limits: &Limits,
-    ) -> Result<(std::collections::HashSet<PackURI>, super::ClosureLedger)> {
-        let owner = super::locate(package, limits)?;
-        super::admit_owner_closure(package, owner.as_ref(), limits)
-    }
-
     pub(in crate::glossary) fn admit_graph(graph: &Graph, limits: &Limits) -> Result<()> {
         super::validate_catalog_limits(&graph.catalog, limits)?;
         admit_catalog(&graph.catalog, limits)?;
@@ -702,10 +689,6 @@ pub mod raw {
     }
 }
 
-pub(in crate::glossary) fn load_graph(package: &OpcPackage) -> Result<Option<raw::Graph>> {
-    load_graph_with_limits(package, &super::Limits::DEFAULT)
-}
-
 pub(in crate::glossary) fn load_graph_with_limits(
     package: &OpcPackage,
     limits: &raw::Limits,
@@ -812,10 +795,6 @@ pub(in crate::glossary) fn copy_relationships(part: &dyn Part) -> Result<Vec<raw
     }
     rels.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(rels)
-}
-
-pub(in crate::glossary) fn put_graph(package: &mut OpcPackage, value: &raw::Graph) -> Result<bool> {
-    put_graph_checked(package, value, &super::Limits::DEFAULT)
 }
 
 pub(in crate::glossary) fn put_graph_checked(
@@ -989,10 +968,6 @@ pub(in crate::glossary) fn put_graph_checked(
     Ok(true)
 }
 
-pub(in crate::glossary) fn remove_graph(package: &mut OpcPackage) -> Result<Option<raw::Graph>> {
-    remove_graph_with_limits(package, &super::Limits::DEFAULT)
-}
-
 pub(in crate::glossary) fn remove_graph_with_limits(
     package: &mut OpcPackage,
     limits: &raw::Limits,
@@ -1047,9 +1022,18 @@ pub(in crate::glossary) fn graph_matches_catalog(
     Ok(actual.catalog == *expected_catalog
         && actual.conformance == expected.conformance
         && actual.root_name == expected.root_name
-        && actual.owner_main == expected.owner_main
-        && actual.owner_id == expected.owner_id
-        && actual.owner_target == expected.owner_target
+        && expected
+            .owner_main
+            .as_ref()
+            .is_none_or(|value| actual.owner_main.as_ref() == Some(value))
+        && expected
+            .owner_id
+            .as_ref()
+            .is_none_or(|value| actual.owner_id.as_ref() == Some(value))
+        && expected
+            .owner_target
+            .as_ref()
+            .is_none_or(|value| actual.owner_target.as_ref() == Some(value))
         && expected_root_xml.is_none_or(|xml| {
             actual.root_xml.as_ref().is_some_and(|actual| {
                 Arc::ptr_eq(actual, xml) || actual.as_slice() == xml.as_slice()

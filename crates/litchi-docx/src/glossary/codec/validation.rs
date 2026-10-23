@@ -32,6 +32,19 @@ pub(in crate::glossary) fn validate_catalog_fields(v: &Catalog) -> Result<()> {
 /// It runs before the catalog rebuilds its name index or any publication plan
 /// allocates derived state.
 pub(in crate::glossary) fn validate_catalog_limits(value: &Catalog, limits: &Limits) -> Result<()> {
+    validate_catalog_limits_with_background(value, value.background.as_deref(), limits)
+}
+
+/// Validate a catalog against the selected policy while charging the
+/// background that would be retained after an edit.  This is separate from
+/// [`validate_catalog_limits`] because replacing a background must account for
+/// the new payload before it is installed, rather than validating the old
+/// payload and then rebinding the policy.
+pub(in crate::glossary) fn validate_catalog_limits_with_background(
+    value: &Catalog,
+    background: Option<&[u8]>,
+    limits: &Limits,
+) -> Result<()> {
     if value.entries.len() > limits.values() {
         return Err(crate::Error::GlossaryLimit {
             kind: crate::glossary::LimitKind::Entry,
@@ -39,8 +52,8 @@ pub(in crate::glossary) fn validate_catalog_limits(value: &Catalog, limits: &Lim
             maximum: limits.values(),
         });
     }
-    let mut retained = value.background.as_ref().map_or(0, Vec::len);
-    if let Some(background) = &value.background {
+    let mut retained = background.map_or(0, <[u8]>::len);
+    if let Some(background) = background {
         if background.len() > limits.xml_bytes() {
             return Err(crate::Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::XmlBytes,
@@ -438,14 +451,6 @@ pub(in crate::glossary) fn expect_w(n: &Node) -> Result<()> {
         Err(invalid("expected WordprocessingML metadata"))
     }
 }
-pub(in crate::glossary) fn wval(n: &Node) -> Result<String> {
-    let v = wattr_get(n, "val")?.ok_or_else(|| invalid("missing w:val"))?;
-    bounded(&v)?;
-    only_w(n, &["val"])?;
-    leaf(n)?;
-    Ok(v)
-}
-
 pub(in crate::glossary) fn wval_with_limits(n: &Node, limits: &Limits) -> Result<String> {
     let v = wattr_get_with_limits(n, "val", limits)?.ok_or_else(|| invalid("missing w:val"))?;
     bounded_with_limits(&v, limits)?;
@@ -453,19 +458,6 @@ pub(in crate::glossary) fn wval_with_limits(n: &Node, limits: &Limits) -> Result
     leaf(n)?;
     Ok(v)
 }
-pub(in crate::glossary) fn wattr_get(n: &Node, l: &str) -> Result<Option<String>> {
-    let mut v = None;
-    for a in &n.attrs {
-        if matches!(a.ns.as_ref(), W | WS) && a.l == l {
-            if v.is_some() {
-                return Err(invalid("duplicate WordprocessingML attribute"));
-            }
-            v = Some(a.v.clone());
-        }
-    }
-    Ok(v)
-}
-
 pub(in crate::glossary) fn wattr_get_with_limits(
     n: &Node,
     l: &str,
@@ -483,18 +475,6 @@ pub(in crate::glossary) fn wattr_get_with_limits(
     }
     Ok(value)
 }
-pub(in crate::glossary) fn onoff(n: &Node, l: &str) -> Result<Option<bool>> {
-    let value = wattr_get(n, l)?;
-    match value.as_deref() {
-        None => Ok(None),
-        Some("1" | "true") => Ok(Some(true)),
-        Some("0" | "false") => Ok(Some(false)),
-        Some("on") if n.ns.as_ref() == W => Ok(Some(true)),
-        Some("off") if n.ns.as_ref() == W => Ok(Some(false)),
-        _ => Err(invalid(format!("invalid on/off attribute '{l}'"))),
-    }
-}
-
 pub(in crate::glossary) fn onoff_with_limits(
     n: &Node,
     l: &str,

@@ -2068,6 +2068,42 @@ fn changed_background_rebind_checks_existing_entries() {
 }
 
 #[test]
+fn changed_background_rebind_checks_retained_graph_bytes() {
+    let mut catalog = Catalog::new();
+    let existing = entry("Existing");
+    let body_bytes = existing.body().unwrap().len();
+    catalog.add(existing).unwrap();
+    let background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    let graph_bytes = body_bytes + background.len() - 1;
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        graph_bytes,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+
+    let error = catalog
+        .set_background(background, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
+    assert!(catalog.background().is_none());
+}
+
+#[test]
 fn aggregate_catalog_budget_is_checked_atomically() {
     let mut catalog = Catalog::new();
     for index in 0..5 {

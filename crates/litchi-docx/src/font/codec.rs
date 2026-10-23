@@ -62,7 +62,7 @@ struct Node {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn parse(xml: &[u8], limits: &super::Limits) -> Result<Table> {
+pub(super) fn parse(xml: &[u8], limits: &super::Limits) -> Result<Table> {
     // The raw admission scan must run before MCE processing or the semantic
     // tree is allocated.  Run it again on the projected bytes because MCE can
     // expand both element and text counts.
@@ -528,7 +528,7 @@ fn parse_embed(n: &Node, style: Style) -> Result<Embed> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
+pub(super) fn write(t: &Table, c: Conformance) -> Result<Vec<u8>> {
     validate_table_value(t, false)?;
     let mut o = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
     o.extend_from_slice(b"<w:fonts xmlns:w=\"");

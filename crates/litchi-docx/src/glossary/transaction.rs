@@ -781,7 +781,7 @@ fn empty_graph_seed(package: &OpcPackage, conformance: Conformance) -> Result<Em
     Ok(EmptyGraphSeed {
         root: root.as_str().to_owned(),
         main: main.partname().as_str().to_owned(),
-        owner_id: next_relationship_id(main),
+        owner_id: next_relationship_id(main)?,
         owner_target: root.relative_ref(main.partname().base_uri()),
         conformance,
     })
@@ -801,7 +801,7 @@ fn generated_graph_usage(seed: &EmptyGraphSeed, limits: &super::Limits) -> Resul
     Ok(usage)
 }
 
-fn next_relationship_id(part: &dyn super::Part) -> String {
+fn next_relationship_id(part: &dyn super::Part) -> Result<String> {
     let mut next = 1u32;
     loop {
         let used = part.rels().iter().any(|relationship| {
@@ -812,9 +812,11 @@ fn next_relationship_id(part: &dyn super::Part) -> String {
                 == Some(next)
         });
         if !used {
-            return format!("rId{next}");
+            return Ok(format!("rId{next}"));
         }
-        next = next.saturating_add(1);
+        next = next
+            .checked_add(1)
+            .ok_or_else(|| invalid("no glossary relationship ID is available"))?;
     }
 }
 

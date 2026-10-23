@@ -1380,11 +1380,6 @@ pub(crate) fn load_with_limits(
     ))
 }
 
-/// Source-backed spelling of load.
-pub(crate) fn load_snapshot(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
-    load(package, owner)
-}
-
 /// Apply a patch to the exact candidate clone owned by the package facade.
 ///
 /// The caller must have loaded `current` from the same source package immediately
@@ -1541,13 +1536,6 @@ fn readback_existing_resource_replacement(
     ))
 }
 
-/// Add or replace one owner resource. The operation returns false for an
-/// exact source/conformance no-op and therefore leaves signatures untouched.
-pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result<bool> {
-    let limits = package.read_limits();
-    put_with_limits(package, owner, resource, limits)
-}
-
 pub(crate) fn put_with_limits(
     package: &mut OpcPackage,
     owner: Owner,
@@ -1588,12 +1576,6 @@ pub(crate) fn put_with_limits(
     }
     *package = candidate;
     Ok(true)
-}
-
-/// Remove one owner resource. Missing resources are an exact no-op.
-pub(crate) fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
-    let limits = package.read_limits();
-    remove_with_limits(package, owner, limits)
 }
 
 pub(crate) fn remove_with_limits(
@@ -2449,10 +2431,6 @@ fn next_relationship_id(package: &OpcPackage, source: &PackURI) -> Result<String
     Err(invalid(
         "no bounded stylesWithEffects relationship ID is available",
     ))
-}
-
-fn inspect_graph(package: &OpcPackage) -> Result<GraphState> {
-    inspect_graph_with_limits(package, None, package.read_limits())
 }
 
 fn inspect_graph_with_validated_resource(

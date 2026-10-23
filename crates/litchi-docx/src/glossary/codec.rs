@@ -21,7 +21,7 @@ use super::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
+pub(super) fn read(xml: &[u8]) -> Result<(Catalog, Conformance)> {
     read_with_limits(xml, &super::Limits::DEFAULT)
 }
 
@@ -78,7 +78,7 @@ pub(in crate::glossary) fn read_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn write(value: &Catalog, conformance: Conformance) -> Result<Vec<u8>> {
+pub(super) fn write(value: &Catalog, conformance: Conformance) -> Result<Vec<u8>> {
     write_with_limits(value, conformance, &super::Limits::DEFAULT)
 }
 
