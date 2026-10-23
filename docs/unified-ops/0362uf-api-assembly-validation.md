@@ -264,3 +264,13 @@ capability delta, corpus manifest, and the complete crate-boundary checker
 (280.83 seconds). [python-assembly-gates-v2.json](results/0362uf/python-assembly-gates-v2.json)
 records their exact outcomes. These are tooling checks, not native corpus
 replay or the final rustdoc/format API gate.
+
+The nineteenth pass starts with the combined DOCX library on `6a7263f0f4`:
+1,514 tests pass and one new context regression fails. The fixture selected
+the compatibility story editor, which intentionally refuses a managed native
+source before deferred publication. The regression now constructs the shared
+deferred boundary directly and still exercises ordinary materialization and
+both restore paths, with independent native/facade cancellation assertions
+unchanged. Production refusal behavior is untouched.
+[consumer-v19.json](results/0362uf/consumer-v19.json) preserves the failure;
+subsequent compiler and harness groups were not reached.

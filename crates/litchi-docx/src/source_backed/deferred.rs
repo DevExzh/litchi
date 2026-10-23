@@ -801,14 +801,33 @@ mod tests {
         if route == 1 {
             return owner.restored(&package()).unwrap();
         }
-        let mut edit = owner.edit_story_text(story_text::Selector::Main).unwrap();
-        edit.replace_paragraph_text(Position::new(0), "after")
+        // Exercise the shared deferred boundary directly. The compatibility
+        // story editor deliberately refuses a managed native source, while
+        // deferred publication itself supports independent native and facade
+        // contexts.
+        let physical = owner.physical_source().unwrap().clone();
+        let stream_physical = physical.clone();
+        let deferred = owner
+            .deferred(
+                move |writer, policy| match policy {
+                    Some(policy) => Ok(physical
+                        .clone()
+                        .write_exact_source_with_policy(writer, policy)?),
+                    None => Ok(physical
+                        .clone()
+                        .write_topology_to_stream(writer, litchi_opc::SourceTopologyPlan::new())?),
+                },
+                move |target| {
+                    target
+                        .publish_source_package(&stream_physical)
+                        .map_err(Error::from)
+                },
+            )
             .unwrap();
-        let commit = edit.commit().unwrap();
         if route == 2 {
-            owner.restored(commit.package()).unwrap()
+            owner.restored(&deferred).unwrap()
         } else {
-            commit.package().clone()
+            deferred
         }
     }
 

@@ -1,0 +1,33 @@
+{
+  "source": "6a7263f0f426b7411c68bf1b08d739abfd90959f",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-docx",
+        "--lib"
+      ],
+      "exit": 101,
+      "seconds": 122.32562545900146,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v19/check-0.log",
+      "bytes": 349053,
+      "sha256": "24406c1a38e9cca0d90b63e4596c427c44b4ed391b17cb81aa478c0d92c1de12",
+      "target_bytes_before": 18615394312,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/litchi_docx-67ae2d927f03ad6a",
+          "bytes": 73385464,
+          "sha256": "ab7fa3f4e0387e9b54119d3d080aea3e33934b365e6f5a4c153af6a4ae1fd229"
+        }
+      ]
+    }
+  ],
+  "note": "Combined DOCX library:1514passed,1failed. New context regression used a compatibility story editor that intentionally refuses managed sources; the test now exercises the shared deferred constructor and both restore paths, retaining all independent-cancellation assertions. Subsequent compiler/harness groups not reached."
+}
