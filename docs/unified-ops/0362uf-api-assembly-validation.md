@@ -330,3 +330,10 @@ diagnostics. The full batch is assigned for behavior-preserving cleanup.
 the exact command and log hash. The reviewed performance harness consumer
 repair is merged through `7d8b47bdbf`, preserving projection-based DOCX
 verification and existing publication timing boundaries.
+
+Both harness compiler checks pass on `808f9883a0`: the full performance
+package with all targets/features (59.81 seconds) and the isolated XLSX raw
+identity harness with all targets/features (33.18 seconds).
+[consumer-v24.json](results/0362uf/consumer-v24.json) retains exact commands
+and log hashes. These compilation passes do not qualify native timings.
+The complete Clippy v2 cleanup is merged separately; its rerun remains required.
