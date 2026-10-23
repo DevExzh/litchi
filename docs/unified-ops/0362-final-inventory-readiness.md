@@ -154,7 +154,8 @@ owning format's debt. Profileless public facades such as `litchi-odf`, iWork
 low-level crates, `litchi-fonts` and `litchi-sign` must be scanned and
 explicitly classified rather than omitted.
 
-The following source ancestry is already verified at this base:
+The following source ancestry is already verified at composed target
+`8225b82dde7bac272e9e77789a78751ae07aaa2a`:
 
 | Scope | Evidence | Status |
 | --- | --- | --- |
@@ -163,7 +164,7 @@ The following source ancestry is already verified at this base:
 | DOCX durable Ink Commit | `3c1d25de24` | integrated |
 | DOCX/ODF glossary closure | `18e811d93b` | integrated |
 | Leaf design §16.4 | `3c35a08905` | integrated; no pending implementation |
-| Signed-native replay | `2b594e1757` is not an ancestor | keep pending until merged and rescanned |
+| Signed-native replay | `2b594e1757`, `7dc296655c`, `77bc2d3ac2` and `df2d948477` are ancestors | integrated; native/ABBA qualification and the workspace gate remain open |
 
 The old `d67468f02a` DOCX helper receipt is historical evidence, not a
 pending helper chain. Final native/ABBA qualification, performance

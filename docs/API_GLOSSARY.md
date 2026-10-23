@@ -173,9 +173,10 @@ line. A line is ✅ when the wave's gate registrations pass.
 
 ### Final contract audit boundary (2026-10-23)
 
-This glossary reconciliation is against assembled source at `c3a9a0cef4` (the
-metadata leaf is `3cad59be707c`) and the records cited above. The no-build audit
-did not generate new rustdoc JSON;
+This glossary reconciliation is against the composed source at
+`8225b82dde7bac272e9e77789a78751ae07aaa2a` (the Pages metadata shared-triad
+leaf is `8db74400ef`, with the later shared-type closure recorded by `0362us`)
+and the records cited above. The no-build audit did not generate new rustdoc JSON;
 the Oct-20 files under `.coord/api-contract/rustdoc/` are stale inputs and are
 not evidence of current conformance. A red cell below is assigned required
 engineering work, not an accepted exception:
@@ -194,8 +195,11 @@ engineering work, not an accepted exception:
   (`0362m`, `0362u`), including PPTX cross-copy, ODP tail-append and XLS/RTF
   source-backed paths. Native/ABBA qualification and the final workspace gate
   remain open; this is not a performance acceptance claim.
-- Signed-native replay remains explicitly pending on `uo2/signed-replay`
-  (`0362w`, tip `2b594e1757`); OLE's commit-only/fixed-error correction is
+- Signed-native replay is integrated at this source boundary: the original
+  implementation (`2b594e1757`) and the reviewed follow-ups (`7dc296655c`,
+  `77bc2d3ac2`, `df2d948477`) are ancestors of the composed target. Native/
+  ABBA qualification and the final workspace gate remain open; this is not a
+  performance acceptance claim. OLE's commit-only/fixed-error correction is
   already integrated (`39a7a2729b`, `1a5f56f45d`, `02c9f44c78`).
 - 0362rd keeps standalone CFB and soapberry ZIP transport methods in separate
   substrate follow-up scope; they are not current format-wave debt merely
