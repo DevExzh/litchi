@@ -68,6 +68,28 @@ pub(crate) fn plan_relationship_publications(
     changes: &[TopologyRelationshipChange],
     physical_members: &super::PhysicalMemberLookup,
 ) -> Result<(HashMap<PackURI, Relationships>, Vec<RelationshipPreflight>)> {
+    plan_relationship_publications_inner(package, changes, physical_members, true)
+}
+
+/// Build relationship lengths for topology admission without repeating the
+/// package-wide signature inventory.  The full publication planner performs
+/// that inventory because it is the final policy boundary; length-only
+/// admission only needs the affected owners' existing relationship maps and
+/// lexical members.  Publication runs the full planner again before output.
+pub(crate) fn plan_relationship_publications_metadata(
+    package: &SourceBackedPackage,
+    changes: &[TopologyRelationshipChange],
+    physical_members: &super::PhysicalMemberLookup,
+) -> Result<(HashMap<PackURI, Relationships>, Vec<RelationshipPreflight>)> {
+    plan_relationship_publications_inner(package, changes, physical_members, false)
+}
+
+fn plan_relationship_publications_inner(
+    package: &SourceBackedPackage,
+    changes: &[TopologyRelationshipChange],
+    physical_members: &super::PhysicalMemberLookup,
+    enforce_signature_policy: bool,
+) -> Result<(HashMap<PackURI, Relationships>, Vec<RelationshipPreflight>)> {
     let mut overrides = HashMap::new();
     overrides
         .try_reserve(changes.len())
@@ -126,7 +148,7 @@ pub(crate) fn plan_relationship_publications(
                         reltype,
                         &target_ref,
                     )?;
-                    if package.has_signature_infrastructure() {
+                    if enforce_signature_policy && package.has_signature_infrastructure() {
                         return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                     }
                     effective.try_add_relationship(
@@ -167,7 +189,7 @@ pub(crate) fn plan_relationship_publications(
                     {
                         continue;
                     }
-                    if package.has_signature_infrastructure() {
+                    if enforce_signature_policy && package.has_signature_infrastructure() {
                         return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                     }
                     // A replacement keeps the Id, and with it the Id's
@@ -204,7 +226,7 @@ pub(crate) fn plan_relationship_publications(
                             change.r_id
                         )));
                     }
-                    if package.has_signature_infrastructure() {
+                    if enforce_signature_policy && package.has_signature_infrastructure() {
                         return Err(OpcError::SignedSourceRequiresExplicitPolicy);
                     }
                     effective.remove(&change.r_id);

@@ -3073,7 +3073,6 @@ struct PreparedTopologyState {
     retained: Option<Arc<PreparedTopologyRetention>>,
     effective: Option<EffectiveTopologyData>,
     totals: Option<PreparedTopologyTotals>,
-    metadata_lengths: Option<(usize, usize)>,
     _catalog_reservation: Option<Arc<Reservation>>,
     no_op: bool,
 }
@@ -9074,10 +9073,337 @@ impl SourceBackedPackage {
         presentation_uri: &PackURI,
         plan: SourceTopologyPlan,
     ) -> Result<(usize, usize)> {
-        let state = self.prepare_topology_state_mode(plan, true, Some(presentation_uri))?;
-        state.metadata_lengths.ok_or_else(|| {
-            overlay_unavailable("topology metadata length planning produced no result")
-        })
+        self.topology_metadata_lengths_fast(presentation_uri, plan)
+    }
+
+    /// Compute the two metadata lengths needed by a native presentation edit.
+    ///
+    /// This is intentionally a lexical, affected-owner preflight.  The full
+    /// topology planner remains the publication authority, but using it here
+    /// would first build a physical-member index, a complete Part namespace,
+    /// and a package-wide relationship graph even when the caller only needs
+    /// the presentation `.rels` and `[Content_Types].xml` lengths.  The
+    /// source catalog already owns the typed maps and scalar relationship
+    /// metrics; this pass reads only changed relationship members and the
+    /// content-types manifest when their selectors actually change.
+    fn topology_metadata_lengths_fast(
+        &self,
+        presentation_uri: &PackURI,
+        plan: SourceTopologyPlan,
+    ) -> Result<(usize, usize)> {
+        self.disable_read_ahead_for_publication()?;
+        self.validate_topology_source_boundary()?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "topology publication refuses encrypted ZIP members",
+            ));
+        }
+        if plan.is_empty() {
+            let relationships = self
+                .declared_relationships_uncompressed_size(presentation_uri)?
+                .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
+            let relationships = usize::try_from(relationships)
+                .map_err(|_| overlay_unavailable("relationships metadata length exceeds usize"))?;
+            let content_types = usize::try_from(self.declared_content_types_uncompressed_size()?)
+                .map_err(|_| {
+                overlay_unavailable("content-types metadata length exceeds usize")
+            })?;
+            return Ok((relationships, content_types));
+        }
+
+        let SourceTopologyPlan {
+            additions,
+            removals,
+            mut relationships,
+            raw_relationships,
+            raw_content_types,
+            ..
+        } = plan;
+        self.check_topology_progress()?;
+        for addition in &additions {
+            let payload_len = addition.payload.effective_bytes_arc().len() as u64;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                payload_len,
+                self.limits.max_part_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                payload_len,
+                self.limits.max_entry_bytes(),
+            )?;
+        }
+        for removal in &removals {
+            if self.part_index(removal).is_none() {
+                return Err(OpcError::PartNotFound(removal.to_string()));
+            }
+        }
+        relationships.sort_unstable_by(|left, right| {
+            left.owner
+                .as_str()
+                .cmp(right.owner.as_str())
+                .then_with(|| left.r_id.cmp(&right.r_id))
+        });
+
+        // The relationship planner only needs physical IDs for the owners it
+        // is about to rewrite.  Exact archive lookup is the common path.  A
+        // fallback directory scan is retained solely for a case-variant
+        // member spelling, and therefore never becomes a package-wide index
+        // or a per-edit archive count.
+        let mut affected_members = Vec::new();
+        let affected_member_capacity = relationships
+            .len()
+            .checked_add(removals.len())
+            .and_then(|count| count.checked_add(raw_relationships.len()))
+            .ok_or_else(|| overlay_unavailable("affected relationship member count overflows"))?;
+        affected_members
+            .try_reserve(affected_member_capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC affected relationship members",
+                source,
+            })?;
+        for change in &relationships {
+            let member = change
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate: &String| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        for removal in &removals {
+            let member = removal
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        for restore in &raw_relationships {
+            let member = restore
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        let physical_members = self.build_affected_physical_member_lookup(&affected_members)?;
+        for restore in &raw_relationships {
+            let member_name = restore
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            let existing =
+                self.source_entry_id_case_insensitive(&member_name, &physical_members)?;
+            match (restore.expected.as_ref(), existing) {
+                (Some(expected), Some(entry)) => {
+                    let metadata = self.archive.metadata_for(entry)?;
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        metadata.uncompressed_size(),
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    let source = self
+                        .archive
+                        .read_entry(entry)
+                        .map_err(map_preservation_error)?;
+                    self.check_topology_progress()?;
+                    if source.as_slice() != expected.as_slice() {
+                        return Err(overlay_unavailable("stale raw relationship source image"));
+                    }
+                },
+                (Some(_), None) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically absent",
+                    ));
+                },
+                (None, Some(_)) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically present",
+                    ));
+                },
+                (None, None) => {},
+            }
+            if let Some(replacement) = restore.replacement.as_ref() {
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    replacement.len() as u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                self.limits.check(
+                    SourceLimitKind::EntryBytes,
+                    replacement.len() as u64,
+                    self.limits.max_entry_bytes(),
+                )?;
+            }
+        }
+        let (_, relationship_preflights) =
+            relationships_plan::plan_relationship_publications_metadata(
+                self,
+                &relationships,
+                &physical_members,
+            )?;
+
+        let relationships_len = raw_relationships
+            .iter()
+            .find(|restore| restore.owner.is_equivalent_to(presentation_uri))
+            .map(|restore| restore.replacement.as_ref().map_or(0, |bytes| bytes.len()))
+            .or_else(|| {
+                relationship_preflights
+                    .iter()
+                    .find(|summary| summary.owner.is_equivalent_to(presentation_uri))
+                    .and_then(|summary| usize::try_from(summary.final_bytes).ok())
+            })
+            .or(self
+                .declared_relationships_uncompressed_size(presentation_uri)?
+                .and_then(|length| usize::try_from(length).ok()))
+            .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
+
+        let content_types_len = if let Some(raw) = raw_content_types.as_ref() {
+            let (source, _, _) = self.read_content_types_xml()?;
+            if source.as_slice() != raw.expected.as_slice() {
+                return Err(overlay_unavailable("stale raw content-types source image"));
+            }
+            self.limits.check(
+                SourceLimitKind::ContentTypesBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_content_types_bytes() as u64,
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_entry_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            usize::try_from(raw.replacement.len())
+                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?
+        } else if additions.is_empty()
+            && removals.is_empty()
+            && !raw_relationships
+                .iter()
+                .any(|restore| restore.replacement.is_none())
+        {
+            usize::try_from(self.declared_content_types_uncompressed_size()?)
+                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?
+        } else {
+            let (source, _, _) = self.read_content_types_xml()?;
+            let mut override_additions = Vec::new();
+            override_additions
+                .try_reserve(additions.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC metadata content-type additions",
+                    source,
+                })?;
+            for addition in additions {
+                if let Some(existing) = self.catalog.content_types.override_for(&addition.partname)
+                {
+                    if existing.as_str() != addition.content_type.as_str() {
+                        return Err(overlay_unavailable(format!(
+                            "existing content-type override for '{}' conflicts",
+                            addition.partname
+                        )));
+                    }
+                    continue;
+                }
+                if self
+                    .catalog
+                    .content_types
+                    .get(&addition.partname)
+                    .is_ok_and(|existing| existing == addition.content_type.as_str())
+                {
+                    continue;
+                }
+                override_additions
+                    .push((addition.partname, addition.content_type.as_str().to_owned()));
+            }
+            let mut override_removals = Vec::new();
+            override_removals
+                .try_reserve(removals.len().saturating_add(raw_relationships.len()))
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC metadata content-type removals",
+                    source,
+                })?;
+            for removal in removals {
+                if self.catalog.content_types.override_for(&removal).is_some() {
+                    override_removals.push(removal.clone());
+                }
+                let relationships_uri = removal.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .catalog
+                    .content_types
+                    .override_for(&relationships_uri)
+                    .is_some()
+                    && self
+                        .source_entry_id_case_insensitive(
+                            relationships_uri.membername(),
+                            &physical_members,
+                        )?
+                        .is_some()
+                {
+                    override_removals.push(relationships_uri);
+                }
+            }
+            for restore in raw_relationships
+                .iter()
+                .filter(|restore| restore.replacement.is_none())
+            {
+                let relationships_uri =
+                    restore.owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .catalog
+                    .content_types
+                    .override_for(&relationships_uri)
+                    .is_some()
+                    && self
+                        .source_entry_id_case_insensitive(
+                            relationships_uri.membername(),
+                            &physical_members,
+                        )?
+                        .is_some()
+                {
+                    override_removals.push(relationships_uri);
+                }
+            }
+            override_removals.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+            override_removals.dedup_by(|left, right| left.is_equivalent_to(right));
+            if override_additions.is_empty() && override_removals.is_empty() {
+                source.len()
+            } else {
+                let content_plan = content_types_plan::ContentTypesPlan::plan_owned(
+                    &source,
+                    override_additions,
+                    &override_removals,
+                    self.limits,
+                    self.cache.context(),
+                    self.cache.reservation_failure_counter(),
+                )?;
+                content_plan.final_len()
+            }
+        };
+        self.check_topology_progress()?;
+        Ok((relationships_len, content_types_len))
     }
 
     /// Validate a complete prepared candidate while borrowing this package.
@@ -9112,15 +9438,6 @@ impl SourceBackedPackage {
     }
 
     fn prepare_topology_state(&self, plan: SourceTopologyPlan) -> Result<PreparedTopologyState> {
-        self.prepare_topology_state_mode(plan, false, None)
-    }
-
-    fn prepare_topology_state_mode(
-        &self,
-        plan: SourceTopologyPlan,
-        metadata_only: bool,
-        metadata_owner: Option<&PackURI>,
-    ) -> Result<PreparedTopologyState> {
         self.disable_read_ahead_for_publication()?;
         if plan.is_empty() {
             self.source.ensure_current()?;
@@ -9130,7 +9447,6 @@ impl SourceBackedPackage {
                 retained: None,
                 effective: None,
                 totals: None,
-                metadata_lengths: None,
                 _catalog_reservation: None,
                 no_op: true,
             });
@@ -10798,65 +11114,6 @@ impl SourceBackedPackage {
         content_type_memory_reservations.extend(content_types_replacement.1.take());
         let content_types_replacement = content_types_replacement.0.take();
 
-        if metadata_only {
-            let materialized_content_types_summary =
-                if let Some(replacement) = content_types_replacement.as_ref() {
-                    Some(ContentTypesPublicationSummary {
-                        bytes: replacement.len() as u64,
-                        mappings: candidate_content_type_mapping_count.ok_or_else(|| {
-                            overlay_unavailable(
-                                "content-types replacement is missing its planned mapping count",
-                            )
-                        })? as u64,
-                    })
-                } else {
-                    None
-                };
-            self.validate_topology_limits(
-                &pending_replacements,
-                &pending_removals,
-                &additions,
-                &relationship_publications,
-                materialized_content_types_summary,
-                &raw_relationship_removed_entries,
-            )?;
-            let metadata_owner = metadata_owner
-                .ok_or_else(|| overlay_unavailable("topology metadata owner is unavailable"))?;
-            let presentation_relationships = relationship_publications
-                .iter()
-                .find(|publication| publication.owner.is_equivalent_to(metadata_owner))
-                .map(|publication| {
-                    publication
-                        .raw_xml
-                        .as_ref()
-                        .map_or(publication.xml.len(), |xml| xml.len())
-                })
-                .or(self
-                    .declared_relationships_uncompressed_size(metadata_owner)?
-                    .and_then(|length| usize::try_from(length).ok()))
-                .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
-            let content_types = content_types_replacement.as_ref().map_or_else(
-                || {
-                    self.declared_content_types_uncompressed_size()
-                        .and_then(|length| {
-                            usize::try_from(length).map_err(|_| {
-                                overlay_unavailable("content-types metadata length exceeds usize")
-                            })
-                        })
-                },
-                |replacement| Ok(replacement.len()),
-            )?;
-            return Ok(PreparedTopologyState {
-                changed: Vec::new(),
-                retained: None,
-                effective: None,
-                totals: None,
-                metadata_lengths: Some((presentation_relationships, content_types)),
-                _catalog_reservation: None,
-                no_op: true,
-            });
-        }
-
         // Check bounded byte resources before auditing authored XML so a
         // payload that violates both limits reports the deterministic policy
         // refusal without first parsing attacker-controlled data.
@@ -11110,7 +11367,6 @@ impl SourceBackedPackage {
                 retained: None,
                 effective: None,
                 totals: None,
-                metadata_lengths: None,
                 _catalog_reservation: None,
                 no_op: true,
             });
@@ -11567,7 +11823,6 @@ impl SourceBackedPackage {
             })),
             effective: Some(effective),
             totals: Some(totals),
-            metadata_lengths: None,
             _catalog_reservation: catalog_reservation,
             no_op: false,
         })
@@ -13905,6 +14160,58 @@ impl SourceBackedPackage {
         }
         self.check_topology_progress()?;
         Ok((PhysicalMemberLookup { by_folded_name }, memory_reservation))
+    }
+
+    fn build_affected_physical_member_lookup(
+        &self,
+        member_names: &[String],
+    ) -> Result<PhysicalMemberLookup> {
+        let mut by_folded_name = HashMap::new();
+        by_folded_name
+            .try_reserve(member_names.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC affected physical member lookup",
+                source,
+            })?;
+        for (index, member_name) in member_names.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let key = folded_ascii_name(
+                member_name,
+                "source-backed OPC folded affected physical member name",
+            )?;
+            if by_folded_name.contains_key(&key) {
+                continue;
+            }
+            if let Some(entry_id) = self.archive.entry_id(member_name) {
+                by_folded_name.insert(key, PhysicalMemberInfo { entry_id, count: 1 });
+                continue;
+            }
+
+            // Source admission rejects ambiguous ASCII-case-equivalent ZIP
+            // members.  The fallback is only for a non-canonical spelling of
+            // this affected `.rels` member; it never constructs the global
+            // directory index used by publication.
+            let mut found = None;
+            let mut count = 0usize;
+            for (entry_id, candidate) in self.archive.file_entries() {
+                if folded_ascii_name(candidate, "source-backed OPC folded fallback member name")?
+                    != key
+                {
+                    continue;
+                }
+                found = Some(entry_id);
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("physical member count overflows"))?;
+            }
+            if let Some(entry_id) = found {
+                by_folded_name.insert(key, PhysicalMemberInfo { entry_id, count });
+            }
+        }
+        self.check_topology_progress()?;
+        Ok(PhysicalMemberLookup { by_folded_name })
     }
 
     fn source_entry_id_case_insensitive(

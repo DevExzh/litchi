@@ -2592,8 +2592,7 @@ impl Patch {
                     &lengths,
                 )?
             },
-            PatchData::Durable(data) => data
-                .encoded_len()?
+            PatchData::Durable(data) => durable::data_wire_len(data)?
                 .checked_add(if self.shape_removals {
                     durable::REMOVAL_MARKER_BYTES
                 } else {
