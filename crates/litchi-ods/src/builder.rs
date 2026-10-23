@@ -99,7 +99,7 @@ impl Workbook {
 
     /// Capture inert DDE source declarations and cached tables.
     pub fn dde(&self) -> FamilyResult<crate::dde::Snapshot> {
-        Ok(self.spreadsheet.dde()?)
+        self.spreadsheet.dde()
     }
 
     /// Capture DDE metadata under explicit limits and execution policy.
@@ -137,7 +137,7 @@ impl Workbook {
 
     /// Capture the inert, source-bound scenario metadata catalog.
     pub fn scenarios(&self) -> FamilyResult<crate::scenario::Snapshot> {
-        Ok(self.spreadsheet.scenarios()?)
+        self.spreadsheet.scenarios()
     }
 
     /// Stage and publish one failure-atomic scenario metadata edit.
@@ -150,7 +150,7 @@ impl Workbook {
 
     /// Capture the source-backed sheet metadata catalog.
     pub fn sheet_metadata(&self) -> FamilyResult<crate::sheet_metadata::Snapshot> {
-        Ok(self.spreadsheet.sheet_metadata()?)
+        self.spreadsheet.sheet_metadata()
     }
 
     /// Capture sheet metadata under explicit finite limits and context.
@@ -159,7 +159,7 @@ impl Workbook {
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
     ) -> FamilyResult<crate::sheet_metadata::Snapshot> {
-        Ok(self.spreadsheet.sheet_metadata_with(limits, context)?)
+        self.spreadsheet.sheet_metadata_with(limits, context)
     }
 
     /// Stage and publish one failure-atomic sheet metadata edit.
@@ -559,7 +559,7 @@ impl Workbook {
     ///
     /// Returns an error when the retained package cannot be reparsed.
     pub fn definitions_snapshot(&self) -> FamilyResult<crate::definitions::Snapshot> {
-        Ok(self.spreadsheet.definitions_snapshot()?)
+        self.spreadsheet.definitions_snapshot()
     }
 
     /// Clone-stage ordered definition CRUD and publish it as one package edit.
@@ -647,7 +647,7 @@ impl Workbook {
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
     pub fn rdf_snapshot(&self) -> FamilyResult<crate::metadata_graphs::Snapshot> {
-        Ok(self.spreadsheet.rdf_snapshot()?)
+        self.spreadsheet.rdf_snapshot()
     }
 
     /// Clone-stage RDF graph and triple CRUD and publish it as one package edit.

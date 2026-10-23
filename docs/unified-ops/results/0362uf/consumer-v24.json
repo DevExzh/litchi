@@ -1,0 +1,55 @@
+{
+  "source": "808f9883a0cd4a006b5cc9754c9d2de8355ac939",
+  "pid": 2026475,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v8.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v24"
+  ],
+  "started_unix_seconds": 1792768043.3078117,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 0,
+      "seconds": 59.81124840100165,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v24/check-0.log",
+      "bytes": 933,
+      "sha256": "4c9e3e15478427962a13b75f292f9a5760c9b8b340d19e32792c7f3cf6d9c853",
+      "target_bytes_before": 18874374339,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 0,
+      "seconds": 33.17816445200151,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v24/check-1.log",
+      "bytes": 4650,
+      "sha256": "46d847e1bc7397055e909a865b26d68e40653b0db4ccd3d403388f30775ab68a",
+      "target_bytes_before": 18887868325,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Both full performance harness and isolated XLSX raw harness all-target/all-feature compiler checks pass. No native timing or full-gate acceptance claimed."
+}

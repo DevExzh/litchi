@@ -696,6 +696,35 @@ fn map_root_error(error: RootError, path: Path) -> Error {
     }
 }
 
+const fn map_budget_limit_kind(kind: BudgetLimitKind) -> LimitKind {
+    match kind {
+        BudgetLimitKind::InputBytes => LimitKind::InputBytes,
+        BudgetLimitKind::OutputBytes | BudgetLimitKind::PackageBytes => LimitKind::OutputBytes,
+        BudgetLimitKind::Entries => LimitKind::Entries,
+        BudgetLimitKind::EntryBytes => LimitKind::EntryBytes,
+        BudgetLimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        BudgetLimitKind::PayloadBytes | BudgetLimitKind::TotalPayloadBytes => {
+            LimitKind::PayloadBytes
+        },
+        BudgetLimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        BudgetLimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        BudgetLimitKind::PayloadItems => LimitKind::PayloadItems,
+        BudgetLimitKind::PayloadReferences => LimitKind::References,
+        BudgetLimitKind::WireBytes => LimitKind::EncodedBytes,
+        BudgetLimitKind::WireOutputBytes => LimitKind::OutputBytes,
+        BudgetLimitKind::WireReferenceBytes => LimitKind::ReferenceBytes,
+        BudgetLimitKind::WireTextBytes => LimitKind::TextBytes,
+        BudgetLimitKind::WireFields => LimitKind::Fields,
+        BudgetLimitKind::WireNesting => LimitKind::Nesting,
+        BudgetLimitKind::WireWork => LimitKind::Work,
+        BudgetLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+        BudgetLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+        BudgetLimitKind::Allocations => LimitKind::Allocations,
+        BudgetLimitKind::CompressedBytes => LimitKind::CompressedBytes,
+        BudgetLimitKind::TransactionWork => LimitKind::TransactionWork,
+    }
+}
+
 fn map_budget_error(error: BudgetError, path: Path) -> Error {
     match error {
         BudgetError::Limit {
@@ -704,34 +733,7 @@ fn map_budget_error(error: BudgetError, path: Path) -> Error {
             maximum,
             ..
         } => Error::Limit {
-            kind: match kind {
-                BudgetLimitKind::InputBytes => LimitKind::InputBytes,
-                BudgetLimitKind::OutputBytes | BudgetLimitKind::PackageBytes => {
-                    LimitKind::OutputBytes
-                },
-                BudgetLimitKind::Entries => LimitKind::Entries,
-                BudgetLimitKind::EntryBytes => LimitKind::EntryBytes,
-                BudgetLimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
-                BudgetLimitKind::PayloadBytes | BudgetLimitKind::TotalPayloadBytes => {
-                    LimitKind::PayloadBytes
-                },
-                BudgetLimitKind::PayloadObjects => LimitKind::PayloadObjects,
-                BudgetLimitKind::PayloadMessages => LimitKind::PayloadMessages,
-                BudgetLimitKind::PayloadItems => LimitKind::PayloadItems,
-                BudgetLimitKind::PayloadReferences => LimitKind::References,
-                BudgetLimitKind::WireBytes => LimitKind::EncodedBytes,
-                BudgetLimitKind::WireOutputBytes => LimitKind::OutputBytes,
-                BudgetLimitKind::WireReferenceBytes => LimitKind::ReferenceBytes,
-                BudgetLimitKind::WireTextBytes => LimitKind::TextBytes,
-                BudgetLimitKind::WireFields => LimitKind::Fields,
-                BudgetLimitKind::WireNesting => LimitKind::Nesting,
-                BudgetLimitKind::WireWork => LimitKind::Work,
-                BudgetLimitKind::ScratchBytes => LimitKind::ScratchBytes,
-                BudgetLimitKind::RetainedBytes => LimitKind::RetainedBytes,
-                BudgetLimitKind::Allocations => LimitKind::Allocations,
-                BudgetLimitKind::CompressedBytes => LimitKind::CompressedBytes,
-                BudgetLimitKind::TransactionWork => LimitKind::TransactionWork,
-            },
+            kind: map_budget_limit_kind(kind),
             observed: usize::try_from(observed).unwrap_or(usize::MAX),
             maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
             path,
@@ -893,10 +895,14 @@ fn map_native_error(
         super::super::comments_reply_native::NativeReplyError::Allocation => {
             Error::Allocation { amount: 1, path }
         },
-        super::super::comments_reply_native::NativeReplyError::Limit => Error::Limit {
-            kind: LimitKind::Work,
-            observed: 1,
-            maximum: 0,
+        super::super::comments_reply_native::NativeReplyError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_budget_limit_kind(kind),
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
             path,
         },
         super::super::comments_reply_native::NativeReplyError::InvalidSource
@@ -1885,7 +1891,60 @@ fn require_exact_apply_source(source_is_exact: bool) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, Refusal, require_exact_apply_source};
+    use super::{Error, LimitKind, Path, Refusal, map_native_error, require_exact_apply_source};
+
+    #[test]
+    fn native_limit_payload_reaches_public_error() {
+        let error = map_native_error(
+            crate::package::comments_reply_native::NativeReplyError::Limit {
+                kind: crate::package::table_cell_pop_up_menu::LimitKind::WireWork,
+                observed: 47,
+                maximum: 29,
+            },
+            Path::Package,
+        );
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Work,
+                observed: 47,
+                maximum: 29,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn native_core_limit_axes_reach_public_error() {
+        for (kind, expected) in [
+            (
+                crate::package::table_cell_pop_up_menu::LimitKind::WireFields,
+                LimitKind::Fields,
+            ),
+            (
+                crate::package::table_cell_pop_up_menu::LimitKind::WireNesting,
+                LimitKind::Nesting,
+            ),
+        ] {
+            let error = map_native_error(
+                crate::package::comments_reply_native::NativeReplyError::Limit {
+                    kind,
+                    observed: 53,
+                    maximum: 31,
+                },
+                Path::Package,
+            );
+            assert_eq!(
+                error,
+                Error::Limit {
+                    kind: expected,
+                    observed: 53,
+                    maximum: 31,
+                    path: Path::Package,
+                }
+            );
+        }
+    }
 
     #[test]
     fn changed_direct_apply_requires_exact_physical_provenance() {

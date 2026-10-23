@@ -328,7 +328,8 @@ making the per-object inline memory cost explicit.
   required before accepting native timing.
 - **Protected native qualification of the owner routes:** needs a quiet host
   window.
-- **`NativePopUpError::Limit`/`NativeReplyError::Limit`:** carry the kind and
-  counts.
+- **`NativePopUpError::Limit`/`NativeReplyError::Limit`:** resolved in
+  [0361fe](0361fe-iwork-native-limit-payload.md); both private native errors
+  now carry the typed kind and exact observed/maximum counts.
 - **Peak heap:** attribute the +5 B process peak on `keynote_media` and the
   footnote insert.

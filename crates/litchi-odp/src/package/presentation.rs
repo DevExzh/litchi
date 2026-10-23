@@ -399,7 +399,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -418,7 +417,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -437,7 +435,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -456,7 +453,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -475,7 +471,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -494,7 +489,6 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(litchi_odf_common::Error::from)
             },
         )
     }

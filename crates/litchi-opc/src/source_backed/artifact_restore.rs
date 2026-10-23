@@ -722,7 +722,8 @@ impl<'a> ArtifactStreamTarget<'a> {
                 failure: None,
             };
             let operation_result = operation(&mut guarded, policy);
-            (operation_result, guarded.failure.take())
+            let guard_error = guarded.failure.take();
+            (operation_result, guard_error)
         };
         let policy_error = policy
             .take_failure()

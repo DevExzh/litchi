@@ -321,3 +321,86 @@ writer `io_other_error` diagnostics. Replacing the constructors with
 partial gate, including the source/lock hashes and capped target. The safe
 runner preserves targets and only releases completed, hashed debug test
 executables; this single Clippy attempt is not the full 53-check gate.
+
+The broader Clippy pass on `af415286f3` checks the whole workspace, all
+targets and all features with `--keep-going`. It stops after 448.53 seconds
+on OPC bound/borrow-scope diagnostics and ODF error-conversion/test-style
+diagnostics. The full batch is assigned for behavior-preserving cleanup.
+[clippy-workspace-v2.json](results/0362uf/clippy-workspace-v2.json) retains
+the exact command and log hash. The reviewed performance harness consumer
+repair is merged through `7d8b47bdbf`, preserving projection-based DOCX
+verification and existing publication timing boundaries.
+
+Both harness compiler checks pass on `808f9883a0`: the full performance
+package with all targets/features (59.81 seconds) and the isolated XLSX raw
+identity harness with all targets/features (33.18 seconds).
+[consumer-v24.json](results/0362uf/consumer-v24.json) retains exact commands
+and log hashes. These compilation passes do not qualify native timings.
+The complete Clippy v2 cleanup is merged separately; its rerun remains required.
+
+The third broad Clippy pass on `355cfe4141` stops after 275.42 seconds
+on XLSX, DOCX and XLSB production/test lints. The complete diagnosed batch
+is assigned for behavior-preserving repair, including enum-size rationale,
+fallible test handling and glossary item ordering.
+[clippy-workspace-v3.json](results/0362uf/clippy-workspace-v3.json) preserves
+the exact source, command and log hash. This remains a partial gate result.
+
+The formatting check on `3107f05f23` reports one newly simplified ODF test
+assertion. The configured formatter corrects its wrapping without changing
+behavior. [format-assembly-v2.json](results/0362uf/format-assembly-v2.json)
+preserves the initial failed check; the assembled rerun follows this repair.
+
+The formatting rerun on `3dce711b8e` passes in 28.98 seconds.
+[format-assembly-v3.json](results/0362uf/format-assembly-v3.json) records
+the exact source and empty diagnostic log. The subsequent reviewed Clippy
+repair is in [0362ur](0362ur-clippy-v3-consumers.md); it keeps glossary
+limits unchanged and scopes smaller enum representations to relationship
+tokens. The full Clippy rerun is still required.
+
+The isolated workspace documentation rerun on `eb718eece7` uses a fresh
+20 GB capped target and one Cargo job, with other Litchi builds held. It
+terminates after 583.21 seconds on an unresolved ODB `Error::Unsupported`
+link, with no memory kill. The API now returns the ODF family's typed
+`Refused` variant; the link and two neighboring stale ODG/ODT descriptions
+are corrected. [wsdoc-assembly-v1.json](results/0362uf/wsdoc-assembly-v1.json)
+records source, command, unchanged locks and log hash. This failed run does
+not establish a documentation or complete gate pass.
+
+The second isolated documentation run on `bee51d5de0` stops after 173.64
+seconds on an ODC link to the nonexistent qualified type
+`litchi_core::CoreError`; the correct exported type is `litchi_core::Error`.
+[wsdoc-assembly-v2.json](results/0362uf/wsdoc-assembly-v2.json) retains the
+failure. A preflight first blocked an overlapping Numbers worker; the
+documentation command ran only after that build ended. A broader diagnostic
+run with `--keep-going` will collect remaining documentation failures before
+the exact gate command is rerun. No memory kill occurred.
+
+The third isolated documentation attempt uses `--keep-going` on
+`e4ef015084` and reports two remaining errors after 291.99 seconds: OPC
+linked a builder method through `SourceLimits`, and public OLE package docs
+linked private `PackageState`. The links are corrected without exposing
+private state or changing behavior.
+[wsdoc-assembly-v3.json](results/0362uf/wsdoc-assembly-v3.json) records the
+complete diagnosed batch. The exact workspace gate command is rerun next.
+
+The exact isolated workspace documentation gate passes on `0f8ce50050`:
+`cargo doc -q --workspace --no-deps --all-features`, with warnings denied,
+one Cargo job, offline/locked dependency resolution and a 20 GB memory cap.
+It finishes in 316.00 seconds with an empty diagnostic log; the target is
+3,440,007,569 bytes.
+[wsdoc-assembly-v4.json](results/0362uf/wsdoc-assembly-v4.json) preserves the
+source, unchanged lock hashes and runner provenance. This resolves the
+documentation failure on the assembled source. It is one passing gate step,
+not the complete 53-check acceptance gate or native qualification.
+
+## Workspace Clippy and Numbers limit validation
+
+The broad all-target/all-feature Clippy check passes on `c3a9a0cef4`
+with warnings denied (213.64 seconds). The immediately following Numbers
+library run passes 488 tests, with four existing ignored cases
+(92.33 seconds including compilation). This validates the typed native limit
+observations and repaired test import in the current assembly.
+[clippy-workspace-v5.json](results/0362uf/clippy-workspace-v5.json) records
+both commands and exact source/log hashes. The preceding failed fourth
+Clippy run is retained separately. Budget proposals are still on the
+diagnostic branch; these successes are not the final combined 53-check gate.

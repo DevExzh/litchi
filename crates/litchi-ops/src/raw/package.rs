@@ -7,6 +7,16 @@ use super::{Part, PartInfo, no_parts};
 use crate::{Code, Error, File, Result};
 
 /// A handle's published package.
+#[cfg_attr(
+    all(
+        any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"),
+        any(feature = "odt", feature = "ods", feature = "odp", odf_objects)
+    ),
+    expect(
+        clippy::large_enum_variant,
+        reason = "This transient stack owner keeps the full ODF policy without another heap allocation"
+    )
+)]
 pub(super) enum Container {
     #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
     Opc {

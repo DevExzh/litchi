@@ -624,8 +624,8 @@ impl Database {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for re-signing and re-encryption. No
-    /// package bytes are changed and no credential is requested.
+    /// Returns [`litchi_odf_common::Error::Refused`] for re-signing and
+    /// re-encryption. Package bytes and credentials remain untouched.
     pub fn require_protection_operation(
         &self,
         operation: crate::ProtectionOperation,

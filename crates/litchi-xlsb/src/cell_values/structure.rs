@@ -2356,19 +2356,16 @@ mod replay_admission_tests {
 
     #[test]
     fn archive_preflight_checks_member_budget_before_owned_handoff() {
-        let bytes = Package::new()
-            .expect("fixture package")
-            .to_bytes()
-            .expect("fixture bytes");
+        let bytes = Package::new().unwrap().to_bytes().unwrap();
         let limits = SourceLimits::builder()
             .max_members(1)
-            .expect("member limit")
+            .unwrap()
             .max_parts(1)
-            .expect("part limit")
+            .unwrap()
             .max_relationship_parts(1)
-            .expect("relationship limit")
+            .unwrap()
             .build()
-            .expect("source limits");
+            .unwrap();
 
         assert!(
             admit_archive_before_copy(&bytes, limits).is_err(),

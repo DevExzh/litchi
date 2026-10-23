@@ -2078,7 +2078,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a shape whose text is not one
+    /// Returns [`Error::Refused`] for a shape whose text is not one
     /// plain span (several paragraphs, spans, links or fields), and
     /// [`Error::InvalidFormat`] for an invalid selector or a limit violation.
     pub fn set_shape_text(

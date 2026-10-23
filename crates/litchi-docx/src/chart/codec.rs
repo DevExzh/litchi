@@ -555,7 +555,6 @@ fn process_markup(xml: &[u8], policy: &super::Limits, output_maximum: usize) -> 
         max_attributes_per_element: policy
             .attributes()
             .min(litchi_ooxml_common::mce::ATTRIBUTES_PER_ELEMENT_CEILING),
-        ..MceLimits::default()
     };
     process_markup_compatibility(xml, &Capabilities::default(), &limits)
         .map(|output| output.xml.into_owned())

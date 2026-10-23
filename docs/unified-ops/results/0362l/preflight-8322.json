@@ -1,0 +1,88 @@
+{
+  "schema": "litchi.docx-durable-ink-preflight.v1",
+  "status": "correctness-and-allocation-complete",
+  "comparison": "integrated-route",
+  "harness_commit": "8322a65e1070593dd34c2586d088dd984a590409",
+  "refs": {
+    "base": "d0406be01712496ca0d43354edf4d2fe80162553",
+    "candidate": "706fc5f0e1b495b90980f1c3149bf461c6ef134b"
+  },
+  "input_lock": {
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-durable-ink/Cargo.lock",
+    "bytes": 139505,
+    "sha256": "d85b4300c58dbdf0dcc3cb8243ad4ea00cd9c29c9d1d4a77c38e51fe12f708aa"
+  },
+  "harness_files": {
+    "ink-probe.rs": {"bytes": 14766, "sha256": "73bedf6deb8d918087f113b2c1f5536660f9fdbff4e91d7c011f5bb89c6b8f92"},
+    "ink-qualify.py": {"bytes": 14574, "sha256": "4bcbc6e5165befba18dc7d8b63f08d081371cebd236f26e531cce99cb21441a1"},
+    "ink-collect.py": {"bytes": 14827, "sha256": "e744cdb6c9a40c8404dac75a4ca60eb9c1d6bfd3b92bfb75b5e2f735f147f03e"},
+    "ink-abba.py": {"bytes": 14606, "sha256": "8452005f92732982f86c20cebd3262322ed0add404e51b385c959ee1355aa016"},
+    "test_ink_qualification.py": {"bytes": 10410, "sha256": "dddf5fce77460b90b857875fd09f21ae15c89cb58d2a1e2fb7f89037ca829a0d"}
+  },
+  "source_delta": {
+    "manifest": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/build.json",
+      "bytes": 153012,
+      "sha256": "cbdb86cee60c5deef1866cd3e9813cceb948a19c7221603a97d3397d052a2ea2"
+    },
+    "prefixes": ["crates/litchi-core/", "crates/litchi-opc/", "crates/litchi-ooxml-common/", "crates/litchi-drawingml/"],
+    "same": 307,
+    "changed": 170,
+    "base_only": 1,
+    "candidate_only": 5
+  },
+  "build": {
+    "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py build /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322 --base d0406be017 --candidate 706fc5f0e1 --lock /home/zhuhe/code/litchi-worktrees/uo2-coordinator-durable-ink/Cargo.lock",
+    "manifest": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/build.json",
+      "bytes": 153012,
+      "sha256": "cbdb86cee60c5deef1866cd3e9813cceb948a19c7221603a97d3397d052a2ea2"
+    },
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "validation_outputs": {
+      "forward.docx": {"bytes": 4249, "sha256": "735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae"},
+      "forward.json": {"bytes": 127509, "sha256": "a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2"},
+      "inverse.docx": {"bytes": 3592, "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"},
+      "inverse.json": {"bytes": 127509, "sha256": "9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55"},
+      "noop.docx": {"bytes": 3592, "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"},
+      "noop.json": {"bytes": 615, "sha256": "9a8f7ae53873720c88492cbd0ad3b478c65d0c4f1c7263891ac2092b56e6c441"},
+      "source.docx": {"bytes": 3592, "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"},
+      "streaming.json": {"bytes": 575, "sha256": "bf9ffb743229f9ecfcbc519b30c91789a4679a3081f3bc2c04adbe3f05ce80c3"}
+    },
+    "binaries": {
+      "base": {
+        "native": {"bytes": 3923992, "sha256": "f1eeeef9ce39a347e5e1932bf690129973e6f5eaeb29f8c4f897d16d8033be8a"},
+        "allocation": {"bytes": 4142288, "sha256": "fce2bd5bd91118f8a2d3b73134a3d07f3c0c67a320cb8b7f5cf959196d901031"}
+      },
+      "candidate": {
+        "native": {"bytes": 4008368, "sha256": "da352f6e24f33bc268a0718d2211aba27ab5585fbf1d79abeeef0775dbba8025"},
+        "allocation": {"bytes": 4228232, "sha256": "1f6182696a9bbd74ed23da8d33b964c9502544baf204fa8e9e9c6fef833281a2"}
+      }
+    }
+  },
+  "allocation": {
+    "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py allocation /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322 --attempt allocation-a1",
+    "manifest": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/allocation-a1/manifest.json",
+      "bytes": 20299,
+      "sha256": "cbc72b108b64b75d2dc4d36baf55aff5db495eda688a6d6f7d9525b624d8cd82"
+    },
+    "status": "complete",
+    "routes": {
+      "forward": {"base": {"allocations": 307900, "allocated": 36779900, "retained": 0, "peak": 82323}, "candidate": {"allocations": 306900, "allocated": 36690200, "retained": 0, "peak": 81179}},
+      "inverse": {"base": {"allocations": 436300, "allocated": 73803400, "retained": 0, "peak": 252189}, "candidate": {"allocations": 416000, "allocated": 72578800, "retained": 0, "peak": 251917}},
+      "noop": {"base": {"allocations": 30100, "allocated": 2301600, "retained": 0, "peak": 3309}, "candidate": {"allocations": 28000, "allocated": 2004600, "retained": 0, "peak": 1848}},
+      "forward_write": {"base": {"allocations": 320600, "allocated": 217352400, "retained": 0, "peak": 605584}, "candidate": {"allocations": 319600, "allocated": 217262700, "retained": 0, "peak": 605584}},
+      "inverse_write": {"base": {"allocations": 443100, "allocated": 170786600, "retained": 0, "peak": 592774}, "candidate": {"allocations": 422800, "allocated": 169562000, "retained": 0, "peak": 592774}},
+      "noop_write": {"base": {"allocations": 30200, "allocated": 2660800, "retained": 0, "peak": 3592}, "candidate": {"allocations": 28100, "allocated": 2363800, "retained": 0, "peak": 3592}}
+    }
+  },
+  "timing": {"native": "not run; coordinator quiet window not granted", "callgrind": "not run"},
+  "prior_attempts": [
+    {"output": "matched-v4-706fc", "status": "failed", "reason": "baseline stream digest assertion hashed the finalized digest a second time"},
+    {"output": "matched-v5-2f4be63", "status": "failed", "reason": "obsolete shared-source equality assertion after both endpoint correctness gates passed"},
+    {"output": "matched-v6-ef013", "status": "stopped", "reason": "stopped while moving source-delta validation before builds"},
+    {"output": "matched-v7-a8779", "status": "stopped", "reason": "stopped on coordinator hold before completion"}
+  ]
+}

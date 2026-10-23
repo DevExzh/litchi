@@ -2628,7 +2628,10 @@ fn exact_transition_proof_package(
 }
 
 enum ProofRelationships<'a> {
-    Current(OwnedRelationships),
+    // A current source token contains the full OPC relationship index, while
+    // closure proofs borrow only their serialized bytes. Box the uncommon
+    // current token so each proof part remains bounded by its borrowed view.
+    Current(Box<OwnedRelationships>),
     Closure { present: bool, bytes: &'a [u8] },
 }
 
@@ -2691,7 +2694,7 @@ fn final_proof_part<'a>(
     Ok(ProofPart {
         content_type: part.content_type(),
         payload: &[],
-        relationships: ProofRelationships::Current(relationships),
+        relationships: ProofRelationships::Current(Box::new(relationships)),
     })
 }
 

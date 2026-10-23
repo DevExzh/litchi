@@ -1,0 +1,67 @@
+{
+  "source": "c3a9a0cef4ae82d64f52f73a9528b0ec36250d29",
+  "pid": 2838327,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v5-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v5"
+  ],
+  "started_unix_seconds": 1792773647.545179,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 213.63834542599943,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v5/check-0.log",
+      "bytes": 937,
+      "sha256": "622bfd248d5e93c2861640d2f08b8bccc24b1207ac53337ff8d35932aed0f614",
+      "target_bytes_before": 3895466267,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-numbers",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 92.35310881400073,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v5/check-1.log",
+      "bytes": 189690,
+      "sha256": "60175070623b92efafffa78b1811770f399be1d77bde4d21119a54afffdf4809",
+      "target_bytes_before": 3921358362,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target/debug/deps/litchi_numbers-7b24f7823b148d4b",
+          "bytes": 35200656,
+          "sha256": "d4ab105b5ab0e2c969e15c4fec048052201b456a7259b0498f12e3c20cff3f1b"
+        }
+      ]
+    }
+  ],
+  "note": "Workspace Clippy passes with all targets/features and warnings denied. Numbers library tests pass: 488 passed, 4 ignored. Exact source c3a9a0cef4; later diagnostic budget changes remain outside this result and full acceptance is still open."
+}

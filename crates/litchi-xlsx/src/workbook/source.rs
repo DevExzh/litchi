@@ -241,8 +241,7 @@ impl SourceOwnerOptions {
         let cache_limits = package.cache_limits();
         owner_options.cache_limits =
             (cache_limits != SourceCacheLimits::default()).then_some(cache_limits);
-        owner_options.package_execution_context =
-            package.execution_context().map(|context| Arc::new(context));
+        owner_options.package_execution_context = package.execution_context().map(Arc::new);
         owner_options
     }
 
@@ -3690,9 +3689,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
             assert!(!styles_cached(&workbook));
             let after = workbook.cache_diagnostics();
@@ -3743,9 +3740,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
 
             let rich = dependency_xlsx(
@@ -3839,9 +3834,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -3891,9 +3884,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -3990,9 +3981,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
             assert!(!styles_cached(&workbook));
             assert_eq!(
@@ -4275,11 +4264,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
             assert_eq!(after.successful_loads, before.successful_loads);
@@ -4405,9 +4392,7 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -4664,11 +4649,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4702,11 +4685,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4748,11 +4729,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4823,11 +4802,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4938,11 +4915,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4982,11 +4957,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -5042,11 +5015,9 @@ mod tests {
                     .inner
                     .dependencies
                     .get()
-                    .map_or(true, |dependencies| {
-                        dependencies.shared_strings.get().is_none()
-                    })
+                    .is_none_or(|dependencies| dependencies.shared_strings.get().is_none())
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();

@@ -21360,7 +21360,10 @@ fn verify_ods_buffered_archive(
         return Err("buffered ODS mimetype member differs from the ODS spreadsheet MIME".into());
     }
     let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
-    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(
+        &manifest_xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let root = manifest
         .get_entry("/")
         .ok_or("buffered ODS manifest root entry is missing")?;
@@ -49990,14 +49993,14 @@ fn run_docx_source_backed_one_edit_save(
             return Err("DOCX source edit differs between iterations".into());
         }
         let replayed = commit.patch().apply(commit.patch().source())?;
-        if replayed.xml_bytes() != commit.snapshot().xml_bytes() {
+        if replayed.xml_bytes() != commit.patch().target().xml_bytes() {
             return Err("DOCX source-edit patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(commit.snapshot())?;
+        let restored = commit.patch().inverse().apply(commit.patch().target())?;
         if restored.xml_bytes() != commit.patch().source().xml_bytes() {
             return Err("DOCX source-edit inverse did not restore main XML".into());
         }
-        if commit.patch().apply(commit.snapshot()).is_ok() {
+        if commit.patch().apply(commit.patch().target()).is_ok() {
             return Err("DOCX source-edit patch accepted a stale target".into());
         }
         verify_docx_source_edit_output(corpus, &sink.bytes)?;

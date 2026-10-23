@@ -3573,6 +3573,90 @@ def p0359re():
     return out
 
 
+@needs("0359qe")
+def p0359qe():
+    """DOC body-toggle evidence with its explicit overlay baseline.
+
+    0359qe is a controlled source-overlay comparison, not a leaf/facade
+    operation pair.  Keep its instruction and heap observations as
+    diagnostic, no-budget rows, and retain the busy-host wall observations as
+    explicitly unqualified native diagnostics.  In particular, do not let a
+    favorable deterministic or host-contaminated value turn into a native
+    acceptance row.
+    """
+    path = RES / "0359qe" / "qualification.json"
+    d = load_json(path)
+    out = []
+    note = (
+        f"{DIAGNOSTIC_NOTE} The controlled baseline is the 3cad source with "
+        "only the recorded body-publication overlay reversed; this is not a "
+        "leaf/facade comparison."
+    )
+    # Every Ir value in this receipt is a labelled candidate/baseline pair.
+    # Read only those explicit pairs; call counts or unrelated metadata do not
+    # become synthetic measurements.
+    expected_callgrind = {
+        f"{route}_{metric}_ir"
+        for route in ("ordinary", "batch")
+        for metric in ("route", "edit_commit", "set_character_property_override", "write_to")
+    }
+    found_callgrind = set()
+    for name, pair in d["callgrind"].items():
+        if not name.endswith("_ir") or not isinstance(pair, dict):
+            continue
+        candidate = pair.get("candidate")
+        baseline = pair.get("baseline")
+        if not isinstance(candidate, (int, float)) or not isinstance(baseline, (int, float)):
+            continue
+        route = "batch" if name.startswith("batch_") else "ordinary"
+        scenario = "body toggle batch route" if route == "batch" else "body toggle ordinary route"
+        size = "1,000 toggles" if route == "batch" else "one toggle"
+        metric = name.removeprefix(f"{route}_").removesuffix("_ir")
+        found_callgrind.add(name)
+        out.append(metric_row(
+            "0359qe", "doc", "batch" if route == "batch" else "set",
+            scenario, size, baseline, candidate, "Ir",
+            f"doc_body_toggle:{route}:{_metric_name(metric)}:callgrind",
+            path, f"Callgrind Ir ({route}, candidate/baseline)",
+            "candidate/baseline", note))
+    if found_callgrind != expected_callgrind:
+        missing = sorted(expected_callgrind - found_callgrind)
+        extra = sorted(found_callgrind - expected_callgrind)
+        raise SystemExit(f"0359qe callgrind pairs changed; missing={missing}, extra={extra}")
+
+    for route, scenario, size in (
+        ("ordinary", "body toggle ordinary route", "one toggle"),
+        ("batch", "body toggle batch route", "1,000 toggles"),
+    ):
+        metric = d["massif"][f"{route}_peak_total_bytes"]
+        candidate = metric["candidate"]
+        baseline = metric["baseline"]
+        out.append(metric_row(
+            "0359qe", "doc", "batch" if route == "batch" else "set",
+            scenario, size, baseline, candidate, "bytes",
+            f"doc_body_toggle:{route}:massif_peak", path,
+            f"Massif peak ({route}, candidate/baseline)",
+            "candidate/baseline", note))
+
+    for route, scenario, size in (
+        ("ordinary", "body toggle ordinary route", "one toggle"),
+        ("batch", "body toggle batch route", "1,000 toggles"),
+    ):
+        metric = d["wall_diagnostic"][f"{route}1k_leaf_write_us_median" if route == "batch" else "ordinary_leaf_write_us_median"]
+        candidate = metric["candidate"]
+        baseline = metric["baseline"]
+        out.append(metric_row(
+            "0359qe", "doc", "batch" if route == "batch" else "set",
+            scenario, size, baseline, candidate, "µs",
+            f"doc_body_toggle:{route}:wall_diagnostic", path,
+            f"Native wall ({route}, diagnostic rejected)",
+            "candidate/baseline", (
+                f"{note} The receipt marks this wall result diagnostic_only "
+                "under host load; quiet-host native timing remains pending."
+            ), verdict="unqualified"))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -3583,7 +3667,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye]
 
 
 

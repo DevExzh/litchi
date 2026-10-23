@@ -211,7 +211,10 @@ fn verify_odt_buffered_compression(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
 
 fn verify_odt_buffered_manifest(archive: &ArchiveReader<'_>) -> Result<(), Box<dyn Error>> {
     let manifest_xml = String::from_utf8(archive.read("META-INF/manifest.xml")?)?;
-    let manifest = litchi_odf_common::core::Manifest::parse(&manifest_xml)?;
+    let manifest = litchi_odf_common::core::Manifest::parse(
+        &manifest_xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )?;
     let root = manifest
         .get_entry("/")
         .ok_or("buffered ODT manifest root entry is missing")?;

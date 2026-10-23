@@ -4338,7 +4338,7 @@ impl DurablePatch {
                 "the source does not match the retained patch base",
             ));
         }
-        Ok(apply_durable_patch(&self.inner, source)?)
+        apply_durable_patch(&self.inner, source)
     }
 
     /// Returns the durable patch that restores the exact source package.
@@ -4401,7 +4401,7 @@ impl SealedPatch {
     /// Returns an error if the source digest differs or the target package no
     /// longer validates as ODT.
     pub fn apply(&self, source: &Package) -> FamilyResult<Package> {
-        Ok(apply_durable_patch(&self.inner, source)?)
+        apply_durable_patch(&self.inner, source)
     }
 }
 

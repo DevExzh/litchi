@@ -1955,7 +1955,7 @@ mod tests {
             limits,
         )
         .unwrap();
-        crate::pkgreader::PackageReader::parse_owned_relationships(&xml.bytes(), &owner, limits)
+        crate::pkgreader::PackageReader::parse_owned_relationships(xml.bytes(), &owner, limits)
             .unwrap();
         let source = OwnedRelationships {
             owner,

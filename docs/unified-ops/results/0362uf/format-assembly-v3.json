@@ -1,0 +1,159 @@
+{
+  "source": {
+    "commit": "3dce711b8e2a03acbb8bcac1e91494c85c14157e",
+    "status": "",
+    "branch": "uo2/coordinator-replay-integration",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+    }
+  },
+  "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+  "policy": {
+    "runner_files": {
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+    },
+    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "memory_max": "20G",
+    "build_jobs": 1,
+    "test_threads": 1,
+    "target_guard_before": 19200000000,
+    "target_guard_after": 20000000000,
+    "free_guard": 12000000000
+  },
+  "selection": {
+    "only": [
+      "fmt"
+    ],
+    "start_at": null,
+    "indexes": [
+      0
+    ],
+    "full_step_count": 53,
+    "partial": true
+  },
+  "started": 1792769958.5957818,
+  "rows": [
+    {
+      "index": 0,
+      "total": 53,
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "environment": {
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+        "CARGO_NET_OFFLINE": "true",
+        "LITCHI_MEM_MAX": "20G",
+        "CARGO_BUILD_JOBS": "1",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_INCREMENTAL": "0"
+      },
+      "exit": 0,
+      "seconds": 28.976844310760498,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3dce/00-fmt.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target_bytes_after": 19050143571,
+      "source_after": {
+        "commit": "3dce711b8e2a03acbb8bcac1e91494c85c14157e",
+        "status": "",
+        "branch": "uo2/coordinator-replay-integration",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_target_trace": [
+        {
+          "pid": "2341950",
+          "cargo_command": "fmt",
+          "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+        }
+      ],
+      "cargo_target_sizes": {
+        "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target": {
+          "bytes": 19050143571
+        }
+      },
+      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3dce/00-cargo-targets.tsv",
+      "cargo_target_trace_bytes": 69,
+      "cargo_target_trace_sha256": "664535b792354fcfa965dc9d36f4b2d6695001b7aa5c44b71f256317fe1e568c",
+      "preflight": {
+        "started": 1792769959.9910076,
+        "target_bytes": 19050143571,
+        "free_bytes": 1923048226816,
+        "builders": [
+          {
+            "pid": 2251176,
+            "ppid": 2251166,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo build --offline --locked --release --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9/tools/perf-baseline-f3/Cargo.toml --example xls_f3_qualification"
+          },
+          {
+            "pid": 2313050,
+            "ppid": 2251176,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9/crates/litchi-xls",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_xls --edition=2024 /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9/crates/litchi-xls/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=3 -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=c5f25424cec3a321 -C extra-filename=-b491cd58af090734 --out-dir /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps -C strip=debuginfo -L dependency=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps --extern bitflags=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libbitflags-16a54aad74e05320.rmeta --extern caseless=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libcaseless-8f5f6e6f809e606c.rmeta --extern chrono=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libchrono-e2b0f051bdf2a9ba.rmeta --extern litchi_biff=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_biff-de9e55ae6ea65fb7.rmeta --extern litchi_cfb=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_cfb-d3b24e636c7f52fe.rmeta --extern litchi_codepage=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_codepage-8d71d1c13b4d6d58.rmeta --extern litchi_core=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_core-d4dc7f8d2fcb720a.rmeta --extern litchi_crypto=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_crypto-73623426ec204946.rmeta --extern litchi_odraw=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_odraw-f4e896b3764ab3b3.rmeta --extern litchi_ograph=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_ograph-3fded8ac18e84b57.rmeta --extern litchi_ole_common=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_ole_common-8196b1877764582e.rmeta --extern litchi_sign=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_sign-34c0d64be3a84b50.rmeta --extern litchi_vba=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/liblitchi_vba-b2ef2c22bb607cd1.rmeta --extern rand=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/librand-966e0018d6e10954.rmeta --extern serde_json=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libserde_json-8561699cf2efbe4e.rmeta --extern unicode_normalization=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libunicode_normalization-6031e4316c1eb213.rmeta --extern zerocopy=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libzerocopy-12d1e5d0bf42957a.rmeta --extern zeroize=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-f3-release/release/deps/libzeroize-f3cecc851551bfc8.rmeta"
+          },
+          {
+            "pid": 2326021,
+            "ppid": 2325993,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-xlsx-feature-budget",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo test --offline --locked -p litchi-xlsx --lib part_edit::tests"
+          },
+          {
+            "pid": 2326453,
+            "ppid": 2326021,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-xlsx-feature-budget",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_xlsx --edition=2024 crates/litchi-xlsx/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --test --cfg feature=\"default\" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values(\"default\", \"encryption\", \"vba-inspection\")) -C metadata=8fcb49c90fd2e099 -C extra-filename=-c39de5850edb4c59 --out-dir /home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps -C strip=debuginfo -L dependency=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps --extern base64=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libbase64-1ea43f4c47235624.rlib --extern bitflags=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libbitflags-a3ea8033d958a9b4.rlib --extern caseless=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libcaseless-64c7c464895f3be0.rlib --extern chrono=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libchrono-939156be5469e548.rlib --extern itoa=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libitoa-812a2061b055b717.rlib --extern litchi_core=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_core-4598a853a387484c.rlib --extern litchi_drawingml=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_drawingml-2fec83ca37b4df0e.rlib --extern litchi_ooxml_common=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_ooxml_common-20212ba409eb4f37.rlib --extern litchi_opc=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_opc-f7ad2c0d48f4a153.rlib --extern litchi_sheet=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_sheet-34dbccf8575de3c9.rlib --extern litchi_spreadsheet_drawing=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_spreadsheet_drawing-7104466ede9b1a6f.rlib --extern litchi_xldm=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/liblitchi_xldm-5521fdac0f52ce09.rlib --extern memchr=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libmemchr-3ccca06e46d831b8.rlib --extern once_cell=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libonce_cell-5ffae3dc441222fd.rlib --extern quick_xml=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libquick_xml-9af3bbdcd7fb552b.rlib --extern ryu=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libryu-92be95c68c281eb6.rlib --extern serde_json=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libserde_json-a54c4446929e49af.rlib --extern sha2=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libsha2-92375c58342e374b.rlib --extern smallvec=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libsmallvec-52503bae96f48754.rlib --extern soapberry_zip=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libsoapberry_zip-23fb26d3d57564af.rlib --extern tempfile=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libtempfile-89567b34d76a3798.rlib --extern thiserror=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libthiserror-ef2d25df41abea81.rlib --extern unicode_normalization=/home/zhuhe/code/litchi-worktrees/.coord/xlsx-feature-budget-target/debug/deps/libunicode_normalization-f064d90174773185.rlib"
+          },
+          {
+            "pid": 2336427,
+            "ppid": 2336407,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo check --offline --locked --all-targets --all-features --keep-going -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-ops"
+          },
+          {
+            "pid": 2337895,
+            "ppid": 2336427,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_xlsx --edition=2024 crates/litchi-xlsx/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --cfg feature=\"default\" --cfg feature=\"encryption\" --cfg feature=\"vba-inspection\" --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values(\"default\", \"encryption\", \"vba-inspection\")) -C metadata=e73c311172b80915 -C extra-filename=-e45a9bf74d24c60f --out-dir /home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps -C strip=debuginfo -L dependency=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps --extern base64=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libbase64-ac9f28db0ae0f58d.rmeta --extern bitflags=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libbitflags-aeccc3a6e3bbd944.rmeta --extern caseless=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libcaseless-a0dac65a6d30baca.rmeta --extern chrono=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libchrono-14299a2181bcab2a.rmeta --extern itoa=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libitoa-2470c3a8186be73c.rmeta --extern litchi_core=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_core-a00b00250fcfc49c.rmeta --extern litchi_crypto=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_crypto-0dca57b65ec0b214.rmeta --extern litchi_drawingml=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_drawingml-7afb0c3af320e106.rmeta --extern litchi_ooxml_common=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_ooxml_common-34af72a596bea4ab.rmeta --extern litchi_opc=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_opc-2f78fff2dd61bb4f.rmeta --extern litchi_sheet=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_sheet-4cfd8d76a4b85d76.rmeta --extern litchi_spreadsheet_drawing=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_spreadsheet_drawing-a9c322615b7c11a7.rmeta --extern litchi_vba=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_vba-e192978010edfb49.rmeta --extern litchi_xldm=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_xldm-412a9cc3a7782c76.rmeta --extern memchr=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libmemchr-18d633f1486392cb.rmeta --extern once_cell=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libonce_cell-51e800961acfbfa0.rmeta --extern quick_xml=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libquick_xml-68220c8f6684876f.rmeta --extern ryu=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libryu-d614a9cacd22b8bf.rmeta --extern serde_json=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libserde_json-f34e70535c6c4a7f.rmeta --extern sha2=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libsha2-20f5620aea3f1b8e.rmeta --extern smallvec=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libsmallvec-7183fad8b9887901.rmeta --extern thiserror=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libthiserror-200beb94c034bfab.rmeta --extern unicode_normalization=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libunicode_normalization-6cc9cc8195253013.rmeta"
+          }
+        ]
+      },
+      "free_bytes_after": 1923130781696,
+      "effective_exit": 0,
+      "status": "passed"
+    }
+  ],
+  "updated": 1792769988.9680536,
+  "finished": 1792769989.938223,
+  "status": "partial-passed"
+}

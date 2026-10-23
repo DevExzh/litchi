@@ -273,10 +273,8 @@ impl Package {
             // physical path's signed managed snapshot fallback without
             // weakening the guard on any changed effective owner.
             if topology.is_noop() {
-                let physical = Self::with_execution(
-                    self.physical_source().map_err(Error::from)?.clone(),
-                    self.execution.clone(),
-                )?;
+                let physical =
+                    Self::with_execution(self.physical_source()?.clone(), self.execution.clone())?;
                 return physical.main_document_snapshot_with_before(
                     operation,
                     source_authorized,
