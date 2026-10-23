@@ -19,9 +19,14 @@ The probes do all semantic and byte checks before starting their timed loops:
 `integrated-route` source delta containing the full resolved baseline and
 candidate commit ids plus every changed, added, or removed archived source
 file with its byte count and SHA-256. Build admission verifies this delta
-before starting Cargo; validation, timing, and collection recompute it from
-the retained source manifests. There is no shared-prefix exception. The
-runner also freezes the lockfile identities, records toolchain and binary hashes,
+before starting Cargo. Each endpoint then generates and retains its own exact
+offline lockfile from the recorded seed; before release builds, the runner
+requires identical common registry names, versions, sources, and checksums and
+requires every added/removed registry package and local edge/feature to match
+the selected source dependency delta. Validation, timing, and collection
+recompute both comparisons from retained source and lock artifacts. There is
+no shared-prefix or blanket lock-drift exception. The runner also freezes the
+lockfile identities, records toolchain and binary hashes,
 requires native and allocation validation for both endpoints, and then runs
 the fixed five-block ABBA protocol (two warmups, 500 ms calibration target,
 150 ms sample minimum, and a 120 s child bound). A build/profiler/benchmark

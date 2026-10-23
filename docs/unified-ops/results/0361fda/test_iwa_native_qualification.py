@@ -237,6 +237,158 @@ class NativeQualificationTests(unittest.TestCase):
                 delta, tampered_maps, "1" * 40, "2" * 40
             )
 
+    def _write_dependency_source(self, root: Path, *, candidate: bool, owner: bool) -> None:
+        packages = {
+            "litchi-iwa-common": "[package]\nname = \"litchi-iwa-common\"\nversion = \"0.1.0\"\n",
+            "litchi-iwa-core": (
+                "[package]\nname = \"litchi-iwa-core\"\nversion = \"0.1.0\"\n\n"
+                "[dependencies]\nlitchi-iwa-common = { path = \"../litchi-iwa-common\" }\n"
+                "snap = \"1\"\n"
+                + ('smallvec = { version = "1", features = ["union"] }\n' if candidate else "")
+            ),
+        }
+        if owner:
+            for name in ("litchi-numbers", "litchi-keynote", "litchi-pages"):
+                packages[name] = (
+                    f"[package]\nname = \"{name}\"\nversion = \"0.1.0\"\n\n"
+                    "[dependencies]\nlitchi-iwa-core = { path = \"../litchi-iwa-core\" }\n"
+                )
+            if candidate:
+                packages["litchi-ops"] = (
+                    "[package]\nname = \"litchi-ops\"\nversion = \"0.1.0\"\n\n"
+                    "[dependencies]\nsha2 = \"0.11\"\n"
+                )
+        for name, contents in packages.items():
+            path = root / "crates" / name / "Cargo.toml"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(contents, encoding="utf-8")
+
+    def _write_dependency_lock(
+        self, path: Path, *, candidate: bool, owner: bool = False, rogue: bool = False
+    ) -> None:
+        dependencies = ["litchi-iwa-common", "snap"]
+        if candidate:
+            dependencies.append("smallvec")
+        if rogue:
+            dependencies.append("rogue")
+        rows = [
+            "version = 4",
+            "",
+            "[[package]]",
+            'name = "litchi-iwa-common"',
+            'version = "0.1.0"',
+            "",
+            "[[package]]",
+            'name = "litchi-iwa-core"',
+            'version = "0.1.0"',
+            "dependencies = [",
+            *[f' "{dependency}",' for dependency in dependencies],
+            "]",
+            "",
+            "[[package]]",
+            'name = "snap"',
+            'version = "1.1.2"',
+            'source = "registry+https://github.com/rust-lang/crates.io-index"',
+            'checksum = "' + "a" * 64 + '"',
+        ]
+        if owner:
+            owner_rows = []
+            for name in ("litchi-numbers", "litchi-keynote", "litchi-pages"):
+                owner_rows.extend(
+                    [
+                        "",
+                        "[[package]]",
+                        f'name = "{name}"',
+                        'version = "0.1.0"',
+                        'dependencies = [',
+                        ' "litchi-iwa-core",',
+                        "]",
+                    ]
+                )
+            rows.extend(owner_rows)
+        if candidate:
+            rows.extend(
+                [
+                    "",
+                    "[[package]]",
+                    'name = "smallvec"',
+                    'version = "1.16.3"',
+                    'source = "registry+https://github.com/rust-lang/crates.io-index"',
+                    'checksum = "' + "b" * 64 + '"',
+                ]
+            )
+        if rogue:
+            rows.extend(
+                [
+                    "",
+                    "[[package]]",
+                    'name = "rogue"',
+                    'version = "9.9.9"',
+                    'source = "registry+https://github.com/rust-lang/crates.io-index"',
+                    'checksum = "' + "c" * 64 + '"',
+                ]
+            )
+        path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
+    def test_endpoint_lock_delta_binds_source_edges_registry_and_features(self) -> None:
+        base_source = self.directory / "constructor-base"
+        candidate_source = self.directory / "constructor-candidate"
+        self._write_dependency_source(base_source, candidate=False, owner=False)
+        self._write_dependency_source(candidate_source, candidate=True, owner=False)
+        base_lock = self.directory / "constructor-base.lock"
+        candidate_lock = self.directory / "constructor-candidate.lock"
+        self._write_dependency_lock(base_lock, candidate=False)
+        self._write_dependency_lock(candidate_lock, candidate=True)
+        delta = RUNNER.lock_delta_manifest(
+            "constructor", base_source, candidate_source, base_lock, candidate_lock
+        )
+        self.assertEqual(delta["registry"]["added"][0]["name"], "smallvec")
+        self.assertEqual(delta["source_dependencies"]["registry_added"], ["smallvec"])
+        self.assertEqual(
+            delta["source_dependencies"]["added"][0]["features"], ["union"]
+        )
+        RUNNER.verify_lock_delta(
+            delta, "constructor", base_source, candidate_source, base_lock, candidate_lock
+        )
+
+        tampered = copy.deepcopy(delta)
+        tampered["registry"]["common"][0]["checksum"] = "0" * 64
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.verify_lock_delta(
+                tampered, "constructor", base_source, candidate_source, base_lock, candidate_lock
+            )
+        tampered = copy.deepcopy(delta)
+        tampered["source_dependencies"]["added"][0]["features"] = []
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.verify_lock_delta(
+                tampered, "constructor", base_source, candidate_source, base_lock, candidate_lock
+            )
+
+        rogue_lock = self.directory / "constructor-rogue.lock"
+        self._write_dependency_lock(rogue_lock, candidate=True, rogue=True)
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.lock_delta_manifest(
+                "constructor", base_source, candidate_source, base_lock, rogue_lock
+            )
+
+    def test_owner_lock_delta_uses_owner_closure_not_unrelated_workspace_edges(self) -> None:
+        base_source = self.directory / "owner-base"
+        candidate_source = self.directory / "owner-candidate"
+        self._write_dependency_source(base_source, candidate=False, owner=True)
+        self._write_dependency_source(candidate_source, candidate=True, owner=True)
+        base_lock = self.directory / "owner-base.lock"
+        candidate_lock = self.directory / "owner-candidate.lock"
+        self._write_dependency_lock(base_lock, candidate=False, owner=True)
+        self._write_dependency_lock(candidate_lock, candidate=True, owner=True)
+        delta = RUNNER.lock_delta_manifest(
+            "owner", base_source, candidate_source, base_lock, candidate_lock
+        )
+        self.assertEqual(delta["source_dependencies"]["registry_added"], ["smallvec"])
+        self.assertNotIn("litchi-ops", delta["source_dependencies"]["packages"])
+        RUNNER.verify_lock_delta(
+            delta, "owner", base_source, candidate_source, base_lock, candidate_lock
+        )
+
     def test_validation_report_requires_all_routes_and_typed_boundaries(self) -> None:
         value = {
             "schema": "litchi.iwa.constructor.validation.v1",
