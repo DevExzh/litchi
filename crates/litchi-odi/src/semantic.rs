@@ -563,18 +563,18 @@ pub struct SemanticPatch {
 }
 
 impl SemanticPatch {
-    pub(crate) fn from_flat_commit(
-        commit: &crate::flat::Commit,
+    pub(crate) fn from_flat_patch(
+        patch: &crate::flat::Patch,
         policy: &SecurityPolicy,
     ) -> Result<Self> {
-        let mut operations = frame_operations(commit.patch().changes());
-        if let Some(change) = commit.patch().metadata_change() {
+        let mut operations = frame_operations(patch.changes());
+        if let Some(change) = patch.metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
         }
         Self::new(
             ArtifactKind::Flat,
-            commit.source().as_bytes(),
-            commit.package().as_bytes(),
+            patch.source().as_bytes(),
+            patch.target().as_bytes(),
             operations,
             policy,
         )
@@ -602,7 +602,7 @@ impl SemanticPatch {
         for change in commit.patch().resource_changes() {
             operations.push(
                 resource_operation(
-                    commit.source().image_ref(),
+                    commit.patch().source().image_ref(),
                     commit.package().image_ref(),
                     change,
                 )
@@ -611,7 +611,7 @@ impl SemanticPatch {
         }
         Self::new(
             ArtifactKind::Package,
-            commit.source().as_bytes(),
+            commit.patch().source().as_bytes(),
             commit.package().as_bytes(),
             operations,
             policy,

@@ -6,6 +6,10 @@ use std::fmt;
 use std::{path::Path, sync::Arc};
 
 pub use crate::authoring::{Builder, ResourceMember};
+pub use litchi_core::edit::Diagnostics;
+
+/// A committed text-web package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 
@@ -376,7 +380,11 @@ impl Package {
                 "the package is not the patch source",
             ));
         }
-        Ok(Commit::replayed(patch.apply(self)?, patch.clone()))
+        Ok(Commit::new(
+            patch.apply(self)?,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Atomically saves the package bytes to `path` (sibling temporary file
@@ -2632,7 +2640,7 @@ impl Edit<'_> {
             && self.structure_lifecycle_changes.is_empty()
             && self.appended.is_empty()
         {
-            return Ok(Commit::unchanged(self.source.clone()));
+            return Ok(unchanged_commit(self.source.clone()));
         }
         let content = crate::codec::compact_for_publication(&replace_texts(
             self.source,
@@ -2659,27 +2667,25 @@ impl Edit<'_> {
         let durable_fragment = published_durable_fragment(&self, &snapshot)?;
         let structure_changes = published_structure_changes(&self, &snapshot)?;
         let structure_lifecycle_changes = published_structure_lifecycle_changes(&self, &snapshot)?;
-        Ok(Commit {
-            snapshot: snapshot.clone(),
-            patch: Patch {
-                source: self.source.clone(),
-                target: snapshot,
-                appended: self.appended,
-                changes: self.changes,
-                durable_fragment,
-                forms_change: self.forms_change,
-                heading_changes: self.heading_changes,
-                inline_changes: self.inline_changes,
-                list_changes: self.list_changes,
-                metadata: self.metadata,
-                payload_changes: self.payload_changes,
-                resource_changes: self.resource_changes,
-                styles: self.styles,
-                structure_changes,
-                structure_lifecycle_changes,
-            },
-            diagnostics: Diagnostics { changed: true },
-        })
+        let package = snapshot.clone();
+        let patch = Patch {
+            source: self.source.clone(),
+            target: snapshot,
+            appended: self.appended,
+            changes: self.changes,
+            durable_fragment,
+            forms_change: self.forms_change,
+            heading_changes: self.heading_changes,
+            inline_changes: self.inline_changes,
+            list_changes: self.list_changes,
+            metadata: self.metadata,
+            payload_changes: self.payload_changes,
+            resource_changes: self.resource_changes,
+            styles: self.styles,
+            structure_changes,
+            structure_lifecycle_changes,
+        };
+        Ok(Commit::new(package, patch, Diagnostics::CHANGED))
     }
 }
 
@@ -3191,92 +3197,25 @@ impl ParagraphChange {
     }
 }
 
-/// A committed immutable package and its exact-source patch.
-pub struct Commit {
-    snapshot: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-/// What one OTH commit changed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the committed package differs from its source package; an
-    /// exact no-op commit returns the source bytes and reports `false`.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
-
-impl Commit {
-    pub(crate) fn replayed(snapshot: Package, patch: Patch) -> Self {
-        Self {
-            diagnostics: Diagnostics {
-                changed: !patch.is_noop(),
-            },
-            snapshot,
-            patch,
-        }
-    }
-
-    fn unchanged(snapshot: Package) -> Self {
-        Self {
-            patch: Patch {
-                appended: Vec::new(),
-                changes: Vec::new(),
-                durable_fragment: None,
-                forms_change: None,
-                heading_changes: Vec::new(),
-                inline_changes: Vec::new(),
-                list_changes: Vec::new(),
-                metadata: PartChange::Keep,
-                payload_changes: Vec::new(),
-                resource_changes: Vec::new(),
-                source: snapshot.clone(),
-                styles: PartChange::Keep,
-                structure_changes: Vec::new(),
-                structure_lifecycle_changes: Vec::new(),
-                target: snapshot.clone(),
-            },
-            snapshot,
-            diagnostics: Diagnostics { changed: false },
-        }
-    }
-
-    /// The committed immutable package.
-    #[must_use]
-    pub fn package(&self) -> &Package {
-        &self.snapshot
-    }
-
-    /// The source-checked reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit changed.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-
-    /// Consumes the commit and returns the published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.snapshot
-    }
-
-    /// Consumes the commit and returns the published package and its patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.snapshot, self.patch)
-    }
+fn unchanged_commit(snapshot: Package) -> Commit {
+    let patch = Patch {
+        appended: Vec::new(),
+        changes: Vec::new(),
+        durable_fragment: None,
+        forms_change: None,
+        heading_changes: Vec::new(),
+        inline_changes: Vec::new(),
+        list_changes: Vec::new(),
+        metadata: PartChange::Keep,
+        payload_changes: Vec::new(),
+        resource_changes: Vec::new(),
+        source: snapshot.clone(),
+        styles: PartChange::Keep,
+        structure_changes: Vec::new(),
+        structure_lifecycle_changes: Vec::new(),
+        target: snapshot.clone(),
+    };
+    Commit::new(snapshot, patch, Diagnostics::UNCHANGED)
 }
 
 /// A source-checked reversible OTH text and structural patch.

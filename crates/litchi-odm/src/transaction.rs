@@ -18,9 +18,13 @@ pub use crate::edit_ops::{
     ResourceChange, ResourceSpec, SectionChange, SectionSpec, SecurityPolicy, StyleChange,
     StyleSpec, SubdocumentSpec,
 };
+pub use litchi_core::edit::Diagnostics;
 pub use litchi_odf_common::{Error, LimitKind};
 
 type FamilyResult<T> = std::result::Result<T, Error>;
+
+/// A committed master package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 macro_rules! family_invalid {
     ($($arg:tt)*) => {
@@ -781,10 +785,15 @@ impl<'source> Edit<'source> {
             || !self.styles.is_empty()
             || !self.resources.is_empty();
         if !title_changed && link_changes.is_empty() && !extended_changed {
+            let patch = Patch {
+                before: self.source.shared_bytes(),
+                after: self.source.shared_bytes(),
+                changes: ChangeSet::default(),
+            };
             return Ok(Commit::new(
-                self.source,
                 self.source.clone(),
-                ChangeSet::default(),
+                patch,
+                Diagnostics::UNCHANGED,
             ));
         }
 
@@ -889,10 +898,10 @@ impl<'source> Edit<'source> {
             before: self.title_before,
             after: self.title_after,
         });
-        Ok(Commit::new(
-            self.source,
-            snapshot,
-            ChangeSet {
+        let patch = Patch {
+            before: self.source.shared_bytes(),
+            after: snapshot.shared_bytes(),
+            changes: ChangeSet {
                 title,
                 links: link_changes,
                 metadata: if explicit_metadata {
@@ -909,7 +918,9 @@ impl<'source> Edit<'source> {
                 styles: self.styles,
                 resources: self.resources.into_values().collect(),
             },
-        ))
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
     }
 }
 
@@ -1059,75 +1070,6 @@ impl MetadataChange {
     }
 }
 
-/// A fully validated unified transaction result.
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-}
-
-impl Commit {
-    pub(crate) fn replayed(package: Package, patch: Patch) -> Self {
-        Self { package, patch }
-    }
-
-    fn new(source: &Package, package: Package, changes: ChangeSet) -> Self {
-        Self {
-            patch: Patch {
-                before: source.shared_bytes(),
-                after: package.shared_bytes(),
-                changes,
-            },
-            package,
-        }
-    }
-
-    /// Returns the published immutable package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Returns the exact-source-checked reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Returns content-free facts about this commit.
-    #[must_use]
-    pub fn diagnostics(&self) -> Diagnostics {
-        Diagnostics {
-            changed: !self.patch.is_noop(),
-        }
-    }
-
-    /// Consumes the commit and returns its published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consumes the commit into its published package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
-
-/// Content-free facts about one [`Commit`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Returns whether the commit published bytes different from its source.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
-
 /// An exact-source-checked reversible unified patch.
 #[derive(Clone)]
 pub struct Patch {
@@ -1203,7 +1145,7 @@ impl Patch {
         stage_changes(&mut edit, &self.changes).map_err(MergeError::Invalid)?;
         stage_changes(&mut edit, &other.changes).map_err(MergeError::Invalid)?;
         edit.commit_core()
-            .map(|commit| commit.patch)
+            .map(|commit| commit.into_parts().1)
             .map_err(MergeError::Invalid)
     }
 
@@ -1342,22 +1284,22 @@ impl History {
     ///
     /// Returns an error for stale lineage, size overflow, or exceeded bounds.
     pub fn record(&mut self, commit: &Commit) -> FamilyResult<Vec<Package>> {
-        if !commit.patch.is_applicable_to(self.current()) {
+        if !commit.patch().is_applicable_to(self.current()) {
             return Err(Error::patch_conflict(
                 "odm.history.record",
                 "the patch source does not match the package",
             ));
         }
-        let weight = u64::try_from(commit.patch.before.len())
+        let weight = u64::try_from(commit.patch().before.len())
             .ok()
             .and_then(|before| {
-                u64::try_from(commit.patch.after.len())
+                u64::try_from(commit.patch().after.len())
                     .ok()
                     .and_then(|after| before.checked_add(after))
             })
             .ok_or_else(|| invalid("ODM history transition weight overflow"))?;
         self.inner
-            .record(commit.package.clone(), weight)
+            .record(commit.package().clone(), weight)
             .map_err(patch_wire_error)
             .map_err(Error::from)
     }

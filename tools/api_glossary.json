@@ -13875,6 +13875,18 @@
           "recursive": false
         },
         {
+          "name": "semantic_patch",
+          "scope": "litchi_odi::flat::Commit",
+          "replacement": "use litchi_odi::flat::Patch::semantic_patch (record 0362uqc)",
+          "recursive": false
+        },
+        {
+          "name": "source",
+          "scope": "litchi_odi::flat::Commit",
+          "replacement": "use commit.patch().source() for exact source provenance (record 0362uqc)",
+          "recursive": false
+        },
+        {
           "name": "apply",
           "scope": "litchi_odi::Patch",
           "replacement": "use Package::apply(&patch) (ADR 0034 \u00a73)",

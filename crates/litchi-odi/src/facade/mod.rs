@@ -9,9 +9,13 @@ use litchi_odf_common::{
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+pub use litchi_core::edit::Diagnostics;
 use litchi_odf_common::{Error as PackageError, OpenOptions};
 
 type PackageResult<T> = std::result::Result<T, PackageError>;
+
+/// A committed image package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// The immutable, cheap-to-clone ODI owner snapshot.
 ///
@@ -340,13 +344,11 @@ impl Package {
                 "the package is not the patch source",
             ));
         }
-        Ok(Commit {
-            package: patch.apply(self)?,
-            diagnostics: Diagnostics {
-                changed: !patch.is_noop(),
-            },
-            patch: patch.clone(),
-        })
+        Ok(Commit::new(
+            patch.apply(self)?,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }
 
@@ -1001,16 +1003,13 @@ impl Edit<'_> {
                 "ODI styles.xml edit failed semantic readback".to_string(),
             ));
         }
-        let diagnostics = Diagnostics {
-            changed: !changes.is_empty()
-                || !resource_changes.is_empty()
-                || style_change.is_some()
-                || metadata_change.is_some(),
-        };
-        Ok(Commit {
-            package: snapshot.clone(),
-            diagnostics,
-            patch: Patch {
+        let changed = !changes.is_empty()
+            || !resource_changes.is_empty()
+            || style_change.is_some()
+            || metadata_change.is_some();
+        Ok(Commit::new(
+            snapshot.clone(),
+            Patch {
                 source: self.source.clone(),
                 target: snapshot,
                 changes,
@@ -1022,7 +1021,8 @@ impl Edit<'_> {
                 metadata_change: metadata_change.clone(),
                 inverse_metadata_change: metadata_change.as_ref().map(MetadataChange::inverse),
             },
-        })
+            Diagnostics::new(changed),
+        ))
     }
 
     fn stage_resource(
@@ -1168,65 +1168,6 @@ impl ResourceEdit {
             before_size: self.before_size,
             after_size: self.after_bytes.as_ref().map(Vec::len),
         }
-    }
-}
-
-/// What a committed package edit changed.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the published package differs from its source (`false` for
-    /// an exact no-op, whose package is the source byte-for-byte).
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
-
-/// A committed immutable image package and its exact-source patch.
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Returns the committed package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Returns the reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Returns what the commit changed.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-
-    /// Returns the exact source package accepted by this commit.
-    pub(crate) const fn source(&self) -> &Package {
-        &self.patch.source
-    }
-
-    /// Consumes this commit into its published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consumes this commit into its published package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
     }
 }
 

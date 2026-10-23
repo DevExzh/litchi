@@ -7,6 +7,10 @@ use std::{collections::BTreeSet, path::Path, sync::Arc};
 
 pub use crate::authoring::Builder;
 use crate::authoring::Definition;
+pub use litchi_core::edit::Diagnostics;
+
+/// A committed chart package: the published package, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 type FamilyResult<T> = Result<T, crate::Error>;
 
@@ -443,11 +447,11 @@ impl Package {
                 "the package is not the patch source",
             ));
         }
-        Ok(Commit {
-            package: Self::from_chart(patch.apply(&self.chart)?),
-            changed: !patch.is_noop(),
-            patch: patch.clone(),
-        })
+        Ok(Commit::new(
+            Self::from_chart(patch.apply(&self.chart)?),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Atomically replace `path` with this package (full durability).
@@ -1111,10 +1115,9 @@ impl Edit<'_> {
             }
         }
         let changed = self.source.as_bytes() != snapshot.as_bytes();
-        Ok(Commit {
-            package: Package::from_chart(snapshot.clone()),
-            changed,
-            patch: Patch {
+        Ok(Commit::new(
+            Package::from_chart(snapshot.clone()),
+            Patch {
                 source: self.source.clone(),
                 target: snapshot,
                 changes,
@@ -1125,7 +1128,8 @@ impl Edit<'_> {
                 resource_changes,
                 definition_changes,
             },
-        })
+            Diagnostics::new(changed),
+        ))
     }
 }
 
@@ -1146,61 +1150,6 @@ impl ResourceEdit {
             before_size: self.before_bytes.as_ref().map(Vec::len),
             after_size: self.after_bytes.as_ref().map(Vec::len),
         }
-    }
-}
-
-/// A committed immutable chart package and its reversible patch.
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Borrow the published immutable package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Borrow the exact-source reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free facts about this commit.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        Diagnostics {
-            changed: self.changed,
-        }
-    }
-
-    /// Consume the commit into its published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its published package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
-
-/// Content-free facts about one [`Commit`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether publication changed the package bytes.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
     }
 }
 
