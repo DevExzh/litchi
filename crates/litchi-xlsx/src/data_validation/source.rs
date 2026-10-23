@@ -143,13 +143,11 @@ impl Edit {
     }
 
     /// Resolve the exact source state observed by this edit.
-    #[must_use]
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
     /// Complete staged data-validation collections.
-    #[must_use]
     pub fn collections(&self) -> Result<&[Collection]> {
         self.effective()
     }

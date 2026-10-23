@@ -138,13 +138,11 @@ impl Edit {
     }
 
     /// Resolve the exact source state observed by this edit.
-    #[must_use]
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
     /// Complete staged protection metadata.
-    #[must_use]
     pub fn metadata(&self) -> Result<&Metadata> {
         self.effective()
     }

@@ -138,13 +138,11 @@ impl Edit {
     }
 
     /// Resolve the exact source state observed by this edit.
-    #[must_use]
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
     /// Currently staged page-margin state.
-    #[must_use]
     pub fn page_margins(&self) -> Result<Option<&Margins>> {
         self.effective()
     }

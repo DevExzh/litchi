@@ -139,13 +139,11 @@ impl Edit {
         }
     }
 
-    #[must_use]
     /// Resolve the exact source state observed by this edit.
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
-    #[must_use]
     /// Complete ordered collection currently staged for publication.
     pub fn collections(&self) -> Result<&[Formatting]> {
         self.effective()

@@ -156,13 +156,11 @@ impl Edit {
     }
 
     /// Resolve the exact source state observed by this edit.
-    #[must_use]
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
     /// Currently staged defined names in workbook order.
-    #[must_use]
     pub fn defined_names(&self) -> Result<&[DefinedName]> {
         self.effective_names()
     }

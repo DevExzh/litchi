@@ -384,7 +384,6 @@ impl Edit {
     }
 
     /// Resolve the exact source snapshots observed by this transaction.
-    #[must_use]
     pub fn before(&self) -> Result<&MultiSnapshot> {
         self.resolve_before()
     }
@@ -402,7 +401,6 @@ impl Edit {
     }
 
     /// Number of selected worksheet owners.
-    #[must_use]
     pub fn worksheet_count(&self) -> Result<usize> {
         Ok(self.resolve_before()?.len())
     }

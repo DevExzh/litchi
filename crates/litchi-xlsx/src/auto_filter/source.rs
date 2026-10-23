@@ -141,13 +141,11 @@ impl Edit {
     }
 
     /// Resolve the exact source state observed by this edit.
-    #[must_use]
     pub fn before(&self) -> Result<&Snapshot> {
         self.resolve_before()
     }
 
     /// Complete currently staged filter and sort state.
-    #[must_use]
     pub fn auto_filter(&self) -> Result<Option<&Definition>> {
         self.effective()
     }
