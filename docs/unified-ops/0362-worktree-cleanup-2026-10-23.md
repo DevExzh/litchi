@@ -532,7 +532,7 @@ python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/qua
 confirmed to be an unregistered duplicate checkout. Its `.git` file points to
 the valid registration
 `/home/zhuhe/code/litchi/.git/worktrees/uo2-odf-facade-runtime-v12`, whose
-real registered sparse leaf remains at
+real registered leaf remains at
 `/home/zhuhe/code/litchi-worktrees/uo2-odf-facade-runtime-v12` on branch
 `uo2/odf-facade-runtime-v12`, HEAD
 `dbcb23941b0f31909c7ded27269fd14c0c9aa5f2`.
@@ -555,7 +555,7 @@ python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/qua
 ```
 
 The restore helper requires the original partial path to be absent and leaves
-the valid registered sparse leaf untouched. The external manifest records the
+the valid registered leaf untouched. The external manifest records the
 exact source pointer, branch, HEAD, paths, modes, sizes, and SHA-256 values.
 
 ### Retained signed replay leaf
@@ -573,3 +573,67 @@ External receipt: `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-202
 partial with `python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/restore.py`,
 then run `python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/build-manifest.py`.
 No complete manifest or target binary is committed.
+
+## Twelfth cleanup: four merged source leaves
+
+The following tracked-clean, inactive leaves were verified as ancestors of
+integration `d20e6ffbaa6d5907db0e31bf4c03732df7937511` (which contains
+diagnostic `f25b55ca77f2fdf262975dce8c1f7338406bc65f`). Each had zero active
+process cwd/file-descriptor users and no top-level target, binary, capture,
+native, portable, or protected measurement directory:
+
+- `uo2/consumer-v9-facade-batch` at `6995c497f5570c92fe2f6cc5b7e9eef1b6095a48`:
+  6,262,079,889 apparent bytes.
+- `uo2/coordinator-durable-ink` at `f97f0eef7a3622f68cd972f2b183c721dfedcf23`:
+  6,255,818,948 apparent bytes.
+- `uo2/coordinator-return-contract` at `0dfb00b5902b84179485f9756b7454efaab6920d`:
+  6,262,741,276 apparent bytes.
+- `uo2/coordinator-w8-part-a` at `fd5f513df62ee8a824d3bb9a6fed4b857514b5dd`:
+  6,256,383,347 apparent bytes.
+
+All four were removed with `git worktree remove` without `--force`. Their
+branch refs remain. The apparent checkout total removed was 25,037,023,460
+bytes. Twenty-five ignored generated lock/bytecode files totaling 8,173,100
+bytes were moved, not deleted, to the external quarantine. The manifest with
+relative paths, sizes, and SHA-256 values is
+`quarantine/twelfth-wave/manifest.json`, SHA-256
+`0b2f36891d121215a0cc7efdc903595b5df6de4886f0c971839c00aa27fdca91`.
+
+Recreate the branches and restore those generated files with:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-consumer-v9-facade-batch uo2/consumer-v9-facade-batch
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-coordinator-durable-ink uo2/coordinator-durable-ink
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-coordinator-return-contract uo2/coordinator-return-contract
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-coordinator-w8-part-a uo2/coordinator-w8-part-a
+python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twelfth-wave/restore.py
+```
+
+## Leaves retained
+
+The coordinator constructors leaf has an ignored 24 GB target and an active
+measurement descriptor (PID 3385965). The coordinator W4 leaf has active
+measurement descriptors (PID 647768). W7 DOCX and XLSX rich-transfer leaves
+have an active evidence descriptor (PID 1547392). DOC toggle has a protected
+target. DOCX ink-perf and OPC stream-restore retain tracked performance
+evidence. These were not touched.
+
+All explicitly active/protected lanes were retained: trunk, coordinator
+metadata integration, budget validation, signed PPTX/XLSB/replay, final
+contract inventory, DOCX runtime, XLSX normalization, IWA qualification,
+legacy safe-runner, W8 readiness, and all `.coord` baseline/build/evidence
+worktrees. Targets, native binaries, external evidence, dirty leaves, and
+measurement artifacts were not moved.
+
+## ODF and legacy incomplete checkouts
+
+The registered `uo2/odf-facade-runtime-v12` leaf at
+`dbcb23941b0f31909c7ded27269fd14c0c9aa5f2` remains untouched. It is not a
+sparse checkout: 460,304 tracked paths are absent from its worktree. No
+discard or force removal is safe. A future cleanup must first restore the
+missing tracked paths from `HEAD` (or create and verify a separate complete
+checkout), then re-audit users and protected evidence before any removal.
+The empty `uo2/legacy-replay-errors` worktree was likewise retained because
+its tracked paths are absent and its state is ambiguous.
+
+The coordinator verified all 25 quarantine file hashes and sizes, retained branch refs and removed path absence. The external receipt is /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twelfth-wave/receipt.md (3560 bytes, SHA-256 `657e21e9403c8fd83befe96ba4f0078173f1e38301329fcc743a0d17c600c96c`). The manifest is 4,803 bytes. No build or measurement artifact was removed.
