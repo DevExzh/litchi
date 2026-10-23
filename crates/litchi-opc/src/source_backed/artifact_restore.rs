@@ -985,8 +985,10 @@ impl<G: ArtifactStreamGuard> Write for GuardedArtifactSink<'_, '_, G> {
             }
         }
         if self.failure.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
+            // `Write::write_all` retries `Interrupted` indefinitely. A
+            // format-owned guard refusal is terminal for this one-shot
+            // publication, while `failure` retains the typed cause.
+            return Err(io::Error::other(
                 "artifact stream publication guard refused output",
             ));
         }
@@ -1000,8 +1002,7 @@ impl<G: ArtifactStreamGuard> Write for GuardedArtifactSink<'_, '_, G> {
             }
         }
         if self.failure.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
+            return Err(io::Error::other(
                 "artifact stream publication guard refused output",
             ));
         }
@@ -3305,6 +3306,38 @@ mod tests {
                 target.publish_source_artifact(&self.second)
             }
         }
+    }
+
+    struct RefusingGuard {
+        checks: AtomicUsize,
+    }
+
+    impl ArtifactStreamGuard for RefusingGuard {
+        type Error = ();
+
+        fn check(&self) -> std::result::Result<(), Self::Error> {
+            self.checks.fetch_add(1, AtomicOrdering::SeqCst);
+            Err(())
+        }
+    }
+
+    #[test]
+    fn guard_refusal_is_terminal_for_write_all() {
+        let guard = RefusingGuard {
+            checks: AtomicUsize::new(0),
+        };
+        let mut output = Vec::new();
+        let mut sink = GuardedArtifactSink {
+            inner: &mut output,
+            guard: &guard,
+            failure: None,
+        };
+        let error = sink
+            .write_all(b"guarded output")
+            .expect_err("a refused guard must stop write_all");
+        assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(guard.checks.load(AtomicOrdering::SeqCst), 1);
+        assert!(output.is_empty());
     }
 
     #[test]
