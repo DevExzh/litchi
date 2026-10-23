@@ -27,6 +27,8 @@ The ODG correction and ODB/ODM correction are now assembled at
 | Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi, correction in progress. |
 | PPT | Primary and metadata edits serialize and parse the whole CFB. `scoped::Base::capture` copies `to_encrypted_bytes()` into a new shared buffer. | 0362ugj, correction required. |
 | PPTX | In-memory `Package::edit` captures all slides, notes and name indexes and fingerprints parts; opened edit construction also clones the slide vector and name index. | 0362ugk, correction required. Source-backed primary and staged part constructors are already cheap. |
+| DOCX | Ordinary and source-backed document entry parses/indexes main XML; Ink scans package parts and bindings; OPC edit clones graph metadata; several source-backed document families capture source projections at entry. | 0362ugl, correction in progress. Main-part `blob_arc()` itself is cheap; subsequent snapshot parsing is the cost. |
+| XLSB | Primary and cell-value constructors serialize source before-images; several owner families read/clone selected graphs, and a cold `From<OpcPackage>` projection can materialize through generic staged entry. | 0362ugm, correction in progress. |
 
 PPT's accepted 0362j work repairs replay and first-commit digest cost. It
 does not authorize serialization at edit construction; the new finding is
@@ -35,6 +37,21 @@ findings. RTF's opened source tail-append entry remains cheap; its committed
 deferred owner rematerialization is explicitly covered by 0359a. Likewise,
 0358a's explicit rematerialization of a previously committed deferred ODS
 owner is distinct from eager work on pristine source edit entry.
+
+The remaining ODF owner audit was checked directly against the `8779d059ad`
+tree. ODC and ODI facade edits clone flat snapshot Arcs; OTH and formula edits
+retain a source reference and empty staging vectors. Their package snapshots,
+and ODT's archive data and prepared index, are Arc-backed. Common metadata
+entry only clones the owner. No source-sized edit-entry scan or payload copy
+was found in these routes. This covers the separate ODC/ODI/OTH/formula crates
+as well as ODT; the auditor's earlier assumption that they all route through
+ODT was corrected before this disposition was recorded.
+
+OLE-common object Package and OGraph Package entry retain shared source state.
+The bounded DataSpaces, smart-tag, toolbar and similar codec Snapshot editors
+are separately scoped by 0359; model/draft cloning there is not an archive
+Package entry or a newly copied archive-part snapshot. Those observations do
+not expand the Package O(1) finding to unrelated raw codec drafts.
 
 ## Review and validation boundary
 
