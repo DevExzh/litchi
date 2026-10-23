@@ -122,14 +122,26 @@ impl Edit {
     }
 
     fn ensure_open(&mut self) -> Result<()> {
-        let Some((base, _)) = self.lazy.take() else {
+        let Some((base, lazy_bytes)) = self.lazy.take() else {
             return Ok(());
         };
         let package = base
             .clone()
             .ok_or_else(|| Error::InvalidData("pivot-view edit lost its source package".into()))?;
-        let (_, bytes) = crate::scoped::capture(&package)?;
-        let eager = Self::open(base, bytes)?;
+        let (_, bytes) = match crate::scoped::capture(&package) {
+            Ok(captured) => captured,
+            Err(error) => {
+                self.lazy = Some((base, lazy_bytes));
+                return Err(error);
+            },
+        };
+        let eager = match Self::open(base.clone(), bytes) {
+            Ok(eager) => eager,
+            Err(error) => {
+                self.lazy = Some((base, lazy_bytes));
+                return Err(error);
+            },
+        };
         self.original = eager.original;
         self.original_tables = eager.original_tables;
         self.tables = eager.tables;

@@ -109,13 +109,14 @@ macro_rules! source_family {
             }
         }
 
-        #[allow(dead_code, reason = "cell-family publication defers its composed reopen")]
         fn published(
             before: &crate::SourceBackedWorkbook,
             plan: litchi_cfb::ValidatedOverlayPlan,
             diagnostics: Diagnostics,
         ) -> crate::Result<Commit> {
-            let after = before.committed(plan).map_err($crate::source_backed::workbook_error)?;
+            let after = before
+                .committed_deferred(plan)
+                .map_err($crate::source_backed::workbook_error)?;
             let patch = Patch {
                 before: before.clone(),
                 after: after.clone(),

@@ -2,7 +2,7 @@ use litchi_cfb::{OleWriter, SharedOleFile};
 use litchi_core::sheet::{Cell as CellTrait, CellValue, WorkbookTrait, Worksheet as _};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
-    OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
+    OwnedSource, Position, ReadAt, SourceVersion, TextOutputError, TextOutputOptions,
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
@@ -2199,6 +2199,114 @@ fn deferred_numeric_fixture() -> (
     panic!("generated deferred fixture has no numeric cell");
 }
 
+fn deferred_comment_fixture() -> (Arc<CountingSource>, SourceBackedWorkbook) {
+    let mut builder = litchi_xls::Builder::new();
+    let sheet = builder.add_worksheet("Comments").unwrap();
+    builder
+        .add_comment(sheet, 0, 0, "Author", "original")
+        .unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    (source, workbook)
+}
+
+fn deferred_visibility_fixture() -> (Arc<CountingSource>, SourceBackedWorkbook) {
+    let mut builder = litchi_xls::Builder::new();
+    builder.add_worksheet("Visible").unwrap();
+    builder.add_worksheet("Other").unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    (source, workbook)
+}
+
+#[test]
+fn source_backed_comments_fence_commit_output_replay_and_inverse() {
+    let (source, workbook) = deferred_comment_fixture();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+    )
+    .unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.commit(),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+
+    let (source, workbook) = deferred_comment_fixture();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = commit.package().clone();
+    let mut output = Vec::new();
+    target.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
+    source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        target.write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    assert!(matches!(
+        workbook.apply_comments(commit.patch()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        target.apply_comments(&commit.patch().inverse()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn source_backed_visibility_fences_commit_output_replay_and_inverse() {
+    let (source, workbook) = deferred_visibility_fixture();
+    let mut edit = workbook.edit_sheet_visibility().unwrap();
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Visible"))
+        .unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.commit(),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+
+    let (source, workbook) = deferred_visibility_fixture();
+    let mut edit = workbook.edit_sheet_visibility().unwrap();
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Visible"))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = commit.package().clone();
+    let mut output = Vec::new();
+    target.write_to(&mut output).unwrap();
+    assert!(!output.is_empty());
+    source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        target.write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    assert!(matches!(
+        workbook.apply_sheet_visibility(commit.patch()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+    assert!(matches!(
+        target.apply_sheet_visibility(&commit.patch().inverse()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
 fn assert_inflight_projection_source_change(
     operation: impl FnOnce(&SourceBackedWorksheet) -> Result<(), SourceBackedError>,
 ) {
@@ -2406,6 +2514,32 @@ fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
             u32::from(reference.column()),
         ),
         Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_and_replay() {
+    let (source, deferred, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    let handoff = Package::from_source(deferred.source_workbook().unwrap().clone()).unwrap();
+
+    let mut edit = handoff.edit().unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.source_cell(sheet_index, reference),
+        Err(litchi_xls::EditError::Package(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        )))
+    ));
+
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let handoff = Package::from_source(deferred.source_workbook().unwrap().clone()).unwrap();
+    let patch = handoff.edit().unwrap().commit().unwrap().patch().clone();
+    source.bump();
+    assert!(matches!(
+        handoff.apply(&patch),
+        Err(litchi_xls::EditError::Package(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        )))
     ));
 }
 

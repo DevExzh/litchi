@@ -441,6 +441,11 @@ impl fmt::Debug for Edit {
 struct SourceGuard {
     source: Arc<SharedOleFile>,
     expected: SourceVersion,
+    /// A deferred or handed-off source owner retains the original dynamic
+    /// source separately from its composed CFB target.  Keep that owner in
+    /// the primary package guard so a mutation is promoted to the typed
+    /// `SourceChanged` result before the composed target can report I/O.
+    original: Option<crate::SourceBackedWorkbook>,
 }
 
 /// Demand-driven semantic snapshot for the primary edit.
@@ -1150,13 +1155,20 @@ impl Package {
 
 fn capture_source_guard(package: &Package) -> Result<Option<SourceGuard>> {
     match &package.inner.state {
-        PackageState::Source { cfb, .. } => {
+        PackageState::Source { cfb, workbook, .. } => {
+            let original = workbook.needs_source_fence().then(|| workbook.clone());
+            if let Some(workbook) = &original {
+                workbook
+                    .ensure_current()
+                    .map_err(|error| Error::Package(PackageError::Source(error)))?;
+            }
             let expected = cfb.source_version().map_err(|error| {
                 Error::Package(PackageError::Source(SourceBackedError::from(error)))
             })?;
             Ok(Some(SourceGuard {
                 source: Arc::clone(cfb),
                 expected,
+                original,
             }))
         },
         PackageState::Eager { .. } => Ok(None),
@@ -1167,6 +1179,11 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
     let Some(guard) = guard else {
         return Ok(());
     };
+    if let Some(workbook) = &guard.original {
+        workbook
+            .ensure_current()
+            .map_err(|error| Error::Package(PackageError::Source(error)))?;
+    }
     let observed = guard
         .source
         .source_version()

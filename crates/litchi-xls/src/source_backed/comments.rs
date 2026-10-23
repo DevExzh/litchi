@@ -95,6 +95,7 @@ impl Edit {
     /// length-changing edit, or a failed readback.
     pub fn commit(self) -> Result<Commit> {
         let source = self.source.clone();
+        source.ensure_original_source_current()?;
         let inner = match self.inner {
             Some(inner) => inner,
             None => {
@@ -107,7 +108,10 @@ impl Edit {
             },
         };
         let (plan, diagnostics) = inner.commit_source_backed()?.into_plan();
-        published(&source, plan, diagnostics)
+        source.ensure_original_source_current()?;
+        let commit = published(&source, plan, diagnostics)?;
+        source.ensure_original_source_current()?;
+        Ok(commit)
     }
 }
 

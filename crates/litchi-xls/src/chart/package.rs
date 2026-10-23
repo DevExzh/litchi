@@ -144,11 +144,23 @@ impl Edit {
     }
 
     fn ensure_open(&mut self) -> Result<()> {
-        let Some((_, package, limits)) = self.lazy.take() else {
+        let Some((base, package, limits)) = self.lazy.take() else {
             return Ok(());
         };
-        let (base, bytes) = crate::scoped::capture(&package)?;
-        let eager = Self::open_based(base, bytes, limits)?;
+        let (captured_base, bytes) = match crate::scoped::capture(&package) {
+            Ok(captured) => captured,
+            Err(error) => {
+                self.lazy = Some((base, package, limits));
+                return Err(error);
+            },
+        };
+        let eager = match Self::open_based(captured_base, bytes, limits) {
+            Ok(eager) => eager,
+            Err(error) => {
+                self.lazy = Some((base, package, limits));
+                return Err(error);
+            },
+        };
         self.base = eager.base;
         self.package = eager.package;
         self.workbook_path = eager.workbook_path;
@@ -659,6 +671,7 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn reorder_at(&mut self, sheet_index: usize, object_ids: &[u16]) -> Result<()> {
+        self.ensure_open()?;
         let (_, sheets) = bindings(&self.workbook)?;
         let sheet = sheets
             .iter()

@@ -49,3 +49,23 @@ rerun of that final focused command is required when the coordinator returns a
 Cargo slot; this record makes no native performance or qualification claim.
 
 No benchmark or native ABBA run was performed.
+
+## Review follow-up
+
+The deferred source-owner review added the remaining freshness boundaries in
+this successor: comments and worksheet visibility now fence the original
+source before planning, after plan validation, and after deferred publication;
+their committed owners retain the deferred overlay instead of reopening it at
+commit time. The chart and pivot editors restore their private lazy state when
+capture or parsing fails, and chart `reorder_at` opens the deferred editor
+before inspecting its workbook. The primary package edit/replay guard now
+retains the original dynamic source across `Package::from_source` handoff, so
+an original mutation is reported as typed `SourceChanged` rather than target
+I/O. Focused source-backed tests cover comment/visibility commit, write,
+replay and inverse freshness plus primary handoff edit/replay.
+
+The broad all-target XLS suite was started under the capped target but
+intentionally interrupted when these review blockers were reported; its
+partial external log is diagnostic only. Full XLS tests, all-target/all-feature
+Clippy, and affected facade/native consumer checks remain pending a fresh
+coordinator slot. No native timing or qualification claim is made here.
