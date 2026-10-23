@@ -3134,24 +3134,15 @@ impl Patch {
 /// Count one immutable workbook endpoint without forcing lazy projections.
 /// The optional archive hint is charged for every endpoint: source-backed
 /// descendants can share a retained ZIP, but a history budget must account
-/// for each endpoint independently. Fields that are private lazy caches and
-/// cannot be observed without forcing work are represented by their
-/// owner/container sizes rather than by an allocator-footprint claim.
-///
-/// The second result is the part of that endpoint occupied by semantic
-/// caches which a package-family reopen intentionally drops. Keeping the two
-/// values from one walk lets an owner admission project the cold target
-/// without a second package census.
-pub(crate) fn workbook_retained_bytes_with_warm_cache(
-    workbook: &Workbook,
-    archive_hint: usize,
-) -> (usize, usize) {
+/// for each endpoint independently. Derived cell and shared-string read
+/// caches are intentionally excluded: reading must not change the semantic
+/// retained-data admission charge.
+pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
     let package = &workbook.inner.package;
     let mut bytes = size_of_val(workbook)
         .saturating_add(size_of_val(workbook.inner.as_ref()))
         .saturating_add(size_of_val(package))
         .saturating_add(archive_hint);
-    let mut warm_cache_bytes = 0;
 
     bytes = bytes
         .saturating_add(workbook.inner.workbook_uri.as_str().len())
@@ -3177,28 +3168,6 @@ pub(crate) fn workbook_retained_bytes_with_warm_cache(
             .saturating_add(sheet.name_key.len())
             .saturating_add(sheet.part_uri.as_str().len())
             .saturating_add(sheet.relationship_id.capacity());
-        if let Some(store) = sheet.cells.get() {
-            // The sparse store's payload vectors are private to the cell
-            // module. Its value is still a retained owner allocation, so
-            // count the fixed store and record counts here; the XML payload
-            // itself is charged below through the package part.
-            let retained = size_of_val(store).saturating_add(
-                store
-                    .stored_cell_count()
-                    .saturating_mul(size_of::<Stored>()),
-            );
-            bytes = bytes.saturating_add(retained);
-            warm_cache_bytes = warm_cache_bytes.saturating_add(retained);
-        }
-    }
-
-    if let Some(strings) = workbook.inner.shared_strings.get() {
-        let mut retained = size_of_val(strings.as_ref());
-        for text in strings.iter() {
-            retained = retained.saturating_add(text.as_str().len());
-        }
-        bytes = bytes.saturating_add(retained);
-        warm_cache_bytes = warm_cache_bytes.saturating_add(retained);
     }
     for name in &workbook.inner.external_reference_ids {
         bytes = bytes.saturating_add(name.capacity());
@@ -3234,19 +3203,7 @@ pub(crate) fn workbook_retained_bytes_with_warm_cache(
             }
         }
     }
-    (
-        bytes.saturating_add(relationship_retained_bytes(package.rels())),
-        warm_cache_bytes,
-    )
-}
-
-/// Count one immutable workbook endpoint without forcing lazy projections.
-///
-/// Package-scoped edit families use the same endpoint accounting as the
-/// primary workbook patch when a signed no-op probe must be charged before it
-/// is replaced by its canonical identity patch.
-pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
-    workbook_retained_bytes_with_warm_cache(workbook, archive_hint).0
+    bytes.saturating_add(relationship_retained_bytes(package.rels()))
 }
 
 fn relationship_retained_bytes(relationships: &Relationships) -> usize {
