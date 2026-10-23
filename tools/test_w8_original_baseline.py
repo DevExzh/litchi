@@ -34,6 +34,15 @@ class AdapterSource(unittest.TestCase):
         # its only accepted API spelling is the old public result field.
         self.assertEqual(adapted.decode("utf-8").count(".file"), source.count(".file") + 4)
 
+    def test_compatibility_patch_contains_only_probe_and_adapter_additions(self):
+        source = PROBE.read_bytes()
+        adapted, _records = overlay.consumer_adapter(source.decode("utf-8"))
+        patch = overlay.adapter_patch(source, adapted).decode("utf-8")
+        self.assertEqual(patch.count("--- /dev/null\n"), 2)
+        self.assertIn(f"+++ b/{overlay.PROBE_RELATIVE.as_posix()}\n", patch)
+        self.assertIn(f"+++ b/{overlay.ADAPTER_RELATIVE.as_posix()}\n", patch)
+        self.assertNotIn("crates/litchi-ops/src/", patch)
+
     def test_history_is_pristine_f2_and_probe_is_independently_pinned(self):
         tree = overlay.git_tree(ROOT)
         history = overlay.verify_history(ROOT, tree)

@@ -73,9 +73,10 @@ python3 "$ROOT/tools/w8_original_baseline.py" prepare \
 
 The command emits a canonical fixture descriptor, a 109-row route map with
 route-specific native/facade timing and publication bindings, a dependency
-projection, and an assembly manifest.  It makes no Cargo invocation and makes
-no native, semantic, timing, or acceptance claim.  Generated artifacts remain
-external.
+projection, a source-assembly record whose compatibility patch contains only
+the two added probe/adapter files, and an assembly manifest.  It makes no
+Cargo invocation and makes no native, semantic, timing, or acceptance claim.
+Generated artifacts remain external.
 
 After coordinator review, the only compile candidate is the standalone
 adapter in the external f2 workspace, with one build job and the exact W8

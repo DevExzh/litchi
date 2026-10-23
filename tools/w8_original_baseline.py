@@ -17,6 +17,7 @@ validation and performance qualification remain pending.
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -96,6 +97,15 @@ def write_new(path: Path, value: object) -> dict[str, Any]:
         raise fail(f"refusing to overwrite generated output: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = canonical(value)
+    path.write_bytes(payload)
+    return artifact(path)
+
+
+def write_bytes_new(path: Path, payload: bytes) -> dict[str, Any]:
+    path = external_output(path, "generated output")
+    if path.exists():
+        raise fail(f"refusing to overwrite generated output: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(payload)
     return artifact(path)
 
@@ -362,6 +372,34 @@ def ensure_adapter(path: Path, payload: bytes) -> tuple[dict[str, Any], bool]:
     return artifact(path), True
 
 
+def adapter_patch(corrected: bytes, adapter: bytes) -> bytes:
+    """Describe only the two added workload/consumer files, never production."""
+
+    chunks: list[str] = []
+    for relative, payload in ((PROBE_RELATIVE, corrected), (ADAPTER_RELATIVE, adapter)):
+        text = payload.decode("utf-8")
+        chunks.extend(
+            difflib.unified_diff(
+                [],
+                text.splitlines(keepends=True),
+                fromfile="/dev/null",
+                tofile=f"b/{relative.as_posix()}",
+            )
+        )
+    value = "".join(chunks).encode()
+    headers = {
+        "--- /dev/null",
+        f"+++ b/{PROBE_RELATIVE.as_posix()}",
+        f"+++ b/{ADAPTER_RELATIVE.as_posix()}",
+    }
+    if not value or any(
+        line.startswith(("--- ", "+++ ")) and line.rstrip("\n") not in headers
+        for line in value.decode("utf-8").splitlines(keepends=True)
+    ):
+        raise fail("consumer adapter patch contains a path outside the two added files")
+    return value
+
+
 def _route_binding(suffix: str) -> dict[str, Any]:
     names = {
         "open_get": "OpenGet", "save": "Save", "repeated_save": "RepeatedSave",
@@ -517,6 +555,21 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
         "production_source_unchanged": True,
     }
     route_artifact = write_new(output_dir / "original-baseline-route-map.json", mapped)
+    patch_artifact = write_bytes_new(
+        output_dir / "original-baseline-consumer-adapter.patch",
+        adapter_patch(corrected, adapter_bytes),
+    )
+    source_assembly = provenance.source_assembly(
+        argparse.Namespace(
+            source=args.source_archive.resolve(),
+            source_commit=BASELINE_COMMIT,
+            overlay_kind="compatibility",
+            overlay_base_commit=BASELINE_COMMIT,
+            overlay_patch=Path(patch_artifact["path"]),
+            description="standalone corrected-probe and old-API consumer additions; f2 production tree unchanged",
+        )
+    )
+    source_assembly_artifact = write_new(output_dir / "original-baseline-source-assembly.json", source_assembly)
     projection_args = argparse.Namespace(workspace=workspace, package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE, lock=lock, toolchain=workspace / "rust-toolchain.toml", probe=probe, fixture=Path(fixture_artifact["path"]), features=[], all_features=True, target=args.target, profile=args.profile)
     projection = provenance.dependency_projection(projection_args)
     selected_features = set(projection["features"]["selected"])
@@ -528,13 +581,15 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
         "baseline": {"commit": BASELINE_COMMIT, "source_role": "pristine_f2_before_leg", "production_tree": {"files": history["tree_files"], "sha256": history["tree_sha256"], "source_archive": archive_info["artifact"], "source_archive_prefix": archive_info["prefix"], "production_delta": {"files_changed": 0, "api_overlay": False}}},
         "consumer_adapter": {"path": ADAPTER_RELATIVE.as_posix(), "artifact": adapter_artifact, "created": adapter_created, "source_probe": {"path": PROBE_RELATIVE.as_posix(), "source_commit": PROBE_SOURCE_COMMIT, "artifact": workspace_info["probe"]}, "transforms": transforms, "production_source_unchanged": True, "old_api_accessors": ["Commit.file", "BatchCommit.file"]},
         "workspace": workspace_info,
+        "source_assembly": source_assembly_artifact,
+        "adapter_patch": patch_artifact,
         "lock": {"path": LOCK_RELATIVE.as_posix(), "artifact": workspace_info["lock"], "source_commit": args.lock_source_commit, "origin": lock_origin, "intentional_external_delta": True},
         "fixture": fixture_artifact, "route_map": route_artifact, "dependency_projection": projection_artifact,
         "build_selection": {"features": projection["features"]["selected"], "all_features": True, "target": args.target, "profile": args.profile, "jobs": 1},
         "provenance_rules": {"no_production_diff": True, "no_workload_substitution": True, "native_compile": "pending", "native_validation": "pending", "performance_qualification": "pending", "acceptance_claim": False},
     }
     assembly_artifact = write_new(output_dir / "original-baseline-assembly.json", assembly)
-    return {"assembly": assembly_artifact, "adapter": adapter_artifact, "route_map": route_artifact, "fixture": fixture_artifact, "dependency_projection": projection_artifact, "route_count": mapped["route_count"], "production_files": history["tree_files"], "adapter_created": adapter_created, "baseline_commit": BASELINE_COMMIT, "probe_sha256": REVIEWED_PROBE_SHA256}
+    return {"assembly": assembly_artifact, "source_assembly": source_assembly_artifact, "adapter_patch": patch_artifact, "adapter": adapter_artifact, "route_map": route_artifact, "fixture": fixture_artifact, "dependency_projection": projection_artifact, "route_count": mapped["route_count"], "production_files": history["tree_files"], "adapter_created": adapter_created, "baseline_commit": BASELINE_COMMIT, "probe_sha256": REVIEWED_PROBE_SHA256}
 
 
 def parser() -> argparse.ArgumentParser:
