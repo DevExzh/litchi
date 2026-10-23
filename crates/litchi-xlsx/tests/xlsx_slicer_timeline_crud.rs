@@ -132,7 +132,7 @@ fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
 fn total_part_bytes(package: &OpcPackage) -> u64 {
     package
         .iter_parts()
-        .map(|part| part.blob().len() as u64)
+        .map(|part| part.payload_len().expect("part metadata payload length") as u64)
         .sum()
 }
 
@@ -223,7 +223,7 @@ fn raw_slicer_rejects_an_over_limit_baseline_before_source_capture() {
 #[test]
 fn raw_slicer_rejects_lazy_baseline_without_decoding_payloads() {
     let (package, _) = package();
-    let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
     let source = litchi_xlsx::Package::from_opc(OpcPackage::from_vec(bytes).unwrap()).unwrap();
     let before = source.clone().into_plain_opc().deferred_decode_counters();
     let limits = SourceLimits::builder()
@@ -280,7 +280,7 @@ fn raw_slicer_rejects_workbook_rewrite_after_new_part_fits_aggregate() {
     let (package, _) = package();
     let existing_bytes = total_part_bytes(&package);
     let definition = slicer_cache("RewriteAggregate", "State");
-    let new_part_bytes = slicer::write(&definition).unwrap().len() as u64;
+    let new_part_bytes = slicer::codec::write(&definition).unwrap().len() as u64;
     let limits = SourceLimits::builder()
         // The new cache fits with one byte of headroom, but the workbook
         // integration extension does not fit in the remaining aggregate.
@@ -1010,7 +1010,7 @@ fn feature_transactions_rollback_and_refuse_host_behavior() {
         );
         assert!(matches!(
             edit.apply_filter(),
-            Err(litchi_xlsx::Error::Unsupported { .. })
+            Err(Error::Unsupported { .. })
         ));
     }
     assert_eq!(
@@ -1024,6 +1024,6 @@ fn feature_transactions_rollback_and_refuse_host_behavior() {
         .unwrap();
     assert!(matches!(
         edit.apply_filter(),
-        Err(litchi_xlsx::Error::Unsupported { .. })
+        Err(Error::Unsupported { .. })
     ));
 }

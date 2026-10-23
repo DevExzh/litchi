@@ -1296,6 +1296,8 @@ impl Workbook {
 mod tests {
     use super::*;
     use crate::builder::Workbook as Draft;
+    use litchi_core::Error as CoreError;
+    use litchi_odf_common::Error as PackageError;
     use std::path::Path;
     use std::sync::Arc;
 

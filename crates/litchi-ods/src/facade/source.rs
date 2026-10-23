@@ -1403,7 +1403,8 @@ mod tests {
     use super::{SourceBackedSpreadsheet, project_text};
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
     use crate::{CellSelector, MAX_CELL_SELECTORS};
-    use litchi_core::{OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
+    use litchi_core::{Error as CoreError, OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
+    use litchi_odf_common::Error as OdfError;
     use std::io::{Cursor, Read, Write};
     use std::ptr;
     use std::sync::{
