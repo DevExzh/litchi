@@ -629,14 +629,11 @@ impl Xlsx {
             XlsxOwner::Source(workbook) => workbook.retained_bytes_for_edit()?,
         };
         // This mirrors the native workbook editor's CaptureBudget::new:
-        // promotion must retain the source and target endpoints, the edit's
-        // action state, and both patch/commit owners before any family route
-        // can stage a changed worksheet or feature buffer.
-        let observed = endpoint
-            .saturating_mul(2)
-            .saturating_add(size_of::<xlsx::workbook::Edit>())
-            .saturating_add(size_of::<xlsx::workbook::Patch>())
-            .saturating_add(size_of::<xlsx::workbook::Commit>());
+        // promotion reserves the two immutable endpoint owners. Semantic
+        // worksheet/feature images and patch payloads are admitted by the
+        // family edit before they are materialized; transient editor and
+        // container headers are not retained snapshot data.
+        let observed = endpoint.saturating_mul(2);
         if observed > maximum {
             return Err(crate::transaction::Error::Limit {
                 kind: crate::transaction::LimitKind::SnapshotBytes,

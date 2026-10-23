@@ -10,7 +10,7 @@
 use litchi_core::FileFormat;
 use litchi_xlsx::{self as xlsx, Address, Rect};
 use std::borrow::Cow;
-use std::collections::{HashSet, TryReserveError};
+use std::collections::{HashMap, HashSet, TryReserveError};
 use std::mem::size_of;
 
 use super::node::{Node, SheetHandle};
@@ -76,12 +76,7 @@ impl Commit {
                         .map_err(native_error)?
                         .into_parts();
                 let canonical_snapshot_bytes = native_patch.retained_bytes();
-                (
-                    original,
-                    target,
-                    native_patch,
-                    canonical_snapshot_bytes,
-                )
+                (original, target, native_patch, canonical_snapshot_bytes)
             } else {
                 (source, target, native_patch, native_snapshot_bytes)
             };
@@ -421,8 +416,6 @@ impl Xlsx {
         if let Some(commit) = self.try_set_sheet(&target, &props, limits)? {
             return Ok(commit);
         }
-        let cells = PreparedCells::new(self, &target, &props, limits)?;
-
         // Even an empty property list must honor signed, retained-source and
         // encrypted edit policy.  Native empty commits return the original
         // unified handle below, preserving exact source bytes on a no-op.
@@ -431,6 +424,9 @@ impl Xlsx {
         } else {
             self.editor_with_snapshot_limit(limits.max_snapshot_bytes())?
         };
+        // Promote/admit the native owner before resolving cell state and
+        // cloning rich/style payloads in `PreparedCells`.
+        let cells = PreparedCells::new(self, &target, &props, limits)?;
         let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         cells.apply(&mut edit)?;
         let native = edit.commit().map_err(native_error)?;
@@ -467,15 +463,15 @@ impl Xlsx {
             .with_property("link")
             .with_format(FileFormat::Xlsx));
         };
-        let cells = if props.is_empty() {
-            None
-        } else {
-            Some(PreparedCells::new(self, target, props, limits)?)
-        };
         let source = if self.signature() == super::Signature::Signed {
             self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         } else {
             self.editor_with_snapshot_limit(limits.max_snapshot_bytes())?
+        };
+        let cells = if props.is_empty() {
+            None
+        } else {
+            Some(PreparedCells::new(self, target, props, limits)?)
         };
         let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         if let Some(cells) = &cells {
@@ -842,6 +838,11 @@ fn operation_payload_bytes(operation: &CellOperation) -> usize {
         },
         CellOperation::Set(xlsx::cell::Content::Formula(formula)) => formula.text().len(),
         CellOperation::Rich(rich) => rich.runs().iter().map(|run| run.text().len()).sum(),
+        // Retyping first projects the existing cell state before it can lower
+        // the converted value. Reserve a semantic cell slot before that
+        // source read; the concrete setter replaces this coarse charge with
+        // the final authored payload once the conversion is known.
+        CellOperation::Retype(_) => size_of::<xlsx::cell::Content>(),
         _ => 0,
     }
 }
@@ -2863,6 +2864,17 @@ fn apply_operation(
     let mut index = 0;
     while index < targets.len() {
         let sheet = targets[index].sheet;
+        if let Some(payload) = operation.payload.as_ref() {
+            let mut reserve_index = index;
+            while let Some(target) = targets
+                .get(reserve_index)
+                .filter(|target| target.sheet == sheet)
+            {
+                edit.reserve_cell_capture(sheet, target.address, operation_payload_bytes(payload))
+                    .map_err(native_error)?;
+                reserve_index += 1;
+            }
+        }
         let mut worksheet = edit.sheet(sheet).map_err(native_error)?.ok_or_else(|| {
             Error::new(
                 Code::OutOfRange,
@@ -3130,10 +3142,11 @@ pub(crate) mod coalesce {
 
     /// Native transaction for one eligible XLSX set run.
     ///
-    /// Only distinct direct cell targets are admitted.  A repeated target,
-    /// selector/range, font assignment, or a staged-byte boundary is a
-    /// barrier owned by the outer transaction, which can flush this run and
-    /// execute the command through the ordinary one-operation path.
+    /// Distinct direct cell targets are admitted for ordinary runs. Signed
+    /// replay runs may repeat a target to prove an exact cancellation; its
+    /// authored charge is replaced by the final target charge. Selectors,
+    /// ranges, font assignments, or a staged-byte boundary remain barriers
+    /// owned by the outer transaction.
     pub(crate) struct Run {
         base: Xlsx,
         resolution: Xlsx,
@@ -3141,6 +3154,7 @@ pub(crate) mod coalesce {
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
         seen: HashSet<CellTarget>,
+        charges: HashMap<CellTarget, usize>,
         initial: Option<HashMap<CellTarget, xlsx::State>>,
         final_states: Option<HashMap<CellTarget, xlsx::State>>,
         staged_bytes: usize,
@@ -3158,6 +3172,20 @@ pub(crate) mod coalesce {
             target: &TargetArg<'_>,
             props: &Props<'_>,
             limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.cell_plan_with_snapshot_limit(target, props, limits, limits.max_snapshot_bytes())
+        }
+
+        /// Admit a coalesced plan against the transaction's remaining
+        /// snapshot ceiling. The ordinary helper is retained for callers
+        /// that have no prior committed snapshots; transaction batches use
+        /// this variant so promotion cannot spend the batch's full maximum.
+        pub(crate) fn cell_plan_with_snapshot_limit(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+            remaining_snapshot: usize,
         ) -> Result<Option<Plan>> {
             self.check_source_for_replay()?;
             let result = (|| {
@@ -3241,12 +3269,12 @@ pub(crate) mod coalesce {
                 let prepared = match &self.0.owner {
                     super::super::XlsxOwner::Source(_) if self.signature() == Signature::Signed => {
                         Some(self.adopt_workbook(
-                            self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?,
+                            self.editor_for_write_with_snapshot_limit(remaining_snapshot)?,
                         ))
                     },
-                    super::super::XlsxOwner::Source(_) => Some(self.adopt_workbook(
-                        self.editor_with_snapshot_limit(limits.max_snapshot_bytes())?,
-                    )),
+                    super::super::XlsxOwner::Source(_) => Some(
+                        self.adopt_workbook(self.editor_with_snapshot_limit(remaining_snapshot)?),
+                    ),
                     _ => None,
                 };
                 let resolved = prepared.as_ref().unwrap_or(self);
@@ -3293,6 +3321,7 @@ pub(crate) mod coalesce {
                 edit,
                 items: Vec::new(),
                 seen: HashSet::new(),
+                charges: HashMap::new(),
                 initial: (base.signature() == Signature::Signed).then(HashMap::new),
                 final_states: (base.signature() == Signature::Signed).then(HashMap::new),
                 staged_bytes: 0,
@@ -3326,9 +3355,11 @@ pub(crate) mod coalesce {
         /// cumulative staged-byte boundary.  The plan itself has already
         /// passed the per-cell admission bound.
         pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
+            let previous = self.charges.get(&plan.key()).copied().unwrap_or(0);
             self.seen.contains(&plan.key()) && !self.allow_repeated
                 || self
                     .staged_bytes
+                    .saturating_sub(previous)
                     .checked_add(plan.charge())
                     .is_none_or(|bytes| bytes > limits.max_staged_bytes())
         }
@@ -3340,9 +3371,11 @@ pub(crate) mod coalesce {
         /// refusal, because staging after it would make changed attribution
         /// ambiguous.
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+            let previous = self.charges.get(&plan.key()).copied().unwrap_or(0);
             if self.seen.contains(&plan.key()) && !self.allow_repeated
                 || self
                     .staged_bytes
+                    .saturating_sub(previous)
                     .checked_add(plan.charge())
                     .is_none_or(|bytes| bytes > self.max_staged_bytes)
             {
@@ -3359,10 +3392,17 @@ pub(crate) mod coalesce {
             self.seen
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
+            self.charges
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
 
             let result = self.stage_native(&plan).inspect(|_| {
                 self.seen.insert(plan.key());
-                self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
+                self.staged_bytes = self
+                    .staged_bytes
+                    .saturating_sub(previous)
+                    .saturating_add(plan.charge());
+                self.charges.insert(plan.key(), plan.charge());
                 self.items.push(Item { plan, index });
             });
             let freshness = self.base.check_source_for_replay();
@@ -3370,6 +3410,13 @@ pub(crate) mod coalesce {
         }
 
         fn stage_native(&mut self, plan: &Plan) -> Result<bool> {
+            // A projected state read can decode a deferred worksheet. Admit
+            // the native before-image before that read; the concrete setter
+            // below replaces this coarse authored charge with its final
+            // semantic payload.
+            self.edit
+                .reserve_cell_capture(plan.target.sheet, plan.target.address, plan.charge())
+                .map_err(native_error)?;
             let mut worksheet = self
                 .edit
                 .sheet(plan.target.sheet)
@@ -3434,43 +3481,60 @@ pub(crate) mod coalesce {
                 None
             };
             base.check_source_for_replay()?;
-            let result = edit
-                .commit()
-                .map_err(native_error)
-                .and_then(|native| {
-                    make_commit(&base, &source, native, items.len(), max_snapshot_bytes)
-                })
-                .and_then(|(after, commit)| {
-                    if logical_noop {
-                        let staged_snapshot_bytes = commit.snapshot_bytes();
-                        let original = original
-                            .as_ref()
-                            .ok_or_else(|| Error::signed(FileFormat::Xlsx))?;
-                        let empty = edit_with_snapshot_limit(original, max_snapshot_bytes)?
+            // Keep the staged source in an option so a signed logical no-op
+            // can explicitly drop the probe and its native proof before the
+            // one canonical identity edit is allocated. The failure-only
+            // locator still borrows the staged source for ordinary writes.
+            let mut staged_source = Some(source);
+            let result = edit.commit().map_err(native_error).and_then(|native| {
+                if logical_noop {
+                    let staged_source = staged_source
+                        .take()
+                        .ok_or_else(|| Error::signed(FileFormat::Xlsx))?;
+                    let (staged_target, staged_patch) = native.into_parts();
+                    let staged_snapshot_bytes = staged_patch.retained_bytes();
+                    drop((staged_source, staged_target, staged_patch));
+
+                    let original = original
+                        .as_ref()
+                        .ok_or_else(|| Error::signed(FileFormat::Xlsx))?;
+                    let (target, native_patch) =
+                        edit_with_snapshot_limit(original, max_snapshot_bytes)?
                             .commit()
-                            .map_err(native_error)?;
-                        make_commit(&base, original, empty, items.len(), max_snapshot_bytes)
-                            .and_then(|(_, mut commit)| {
-                                commit.snapshot_bytes =
-                                    commit.snapshot_bytes.max(staged_snapshot_bytes);
-                                if commit.snapshot_bytes > max_snapshot_bytes {
-                                    return Err(snapshot_limit(
-                                        commit.snapshot_bytes,
-                                        max_snapshot_bytes,
-                                    ));
-                                }
-                                Ok((base.clone(), commit))
-                            })
-                    } else {
-                        Ok((after, commit))
+                            .map_err(native_error)?
+                            .into_parts();
+                    let canonical_snapshot_bytes = native_patch.retained_bytes();
+                    let snapshot_bytes = staged_snapshot_bytes.max(canonical_snapshot_bytes);
+                    if snapshot_bytes > max_snapshot_bytes {
+                        return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
                     }
-                });
+                    Ok((
+                        base.clone(),
+                        Commit {
+                            after_xlsx: base.clone(),
+                            source: original.clone(),
+                            target,
+                            native_patch,
+                            operations: items.len(),
+                            snapshot_bytes,
+                        },
+                    ))
+                } else {
+                    let source = staged_source.as_ref().ok_or_else(|| {
+                        Error::new(Code::InternalError, "XLSX staged source missing")
+                    })?;
+                    make_commit(&base, source, native, items.len(), max_snapshot_bytes)
+                }
+            });
             let freshness = base.check_source_for_replay();
             match freshness.and(result) {
                 Ok(commit) => Ok(commit),
+                Err(error) if logical_noop => Err(error),
                 Err(error) => Err(locate_failure(
                     &base,
-                    &source,
+                    staged_source
+                        .as_ref()
+                        .expect("ordinary XLSX failures retain their staged source"),
                     &items,
                     error,
                     max_snapshot_bytes,

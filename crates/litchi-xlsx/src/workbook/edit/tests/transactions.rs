@@ -2,20 +2,17 @@
 
 use super::super::*;
 use super::support::part_text;
-use std::mem::size_of;
-
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
+use std::mem::size_of;
 
 #[test]
 fn primary_edit_capture_budget_rejects_before_cell_staging() {
     let source = crate::Package::new().expect("source workbook");
-    let maximum = source
-        .retained_bytes()
-        .saturating_mul(2)
-        .saturating_add(size_of::<Edit>())
-        .saturating_add(size_of::<Patch>())
-        .saturating_add(size_of::<Commit>());
+    // The native ledger admits only the two final endpoints at this
+    // boundary. The worksheet before-image and semantic cell delta must be
+    // rejected before the action map stages anything.
+    let maximum = source.retained_bytes().saturating_mul(2);
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
         .expect("base capture fits the budget");
@@ -32,6 +29,40 @@ fn primary_edit_capture_budget_rejects_before_cell_staging() {
             ..
         }
     ));
+}
+
+#[test]
+fn primary_edit_capture_budget_replaces_repeated_cell_payload() {
+    let source = crate::Package::new().expect("source workbook");
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let final_content = crate::Content::from("final authored value");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(final_content.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("base capture fits the budget");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet
+        .set("A1", "short")
+        .expect("first authored payload fits");
+    sheet
+        .set("A1", final_content)
+        .expect("replacement keeps only final payload charge");
 }
 
 fn strict_unknown_worksheet() -> crate::Package {

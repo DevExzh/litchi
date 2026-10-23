@@ -4,6 +4,7 @@
 //! formula markup is kept byte for byte.
 
 use litchi_xlsx::{self as xlsx};
+use std::mem::size_of;
 
 use super::super::Xlsx;
 use super::{Commit, native_error};
@@ -13,9 +14,6 @@ use crate::refresh::{
 };
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::{File, Result};
-
-/// The fixed staging charge of one written cache, beside its text.
-const CACHE_CHARGE: usize = 32;
 
 /// Refresh `file`, whose XLSX handle is `handle`. `None` means nothing was
 /// written.
@@ -63,31 +61,37 @@ pub(crate) fn refresh(
                     continue;
                 };
                 let address = format!("{}{}", column_letters(formula.column()), formula.row() + 1);
-                if worksheet.set_cached(address.as_str(), value).is_err() {
-                    fields.push(formula_report(&names, formula, false).with_status(
-                        Status::Unsupported,
-                        "the cell's formula is not a scalar formula",
-                    ));
-                    continue;
-                }
-                writes += 1;
-                staged = staged.saturating_add(CACHE_CHARGE);
-                if writes > limits.max_expanded_targets() {
+                let next_writes = writes.saturating_add(1);
+                if next_writes > limits.max_expanded_targets() {
                     return Err(TransactionError::Limit {
                         kind: LimitKind::ExpandedTargets,
-                        observed: writes,
+                        observed: next_writes,
                         maximum: limits.max_expanded_targets(),
                     }
                     .into());
                 }
-                if staged > limits.max_staged_bytes() {
+                let next_staged = staged.saturating_add(cache_value_bytes(&value));
+                if next_staged > limits.max_staged_bytes() {
                     return Err(TransactionError::Limit {
                         kind: LimitKind::StagedBytes,
-                        observed: staged,
+                        observed: next_staged,
                         maximum: limits.max_staged_bytes(),
                     }
                     .into());
                 }
+                match worksheet.set_cached(address.as_str(), value) {
+                    Ok(_) => {},
+                    Err(error) if cache_target_is_unsupported(&error) => {
+                        fields.push(formula_report(&names, formula, false).with_status(
+                            Status::Unsupported,
+                            "the cell's formula is not a scalar formula",
+                        ));
+                        continue;
+                    },
+                    Err(error) => return Err(native_error(error)),
+                }
+                writes = next_writes;
+                staged = next_staged;
                 fields.push(formula_report(&names, formula, true));
             }
         }
@@ -112,6 +116,24 @@ pub(crate) fn refresh(
     })();
     let freshness = handle.check_source();
     freshness.and(result)
+}
+
+fn cache_target_is_unsupported(error: &xlsx::Error) -> bool {
+    matches!(
+        error,
+        xlsx::Error::Invalid(message)
+            if message == "a formula cache needs a stored scalar formula"
+    )
+}
+
+fn cache_value_bytes(value: &xlsx::Value) -> usize {
+    size_of::<xlsx::Value>().saturating_add(match value {
+        xlsx::Value::Text(text) => text.as_str().len(),
+        xlsx::Value::Number(number) => number.as_str().len(),
+        xlsx::Value::Date(date) => date.as_str().len(),
+        xlsx::Value::Bool(_) | xlsx::Value::Error(_) => 0,
+        _ => 0,
+    })
 }
 
 /// The stored form of a computed value; `None` for a number a workbook

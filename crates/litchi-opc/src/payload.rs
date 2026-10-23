@@ -305,6 +305,22 @@ impl PartPayload {
         }
     }
 
+    /// Return the declared uncompressed size without decoding a deferred
+    /// source member. The central-directory value is only an admission bound;
+    /// `force` remains responsible for validating the actual inflated length.
+    pub(crate) fn declared_uncompressed_size(&self) -> Result<u64> {
+        match self {
+            Self::Ready(bytes) => Ok(bytes.len() as u64),
+            Self::Deferred(deferred) => Ok(deferred
+                .source
+                .index()?
+                .metadata(deferred.member())?
+                .uncompressed_size()),
+            Self::Transferred(transferred) => Ok(transferred.decoded().len() as u64),
+            Self::Verified(verified) => Ok(verified.bytes().len() as u64),
+        }
+    }
+
     /// The payload bytes, or **an empty slice** while a deferred payload has
     /// not been decoded (or its decode failed).
     ///

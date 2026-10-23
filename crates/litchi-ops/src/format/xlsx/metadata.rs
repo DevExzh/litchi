@@ -69,6 +69,13 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        // Admit the native endpoint pair before the metadata editor starts
+        // decoding and retaining document-property parts. The final metadata
+        // patch is charged again by `from_metadata` with its exact payload;
+        // this guard closes the pre-commit allocation window.
+        let _native_capture =
+            super::write::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
+        drop(_native_capture);
         let (target, metadata, changed, native_patch_bytes) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {

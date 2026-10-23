@@ -129,6 +129,15 @@ pub trait Part: PartClone + Send + Sync {
         Ok(())
     }
 
+    /// Return the declared uncompressed payload size without decoding a
+    /// deferred source member. Built-in deferred parts use the ZIP central
+    /// directory declaration; ordinary custom parts fall back to their
+    /// already-owned payload length.
+    #[doc(hidden)]
+    fn declared_uncompressed_size(&self) -> Result<u64> {
+        Ok(self.blob().len() as u64)
+    }
+
     /// The payload if it is already available, without decoding anything.
     ///
     /// `None` means the part still holds the payload its source member
@@ -352,6 +361,10 @@ impl Part for BlobPart {
 
     fn ensure_payload(&self) -> Result<()> {
         self.blob.force().map(|_| ())
+    }
+
+    fn declared_uncompressed_size(&self) -> Result<u64> {
+        self.blob.declared_uncompressed_size()
     }
 
     fn decoded_blob(&self) -> Option<&[u8]> {
@@ -632,6 +645,10 @@ impl Part for XmlPart {
         self.xml_bytes.force().map(|_| ())
     }
 
+    fn declared_uncompressed_size(&self) -> Result<u64> {
+        self.xml_bytes.declared_uncompressed_size()
+    }
+
     fn decoded_blob(&self) -> Option<&[u8]> {
         self.xml_bytes.decoded().map(|blob| blob.as_slice())
     }
@@ -736,6 +753,13 @@ impl<'part> PartMetadata<'part> {
     #[must_use]
     pub fn payload_is_decoded(&self) -> bool {
         self.part.decoded_blob().is_some()
+    }
+
+    /// Return this part's declared uncompressed payload size without decoding
+    /// a deferred source member.
+    #[doc(hidden)]
+    pub fn declared_uncompressed_size(&self) -> Result<u64> {
+        self.part.declared_uncompressed_size()
     }
 }
 
