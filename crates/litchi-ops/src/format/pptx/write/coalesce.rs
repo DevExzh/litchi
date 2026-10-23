@@ -1580,6 +1580,18 @@ fn stage_batch(
     items: &[Item],
     changes: &mut Vec<(usize, bool)>,
 ) -> Result<usize> {
+    // A one-item run must use the same native singular operation as the
+    // ordinary selector writer.  The chunked source route performs a second
+    // reservation/admission pass and can retain a different patch envelope
+    // even though it describes the same shape write.  That made a coalesced
+    // edit reject a budget obtained from the direct proof.  Multi-item runs
+    // still use the bounded chunk API so the coalescer keeps its one-pass
+    // publication cost; reported story plans stay on their per-edit path
+    // below because their native result is needed for diagnostics.
+    if items.len() == 1 && !items[0].plan.reported {
+        stage_one(edit, &items[0].plan)?;
+        return Ok(usize::from(items[0].plan.changed));
+    }
     if kind == BatchKind::Format {
         let mut edits = Vec::new();
         edits.try_reserve_exact(items.len()).map_err(allocation)?;
