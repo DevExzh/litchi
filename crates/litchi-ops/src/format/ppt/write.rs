@@ -1276,14 +1276,14 @@ where
             maximum,
         }));
     }
-    let package = file.editable_package_for_write()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
-    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
+    let before_bytes = file.retained_source_len().unwrap_or(0);
     let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
     if minimum > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
     }
+    let package = file.editable_package_for_write()?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     stage(&mut edit).map_err(native_edit_error)?;
     edit.commit().map_err(native_edit_error)
@@ -1312,14 +1312,14 @@ fn stage_plans(
             maximum,
         }));
     }
-    let package = file.editable_package_for_write()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
-    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
+    let before_bytes = file.retained_source_len().unwrap_or(0);
     let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
     if minimum > snapshot_budget {
         return Err(snapshot_limit(minimum, snapshot_budget));
     }
+    let package = file.editable_package_for_write()?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     if plans.len() > 1
         && plans.iter().all(|plan| {

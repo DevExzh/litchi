@@ -13,13 +13,14 @@ use std::sync::OnceLock;
 use litchi_core::{FileFormat, Metadata};
 use litchi_xlsb as xlsb;
 
-use super::write::Commit;
+use super::write::{Commit, snapshot_limit};
 use super::{Xlsb, XlsbOwner};
 use crate::error::Result;
 use crate::format::metadata::{self, Assignments};
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 
 /// The canonical package images around one metadata patch.
 ///
@@ -106,24 +107,27 @@ impl Xlsb {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         if !metadata::is_target(target) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsb)?;
-        self.set_metadata(&assignments, props.len()).map(Some)
+        self.set_metadata(&assignments, props.len(), limits)
+            .map(Some)
     }
 
     fn set_metadata(
         &self,
         assignments: &Assignments,
         authored_operations: usize,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         if let (XlsbOwner::Source(source), super::Signature::Unsigned) =
             (&self.0.owner, self.signature())
         {
             if self.0.retain_source {
-                return self.set_source_metadata(source, assignments, authored_operations);
+                return self.set_source_metadata(source, assignments, authored_operations, limits);
             }
         }
         // Stage on the workbook itself: no copy into a package first
@@ -157,6 +161,10 @@ impl Xlsb {
             } else {
                 (target, patch, staged_retained)
             };
+        let retained = retained.max(signed_before.saturating_mul(2));
+        if retained > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(retained, limits.max_snapshot_bytes()));
+        }
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -171,7 +179,7 @@ impl Xlsb {
                 after_file,
                 before: OnceLock::new(),
                 after: OnceLock::new(),
-                retained: retained.max(signed_before.saturating_mul(2)),
+                retained,
                 authored_operations,
                 patch,
             },
@@ -186,6 +194,7 @@ impl Xlsb {
         source: &super::source::SourceWorkbook,
         assignments: &Assignments,
         authored_operations: usize,
+        _limits: &SemanticLimits,
     ) -> Result<Commit> {
         self.check_source_for_replay()?;
         let mut edit = source.workbook().edit_metadata().map_err(native)?;

@@ -402,6 +402,18 @@ impl Ppt {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    /// The retained compound-file length, when an edit owner exists. This
+    /// O(1) lower bound is checked before private native-editor allocation;
+    /// the exact before/after patch remains the hard post-commit charge.
+    pub(crate) fn retained_source_len(&self) -> Option<usize> {
+        match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => {
+                Some(usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX))
+            },
+            PptOwner::Released => None,
+        }
+    }
+
     /// Admit a primary native PPT edit under the signature, encryption and
     /// source-retention policy shared by the other native formats.
     pub(crate) fn admit_edit(&self) -> Result<()> {

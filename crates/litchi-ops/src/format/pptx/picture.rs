@@ -355,7 +355,7 @@ impl Pptx {
         };
         let slide = slide as usize;
         let shape = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source)?;
         let mut edit = base.edit()?;
         let mut operations = 0;

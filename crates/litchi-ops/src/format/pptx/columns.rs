@@ -101,7 +101,11 @@ impl Pptx {
     fn change_columns(&self, table: &TreeItem, change: Change) -> Result<Commit> {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if matches!(&change, Change::Width { .. }) {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = super::smartart::eager(&source)?;
         let mut native = base.edit()?;
         match change {

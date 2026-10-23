@@ -87,7 +87,11 @@ impl Xls {
         commit: sf::edit::Commit,
         limits: &SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        // A signed setter may still prove an exact native identity patch.
+        // Changed feature output is rejected below, but the strict guard here
+        // would prevent same-value set/remove requests from reaching that
+        // proof.
+        self.check_source_for_write()?;
         let changed = commit.diagnostics().changed();
         let staged_snapshot_bytes = commit.patch().retained_bytes();
         let (package, patch) = commit.into_parts();
@@ -132,7 +136,7 @@ impl Xls {
         } else {
             self.clone()
         };
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after,

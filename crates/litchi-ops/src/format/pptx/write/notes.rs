@@ -91,7 +91,7 @@ impl Pptx {
                 ));
             },
         };
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = match &source {
             Editable::Eager(package) => Arc::clone(package),
             Editable::Source(package) => {

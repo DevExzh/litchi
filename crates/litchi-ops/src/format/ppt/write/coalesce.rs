@@ -92,6 +92,7 @@ pub(crate) struct Run {
     max_staged_bytes: usize,
     max_expanded_targets: usize,
     limits: SemanticLimits,
+    max_snapshot_bytes: usize,
     scene: Option<SceneCache>,
     allow_repeated: bool,
 }
@@ -107,17 +108,16 @@ impl Run {
         remaining_snapshot: usize,
     ) -> Result<Self> {
         base.check_source_for_write()?;
+        let before_bytes = base.retained_source_len().unwrap_or(0);
+        let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(snapshot_limit(minimum, remaining_snapshot));
+        }
         let package = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_package_for_write()?
         } else {
             base.editable_package()?
         };
-        let before_bytes =
-            usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
-        let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
-        if minimum > remaining_snapshot {
-            return Err(snapshot_limit(minimum, remaining_snapshot));
-        }
         let edit = package.edit().map_err(native_edit_error)?;
         base.check_source_for_write()?;
         Ok(Self {
@@ -132,6 +132,7 @@ impl Run {
             max_staged_bytes: limits.max_staged_bytes(),
             max_expanded_targets: limits.max_expanded_targets(),
             limits: *limits,
+            max_snapshot_bytes: remaining_snapshot,
             scene: None,
             allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
         })
@@ -213,9 +214,11 @@ impl Run {
             mut edit,
             items,
             limits,
+            max_snapshot_bytes,
             allow_repeated,
             ..
         } = self;
+        let snapshot_limits = limits.with_snapshot_budget(max_snapshot_bytes);
         let logical_noop = allow_repeated && logical_noop(&items);
         // Native text/anchor setters may expand one authored command into
         // several physical operations.  The unified leaf diagnostic is the
@@ -232,7 +235,7 @@ impl Run {
         let result = (|| {
             stage_all(&mut edit, &items)?;
             let native = edit.commit().map_err(native_edit_error)?;
-            let mut commit = super::finish_commit(&base, native, &limits)?;
+            let mut commit = super::finish_commit(&base, native, &snapshot_limits)?;
             commit.operations = authored_operations;
             let staged_snapshot_bytes = commit.snapshot_bytes;
             if logical_noop {
@@ -248,7 +251,7 @@ impl Run {
                     .map_err(native_edit_error)?
                     .commit()
                     .map_err(native_edit_error)?;
-                commit = super::finish_commit(&base, empty, &limits)?;
+                commit = super::finish_commit(&base, empty, &snapshot_limits)?;
                 commit.operations = authored_operations;
                 commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
             }

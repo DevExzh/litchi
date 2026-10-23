@@ -83,24 +83,6 @@ impl Patch {
         }
     }
 
-    /// Charge every retained native image and semantic cell delta. A selector
-    /// spanning worksheets keeps one exact package patch per worksheet, so
-    /// endpoint images alone would undercharge transaction history.
-    pub(crate) fn snapshot_bytes(&self) -> usize {
-        match self {
-            Self::Metadata(images) => images.retained_bytes(),
-            Self::Feature(images) => images.retained_bytes(),
-            Self::Structure { patch, .. } => {
-                patch.before().len().saturating_add(patch.after().len())
-            },
-            Self::Cells(patches) => patches
-                .iter()
-                .fold(size_of::<Vec<NativeCellPatch>>(), |bytes, patch| {
-                    bytes.saturating_add(patch.retained_bytes())
-                }),
-        }
-    }
-
     /// Exact native history charge. Structural patches cache the checked
     /// native calculation at commit construction so transaction diagnostics
     /// remain infallible; cell patches retain their native semantic payloads.
@@ -211,29 +193,37 @@ impl Commit {
         let result = (|| {
             let (package, patch) = native.into_parts();
             let operations = patch.operation_count();
-            let native_snapshot_bytes = patch.retained_bytes().map_err(native_error)?;
-            if native_snapshot_bytes > max_snapshot_bytes {
+            let signed = base.signature() == super::Signature::Signed;
+            // Native retained-byte accounting is needed only while a signed
+            // private probe is being replaced by the canonical identity
+            // patch.  Unsigned commits keep their endpoint directly and do
+            // not pay an otherwise unconditional patch walk.
+            let native_snapshot_bytes = if signed {
+                patch.retained_bytes().map_err(native_error)?
+            } else {
+                0
+            };
+            if signed && native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
-            let (package, patch, retained_bytes) =
-                if patch.is_noop() && base.signature() == super::Signature::Signed {
-                    // Structural writes are staged through an unsigned private
-                    // package. Rebuild the identity patch over the retained
-                    // signed package so the leaf and facade share one base.
-                    let original = base.original_package_for_noop()?;
-                    let (package, patch) = original
-                        .edit()
-                        .map_err(native_error)?
-                        .commit()
-                        .map_err(native_error)?
-                        .into_parts();
-                    let retained_bytes = patch.retained_bytes().map_err(native_error)?;
-                    (package, patch, retained_bytes)
-                } else {
-                    (package, patch, native_snapshot_bytes)
-                };
+            let (package, patch, retained_bytes) = if patch.is_noop() && signed {
+                // Structural writes are staged through an unsigned private
+                // package. Rebuild the identity patch over the retained
+                // signed package so the leaf and facade share one base.
+                let original = base.original_package_for_noop()?;
+                let (package, patch) = original
+                    .edit()
+                    .map_err(native_error)?
+                    .commit()
+                    .map_err(native_error)?
+                    .into_parts();
+                let retained_bytes = patch.retained_bytes().map_err(native_error)?;
+                (package, patch, retained_bytes)
+            } else {
+                (package, patch, native_snapshot_bytes)
+            };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if snapshot_bytes > max_snapshot_bytes {
+            if signed && snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
             // A native edit may retain a semantic operation whose replay is
@@ -264,36 +254,40 @@ impl Commit {
         native: litchi_xlsb::cell_values::Commit,
         sheet: usize,
         limits: TransferLimits,
+        authored_operations: usize,
     ) -> Result<Self> {
         base.check_source_for_replay()?;
         let result = (|| {
             let (package, patch) = native.into_parts();
-            let operations = patch.changes().len();
-            let native_snapshot_bytes = patch.retained_bytes();
-            if native_snapshot_bytes > limits.bytes() {
+            let signed = base.signature() == super::Signature::Signed;
+            let native_snapshot_bytes = if signed { patch.retained_bytes() } else { 0 };
+            if signed && native_snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(native_snapshot_bytes, limits.bytes()));
             }
-            let (patch, retained_bytes) =
-                if patch.is_noop() && base.signature() == super::Signature::Signed {
-                    let patch = canonical_cell_patch(base, sheet, limits)?;
-                    let retained_bytes = patch.retained_bytes();
-                    (patch, retained_bytes)
-                } else {
-                    (Patch::Cells(vec![patch]), native_snapshot_bytes)
-                };
+            let (patch, retained_bytes) = if patch.is_noop() && signed {
+                let patch = canonical_cell_patch(base, sheet, limits)?;
+                let retained_bytes = patch.retained_bytes();
+                (patch, retained_bytes)
+            } else {
+                (Patch::Cells(vec![patch]), native_snapshot_bytes)
+            };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if snapshot_bytes > limits.bytes() {
+            if signed && snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(snapshot_bytes, limits.bytes()));
             }
             Ok(Self {
                 after,
                 patch,
-                operations,
+                // Native cell patches count physical deltas.  Keep the
+                // authored count separately so a same-value set/remove (and
+                // the canonical empty patch used for a signed replay) still
+                // reports the operation the caller actually wrote.
+                operations: authored_operations,
                 snapshot_bytes,
             })
         })();
@@ -307,6 +301,7 @@ impl Commit {
         patches: Vec<NativeCellPatch>,
         canonical: (usize, TransferLimits),
         max_snapshot_bytes: usize,
+        authored_operations: usize,
     ) -> Result<Self> {
         if patches.is_empty() {
             return Err(Error::new(
@@ -318,41 +313,39 @@ impl Commit {
         base.check_source_for_replay()?;
         let result = (|| {
             let native_patch = Patch::Cells(patches);
-            let native_snapshot_bytes = native_patch.retained_bytes();
-            if native_snapshot_bytes > max_snapshot_bytes {
+            let signed = base.signature() == super::Signature::Signed;
+            let native_snapshot_bytes = if signed {
+                native_patch.retained_bytes()
+            } else {
+                0
+            };
+            if signed && native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
-            let operations = match &native_patch {
-                Patch::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
-                    count.saturating_add(patch.changes().len())
-                }),
-                _ => 0,
-            };
             let all_noop = match &native_patch {
                 Patch::Cells(patches) => patches.iter().all(NativeCellPatch::is_noop),
                 _ => false,
             };
-            let (patch, retained_bytes) =
-                if base.signature() == super::Signature::Signed && all_noop {
-                    let patch = canonical_cell_patch(base, canonical.0, canonical.1)?;
-                    let retained_bytes = patch.retained_bytes();
-                    (patch, retained_bytes)
-                } else {
-                    (native_patch, native_snapshot_bytes)
-                };
+            let (patch, retained_bytes) = if signed && all_noop {
+                let patch = canonical_cell_patch(base, canonical.0, canonical.1)?;
+                let retained_bytes = patch.retained_bytes();
+                (patch, retained_bytes)
+            } else {
+                (native_patch, native_snapshot_bytes)
+            };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if snapshot_bytes > max_snapshot_bytes {
+            if signed && snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
             Ok(Self {
                 after,
                 patch,
-                operations,
+                operations: authored_operations,
                 snapshot_bytes,
             })
         })();
@@ -430,23 +423,34 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<Commit> {
     file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
-    if let Some(commit) = file.try_set_metadata(&target, &props)? {
-        return Ok(commit);
-    }
-    if let Some(commit) = file.try_set_feature(&target, &props)? {
-        return Ok(commit);
-    }
-    if let Some(commit) = super::merge_write::set_merges_with_limits(file, &target, &props, limits)?
-    {
-        return Ok(commit);
-    }
-    if let Some(commit) = super::name_write::try_set_named_range(file, &target, &props, limits)? {
-        return Ok(commit);
-    }
-    if let Some(commit) = set_cells_with_limits(file, &target, &props, limits)? {
-        return Ok(commit);
-    }
-    set_sheet_with_limits(file, target, &props, limits)
+    let result = (|| {
+        if let Some(commit) = file.try_set_metadata(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) = file.try_set_feature(&target, &props, limits)? {
+            return Ok(commit);
+        }
+        if let Some(commit) =
+            super::merge_write::set_merges_with_limits(file, &target, &props, limits)?
+        {
+            return Ok(commit);
+        }
+        if let Some(commit) = super::name_write::try_set_named_range(file, &target, &props, limits)?
+        {
+            return Ok(commit);
+        }
+        if let Some(commit) = set_cells_with_limits(file, &target, &props, limits)? {
+            return Ok(commit);
+        }
+        set_sheet_with_limits(file, target, &props, limits)
+    })();
+    result.and_then(|commit| {
+        let snapshot_bytes = commit.snapshot_bytes();
+        if snapshot_bytes > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+        }
+        Ok(commit)
+    })
 }
 
 /// Add one worksheet tab through the native workbook structure editor.
@@ -515,7 +519,6 @@ pub(crate) fn add_with_limits<'p, 'n>(
         .map_err(native_error)?;
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok((commit, sheet_path(position)))
 }
 
@@ -615,7 +618,7 @@ pub(crate) fn remove_with_limits(
     // prove a real identity patch for signed no-op removals (for example an
     // unstored cell or an identity sheet selector).
     file.admit_edit_for_write()?;
-    if let Some(commit) = file.try_remove_feature(&target)? {
+    if let Some(commit) = file.try_remove_feature(&target, limits)? {
         return Ok(commit);
     }
     if let Some(commit) = super::name_write::try_remove_named_range(file, &target, limits)? {
@@ -644,6 +647,7 @@ pub(crate) fn remove_with_limits(
     // package owner is materialized.  One native edit covers each worksheet;
     // a cross-worksheet selector publishes those edits in tab order through
     // one immutable package chain.
+    let authored_operations = targets.len();
     let mut grouped = BTreeMap::<usize, Vec<CellTarget>>::new();
     for target in targets {
         grouped
@@ -699,7 +703,11 @@ pub(crate) fn remove_with_limits(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
-        let patch_bytes = patch.retained_bytes();
+        let patch_bytes = if file.signature() == super::Signature::Signed {
+            patch.retained_bytes()
+        } else {
+            0
+        };
         let retained = patch_bytes
             .checked_add(semantic_charge)
             .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
@@ -729,8 +737,8 @@ pub(crate) fn remove_with_limits(
         patches,
         canonical,
         limits.max_snapshot_bytes(),
+        authored_operations,
     )?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
 
@@ -803,7 +811,6 @@ fn remove_sheets_with_limits(
     }
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
 
@@ -879,7 +886,6 @@ fn reorder_with_limits(file: &Xlsb, order: Vec<usize>, limits: &SemanticLimits) 
     edit.reorder_sheets(&selectors).map_err(native_error)?;
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
 
@@ -1076,7 +1082,6 @@ fn set_sheet_with_limits(
     }
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
 
@@ -1133,6 +1138,7 @@ fn set_cells_with_limits(
     // the native package owner is materialized. Every target in one worksheet
     // is staged in one native cell-values edit; a selector spanning worksheets
     // publishes the edits in workbook order through one exact package chain.
+    let authored_operations = targets.len();
     let mut grouped = BTreeMap::<usize, Vec<CellTarget>>::new();
     for target in targets {
         grouped
@@ -1185,7 +1191,11 @@ fn set_cells_with_limits(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
-        let patch_bytes = patch.retained_bytes();
+        let patch_bytes = if file.signature() == super::Signature::Signed {
+            patch.retained_bytes()
+        } else {
+            0
+        };
         let retained = patch_bytes
             .checked_add(semantic_charge)
             .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
@@ -1215,8 +1225,8 @@ fn set_cells_with_limits(
         patches,
         canonical,
         limits.max_snapshot_bytes(),
+        authored_operations,
     )?;
-    check_snapshot_limits(&commit.patch, limits)?;
     Ok(Some(commit))
 }
 
@@ -2259,14 +2269,6 @@ fn check_limits(
     Ok(())
 }
 
-pub(super) fn check_snapshot_limits(patch: &Patch, limits: &SemanticLimits) -> Result<()> {
-    let observed = patch.snapshot_bytes();
-    if observed > limits.max_snapshot_bytes() {
-        return Err(snapshot_limit(observed, limits.max_snapshot_bytes()));
-    }
-    Ok(())
-}
-
 fn operation_limit(observed: usize, maximum: usize) -> Error {
     transaction_limit(LimitKind::Operations, observed, maximum)
 }
@@ -2279,7 +2281,7 @@ fn staged_limit(observed: usize, maximum: usize) -> Error {
     transaction_limit(LimitKind::StagedBytes, observed, maximum)
 }
 
-fn snapshot_limit(observed: usize, maximum: usize) -> Error {
+pub(super) fn snapshot_limit(observed: usize, maximum: usize) -> Error {
     transaction_limit(LimitKind::SnapshotBytes, observed, maximum)
 }
 
@@ -2511,6 +2513,11 @@ pub(crate) mod sheet_coalesce {
                 ));
             }
             base.check_source_for_replay()?;
+            let source_bytes = base.retained_source_len()?.unwrap_or(0);
+            let minimum = source_bytes.saturating_add(size_of::<NativeStructurePatch>());
+            if minimum > remaining_snapshot {
+                return Err(super::snapshot_limit(minimum, remaining_snapshot));
+            }
             let source = package_from_editor(
                 if base.signature() == crate::format::signature::Signature::Signed {
                     base.editor_for_write()?
@@ -2961,6 +2968,11 @@ pub(crate) mod coalesce {
                 ));
             }
             base.check_source_for_replay()?;
+            let source_bytes = base.retained_source_len()?.unwrap_or(0);
+            let minimum = source_bytes.saturating_add(size_of::<NativeCellPatch>());
+            if minimum > remaining_snapshot {
+                return Err(super::snapshot_limit(minimum, remaining_snapshot));
+            }
             let source = package_from_editor(
                 if base.signature() == crate::format::signature::Signature::Signed {
                     base.editor_for_write()?
@@ -3092,7 +3104,15 @@ pub(crate) mod coalesce {
             let result = edit
                 .commit()
                 .map_err(native_error)
-                .and_then(|native| Commit::from_cell_native(&base, native, sheet, native_limits))
+                .and_then(|native| {
+                    Commit::from_cell_native(
+                        &base,
+                        native,
+                        sheet,
+                        native_limits,
+                        authored_operations,
+                    )
+                })
                 .and_then(|commit| {
                     if logical_noop {
                         let original = original
@@ -3113,7 +3133,13 @@ pub(crate) mod coalesce {
                             })?
                             .commit()
                             .map_err(native_error)?;
-                        Commit::from_cell_native(&base, empty, sheet, native_limits)
+                        Commit::from_cell_native(
+                            &base,
+                            empty,
+                            sheet,
+                            native_limits,
+                            authored_operations,
+                        )
                     } else {
                         Ok(commit)
                     }

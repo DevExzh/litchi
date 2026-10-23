@@ -351,6 +351,17 @@ impl Xls {
         &self.0.package
     }
 
+    /// The retained compound-file length, when the native package exposes
+    /// one. This O(1) lower bound is used before a private edit owner is
+    /// materialized; native patch accounting remains the hard post-commit
+    /// limit check.
+    pub(crate) fn retained_source_len(&self) -> usize {
+        self.owner()
+            .source()
+            .map(|source| usize::try_from(source.file_size()).unwrap_or(usize::MAX))
+            .unwrap_or(0)
+    }
+
     /// The handle's sheet-step cache (record 0315).
     pub(super) fn sheet_step(&self) -> &nav::SheetStep {
         &self.0.sheet_step

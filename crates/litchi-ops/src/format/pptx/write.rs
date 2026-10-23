@@ -63,12 +63,21 @@ impl Commit {
         self.after
     }
 
-    pub(crate) fn snapshot_bytes(&self) -> usize {
-        self.snapshot_bytes.max(
-            *self
-                .retained_cache
-                .get_or_init(|| self.proof.retained_bytes()),
-        )
+    /// Return the already-accounted snapshot charge.  Retained-patch walks
+    /// are deliberately explicit: unsigned writes do not need the charge and
+    /// therefore do not pay for an otherwise unconditional scan.
+    pub(crate) const fn snapshot_bytes(&self) -> usize {
+        self.snapshot_bytes
+    }
+
+    /// Measure the native proof when a signed write needs a hard snapshot
+    /// check, caching the result for the transaction wrapper and any later
+    /// canonical no-op accounting.
+    pub(crate) fn measure_snapshot_bytes(&mut self) -> usize {
+        let proof = &self.proof;
+        let measured = *self.retained_cache.get_or_init(|| proof.retained_bytes());
+        self.snapshot_bytes = self.snapshot_bytes.max(measured);
+        self.snapshot_bytes
     }
 }
 impl Editable {
@@ -219,11 +228,12 @@ impl Pptx {
         let result = (|| self.set_inner(target, Props::from_props(props)?, limits))()
             .map_err(|error| error.with_format(FileFormat::Pptx));
         result.and_then(|commit| {
-            let snapshot_bytes = commit.snapshot_bytes();
-            if snapshot_bytes > limits.max_snapshot_bytes() {
-                return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
-            }
             if self.signature() == crate::format::signature::Signature::Signed {
+                let mut commit = commit;
+                let snapshot_bytes = commit.measure_snapshot_bytes();
+                if snapshot_bytes > limits.max_snapshot_bytes() {
+                    return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+                }
                 self.check_source_for_replay()?;
                 if commit.after.same_snapshot(self) {
                     if commit.proof.is_noop() {
@@ -523,6 +533,9 @@ impl Pptx {
                 )
             },
         };
+        // One facade setter remains one authored operation even when the
+        // native property writer proves that its final value is unchanged.
+        operations = operations.max(1);
         // Defer the retained-patch walk to the cached accessor.  This keeps
         // construction of an unsigned direct commit from doing an eager
         // second scan when the transaction only needs the charge once.

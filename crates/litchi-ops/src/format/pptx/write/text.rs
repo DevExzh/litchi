@@ -864,7 +864,7 @@ impl Pptx {
         notes: &[(usize, Vec<TextAssignment<'_>>)],
     ) -> Result<Commit> {
         let capacity = litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS;
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let mut operations = 0;
         let materialized = match (&source, notes.is_empty()) {
             (Editable::Source(package), false) => {
@@ -910,6 +910,9 @@ impl Pptx {
                 )
             },
         };
+        // Native text chunks may report zero physical changes for an equal
+        // assignment, but the unified setter still authored one command.
+        operations = operations.max(1);
         let after = if changed {
             match &target {
                 Editable::Source(package) => self.adopt_source(package.clone())?,

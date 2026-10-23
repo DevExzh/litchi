@@ -13,8 +13,8 @@ use litchi_xlsb::sheet::Selector as NativeSelector;
 
 use super::super::Xlsb;
 use super::{
-    Commit, NativeCellOptions, Reference, TransferLimits, cell_semantic_charge,
-    check_snapshot_limits, native_error, package_from_editor, snapshot_limit,
+    Commit, NativeCellOptions, Reference, TransferLimits, cell_semantic_charge, native_error,
+    package_from_editor, snapshot_limit,
 };
 use crate::calc::{ErrorValue, Status as Calc, Value};
 use crate::refresh::{Field, Options, Status, Summary, formula_report, workbook_summary};
@@ -147,8 +147,8 @@ pub(crate) fn refresh(
             patches,
             (canonical_sheet, native_limits),
             limits.max_snapshot_bytes(),
+            writes,
         )?;
-        check_snapshot_limits(commit.patch(), limits)?;
         Ok((Some(commit), summary))
     })();
     let freshness = handle.check_source();

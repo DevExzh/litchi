@@ -276,7 +276,7 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let (edit, geometry) = admit_set(self, &which, &tree, props, limits)?;
         let position = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = eager(&source)?;
         let mut native = base.edit()?;
         if geometry.iter().any(Option::is_some) {

@@ -474,8 +474,10 @@ impl Doc {
     }
 
     /// The length of the retained input, or `None` when it was released.
-    #[cfg(test)]
-    fn retained_source_len(&self) -> Option<u64> {
+    /// This is an O(1) lower-bound probe used before a source-backed native
+    /// editor is allocated; the commit path still checks the exact retained
+    /// patch after staging.
+    pub(crate) fn retained_source_len(&self) -> Option<u64> {
         match &self.0.source {
             DocSource::Retained(package) => Some(package.shared_source().file_size()),
             DocSource::Released => None,

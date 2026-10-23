@@ -15,6 +15,7 @@ use crate::format::metadata::{self, Assignments};
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 
 fn native(error: xlsx::metadata::Error) -> crate::Error {
     metadata::native_error(error, FileFormat::Xlsx)
@@ -49,19 +50,22 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let root = metadata::is_root(target) && !props.is_empty();
         if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsx)?;
-        self.set_metadata(&assignments, props.len()).map(Some)
+        self.set_metadata(&assignments, props.len(), limits)
+            .map(Some)
     }
 
     fn set_metadata(
         &self,
         assignments: &Assignments,
         authored_operations: usize,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write()?;
         let (target, metadata, changed) =
@@ -72,7 +76,15 @@ impl Xlsx {
             self.clone()
         };
         self.check_source_for_replay()?;
-        Commit::from_metadata(self, after, source, target, changed, authored_operations)
+        Commit::from_metadata(
+            self,
+            after,
+            source,
+            target,
+            changed,
+            authored_operations,
+            limits.max_snapshot_bytes(),
+        )
     }
 
     /// Adopt a metadata revision: [`Self::adopt_workbook`] with the new

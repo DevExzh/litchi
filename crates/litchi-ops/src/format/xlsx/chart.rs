@@ -35,6 +35,7 @@ use crate::placement::Placement;
 use crate::props::Props;
 use crate::registry::{Access, Alias, Constraint, Entry, Operation, Table};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 use crate::value::{Scalar, ValueType};
 
 fn error(code: Code, message: &'static str) -> Error {
@@ -573,6 +574,7 @@ impl Xlsx {
         &self,
         parent: &Node<'_>,
         node: NewNode<'_>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
         let Item::Sheet(sheet) = parent.item() else {
             return Err(error(
@@ -745,7 +747,15 @@ impl Xlsx {
         let target = edit.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok((
-            Commit::from_metadata(self, after, source, target, true, 1)?,
+            Commit::from_metadata(
+                self,
+                after,
+                source,
+                target,
+                true,
+                1,
+                limits.max_snapshot_bytes(),
+            )?,
             Path::from_steps([
                 Step::new("sheet").with(Predicate::Index(Position::new(sheet))),
                 Step::new("chart").with(Predicate::Index(Position::new(index))),
@@ -917,6 +927,7 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
@@ -1087,12 +1098,22 @@ impl Xlsx {
             self.clone()
         };
         Ok(Some(Commit::from_metadata(
-            self, after, source, target, changed, 1,
+            self,
+            after,
+            source,
+            target,
+            changed,
+            1,
+            limits.max_snapshot_bytes(),
         )?))
     }
 
     /// Remove a chart selected by its path; `None` for other targets.
-    pub(super) fn try_remove_chart(&self, target: &TargetArg<'_>) -> Result<Option<Commit>> {
+    pub(super) fn try_remove_chart(
+        &self,
+        target: &TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
         };
@@ -1115,7 +1136,13 @@ impl Xlsx {
         let target = native.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok(Some(Commit::from_metadata(
-            self, after, source, target, true, 1,
+            self,
+            after,
+            source,
+            target,
+            true,
+            1,
+            limits.max_snapshot_bytes(),
         )?))
     }
 }

@@ -50,31 +50,35 @@ impl Commit {
         let result = (|| {
             let (target, native_patch) = native.into_parts();
             let native_operations = native_patch.operation_count();
-            let native_snapshot_bytes = native_patch.retained_bytes();
-            if native_snapshot_bytes > max_snapshot_bytes {
+            // Unsigned history does not need a retained-patch accounting walk:
+            // its native owner remains the published endpoint and no signed
+            // probe is discarded.  Signed writes still charge the exact
+            // native capture before any canonical no-op rebuild.
+            let signed = base.signature() == super::Signature::Signed;
+            let native_snapshot_bytes = signed.then(|| native_patch.retained_bytes()).unwrap_or(0);
+            if signed && native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
             let changed = !source.same_content(&target).map_err(native_error)?;
-            let (source, target, native_patch, canonical_snapshot_bytes) =
-                if !changed && base.signature() == super::Signature::Signed {
-                    // Writes stage through an unsigned private workbook. A
-                    // no-op patch must instead be rooted in the retained
-                    // signed package so native replay and File use identical
-                    // physical base bytes.
-                    let original = base.original_package_for_noop()?;
-                    let (target, native_patch) = original
-                        .edit()
-                        .map_err(native_error)?
-                        .commit()
-                        .map_err(native_error)?
-                        .into_parts();
-                    let canonical_snapshot_bytes = native_patch.retained_bytes();
-                    (original, target, native_patch, canonical_snapshot_bytes)
-                } else {
-                    (source, target, native_patch, native_snapshot_bytes)
-                };
+            let (source, target, native_patch, canonical_snapshot_bytes) = if !changed && signed {
+                // Writes stage through an unsigned private workbook. A
+                // no-op patch must instead be rooted in the retained
+                // signed package so native replay and File use identical
+                // physical base bytes.
+                let original = base.original_package_for_noop()?;
+                let (target, native_patch) = original
+                    .edit()
+                    .map_err(native_error)?
+                    .commit()
+                    .map_err(native_error)?
+                    .into_parts();
+                let canonical_snapshot_bytes = native_patch.retained_bytes();
+                (original, target, native_patch, canonical_snapshot_bytes)
+            } else {
+                (source, target, native_patch, native_snapshot_bytes)
+            };
             let snapshot_bytes = native_snapshot_bytes.max(canonical_snapshot_bytes);
-            if snapshot_bytes > max_snapshot_bytes {
+            if signed && snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
             let after_xlsx = if changed {
@@ -105,11 +109,18 @@ impl Commit {
         target: xlsx::Package,
         changed: bool,
         authored_operations: usize,
+        max_snapshot_bytes: usize,
     ) -> Result<Self> {
         if changed && base.signature() == super::Signature::Signed {
             return Err(Error::signed(FileFormat::Xlsx));
         }
         if !changed && base.signature() == super::Signature::Signed {
+            // Feature and metadata families stage through a private unsigned
+            // package. Charge both real endpoint owners before dropping that
+            // probe; the canonical identity patch below may retain more.
+            let staged_snapshot_bytes = source
+                .retained_bytes()
+                .saturating_add(target.retained_bytes());
             // Metadata/features use the leaf metadata adapter rather than the
             // primary workbook editor. Rebuild a genuine identity workbook
             // patch over the retained signed owner instead of publishing the
@@ -121,7 +132,11 @@ impl Commit {
                 .commit()
                 .map_err(native_error)?
                 .into_parts();
-            let snapshot_bytes = native_patch.retained_bytes();
+            let canonical_snapshot_bytes = native_patch.retained_bytes();
+            let snapshot_bytes = staged_snapshot_bytes.max(canonical_snapshot_bytes);
+            if snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+            }
             return Ok(Self {
                 after_xlsx: base.clone(),
                 source: original,
@@ -344,14 +359,14 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let props = Props::from_props(props)?;
-        if let Some(commit) = self.try_set_metadata(&target, &props)? {
+        if let Some(commit) = self.try_set_metadata(&target, &props, limits)? {
             return Ok(commit);
         }
         // Rich-text runs (record 0338).
         if let Some(commit) = self.try_set_run(&target, &props, limits)? {
             return Ok(commit);
         }
-        if let Some(commit) = self.try_set_chart(&target, &props)? {
+        if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_set_feature(&target, &props, limits)? {
@@ -3223,16 +3238,20 @@ pub(crate) mod coalesce {
             remaining_snapshot: usize,
         ) -> Result<Self> {
             base.check_source_for_replay()?;
-            let source = if base.signature() == super::Signature::Signed {
-                base.editor_for_write()?
-            } else {
-                base.editor()?
-            };
+            // The source length plus native patch header is only an
+            // allocation lower bound. Check it before promotion/editor
+            // construction; the exact retained proof is charged below after
+            // commit, including signed canonical no-op replay.
             let source_bytes = base.retained_source_len()?.unwrap_or(0);
             let minimum = source_bytes.saturating_add(size_of::<xlsx::workbook::Patch>());
             if minimum > remaining_snapshot {
                 return Err(snapshot_limit(minimum, remaining_snapshot));
             }
+            let source = if base.signature() == super::Signature::Signed {
+                base.editor_for_write()?
+            } else {
+                base.editor()?
+            };
             let edit = source.edit().map_err(native_error)?;
             base.check_source_for_replay()?;
             Ok(Self {
@@ -3246,7 +3265,7 @@ pub(crate) mod coalesce {
                 final_states: (base.signature() == super::Signature::Signed).then(HashMap::new),
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
-                max_snapshot_bytes: limits.max_snapshot_bytes(),
+                max_snapshot_bytes: remaining_snapshot,
                 allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
             })
         }

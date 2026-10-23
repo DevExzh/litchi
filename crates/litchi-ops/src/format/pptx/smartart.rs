@@ -351,7 +351,11 @@ impl Pptx {
             ));
         }
         let position = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if matches!(&change, Change::Text { .. } | Change::Rebuild { .. }) {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = eager(&source)?;
         let mut native = base.edit()?;
         let parts = native.smartart(slide as usize, position)?;

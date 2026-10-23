@@ -941,11 +941,13 @@ pub(super) fn finish_commit(
 ) -> Result<WriteCommit> {
     file.check_source_for_write()?;
     let changed = native.diagnostics().changed();
-    let operations =
-        native
-            .diagnostics()
-            .operation_count()
-            .max(if changed { fallback_operations } else { 0 });
+    // Native diagnostics count physical edits and therefore become zero for
+    // an exact signed identity patch. Keep the authored leaf count as the
+    // fallback even when the final package is unchanged.
+    let operations = native
+        .diagnostics()
+        .operation_count()
+        .max(fallback_operations);
     let native_snapshot_bytes = native.patch().retained_bytes();
     if native_snapshot_bytes > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(
@@ -1263,6 +1265,7 @@ pub(crate) mod coalesce {
         staged_bytes: usize,
         max_staged_bytes: usize,
         limits: SemanticLimits,
+        max_snapshot_bytes: usize,
         allow_repeated: bool,
     }
 
@@ -1475,15 +1478,12 @@ pub(crate) mod coalesce {
             remaining_snapshot: usize,
         ) -> Result<Self> {
             base.check_source_for_write()?;
-            let source = base.editable_package_for_write()?;
-            let source_bytes = source
-                .source()
-                .map(|source| usize::try_from(source.file_size()).unwrap_or(usize::MAX))
-                .unwrap_or(0);
+            let source_bytes = base.retained_source_len();
             let minimum = source_bytes.saturating_add(size_of::<litchi_xls::Patch>());
             if minimum > remaining_snapshot {
                 return Err(snapshot_limit(minimum, remaining_snapshot));
             }
+            let source = base.editable_package_for_write()?;
             let edit = source.edit().map_err(native_edit_error)?;
             base.check_source_for_write()?;
             Ok(Self {
@@ -1495,6 +1495,7 @@ pub(crate) mod coalesce {
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 limits: *limits,
+                max_snapshot_bytes: remaining_snapshot,
                 allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
             })
         }
@@ -1603,9 +1604,11 @@ pub(crate) mod coalesce {
                 edit,
                 items,
                 limits,
+                max_snapshot_bytes,
                 allow_repeated,
                 ..
             } = self;
+            let snapshot_limits = limits.with_snapshot_budget(max_snapshot_bytes);
             let logical_noop = if allow_repeated {
                 logical_noop(&items)
             } else {
@@ -1620,7 +1623,7 @@ pub(crate) mod coalesce {
             let result = edit
                 .commit()
                 .map_err(native_edit_error)
-                .and_then(|native| finish_commit(&base, native, items.len(), &limits))
+                .and_then(|native| finish_commit(&base, native, items.len(), &snapshot_limits))
                 .and_then(|commit| {
                     if logical_noop {
                         let staged_snapshot_bytes = commit.snapshot_bytes;
@@ -1632,7 +1635,8 @@ pub(crate) mod coalesce {
                             .map_err(native_edit_error)?
                             .commit()
                             .map_err(native_edit_error)?;
-                        let mut commit = finish_commit(&base, empty, items.len(), &limits)?;
+                        let mut commit =
+                            finish_commit(&base, empty, items.len(), &snapshot_limits)?;
                         commit.operations = items.len();
                         commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
                         Ok(commit)

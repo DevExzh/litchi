@@ -671,19 +671,23 @@ impl Edit {
                 feature = "iwork-adapter"
             ))]
             let limits = self.limits;
-            #[cfg(feature = "ppt")]
             let remaining_snapshot = limits
                 .max_snapshot_bytes()
                 .saturating_sub(self.snapshot_bytes);
+            let operation_limits = limits.with_snapshot_budget(remaining_snapshot);
             self.execute(|file| match file {
                 #[cfg(feature = "doc")]
-                File::Doc(handle) => {
-                    wrap_doc(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Doc(handle) => wrap_doc(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "odp")]
-                File::Odp(handle) => {
-                    wrap_odp(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Odp(handle) => wrap_odp(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "docx")]
                 File::Docx(handle) => {
                     let commit = if _command_text {
@@ -694,52 +698,75 @@ impl Edit {
                     wrap(handle, commit, ())
                 },
                 #[cfg(feature = "xlsx")]
-                File::Xlsx(handle) => {
-                    wrap_xlsx(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Xlsx(handle) => wrap_xlsx(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "xlsb")]
-                File::Xlsb(handle) => {
-                    wrap_xlsb(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Xlsb(handle) => wrap_xlsb(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "xls")]
-                File::Xls(handle) => {
-                    wrap_xls(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Xls(handle) => wrap_xls(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "ppt")]
                 File::Ppt(handle) => wrap_ppt(
                     handle,
-                    handle.set_with_snapshot_budget(target, props, &limits, remaining_snapshot)?,
+                    handle.set_with_snapshot_budget(
+                        target,
+                        props,
+                        &operation_limits,
+                        remaining_snapshot,
+                    )?,
                     (),
                 ),
                 #[cfg(feature = "pptx")]
-                File::Pptx(handle) => {
-                    wrap_pptx(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Pptx(handle) => wrap_pptx(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "rtf")]
-                File::Rtf(handle) => {
-                    wrap_rtf(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Rtf(handle) => wrap_rtf(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "ods")]
-                File::Ods(handle) => {
-                    wrap_ods(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Ods(handle) => wrap_ods(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "odt")]
-                File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
-                    wrap_odt(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
 
                 #[cfg(odf_objects)]
                 File::Odg(handle)
                 | File::Odc(handle)
                 | File::Odi(handle)
                 | File::Odb(handle)
-                | File::Odf(handle) => {
-                    wrap_object(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                | File::Odf(handle) => wrap_object(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "iwork-adapter")]
-                File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
-                    wrap_iwork(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
+                    handle,
+                    handle.set_with_limits(target, props, &operation_limits)?,
+                    (),
+                ),
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
             })
@@ -1004,6 +1031,10 @@ impl Edit {
             if self.coalesce_remove_parsed(&target, index)?.is_some() {
                 return Ok(());
             }
+            // The ordinary path below is flushed again by `execute`; do it
+            // here so the leaf sees the post-flush snapshot remainder while
+            // it preflights its native before image.
+            self.flush_pending()?;
             #[cfg(any(
                 feature = "doc",
                 feature = "xlsx",
@@ -1019,55 +1050,60 @@ impl Edit {
                 feature = "iwork-adapter"
             ))]
             let limits = self.limits;
+            let operation_limits = limits.with_snapshot_budget(
+                limits
+                    .max_snapshot_bytes()
+                    .saturating_sub(self.snapshot_bytes),
+            );
             self.execute(|file| match file {
                 #[cfg(feature = "docx")]
                 File::Docx(handle) => wrap(handle, handle.remove(target.clone())?, ()),
                 #[cfg(feature = "xlsx")]
                 File::Xlsx(handle) => wrap_xlsx(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "xlsb")]
                 File::Xlsb(handle) => wrap_xlsb(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "xls")]
                 File::Xls(handle) => wrap_xls(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "ppt")]
                 File::Ppt(handle) => wrap_ppt(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => wrap_pptx(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "rtf")]
                 File::Rtf(handle) => wrap_rtf(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "ods")]
                 File::Ods(handle) => wrap_ods(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "odt")]
                 File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
 
@@ -1078,25 +1114,25 @@ impl Edit {
                 | File::Odb(handle)
                 | File::Odf(handle) => wrap_object(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "iwork-adapter")]
                 File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "doc")]
                 File::Doc(handle) => wrap_doc(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[cfg(feature = "odp")]
                 File::Odp(handle) => wrap_odp(
                     handle,
-                    handle.remove_with_limits(target.clone(), &limits)?,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
                     (),
                 ),
                 #[allow(unreachable_patterns)]
@@ -3126,7 +3162,15 @@ impl Edit {
                 return Err(error);
             },
         };
-        let limits = self.limits;
+        // Native find adapters capture their source before returning a step;
+        // hand them the post-flush remainder so that capture is rejected
+        // before a private editor is allocated.
+        self.flush_pending()?;
+        let limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         let _ = (target, &spec, &limits);
         #[cfg(feature = "xls")]
         if matches!(self.current, File::Xls(_)) {

@@ -69,7 +69,7 @@ impl Xlsx {
         let parent = resolve_path(self, &parent)?;
         if matches!(kind, NewKind::Chart) {
             drop(source);
-            return self.add_chart(&parent, node);
+            return self.add_chart(&parent, node, limits);
         }
         if let NewKind::Feature(kind, implied) = kind {
             drop(source);
@@ -149,7 +149,7 @@ impl Xlsx {
         if let Some(commit) = self.try_remove_run(&target, limits)? {
             return Ok(commit);
         }
-        if let Some(commit) = self.try_remove_chart(&target)? {
+        if let Some(commit) = self.try_remove_chart(&target, limits)? {
             return Ok(commit);
         }
         if let Some(commit) = self.try_remove_feature(&target, limits)? {

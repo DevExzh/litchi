@@ -121,6 +121,23 @@ impl Run {
             }));
         }
         base.check_source_for_write()?;
+        // The native body editor retains the source and a patch-sized handoff.
+        // Check this lower bound before the signed setter materializes its
+        // unsigned private package; the final commit still charges the exact
+        // retained before/after proof.
+        let source_bytes = base
+            .retained_source_len()
+            .map_or(0, |length| usize::try_from(length).unwrap_or(usize::MAX));
+        let minimum = source_bytes
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_doc::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(Error::from(TransactionError::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed: minimum,
+                maximum: remaining_snapshot,
+            }));
+        }
         let package = (if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_package_for_write()?
         } else {
@@ -134,21 +151,6 @@ impl Run {
             .with_format(FileFormat::Doc)
             .with_suggestion("reopen the document with source retention enabled")
         })?;
-        // The body editor retains the source and a patch-sized handoff before
-        // it can publish a run. Reject a too-small remainder before creating
-        // that editor, just as the OLE and OPC adapters do.
-        let source_bytes =
-            usize::try_from(package.shared_source().file_size()).unwrap_or(usize::MAX);
-        let minimum = source_bytes
-            .saturating_mul(2)
-            .saturating_add(size_of::<litchi_doc::Patch>());
-        if minimum > remaining_snapshot {
-            return Err(Error::from(TransactionError::Limit {
-                kind: LimitKind::SnapshotBytes,
-                observed: minimum,
-                maximum: remaining_snapshot,
-            }));
-        }
         let edit = package.edit_with_options(super::edit_options(
             super::body_transaction_limits_with_snapshot(*limits, remaining_snapshot),
         ))?;

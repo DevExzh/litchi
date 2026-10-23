@@ -73,7 +73,11 @@ impl Pptx {
     fn change_rows(&self, table: &TreeItem, change: Change) -> Result<Commit> {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if matches!(&change, Change::Height { .. }) {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = super::smartart::eager(&source)?;
         let mut native = base.edit()?;
         match change {
@@ -174,7 +178,7 @@ impl Pptx {
         }
         let slide = slide_table(&table)?;
         let shape = table.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source)?;
         let mut native = base.edit()?;
         if let Some(name) = &name {

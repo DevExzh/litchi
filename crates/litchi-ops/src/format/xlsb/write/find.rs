@@ -20,7 +20,7 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeScalar, Reference, TransferLimits, caller_value_error,
-    cell_semantic_charge, check_snapshot_limits, native_error, package_from_editor, snapshot_limit,
+    cell_semantic_charge, native_error, package_from_editor, snapshot_limit,
 };
 use crate::error::{Code, Error, Result};
 use crate::find::Spec;
@@ -79,7 +79,14 @@ pub(crate) fn find_replace(
         let rich = rich_texts(super::super::projection(&editor)?);
         let runs = runs(&cells, &rich);
         let (changes, matches) = surface::find(&runs, spec, replacement, FileFormat::Xlsb, limits)?;
-        let commit = commit(file, package_from_editor(editor), &cells, changes, limits)?;
+        let commit = commit(
+            file,
+            package_from_editor(editor),
+            &cells,
+            changes,
+            matches,
+            limits,
+        )?;
         Ok((commit, matches))
     })()
     .map_err(|error: Error| error.with_format(FileFormat::Xlsb));
@@ -198,6 +205,7 @@ fn commit(
     package: litchi_xlsb::Package,
     cells: &[TextCell],
     changes: Vec<Change>,
+    authored_operations: usize,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let mut by_sheet: BTreeMap<usize, Vec<(Reference, String)>> = BTreeMap::new();
@@ -281,8 +289,8 @@ fn commit(
         patches,
         (canonical_sheet, native_limits),
         limits.max_snapshot_bytes(),
+        authored_operations,
     )?;
-    check_snapshot_limits(commit.patch(), limits)?;
     Ok(commit)
 }
 

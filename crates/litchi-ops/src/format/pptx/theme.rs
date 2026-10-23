@@ -237,7 +237,7 @@ impl Pptx {
                 Ok(())
             })?;
         }
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source)?;
         let mut native = base.edit()?;
         if !colors.is_empty() || name.is_some() {

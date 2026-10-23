@@ -15,9 +15,7 @@ use super::Nav;
 use super::Xlsb;
 use super::node::{Item, Node};
 use super::spec::{Kind, MERGE_WRITE_TABLE};
-use super::write::{
-    Commit, NativeStructureOptions, check_snapshot_limits, native_error, package_from_editor,
-};
+use super::write::{Commit, NativeStructureOptions, native_error, package_from_editor};
 use crate::error::{Code, Error, Result};
 use crate::props::Props;
 use crate::registry::Operation;
@@ -97,7 +95,6 @@ pub(super) fn set_merges_with_limits(
     }
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(commit.patch(), limits)?;
     Ok(Some(commit))
 }
 

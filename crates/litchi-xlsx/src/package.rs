@@ -236,6 +236,15 @@ impl Package {
         self.workbook.opc_package()
     }
 
+    /// Conservative retained-data charge for one immutable package endpoint.
+    /// This is used by format adapters when a private signed no-op probe is
+    /// discarded after its native identity patch is rebuilt. It does not
+    /// force lazy cell or feature projections.
+    pub fn retained_bytes(&self) -> usize {
+        let archive_hint = self.opc().exact_source_len().unwrap_or(0);
+        crate::workbook::edit::model::workbook_retained_bytes(self.workbook_ref(), archive_hint)
+    }
+
     /// Whether the package carries OPC digital-signature parts or
     /// relationships. Nothing is verified.
     #[must_use]

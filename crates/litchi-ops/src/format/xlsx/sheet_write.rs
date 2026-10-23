@@ -174,7 +174,13 @@ impl Xlsx {
             self.clone()
         };
         Ok(Some(Commit::from_metadata(
-            self, after, source, target, changed, 1,
+            self,
+            after,
+            source,
+            target,
+            changed,
+            1,
+            limits.max_snapshot_bytes(),
         )?))
     }
 }

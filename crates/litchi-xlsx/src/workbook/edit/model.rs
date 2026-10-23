@@ -3142,7 +3142,12 @@ impl Patch {
 /// independently. Fields that are private lazy caches and cannot be observed
 /// without forcing work are represented by their owner/container sizes rather
 /// than by an allocator-footprint claim.
-fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
+/// Count one immutable workbook endpoint without forcing lazy projections.
+///
+/// Package-scoped edit families use the same endpoint accounting as the
+/// primary workbook patch when a signed no-op probe must be charged before it
+/// is replaced by its canonical identity patch.
+pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
     let package = &workbook.inner.package;
     let mut bytes = size_of_val(workbook)
         .saturating_add(size_of_val(workbook.inner.as_ref()))

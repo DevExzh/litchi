@@ -18,9 +18,7 @@ use super::Nav;
 use super::Xlsb;
 use super::node::Item;
 use super::spec::{Kind, NAMED_RANGE_WRITE_TABLE, NamedRangeSetter};
-use super::write::{
-    Commit, NativeStructureOptions, check_snapshot_limits, native_error, package_from_editor,
-};
+use super::write::{Commit, NativeStructureOptions, native_error, package_from_editor};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
 use crate::props::Props;
@@ -157,7 +155,6 @@ fn commit(
 ) -> Result<Commit> {
     let native = edit.commit().map_err(name_error)?;
     let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
-    check_snapshot_limits(commit.patch(), limits)?;
     Ok(commit)
 }
 

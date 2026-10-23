@@ -438,6 +438,21 @@ impl Pptx {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    /// Return the O(1) source-size lower bound used before a native editor is
+    /// admitted.  This is only an allocation preflight; the exact retained
+    /// proof is still charged after the edit commits.  In particular, eager
+    /// owners may expose their already-indexed OPC source length without
+    /// forcing any lazy presentation payloads.
+    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
+        match &self.0.owner {
+            PptxOwner::Source(presentation) => Ok(Some(
+                usize::try_from(presentation.source_backed_package().source_artifact().len())
+                    .unwrap_or(usize::MAX),
+            )),
+            PptxOwner::Eager(package) => Ok(package.opc()?.exact_source_len()),
+        }
+    }
+
     /// This handle's key for [`crate::path::fence::Scope`].
     pub(crate) fn fence_key(&self) -> usize {
         Arc::as_ptr(&self.0).addr()

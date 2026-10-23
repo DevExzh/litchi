@@ -9,8 +9,8 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeFormat, NativeScalar, NativeSelector, Reference,
-    TransferLimits, caller_value_error, cell_semantic_charge, check_snapshot_limits, native_error,
-    package_from_editor, snapshot_limit,
+    TransferLimits, caller_value_error, cell_semantic_charge, native_error, package_from_editor,
+    snapshot_limit,
 };
 use crate::error::{Code, Error, Result};
 use crate::import::{Origin, Summary, Table, Value, Written, serial};
@@ -173,8 +173,8 @@ pub(crate) fn import(
             vec![patch],
             (sheet, native_limits),
             limits.max_snapshot_bytes(),
+            table.fields().len(),
         )?;
-        check_snapshot_limits(commit.patch(), limits)?;
         Ok((commit, summary))
     })();
     let freshness = file.check_source();

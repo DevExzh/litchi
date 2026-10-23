@@ -224,6 +224,20 @@ impl Xlsx {
         target: xlsx::Package,
         changed: bool,
     ) -> Result<Commit> {
+        self.publish_with_limit(source, target, changed, usize::MAX)
+    }
+
+    /// Publish a set/remove probe under the transaction's remaining native
+    /// snapshot budget. Add routes retain the legacy unconstrained adapter,
+    /// while set routes must check the staged and canonical signed endpoints
+    /// before the private probe is discarded.
+    fn publish_with_limit(
+        &self,
+        source: xlsx::Package,
+        target: xlsx::Package,
+        changed: bool,
+        max_snapshot_bytes: usize,
+    ) -> Result<Commit> {
         if changed && self.signature() == super::Signature::Signed {
             return Err(Error::signed(FileFormat::Xlsx));
         }
@@ -232,7 +246,7 @@ impl Xlsx {
         } else {
             self.clone()
         };
-        Commit::from_metadata(self, after, source, target, changed, 1)
+        Commit::from_metadata(self, after, source, target, changed, 1, max_snapshot_bytes)
     }
 
     /// The features of `kind` on the worksheet at `sheet`, read again.
@@ -313,13 +327,13 @@ impl Xlsx {
         };
         let sheet = node.sheet_position();
         Ok(Some(match feature.kind {
-            Kind::Comment => self.set_comment(sheet, feature, props)?,
+            Kind::Comment => self.set_comment(sheet, feature, props, limits)?,
             Kind::Hyperlink => self.set_hyperlink(sheet, feature, props, limits)?,
-            Kind::Picture | Kind::Shape => self.set_drawing(sheet, feature, props)?,
-            Kind::Cf => self.set_cf(sheet, feature, props)?,
-            Kind::DataValidation => self.set_validation(sheet, feature, props)?,
-            Kind::Autofilter => self.set_autofilter(sheet, props)?,
-            _ => self.set_break(sheet, feature, props)?,
+            Kind::Picture | Kind::Shape => self.set_drawing(sheet, feature, props, limits)?,
+            Kind::Cf => self.set_cf(sheet, feature, props, limits)?,
+            Kind::DataValidation => self.set_validation(sheet, feature, props, limits)?,
+            Kind::Autofilter => self.set_autofilter(sheet, props, limits)?,
+            _ => self.set_break(sheet, feature, props, limits)?,
         }))
     }
 
@@ -404,11 +418,22 @@ impl Xlsx {
                 let mut breaks = self.breaks(sheet, feature.kind)?;
                 remove_at(&mut breaks, feature.index)?;
                 return self
-                    .publish_breaks(source, sheet, feature.kind, breaks)
+                    .publish_breaks(
+                        source,
+                        sheet,
+                        feature.kind,
+                        breaks,
+                        limits.max_snapshot_bytes(),
+                    )
                     .map(Some);
             },
         };
-        Ok(Some(self.publish(source, target, changed)?))
+        Ok(Some(self.publish_with_limit(
+            source,
+            target,
+            changed,
+            limits.max_snapshot_bytes(),
+        )?))
     }
 }
 
@@ -642,7 +667,13 @@ impl Xlsx {
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
-    fn set_comment(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_comment(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let Data::Comment(note) = &feature.data else {
             return Err(error(Code::InternalError, "a note node holds no note"));
         };
@@ -694,7 +725,7 @@ impl Xlsx {
         }
         .map_err(authored)?;
         let (target, changed) = split(edit.commit()?);
-        self.publish(source, target, changed)
+        self.publish_with_limit(source, target, changed, limits.max_snapshot_bytes())
     }
 }
 
@@ -1492,7 +1523,13 @@ impl Xlsx {
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
     }
 
-    fn set_drawing(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_drawing(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let Data::Drawing(element) = &feature.data else {
             return Err(error(
                 Code::InternalError,
@@ -1605,7 +1642,12 @@ impl Xlsx {
         }
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        self.publish(source, commit.into_package(), changed)
+        self.publish_with_limit(
+            source,
+            commit.into_package(),
+            changed,
+            limits.max_snapshot_bytes(),
+        )
     }
 }
 
@@ -2285,7 +2327,13 @@ impl Xlsx {
         Ok((commit, feature_path(parent.sheet, "cf", Some(index))))
     }
 
-    fn set_cf(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_cf(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let request = cf_request(Operation::Set, props)?;
         let source = self.editor_for_write()?;
         let mut edit = source.edit_conditional_formats()?;
@@ -2322,7 +2370,12 @@ impl Xlsx {
         edit.set_formats(sheet, formats).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        self.publish(source, commit.into_package(), changed)
+        self.publish_with_limit(
+            source,
+            commit.into_package(),
+            changed,
+            limits.max_snapshot_bytes(),
+        )
     }
 }
 
@@ -2601,7 +2654,13 @@ impl Xlsx {
         ))
     }
 
-    fn set_validation(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_validation(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let source = self.editor_for_write()?;
         let mut edit = source.edit_data_validations()?;
         let mut collections = edit.validations(sheet)?;
@@ -2628,7 +2687,12 @@ impl Xlsx {
         edit.set_validations(sheet, collections).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        self.publish(source, commit.into_package(), changed)
+        self.publish_with_limit(
+            source,
+            commit.into_package(),
+            changed,
+            limits.max_snapshot_bytes(),
+        )
     }
 }
 
@@ -2914,7 +2978,12 @@ impl Xlsx {
         Ok((commit, feature_path(parent.sheet, "autofilter", None)))
     }
 
-    fn set_autofilter(&self, sheet: usize, props: &Props<'_>) -> Result<Commit> {
+    fn set_autofilter(
+        &self,
+        sheet: usize,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let source = self.editor_for_write()?;
         let mut edit = source.edit_auto_filter()?;
         let mut definition = edit
@@ -2929,7 +2998,12 @@ impl Xlsx {
         edit.set_auto_filter(sheet, Some(definition))?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        self.publish(source, commit.into_package(), changed)
+        self.publish_with_limit(
+            source,
+            commit.into_package(),
+            changed,
+            limits.max_snapshot_bytes(),
+        )
     }
 }
 
@@ -2978,6 +3052,7 @@ impl Xlsx {
         sheet: usize,
         kind: Kind,
         breaks: Vec<xlsx::page_breaks::Break>,
+        max_snapshot_bytes: usize,
     ) -> Result<Commit> {
         let mut edit = source.edit_page_breaks(sheet)?;
         let changed = if breaks.is_empty() {
@@ -2995,7 +3070,12 @@ impl Xlsx {
         };
         let committed = edit.commit()?;
         let changed = changed && committed.diagnostics().changed();
-        self.publish(source, committed.into_package(), changed)
+        self.publish_with_limit(
+            source,
+            committed.into_package(),
+            changed,
+            max_snapshot_bytes,
+        )
     }
 
     fn break_spec(
@@ -3057,14 +3137,20 @@ impl Xlsx {
         let index = breaks.partition_point(|held| held.id() < item.id());
         breaks.insert(index, item);
         let source = self.editor_for_write()?;
-        let commit = self.publish_breaks(source, parent.sheet, kind, breaks)?;
+        let commit = self.publish_breaks(source, parent.sheet, kind, breaks, usize::MAX)?;
         Ok((
             commit,
             feature_path(parent.sheet, features::step_name(kind), Some(index)),
         ))
     }
 
-    fn set_break(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
+    fn set_break(
+        &self,
+        sheet: usize,
+        feature: &Feature,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let Data::Break(current) = feature.data else {
             return Err(error(
                 Code::InternalError,
@@ -3083,6 +3169,12 @@ impl Xlsx {
         let index = breaks.partition_point(|held| held.id() < item.id());
         breaks.insert(index, item);
         let source = self.editor_for_write()?;
-        self.publish_breaks(source, sheet, feature.kind, breaks)
+        self.publish_breaks(
+            source,
+            sheet,
+            feature.kind,
+            breaks,
+            limits.max_snapshot_bytes(),
+        )
     }
 }

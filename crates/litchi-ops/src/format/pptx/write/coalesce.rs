@@ -307,23 +307,16 @@ impl Run {
         remaining_snapshot: usize,
     ) -> Result<Self> {
         base.check_source_for_write()?;
+        let source_bytes = base.retained_source_len()?.unwrap_or(0);
+        let minimum = source_bytes.saturating_add(size_of::<litchi_pptx::opened::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(super::snapshot_limit(minimum, remaining_snapshot));
+        }
         let source = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_owner_for_write()?
         } else {
             base.editable_owner()?
         };
-        let source_bytes = match &source {
-            Editable::Source(package) => package
-                .opc()
-                .map_err(native_error)?
-                .exact_source_len()
-                .unwrap_or(0),
-            Editable::Eager(_) => 0,
-        };
-        let minimum = source_bytes.saturating_add(size_of::<litchi_pptx::opened::Patch>());
-        if minimum > remaining_snapshot {
-            return Err(super::snapshot_limit(minimum, remaining_snapshot));
-        }
         let edit = match &source {
             Editable::Eager(package) => match base.take_spare_edit(package) {
                 Some(edit) => NativeEdit::Eager(edit),
@@ -339,7 +332,7 @@ impl Run {
             items: Vec::new(),
             seen: HashMap::new(),
             staged_bytes: 0,
-            max_snapshot_bytes: limits.max_snapshot_bytes(),
+            max_snapshot_bytes: remaining_snapshot,
             target_count: 0,
             max_staged_bytes: limits.max_staged_bytes(),
             max_expanded_targets: limits.max_expanded_targets(),
@@ -457,7 +450,12 @@ impl Run {
             let operations = stage_all(&mut edit, &items, &mut changes)?;
             let (mut after, mut commit) = commit_native(&base, source, edit, operations)?;
             commit.operations = authored_operations;
-            let staged_snapshot_bytes = commit.snapshot_bytes();
+            let staged_snapshot_bytes =
+                if base.signature() == crate::format::signature::Signature::Signed {
+                    commit.measure_snapshot_bytes()
+                } else {
+                    0
+                };
             bound(
                 LimitKind::SnapshotBytes,
                 staged_snapshot_bytes,
@@ -498,7 +496,7 @@ fn proof_is_noop(proof: &Proof) -> bool {
     match proof {
         Proof::Source(patch) => patch.is_noop(),
         Proof::Eager(patch) => patch.is_noop(),
-        Proof::Metadata(_) => false,
+        Proof::Metadata(patch) => patch.is_noop(),
     }
 }
 
