@@ -748,8 +748,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when the exact source package cannot be reparsed for staging or
-    /// its signature/encryption policy makes it read-only.
+    /// Returns an error when the source signature/encryption policy makes it read-only.
+    /// Source XML and staging errors are deferred until the first fallible
+    /// transaction operation or [`Edit::commit`].
     pub fn edit(&self) -> Result<Edit, PackageError> {
         Ok(self.edit_core()?)
     }
@@ -1025,12 +1026,17 @@ struct ContentDraft {
 
 impl Edit {
     /// Borrow the current staged slide projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the deferred source slide projection cannot be
+    /// materialized under the editing limits.
     #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        self.draft
-            .as_ref()
-            .map(MutablePresentation::slides)
-            .unwrap_or_else(|| self.source.slides().unwrap_or(&[]))
+    pub fn slides(&self) -> FamilyResult<&[Slide]> {
+        match self.draft.as_ref() {
+            Some(draft) => Ok(draft.slides()),
+            None => self.source.slides(),
+        }
     }
 
     fn ensure_entry(&mut self) -> CoreResult<()> {

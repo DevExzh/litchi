@@ -80,9 +80,9 @@ fn retained_unknown_slide_is_preserved_or_rewrite_is_refused() {
     let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
 
     let mut refused = source.edit().unwrap();
-    let before = refused.slides().to_vec();
+    let before = refused.slides().unwrap().to_vec();
     assert!(refused.replace(0, "Changed", "Body").is_err());
-    assert_eq!(refused.slides(), before);
+    assert_eq!(refused.slides().unwrap(), before);
 
     let mut transaction = source.edit().unwrap();
     transaction.add("New", "Body").unwrap();
@@ -235,10 +235,10 @@ fn text_limit_failure_is_atomic_at_n_plus_one() {
     let mut transaction = source.edit().unwrap();
     let boundary = "a".repeat(N);
     transaction.add("", &boundary).unwrap();
-    let before = transaction.slides().len();
+    let before = transaction.slides().unwrap().len();
     let over = "b".repeat(N + 1);
     assert!(transaction.add("", &over).is_err());
-    assert_eq!(transaction.slides().len(), before);
+    assert_eq!(transaction.slides().unwrap().len(), before);
 }
 
 #[test]
