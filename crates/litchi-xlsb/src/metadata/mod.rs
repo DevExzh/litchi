@@ -324,12 +324,13 @@ mod tests {
     #[test]
     fn retained_snapshot_limit_is_checked_before_candidate_publication() {
         let package = Package::new().unwrap();
+        let before = package.metadata().unwrap();
         let mut edit = package
             .edit_metadata_with_options(EditOptions::default().max_snapshot_bytes(1))
             .unwrap();
         edit.update(|metadata| metadata.title = Some("Budget".to_owned()))
             .unwrap();
         assert!(matches!(edit.commit(), Err(Error::Limit { .. })));
-        assert_eq!(package.metadata().unwrap(), Metadata::default());
+        assert_eq!(package.metadata().unwrap(), before);
     }
 }

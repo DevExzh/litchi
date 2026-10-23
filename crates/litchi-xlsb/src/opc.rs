@@ -169,6 +169,17 @@ mod tests {
         )
     }
 
+    /// Reopen a newly authored package before comparing replay results. A
+    /// reopened package retains its content-types source bytes, whereas an
+    /// in-memory builder package has no source provenance to retain. The
+    /// projection tests compare the graph and provenance of like-for-like
+    /// source-backed packages; their eager/deferred assertions remain about
+    /// the workbook projection itself.
+    fn source_backed_package() -> Package {
+        let package = Package::new().unwrap();
+        Package::from_bytes(&package.to_bytes().unwrap()).unwrap()
+    }
+
     type RelationshipSnapshot = (String, String, String, bool);
 
     #[derive(Debug, PartialEq, Eq)]
@@ -417,7 +428,7 @@ mod tests {
 
     #[test]
     fn an_unreferenced_part_defers_projection_and_replays_after_reopen() {
-        let package = Package::new().unwrap();
+        let package = source_backed_package();
         let before_bytes = package.to_bytes().unwrap();
         let mut edit = package.edit_opc().unwrap();
         edit.update(|opc| {
@@ -499,7 +510,7 @@ mod tests {
 
     #[test]
     fn a_transitively_referenced_part_keeps_eager_projection_validation() {
-        let package = Package::new().unwrap();
+        let package = source_backed_package();
         let mut seed = package.edit_opc().unwrap();
         seed.update(|opc| {
             let name = PackURI::new("/custom/transitive-root.bin")?;
