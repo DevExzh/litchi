@@ -4272,11 +4272,21 @@ mod tests {
         let archive = ZipArchive::from_slice(&data).unwrap();
         let central = usize::try_from(archive.directory_offset()).unwrap();
         let eocd = usize::try_from(archive.eocd_offset()).unwrap();
-        data[central + 32..central + 34].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        let fixed = ZipFileHeaderFixed::parse(&data[central..]).unwrap();
+        let first_record_len = ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        let comment_len = usize::from(fixed.file_comment_len)
+            .checked_add(comment.len())
+            .expect("file comment length must fit usize");
+        data[central + 32..central + 34]
+            .copy_from_slice(&(u16::try_from(comment_len).unwrap()).to_le_bytes());
         let central_size = u32::from_le_bytes(data[eocd + 12..eocd + 16].try_into().unwrap());
-        data[eocd + 12..eocd + 16]
+        data.splice(
+            central + first_record_len..central + first_record_len,
+            comment.iter().copied(),
+        );
+        let new_eocd = eocd + comment.len();
+        data[new_eocd + 12..new_eocd + 16]
             .copy_from_slice(&(central_size + comment.len() as u32).to_le_bytes());
-        data.splice(eocd..eocd, comment.iter().copied());
         data
     }
 
