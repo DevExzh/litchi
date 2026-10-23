@@ -1,70 +1,59 @@
 # XLSX raw identity lifecycle probe
 
-This probe compares the owned timeline raw insertion lifecycle at two exact
-source revisions. It covers a one-cache small package, a one-cache package
-with sixteen deterministic 512 KiB parts, an eight-cache batch on the small
-package, and the same batch on the multipart package. Each case constructs
-the package and raw values before the measured region, performs
-`Package::edit_timelines` → `timeline::raw::Cache` batch insertion → `commit`,
-and verifies the output bytes and native relationship IDs afterward.
+This probe compares the same owned lifecycle on the immediate pre-repair
+revision `0befb112d96d2409e6f40c9abfeb4813665905ad` and candidate
+`5726f03c7db2dd7dd539000b45f109f14ea8c33a`. The harness has one API surface;
+`--api-variant` labels the report and does not select a compatibility adapter.
 
-The probe was added in `44c6d22be72a6351e48fb92e4c18017101657bcb`. To measure
-the pre-repair source, check out `47c89d20da1594187c967e161b506d828aed1599`
-and cherry-pick that harness commit. Keep each target directory outside the
-checkout and record the resulting binary SHA-256 in the report:
+Each corpus contains a small and a sixteen-part 512 KiB multipart package,
+with one-cache and eight-cache variants. For every corpus it measures owned
+open, the first selected deferred read, raw slicer insertion, raw timeline
+batch insertion, typed slicer replacement, and typed timeline replacement.
+The correctness pass outside the measured region checks the serialized output
+bytes, native relationship IDs and paths, untouched worksheet bytes, patch
+replay, inverse restoration, stale-patch refusal, no-op preservation, and
+deferred decode counters.
+
+The harness is in `tools/perf-baseline/src/xlsx_raw_identity.rs`; the normal
+perf-baseline binary and the existing allocator binary both dispatch the
+`xlsx-raw-identity` selector. The allocator binary reports operation-scoped
+allocation samples. The normal binary reports the same elapsed samples with
+an explicit unavailable allocation status.
+
+The coordinator must provide an existing target directory and keep captures
+outside the checkout. At this handoff the existing coordinator target root is
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets`; this commit creates
+no target, evidence directory, or binary. Select an assigned existing
+subdirectory under that root rather than reusing a target from another
+measurement.
+
+After consumer integration releases the build hold, use the same command line
+on both revisions, with the harness present in each checkout:
 
 ```sh
-# Baseline checkout: 47c89d20da1594187c967e161b506d828aed1599 plus the
-# harness commit above.
+TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/<assigned-existing-target>
+
 CARGO_NET_OFFLINE=true cargo build --release --locked \
   --features allocator-metrics \
   --manifest-path tools/perf-baseline/Cargo.toml \
   --bin litchi-perf-baseline-alloc \
-  --target-dir /outside/uo2-raw-baseline-target
+  --target-dir "$TARGET_DIR"
 
-taskset -c 0 /outside/uo2-raw-baseline-target/release/litchi-perf-baseline-alloc \
-  xlsx-raw-identity \
-  --api-variant original \
-  --source-revision 47c89d20da1594187c967e161b506d828aed1599 \
-  --iterations 5 --warmups 2 --json /outside/report-original.json
-
-# Candidate checkout: 44c6d22be72a6351e48fb92e4c18017101657bcb.
-CARGO_NET_OFFLINE=true cargo build --release --locked \
-  --features allocator-metrics,xlsx-raw-candidate \
-  --manifest-path tools/perf-baseline/Cargo.toml \
-  --bin litchi-perf-baseline-alloc \
-  --target-dir /outside/uo2-raw-candidate-target
-
-taskset -c 0 /outside/uo2-raw-candidate-target/release/litchi-perf-baseline-alloc \
-  xlsx-raw-identity \
-  --api-variant candidate \
-  --source-revision 44c6d22be72a6351e48fb92e4c18017101657bcb \
-  --iterations 5 --warmups 2 --json /outside/report-candidate.json
-```
-
-The baseline call uses the old required-limits method through the feature
-adapter; the candidate call uses the retained edit policy. For instruction
-counts, run the same command for each variant and case under Callgrind, using
-the same iterations, warmups, CPU pinning, and output directory outside the
-repository:
-
-```sh
-valgrind --tool=callgrind --callgrind-out-file=/outside/raw-baseline-small.out \
-  /outside/uo2-raw-baseline-target/release/litchi-perf-baseline-alloc \
+taskset -c 0 "$TARGET_DIR/release/litchi-perf-baseline-alloc" \
   xlsx-raw-identity --api-variant original \
-  --source-revision 47c89d20da1594187c967e161b506d828aed1599 \
-  --case small_single --iterations 1 --warmups 1
+  --source-revision 0befb112d96d2409e6f40c9abfeb4813665905ad \
+  --iterations 5 --warmups 2 --json <coordinator-evidence>/raw-original.json
 
-valgrind --tool=callgrind --callgrind-out-file=/outside/raw-candidate-small.out \
-  /outside/uo2-raw-candidate-target/release/litchi-perf-baseline-alloc \
+taskset -c 0 "$TARGET_DIR/release/litchi-perf-baseline-alloc" \
   xlsx-raw-identity --api-variant candidate \
-  --source-revision 44c6d22be72a6351e48fb92e4c18017101657bcb \
-  --case small_single --iterations 1 --warmups 1
+  --source-revision 5726f03c7db2dd7dd539000b45f109f14ea8c33a \
+  --iterations 5 --warmups 2 --json <coordinator-evidence>/raw-candidate.json
 ```
 
-The report records the generated corpus SHA-256 for every case, the source
-revision supplied by the operator, binary identity, output SHA-256, allocation
-samples, and the measured-region scope. It does not include output
-serialization, identity verification, or destruction in the allocation
-region. The Callgrind command supplies the separate Ir measurement; its
-capture and summary files stay outside the repository.
+Run the same selected case under Callgrind for instruction counts, using the
+same target, CPU pinning, iterations, warmups, and an evidence path outside
+the repository. Record each binary SHA-256 from the JSON report and keep raw
+Callgrind captures outside the checkout. No performance conclusion is made by
+this source-only commit; the owned-open and first-read costs include the new
+per-deferred-part metadata already present in the candidate and require a
+matched run before qualification.
