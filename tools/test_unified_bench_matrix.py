@@ -134,6 +134,12 @@ class Committed(unittest.TestCase):
         native = [r for r in measured_rows if r["record"] in ("0359qb", "0362ye")
                   and r["status"] == "unqualified"]
         self.assertGreaterEqual(len(native), 2)
+        final_only = [r for r in measured_rows
+                      if r["record"] == "0359re" and r["stage"] == "Heaptrack final-only"]
+        self.assertEqual({r["series"].rsplit(":", 1)[-1] for r in final_only},
+                         {"temporary", "peak_heap", "leaked"})
+        self.assertTrue(all(r["leaf"] is None and r["ratio"] is None
+                            and r["unified"] is not None for r in final_only))
 
     def test_summary_total_matches_its_eight_counter_header(self):
         rows, conflicts, agreements, cur, _ = matrix.build()

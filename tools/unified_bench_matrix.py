@@ -3542,18 +3542,24 @@ def p0359re():
     d = load_json(path)
     out = []
     heap = d["heaptrack"]
-    for metric, unit in (("original_allocations", "count"), ("final_allocations", "count"),
-                         ("temporary", "count"), ("peak_heap", "bytes"), ("leaked", "bytes")):
-        if metric == "original_allocations":
-            before, after = _median_value(heap[metric]), _median_value(heap["final_allocations"])
-        elif metric == "final_allocations":
-            before, after = _median_value(heap["original_allocations"]), _median_value(heap[metric])
+    for metric, unit in (("allocations", "count"), ("temporary", "count"),
+                         ("peak_heap", "bytes"), ("leaked", "bytes")):
+        if metric == "allocations":
+            before, after = (_median_value(heap["original_allocations"]),
+                             _median_value(heap["final_allocations"]))
+            comparison, stage = "final/original", "Heaptrack paired"
+            explanation = "Final-source allocation attribution is retained; compiler activity rejected it for native qualification."
         else:
-            before = after = _median_value(heap[metric])
+            # The compact receipt does not label the temporary/peak/leaked
+            # vectors by leg.  Keep the reported final absolute value, rather
+            # than manufacturing a ratio against the same aggregate.
+            before, after = None, _median_value(heap[metric])
+            comparison, stage = "final absolute", "Heaptrack final-only"
+            explanation = "Final-source heaptrack value only; the receipt has no labelled original counterpart, so no ratio or native qualification is inferred."
         out.append(metric_row(
             "0359re", "rtf", "replay", f"final shared replay storage: {metric}", "34-sample probe",
-            before, after, unit, f"rtf_replay_shared:{metric}", path, "Heaptrack diagnostic",
-            "final/original", "Final-source allocation attribution is retained; compiler activity rejected it for native qualification."))
+            before, after, unit, f"rtf_replay_shared:{metric}", path, stage,
+            comparison, explanation))
     cg = d["callgrind"]
     for name, before, after in (("whole profile", med(cg["original_ir"]), med(cg["final_ir"])),
                                 ("Package::apply", cg["old_api_package_apply_inclusive_ir"], cg["final_package_apply_inclusive_ir"]),
