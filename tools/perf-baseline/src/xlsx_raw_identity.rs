@@ -8,7 +8,7 @@
 //! bytes, and deferred decode counters.
 
 use crate::allocation_metrics::{self, Sample as AllocationSample};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 use litchi_xlsx::Package;
 use litchi_xlsx::slicer;
 use litchi_xlsx::timeline::{self, CacheDefinition, FilterType, Range, State};
@@ -123,6 +123,7 @@ struct OperationReport {
     elapsed_ns: Vec<u128>,
     allocation_samples: Vec<AllocationSample>,
     decode_counters_before: Option<(u64, u64)>,
+    decode_counters_before_publication: Option<(u64, u64)>,
     decode_counters_after: Option<(u64, u64)>,
     native_identity: Vec<String>,
     untouched_worksheet_bytes: bool,
@@ -171,6 +172,7 @@ struct TimedCommit {
     data: CommitData,
     elapsed_ns: u128,
     allocation: AllocationSample,
+    decode_counters_before_publication: Option<(u64, u64)>,
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -379,6 +381,22 @@ fn part_bytes(package: &Package, path: &str) -> ProbeResult<Vec<u8>> {
     Ok(opc.get_part(&PackURI::new(path)?)?.blob().to_vec())
 }
 
+fn untouched_large_parts(
+    source: &Package,
+    candidate: &Package,
+    spec: CaseSpec,
+) -> ProbeResult<bool> {
+    for index in 0..spec.extra_parts {
+        let path = format!("/xl/rawProbe/part-{index:03}.bin");
+        let source_part = part_bytes(source, &path)?;
+        let candidate_part = part_bytes(candidate, &path)?;
+        if source_part != candidate_part {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn native_identity(
     package: &Package,
     operation: Operation,
@@ -393,11 +411,45 @@ fn native_identity(
         } else {
             format!("rIdRawProbe{index}")
         };
+        let (expected_path, expected_type) = if operation.is_slicer() {
+            (
+                if operation.is_replace() {
+                    "/xl/slicerCaches/existing-raw-probe.xml".to_owned()
+                } else {
+                    format!("/xl/slicerCaches/raw-probe-{index}.xml")
+                },
+                slicer::CACHE_CONTENT_TYPE,
+            )
+        } else {
+            (
+                if operation.is_replace() {
+                    "/xl/timelineCaches/existing-raw-probe.xml".to_owned()
+                } else {
+                    format!("/xl/timelineCaches/raw-probe-{index}.xml")
+                },
+                timeline::CACHE_CONTENT_TYPE,
+            )
+        };
         let relationship = workbook
             .rels()
             .get(&id)
             .ok_or_else(|| format!("missing native relationship {id}"))?;
-        result.push(relationship.target_partname()?.to_string());
+        let target = relationship.target_partname()?.to_string();
+        if target != expected_path {
+            return Err(format!(
+                "native relationship {id} targets {target}, expected {expected_path}"
+            )
+            .into());
+        }
+        let part = opc.get_part(relationship.target_partname()?)?;
+        if part.content_type() != expected_type {
+            return Err(format!(
+                "native relationship {id} has content type {}, expected {expected_type}",
+                part.content_type()
+            )
+            .into());
+        }
+        result.push(format!("{id}:{target}:{}", part.content_type()));
     }
     Ok(result)
 }
@@ -436,11 +488,26 @@ fn verify_commit(
     operation: Operation,
     spec: CaseSpec,
     data: &CommitData,
-) -> ProbeResult<(Vec<u8>, Vec<String>, bool, bool, bool, bool)> {
+) -> ProbeResult<(
+    Vec<u8>,
+    Vec<String>,
+    bool,
+    bool,
+    bool,
+    bool,
+    Option<(u64, u64)>,
+)> {
+    let before_publication = counters(&data.package);
     let output_bytes = data.package.to_bytes()?;
     let replay_bytes = replay_patch(source, &data.patch)?.to_bytes()?;
     let inverse_bytes = replay_patch(&data.package, &inverse_patch(&data.patch))?.to_bytes()?;
-    let stale_refused = replay_patch(&data.package, &data.patch).is_err();
+    let stale_refused = match replay_patch(&data.package, &data.patch) {
+        Ok(_) => false,
+        Err(error) => matches!(
+            error.downcast_ref::<litchi_xlsx::Error>(),
+            Some(litchi_xlsx::Error::PatchConflict { .. })
+        ),
+    };
     let count = if operation.is_replace() {
         1
     } else {
@@ -448,14 +515,39 @@ fn verify_commit(
     };
     let identities = native_identity(&data.package, operation, count)?;
     let untouched = part_bytes(source, WORKSHEET)? == part_bytes(&data.package, WORKSHEET)?;
+    let reopened = open_package(&output_bytes)?;
+    if reopened.to_bytes()? != output_bytes {
+        return Err("reopened XLSX output changed serialized bytes".into());
+    }
+    if native_identity(&reopened, operation, count)? != identities {
+        return Err("reopened XLSX output changed native relationship identity".into());
+    }
+    if !untouched_large_parts(source, &data.package, spec)?
+        || !untouched_large_parts(source, &reopened, spec)?
+    {
+        return Err("a large untouched XLSX part changed across commit or reopen".into());
+    }
     let noop = no_op(source, operation, source_bytes)?;
+    if replay_bytes != output_bytes {
+        return Err("replayed XLSX patch did not reproduce serialized output".into());
+    }
+    if inverse_bytes != source_bytes {
+        return Err("inverse XLSX patch did not restore source bytes".into());
+    }
+    if !stale_refused {
+        return Err("replaying an applied XLSX patch did not return PatchConflict".into());
+    }
+    if !noop || !untouched {
+        return Err("XLSX no-op or untouched worksheet fidelity check failed".into());
+    }
     Ok((
         output_bytes,
         identities,
-        replay_bytes == output_bytes,
-        inverse_bytes == source_bytes,
-        stale_refused,
-        noop && untouched,
+        true,
+        true,
+        true,
+        true,
+        before_publication,
     ))
 }
 
@@ -472,10 +564,12 @@ fn timed_commit(
     let allocation = region
         .finish()
         .unwrap_or_else(allocation_metrics::unavailable_sample);
+    let decode_counters_before_publication = counters(&data.package);
     Ok(TimedCommit {
         data,
         elapsed_ns,
         allocation,
+        decode_counters_before_publication,
     })
 }
 
@@ -492,12 +586,12 @@ fn open_report(source_bytes: &[u8], iterations: usize, warmups: usize) -> ProbeR
         let started = Instant::now();
         let package = Package::from_opc(OpcPackage::from_vec(owned)?)?;
         elapsed_ns.push(started.elapsed().as_nanos());
-        decode_counters_after = counters(&package);
         allocation_samples.push(
             region
                 .finish()
                 .unwrap_or_else(allocation_metrics::unavailable_sample),
         );
+        decode_counters_after = counters(&package);
     }
     Ok(ReadReport {
         operation: "owned_open",
@@ -527,12 +621,12 @@ fn first_read_report(
         let started = Instant::now();
         let _ = package.get_part(&target)?.blob().len();
         elapsed_ns.push(started.elapsed().as_nanos());
-        decode_counters_after = package.deferred_decode_counters();
         allocation_samples.push(
             region
                 .finish()
                 .unwrap_or_else(allocation_metrics::unavailable_sample),
         );
+        decode_counters_after = package.deferred_decode_counters();
     }
     Ok(ReadReport {
         operation: "first_selected_read",
@@ -553,8 +647,15 @@ fn operation_report(
     let source = open_package(source_bytes)?;
     let before = counters(&source);
     let expected = apply_operation(&source, operation, spec)?;
-    let (output_bytes, identities, replay_ok, inverse_ok, stale_refused, no_op_ok) =
-        verify_commit(&source, source_bytes, operation, spec, &expected)?;
+    let (
+        output_bytes,
+        identities,
+        replay_ok,
+        inverse_ok,
+        stale_refused,
+        no_op_ok,
+        before_publication,
+    ) = verify_commit(&source, source_bytes, operation, spec, &expected)?;
     for _ in 0..warmups {
         drop(timed_commit(source_bytes, operation, spec)?);
     }
@@ -567,7 +668,7 @@ fn operation_report(
         if candidate_bytes != output_bytes {
             return Err(format!("non-deterministic output for {}", operation.name()).into());
         }
-        after = counters(&timed.data.package);
+        after = timed.decode_counters_before_publication;
         elapsed_ns.push(timed.elapsed_ns);
         allocation_samples.push(timed.allocation);
     }
@@ -580,6 +681,7 @@ fn operation_report(
         elapsed_ns,
         allocation_samples,
         decode_counters_before: before,
+        decode_counters_before_publication: before_publication,
         decode_counters_after: after,
         native_identity: identities,
         untouched_worksheet_bytes: part_bytes(&source, WORKSHEET)?
