@@ -77,4 +77,28 @@ does not have this tradeoff: its peak is 612,845 to 612,893 bytes (+48 bytes,
 check was found.
 
 Native timing remains pending a quiet host window; these deterministic
-instruction rows do not make a native-speed claim.
+instruction rows do not make a native-speed claim. A pinned-CPU diagnostic
+ABBA was nevertheless captured for triage. It used 15 rounds, four timed
+legs per route, and 30 samples per binary/route after pairing; the candidate
+median divided by the baseline median was:
+
+| route | candidate / baseline |
+|---|---:|
+| `open` | 1.0027× |
+| `first_slide` | 1.0058× |
+| `repeat_slide` | 1.0113× |
+| `first_text` | 1.0084× |
+| `repeat_text` | 1.0111× |
+| `write_text` | 1.0079× |
+| `repeat_write_text` | 1.0162× |
+| `unchanged_write` | 1.0012× |
+| `append_commit_write` | 1.0033× |
+| `replay` | 1.0040× |
+
+The run was pinned to CPU 5, which was 100% idle immediately before and
+after, but host load was 19.83/25.00/27.01 at start and 18.57/23.87/26.52 at
+end. It is therefore diagnostic only, not quiet-host acceptance. The raw
+20,398-byte receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/native-5575-abba-cpu5-r15.txt`
+(SHA-256
+`c542b0471f74c150d8e551101e94dee7f0ba37304c3bf83ca7dac61f9d4ee248`).
