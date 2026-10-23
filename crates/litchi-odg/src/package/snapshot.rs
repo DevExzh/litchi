@@ -38,9 +38,10 @@ use quick_xml::{
     reader::NsReader,
 };
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, BTreeSet},
     fmt::Write as _,
-    ops::Range,
+    ops::{Deref, Range},
     path::Path,
     sync::Arc,
 };
@@ -1152,12 +1153,16 @@ impl Package {
     ) -> Edit {
         Edit {
             source: self.clone(),
-            content: self.content_xml().to_string(),
-            styles: self.styles_xml().map(str::to_owned),
+            content: LazyPart::source(self, EditPart::Content),
+            styles: self
+                .styles_xml()
+                .map(|_| LazyPart::source(self, EditPart::Styles)),
             content_splices: Some(Vec::new()),
             changes: Vec::new(),
             resource_edits: Vec::new(),
             requires_package_projection: false,
+            pending_joined: None,
+            package_replacement: None,
             security_policy,
             active_content_policy,
         }
@@ -1167,64 +1172,6 @@ impl Package {
     #[must_use]
     pub fn joined_edits(&self, limits: CompositionLimits) -> JoinedEdits {
         JoinedEdits::new(Lineage::new(self), limits)
-    }
-
-    /// Applies joined disjoint work atomically against this exact base.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
-    /// whole-package readback. No intermediate snapshot is published on failure.
-    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Package> {
-        self.apply_joined_with_policies(
-            joined,
-            SecurityWritePolicy::Refuse,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under an explicit signature-write policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus policy refusal.
-    pub fn apply_joined_with_security_policy(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-    ) -> Result<Package> {
-        self.apply_joined_with_policies(
-            joined,
-            security_policy,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under explicit security and inert active-content dispositions.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus either policy refusal.
-    pub fn apply_joined_with_policies(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-        active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Package> {
-        if !joined.lineage().matches(self) {
-            return Err(Error::PatchConflict);
-        }
-        let mut current = self.clone();
-        for edit in joined.into_sub_edits() {
-            current = apply_durable_patch(
-                &current,
-                edit.payload(),
-                false,
-                security_policy,
-                active_content_policy,
-            )?;
-        }
-        Ok(current)
     }
 
     /// Starts explicit bounded undo/redo history at this snapshot.
@@ -1566,14 +1513,65 @@ fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
 /// A staged source-bound package shape edit.
 pub struct Edit {
     source: Package,
-    content: String,
-    styles: Option<String>,
+    content: LazyPart,
+    styles: Option<LazyPart>,
     content_splices: Option<Vec<ContentSplice>>,
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
     requires_package_projection: bool,
+    pending_joined: Option<JoinedEdits>,
+    package_replacement: Option<Package>,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
+}
+
+#[derive(Clone, Copy)]
+enum EditPart {
+    Content,
+    Styles,
+}
+
+/// A source part borrowed through the owning package until the first mutation.
+///
+/// The package clone retained here is O(1); only `set_owned` materializes the
+/// selected XML part.  `Deref` keeps read-only transaction paths borrowed.
+struct LazyPart {
+    source: Package,
+    part: EditPart,
+    owned: Option<String>,
+}
+
+impl LazyPart {
+    fn source(source: &Package, part: EditPart) -> Self {
+        Self {
+            source: source.clone(),
+            part,
+            owned: None,
+        }
+    }
+
+    fn source_text(&self) -> &str {
+        match self.part {
+            EditPart::Content => self.source.content_xml(),
+            EditPart::Styles => self.source.styles_xml().unwrap_or_default(),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        self.owned.as_deref().unwrap_or_else(|| self.source_text())
+    }
+
+    fn set_owned(&mut self, value: String) {
+        self.owned = Some(value);
+    }
+}
+
+impl Deref for LazyPart {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
 }
 
 #[derive(Debug)]
@@ -1585,6 +1583,206 @@ struct ContentSplice {
 }
 
 impl Edit {
+    /// Appends one admitted disjoint composition after the ordinary staged
+    /// operations in this edit.
+    ///
+    /// The composition is retained without publishing or rebuilding. Lineage,
+    /// durable-payload validity, and conflicts with already staged work are
+    /// checked before the composition is moved into the edit, so a refusal
+    /// leaves this edit unchanged. A second composition is refused with the
+    /// rejected plan intact: one plan preserves its original composition
+    /// limits, stable identifiers, and deterministic order.
+    pub fn join(&mut self, joined: JoinedEdits) -> std::result::Result<&mut Self, JoinError> {
+        if self.pending_joined.is_some() {
+            return Err(JoinError::new(
+                joined_refusal("ODG edit accepts one bounded joined plan"),
+                joined,
+            ));
+        }
+        if !joined.lineage().matches(&self.source) {
+            return Err(JoinError::new(Error::PatchConflict, joined));
+        }
+        if let Err(error) = validate_joined_effect_declarations(&joined) {
+            return Err(JoinError::new(error, joined));
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        let validation_error = joined.sub_edits().find_map(|sub_edit| {
+            validate_durable_patch(&sub_edit.payload().inner)
+                .err()
+                .or_else(|| {
+                    validate_joined_preconditions(sub_edit.payload(), &source_fingerprint).err()
+                })
+        });
+        if let Some(error) = validation_error {
+            return Err(JoinError::new(error, joined));
+        }
+        match joined_contains_mixed_package_effects(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal(
+                        "ODG joined package replacement conflicts with independent staged effects",
+                    ),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        match self.joined_conflicts_with_staged(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit overlaps staged work"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        match joined_has_dependent_conflict(&self.source, &joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit has dependent presentation effects"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
+        }
+        if let Err(error) = self.validate_joined_page_names(&joined) {
+            return Err(JoinError::new(error, joined));
+        }
+        self.pending_joined = Some(joined);
+        Ok(self)
+    }
+
+    fn joined_conflicts_with_staged(&self, joined: &JoinedEdits) -> Result<bool> {
+        let staged_package_effect = self.requires_package_projection
+            || !self.resource_edits.is_empty()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Structure(_)))
+            || self.package_replacement.is_some();
+        let direct_conflict =
+            joined
+                .sub_edits()
+                .try_fold(false, |conflict, sub_edit| -> Result<bool> {
+                    if conflict {
+                        return Ok(true);
+                    }
+                    let effects = actual_durable_effect_keys(sub_edit.payload())?;
+                    Ok(effects.into_iter().any(|effect| {
+                        if effect == "package" {
+                            return staged_package_effect || !self.changes.is_empty();
+                        }
+                        if staged_package_effect {
+                            return true;
+                        }
+                        self.changes
+                            .iter()
+                            .flat_map(|change| change_effect_keys(&self.source, change))
+                            .any(|staged| staged == effect)
+                    }))
+                })?;
+        if direct_conflict {
+            return Ok(true);
+        }
+        projected_staged_style_conflict(self, joined)
+    }
+
+    fn validate_joined_page_names(&self, joined: &JoinedEdits) -> Result<()> {
+        // A replacement changes the page universe, so validating any later
+        // selector against the source would be both incorrect and an extra
+        // package reopen. The execution segments validate against the active
+        // replacement exactly once before staging their operations.
+        if joined_contains_package_replacement(joined) {
+            return Ok(());
+        }
+        let mut segment = Vec::new();
+        let mut active_replacement = None;
+        for sub_edit in joined.sub_edits() {
+            for operation in sub_edit.payload().operations() {
+                if operation.op == "package.replace" {
+                    self.validate_page_name_segment(active_replacement.as_ref(), &segment)?;
+                    segment.clear();
+                    let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                    let base = active_replacement.as_ref().unwrap_or(&self.source);
+                    active_replacement = Some(base.reopen_same_flavor(blob.to_vec())?);
+                } else {
+                    segment.push(operation);
+                }
+            }
+        }
+        self.validate_page_name_segment(active_replacement.as_ref(), &segment)
+    }
+
+    fn validate_page_name_segment(
+        &self,
+        active_replacement: Option<&Package>,
+        operations: &[&PatchOperation],
+    ) -> Result<()> {
+        if let Some(replacement) = active_replacement {
+            let edit =
+                replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+            edit.page_name_targets_for_operations(operations.iter().copied())?;
+        } else {
+            self.page_name_targets_for_operations(operations.iter().copied())?;
+        }
+        Ok(())
+    }
+
+    fn page_name_targets_for_operations<'a>(
+        &self,
+        operations: impl Iterator<Item = &'a PatchOperation>,
+    ) -> Result<BTreeMap<usize, String>> {
+        let mut operations = operations
+            .filter(|operation| operation.op == "page.name.set")
+            .peekable();
+        if operations.peek().is_none() {
+            return Ok(BTreeMap::new());
+        }
+        let parsed = parse_content(&self.content)?;
+        let mut names = parsed
+            .pages
+            .iter()
+            .map(|page| page.name().map(str::to_owned))
+            .collect::<Vec<_>>();
+        let mut targets = BTreeMap::new();
+        for operation in operations {
+            let page = parse_page_target(&operation.target)?;
+            let after = string_value(operation)?.to_owned();
+            validate_bounded_value(&after, "ODG page name")?;
+            let before = names.get(page).and_then(Option::as_deref).ok_or_else(|| {
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename requires an existing draw:name",
+                ))
+            })?;
+            if before != after.as_str()
+                && xml_has_attribute(&self.content, DRAW, b"page-name", before)?
+            {
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename is blocked by a draw:page-name dependency",
+                )));
+            }
+            names[page] = Some(after.clone());
+            targets.insert(page, after);
+        }
+        for (page, name) in &targets {
+            if names
+                .iter()
+                .enumerate()
+                .any(|(other, value)| other != *page && value.as_deref() == Some(name.as_str()))
+            {
+                return Err(joined_refusal("ODG joined page names would duplicate"));
+            }
+        }
+        Ok(targets)
+    }
+
     fn replace_or_insert_shape_attribute(
         &mut self,
         page: usize,
@@ -1612,7 +1810,8 @@ impl Edit {
         let mut attribute = String::new();
         push_attribute(&mut attribute, qualified_name, Some(value))?;
         self.invalidate_content_splices();
-        self.content = insert_xml(&self.content, insertion, &attribute)?;
+        self.content
+            .set_owned(insert_xml(&self.content, insertion, &attribute)?);
         Ok(())
     }
 
@@ -1628,7 +1827,7 @@ impl Edit {
                 escaped.as_bytes(),
             )?;
         }
-        self.content = next;
+        self.content.set_owned(next);
         Ok(())
     }
 
@@ -1672,7 +1871,7 @@ impl Edit {
         {
             self.content_splices = None;
         }
-        self.content = next;
+        self.content.set_owned(next);
         Ok(())
     }
 
@@ -2019,7 +2218,7 @@ impl Edit {
             ) {
                 self.requires_package_projection = true;
             }
-            self.content = after_xml;
+            self.content.set_owned(after_xml);
             self.invalidate_content_splices();
         } else if let Some(styles) = &mut self.styles {
             // styles.xml is handed to PackageWriter as a replacement when it
@@ -2050,7 +2249,7 @@ impl Edit {
                 style_name,
                 current.as_ref(),
             );
-            *styles = after_xml;
+            styles.set_owned(after_xml);
             if requires_projection {
                 self.requires_package_projection = true;
             }
@@ -2678,11 +2877,12 @@ impl Edit {
         } else {
             None
         };
-        let styled_content = if let Some((_name, style_xml)) = generated_style.as_ref() {
-            insert_automatic_style(&self.content, style_xml)?
-        } else {
-            self.content.clone()
-        };
+        let styled_content: Cow<'_, str> =
+            if let Some((_name, style_xml)) = generated_style.as_ref() {
+                Cow::Owned(insert_automatic_style(&self.content, style_xml)?)
+            } else {
+                Cow::Borrowed(self.content.as_str())
+            };
         let styled_parsed = parse_content(&styled_content)?;
         let at = if position == styled_parsed.pages.len() {
             styled_parsed.drawing_insert_position
@@ -2696,7 +2896,7 @@ impl Edit {
         if generated_style.is_some() {
             let content = insert_child_xml(&styled_content, at, &xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
         } else {
             self.insert_content_child(at, &xml)?;
         }
@@ -3090,7 +3290,7 @@ impl Edit {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_definitions(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -3122,7 +3322,7 @@ impl Edit {
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.style.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleRemoved {
                 name: name.to_owned(),
@@ -3181,7 +3381,7 @@ impl Edit {
             )
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_style_resources(&self.content)?;
         self.changes.push(Change::Structure(change));
         Ok(())
@@ -3218,7 +3418,7 @@ impl Edit {
         let content = remove_xml(&self.content, &existing.span)?;
         let removed = existing.resource.clone();
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::StyleResourceRemoved {
                 kind,
@@ -3273,7 +3473,7 @@ impl Edit {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
@@ -3308,7 +3508,7 @@ impl Edit {
         let xml = serialize_form_control(control)?;
         let content = replace_xml(&self.content, span, &xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlReplaced {
@@ -3352,7 +3552,7 @@ impl Edit {
             .ok_or_else(|| Error::InvalidFormat("ODG form-control span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::FormControlRemoved {
                 id: identifier.to_owned(),
@@ -3454,7 +3654,7 @@ impl Edit {
             )?;
             let content = insert_automatic_style(&self.content, &resource_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleResourceInserted {
                     kind,
@@ -3558,7 +3758,7 @@ impl Edit {
             )?;
             let content = insert_automatic_style(&self.content, &style_xml)?;
             self.invalidate_content_splices();
-            self.content = content;
+            self.content.set_owned(content);
             self.changes
                 .push(Change::Structure(StructureChange::StyleInserted {
                     name: destination_name.clone(),
@@ -3716,7 +3916,7 @@ impl Edit {
         };
         let content = insert_child_xml(&self.content, at, &transfer_xml)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
@@ -3799,7 +3999,7 @@ impl Edit {
             }
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerInserted {
                 page,
@@ -3847,7 +4047,7 @@ impl Edit {
             .ok_or_else(|| Error::InvalidFormat("ODG layer span is missing".into()))?;
         let content = remove_xml(&self.content, span)?;
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         self.changes
             .push(Change::Structure(StructureChange::LayerRemoved {
                 page,
@@ -4113,12 +4313,224 @@ impl Edit {
             insert_xml(&self.content, parsed.drawing_start_position, &forms_xml)?
         };
         self.invalidate_content_splices();
-        self.content = content;
+        self.content.set_owned(content);
         parse_content(&self.content)?;
         self.changes
             .push(Change::Structure(StructureChange::FormControlInserted {
                 id: id.to_owned(),
             }));
+        Ok(())
+    }
+
+    fn stage_durable_operation(
+        &mut self,
+        operation: &PatchOperation,
+        source_fingerprint: &str,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
+    ) -> Result<()> {
+        if operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+        {
+            return Err(Error::PatchConflict);
+        }
+        match operation.op.as_str() {
+            "page.name.set" => {
+                self.stage_page_name_operation(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?.to_owned(),
+                    page_name_targets,
+                )?;
+            },
+            "page.style.set" => {
+                self.set_page_style_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
+            "page.transition.set" => {
+                self.set_page_transition(
+                    parse_page_target(&operation.target)?,
+                    transition_from_value(&operation.value)?,
+                )?;
+            },
+            "shape.geometry.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                let values = geometry_value(&operation.value)?;
+                self.set_shape_geometry(
+                    page, shape, &values[0], &values[1], &values[2], &values[3],
+                )?;
+            },
+            "shape.control.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_control_reference(page, shape, string_value(operation)?)?;
+            },
+            "shape.layer.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_layer(page, shape, string_value(operation)?)?;
+            },
+            "shape.name.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.path.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_path_data(page, shape, string_value(operation)?)?;
+            },
+            "shape.style.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_style_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.text.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_text(page, shape, string_value(operation)?)?;
+            },
+            _ => return invalid("ODG durable patch operation is unsupported"),
+        }
+        Ok(())
+    }
+
+    fn stage_page_name_operation(
+        &mut self,
+        page: usize,
+        after: String,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
+    ) -> Result<()> {
+        if page_name_targets.is_none() {
+            return self.set_page_name(page, after);
+        }
+        validate_bounded_value(&after, "ODG page name")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let before = selected.name().ok_or_else(|| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename requires an existing draw:name",
+            ))
+        })?;
+        if before == after {
+            return Ok(());
+        }
+        if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename is blocked by a draw:page-name dependency",
+            )));
+        }
+        let span = parsed.page_attribute_spans[page][0]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page name source span is missing".into()))?;
+        let before_owned = before.to_owned();
+        self.replace_content_value(span, &after)?;
+        self.changes.push(Change::PageName(PageNameChange {
+            page,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
+    }
+
+    fn apply_pending_joined(&mut self) -> Result<()> {
+        let Some(joined) = self.pending_joined.as_ref() else {
+            return Ok(());
+        };
+        if self.joined_conflicts_with_staged(joined)? {
+            return invalid("ODG joined edit overlaps staged work");
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        for sub_edit in joined.sub_edits() {
+            validate_durable_patch(&sub_edit.payload().inner)?;
+            validate_joined_preconditions(sub_edit.payload(), &source_fingerprint)?;
+        }
+        self.validate_joined_page_names(joined)?;
+        let joined = self
+            .pending_joined
+            .take()
+            .expect("pending joined plan was borrowed above");
+        let mut staged_before_replacement = Vec::new();
+        let mut replacement_operations: Option<Vec<PatchOperation>> = None;
+        for sub_edit in joined.into_sub_edits() {
+            let durable = sub_edit.into_payload();
+            for operation in durable.operations() {
+                if operation.op == "package.replace" {
+                    if let Some(operations) = &replacement_operations {
+                        self.commit_replacement_operations(operations, &source_fingerprint)?;
+                    } else {
+                        self.stage_durable_operations(
+                            &staged_before_replacement,
+                            &source_fingerprint,
+                        )?;
+                        staged_before_replacement.clear();
+                    }
+                    let active = self.package_replacement.as_ref().unwrap_or(&self.source);
+                    enforce_security_policy(active, self.security_policy)?;
+                    enforce_active_content_policy(active, self.active_content_policy)?;
+                    let blob = durable_blob(&durable, &operation.value)?;
+                    let replacement = active.reopen_same_flavor(blob.to_vec())?;
+                    enforce_active_content_policy(&replacement, self.active_content_policy)?;
+                    self.package_replacement = Some(replacement);
+                    replacement_operations = Some(Vec::new());
+                } else if let Some(operations) = &mut replacement_operations {
+                    operations.push(operation.clone());
+                } else {
+                    staged_before_replacement.push(operation.clone());
+                }
+            }
+        }
+        if let Some(operations) = &replacement_operations {
+            self.commit_replacement_operations(operations, &source_fingerprint)?;
+        } else {
+            self.stage_durable_operations(&staged_before_replacement, &source_fingerprint)?;
+        }
+        Ok(())
+    }
+
+    fn stage_durable_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let page_name_targets = self.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            self.stage_durable_operation(operation, source_fingerprint, Some(&page_name_targets))?;
+        }
+        Ok(())
+    }
+
+    fn commit_replacement_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let replacement = self
+            .package_replacement
+            .take()
+            .expect("package replacement was retained for ordered operations");
+        let mut replacement_edit =
+            replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+        let page_name_targets =
+            replacement_edit.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            replacement_edit.stage_durable_operation(
+                operation,
+                source_fingerprint,
+                Some(&page_name_targets),
+            )?;
+        }
+        self.package_replacement = Some(replacement_edit.commit_core()?.into_package());
         Ok(())
     }
 
@@ -4134,9 +4546,25 @@ impl Edit {
         Ok(self.commit_core()?)
     }
 
-    pub(crate) fn commit_core(self) -> Result<Commit> {
-        if self.content == self.source.content_xml()
-            && self.styles == self.source.styles_xml().map(str::to_owned)
+    pub(crate) fn commit_core(mut self) -> Result<Commit> {
+        self.apply_pending_joined()?;
+        if let Some(snapshot) = self.package_replacement.take() {
+            let changed = self.source.as_bytes() != snapshot.as_bytes();
+            let patch = Patch {
+                source: self.source,
+                target: snapshot.clone(),
+                changes: Vec::new(),
+                resource_changes: Vec::new(),
+                requires_package_projection: true,
+            };
+            return Ok(Commit {
+                snapshot,
+                patch,
+                changed,
+            });
+        }
+        if self.content.as_str() == self.source.content_xml()
+            && self.styles.as_deref() == self.source.styles_xml()
             && self.resource_edits.is_empty()
         {
             return Ok(Commit::unchanged(self.source));
@@ -4199,7 +4627,7 @@ impl Edit {
             )?
         };
         let snapshot = self.source.reopen_same_flavor(rebuilt)?;
-        if snapshot.content_xml() != self.content {
+        if snapshot.content_xml() != self.content.as_str() {
             return invalid("ODG package edit failed exact content readback");
         }
         if snapshot.styles_xml() != self.styles.as_deref() {
@@ -4253,6 +4681,44 @@ pub enum Change {
     PageStyle(PageStyleChange),
     PageTransition(Box<PageTransitionChange>),
     Structure(StructureChange),
+}
+
+fn change_effect_keys(_source: &Package, change: &Change) -> Vec<String> {
+    let (target, operation) = match change {
+        Change::ControlReference(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.control.set",
+        ),
+        Change::Text(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.text.set",
+        ),
+        Change::Name(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.name.set",
+        ),
+        Change::Layer(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.layer.set",
+        ),
+        Change::Geometry(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.geometry.set",
+        ),
+        Change::Style(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.style.set",
+        ),
+        Change::Path(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.path.set",
+        ),
+        Change::PageName(value) => (format!("page/{}", value.page), "page.name.set"),
+        Change::PageStyle(value) => (format!("page/{}", value.page), "page.style.set"),
+        Change::PageTransition(value) => (format!("page/{}", value.page), "page.transition.set"),
+        Change::Structure(_) => return vec!["package".to_owned()],
+    };
+    vec![format!("{target}#{operation}")]
 }
 
 /// One reversible page-name change.
@@ -5007,19 +5473,14 @@ impl Patch {
         limits: CompositionLimits,
     ) -> Result<SubEdit> {
         let durable = self.durable()?;
-        let writes = if durable
+        let writes = durable
             .operations()
             .iter()
-            .any(|operation| operation.op == "package.replace")
-        {
-            vec!["package".to_string()]
-        } else {
-            durable
-                .operations()
-                .iter()
-                .map(|operation| format!("{}#{}", operation.target, operation.op))
-                .collect::<Vec<_>>()
-        };
+            .map(durable_effect_keys)
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
         SubEdit::new(
             Lineage::new(&self.source),
             limits,
@@ -5051,6 +5512,45 @@ pub type SubEdit = litchi_core::SubEdit<Lineage, DurablePatch>;
 
 /// Deterministically ordered, provably disjoint ODG sub-edits.
 pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
+
+/// Recoverable refusal while staging a bounded joined plan on an edit.
+///
+/// The rejected plan is retained so callers can correct or route it to a
+/// different edit without reconstructing its payloads. The error itself is
+/// content-free; the plan is available only through the explicit recovery
+/// accessor.
+#[derive(Debug)]
+pub struct JoinError {
+    error: Error,
+    rejected: Box<JoinedEdits>,
+}
+
+impl JoinError {
+    fn new(error: Error, rejected: JoinedEdits) -> Self {
+        Self {
+            error,
+            rejected: Box::new(rejected),
+        }
+    }
+
+    /// The fixed classified reason for refusing the plan.
+    #[must_use]
+    pub const fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Recover the rejected plan for retry or alternate routing.
+    #[must_use]
+    pub fn into_rejected(self) -> JoinedEdits {
+        *self.rejected
+    }
+
+    /// Recover both the refusal and the rejected plan.
+    #[must_use]
+    pub fn into_parts(self) -> (Error, JoinedEdits) {
+        (self.error, *self.rejected)
+    }
+}
 
 /// Non-mutating three-way ODG merge plan.
 pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
@@ -5706,58 +6206,7 @@ fn apply_durable_patch(
             continue;
         }
         let mut edit = current.edit_with_policies(security_policy, active_content_policy);
-        match operation.op.as_str() {
-            "page.name.set" => {
-                edit.set_page_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.style.set" => {
-                edit.set_page_style_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.transition.set" => {
-                edit.set_page_transition(
-                    parse_page_target(&operation.target)?,
-                    transition_from_value(&operation.value)?,
-                )?;
-            },
-            "shape.geometry.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                let values = geometry_value(&operation.value)?;
-                edit.set_shape_geometry(
-                    page, shape, &values[0], &values[1], &values[2], &values[3],
-                )?;
-            },
-            "shape.control.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_control_reference(page, shape, string_value(operation)?)?;
-            },
-            "shape.layer.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_layer(page, shape, string_value(operation)?)?;
-            },
-            "shape.name.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.path.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_path_data(page, shape, string_value(operation)?)?;
-            },
-            "shape.style.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_style_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.text.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_text(page, shape, string_value(operation)?)?;
-            },
-            _ => return invalid("ODG durable patch operation is unsupported"),
-        }
+        edit.stage_durable_operation(operation, &source_fingerprint, None)?;
         current = edit.commit_core()?.into_package();
     }
     Ok(current)
@@ -5908,6 +6357,425 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str) -> Result<()> {
+    if patch.operations().iter().any(|operation| {
+        operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+    }) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
+    let mut accepted = BTreeSet::new();
+    for sub_edit in joined.sub_edits() {
+        let declared = sub_edit
+            .effects()
+            .writes()
+            .map(canonical_declared_effect_key)
+            .collect::<BTreeSet<_>>();
+        let actual = actual_durable_effect_keys(sub_edit.payload())?
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        if !actual.is_subset(&declared) {
+            return Err(joined_refusal(
+                "ODG joined payload effects do not match declarations",
+            ));
+        }
+        if actual.iter().any(|effect| !accepted.insert(effect.clone())) {
+            return Err(joined_refusal("ODG joined payload effects overlap"));
+        }
+    }
+    Ok(())
+}
+
+fn durable_effect_keys(operation: &PatchOperation) -> Result<Vec<String>> {
+    let key = match operation.op.as_str() {
+        "package.replace" => "package".to_owned(),
+        op @ ("page.name.set" | "page.style.set" | "page.transition.set") => {
+            format!("page/{}#{op}", parse_page_target(&operation.target)?)
+        },
+        op @ ("shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set") => {
+            let (page, shape) = parse_shape_target(&operation.target)?;
+            format!("page/{page}/shape/{shape}#{op}")
+        },
+        _ => format!("{}#{}", operation.target, operation.op),
+    };
+    Ok(vec![key])
+}
+
+fn actual_durable_effect_keys(patch: &DurablePatch) -> Result<Vec<String>> {
+    patch
+        .operations()
+        .iter()
+        .try_fold(Vec::new(), |mut effects, operation| {
+            effects.extend(durable_effect_keys(operation)?);
+            Ok(effects)
+        })
+}
+
+fn canonical_declared_effect_key(effect: &str) -> String {
+    if effect == "package" {
+        return effect.to_owned();
+    }
+    let Some((target, operation)) = effect.rsplit_once('#') else {
+        return effect.to_owned();
+    };
+    match operation {
+        "page.name.set" | "page.style.set" | "page.transition.set" => parse_page_target(target)
+            .map(|page| format!("page/{page}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        "shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set" => parse_shape_target(target)
+            .map(|(page, shape)| format!("page/{page}/shape/{shape}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        _ => effect.to_owned(),
+    }
+}
+
+const ORDINARY_STYLE_GROUP: usize = usize::MAX;
+
+#[derive(Clone)]
+struct StyleProjection {
+    pages: Vec<Option<String>>,
+    parents: Arc<BTreeMap<String, Option<String>>>,
+}
+
+impl StyleProjection {
+    fn from_package(package: &Package) -> Result<Self> {
+        Ok(Self {
+            pages: package
+                .pages()
+                .iter()
+                .map(|page| page.style_name().map(str::to_owned))
+                .collect(),
+            parents: Arc::new(drawing_page_style_parents(
+                package.content_xml(),
+                package.styles_xml(),
+            )?),
+        })
+    }
+
+    fn page_style(&self, page: usize) -> Option<String> {
+        self.pages.get(page).cloned().flatten()
+    }
+
+    fn set_page_style(&mut self, page: usize, style: String) {
+        if let Some(current) = self.pages.get_mut(page) {
+            *current = Some(style);
+        }
+    }
+}
+
+#[derive(Clone)]
+enum StyleDependencyEvent {
+    Retarget {
+        group: usize,
+        page: usize,
+        source_style: Option<String>,
+        destination: String,
+    },
+    Transition {
+        group: usize,
+        page: usize,
+        source_style: Option<String>,
+        parents: Arc<BTreeMap<String, Option<String>>>,
+    },
+}
+
+fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> Result<bool> {
+    if !joined
+        .sub_edits()
+        .any(|sub_edit| has_style_dependency_operation(sub_edit.payload().operations()))
+    {
+        return Ok(false);
+    }
+    // Cross-sub-edit package/semantic mixing has already been rejected by
+    // `joined_contains_mixed_package_effects`. Any remaining style/transition
+    // operations around a replacement are in one ordered sub-edit, where
+    // intra-sub-edit dependencies are intentional and valid. Do not reopen
+    // replacement blobs merely to walk a dependency graph that cannot cross a
+    // composition boundary.
+    if joined_contains_package_replacement(joined) {
+        return Ok(false);
+    }
+    let events = projected_joined_style_events(source, joined)?;
+    style_events_conflict(&effective_style_events(events))
+}
+
+fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<bool> {
+    if !edit
+        .changes
+        .iter()
+        .any(|change| matches!(change, Change::PageStyle(_) | Change::PageTransition(_)))
+    {
+        return Ok(false);
+    }
+    let mut projection = StyleProjection::from_package(&edit.source)?;
+    let mut events = Vec::new();
+    for change in &edit.changes {
+        match change {
+            Change::PageStyle(value) => {
+                events.push(StyleDependencyEvent::Retarget {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    source_style: projection.page_style(value.page),
+                    destination: value.after.clone(),
+                });
+                projection.set_page_style(value.page, value.after.clone());
+            },
+            Change::PageTransition(value) => {
+                events.push(StyleDependencyEvent::Transition {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    source_style: projection.page_style(value.page),
+                    parents: projection.parents.clone(),
+                });
+            },
+            _ => {},
+        }
+    }
+    events.extend(projected_joined_style_events_from_projection(
+        edit.source.clone(),
+        projection,
+        joined,
+    )?);
+    style_events_conflict(&effective_style_events(events))
+}
+
+fn has_style_dependency_operation<'a>(
+    operations: impl IntoIterator<Item = &'a PatchOperation>,
+) -> bool {
+    operations.into_iter().any(|operation| {
+        matches!(
+            operation.op.as_str(),
+            "page.style.set" | "page.transition.set"
+        )
+    })
+}
+
+fn joined_contains_package_replacement(joined: &JoinedEdits) -> bool {
+    joined.sub_edits().any(|sub_edit| {
+        sub_edit
+            .payload()
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "package.replace")
+    })
+}
+
+fn projected_joined_style_events(
+    source: &Package,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    projected_joined_style_events_from_projection(
+        source.clone(),
+        StyleProjection::from_package(source)?,
+        joined,
+    )
+}
+
+fn projected_joined_style_events_from_projection(
+    mut active_package: Package,
+    mut projection: StyleProjection,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    let mut events = Vec::new();
+    for (group, sub_edit) in joined.sub_edits().enumerate() {
+        for operation in sub_edit.payload().operations() {
+            if operation.op == "package.replace" {
+                let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                active_package = active_package.reopen_same_flavor(blob.to_vec())?;
+                projection = StyleProjection::from_package(&active_package)?;
+                continue;
+            }
+            match operation.op.as_str() {
+                "page.style.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    let destination = string_value(operation)?.to_owned();
+                    events.push(StyleDependencyEvent::Retarget {
+                        group,
+                        page,
+                        source_style: projection.page_style(page),
+                        destination: destination.clone(),
+                    });
+                    projection.set_page_style(page, destination);
+                },
+                "page.transition.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    events.push(StyleDependencyEvent::Transition {
+                        group,
+                        page,
+                        source_style: projection.page_style(page),
+                        parents: projection.parents.clone(),
+                    });
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(events)
+}
+
+fn effective_style_events(events: Vec<StyleDependencyEvent>) -> Vec<StyleDependencyEvent> {
+    // Cross-group dependency checks observe each group's effective final style
+    // state.  Retargets overwritten later in the same group are not external
+    // dependencies; transitions remain because they observe the intermediate
+    // style at their position in the ordered payload.
+    let mut initial_styles = BTreeMap::new();
+    let mut final_retargets = BTreeMap::new();
+    for (index, event) in events.iter().enumerate() {
+        if let StyleDependencyEvent::Retarget {
+            group,
+            page,
+            source_style,
+            ..
+        } = event
+        {
+            initial_styles
+                .entry((*group, *page))
+                .or_insert_with(|| source_style.clone());
+            final_retargets.insert((*group, *page), index);
+        }
+    }
+    events
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, event)| match &event {
+            StyleDependencyEvent::Retarget {
+                group,
+                page,
+                source_style: _,
+                destination,
+            } => {
+                if final_retargets.get(&(*group, *page)) != Some(&index) {
+                    return None;
+                }
+                if initial_styles
+                    .get(&(*group, *page))
+                    .and_then(Option::as_deref)
+                    == Some(destination.as_str())
+                {
+                    return None;
+                }
+                Some(event)
+            },
+            StyleDependencyEvent::Transition { .. } => Some(event),
+        })
+        .collect()
+}
+
+fn style_events_conflict(events: &[StyleDependencyEvent]) -> Result<bool> {
+    for (index, left) in events.iter().enumerate() {
+        for right in events[index.saturating_add(1)..].iter() {
+            if style_event_group(left) == style_event_group(right) {
+                continue;
+            }
+            if style_event_pair_conflicts(left, right)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn style_event_group(event: &StyleDependencyEvent) -> usize {
+    match event {
+        StyleDependencyEvent::Retarget { group, .. }
+        | StyleDependencyEvent::Transition { group, .. } => *group,
+    }
+}
+
+fn style_event_pair_conflicts(
+    left: &StyleDependencyEvent,
+    right: &StyleDependencyEvent,
+) -> Result<bool> {
+    match (left, right) {
+        (
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+        )
+        | (
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+        ) => {
+            if left_page == right_page {
+                return Ok(true);
+            }
+            match source_style.as_deref() {
+                Some(source_style) => style_chain_contains(parents, destination, source_style),
+                None => Ok(false),
+            }
+        },
+        (
+            StyleDependencyEvent::Transition {
+                source_style: left_style,
+                parents: left_parents,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                source_style: right_style,
+                parents: right_parents,
+                ..
+            },
+        ) => {
+            let Some(left_style) = left_style.as_deref() else {
+                return Ok(false);
+            };
+            let Some(right_style) = right_style.as_deref() else {
+                return Ok(false);
+            };
+            if left_style == right_style {
+                return Ok(true);
+            }
+            if style_chain_contains(left_parents, left_style, right_style)? {
+                return Ok(true);
+            }
+            style_chain_contains(right_parents, right_style, left_style)
+        },
+        _ => Ok(false),
+    }
+}
+
+fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> Result<bool> {
+    let sub_edits = joined
+        .sub_edits()
+        .map(|sub_edit| actual_durable_effect_keys(sub_edit.payload()))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(sub_edits.iter().enumerate().any(|(index, left)| {
+        let left_package = left.iter().any(|effect| effect == "package");
+        let left_other = left.iter().any(|effect| effect != "package");
+        sub_edits[index.saturating_add(1)..].iter().any(|right| {
+            let right_package = right.iter().any(|effect| effect == "package");
+            let right_other = right.iter().any(|effect| effect != "package");
+            (left_package && right_other) || (left_other && right_package)
+        })
+    }))
 }
 
 struct Parsed {
@@ -9025,35 +9893,64 @@ fn transition_style_is_shared(
     if pages.len() <= 1 {
         return Ok(false);
     }
+    let parents = drawing_page_style_parents(content, styles)?;
+    for (index, page) in pages.iter().enumerate() {
+        if index == selected_page {
+            continue;
+        }
+        if let Some(name) = page.style_name()
+            && style_chain_contains(&parents, name, selected_style)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn drawing_page_style_parents(
+    content: &str,
+    styles: Option<&str>,
+) -> Result<BTreeMap<String, Option<String>>> {
     let content_styles = parse_style_definitions(content)?;
     let named_styles = styles
         .map(parse_style_definitions)
         .transpose()?
         .unwrap_or_default();
     // Use the same family filter and automatic-style shadowing as transition
-    // resolution. An indirect inheritor also shares the selected style owner.
+    // resolution. Content definitions are inserted last so they shadow a
+    // same-named named style and its parent closure.
     let mut parents = BTreeMap::new();
     for definition in named_styles.iter().chain(&content_styles) {
         if definition.style.family() == "drawing-page" {
-            parents.insert(definition.style.name(), definition.style.parent());
+            parents.insert(
+                definition.style.name().to_owned(),
+                definition.style.parent().map(str::to_owned),
+            );
         }
     }
-    for (index, page) in pages.iter().enumerate() {
-        if index == selected_page {
-            continue;
+    Ok(parents)
+}
+
+fn style_chain_contains(
+    parents: &BTreeMap<String, Option<String>>,
+    start: &str,
+    target: &str,
+) -> Result<bool> {
+    let mut current = Some(start);
+    let mut visited = BTreeSet::new();
+    let mut depth = 0usize;
+    while let Some(name) = current {
+        if depth > MAX_DEPTH {
+            return invalid("ODG drawing-page style inheritance exceeds the limit");
         }
-        let mut current = page.style_name();
-        let mut depth = 0usize;
-        while let Some(name) = current {
-            if depth > MAX_DEPTH {
-                return invalid("ODG drawing-page style inheritance exceeds the limit");
-            }
-            if name == selected_style {
-                return Ok(true);
-            }
-            current = parents.get(name).copied().flatten();
-            depth += 1;
+        if !visited.insert(name) {
+            return invalid("ODG drawing-page style inheritance is cyclic");
         }
+        if name == target {
+            return Ok(true);
+        }
+        current = parents.get(name).and_then(|parent| parent.as_deref());
+        depth += 1;
     }
     Ok(false)
 }
@@ -11225,13 +12122,13 @@ fn clone_bounded_string(source: &str, maximum: usize, resource: &'static str) ->
 }
 
 fn own_bounded_cow<'a>(
-    value: std::borrow::Cow<'a, str>,
+    value: Cow<'a, str>,
     maximum: usize,
     resource: &'static str,
 ) -> Result<String> {
     match value {
-        std::borrow::Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
-        std::borrow::Cow::Owned(value) => {
+        Cow::Borrowed(value) => clone_bounded_string(value, maximum, resource),
+        Cow::Owned(value) => {
             if value.len() > maximum {
                 return Err(Error::InvalidFormat(format!(
                     "{resource} exceeds the byte limit"
@@ -13410,10 +14307,78 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
 }
 
+fn joined_refusal(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odg.edit.join",
+        reason,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use quick_xml::events::{BytesCData, BytesPI, BytesText};
+
+    fn lazy_source_package() -> Package {
+        let content = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"/></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
+        let styles = br#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        writer.set_mimetype(MIMETYPE).unwrap();
+        writer.add_file("content.xml", content).unwrap();
+        writer.add_file("styles.xml", styles).unwrap();
+        Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn edit_parts_stay_borrowed_for_noop_and_pure_replacement() {
+        let source = lazy_source_package();
+        let edit = source.edit();
+        assert!(edit.content.owned.is_none());
+        assert_eq!(edit.content.as_ptr(), source.content_xml().as_ptr());
+        let styles = edit.styles.as_ref().expect("fixture has styles.xml");
+        assert!(styles.owned.is_none());
+        assert_eq!(styles.as_ptr(), source.styles_xml().unwrap().as_ptr());
+        drop(edit);
+
+        let mut mutation = source.edit();
+        mutation.set_page_name(0, "Materialized page").unwrap();
+        assert!(mutation.content.owned.is_some());
+        assert!(mutation
+            .styles
+            .as_ref()
+            .is_some_and(|part| part.owned.is_none()));
+        drop(mutation);
+
+        let no_op = source.edit().commit().unwrap();
+        assert!(!no_op.diagnostics().changed());
+        assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+
+        let mut replacement_edit = source.edit();
+        replacement_edit
+            .add_page(Page::new("Replacement page"))
+            .unwrap();
+        let replacement = replacement_edit.commit().unwrap();
+        let limits = CompositionLimits::new(2, 2, 4, 2);
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(replacement.patch().prepare("replacement", limits).unwrap())
+            .unwrap();
+        let mut owner = source.edit();
+        owner.join(joined).unwrap();
+        owner.apply_pending_joined().unwrap();
+        assert!(owner.package_replacement.is_some());
+        assert!(owner.content.owned.is_none());
+        assert!(
+            owner
+                .styles
+                .as_ref()
+                .is_some_and(|part| part.owned.is_none())
+        );
+        let committed = owner.commit_core().unwrap();
+        assert!(committed.diagnostics().changed());
+    }
 
     #[test]
     fn borrowed_event_admission_rejects_oversized_ignored_inputs() {
