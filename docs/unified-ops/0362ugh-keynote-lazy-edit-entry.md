@@ -45,3 +45,12 @@ git diff --check
 
 No Cargo build, test, release artifact, benchmark binary, native timing, or
 large evidence artifact is claimed by this record.
+
+## Follow-up consumer correction
+
+The standalone `tools/perf-baseline/unified-batch-closure` Keynote leaf leg was
+also migrated: its `edit.text()` read now propagates the deferred
+`litchi_keynote` error with `?` before computing the UTF-16 replacement span.
+The remaining `docs/unified-ops/results/0359a/routes_before.rs` occurrence is
+historical evidence for the pre-API source-backed baseline and is not compiled
+or used by the current harness.
