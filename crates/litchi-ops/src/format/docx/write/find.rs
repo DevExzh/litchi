@@ -140,7 +140,8 @@ impl Docx {
             owning_editor(self)?
         } else {
             self.edit()?
-        };
+        }
+        .with_snapshot_budget(limits.max_snapshot_bytes())?;
         let mut work = WorkEdit::from(editor)?;
         let matcher = spec.matcher();
         let mut totals = Totals {

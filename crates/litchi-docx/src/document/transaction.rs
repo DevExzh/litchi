@@ -3087,7 +3087,11 @@ impl Edit {
             patch.target().xml_bytes().len()
         };
         self.admit_snapshot_xml(projected_bytes)?;
-        let snapshot = patch.apply(self.projected())?;
+        // The source comparison above authenticates the patch once.  Reuse
+        // that proof while retaining the budget check before the target
+        // snapshot is cloned; calling the public replay entry point here
+        // would scan distinct-but-equal source allocations a second time.
+        let snapshot = patch.apply_verified(self.projected());
         crate::document::raw::validate_xml(snapshot.xml_bytes(), limits)?;
         let mut edit = snapshot.edit().with_raw_limits(limits)?;
         if let Some(maximum) = self.snapshot_budget {
@@ -7010,11 +7014,18 @@ impl Patch {
         if !source.same_source(&self.before) {
             return Err(Error::PatchConflict);
         }
-        Ok(if !self.is_noop() {
+        Ok(self.apply_verified(source))
+    }
+
+    /// Apply after the caller has authenticated `source` against `before`.
+    /// Keeping this path private makes the single-comparison precondition
+    /// explicit for budgeted native replay without weakening the public API.
+    fn apply_verified(&self, source: &Snapshot) -> Snapshot {
+        if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
-        })
+        }
     }
 
     /// Reuse the retained target when `bytes` are already the exact,
