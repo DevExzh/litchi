@@ -9,10 +9,10 @@ mod rewrite;
 mod semantic;
 mod xml;
 
-pub(super) use package::read;
-pub(super) use xml::{parse, write};
+pub(crate) use package::read;
+pub(crate) use xml::{parse, write};
 
-pub(super) use xml::write_with_limits;
+pub(crate) use xml::write_with_limits;
 
 pub(super) use rewrite::rewrite;
 

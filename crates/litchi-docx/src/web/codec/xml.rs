@@ -245,7 +245,7 @@ impl Settings {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub(super) fn parse(xml: &[u8], limits: &super::super::Limits) -> Result<(Settings, Conformance)> {
+pub(crate) fn parse(xml: &[u8], limits: &super::super::Limits) -> Result<(Settings, Conformance)> {
     super::super::raw::admit_xml(xml, limits)?;
     let processed = process_web_xml(xml, limits)?;
     super::super::raw::admit_xml(processed.as_ref(), limits)?;
@@ -282,13 +282,13 @@ pub(super) fn process_web_xml<'a>(
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub(super) fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
+pub(crate) fn write(value: &Settings, conformance: Conformance) -> Result<Vec<u8>> {
     write_with_limits(value, conformance, &super::super::Limits::DEFAULT)
 }
 
 /// Serialize a checked model while bounding the output allocation before it
 /// is created.
-pub(super) fn write_with_limits(
+pub(crate) fn write_with_limits(
     value: &Settings,
     conformance: Conformance,
     limits: &super::super::Limits,

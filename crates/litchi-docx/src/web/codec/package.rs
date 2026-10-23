@@ -39,7 +39,7 @@ impl Settings {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub(super) fn read(
+pub(crate) fn read(
     part: &dyn Part,
     limits: &super::super::Limits,
 ) -> Result<(Settings, Conformance)> {

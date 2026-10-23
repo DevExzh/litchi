@@ -52,7 +52,7 @@ pub mod raw {
     pub use super::super::limit::Limits;
     use super::super::model::Catalog as TypedCatalog;
     use super::super::{
-        Error, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES, OpcPackage, PackURI, Result,
+        Error, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES, OpcPackage, Result,
     };
     use super::{Catalog, Conformance};
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
