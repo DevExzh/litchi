@@ -1434,6 +1434,64 @@ fn rich_transfer_keeps_the_source_shared_style() {
 }
 
 #[test]
+fn typed_facet_equal_to_source_overrides_pending_complete_style() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut configure = source.edit().expect("configure edit");
+    configure
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "styled")
+        .and_then(|sheet| {
+            sheet.font(
+                "A1",
+                &FontChange::new()
+                    .bold(Some(true))
+                    .name(Some("Accent"))
+                    .expect("font name"),
+            )
+        })
+        .expect("complete source style");
+    let configured = configure.commit().expect("configure commit").into_package();
+    let accent = configured
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("accent style");
+
+    let mut edit = configured
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1", &accent)
+        .and_then(|sheet| {
+            sheet.font(
+                "B1",
+                &FontChange::new().name(None).expect("clear font name"),
+            )
+        })
+        .expect("typed override");
+    let committed = edit.commit().expect("override commit");
+    let format = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1")
+        .expect("style lookup")
+        .expect("styled B1")
+        .format()
+        .expect("cell format");
+    let font = format.font().expect("font");
+    assert_eq!(font.bold(), Some(true));
+    assert_eq!(font.name(), None);
+}
+
+#[test]
 fn hyperlink_ranges_with_one_start_keep_independent_captures() {
     let source = crate::Package::new().expect("source workbook");
     let mut edit = source

@@ -1,10 +1,77 @@
 //! Transaction joins, conflicts, and cross-facet edit tests.
 
 use super::super::*;
-use super::support::part_text;
+use super::support::{part_text, styled_workbook};
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
 use std::mem::size_of;
+
+#[test]
+fn bounded_endpoint_accepts_exact_payload_and_typed_noops() {
+    let source = styled_workbook();
+    let existing_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("existing style");
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("endpoint-only budget");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.set("A1", 1_i32).expect("same scalar payload");
+    sheet
+        .style("A1", &existing_style)
+        .expect("same shared style");
+    sheet
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty authored font name"),
+        )
+        .expect("same default font");
+    sheet
+        .fill(
+            "A1",
+            &crate::style::FillChange::new()
+                .pattern(Some(crate::style::cell_format::Pattern::Solid)),
+        )
+        .expect("same source fill pattern");
+    let commit = edit.commit().expect("endpoint no-op commit");
+    assert!(commit.patch().is_noop());
+}
+
+#[test]
+fn mixed_join_normalizes_unbounded_typed_noop_before_bounded_admission() {
+    let source = styled_workbook();
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut unbounded = source.edit().expect("unbounded edit");
+    unbounded
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty authored font name"),
+        )
+        .expect("stage unbounded typed no-op");
+    bounded
+        .join(unbounded)
+        .expect("typed no-op does not consume bounded endpoint budget");
+    let commit = bounded.commit().expect("mixed no-op commit");
+    assert!(commit.patch().is_noop());
+}
 
 #[test]
 fn primary_edit_capture_budget_rejects_before_cell_staging() {

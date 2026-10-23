@@ -33,6 +33,7 @@ use crate::raw::worksheet::edit::{
 use crate::row::{HeightAt, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
+use crate::style::cell_format::Format;
 use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
@@ -54,7 +55,11 @@ use super::super::{codec, package, workbook_retained_bytes};
 
 use self::snapshot::Snapshot;
 use super::super::svg::{PictureSelector, SvgInput};
-use super::worksheet::{NewSheet, Sheet, Tab};
+use super::worksheet::{
+    NewSheet, Sheet, Tab, alignment_change_matches_source, border_change_matches_source,
+    fill_change_matches_source, font_change_matches_source, number_format_matches_source,
+    protection_change_matches_source, quote_prefix_matches_source,
+};
 
 const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
 
@@ -429,6 +434,22 @@ struct CellCapture {
     active: bool,
 }
 
+/// The typed style facets that still change the immutable source after all
+/// pending requests for one address have been composed.  This is deliberately
+/// a boolean projection: the capture ledger charges the final retained
+/// endpoint, not every intermediate request that an unbounded edit happened
+/// to author before a mixed-budget join.
+#[derive(Debug, Clone, Copy, Default)]
+struct EffectiveTypedFacets {
+    font: bool,
+    alignment: bool,
+    fill: bool,
+    border: bool,
+    protection: bool,
+    quote_prefix: bool,
+    number_format: bool,
+}
+
 impl CellCapture {
     fn retained_bytes(self) -> usize {
         if !self.active {
@@ -656,13 +677,96 @@ impl CaptureBudget {
                 } else {
                     false
                 };
-                let has_other_facet = actions.fonts.contains_key(&address)
-                    || actions.alignments.contains_key(&address)
-                    || actions.fills.contains_key(&address)
-                    || actions.borders.contains_key(&address)
-                    || actions.protections.contains_key(&address)
-                    || actions.quote_prefixes.contains_key(&address)
-                    || actions.number_formats.contains_key(&address)
+                let complete_style = actions.cells.get(&address).is_some_and(|action| {
+                    matches!(
+                        action,
+                        Action::Update { style: Some(_), .. } | Action::Remove
+                    )
+                });
+                let typed = if complete_style {
+                    if matches!(actions.cells.get(&address), Some(Action::Remove)) {
+                        EffectiveTypedFacets::default()
+                    } else {
+                        EffectiveTypedFacets {
+                            font: actions.fonts.contains_key(&address),
+                            alignment: actions.alignments.contains_key(&address),
+                            fill: actions.fills.contains_key(&address),
+                            border: actions.borders.contains_key(&address),
+                            protection: actions.protections.contains_key(&address),
+                            quote_prefix: actions.quote_prefixes.contains_key(&address),
+                            number_format: actions.number_formats.contains_key(&address),
+                        }
+                    }
+                } else {
+                    let source_format = if actions.fonts.contains_key(&address)
+                        || actions.alignments.contains_key(&address)
+                        || actions.fills.contains_key(&address)
+                        || actions.borders.contains_key(&address)
+                        || actions.protections.contains_key(&address)
+                        || actions.quote_prefixes.contains_key(&address)
+                        || actions.number_formats.contains_key(&address)
+                    {
+                        source
+                            .style(address)?
+                            .map(|style| style.format())
+                            .transpose()?
+                    } else {
+                        None
+                    };
+                    EffectiveTypedFacets {
+                        font: actions.fonts.get(&address).is_some_and(|change| {
+                            !font_change_matches_source(
+                                change,
+                                source_format.as_ref().and_then(Format::font),
+                            )
+                        }),
+                        alignment: actions.alignments.get(&address).is_some_and(|change| {
+                            !alignment_change_matches_source(
+                                change,
+                                source_format.as_ref().and_then(Format::alignment),
+                            )
+                        }),
+                        fill: actions.fills.get(&address).is_some_and(|change| {
+                            !fill_change_matches_source(
+                                change,
+                                source_format.as_ref().and_then(Format::fill),
+                            )
+                        }),
+                        border: actions.borders.get(&address).is_some_and(|change| {
+                            !border_change_matches_source(
+                                change,
+                                source_format.as_ref().and_then(Format::border),
+                            )
+                        }),
+                        protection: actions.protections.get(&address).is_some_and(|change| {
+                            !protection_change_matches_source(
+                                change,
+                                source_format.as_ref().and_then(Format::protection),
+                            )
+                        }),
+                        quote_prefix: actions.quote_prefixes.get(&address).is_some_and(|value| {
+                            !quote_prefix_matches_source(
+                                *value,
+                                source_format.as_ref().map(Format::quote_prefix),
+                            )
+                        }),
+                        number_format: actions.number_formats.get(&address).is_some_and(|value| {
+                            !number_format_matches_source(
+                                value.as_deref(),
+                                source_format
+                                    .as_ref()
+                                    .and_then(|format| format.number_format().code()),
+                            )
+                        }),
+                    }
+                };
+                let has_other_facet = typed.font
+                    || typed.alignment
+                    || typed.fill
+                    || typed.border
+                    || typed.protection
+                    || typed.quote_prefix
+                    || typed.number_format
                     || effective_merge_starts.contains(&address)
                     || actions
                         .hyperlinks
@@ -674,6 +778,7 @@ impl CaptureBudget {
                         address,
                         action_effective,
                         effective_merge_starts.contains(&address),
+                        typed,
                     ) {
                         budget.cells.insert((*position, address), capture);
                     }
@@ -714,7 +819,21 @@ impl CaptureBudget {
                     .saturating_add(added.name.as_str().len()),
             );
             for address in addresses {
-                if let Some(capture) = staged_cell_capture(&added.actions, address, true, true) {
+                if let Some(capture) = staged_cell_capture(
+                    &added.actions,
+                    address,
+                    true,
+                    true,
+                    EffectiveTypedFacets {
+                        font: true,
+                        alignment: true,
+                        fill: true,
+                        border: true,
+                        protection: true,
+                        quote_prefix: true,
+                        number_format: true,
+                    },
+                ) {
                     budget.added_cells.insert((index, address), capture);
                 }
             }
@@ -5465,15 +5584,7 @@ impl Edit {
             .get(&position)
             .and_then(|actions| actions.hyperlinks.get(&key))
             .map_or(0, hyperlink_action_retained_bytes);
-        let capture =
-            self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
-        let source = match self.source_hyperlink(position, key) {
-            Ok(source) => source,
-            Err(error) => {
-                self.rollback_cell_capture(capture);
-                return Err(error);
-            },
-        };
+        let source = self.source_hyperlink(position, key)?;
         if source.as_ref() == Some(&hyperlink) {
             self.sheets
                 .entry(position)
@@ -5481,13 +5592,16 @@ impl Edit {
                 .hyperlinks
                 .remove(&key);
             self.recompute_relationship_capture(position, address);
-        } else {
-            self.sheets
-                .entry(position)
-                .or_default()
-                .hyperlinks
-                .insert(key, HyperlinkAction::Put(hyperlink));
+            return Ok(());
         }
+        let capture =
+            self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
+        self.sheets
+            .entry(position)
+            .or_default()
+            .hyperlinks
+            .insert(key, HyperlinkAction::Put(hyperlink));
+        drop(capture);
         Ok(())
     }
 
@@ -5503,6 +5617,20 @@ impl Edit {
             return Ok(None);
         };
         let source = self.source_hyperlink(position, key)?;
+        let staged_put = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.hyperlinks.get(&key))
+            .is_some_and(|action| matches!(action, HyperlinkAction::Put(_)));
+        if staged_put {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
+            self.recompute_relationship_capture(position, address);
+            return Ok(Some(current));
+        }
         let previous_bytes = self
             .sheets
             .get(&position)
@@ -6162,6 +6290,7 @@ fn staged_cell_capture(
     address: Address,
     include_action: bool,
     include_structural: bool,
+    typed: EffectiveTypedFacets,
 ) -> Option<CellCapture> {
     let mut capture = CellCapture::default();
     if include_action {
@@ -6169,30 +6298,42 @@ fn staged_cell_capture(
             apply_action_capture(&mut capture, action);
         }
     }
-    if let Some(change) = actions.fonts.get(&address) {
-        capture.apply(CaptureFacet::Font, change.retained_bytes());
+    if typed.font {
+        if let Some(change) = actions.fonts.get(&address) {
+            capture.apply(CaptureFacet::Font, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.alignments.get(&address) {
-        capture.apply(CaptureFacet::Alignment, change.retained_bytes());
+    if typed.alignment {
+        if let Some(change) = actions.alignments.get(&address) {
+            capture.apply(CaptureFacet::Alignment, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.fills.get(&address) {
-        capture.apply(CaptureFacet::Fill, change.retained_bytes());
+    if typed.fill {
+        if let Some(change) = actions.fills.get(&address) {
+            capture.apply(CaptureFacet::Fill, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.borders.get(&address) {
-        capture.apply(CaptureFacet::Border, change.retained_bytes());
+    if typed.border {
+        if let Some(change) = actions.borders.get(&address) {
+            capture.apply(CaptureFacet::Border, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.protections.get(&address) {
-        capture.apply(CaptureFacet::Protection, change.retained_bytes());
+    if typed.protection {
+        if let Some(change) = actions.protections.get(&address) {
+            capture.apply(CaptureFacet::Protection, change.retained_bytes());
+        }
     }
-    if actions.quote_prefixes.contains_key(&address) {
+    if typed.quote_prefix {
         capture.apply(CaptureFacet::QuotePrefix, size_of::<Option<bool>>());
     }
-    if let Some(value) = actions.number_formats.get(&address) {
-        capture.apply(
-            CaptureFacet::NumberFormat,
-            size_of::<Option<Arc<str>>>()
-                .saturating_add(value.as_ref().map_or(0, |value| value.len())),
-        );
+    if typed.number_format {
+        if let Some(value) = actions.number_formats.get(&address) {
+            capture.apply(
+                CaptureFacet::NumberFormat,
+                size_of::<Option<Arc<str>>>()
+                    .saturating_add(value.as_ref().map_or(0, |value| value.len())),
+            );
+        }
     }
     if include_structural {
         capture.apply(CaptureFacet::Structural, 0);
