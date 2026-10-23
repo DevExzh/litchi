@@ -3007,7 +3007,7 @@ impl Edit {
         Ok(self.commit_core()?)
     }
 
-    pub(crate) fn commit_core(mut self) -> CoreResult<Commit> {
+    pub(crate) fn commit_core(self) -> CoreResult<Commit> {
         // Edit construction is intentionally O(1).  Validate the source XML
         // only when the transaction is first observed or published, so a
         // deferred no-op still refuses malformed content before publication.
