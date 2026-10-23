@@ -9054,6 +9054,41 @@ class BoundaryPolicyTests(unittest.TestCase):
             frozenset({"reqwest"}),
         )
 
+    def test_metadata_preserves_optional_normal_boundary_edges(self) -> None:
+        edge = boundaries.Edge("litchi-ops", "soapberry-zip")
+        snapshot = boundaries.snapshot_from_metadata(
+            {
+                "workspace_members": ["ops-id", "zip-id"],
+                "packages": [
+                    {
+                        "id": "ops-id",
+                        "name": "litchi-ops",
+                        "manifest_path": "/workspace/crates/litchi-ops/Cargo.toml",
+                        "features": {},
+                        "dependencies": [
+                            {"name": "soapberry-zip", "kind": None, "optional": True}
+                        ],
+                    },
+                    {
+                        "id": "zip-id",
+                        "name": "soapberry-zip",
+                        "manifest_path": "/workspace/crates/soapberry-zip/Cargo.toml",
+                        "features": {},
+                        "dependencies": [],
+                    },
+                ],
+            }
+        )
+
+        self.assertIn(edge, snapshot.edges)
+        self.assertEqual(snapshot.dependency_kinds[edge], frozenset({"normal"}))
+        self.assertEqual(
+            snapshot.normal_optional_dependencies["litchi-ops"],
+            frozenset({"soapberry-zip"}),
+        )
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+
     def test_manifest_dependency_inventory_rejects_root_workspace_dependency(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -26937,7 +26972,80 @@ fn rewrite_movie_title_operation(
                 violations,
             )
             self.assertTrue(
+                any("omits original_header" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
                 any("omits original_canonical_header" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_accepts_shared_source_provenance_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "struct SourceProvenance;\n"
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<(&[u8], &[u8])> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| (\n"
+                "            provenance.original_header(),\n"
+                "            provenance.original_canonical_header(),\n"
+                "        ))\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers() == other.source_headers()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_incomplete_shared_source_provenance(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<&[u8]> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| {\n"
+                "            provenance.original_header()\n"
+                "        })\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers().is_some()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("omits original_canonical_header" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must compare both source_headers values" in item for item in violations),
                 violations,
             )
 

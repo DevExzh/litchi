@@ -45405,8 +45405,39 @@ def audit_numbers_identity_boundary_source_topology(
                 "same_content_ignoring_offsets is missing"
             )
         else:
+            resolved_fields = {
+                field_name
+                for field_name in required_fields
+                if re.search(rf"\b{re.escape(field_name)}\b", helper_body)
+                is not None
+            }
+            source_headers_calls = re.findall(
+                r"\bsource_headers\s*\(", helper_body
+            )
+            if source_headers_calls:
+                if len(source_headers_calls) < 2:
+                    violations.append(
+                        "focused litchi-iwa-core archive helper "
+                        "same_content_ignoring_offsets must compare both "
+                        "source_headers values"
+                    )
+                source_headers_body = _rust_any_function_body(
+                    core_code, "source_headers"
+                )
+                if source_headers_body is not None and len(source_headers_calls) >= 2:
+                    resolved_fields.update(
+                        field_name
+                        for field_name in (
+                            "original_header",
+                            "original_canonical_header",
+                        )
+                        if re.search(
+                            rf"\b{re.escape(field_name)}\b", source_headers_body
+                        )
+                        is not None
+                    )
             for field_name in required_fields:
-                if re.search(rf"\b{re.escape(field_name)}\b", helper_body) is None:
+                if field_name not in resolved_fields:
                     violations.append(
                         "focused litchi-iwa-core archive helper "
                         f"same_content_ignoring_offsets omits {field_name}"

@@ -283,7 +283,8 @@
       "litchi-sign",
       "litchi-xls",
       "litchi-xlsb",
-      "litchi-xlsx"
+      "litchi-xlsx",
+      "soapberry-zip"
     ],
     "litchi-oth": [
       "litchi-core",
