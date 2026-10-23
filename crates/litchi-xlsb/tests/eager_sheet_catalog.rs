@@ -113,7 +113,7 @@ fn sheet_partname(package: &OpcPackage, position: usize) -> PackURI {
 }
 
 fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let relationship_ids = bundle_entries(&package);
     let workbook_part = package.get_part(&workbook_uri).unwrap();
@@ -159,7 +159,7 @@ fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type:
 }
 
 fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -188,7 +188,7 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
 }
 
 fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -238,7 +238,7 @@ fn rewrite_target(
     position: usize,
     f: impl FnOnce(&mut OpcPackage, &PackURI),
 ) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let uri = sheet_partname(&package, position);
     f(&mut package, &uri);
     let mut output = Vec::new();
@@ -331,7 +331,8 @@ fn eager_catalog_refuses_missing_external_and_wrong_content_type_targets() {
     }
 
     let external = {
-        let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut package =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
         let relationship_ids = bundle_entries(&package);
         let relationship_id = relationship_ids[0].1.clone();

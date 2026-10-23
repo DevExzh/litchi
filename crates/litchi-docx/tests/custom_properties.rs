@@ -16,7 +16,8 @@ const HEADER_FIXTURE: &[u8] = include_bytes!(
 );
 
 fn custom_properties_xml(bytes: &[u8]) -> Vec<u8> {
-    let package = OpcPackage::from_bytes(bytes).expect("open DOCX OPC package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("open DOCX OPC package");
     let uri = PackURI::new("/docProps/custom.xml").expect("static custom-properties URI");
     package
         .get_part(&uri)
@@ -96,7 +97,8 @@ fn custom_props_round_trip_and_clear_remove_the_package_graph() {
         edit_custom_props(&reopened, CustomProps::clear).expect("clear custom properties");
     reopened.save(&path).expect("save cleared properties");
 
-    let graph = OpcPackage::open(&path).expect("open cleared OPC graph");
+    let graph = OpcPackage::open(&path, litchi_opc::SourceLimits::default())
+        .expect("open cleared OPC graph");
     assert!(
         graph
             .rels()
@@ -123,7 +125,8 @@ fn malformed_custom_props_are_not_treated_as_absent() {
     let package = Package::new().expect("new DOCX package");
     package.save(&path).expect("save base package");
 
-    let mut opc = OpcPackage::open(&path).expect("open base OPC package");
+    let mut opc = OpcPackage::open(&path, litchi_opc::SourceLimits::default())
+        .expect("open base OPC package");
     let part = PackURI::new("/docProps/custom.xml").expect("static package URI");
     opc.add_part(Box::new(BlobPart::new(
         part,

@@ -159,17 +159,14 @@ impl SourceState {
         let workbook = package.get_part(workbook_name)?;
         let root_name = litchi_opc::PackURI::new("/")?;
         let opc_limits = opc_capture_limits(limits)?;
-        let root_relationships =
-            package.source_relationships_with_limits(&root_name, opc_limits)?;
-        let workbook_relationships =
-            package.source_relationships_with_limits(workbook_name, opc_limits)?;
-        let content_types = package.source_content_types_with_limits(opc_limits)?;
+        let root_relationships = package.source_relationships(&root_name, opc_limits)?;
+        let workbook_relationships = package.source_relationships(workbook_name, opc_limits)?;
+        let content_types = package.source_content_types(opc_limits)?;
         let owner = graph
             .map(|graph| package.get_part(&graph.part_name))
             .transpose()?
             .map(|part| {
-                let relationships =
-                    package.source_relationships_with_limits(part.partname(), opc_limits)?;
+                let relationships = package.source_relationships(part.partname(), opc_limits)?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: part.partname().as_str().to_string(),
                     content_type: part.content_type().to_string(),

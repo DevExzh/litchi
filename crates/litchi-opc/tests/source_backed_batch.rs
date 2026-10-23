@@ -978,11 +978,12 @@ fn managed_context(
 }
 
 fn package_with_context(source: Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         source,
         SourceLimits::default(),
         SourceCacheLimits::new(PART_BYTES * 8, 16).unwrap(),
-        context,
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap()
 }
@@ -1007,7 +1008,13 @@ fn assert_batch_bytes(batch: &litchi_opc::PartBatch, expected: &[Vec<u8>]) {
 #[test]
 fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
     let (archive, expected_parts) = archive_bytes(None);
-    let serial = SourceBackedPackage::from_vec(archive.clone()).unwrap();
+    let serial = SourceBackedPackage::from_vec(
+        archive.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let requests = vec![
         pack(BETA_URI),
         pack(ALPHA_URI),
@@ -1027,7 +1034,13 @@ fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
         })
         .collect::<Vec<_>>();
 
-    let package = SourceBackedPackage::from_vec(archive).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let batch = package.read_parts_ordered(&requests).unwrap();
     assert_batch_bytes(&batch, &expected);
     assert_eq!(batch.get(0).unwrap().as_bytes(), expected[0].as_slice());
@@ -1053,7 +1066,14 @@ fn batch_short_read_provider_preserves_exact_bytes() {
         .collect::<Vec<_>>();
     let inner: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::new(archive));
     let probe = ProbeSource::new(inner).with_short_reads(7);
-    let package = SourceBackedPackage::from_read_at(Arc::new(probe)).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(probe),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let requests = requested_uris();
     let batch = package.read_parts_ordered(&requests).unwrap();
     assert_batch_bytes(&batch, &expected);
@@ -1152,7 +1172,13 @@ fn batch_below_parallel_threshold_uses_serial_fallback() {
 #[test]
 fn batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights() {
     let (archive, _) = archive_bytes(None);
-    let package = SourceBackedPackage::from_vec(archive).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let missing =
         package.read_parts_ordered(&[pack(ALPHA_URI), pack("/custom/missing.bin"), pack(BETA_URI)]);
     assert!(matches!(missing, Err(OpcError::PartNotFound(_))));
@@ -1183,9 +1209,12 @@ fn batch_request_count_limit_remains_a_typed_read_limit() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_read_at_with_limits(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(archive)),
         limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
     )
     .unwrap();
     let result = package.read_parts_ordered(&[
@@ -1492,7 +1521,13 @@ fn warm_batch_holds_structural_memory_until_the_returned_batch_drops() {
 #[test]
 fn batch_empty_one_worker_and_oversized_single_part_use_serial_fallbacks() {
     let (archive, expected_parts) = archive_bytes(None);
-    let empty = SourceBackedPackage::from_vec(archive.clone()).unwrap();
+    let empty = SourceBackedPackage::from_vec(
+        archive.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let empty_batch = empty.read_parts_ordered(&[]).unwrap();
     assert!(empty_batch.is_empty());
     assert_eq!(empty_batch.len(), 0);
@@ -1663,7 +1698,14 @@ fn batch_source_mutation_during_a_gated_load_returns_source_changed() {
     let inner: Arc<dyn ReadAt> = mutable.clone();
     let gate = Arc::new(ReadGate::default());
     let probe = Arc::new(ProbeSource::new(inner).with_gate(Arc::clone(&gate)));
-    let package = SourceBackedPackage::from_read_at(probe).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        probe,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     gate.arm();
     let worker = thread::spawn(move || {
         let result = package.read_parts_ordered(&[pack(ALPHA_URI), pack(BETA_URI)]);

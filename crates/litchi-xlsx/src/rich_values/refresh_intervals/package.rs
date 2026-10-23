@@ -109,7 +109,7 @@ impl SourceState {
 
     fn capture(package: &OpcPackage, owner: &dyn OpcPart) -> Result<Self> {
         let part_name = owner.partname().clone();
-        let relationships = package.source_relationships(&part_name)?;
+        let relationships = package.source_relationships(&part_name, package.read_limits())?;
         Ok(Self {
             part: Some(SourcePart {
                 name: part_name.clone(),

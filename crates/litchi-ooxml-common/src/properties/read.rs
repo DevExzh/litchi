@@ -924,7 +924,11 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/openxml4j")
             .join(name);
-        OpcPackage::from_bytes(&std::fs::read(path).unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &std::fs::read(path).unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn source_package_with_core(xml: &[u8], relationship: &str) -> SourceBackedPackage {
@@ -937,13 +941,27 @@ mod tests {
         package.relate_to("docProps/core.xml", relationship);
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+        SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
     }
 
     fn source_package(package: &OpcPackage) -> SourceBackedPackage {
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+        SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
     }
 
     fn error_family(error: &Error) -> &'static str {
@@ -991,13 +1009,27 @@ mod tests {
         let eager = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, valid);
         let mut bytes = Vec::new();
         eager.write_to(&mut bytes).unwrap();
-        let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let source = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(read_source_backed(&source).unwrap(), read(&eager).unwrap());
 
         let empty = OpcPackage::new();
         let mut bytes = Vec::new();
         empty.write_to(&mut bytes).unwrap();
-        let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let source = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(read_source_backed(&source).unwrap(), read(&empty).unwrap());
 
         let strict_xml = br#"<cp:coreProperties xmlns:cp="http://purl.oclc.org/ooxml/package/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Strict</dc:title></cp:coreProperties>"#;
@@ -1519,6 +1551,12 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
             "../../test-data/poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFAIL.docx",
         );
-        assert!(OpcPackage::from_bytes(&std::fs::read(path).unwrap()).is_err());
+        assert!(
+            OpcPackage::from_bytes(
+                &std::fs::read(path).unwrap(),
+                litchi_opc::SourceLimits::default()
+            )
+            .is_err()
+        );
     }
 }

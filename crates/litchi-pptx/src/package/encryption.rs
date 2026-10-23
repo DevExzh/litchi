@@ -250,7 +250,7 @@ impl Package {
     fn from_opened_encryption(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
         let mode = opened.mode();
         let mut package = Self::from_opc_package_with_provenance(
-            litchi_opc::OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?,
+            litchi_opc::OpcPackage::from_vec(opened.into_bytes(), limits)?,
             true,
         )?;
         package.encryption = match mode {

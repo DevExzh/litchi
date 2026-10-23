@@ -36,7 +36,11 @@ fn test_data(name: &str) -> Vec<u8> {
 
 /// The first part whose name contains `fragment`.
 fn part_name(package_bytes: &[u8], fragment: &str) -> String {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .iter_parts()
         .map(|part| part.partname().to_string())
@@ -45,7 +49,11 @@ fn part_name(package_bytes: &[u8], fragment: &str) -> String {
 }
 
 fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let uri = PackURI::new(part).unwrap();
     let mut stream: Stream = Records::new(
         package.get_part(&uri).unwrap().blob(),

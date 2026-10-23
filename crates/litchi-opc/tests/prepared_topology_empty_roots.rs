@@ -31,7 +31,14 @@ fn empty_package(types: &str, relationships: Option<&str>) -> Vec<u8> {
 }
 
 fn publish_first_part(source: Vec<u8>, add_relationship: bool) -> Vec<u8> {
-    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut plan = SourceTopologyPlan::new();
     plan.try_add_part(
         uri("/first.xml"),
@@ -65,8 +72,14 @@ fn publish_first_part(source: Vec<u8>, add_relationship: bool) -> Vec<u8> {
         .unwrap();
     let mut output = Vec::new();
     prepared.publish_to_stream(&mut output).unwrap();
-    let reopened =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(output.clone()))).unwrap();
+    let reopened = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(output.clone())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&uri("/first.xml"))

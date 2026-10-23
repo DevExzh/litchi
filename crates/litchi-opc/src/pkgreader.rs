@@ -517,20 +517,13 @@ impl<R: Read + Seek + ?Sized> soapberry_zip::ReaderAt for BorrowedReaderAt<'_, R
     }
 }
 
-/// Probe an OPC package from a mutable seekable reader using default limits.
+/// Probe an OPC package from a mutable seekable reader under explicit limits.
 ///
 /// The probe validates ZIP structure, content types, relationship manifests,
 /// part-name admission, and declared part metadata. It reads structural
 /// relationship and content-type members as needed, but never reads or
 /// decompresses ordinary part payloads. The reader's cursor is restored to
 /// its position on entry on both success and failure.
-pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
-    reader: &mut R,
-) -> Result<PackageCatalog> {
-    probe_package_catalog_from_reader_with_limits(reader, SourceLimits::default())
-}
-
-/// Probe an OPC package from a mutable seekable reader under explicit limits.
 ///
 /// ZIP central-directory metadata, `[Content_Types].xml`, and relationship
 /// manifests are read to build the same structural catalog used by the
@@ -542,7 +535,7 @@ pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
 /// result. If probing fails and restoration also fails, the primary probe
 /// error is returned. If probing succeeds but restoration fails, the
 /// restoration I/O error is returned instead of the catalog.
-pub fn probe_package_catalog_from_reader_with_limits<R: Read + Seek + ?Sized>(
+pub fn probe_package_catalog_from_reader<R: Read + Seek + ?Sized>(
     reader: &mut R,
     limits: SourceLimits,
 ) -> Result<PackageCatalog> {
@@ -647,7 +640,7 @@ mod physical_part_tests {
         )));
 
         let serialized = PackageWriter::to_bytes(&source).unwrap();
-        let loaded = OpcPackage::from_bytes(&serialized).unwrap();
+        let loaded = OpcPackage::from_bytes(&serialized, SourceLimits::default()).unwrap();
         let orphan = loaded
             .try_iter_parts()
             .find_map(|part| {
@@ -658,7 +651,7 @@ mod physical_part_tests {
         assert_eq!(orphan.blob(), ORPHAN_CONTENT);
 
         let reserialized = PackageWriter::to_bytes(&loaded).unwrap();
-        let reloaded = OpcPackage::from_bytes(&reserialized).unwrap();
+        let reloaded = OpcPackage::from_bytes(&reserialized, SourceLimits::default()).unwrap();
         let surviving_orphan = reloaded
             .try_iter_parts()
             .find_map(|part| {
@@ -679,7 +672,8 @@ mod physical_part_tests {
         )));
 
         let serialized = PackageWriter::to_bytes(&source).unwrap();
-        let physical = crate::phys_pkg::PhysPkgReader::new(&serialized).unwrap();
+        let physical =
+            crate::phys_pkg::PhysPkgReader::new(&serialized, SourceLimits::default()).unwrap();
         let reader = PackageReader::from_phys_reader(&physical).unwrap();
         let archive_blob = physical.archive().read_shared("custom/orphan.xml").unwrap();
         let serialized_blob = reader
@@ -799,13 +793,6 @@ impl PackageReader {
         self.read_limits
     }
 
-    pub(crate) fn parse_owned_relationships(
-        xml: &[u8],
-        owner: &PackURI,
-    ) -> Result<crate::Relationships> {
-        Self::parse_owned_relationships_with_limits(xml, owner, SourceLimits::default())
-    }
-
     /// Decode relationship XML for an owner under explicit source limits.
     ///
     /// The returned graph carries no source-replacement authority. Callers
@@ -814,7 +801,7 @@ impl PackageReader {
     ///
     /// # Errors
     /// Returns an error for invalid XML, relationships, owner names, or limits.
-    pub fn parse_owned_relationships_with_limits(
+    pub fn parse_owned_relationships(
         xml: &[u8],
         owner: &PackURI,
         limits: SourceLimits,
@@ -2689,7 +2676,7 @@ mod tests {
         reader.seek(SeekFrom::Start(3)).unwrap();
         let original_position = reader.stream_position().unwrap();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            probe_package_catalog_from_reader_with_limits(&mut reader, SourceLimits::default())
+            probe_package_catalog_from_reader(&mut reader, SourceLimits::default())
         }))
         .expect("public OPC probe must not panic on a hostile reader");
         let error = result.unwrap_err();
@@ -2851,7 +2838,7 @@ mod tests {
             .unwrap();
         bytes[position] ^= 0xff;
 
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let Err(error) = PackageReader::from_phys_reader(&physical) else {
             panic!("corrupt required part unexpectedly loaded")
         };
@@ -2863,7 +2850,7 @@ mod tests {
         // LENIENCY_AUDIT 8.6: an unresolvable internal target is not followed.
         let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="officeDocument" Target="../escape.xml"/></Relationships>"#;
         let bytes = package_bytes(relationships, b"document");
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let reader = PackageReader::from_phys_reader(&physical).unwrap();
         assert_eq!(reader.pkg_srels().len(), 1);
         let recorded = reader.tolerance_report().defects();
@@ -2960,7 +2947,7 @@ mod tests {
     #[test]
     fn eager_serialized_parts_follow_physical_order_and_reuse_archive_payloads() {
         let bytes = package_with_physical_parts("z/second.xml", "a/first.xml");
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let reader = PackageReader::from_phys_reader(&physical).unwrap();
 
         let names = reader
@@ -2987,7 +2974,7 @@ mod tests {
     #[test]
     fn eager_serialized_parts_preserve_mixed_storage_and_shared_identity() {
         let bytes = package_with_mixed_physical_parts();
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let reader = PackageReader::from_phys_reader(&physical).unwrap();
 
         let names = reader
@@ -3023,7 +3010,7 @@ mod tests {
     fn serial_eager_payload_error_precedes_later_relationship_error_and_preflight() {
         let mut corrupt_bytes = package_with_corrupt_deflate_and_later_malformed_relationship();
         corrupt_local_member_payload(&mut corrupt_bytes, b"bad.xml");
-        let physical = PhysPkgReader::new(&corrupt_bytes).unwrap();
+        let physical = PhysPkgReader::new(&corrupt_bytes, SourceLimits::default()).unwrap();
         let Err(payload_error) = PackageReader::from_phys_reader(&physical) else {
             panic!("corrupt eager payload unexpectedly loaded")
         };
@@ -3040,7 +3027,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let limited_physical = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let limited_physical = PhysPkgReader::new(&bytes, limits).unwrap();
         let Err(preflight_error) = PackageReader::from_phys_reader(&limited_physical) else {
             panic!("declared eager payload limit unexpectedly accepted")
         };
@@ -3056,7 +3043,7 @@ mod tests {
     #[test]
     fn eager_declared_part_preflight_rejects_before_bulk_reader_invocation() {
         let bytes = package_with_physical_parts("z/second.xml", "a/first.xml");
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let archive = physical.archive();
         let content_types_member = PackageReader::locate_content_types_member(archive).unwrap();
         let content_types_xml = read_structural_member(archive, content_types_member).unwrap();
@@ -3110,7 +3097,7 @@ mod tests {
     #[test]
     fn rejects_equivalent_and_derived_physical_part_names() {
         let bytes = package_with_physical_parts("word/document.xml", "WORD/DOCUMENT.XML");
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let Err(error) = PackageReader::from_phys_reader(&physical) else {
             panic!("case-equivalent part names unexpectedly loaded")
         };
@@ -3118,7 +3105,7 @@ mod tests {
 
         let derived_bytes =
             package_with_physical_parts("word/document.xml", "word/document.xml/image.gif");
-        let derived_physical = PhysPkgReader::new(&derived_bytes).unwrap();
+        let derived_physical = PhysPkgReader::new(&derived_bytes, SourceLimits::default()).unwrap();
         let Err(derived_error) = PackageReader::from_phys_reader(&derived_physical) else {
             panic!("derived part names unexpectedly loaded")
         };
@@ -3130,7 +3117,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx");
         let bytes = std::fs::read(path).unwrap();
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let Err(error) = PackageReader::from_phys_reader(&physical) else {
             panic!("Apache POI derived-name failure fixture unexpectedly loaded")
         };
@@ -3389,7 +3376,7 @@ mod tests {
     }
 
     fn read_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<PackageReader> {
-        let physical = PhysPkgReader::new_with_limits(bytes, limits)?;
+        let physical = PhysPkgReader::new(bytes, limits)?;
         PackageReader::from_phys_reader(&physical)
     }
 
@@ -3713,7 +3700,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/openxml4j/PackageRelsHasEntities.ooxml");
         let bytes = std::fs::read(path).unwrap();
-        let physical = PhysPkgReader::new(&bytes).unwrap();
+        let physical = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let Err(error) = PackageReader::from_phys_reader(&physical) else {
             panic!("entity-bearing relationships fixture unexpectedly loaded")
         };
@@ -3736,7 +3723,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/openxml4j/50154.xlsx");
         let bytes = std::fs::read(path).unwrap();
-        let package = crate::OpcPackage::from_bytes(&bytes).unwrap();
+        let package = crate::OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         let original_targets = targets(&package);
         assert!(original_targets.iter().any(|target| target.contains('#')));
         assert!(
@@ -3746,7 +3733,7 @@ mod tests {
         );
 
         let serialized = crate::PackageWriter::to_bytes(&package).unwrap();
-        let reloaded = crate::OpcPackage::from_bytes(&serialized).unwrap();
+        let reloaded = crate::OpcPackage::from_bytes(&serialized, SourceLimits::default()).unwrap();
         assert_eq!(targets(&reloaded), original_targets);
     }
 

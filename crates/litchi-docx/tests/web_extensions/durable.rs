@@ -627,7 +627,7 @@ fn durable_inverse_rejects_unrelated_binary_closure_record() {
     assert_eq!(source_part.blob(), original_payload);
     let source_relationships = source
         .opc_package()
-        .source_relationships(&forged_name)
+        .source_relationships(&forged_name, litchi_opc::SourceLimits::default())
         .unwrap();
     let original = package_bytes(&source);
     let ordinary = source

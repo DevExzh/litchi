@@ -419,7 +419,7 @@ mod tests {
     }
 
     fn parse_fixture(path: &str) -> PrintOptions {
-        let package = OpcPackage::open(path).unwrap();
+        let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
         let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
         parse_print_options(package.get_part(&uri).unwrap().blob())
             .unwrap()

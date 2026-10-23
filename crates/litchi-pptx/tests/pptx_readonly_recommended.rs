@@ -19,7 +19,8 @@ const URI: &str = "{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}";
 fn package_with_properties(xml: &[u8]) -> Package {
     let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
-    let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("reopen package");
     let properties = PackURI::new("/ppt/presProps.xml").expect("properties part URI");
     opc.get_part_mut(&properties)
         .expect("properties part")
@@ -130,7 +131,8 @@ fn exact_signed_noop_is_allowed_but_changed_edit_requires_explicit_policy() {
 fn duplicate_presentation_properties_parts_are_rejected() {
     let authored = Package::new().expect("new package");
     let bytes = authored.to_bytes().expect("serialize package");
-    let mut opc = OpcPackage::from_bytes(&bytes).expect("reopen package");
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("reopen package");
     let orphan = PackURI::new("/ppt/presProps-orphan.xml").expect("orphan URI");
     opc.try_add_part(Box::new(BlobPart::new(
         orphan,

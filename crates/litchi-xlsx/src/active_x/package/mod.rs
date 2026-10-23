@@ -178,7 +178,7 @@ mod tests {
 
     const WS: &str = "/xl/worksheets/sheet1.xml";
     fn fixture(bytes: &[u8]) -> ControlSet {
-        let p = OpcPackage::from_bytes(bytes).unwrap();
+        let p = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         load_from_worksheet(&p, &PackURI::new(WS).unwrap()).unwrap()
     }
 
@@ -489,7 +489,7 @@ mod tests {
         assert!(xml.contains("</controls><tableParts count=\"0\"/><extLst/>"));
 
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             load_from_worksheet(&reopened, &worksheet_uri).unwrap(),
             expected

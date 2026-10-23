@@ -35,7 +35,7 @@ fn volatile_dependencies_survive_direct_package_publication() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("volatile-dependencies.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(load_from_package(&reopened).unwrap(), Some(value));
 }
 

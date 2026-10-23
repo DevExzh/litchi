@@ -383,7 +383,9 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
 }
 
 fn with_first_slide(xml: &[u8]) -> Vec<u8> {
-    let mut package = litchi_opc::OpcPackage::from_bytes(&fixture()).unwrap();
+    let mut package =
+        litchi_opc::OpcPackage::from_bytes(&fixture(), litchi_opc::SourceLimits::default())
+            .unwrap();
     package
         .get_part_mut(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
         .unwrap()

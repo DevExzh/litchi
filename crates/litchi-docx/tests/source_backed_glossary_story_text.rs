@@ -413,7 +413,9 @@ fn fixture(dialect: Dialect, mutation: Mutation) -> Vec<u8> {
 /// well-formed, so a fixture that must carry such XML to a reader is written
 /// with a well-formed stand-in and its bytes are put back here.
 fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
-    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(archive).unwrap();
+    let reader =
+        litchi_opc::phys_pkg::PhysPkgReader::new(archive, litchi_opc::SourceLimits::default())
+            .unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let data = if name == member {
@@ -449,7 +451,7 @@ fn glossary_by_index(index: usize) -> story_text::Selector {
 }
 
 fn part(bytes: &[u8], name: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()

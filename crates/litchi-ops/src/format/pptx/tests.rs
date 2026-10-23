@@ -44,7 +44,14 @@ fn open_bytes(bytes: Vec<u8>) -> Pptx {
 
 fn open_source_package(bytes: Vec<u8>) -> Pptx {
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::new(bytes)));
-    let package = opc::SourceBackedPackage::from_read_at(source).expect("indexed OPC package");
+    let package = opc::SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("indexed OPC package");
     Pptx::from_source_package(package, &options()).expect("source package route")
 }
 
@@ -139,7 +146,8 @@ fn expected(name: &str) -> Expected {
         .map(|(position, reference)| SlideDescriptor::new(position, reference.id()))
         .collect();
     let size = presentation.slide_size().expect("eager slide size");
-    let opc = opc::OpcPackage::from_bytes(&bytes).expect("eager OPC");
+    let opc = opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("eager OPC");
     let metadata = litchi_ooxml_common::properties::read_with_report(
         &opc,
         &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
@@ -842,7 +850,8 @@ fn source_order_rebinds_slide_facts_and_all_related_parts() {
 #[test]
 fn stock_builder_source_order_preserves_presentation_properties() {
     let bytes = related_order_fixture();
-    let before_opc = opc::OpcPackage::from_bytes(&bytes).unwrap();
+    let before_opc =
+        opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let pres_props_uri = opc::PackURI::new("/ppt/presProps.xml").unwrap();
     let before_pres_props = before_opc
         .get_part(&pres_props_uri)
@@ -854,14 +863,19 @@ fn stock_builder_source_order_preserves_presentation_properties() {
     let moved = crate::File::Pptx(source)
         .move_to("/slide[1]", crate::Placement::End)
         .unwrap();
-    let after_opc = opc::OpcPackage::from_bytes(&moved.to_bytes().unwrap()).unwrap();
+    let after_opc = opc::OpcPackage::from_bytes(
+        &moved.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let after_pres_props = after_opc.get_part(&pres_props_uri).unwrap().blob().to_vec();
     assert_eq!(after_pres_props, before_pres_props);
 }
 
 fn unknown_pres_props_extension_fixture() -> Vec<u8> {
     let bytes = related_order_fixture();
-    let mut package = opc::OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package =
+        opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let pres_props_uri = opc::PackURI::new("/ppt/presProps.xml").unwrap();
     let part = package.get_part_mut(&pres_props_uri).unwrap();
     let xml = String::from_utf8(part.blob().to_vec()).unwrap();

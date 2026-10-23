@@ -195,7 +195,7 @@ impl Pptx {
             .count();
         let name = name.unwrap_or_else(|| format!("Chart {}", ordinal + 1));
         let source = self.editable_owner()?;
-        let base = eager(&source)?;
+        let base = eager(&source, self.0.ooxml_limits)?;
         let mut edit = base.edit()?;
         edit.add_chart(slide, &spec, &name, bounds)?;
         let (target, patch) = edit.commit()?.into_parts();
@@ -275,7 +275,7 @@ impl Pptx {
         let (edit, geometry) = admit_set(self, &which, &tree, props, limits)?;
         let position = tree.handle.position().get();
         let source = self.editable_owner()?;
-        let base = eager(&source)?;
+        let base = eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         if geometry.iter().any(Option::is_some) {
             let current = tree
@@ -355,12 +355,10 @@ impl Pptx {
 }
 
 /// The eager package of an editable owner, promoting a source owner.
-fn eager(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
+fn eager(source: &Editable, limits: litchi_opc::SourceLimits) -> Result<Arc<litchi_pptx::Package>> {
     Ok(match source {
         Editable::Eager(package) => Arc::clone(package),
-        Editable::Source(package) => Arc::new(litchi_pptx::Package::from_reader(
-            std::io::Cursor::new(package.to_bytes()?),
-        )?),
+        Editable::Source(package) => super::eager_package_from_source(package.to_bytes()?, limits)?,
     })
 }
 

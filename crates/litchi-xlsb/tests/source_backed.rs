@@ -63,7 +63,11 @@ fn external_wide_string(value: &str) -> Vec<u8> {
 }
 
 fn two_external_link_fixture() -> (Vec<u8>, usize) {
-    let mut package = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
     let copied_external_uri = PackURI::new("/xl/externalLinks/externalLink2.bin").unwrap();
@@ -144,7 +148,9 @@ fn two_external_link_fixture() -> (Vec<u8>, usize) {
 }
 
 fn rewrite_part(partname: &str, blob: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     package
         .get_part_mut(&PackURI::new(partname).unwrap())
         .unwrap()
@@ -160,7 +166,8 @@ fn reserved_cell_flag_fixture() -> Vec<u8> {
         "/../../test-data/ooxml/xlsb/universal-content.xlsb"
     ))
     .unwrap();
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -184,7 +191,8 @@ fn reserved_cell_flag_fixture() -> Vec<u8> {
 
 fn reserved_indexed_fixture() -> Vec<u8> {
     let source = indexed_fixture();
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -207,7 +215,9 @@ fn reserved_indexed_fixture() -> Vec<u8> {
 }
 
 fn rewrite_workbook_blob(blob: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/workbook.bin").unwrap())
         .unwrap()
@@ -218,7 +228,9 @@ fn rewrite_workbook_blob(blob: Vec<u8>) -> Vec<u8> {
 }
 
 fn rewrite_sheet_states(states: &[u32]) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let offsets: Vec<usize> = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
@@ -238,7 +250,9 @@ fn rewrite_sheet_states(states: &[u32]) -> Vec<u8> {
 }
 
 fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut workbook_blob = Vec::new();
@@ -278,7 +292,9 @@ fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
 }
 
 fn remove_part(partname: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     assert!(package.remove_part(&PackURI::new(partname).unwrap()));
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
@@ -286,7 +302,9 @@ fn remove_part(partname: &str) -> Vec<u8> {
 }
 
 fn rewrite_content_type(partname: &str, content_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     package
         .get_part_mut(&PackURI::new(partname).unwrap())
         .unwrap()
@@ -298,7 +316,9 @@ fn rewrite_content_type(partname: &str, content_type: &str) -> Vec<u8> {
 }
 
 fn add_comments_part(content_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let comments_uri = PackURI::new("/xl/comments1.bin").unwrap();
     let mut comments = Vec::new();
@@ -328,7 +348,9 @@ fn add_comments_part(content_type: &str) -> Vec<u8> {
 }
 
 fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let (r_id, target_ref, is_external) = package
@@ -373,7 +395,8 @@ fn rewrite_sheet_relationship_with_blob(
     blob: Vec<u8>,
 ) -> Vec<u8> {
     let source = rewrite_sheet_relationship(relationship_type, content_type);
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap()
@@ -384,7 +407,9 @@ fn rewrite_sheet_relationship_with_blob(
 }
 
 fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let target_partname = PackURI::new(target_partname).unwrap();
     let (r_id, rel_type, is_external) = package
@@ -414,7 +439,9 @@ fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
 }
 
 fn set_date1904() -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let payload_offset = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
@@ -1072,10 +1099,12 @@ fn exact_duplicate_sheet_targets_are_rejected() {
 #[test]
 fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
     let (cancellation_source, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(fixture())),
         SourceLimits::default(),
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     cancellation_source.cancel();
@@ -1112,7 +1141,9 @@ fn unselected_malformed_sheet_remains_deferred() {
 
 #[test]
 fn declared_part_read_limit_is_forwarded_at_catalog_open() {
-    let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     let dependency_limit = [
         "/xl/workbook.bin",
         "/xl/styles.bin",
@@ -1744,7 +1775,9 @@ fn table_workbook_source(
     second: Option<(String, Vec<u8>, bool)>,
     formula: Option<Vec<u8>>,
 ) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), litchi_opc::SourceLimits::default())
+            .unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/workbook.bin").unwrap())
         .unwrap()
@@ -1817,7 +1850,8 @@ fn table_workbook_source(
 }
 
 fn add_pivot_relationship(source: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap()
@@ -2421,9 +2455,12 @@ fn source_external_link_semantic_cache_survives_physical_eviction() {
         ],
         None,
     ));
-    let package = SourceBackedPackage::from_read_at_with_cache_limits(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
+        litchi_opc::SourceLimits::default(),
         SourceCacheLimits::new(1, 1).unwrap(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
     )
     .unwrap();
     let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
@@ -2443,8 +2480,11 @@ fn source_external_link_owner_graph_is_validated_at_catalog_open() {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
 
-    let mut wrong_relationship =
-        OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let mut wrong_relationship = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let (relationship_id, target, external) = wrong_relationship
         .get_part(&workbook_uri)
         .unwrap()
@@ -2486,7 +2526,11 @@ fn source_external_link_owner_graph_is_validated_at_catalog_open() {
         Err(PackageError::InvalidRelationship(_))
     ));
 
-    let mut wrong_content = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let mut wrong_content = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     wrong_content
         .get_part_mut(&external_uri)
         .unwrap()
@@ -2504,7 +2548,11 @@ fn source_external_link_owner_graph_is_validated_at_catalog_open() {
 fn source_external_link_payload_failures_remain_deferred_and_typed() {
     let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
 
-    let mut malformed = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let mut malformed = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     malformed
         .get_part_mut(&external_uri)
         .unwrap()
@@ -2517,7 +2565,11 @@ fn source_external_link_payload_failures_remain_deferred_and_typed() {
         Err(PackageError::Wire(_))
     ));
 
-    let mut missing_inner = OpcPackage::from_reader(Cursor::new(external_link_fixture())).unwrap();
+    let mut missing_inner = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let relationship_id = missing_inner
         .get_part(&external_uri)
         .unwrap()
@@ -2553,9 +2605,12 @@ fn source_external_link_successful_initialization_is_single_flight() {
         ],
         None,
     ));
-    let package = SourceBackedPackage::from_read_at_with_cache_limits(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
+        litchi_opc::SourceLimits::default(),
         SourceCacheLimits::new(1, 1).unwrap(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
     )
     .unwrap();
     let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();

@@ -116,18 +116,14 @@ impl Table {
                 if !image.present {
                     return Err(invalid("content-types metadata cannot be absent"));
                 }
-                Catalog::Types(ContentTypeFragments::from_bytes_with_limits(
+                Catalog::Types(ContentTypeFragments::from_bytes(
                     Arc::clone(&image.bytes),
                     limits,
                 )?)
             },
-            Owner::Relationships(owner) => {
-                Catalog::Relationships(RelationshipFragments::from_bytes_with_limits(
-                    owner.clone(),
-                    Arc::clone(&image.bytes),
-                    limits,
-                )?)
-            },
+            Owner::Relationships(owner) => Catalog::Relationships(
+                RelationshipFragments::from_bytes(owner.clone(), Arc::clone(&image.bytes), limits)?,
+            ),
         };
         let count = match &catalog {
             Catalog::Types(value) => value.iter().len(),
@@ -143,12 +139,11 @@ impl Table {
             if owner.as_str() == "/" {
                 return Err(invalid("root relationship member cannot be absent"));
             }
-            let graph =
-                litchi_opc::pkgreader::PackageReader::parse_owned_relationships_with_limits(
-                    &image.bytes,
-                    owner,
-                    limits,
-                )?;
+            let graph = litchi_opc::pkgreader::PackageReader::parse_owned_relationships(
+                &image.bytes,
+                owner,
+                limits,
+            )?;
             if graph
                 .plan_canonical(limits)?
                 .materialize(limits)?
@@ -368,15 +363,13 @@ fn image(package: &OpcPackage, owner: &Owner, limits: SourceLimits) -> Result<Op
     Ok(match owner {
         Owner::ContentTypes => Some(Image {
             present: true,
-            bytes: package
-                .source_content_types_with_limits(limits)?
-                .bytes_arc(),
+            bytes: package.source_content_types(limits)?.bytes_arc(),
         }),
         Owner::Relationships(owner) => {
             if owner.as_str() != "/" && package.part_metadata(owner).is_none() {
                 None
             } else {
-                let token = package.source_relationships_with_limits(owner, limits)?;
+                let token = package.source_relationships(owner, limits)?;
                 Some(Image {
                     present: token.member_present(),
                     bytes: token.bytes_arc(),
@@ -510,14 +503,19 @@ impl Metadata {
             let Owner::Relationships(owner) = &member.owner else {
                 continue;
             };
-            let decode =
-                |image: &Option<Image>| {
-                    image.as_ref().map(|image| {
-                    litchi_opc::pkgreader::PackageReader::parse_owned_relationships_with_limits(
-                        &image.bytes, owner, policy,
-                    ).map_err(Error::from)
-                }).transpose()
-                };
+            let decode = |image: &Option<Image>| {
+                image
+                    .as_ref()
+                    .map(|image| {
+                        litchi_opc::pkgreader::PackageReader::parse_owned_relationships(
+                            &image.bytes,
+                            owner,
+                            policy,
+                        )
+                        .map_err(Error::from)
+                    })
+                    .transpose()
+            };
             let before = decode(&member.before)?;
             let after = decode(&member.after)?;
             let declared = if owner.as_str() == "/" {
@@ -1023,7 +1021,7 @@ impl Metadata {
                 seen.try_reserve(count).map_err(allocation)?;
                 let bytes = match &member.owner {
                     Owner::ContentTypes => {
-                        let source = package.source_content_types_with_limits(policy)?;
+                        let source = package.source_content_types(policy)?;
                         let mut edits = Vec::new();
                         edits.try_reserve_exact(count).map_err(allocation)?;
                         for (group, (before, after)) in groups.iter().zip(&tables) {
@@ -1053,7 +1051,7 @@ impl Metadata {
                             .bytes_arc()
                     },
                     Owner::Relationships(owner) => {
-                        let source = package.source_relationships_with_limits(owner, policy)?;
+                        let source = package.source_relationships(owner, policy)?;
                         let mut edits = Vec::new();
                         edits.try_reserve_exact(count).map_err(allocation)?;
                         for (group, (before, after)) in groups.iter().zip(&tables) {
@@ -1096,16 +1094,16 @@ impl Prepared {
         for (owner, desired) in self.members {
             match (owner, desired) {
                 (Owner::ContentTypes, Some(image)) => {
-                    let current = candidate.source_content_types_with_limits(policy)?;
-                    candidate.try_replace_content_types_bytes_with_limits(
+                    let current = candidate.source_content_types(policy)?;
+                    candidate.try_replace_content_types_bytes(
                         current.bytes(),
                         image.bytes,
                         policy,
                     )?;
                 },
                 (Owner::Relationships(owner), Some(image)) => {
-                    let current = candidate.source_relationships_with_limits(&owner, policy)?;
-                    candidate.try_replace_relationships_bytes_with_limits(
+                    let current = candidate.source_relationships(&owner, policy)?;
+                    candidate.try_replace_relationships_bytes(
                         &current,
                         image.bytes,
                         image.present,
@@ -1177,7 +1175,7 @@ mod tests {
             ..canonical.clone()
         };
         let removal = member(present.clone(), canonical);
-        let token = RelationshipFragments::from_bytes_with_limits(
+        let token = RelationshipFragments::from_bytes(
             name,
             Arc::clone(&present.bytes),
             SourceLimits::default(),
@@ -1228,8 +1226,11 @@ mod tests {
     #[test]
     fn topology_requires_content_type_provenance_even_when_default_already_covers_it() {
         use super::super::Patch;
-        let source =
-            OpcPackage::from_bytes(&crate::Package::new().unwrap().to_bytes().unwrap()).unwrap();
+        let source = OpcPackage::from_bytes(
+            &crate::Package::new().unwrap().to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let mut target = source.clone();
         target
             .try_add_part(Box::new(litchi_opc::BlobPart::new(
@@ -1260,15 +1261,12 @@ mod tests {
         let mut replayed = source.clone();
         super::super::apply(&mut replayed, &decoded, true).unwrap();
         let mut overlay = source.clone();
-        let token = overlay.source_content_types().unwrap();
+        let token = overlay.source_content_types(overlay.read_limits()).unwrap();
         let mut xml = token.bytes().to_vec();
         xml.extend_from_slice(b"<!--unrelated trailing comment-->");
+        let limits = overlay.read_limits();
         overlay
-            .try_replace_content_types_bytes_with_limits(
-                token.bytes(),
-                Arc::new(xml),
-                SourceLimits::default(),
-            )
+            .try_replace_content_types_bytes(token.bytes(), Arc::new(xml), limits)
             .unwrap();
         let original = litchi_opc::PackageWriter::to_bytes(&overlay).unwrap();
         assert!(super::super::apply(&mut overlay, &decoded, true).is_err());

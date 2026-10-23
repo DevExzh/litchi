@@ -67,7 +67,7 @@ fn package_with_modern_comments() -> Package {
     let comments_name = PackURI::new("/ppt/comments/comment1.xml").unwrap();
 
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     {
         opc.get_part_mut(&presentation_name)
             .unwrap()
@@ -108,7 +108,7 @@ fn package_with_modern_comments() -> Package {
 
 fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

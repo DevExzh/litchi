@@ -82,7 +82,7 @@ fn custom_props() -> CustomProps {
 
 /// Whether `bytes` still carries any OPC signature infrastructure.
 fn carries_signature(bytes: &[u8]) -> bool {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package.is_signed()
         || package
             .iter_parts()
@@ -101,7 +101,7 @@ fn is_refusal(error: &Error) -> bool {
 /// signed source, as a file a producer signed does. The signature is not
 /// valid; only its presence matters to the edit policy.
 fn sign(plain: &[u8]) -> Vec<u8> {
-    let source = OpcPackage::from_bytes(plain).unwrap();
+    let source = OpcPackage::from_bytes(plain, litchi_opc::SourceLimits::default()).unwrap();
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -1298,7 +1298,8 @@ fn shape_put_no_ops_keep_a_signed_package_exact() {
 #[test]
 fn generic_removal_of_signature_parts_does_not_authorize_a_change() {
     for name in SIGNED {
-        let mut opc = OpcPackage::from_vec(fixture(name)).unwrap();
+        let mut opc =
+            OpcPackage::from_vec(fixture(name), litchi_opc::SourceLimits::default()).unwrap();
         let signature_parts: Vec<_> = opc
             .iter_parts()
             .map(|part| part.partname().clone())

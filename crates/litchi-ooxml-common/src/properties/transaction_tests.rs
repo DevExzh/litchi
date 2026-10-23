@@ -594,7 +594,13 @@ fn a_stale_patch_conflicts_without_mutation() {
 
 fn source_backed(package: &OpcPackage) -> litchi_opc::SourceBackedPackage {
     let bytes = litchi_opc::PackageWriter::to_bytes(package).unwrap();
-    litchi_opc::SourceBackedPackage::from_vec(bytes).unwrap()
+    litchi_opc::SourceBackedPackage::from_vec(
+        bytes,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
 }
 
 fn edited(snapshot: &Snapshot, title: &str) -> (Snapshot, super::Patch) {
@@ -644,7 +650,7 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
     let topology = patch.prepare_source_backed(&source).unwrap();
     let mut published = Vec::new();
     topology.publish_to_stream(&mut published).unwrap();
-    let reopened = OpcPackage::from_bytes(&published).unwrap();
+    let reopened = OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
     let read = Snapshot::read(&reopened, Host::Word).unwrap();
     assert_eq!(read.metadata().unwrap(), after.metadata().unwrap());
     assert_eq!(

@@ -523,7 +523,7 @@ pub(crate) fn detect_ooxml_smart<T: ZipTail>(
         if !normal_odf {
             #[cfg(any(test, feature = "test-support"))]
             super::record_opc_probe();
-            match crate::opc::OpcPackage::from_bytes_with_limits(&bytes, source_limits.ooxml()) {
+            match crate::opc::OpcPackage::from_bytes(&bytes, source_limits.ooxml()) {
                 Ok(package) => {
                     if let Some(format) =
                         crate::detect::ooxml::detect_ooxml_format_from_package(&package)
@@ -822,9 +822,12 @@ pub(crate) fn detect_and_prepare_path<T: ZipTail>(
 
     #[cfg(any(test, feature = "test-support"))]
     super::record_opc_probe();
-    let Ok(package) = crate::opc::SourceBackedPackage::from_read_at_with_limits(
+    let Ok(package) = crate::opc::SourceBackedPackage::from_read_at(
         std::sync::Arc::clone(&source),
         limits.ooxml(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
     ) else {
         return unprepared();
     };

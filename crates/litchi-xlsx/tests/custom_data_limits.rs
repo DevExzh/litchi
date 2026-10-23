@@ -787,12 +787,12 @@ fn logical_package_size(package: &Package) -> usize {
     let opc = package.clone().into_plain_opc();
     let root = uri("/");
     let mut total = opc
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len();
     total += opc
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
@@ -802,7 +802,7 @@ fn logical_package_size(package: &Package) -> usize {
     {
         total += part.blob().len();
         total += opc
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("source relationship member exists")
             .bytes()
             .len();
@@ -814,7 +814,7 @@ fn relationship_xml_size(package: &Package, owner: &str) -> usize {
     package
         .clone()
         .into_plain_opc()
-        .source_relationships(&uri(owner))
+        .source_relationships(&uri(owner), litchi_opc::SourceLimits::default())
         .expect("source relationship member exists")
         .bytes()
         .len()
@@ -824,13 +824,13 @@ fn max_relationship_xml_size(package: &Package) -> usize {
     let opc = package.clone().into_plain_opc();
     let root = uri("/");
     let mut maximum = opc
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
     for part in opc.iter_parts() {
         maximum = maximum.max(
-            opc.source_relationships(part.partname())
+            opc.source_relationships(part.partname(), litchi_opc::SourceLimits::default())
                 .expect("source relationship member exists")
                 .bytes()
                 .len(),
@@ -895,7 +895,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
     metrics.insert(
         "[Content_Types].xml".to_owned(),
         xml_metrics(
-            opc.source_content_types()
+            opc.source_content_types(litchi_opc::SourceLimits::default())
                 .expect("source content types exist")
                 .bytes(),
         ),
@@ -904,7 +904,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
     metrics.insert(
         "relationships:/".to_owned(),
         xml_metrics(
-            opc.source_relationships(&root)
+            opc.source_relationships(&root, litchi_opc::SourceLimits::default())
                 .expect("source package relationships exist")
                 .bytes(),
         ),
@@ -917,7 +917,7 @@ fn owned_xml_metrics(package: &Package) -> BTreeMap<String, XmlMetrics> {
         metrics.insert(
             format!("relationships:{owner}"),
             xml_metrics(
-                opc.source_relationships(part.partname())
+                opc.source_relationships(part.partname(), litchi_opc::SourceLimits::default())
                     .expect("source relationship member exists")
                     .bytes(),
             ),
@@ -1633,7 +1633,7 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
         .package
         .clone()
         .into_plain_opc()
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content-types manifest exists")
         .bytes()
         .len();
@@ -1656,7 +1656,7 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
     let candidate_content_types = changed
         .clone()
         .into_plain_opc()
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("candidate content-types manifest exists")
         .bytes()
         .len();

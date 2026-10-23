@@ -32,7 +32,14 @@ fn source_bytes(deflated: bool) -> Vec<u8> {
 }
 
 fn open(bytes: Vec<u8>) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+    SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap()
 }
 
 fn document_uri() -> PackURI {

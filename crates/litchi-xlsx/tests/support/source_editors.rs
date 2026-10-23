@@ -356,7 +356,7 @@ pub fn replay_patch(package: &mut OpcPackage, patch: &impl Replay) -> Result<()>
     let workbook =
         SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
     let next = patch.replay(&workbook)?.to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }
 

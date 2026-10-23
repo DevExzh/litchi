@@ -16,13 +16,15 @@ fn package(relationships: Option<&[u8]>) -> OpcPackage {
             .unwrap();
     }
     writer.write_stored("custom/item.bin", b"opaque").unwrap();
-    OpcPackage::from_vec(writer.finish_to_bytes().unwrap()).unwrap()
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
 }
 
 #[test]
 fn content_type_plan_reports_exact_events_for_default_to_override_replacement() {
     let package = package(None);
-    let before = package.source_content_types().unwrap();
+    let before = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let part_name = PackURI::new("/custom/item.bin").unwrap();
     let additions = [ContentTypeEdit {
         part_name: &part_name,
@@ -80,7 +82,10 @@ fn relationship_plan_admits_exact_events_before_materialization_for_all_root_for
     for source in [None, Some(empty.as_slice()), Some(paired.as_slice())] {
         let package = package(source);
         let before = package
-            .source_relationships(&PackURI::new("/custom/item.bin").unwrap())
+            .source_relationships(
+                &PackURI::new("/custom/item.bin").unwrap(),
+                SourceLimits::default(),
+            )
             .unwrap();
         let additions = [RelationshipEdit {
             id: "rId1",
@@ -138,7 +143,10 @@ fn mixed_relationship_plan_counts_removed_paired_tokens_and_preserves_unrelated_
     let source = br#"<?xml version='1.0'?><r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'><!-- keep --><r:Relationship Id='rId1' Type='urn:test' Target='https://example.test/old' TargetMode='External'></r:Relationship><?keep data?><r:Relationship Id='rId2' Type='urn:other' Target='https://example.test/untouched' TargetMode='External'/></r:Relationships>"#;
     let package = package(Some(source));
     let before = package
-        .source_relationships(&PackURI::new("/custom/item.bin").unwrap())
+        .source_relationships(
+            &PackURI::new("/custom/item.bin").unwrap(),
+            SourceLimits::default(),
+        )
         .unwrap();
     let additions = [RelationshipEdit {
         id: "rId1",
@@ -170,7 +178,10 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
     let xml = br#"<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'/>"#;
     let package = package(Some(xml));
     let before = package
-        .source_relationships(&PackURI::new("/custom/item.bin").unwrap())
+        .source_relationships(
+            &PackURI::new("/custom/item.bin").unwrap(),
+            SourceLimits::default(),
+        )
         .unwrap();
     let addition = [RelationshipEdit {
         id: "rId1",
@@ -212,7 +223,9 @@ fn relationship_plan_enforces_archive_entry_cap_for_noop_and_changed_output() {
 #[test]
 fn content_type_override_conflicts_are_refused_during_planning() {
     let package = package(None);
-    let initial = package.source_content_types().unwrap();
+    let initial = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let part = PackURI::new("/custom/item.bin").unwrap();
     let additions = [ContentTypeEdit {
         part_name: &part,
@@ -247,7 +260,9 @@ fn content_type_override_conflicts_are_refused_during_planning() {
 #[test]
 fn content_type_default_selectors_use_only_xml_token_whitespace() {
     let package = package(None);
-    let before = package.source_content_types().unwrap();
+    let before = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let plain = before
         .plan_edit_with_defaults(&[], &[], &["bin"], limits)

@@ -137,7 +137,8 @@ fn batch_remove(path: &'static str) -> BatchItem<'static> {
 }
 
 fn signed_fixture() -> Vec<u8> {
-    let source = OpcPackage::from_bytes(&fixture()).expect("parse XLSB fixture as OPC");
+    let source = OpcPackage::from_bytes(&fixture(), litchi_opc::SourceLimits::default())
+        .expect("parse XLSB fixture as OPC");
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -214,7 +215,7 @@ fn signed_fixture() -> Vec<u8> {
 }
 
 fn part(bytes: &[u8], path: &str) -> Option<Vec<u8>> {
-    let package = OpcPackage::from_bytes(bytes).ok()?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).ok()?;
     let uri = PackURI::new(path).ok()?;
     package.get_part(&uri).ok().map(|part| part.blob().to_vec())
 }

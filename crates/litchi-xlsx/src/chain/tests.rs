@@ -447,7 +447,7 @@ fn package_calculation_chain_mutators_reject_invalid_existing_graphs() {
 fn loads_real_poi_and_synthetic_packages_and_validates_relationships() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..//test-data/poi/test-data/spreadsheet/62834.xlsx");
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let (chain, _) = load(&package).unwrap().unwrap();
     assert_eq!(chain.cells().len(), 3);
     assert_eq!(chain.cells()[0].reference(), "A5");

@@ -1802,7 +1802,11 @@ mod tests {
             )
             .unwrap();
         writer.write_stored("part.xml", xml.as_bytes()).unwrap();
-        let package = OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+        let package = OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let name = PackURI::new("/part.xml").unwrap();
         package.source_xml_part(&name).unwrap()
     }

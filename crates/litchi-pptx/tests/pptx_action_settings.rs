@@ -95,7 +95,7 @@ fn package_with_actions(fragment: &str, add_relationships: bool) -> OpcPackage {
     builder.presentation().unwrap().add_slide().unwrap();
     let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     install_actions(&mut package, fragment, add_relationships);
     package
 }

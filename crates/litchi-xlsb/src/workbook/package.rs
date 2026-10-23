@@ -543,7 +543,7 @@ impl Workbook {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::from_reader_with_limits(reader, options.source_limits)?;
+        let package = OpcPackage::from_reader(reader, options.source_limits)?;
         Self::from_opc_package_with_options(package, options)
     }
 

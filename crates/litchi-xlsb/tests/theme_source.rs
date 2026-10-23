@@ -139,7 +139,11 @@ fn theme_access_materializes_only_the_selected_theme_part() {
 #[test]
 fn malformed_unselected_worksheet_does_not_block_theme_access() {
     let source = Source::fixture();
-    let mut package = OpcPackage::from_reader(Cursor::new(&source.bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(&source.bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap()
@@ -211,7 +215,11 @@ fn managed_theme_view_retains_captured_data_after_workbook_drop() {
 #[test]
 fn theme_image_relationships_do_not_materialize_image_payloads() {
     let fixture = Source::fixture();
-    let mut package = OpcPackage::from_reader(Cursor::new(&fixture.bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(&fixture.bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let image_name = PackURI::new("/xl/media/theme-test.png").unwrap();
     package
         .try_add_part(Box::new(litchi_opc::BlobPart::new(

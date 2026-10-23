@@ -233,7 +233,7 @@ fn add_external_dependency(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
 }
 
 fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>> {
-    let opc = OpcPackage::from_bytes(archive)?;
+    let opc = OpcPackage::from_bytes(archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))

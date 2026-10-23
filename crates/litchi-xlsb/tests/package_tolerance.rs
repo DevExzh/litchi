@@ -98,9 +98,11 @@ fn duplicate_relationship_id_is_listed_in_the_workbook_report_on_every_route() {
     let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert_duplicate_recorded(&source.tolerance_report(), "source-backed");
 
-    let materialized = SourceBackedPackage::from_reader_with_limits(
+    let materialized = SourceBackedPackage::from_reader(
         Cursor::new(bytes),
         litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
     )
     .unwrap()
     .into_opc_package()
@@ -128,9 +130,11 @@ fn conformant_package_contributes_no_packaging_repairs() {
             .tolerance_report(),
         "source-backed",
     );
-    let materialized = SourceBackedPackage::from_reader_with_limits(
+    let materialized = SourceBackedPackage::from_reader(
         Cursor::new(bytes),
         litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
     )
     .unwrap()
     .into_opc_package()

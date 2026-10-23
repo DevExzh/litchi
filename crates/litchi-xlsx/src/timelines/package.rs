@@ -390,7 +390,7 @@ pub(crate) fn store_timeline_caches_prepared_limited(
             );
     }
     package.get_part_mut(workbook_name)?.set_blob(updated);
-    package.source_content_types_with_limits(*limits)?;
+    package.source_content_types(*limits)?;
     Ok(())
 }
 
@@ -681,7 +681,7 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
             false,
         );
     package.get_part_mut(&worksheet_uri)?.set_blob(updated);
-    package.source_content_types_with_limits(*limits)?;
+    package.source_content_types(*limits)?;
     Ok(())
 }
 

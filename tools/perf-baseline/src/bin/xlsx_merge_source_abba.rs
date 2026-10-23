@@ -949,7 +949,7 @@ fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
     let committed = edit.commit()?.into_package();
     let mut output = Vec::new();
     committed.write_to(&mut output)?;
-    let mut package = OpcPackage::from_bytes(&output)?;
+    let mut package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/xl/merge-abba-aux.bin")?,
         "application/octet-stream".to_owned(),
@@ -959,7 +959,7 @@ fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
 }
 
 fn fixture_target_sha256(bytes: &[u8]) -> AnyResult<String> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     let uri = PackURI::new(WORKSHEET_PART)?;
     Ok(sha256_hex(package.get_part(&uri)?.blob()))
 }
@@ -1017,7 +1017,7 @@ struct PartDigest {
 type PartInventory = BTreeMap<String, PartDigest>;
 
 fn package_inventory(bytes: &[u8]) -> AnyResult<PartInventory> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     let mut inventory = BTreeMap::new();
     for part in package
         .try_iter_parts()
@@ -1068,7 +1068,7 @@ fn source_patch_checks(
             foreign_refused: None,
         });
     };
-    let package = OpcPackage::from_bytes(&forward)?;
+    let package = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())?;
     let forward_inventory = package_inventory_from_package(&package);
     let forward_exact_one_part_overlay =
         exact_worksheet_overlay(&before_inventory, &forward_inventory)?;
@@ -1084,7 +1084,10 @@ fn source_patch_checks(
         });
     let inverse_restored_complete_package = match restored {
         Ok(restored) => {
-            package_inventory_from_package(&OpcPackage::from_bytes(&restored)?) == before_inventory
+            package_inventory_from_package(&OpcPackage::from_bytes(
+                &restored,
+                litchi_opc::SourceLimits::default(),
+            )?) == before_inventory
         },
         Err(_) => false,
     };
@@ -1133,7 +1136,7 @@ fn stale_refusal(fixture: &[u8], operation: Operation) -> AnyResult<bool> {
 fn foreign_refusal(fixture: &[u8], commit: &litchi_xlsx::merge::source::Commit) -> AnyResult<bool> {
     // A replay compares content (record 0360), so a foreign workbook is one
     // whose selected worksheet differs from the patch's before state.
-    let mut foreign_package = OpcPackage::from_bytes(fixture)?;
+    let mut foreign_package = OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new(WORKSHEET_PART)?;
     let mut changed = foreign_package.get_part(&worksheet)?.blob().to_vec();
     changed.extend_from_slice(b"\n");

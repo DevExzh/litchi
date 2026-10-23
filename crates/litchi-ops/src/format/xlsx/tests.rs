@@ -159,7 +159,13 @@ fn every_route_matches_the_facade_on_real_fixtures() {
 #[test]
 fn metadata_matches_the_leaf_core_properties_read() {
     let bytes = fixture("xlsx/DateFormatTests.xlsx");
-    let package = SourceBackedPackage::from_vec(bytes.clone()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let (leaf, _) =
         crate::detect::workbook_metadata::read_source_backed_metadata(&package).unwrap();
     let handle = open_bytes(bytes, &OpenOptions::new());
@@ -706,6 +712,33 @@ fn eager_owner_editor_is_the_snapshot_and_retention_can_be_refused() {
     }
 }
 
+#[cfg(feature = "encryption")]
+#[test]
+fn supplied_package_source_policy_survives_default_facade_adoption() {
+    let bytes = litchi_xlsx::Package::new()
+        .expect("create workbook")
+        .to_bytes()
+        .expect("serialize workbook");
+    let exact_input = u64::try_from(bytes.len()).expect("input length fits u64");
+    let limits = litchi_opc::SourceLimits::builder()
+        .max_input_bytes(exact_input)
+        .expect("exact input limit")
+        .build()
+        .expect("valid source limits");
+    let package = litchi_xlsx::Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )
+    .expect("open under the tight source policy");
+    assert_eq!(package.source_limits(), limits);
+
+    let handle = Xlsx::from_package(package, &OpenOptions::default())
+        .expect("adopt supplied package with default facade options");
+    assert_eq!(handle.ooxml_read_limits(), limits);
+    let file = crate::File::Xlsx(handle);
+    assert_eq!(file.ooxml_read_limits(), limits);
+}
+
 #[test]
 fn clones_share_one_state() {
     let handle = open_bytes(two_sheets(), &OpenOptions::new());
@@ -746,7 +779,14 @@ fn transient_promotion_read_failure_can_retry_the_same_source() {
         source: OwnedSource::new(bytes.clone()),
         fail_next: AtomicBool::new(false),
     });
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let handle = Xlsx::from_source_package(package, &OpenOptions::new()).unwrap();
     source.fail_next.store(true, Ordering::SeqCst);
     let error = handle.editor().expect_err("first promotion read fails");

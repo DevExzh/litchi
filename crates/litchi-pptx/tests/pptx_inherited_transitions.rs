@@ -179,5 +179,9 @@ fn package_with_slides(count: usize) -> OpcPackage {
         builder.presentation().unwrap().add_slide().unwrap();
     }
     let package = builder.build().unwrap();
-    OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap()
+    OpcPackage::from_vec(
+        package.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
 }

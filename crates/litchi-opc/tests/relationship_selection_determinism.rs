@@ -245,7 +245,8 @@ fn corpus_packages_reuse_the_same_hyperlink_relationship_on_every_open() {
         };
         let mut seen = BTreeSet::new();
         for _ in 0..16 {
-            let mut package = OpcPackage::from_bytes(&bytes).expect("open corpus package");
+            let mut package = OpcPackage::from_bytes(&bytes, SourceLimits::default())
+                .expect("open corpus package");
             let part = package.get_part_mut(&partname).expect("owner part");
             seen.insert(part.relate_to_ext(target, reltype));
         }

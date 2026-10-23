@@ -236,9 +236,12 @@ pub fn validate_source(
     let expected_version = source
         .version()
         .map_err(|error| PptxValidationError::Ingress(OpcError::IoError(error)))?;
-    let result = match SourceBackedPackage::from_read_at_with_limits(
+    let result = match SourceBackedPackage::from_read_at(
         Arc::clone(&source),
         input_limits.read_limits,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
     ) {
         Ok(package) => validate_source_backed(&package, input_limits, report_limits),
         Err(OpcError::Limit { .. }) => blocked_report(

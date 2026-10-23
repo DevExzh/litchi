@@ -1034,7 +1034,7 @@ mod tests {
     use super::*;
     use litchi_opc::OpcPackage;
     fn f(b: &[u8]) -> ViewProperties {
-        let p = OpcPackage::from_bytes(b).unwrap();
+        let p = OpcPackage::from_bytes(b, litchi_opc::SourceLimits::default()).unwrap();
         load_from_package(&p).unwrap().unwrap()
     }
     #[test]

@@ -172,7 +172,7 @@ fn ordinary_fixture(signed: bool) -> Vec<u8> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -274,7 +274,8 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     assert!(commit.diagnostics().changed());
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::auto_filter::Snapshot::load(&replay, "Sheet1")
@@ -288,7 +289,7 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -301,8 +302,9 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     let commit = changed_commit(&editor);
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     for part in source
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -352,12 +354,13 @@ fn managed_snapshot_changed_publication_and_exact_inverse_are_bounded() {
     drop(snapshot);
 
     let commit = changed_commit(&editor);
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::auto_filter::Snapshot::load(&published, "Sheet1")
             .unwrap()
@@ -369,7 +372,7 @@ fn managed_snapshot_changed_publication_and_exact_inverse_are_bounded() {
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
@@ -473,7 +476,11 @@ fn signed_noop_is_exact_and_conflicts_and_partial_output_fail_closed() {
     let commit = changed_commit(&editor);
     assert!(commit.package().write_to(FailingSink(32)).is_err());
 
-    let mut foreign = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut foreign = OpcPackage::from_bytes(
+        &ordinary_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     foreign
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -485,7 +492,11 @@ fn signed_noop_is_exact_and_conflicts_and_partial_output_fail_closed() {
         Err(Error::PatchConflict { .. })
     ));
 
-    let mut foreign_styles = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut foreign_styles = OpcPackage::from_bytes(
+        &ordinary_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     foreign_styles
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/styles.xml").unwrap(),
@@ -512,7 +523,11 @@ fn signed_noop_is_exact_and_conflicts_and_partial_output_fail_closed() {
 
 #[test]
 fn differential_format_references_bind_the_styles_part() {
-    let mut package = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &ordinary_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let styles_uri = PackURI::new("/xl/styles.xml").unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
@@ -566,6 +581,6 @@ fn replay_patch(
         .apply_auto_filter(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

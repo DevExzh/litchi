@@ -89,7 +89,7 @@ fn authored_fixture() -> Result<Vec<u8>> {
 }
 
 fn replace_part(bytes: &[u8], path: &str, rewrite: impl FnOnce(&[u8]) -> Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part = package.get_part_mut(&PackURI::new(path).unwrap()).unwrap();
     let replacement = rewrite(part.blob());
     part.set_blob(replacement);

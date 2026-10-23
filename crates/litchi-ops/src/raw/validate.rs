@@ -132,35 +132,40 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
     let report = match format {
         #[cfg(feature = "docx")]
         FileFormat::Docx => {
+            let limits = file.ooxml_read_limits();
             let bytes = Arc::new(file.to_bytes()?);
             let leaf = litchi_docx::validate_read_at(
                 Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
-                litchi_docx::SourceLimits::default(),
+                limits,
                 litchi_docx::DocxValidationLimits::default(),
                 ValidationLimits::default(),
             )
             .map_err(Error::Docx)?;
-            with_parts(leaf, bytes)?
+            with_parts(leaf, bytes, limits)?
         },
         #[cfg(feature = "pptx")]
         FileFormat::Pptx => {
+            let limits = file.ooxml_read_limits();
             let bytes = Arc::new(file.to_bytes()?);
             let leaf = litchi_pptx::validate_source(
                 Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
-                litchi_pptx::PptxValidationLimits::default(),
+                litchi_pptx::PptxValidationLimits::default().with_read_limits(limits),
                 ValidationLimits::default(),
             )
             .map_err(Error::Pptx)?;
-            with_parts(leaf, bytes)?
+            with_parts(leaf, bytes, limits)?
         },
         #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         FileFormat::Xlsx | FileFormat::Xlsb => {
+            let limits = file.ooxml_read_limits();
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_opc::validate_read_at(Arc::new(litchi_core::OwnedSource::from_arc(
-                Arc::clone(&bytes),
-            )))
+            let leaf = litchi_opc::validate_read_at(
+                Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
+                limits,
+                litchi_core::ValidationLimits::default(),
+            )
             .map_err(Error::Opc)?;
-            with_parts(leaf, bytes)?
+            with_parts(leaf, bytes, limits)?
         },
         #[cfg(feature = "xls")]
         FileFormat::Xls => {
@@ -232,11 +237,12 @@ fn refused(file: &File) -> OpsError {
 /// The leaf report plus the OPC part-graph checks, when the published
 /// package indexes.
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
-fn with_parts(leaf: ValidateReport, bytes: Arc<Vec<u8>>) -> Result<ValidateReport> {
-    let Ok(package) = litchi_opc::OpcPackage::from_shared_vec_with_limits(
-        bytes,
-        litchi_opc::SourceLimits::default(),
-    ) else {
+fn with_parts(
+    leaf: ValidateReport,
+    bytes: Arc<Vec<u8>>,
+    limits: litchi_opc::SourceLimits,
+) -> Result<ValidateReport> {
+    let Ok(package) = litchi_opc::OpcPackage::from_shared_vec(bytes, limits) else {
         // The leaf report already records the ingress rejection.
         return Ok(leaf);
     };

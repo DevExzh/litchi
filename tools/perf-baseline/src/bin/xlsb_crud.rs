@@ -1987,9 +1987,7 @@ mod tests {
                 .windows(marker.len())
                 .position(|window| window == marker)
                 .ok_or_else(|| {
-                    litchi_xlsb::package::error::Error::InvalidFormat(
-                        "drawing marker missing",
-                    )
+                    litchi_xlsb::package::error::Error::InvalidFormat("drawing marker missing")
                 })?;
             blob.splice(
                 offset + marker.len() - 1..offset + marker.len() - 1,
@@ -2032,7 +2030,9 @@ mod tests {
             "raw drawing mutation must survive save/reopen"
         );
 
-        let mut package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("raw OPC package");
+        let mut package =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+                .expect("raw OPC package");
         let sheet_uri =
             litchi_opc::PackURI::new("/xl/worksheets/sheet1.bin").expect("worksheet URI");
         let drawing_rel_id = package

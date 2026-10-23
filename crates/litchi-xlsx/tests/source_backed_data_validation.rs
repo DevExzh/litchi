@@ -177,7 +177,7 @@ fn ordinary_fixture(signed: bool) -> Vec<u8> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -256,7 +256,8 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::data_validation::Snapshot::load(&replay, "Sheet1")
@@ -270,7 +271,7 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -283,8 +284,10 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
             .unwrap();
     let commit = changed_commit(&editor);
     commit.package().write_to(&mut output).unwrap();
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let output_package =
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     for part in source
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -334,12 +337,13 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     drop(snapshot);
 
     let commit = changed_commit(&editor);
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::data_validation::Snapshot::load(&published, "Sheet1")
             .unwrap()
@@ -351,7 +355,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
@@ -414,7 +418,8 @@ fn no_op_signed_source_is_exact_but_changed_signed_source_is_refused() {
 #[test]
 fn add_replace_clear_noop_and_atomic_update_are_exact() {
     let source_bytes = ordinary_fixture(false);
-    let mut seeded = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut seeded =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let sheet = seeded.get_part_mut(&PackURI::new(SHEET).unwrap()).unwrap();
     sheet.set_blob(
         replace_data_validation_collections(sheet.blob(), &target_collections()).unwrap(),
@@ -463,7 +468,8 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
         SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
     let commit = changed_commit(&editor);
-    let mut package = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -487,7 +493,8 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
     assert!(commit.package().write_to(Vec::new()).is_err());
 
     let foreign = ordinary_fixture(false);
-    let mut foreign_package = OpcPackage::from_bytes(&foreign).unwrap();
+    let mut foreign_package =
+        OpcPackage::from_bytes(&foreign, litchi_opc::SourceLimits::default()).unwrap();
     foreign_package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -504,7 +511,11 @@ fn patch_conflicts_on_owner_or_outbound_relationship_change_and_source_version_c
         Err(Error::PatchConflict { .. })
     ));
 
-    let mut retargeted = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut retargeted = OpcPackage::from_bytes(
+        &ordinary_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let workbook = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap();
@@ -573,7 +584,11 @@ fn chartsheet_selection_is_refused_and_editor_is_send() {
     const CHARTSHEET_CT: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
 
-    let mut package = OpcPackage::from_bytes(&ordinary_fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &ordinary_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&sheet_uri).unwrap();
     sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
@@ -611,6 +626,6 @@ fn replay_patch(
         .apply_data_validations(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

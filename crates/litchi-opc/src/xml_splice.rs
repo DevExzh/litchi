@@ -193,7 +193,7 @@ impl SourceXmlPart {
     /// package.try_add_part(Box::new(BlobPart::new(
     ///     name.clone(), "application/xml".to_owned(), b"<first/>".to_vec(),
     /// )))?;
-    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?)?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
     /// let mut current = source.part(&name)?.source_xml()?;
     /// for next in [b"<second/>".as_slice(), b"<third/>".as_slice()] {
     ///     let revision = current.begin_revision()?;

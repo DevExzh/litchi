@@ -406,8 +406,8 @@ impl PartPatch {
                 let limits = target.read_limits();
                 let current = RelationshipImage::new(&target, &delta.name)?;
                 if current != after.relationship_xml {
-                    let token = target.source_relationships_with_limits(&delta.name, limits)?;
-                    target.try_replace_relationships_bytes_with_limits(
+                    let token = target.source_relationships(&delta.name, limits)?;
+                    target.try_replace_relationships_bytes(
                         &token,
                         Arc::clone(&after.relationship_xml.bytes),
                         after.relationship_xml.member_present,
@@ -419,8 +419,8 @@ impl PartPatch {
         if let Some((_, after)) = &self.root {
             let limits = target.read_limits();
             let owner = PackURI::new("/").map_err(Error::Uri)?;
-            let current = target.source_relationships_with_limits(&owner, limits)?;
-            target.try_replace_relationships_bytes_with_limits(
+            let current = target.source_relationships(&owner, limits)?;
+            target.try_replace_relationships_bytes(
                 &current,
                 Arc::clone(&after.bytes),
                 after.member_present,
@@ -441,11 +441,7 @@ impl PartPatch {
                     let current = ContentTypesImage::publication_bytes(&target)?;
                     let replacement = after.bytes_for(&target)?;
                     if current != replacement {
-                        target.try_replace_content_types_bytes_with_limits(
-                            &current,
-                            replacement,
-                            limits,
-                        )?;
+                        target.try_replace_content_types_bytes(&current, replacement, limits)?;
                     }
                 } else if self.exact_content_types {
                     return Err(Error::PatchConflict);

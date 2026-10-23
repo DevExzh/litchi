@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{CheckStatus, OwnedSource, ReadAt, SourceVersion, ValidationLimits};
-use litchi_opc::{OpcError, SourceLimits, validate_read_at, validate_read_at_with_limits};
+use litchi_opc::{OpcError, SourceLimits, validate_read_at};
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
 const EMPTY_CONTENT_TYPES: &[u8] =
@@ -123,7 +123,12 @@ fn phase_vector(report: &litchi_core::ValidateReport) -> Vec<String> {
 }
 
 fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_errors());
     assert_eq!(report.issues().len(), 1);
     assert_eq!(report.issues()[0].check().as_str(), check);
@@ -131,7 +136,7 @@ fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
 }
 
 fn assert_limit_phase(bytes: Vec<u8>, read_limits: SourceLimits, phases: [&str; 4]) {
-    let report = validate_read_at_with_limits(
+    let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         read_limits,
         ValidationLimits::default(),
@@ -147,8 +152,18 @@ fn valid_catalog_is_complete_deterministic_and_does_not_read_payload() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, &payload);
     let source = Arc::new(CountingSource::new(bytes.clone()));
 
-    let first = validate_read_at(source.clone()).unwrap();
-    let second = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let first = validate_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
+    let second = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
 
     assert!(first.is_complete());
     assert!(!first.has_errors());
@@ -177,7 +192,12 @@ fn malformed_content_types_and_relationships_are_conclusive_issues() {
             ["complete", "blocked", "complete", "blocked"],
         ),
     ] {
-        let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let report = validate_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            SourceLimits::default(),
+            litchi_core::ValidationLimits::default(),
+        )
+        .unwrap();
         assert!(!report.is_complete());
         assert!(report.has_errors());
         assert!(matches!(
@@ -219,11 +239,15 @@ fn parser_errors_and_invalid_uris_keep_exact_manifest_phase() {
     // ingress repair (the relationship stays dangling), not a structural
     // rejection, so validation admits the package.
     let invalid_relationship_uri = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="../escape.xml"/></Relationships>"#;
-    let report = validate_read_at(Arc::new(OwnedSource::new(package_bytes(
-        EMPTY_CONTENT_TYPES,
-        invalid_relationship_uri,
-        b"document",
-    ))))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(package_bytes(
+            EMPTY_CONTENT_TYPES,
+            invalid_relationship_uri,
+            b"document",
+        ))),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
     .unwrap();
     assert!(!report.has_errors());
     assert_eq!(
@@ -382,9 +406,11 @@ fn relationship_part_source_topology_belongs_to_catalog_admission() {
         )
         .unwrap();
 
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
     .unwrap();
     assert!(report.has_errors());
     assert_eq!(report.issues().len(), 1);
@@ -404,7 +430,12 @@ fn duplicate_physical_entries_are_reported_as_structural_rejection() {
     // duplicate-physical-entry rejection path.
     let bytes = duplicate_package_bytes();
 
-    let report = validate_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap();
     assert!(report.has_errors());
     assert!(matches!(
         status(&report, "opc.package.ingress"),
@@ -424,7 +455,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let input = validate_read_at_with_limits(
+    let input = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         input_limits,
         ValidationLimits::default(),
@@ -454,7 +485,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let archive = validate_read_at_with_limits(
+    let archive = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         archive_limits,
         ValidationLimits::default(),
@@ -475,7 +506,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let declared_size = validate_read_at_with_limits(
+    let declared_size = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         declared_size_limits,
         ValidationLimits::default(),
@@ -496,7 +527,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let catalog = validate_read_at_with_limits(
+    let catalog = validate_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
         catalog_limits,
         ValidationLimits::default(),
@@ -517,7 +548,7 @@ fn zip_and_relationship_ceilings_are_blocked_without_issues() {
         .unwrap()
         .build()
         .unwrap();
-    let relationships = validate_read_at_with_limits(
+    let relationships = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         relationship_limits,
         ValidationLimits::default(),
@@ -539,7 +570,7 @@ fn report_limits_are_fallible_errors_not_unbounded_retention() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
     let tiny = ValidationLimits::new(1, 1, 1, 1, 8, 8, 8, 8, 8, 32);
     assert!(matches!(
-        validate_read_at_with_limits(
+        validate_read_at(
             Arc::new(OwnedSource::new(bytes)),
             SourceLimits::default(),
             tiny,
@@ -563,9 +594,11 @@ fn signature_presence_is_information_not_signature_validity() {
     writer
         .write_stored("_xmlsignatures/origin.sigs", b"not a signature")
         .unwrap();
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
     .unwrap();
 
     assert!(report.is_complete());
@@ -597,9 +630,11 @@ fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
     writer
         .write_stored("word/vbaProject.bin", b"inert")
         .unwrap();
-    let report = validate_read_at(Arc::new(OwnedSource::new(
-        writer.finish_to_bytes().unwrap(),
-    )))
+    let report = validate_read_at(
+        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
     .unwrap();
 
     assert!(report.is_complete());
@@ -614,13 +649,23 @@ fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
 #[test]
 fn io_and_source_change_failures_remain_errors() {
     let bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
-    let io_error = validate_read_at(Arc::new(FailingSource::new(bytes.clone()))).unwrap_err();
+    let io_error = validate_read_at(
+        Arc::new(FailingSource::new(bytes.clone())),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(
         io_error,
         OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
     ));
 
-    let stale = validate_read_at(Arc::new(MutatingSource::new(bytes))).unwrap_err();
+    let stale = validate_read_at(
+        Arc::new(MutatingSource::new(bytes)),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(stale, OpcError::SourceChanged { .. }));
 
     let blocked_bytes = package_bytes(CONTENT_TYPES, ROOT_RELS, b"document");
@@ -629,7 +674,7 @@ fn io_and_source_change_failures_remain_errors() {
         .unwrap()
         .build()
         .unwrap();
-    let blocked_stale = validate_read_at_with_limits(
+    let blocked_stale = validate_read_at(
         Arc::new(LengthMutatingSource::new(blocked_bytes)),
         blocked_limits,
         ValidationLimits::default(),
@@ -637,8 +682,12 @@ fn io_and_source_change_failures_remain_errors() {
     .unwrap_err();
     assert!(matches!(blocked_stale, OpcError::SourceChanged { .. }));
 
-    let structural_stale =
-        validate_read_at(Arc::new(MutatingSource::new(b"not a zip".to_vec()))).unwrap_err();
+    let structural_stale = validate_read_at(
+        Arc::new(MutatingSource::new(b"not a zip".to_vec())),
+        SourceLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .unwrap_err();
     assert!(matches!(structural_stale, OpcError::SourceChanged { .. }));
 }
 
@@ -790,7 +839,7 @@ impl ReadAt for MutatingSource {
 #[test]
 fn part_validation_reports_dangling_targets_and_malformed_xml() {
     let clean = package_bytes(CONTENT_TYPES, ROOT_RELS, b"<document/>");
-    let package = litchi_opc::OpcPackage::from_bytes(&clean).unwrap();
+    let package = litchi_opc::OpcPackage::from_bytes(&clean, SourceLimits::default()).unwrap();
     let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
     assert!(report.is_complete());
     assert!(report.issues().is_empty());
@@ -810,7 +859,7 @@ fn part_validation_reports_dangling_targets_and_malformed_xml() {
         )
         .unwrap();
     let broken = writer.finish_to_bytes().unwrap();
-    let package = litchi_opc::OpcPackage::from_bytes(&broken).unwrap();
+    let package = litchi_opc::OpcPackage::from_bytes(&broken, SourceLimits::default()).unwrap();
     let report = litchi_opc::validate_parts(&package, ValidationLimits::default()).unwrap();
     let codes: Vec<&str> = report.issues().iter().map(|issue| issue.code()).collect();
     assert!(

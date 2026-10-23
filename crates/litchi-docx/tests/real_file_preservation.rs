@@ -17,7 +17,10 @@ const HYPERLINK_URL: &str = "https://example.test/litchi-docx-changed-relationsh
 const HYPERLINK_TEXT: &str = "litchi-docx-changed-relationship-regression";
 
 fn member(bytes: &[u8], name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(OwnedPhysPkgReader::from_bytes(bytes.to_vec())?.read_member(name)?)
+    Ok(
+        OwnedPhysPkgReader::from_bytes(bytes.to_vec(), litchi_opc::SourceLimits::default())?
+            .read_member(name)?,
+    )
 }
 
 #[test]

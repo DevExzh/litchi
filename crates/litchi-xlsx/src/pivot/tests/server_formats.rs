@@ -400,7 +400,7 @@ impl Fixture {
     }
 
     fn package(&self) -> OpcPackage {
-        OpcPackage::from_bytes(&self.bytes).unwrap()
+        OpcPackage::from_bytes(&self.bytes, litchi_opc::SourceLimits::default()).unwrap()
     }
 }
 
@@ -413,7 +413,9 @@ fn with_unaudited_table(archive: Vec<u8>, published: &str, table_xml: &str) -> V
         TABLE_URI.trim_start_matches('/'),
         WORKSHEET_TABLE_URI.trim_start_matches('/'),
     ];
-    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&archive).unwrap();
+    let reader =
+        litchi_opc::phys_pkg::PhysPkgReader::new(&archive, litchi_opc::SourceLimits::default())
+            .unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let data = if tables.contains(&name.as_str()) {
@@ -1095,7 +1097,9 @@ fn relationship_inventory(package: &OpcPackage) -> RelationshipInventory {
             }
         }
 
-        let source = package.source_relationships(&owner).unwrap();
+        let source = package
+            .source_relationships(&owner, litchi_opc::SourceLimits::default())
+            .unwrap();
         if source.member_present() {
             inventory.parts += 1;
             inventory.total_xml_bytes += source.bytes().len();
@@ -1954,7 +1958,7 @@ fn structural_list_aggregate_cap_is_checked_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let mut exact = OpcPackage::from_bytes_with_limits(&fixture.bytes, exact_limits).unwrap();
+    let mut exact = OpcPackage::from_bytes(&fixture.bytes, exact_limits).unwrap();
     let mut exact_transaction = edit(&mut exact, "Pivot").unwrap();
     exact_transaction
         .insert_server_format(1, inserted.clone())
@@ -1974,8 +1978,7 @@ fn structural_list_aggregate_cap_is_checked_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let mut one_under =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, one_under_limits).unwrap();
+    let mut one_under = OpcPackage::from_bytes(&fixture.bytes, one_under_limits).unwrap();
     let before = table_blob(&one_under);
     let mut one_under_transaction = edit(&mut one_under, "Pivot").unwrap();
     one_under_transaction
@@ -2050,7 +2053,7 @@ fn stale_signed_and_limited_publications_refuse_before_mutation() {
         .unwrap()
         .build()
         .unwrap();
-    let mut limited = OpcPackage::from_bytes_with_limits(&limited_fixture.bytes, limits).unwrap();
+    let mut limited = OpcPackage::from_bytes(&limited_fixture.bytes, limits).unwrap();
     let limited_before = table_blob(&limited);
     let mut limited_transaction = edit(&mut limited, "Pivot").unwrap();
     limited_transaction
@@ -2528,7 +2531,7 @@ fn caller_limits_reject_before_server_format_collection_allocation() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(OpcPackage::from_bytes_with_limits(&fixture.bytes, tiny).is_err());
+    assert!(OpcPackage::from_bytes(&fixture.bytes, tiny).is_err());
 }
 
 #[test]
@@ -2576,7 +2579,7 @@ fn exact_source_aggregate_cap_admits_equal_size_edit_but_rejects_growth() {
         .unwrap()
         .build()
         .unwrap();
-    let mut exact = OpcPackage::from_bytes_with_limits(&fixture.bytes, exact_limits).unwrap();
+    let mut exact = OpcPackage::from_bytes(&fixture.bytes, exact_limits).unwrap();
     let mut exact_edit = edit(&mut exact, "Pivot").unwrap();
     exact_edit
         .set_format(0, Some(planned_format.clone()))
@@ -2602,8 +2605,7 @@ fn exact_source_aggregate_cap_admits_equal_size_edit_but_rejects_growth() {
         .unwrap()
         .build()
         .unwrap();
-    let mut one_under =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, one_under_limits).unwrap();
+    let mut one_under = OpcPackage::from_bytes(&fixture.bytes, one_under_limits).unwrap();
     let before = table_blob(&one_under);
     let mut one_under_edit = edit(&mut one_under, "Pivot").unwrap();
     one_under_edit.set_format(0, Some(planned_format)).unwrap();
@@ -2645,7 +2647,7 @@ fn caller_encoded_attribute_limit_admits_exact_output_and_rejects_one_under() {
         .unwrap()
         .build()
         .unwrap();
-    let mut exact = OpcPackage::from_bytes_with_limits(&fixture.bytes, exact_limits).unwrap();
+    let mut exact = OpcPackage::from_bytes(&fixture.bytes, exact_limits).unwrap();
     let mut exact_edit = edit(&mut exact, "Pivot").unwrap();
     exact_edit
         .set_format(0, Some(planned_format.clone()))
@@ -2660,8 +2662,7 @@ fn caller_encoded_attribute_limit_admits_exact_output_and_rejects_one_under() {
         .unwrap()
         .build()
         .unwrap();
-    let mut one_under =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, one_under_limits).unwrap();
+    let mut one_under = OpcPackage::from_bytes(&fixture.bytes, one_under_limits).unwrap();
     let before = table_blob(&one_under);
     let mut one_under_edit = edit(&mut one_under, "Pivot").unwrap();
     one_under_edit.set_format(0, Some(planned_format)).unwrap();
@@ -2680,8 +2681,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         .unwrap()
         .build()
         .unwrap();
-    let event_package =
-        OpcPackage::from_bytes_with_limits(&event_fixture.bytes, event_limits).unwrap();
+    let event_package = OpcPackage::from_bytes(&event_fixture.bytes, event_limits).unwrap();
     assert!(load(&event_package, "Pivot").is_err());
 
     let mut nested = String::new();
@@ -2700,8 +2700,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         .unwrap()
         .build()
         .unwrap();
-    let depth_package =
-        OpcPackage::from_bytes_with_limits(&depth_fixture.bytes, depth_limits).unwrap();
+    let depth_package = OpcPackage::from_bytes(&depth_fixture.bytes, depth_limits).unwrap();
     assert!(load(&depth_package, "Pivot").is_err());
 
     let attribute_fixture = Fixture::build(FixtureOptions {
@@ -2716,7 +2715,7 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         .build()
         .unwrap();
     let attribute_package =
-        OpcPackage::from_bytes_with_limits(&attribute_fixture.bytes, attribute_limits).unwrap();
+        OpcPackage::from_bytes(&attribute_fixture.bytes, attribute_limits).unwrap();
     assert!(load(&attribute_package, "Pivot").is_err());
 
     let escaped_attribute_fixture = Fixture::build(FixtureOptions {
@@ -2730,11 +2729,8 @@ fn retained_xml_event_depth_and_attribute_limits_are_honored_by_owner_scan() {
         .unwrap()
         .build()
         .unwrap();
-    let escaped_attribute_package = OpcPackage::from_bytes_with_limits(
-        &escaped_attribute_fixture.bytes,
-        escaped_attribute_limits,
-    )
-    .unwrap();
+    let escaped_attribute_package =
+        OpcPackage::from_bytes(&escaped_attribute_fixture.bytes, escaped_attribute_limits).unwrap();
     // The decoded value is only 110 bytes, but its raw lexical attribute is
     // over the caller limit.  The owner scan must reject before unescaping or
     // collecting the server-format values.
@@ -2780,7 +2776,7 @@ fn greater_than_65535_server_format_text_is_allowed_within_caller_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = OpcPackage::from_bytes_with_limits(&fixture.bytes, limits).unwrap();
+    let package = OpcPackage::from_bytes(&fixture.bytes, limits).unwrap();
     let snapshot = load(&package, "Pivot").unwrap();
     assert_eq!(
         snapshot.server_formats().formats()[0]
@@ -2949,16 +2945,12 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
     ];
 
     for (resource, exact_builder, under_builder) in cases {
-        let exact =
-            OpcPackage::from_bytes_with_limits(&fixture.bytes, exact_builder.build().unwrap())
-                .unwrap();
+        let exact = OpcPackage::from_bytes(&fixture.bytes, exact_builder.build().unwrap()).unwrap();
         let mut exact = exact;
         add_unknown_relationships(&mut exact);
         load(&exact, "Pivot").unwrap();
 
-        let under =
-            OpcPackage::from_bytes_with_limits(&fixture.bytes, under_builder.build().unwrap())
-                .unwrap();
+        let under = OpcPackage::from_bytes(&fixture.bytes, under_builder.build().unwrap()).unwrap();
         let mut under = under;
         add_unknown_relationships(&mut under);
         assert_read_limit(load(&under, "Pivot"), resource);
@@ -2976,14 +2968,12 @@ fn retained_relationship_limits_account_for_mutated_root_and_unknown_edges() {
         .max_relationship_target_bytes(target_exact - 1)
         .unwrap();
     let mut exact =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, target_exact_builder.build().unwrap())
-            .unwrap();
+        OpcPackage::from_bytes(&fixture.bytes, target_exact_builder.build().unwrap()).unwrap();
     add_unknown_relationships(&mut exact);
     load(&exact, "Pivot").unwrap();
 
     let mut under =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, target_under_builder.build().unwrap())
-            .unwrap();
+        OpcPackage::from_bytes(&fixture.bytes, target_under_builder.build().unwrap()).unwrap();
     add_unknown_relationships(&mut under);
     assert_read_limit(
         load(&under, "Pivot"),
@@ -3004,7 +2994,7 @@ fn retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds(
         .unwrap()
         .build()
         .unwrap();
-    let mut exact_package = OpcPackage::from_bytes_with_limits(&fixture.bytes, exact).unwrap();
+    let mut exact_package = OpcPackage::from_bytes(&fixture.bytes, exact).unwrap();
     add_unknown_relationships(&mut exact_package);
     load(&exact_package, "Pivot").unwrap();
 
@@ -3013,7 +3003,7 @@ fn retained_relationship_xml_part_limit_has_exact_and_one_under_mutation_bounds(
         .unwrap()
         .build()
         .unwrap();
-    let mut under_package = OpcPackage::from_bytes_with_limits(&fixture.bytes, under).unwrap();
+    let mut under_package = OpcPackage::from_bytes(&fixture.bytes, under).unwrap();
     add_unknown_relationships(&mut under_package);
     assert_read_limit(
         load(&under_package, "Pivot"),
@@ -3039,11 +3029,7 @@ fn retained_relationship_archive_member_bound_uses_public_source_capture() {
         .unwrap()
         .build()
         .unwrap();
-    assert!(
-        package
-            .source_relationships_with_limits(&owner, exact)
-            .is_ok()
-    );
+    assert!(package.source_relationships(&owner, exact).is_ok());
 
     let under = SourceLimits::builder()
         .max_archive_member_name_bytes((member_len - 1) as u64)
@@ -3051,7 +3037,7 @@ fn retained_relationship_archive_member_bound_uses_public_source_capture() {
         .build()
         .unwrap();
     assert!(matches!(
-        package.source_relationships_with_limits(&owner, under),
+        package.source_relationships(&owner, under),
         Err(OpcError::Limit {
             kind: SourceLimitKind::ArchiveMemberNameBytes,
             observed: actual,

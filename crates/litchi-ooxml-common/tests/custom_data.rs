@@ -35,7 +35,8 @@ fn source_part(xml: &[u8]) -> litchi_opc::OwnedXmlPart {
         xml.to_vec(),
     )));
     let bytes = PackageWriter::to_bytes(&package).expect("fixture package writes");
-    let package = OpcPackage::from_bytes(&bytes).expect("fixture package reopens");
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("fixture package reopens");
     package
         .source_xml_part(&name)
         .expect("reopened part retains exact XML provenance")

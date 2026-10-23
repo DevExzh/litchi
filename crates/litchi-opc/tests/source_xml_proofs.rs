@@ -80,7 +80,13 @@ fn package_bytes(parts: &[(&str, &str, String)]) -> Vec<u8> {
 }
 
 fn open(bytes: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(bytes.to_vec()).unwrap()
+    SourceBackedPackage::from_vec(
+        bytes.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
 }
 
 fn published(topology: &PreparedTopology) -> Vec<u8> {
@@ -298,14 +304,14 @@ fn a_managed_package_keeps_no_proof() {
     )
     .unwrap();
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    let package =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(litchi_core::OwnedSource::new(bytes)),
-            SourceLimits::default(),
-            SourceCacheLimits::default(),
-            context,
-        )
-        .unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(litchi_core::OwnedSource::new(bytes)),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .unwrap();
     let mut plan = SourceTopologyPlan::new();
     plan.try_replace_part(
         pack(DOCUMENT),
@@ -382,7 +388,8 @@ fn an_invalid_original_is_reported_on_every_write() {
     // The writer refuses to produce such a Part, so it is put in place in
     // the archive afterwards.
     let generated = package_bytes(&[(SLIDE, PML_SLIDE, slide(1))]);
-    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&generated).unwrap();
+    let reader =
+        litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let member = if name == SLIDE[1..] {

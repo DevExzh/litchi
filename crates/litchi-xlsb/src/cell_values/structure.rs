@@ -2306,7 +2306,7 @@ fn replay_package(
     // Durable replay is defined against this exact serialized image, not the
     // in-memory graph's potentially different archive/layout provenance.
     let limits = base.opc_package().read_limits();
-    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before.as_slice(), limits)?;
+    let graph = litchi_opc::OpcPackage::from_bytes(before, limits)?;
     let workbook = base.project_candidate(graph)?;
     validate_all_worksheets(&workbook)?;
     let (bytes, mut workbook) = replay_workbook(workbook, before.as_slice(), operations)?;
@@ -2345,9 +2345,7 @@ fn admit_archive_before_copy<'data>(
             maximum,
         }));
     }
-    Ok(litchi_opc::phys_pkg::PhysPkgReader::new_with_limits(
-        bytes, limits,
-    )?)
+    Ok(litchi_opc::phys_pkg::PhysPkgReader::new(bytes, limits)?)
 }
 
 #[cfg(test)]
@@ -6863,7 +6861,7 @@ fn workbook_from_bytes(
     drawing_load_policy: DrawingLoadPolicy,
     raw_limits: RawLimits,
 ) -> Result<Workbook> {
-    let package = litchi_opc::OpcPackage::from_bytes(bytes)?;
+    let package = litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     Workbook::reparse_candidate_with_policy(
         package,
         external_link_limits,

@@ -3001,7 +3001,7 @@ enum ChangedOverlayTarget {
 /// use litchi_opc::{OpcPackage, PackageWriter, SourceBackedPackage, SourceTopologyPlan};
 /// # fn main() -> litchi_opc::Result<()> {
 /// let bytes = PackageWriter::to_bytes(&OpcPackage::new())?;
-/// let source = SourceBackedPackage::from_vec(bytes.clone())?;
+/// let source = SourceBackedPackage::from_vec(bytes.clone(), SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
 /// let prepared = source.prepare_topology(SourceTopologyPlan::new())?;
 /// let shared = prepared.clone();
 /// let mut first = Vec::new();
@@ -4888,18 +4888,6 @@ impl<E> VerifiedDecodedReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::opc`].
-    #[must_use]
-    pub fn opc_error(&self) -> Option<&OpcError> {
-        self.opc()
-    }
-
-    /// Alias for [`Self::opc`] using the conventional `error` name.
-    #[must_use]
-    pub fn error(&self) -> Option<&OpcError> {
-        self.opc()
-    }
-
     /// Returns the callback failure, including one retained by a primary OPC
     /// failure.
     #[must_use]
@@ -4910,12 +4898,6 @@ impl<E> VerifiedDecodedReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::callback`].
-    #[must_use]
-    pub fn callback_error(&self) -> Option<&E> {
-        self.callback()
-    }
-
     /// Extracts the primary OPC failure, if present.
     pub fn into_opc(self) -> Option<OpcError> {
         match self {
@@ -4924,27 +4906,12 @@ impl<E> VerifiedDecodedReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::into_opc`].
-    pub fn into_opc_error(self) -> Option<OpcError> {
-        self.into_opc()
-    }
-
-    /// Alias for [`Self::into_opc`].
-    pub fn into_error(self) -> Option<OpcError> {
-        self.into_opc()
-    }
-
     /// Extracts the callback failure, if one was returned.
     pub fn into_callback(self) -> Option<E> {
         match self {
             Self::Opc { callback_error, .. } => callback_error,
             Self::Callback(error) => Some(error),
         }
-    }
-
-    /// Alias for [`Self::into_callback`].
-    pub fn into_callback_error(self) -> Option<E> {
-        self.into_callback()
     }
 }
 
@@ -7317,20 +7284,6 @@ impl SourceBackedPackage {
         })
     }
 
-    /// Open a filesystem-backed OPC package without materializing ordinary
-    /// part payloads.
-    ///
-    /// The path is held through an immutable positional [`FileSource`]. ZIP
-    /// metadata, content types, and relationship manifests are validated at
-    /// open; ordinary payloads remain cold until a [`PartView::data`] request.
-    /// This avoids the eager [`OpcPackage`] input and all-Part payload
-    /// allocations, but does not claim a total RSS bound. [`OpcPackage`] stays
-    /// the explicit eager CRUD type.
-    #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(Arc::new(FileSource::open(path)?))
-    }
-
     /// Open a filesystem-backed OPC package with explicit read limits without
     /// materializing ordinary part payloads.
     ///
@@ -7341,34 +7294,18 @@ impl SourceBackedPackage {
     /// and all-Part payload allocations, but does not claim a total RSS bound.
     /// [`OpcPackage`] stays the explicit eager CRUD type.
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), limits)
-    }
-
-    /// Open a source-backed package from a sequential reader with the standard
-    /// bounded read policy.
-    ///
-    /// The reader is consumed once into an owned byte vector, which is moved
-    /// into the source-backed positional owner without copying its bytes.
-    /// Opening validates only the ZIP catalog, content types, and relationships;
-    /// ordinary part payloads remain deferred until a [`PartView::data`] request.
-    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
-    }
-
-    /// Open a source-backed package from a sequential reader with an explicit
-    /// bounded read policy.
-    ///
-    /// The reader is consumed once, with `limits.max_input_bytes()` enforced
-    /// during ingestion. The resulting byte vector is moved into the existing
-    /// owned source without a second copy. Ordinary part payloads remain
-    /// deferred until a [`PartView::data`] request.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
-        Self::from_vec_with_limits(read_limited(reader, limits)?, limits)
+    pub fn from_path(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
+        Self::from_read_at(
+            Arc::new(FileSource::open(path)?),
+            limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
     }
 
     /// Open a source-backed package from a sequential reader with explicit
-    /// source and deferred-cache policies.
+    /// source, deferred-cache and execution policies.
     ///
     /// The reader is consumed once with `limits` enforced during ingestion.
     /// When `execution_context` is present it is checked before ingestion and
@@ -7377,11 +7314,7 @@ impl SourceBackedPackage {
     /// without a second copy; `cache_limits` governs the deferred payload
     /// cache just as it does for positional-source opens.
     ///
-    /// This is the raw OPC physical constructor. Format facades should expose
-    /// their canonical `OpenOptions` entry point and pass its required source
-    /// limits and optional policies here; callers must not use this helper as
-    /// a second format-level API.
-    pub fn from_reader_with_source_options<R: Read>(
+    pub fn from_reader<R: Read>(
         reader: R,
         limits: SourceLimits,
         cache_limits: SourceCacheLimits,
@@ -7400,167 +7333,51 @@ impl SourceBackedPackage {
         )
     }
 
-    /// Open a source-backed package with the standard bounded read policy.
+    /// Open an owned source-backed package with explicit source, deferred-cache
+    /// and execution policies.
     ///
-    /// The input vector is moved into the source owner. Ordinary part payloads
-    /// remain deferred until a [`PartView::data`] request, just as with
-    /// [`Self::from_read_at`].
-    pub fn from_vec(data: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(data, SourceLimits::default())
-    }
-
-    /// Open an owned source-backed package with an explicit bounded read
-    /// policy.
-    ///
-    /// The input vector is moved into the source owner. Opening validates the
-    /// ZIP catalog, content types, and relationships without materializing
-    /// ordinary part payloads; a payload is decompressed only when its
-    /// [`PartView::data`] is requested.
-    pub fn from_vec_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
+    /// The input vector is moved into the source owner. `execution_context` is
+    /// checked before that move and retained by the owner for mandatory-open
+    /// and deferred payload checks. Opening validates the ZIP catalog, content
+    /// types, and relationships without materializing ordinary part payloads;
+    /// a payload is decompressed only when its [`PartView::data`] is requested.
+    pub fn from_vec(
+        data: Vec<u8>,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        execution_context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        if let Some(context) = execution_context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
         let source = Arc::new(OwnedSource::new(data));
         Self::from_read_at_inner(
             SourceInput::Owned(source),
             limits,
-            SourceCacheLimits::default(),
-            None,
+            cache_limits,
+            execution_context,
             SourceReadPolicy::exact(),
         )
     }
 
-    /// Open a source-backed package with the standard bounded read policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(
-            source,
-            SourceLimits::default(),
-            SourceCacheLimits::default(),
-        )
-    }
-
-    /// Open a source-backed package with an explicit bounded read policy.
+    /// Open a source-backed package with explicit source, cache, read-ahead,
+    /// and execution policies. `execution_context` is `None` for an
+    /// unmanaged package and `Some` for the managed reservation path.
     ///
     /// The source version is captured before indexing and checked after every
     /// mandatory open read.  A changed source is never silently accepted.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(
-            source,
-            limits,
-            SourceCacheLimits::default(),
-        )
-    }
-
-    /// Open a source-backed package with an explicit payload-cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(
-            source,
-            SourceLimits::default(),
-            cache_limits,
-        )
-    }
-
-    /// Open a source-backed package whose lazy payload cache is charged to an
-    /// explicit hierarchical execution budget.
-    ///
-    /// Compatibility constructors remain unmanaged and keep their existing
-    /// behavior. This opt-in path checks cancellation before opening and
-    /// reserves each Part's declared uncompressed size before reading its
-    /// payload. The reservation is retained with the clean cache entry and
-    /// active same-Part flight. A returned [`PartData`] is a budgeted handle;
-    /// use [`PartData::as_bytes`] or clone that handle while consuming the
-    /// payload. Its [`PartData::into_arc`] escape is rejected on this managed
-    /// path so the reservation cannot be silently detached.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            limits,
-            SourceCacheLimits::default(),
-            context,
-        )
-    }
-
-    /// Open a managed source-backed package with explicit read, cache, and
-    /// hierarchical execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_inner(
-            SourceInput::Generic(source),
-            limits,
-            cache_limits,
-            Some(context),
-            SourceReadPolicy::exact(),
-        )
-    }
-
-    /// Open a source-backed package with explicit read and cache policies.
-    ///
-    /// The source version is captured before indexing and checked after every
-    /// mandatory open read. A changed source is never silently accepted.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_inner(
-            SourceInput::Generic(source),
-            limits,
-            cache_limits,
-            None,
-            SourceReadPolicy::exact(),
-        )
-    }
-
-    /// Open with an explicit bounded source-read policy and payload-cache limits.
-    ///
-    /// Read-ahead fetches adjacent compressed bytes and may increase input-byte
-    /// use. Publication and mutable materialization permanently switch this
-    /// package, and every clone of it, back to exact reads and release the
-    /// read-ahead window. Existing constructors remain exact. Use the
-    /// execution-context variant to charge physical reads and retained memory
-    /// to a hierarchical budget.
-    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    pub fn from_read_at(
         source: Arc<dyn ReadAt>,
         limits: SourceLimits,
         cache_limits: SourceCacheLimits,
         source_read_policy: SourceReadPolicy,
+        execution_context: Option<ExecutionContext>,
     ) -> Result<Self> {
         Self::from_read_at_inner(
             SourceInput::Generic(source),
             limits,
             cache_limits,
-            None,
-            source_read_policy,
-        )
-    }
-
-    /// Open with explicit read-ahead, cache, and hierarchical execution policies.
-    ///
-    /// Input charges follow accepted physical reads, including overfetch; cache
-    /// hits consume no additional input bytes. The window's memory reservation
-    /// remains live until the window is released or the last clone of the
-    /// package is dropped. Publication from any clone permanently returns
-    /// every clone to exact reads.
-    pub fn from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        source_read_policy: SourceReadPolicy,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_inner(
-            SourceInput::Generic(source),
-            limits,
-            cache_limits,
-            Some(context),
+            execution_context,
             source_read_policy,
         )
     }
@@ -10000,11 +9817,8 @@ impl SourceBackedPackage {
                         self.limits.max_relationship_xml_bytes() as u64,
                     )?;
                     validate_overlay_xml(relationship_uri.as_str(), &xml)?;
-                    let reparsed = PackageReader::parse_owned_relationships_with_limits(
-                        &xml,
-                        &owner,
-                        self.limits,
-                    )?;
+                    let reparsed =
+                        PackageReader::parse_owned_relationships(&xml, &owner, self.limits)?;
                     if !relationships_semantically_equal(&reparsed, owner_relationships) {
                         return Err(overlay_unavailable(
                             "generated canonical relationships changed semantic graph",
@@ -10419,11 +10233,7 @@ impl SourceBackedPackage {
                     self.limits.max_relationship_xml_bytes() as u64,
                 )?;
                 validate_overlay_xml(relationship_uri.as_str(), &xml)?;
-                let reparsed = PackageReader::parse_owned_relationships_with_limits(
-                    &xml,
-                    &owner,
-                    self.limits,
-                )?;
+                let reparsed = PackageReader::parse_owned_relationships(&xml, &owner, self.limits)?;
                 if !relationships_semantically_equal(&reparsed, owner_relationships) {
                     return Err(overlay_unavailable(
                         "generated canonical relationships changed semantic graph",
@@ -17172,7 +16982,13 @@ mod tests {
             .expect("the content-types marker must be present in the fixture");
         let source = Arc::new(CatalogReadFailureSource::new(bytes, fail_offset));
 
-        let error = match SourceBackedPackage::from_read_at(source) {
+        let error = match SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        ) {
             Ok(_) => panic!("the catalog-stage source read must fail"),
             Err(error) => error,
         };
@@ -17184,11 +17000,12 @@ mod tests {
 
     #[test]
     fn owned_bytes_open_keeps_ordinary_payloads_deferred() {
-        let package = SourceBackedPackage::from_vec(archive_bytes(
-            root_relationships(),
-            b"<document/>",
-            true,
-        ))
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), b"<document/>", true),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
         .unwrap();
 
         let opened = package.cache_diagnostics();
@@ -17212,7 +17029,14 @@ mod tests {
             b"<document/>",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let before = package.cache_diagnostics();
         let document = PackURI::new("/word/document.xml").unwrap();
         let view = package.part(&document).unwrap();
@@ -17233,7 +17057,14 @@ mod tests {
             b"<document/>",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
         let view = package.part(&document).unwrap();
         source.changed();
@@ -17243,14 +17074,16 @@ mod tests {
         ));
 
         let (_budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(archive_bytes(
                 root_relationships(),
                 b"<document/>",
                 false,
             ))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let view = package.part(&document).unwrap();
@@ -17264,9 +17097,14 @@ mod tests {
     #[test]
     fn topology_add_part_inserts_lossless_content_type_override() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_part(
             PackURI::new("/custom/new.bin").unwrap(),
@@ -17286,7 +17124,7 @@ mod tests {
                 == b"<Override PartName=\"/custom/new.bin\" ContentType=\"application/octet-stream\"/>"));
         assert_ne!(output, source_content_types);
         assert_eq!(archive.read("custom/new.bin").unwrap(), b"new payload");
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened
                 .try_iter_parts()
@@ -17304,7 +17142,13 @@ mod tests {
     #[test]
     fn prepared_topology_exposes_complete_effective_graph_and_publishes_same_overlays() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
-        let package = SourceBackedPackage::from_vec(source_bytes.clone()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            source_bytes.clone(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
         let added = PackURI::new("/custom/new.xml").unwrap();
         let mut plan = SourceTopologyPlan::new();
@@ -17348,7 +17192,13 @@ mod tests {
 
         let mut output = Vec::new();
         prepared.publish_to_stream(&mut output).unwrap();
-        let reopened = SourceBackedPackage::from_vec(output).unwrap();
+        let reopened = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             reopened.part(&document).unwrap().data().unwrap().as_bytes(),
             b"<after/>"
@@ -17377,7 +17227,14 @@ mod tests {
             b"<before/>",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_part(
             PackURI::new("/word/document.xml").unwrap(),
@@ -17401,7 +17258,13 @@ mod tests {
     #[test]
     fn prepared_topology_removal_updates_effective_membership_and_content_types() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
-        let package = SourceBackedPackage::from_vec(source_bytes).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            source_bytes,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let removed = PackURI::new("/custom/orphan.xml").unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_remove_part(removed.clone()).unwrap();
@@ -17422,14 +17285,26 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         prepared.publish_to_stream(&mut output).unwrap();
-        let reopened = SourceBackedPackage::from_vec(output).unwrap();
+        let reopened = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         assert!(reopened.part(&removed).is_err());
     }
 
     #[test]
     fn prepared_topology_empty_plan_keeps_exact_source_fast_path_without_candidate() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
-        let package = SourceBackedPackage::from_vec(source_bytes.clone()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            source_bytes.clone(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let prepared = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
         assert!(matches!(
             prepared.with_candidate(|_| Ok(())),
@@ -17571,20 +17446,30 @@ mod tests {
             .try_replace_part(partname.clone(), b"<after/>".to_vec())
             .unwrap();
         let mut owned_output = Vec::new();
-        SourceBackedPackage::from_vec(source_bytes.clone())
-            .unwrap()
-            .write_topology_to_stream(&mut owned_output, owned_plan)
-            .unwrap();
+        SourceBackedPackage::from_vec(
+            source_bytes.clone(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut owned_output, owned_plan)
+        .unwrap();
 
         let mut shared_plan = SourceTopologyPlan::new();
         shared_plan
             .try_replace_part_shared(partname.clone(), Arc::new(b"<after/>".to_vec()))
             .unwrap();
         let mut shared_output = Vec::new();
-        SourceBackedPackage::from_vec(source_bytes)
-            .unwrap()
-            .write_topology_to_stream(&mut shared_output, shared_plan)
-            .unwrap();
+        SourceBackedPackage::from_vec(
+            source_bytes,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut shared_output, shared_plan)
+        .unwrap();
 
         assert_eq!(shared_output, owned_output);
         assert_eq!(
@@ -17639,11 +17524,12 @@ mod tests {
         );
 
         let mut output = Vec::new();
-        SourceBackedPackage::from_vec(archive_bytes(
-            root_relationships(),
-            original.as_bytes(),
-            false,
-        ))
+        SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), original.as_bytes(), false),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
         .unwrap()
         .write_topology_to_stream(&mut output, plan)
         .unwrap();
@@ -17695,11 +17581,12 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
-            SourceBackedPackage::from_vec(archive_bytes(
-                root_relationships(),
-                original.as_bytes(),
-                false,
-            ))
+            SourceBackedPackage::from_vec(
+                archive_bytes(root_relationships(), original.as_bytes(), false,),
+                SourceLimits::default(),
+                crate::SourceCacheLimits::default(),
+                None
+            )
             .unwrap()
             .write_topology_to_stream(&mut output, plan),
             Err(OpcError::XmlPublication { .. })
@@ -17720,11 +17607,12 @@ mod tests {
             ));
         }
         document.push_str("</w:body></w:document>");
-        let package = SourceBackedPackage::from_vec(archive_bytes(
-            root_relationships(),
-            document.as_bytes(),
-            false,
-        ))
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), document.as_bytes(), false),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
         .unwrap();
         let target = package.part_index(&partname).unwrap();
         let original = package.read_part(target).unwrap();
@@ -17799,9 +17687,13 @@ mod tests {
     fn physical_replacement_audit_remembers_only_passing_originals() {
         // Record 0311: the remembered original verdict and the plan's proof.
         let partname = PackURI::new("/word/document.xml").unwrap();
-        let package =
-            SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", false))
-                .unwrap();
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), b"<before/>", false),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let target = package.part_index(&partname).unwrap();
         let original = package.read_part(target).unwrap();
         let version = package.source.version();
@@ -17881,10 +17773,15 @@ mod tests {
         assert!(plan.replacements[0].replacement_spans.is_none());
 
         let mut output = Vec::new();
-        SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", false))
-            .unwrap()
-            .write_topology_to_stream(&mut output, plan)
-            .unwrap();
+        SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), b"<before/>", false),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut output, plan)
+        .unwrap();
         assert_eq!(
             soapberry_zip::office::ArchiveReader::new(&output)
                 .unwrap()
@@ -18014,7 +17911,14 @@ mod tests {
         assert_eq!(source_archive.entries().count(), SOURCE_MEMBER_COUNT);
         let source_raw = raw_records(&source_bytes);
         let source = Arc::new(CountingSource::new(source_bytes.clone()));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(package.physical_member_names().len(), SOURCE_MEMBER_COUNT);
         assert_eq!(package.iter_parts().count(), SOURCE_MEMBER_COUNT - 2);
 
@@ -18055,7 +17959,13 @@ mod tests {
             archive_reader.read(added.membername()).unwrap(),
             b"new payload"
         );
-        let reopened = SourceBackedPackage::from_vec(output).expect("reopen boundary output");
+        let reopened = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("reopen boundary output");
         assert_eq!(reopened.iter_parts().count(), SOURCE_MEMBER_COUNT - 1);
         assert_eq!(
             reopened.part(&added).unwrap().data().unwrap().as_bytes(),
@@ -18073,9 +17983,12 @@ mod tests {
             .expect("the source payload must be present") as u64;
         let payload_end = payload_start + BEFORE.len() as u64;
         let source = Arc::new(CountingSource::new(source_bytes));
-        let package = SourceBackedPackage::from_read_at_with_cache_limits(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
+            SourceLimits::default(),
             SourceCacheLimits::new(1, 1).unwrap(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let ranges_before = source.read_ranges().len();
@@ -18114,7 +18027,14 @@ mod tests {
             SOURCE_XML,
             false,
         )));
-        let source_package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let source_package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
         let source_xml = source_package
             .part(&document)
@@ -18125,9 +18045,17 @@ mod tests {
         // publication proof. The next check is the transfer-boundary fence.
         source.arm_after_versions(2);
 
-        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"<destination/>", false),
-        )))
+        let destination = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<destination/>",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
@@ -18149,10 +18077,12 @@ mod tests {
             archive_bytes(root_relationships(), SOURCE_XML, false),
             cancellation_source,
         ));
-        let source_package = SourceBackedPackage::from_read_at_with_execution_context(
+        let source_package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
@@ -18165,9 +18095,17 @@ mod tests {
         // after the two checks that complete the initial XML proof.
         source.arm_after_versions(2);
 
-        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"<destination/>", false),
-        )))
+        let destination = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<destination/>",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
@@ -18187,14 +18125,16 @@ mod tests {
     fn topology_source_xml_addition_charges_one_xml_validation_pass() {
         const SOURCE_XML: &[u8] = b"<source><nested/></source>";
         let (budget, _cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
-        let source_package = SourceBackedPackage::from_read_at_with_execution_context(
+        let source_package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(archive_bytes(
                 root_relationships(),
                 SOURCE_XML,
                 false,
             ))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
@@ -18205,9 +18145,17 @@ mod tests {
             .unwrap();
         let work_before = budget.used(Resource::Work);
 
-        let destination = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"<destination/>", false),
-        )))
+        let destination = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<destination/>",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_source_xml_part(PackURI::new("/custom/copied.xml").unwrap(), source_xml)
@@ -18243,7 +18191,14 @@ mod tests {
         let added = PackURI::new("/custom/new.bin").unwrap();
         let publish = || {
             let source = Arc::new(CountingSource::new(source_bytes.clone()));
-            let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+            let package = SourceBackedPackage::from_read_at(
+                source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
             let mut plan = SourceTopologyPlan::new();
             plan.try_remove_part(orphan.clone()).unwrap();
             plan.try_add_part(
@@ -18282,7 +18237,8 @@ mod tests {
             );
         }
 
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen ZIP64 topology output");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen ZIP64 topology output");
         assert_eq!(reopened.get_part(&document).unwrap().blob(), b"<before/>");
         assert_eq!(reopened.get_part(&added).unwrap().blob(), b"new payload");
         assert!(matches!(
@@ -18330,8 +18286,14 @@ mod tests {
             .write_stored("word/document.xml", b"<before/>")
             .unwrap();
         let source = writer.finish_to_bytes().unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         let target = PackURI::new("/custom/new.bin").unwrap();
         plan.try_add_part(
@@ -18349,8 +18311,14 @@ mod tests {
         .unwrap();
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             reopened.rels().get("rId2").unwrap().target_ref(),
             "custom/new.bin"
@@ -18576,10 +18544,12 @@ mod tests {
             .unwrap();
         }
         let (budget, _cancellation_source, context) = managed_context_with_cancellation(64 * 1024);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -18620,9 +18590,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut plan = SourceTopologyPlan::new();
@@ -18689,8 +18662,14 @@ mod tests {
     fn topology_appends_prefixed_noncanonical_relationships_losslessly_and_reopens() {
         let relationships = noncanonical_document_relationships();
         let source = topology_relationship_archive(relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
         package
@@ -18714,9 +18693,14 @@ mod tests {
             expected_relationships
         );
 
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output.clone())))
-                .unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let relationships = reopened.part(&owner).unwrap().rels();
         assert_eq!(
             relationships.get("rExisting").unwrap().target_ref(),
@@ -18730,7 +18714,7 @@ mod tests {
             relationships.get("rAdded").unwrap().target_mode(),
             TargetMode::External
         );
-        let reopened_owned = OpcPackage::from_bytes(&output).unwrap();
+        let reopened_owned = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened_owned
                 .get_part(&owner)
@@ -18750,8 +18734,14 @@ mod tests {
   <Relationship Target="https://before.invalid/" Type="urn:litchi:test" Id="rExisting" TargetMode="External" />
 </Relationships>"#;
         let source = topology_relationship_archive(relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package
             .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
@@ -18773,8 +18763,14 @@ mod tests {
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
         );
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(
             reopened
                 .part(&PackURI::new("/word/document.xml").unwrap())
@@ -18793,8 +18789,14 @@ mod tests {
         relationships.extend_from_slice(b"\xEF\xBB\xBF");
         relationships.extend_from_slice(noncanonical_document_relationships());
         let source = topology_relationship_archive(&relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         let owner = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
@@ -18832,8 +18834,14 @@ mod tests {
             expected_relationships
         );
 
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let relationships = reopened.part(&owner).unwrap().rels();
         assert!(relationships.get("rExisting").is_none());
         assert_eq!(
@@ -18860,9 +18868,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
@@ -18896,10 +18907,12 @@ mod tests {
         let source = topology_relationship_archive(relationships);
         let (_budget, _cancellation_source, context) =
             managed_context_with_cancellation((relationships.len() as u64).saturating_mul(2) - 1);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -18926,8 +18939,14 @@ mod tests {
             "https://replacement.invalid/",
         )
         .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         let error = package
             .write_topology_to_stream(&mut output, plan)
@@ -18947,8 +18966,14 @@ mod tests {
         let mut plan = SourceTopologyPlan::new();
         plan.try_remove_external_relationship(owner.clone(), "rExisting")
             .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
 
@@ -18986,8 +19011,14 @@ mod tests {
                 .any(|window| window == b"preserve-after")
         );
 
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let relationships = reopened.part(&owner).unwrap().rels();
         assert!(relationships.get("rExisting").is_none());
         assert_eq!(
@@ -19011,8 +19042,14 @@ mod tests {
         let mut plan = SourceTopologyPlan::new();
         plan.try_remove_external_relationship(owner.clone(), "rOnly")
             .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
 
@@ -19040,8 +19077,14 @@ mod tests {
                 .any(|window| window == b"producer=\"opaque\"")
         );
 
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert!(reopened.part(&owner).unwrap().rels().is_empty());
     }
 
@@ -19054,16 +19097,27 @@ mod tests {
         remove
             .try_remove_external_relationship(owner.clone(), "rExisting")
             .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut removed_output = Vec::new();
         package
             .write_topology_to_stream(&mut removed_output, remove)
             .unwrap();
 
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(removed_output)))
-                .unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(removed_output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut add = SourceTopologyPlan::new();
         add.try_add_external_relationship(
             owner.clone(),
@@ -19095,9 +19149,14 @@ mod tests {
                 .any(|window| window == b"preserve-after")
         );
 
-        let inverse =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(inverse_output)))
-                .unwrap();
+        let inverse = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(inverse_output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let relationship = inverse
             .part(&owner)
             .unwrap()
@@ -19115,8 +19174,14 @@ mod tests {
     fn topology_noncanonical_relationship_unknown_markup_refuses_before_output() {
         let relationships = br#"<Relationships foo="unknown" xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rExisting" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://before.invalid/" TargetMode="External">opaque</Relationship></Relationships>"#;
         let source = topology_relationship_archive(relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         let error = package
             .write_topology_to_stream(&mut output, noncanonical_relationship_append_plan())
@@ -19215,9 +19280,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -19240,10 +19308,12 @@ mod tests {
         let source = topology_relationship_archive(relationships);
         let (_budget, _cancellation_source, context) =
             managed_context_with_cancellation((relationships.len() as u64).saturating_mul(2) - 1);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -19262,10 +19332,12 @@ mod tests {
     fn topology_noncanonical_relationship_append_honors_cancellation() {
         let source = topology_relationship_archive(noncanonical_document_relationships());
         let (_budget, cancellation_source, context) = managed_context_with_cancellation(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         cancellation_source.cancel();
@@ -19282,10 +19354,12 @@ mod tests {
         let source = archive_bytes(root_relationships(), b"<document/>", false);
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
@@ -19310,10 +19384,12 @@ mod tests {
         let source = topology_relationship_archive(&relationships);
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
@@ -19352,10 +19428,12 @@ mod tests {
         let source = topology_relationship_archive(&relationships);
         let (budget, cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
@@ -19376,10 +19454,12 @@ mod tests {
         let source = archive_bytes(root_relationships(), b"<document/>", false);
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let entry = package
@@ -19420,10 +19500,12 @@ mod tests {
         let source = archive_bytes(root_relationships(), b"<document/>", false);
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let entry = package
@@ -19459,10 +19541,12 @@ mod tests {
         let source = archive_bytes(root_relationships(), b"<document/>", false);
         let (budget, cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let memory_before = budget.used(Resource::Memory);
@@ -19491,10 +19575,12 @@ mod tests {
         let source = Arc::new(ChangeDuringPayloadSource::new(source_bytes, payload_offset));
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let memory_before = budget.used(Resource::Memory);
@@ -19515,18 +19601,28 @@ mod tests {
 
     #[test]
     fn source_signature_query_is_metadata_only_and_conservative() {
-        let ordinary = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"<document/>", false),
-        )))
+        let ordinary = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<document/>",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         assert!(!ordinary.has_signature_infrastructure());
 
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-        let signed = SourceBackedPackage::from_read_at_with_execution_context(
+        let signed = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(signed_archive(b"<document/>"))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let memory_before = budget.used(Resource::Memory);
@@ -19542,8 +19638,14 @@ mod tests {
     fn topology_adds_external_relationship_with_exact_uri_reference() {
         let relationships = canonical_document_relationships(&[]);
         let source = topology_relationship_archive(&relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_add_external_relationship(
@@ -19556,8 +19658,14 @@ mod tests {
 
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = reopened.part(&owner).unwrap();
         let relationship = part.rels().get("rLink").unwrap();
         assert_eq!(relationship.target_mode(), TargetMode::External);
@@ -19586,8 +19694,14 @@ mod tests {
             ),
         ]);
         let source = topology_relationship_archive(&relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let owner = PackURI::new("/word/document.xml").unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_external_relationship(
@@ -19602,8 +19716,14 @@ mod tests {
 
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = reopened.part(&owner).unwrap();
         let relationships = part.rels();
         assert_eq!(
@@ -19619,9 +19739,14 @@ mod tests {
             "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
         let relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship TargetMode="External" Target="https://same.invalid/?q=1#same" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Id="rSame"/></Relationships>"#;
         let source = topology_relationship_archive(relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_external_relationship(
             PackURI::new("/word/document.xml").unwrap(),
@@ -19652,10 +19777,16 @@ mod tests {
         )
         .unwrap();
         let mut output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
-            .unwrap()
-            .write_topology_to_stream(&mut output, noop)
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut output, noop)
+        .unwrap();
         assert_eq!(output, source);
 
         let mut mutation = SourceTopologyPlan::new();
@@ -19668,10 +19799,16 @@ mod tests {
             )
             .unwrap();
         output.clear();
-        let error = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source)))
-            .unwrap()
-            .write_topology_to_stream(&mut output, mutation)
-            .unwrap_err();
+        let error = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut output, mutation)
+        .unwrap_err();
         assert!(matches!(
             error,
             OpcError::SignedSourceRequiresExplicitPolicy
@@ -19688,10 +19825,16 @@ mod tests {
         noop.try_replace_part(target.clone(), b"<signed/>".to_vec())
             .unwrap();
         let mut output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
-            .unwrap()
-            .write_topology_to_stream(&mut output, noop)
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut output, noop)
+        .unwrap();
         assert_eq!(output, source);
 
         let mut mutation = SourceTopologyPlan::new();
@@ -19699,10 +19842,16 @@ mod tests {
             .try_replace_part(target, b"<changed/>".to_vec())
             .unwrap();
         output.clear();
-        let error = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source)))
-            .unwrap()
-            .write_topology_to_stream(&mut output, mutation)
-            .unwrap_err();
+        let error = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_topology_to_stream(&mut output, mutation)
+        .unwrap_err();
         assert!(matches!(
             error,
             OpcError::SignedSourceRequiresExplicitPolicy
@@ -19721,8 +19870,14 @@ mod tests {
             TargetMode::Internal,
         )]);
         let source = topology_relationship_archive(&relationships);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_external_relationship(
             PackURI::new("/word/document.xml").unwrap(),
@@ -19767,13 +19922,24 @@ mod tests {
             PackURI::new("/word/target.xml").unwrap(),
         )
         .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(output))).unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(output)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = reopened.part(&owner).unwrap();
         let relationship = part.rels().get("rInternal").unwrap();
         assert_eq!(relationship.target_mode(), TargetMode::Internal);
@@ -19791,8 +19957,14 @@ mod tests {
                 PackURI::new("/word/target.xml").unwrap(),
             )
             .unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut mismatch_output = Vec::new();
         let error = package
             .write_topology_to_stream(&mut mismatch_output, mismatch)
@@ -19814,9 +19986,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source.clone())),
             target_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut target_plan = SourceTopologyPlan::new();
@@ -19845,9 +20020,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source.clone())),
             attribute_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut attribute_plan = SourceTopologyPlan::new();
@@ -19874,9 +20052,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source.clone())),
             name_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut name_plan = SourceTopologyPlan::new();
@@ -19909,9 +20090,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source)),
             event_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut event_plan = SourceTopologyPlan::new();
@@ -19997,7 +20181,14 @@ mod tests {
             false,
         )));
         let read_at: Arc<dyn ReadAt> = source.clone();
-        let package = SourceBackedPackage::from_read_at(read_at).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            read_at,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let artifact = package.source_artifact();
         source.overreport.store(true, Ordering::SeqCst);
 
@@ -20016,9 +20207,17 @@ mod tests {
 
     #[test]
     fn source_artifact_copy_rejects_overreporting_sink_without_false_progress() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"<before/>", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"<before/>",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let artifact = package.source_artifact();
         let mut sink = OverReportingSink {
@@ -20209,7 +20408,13 @@ mod tests {
         let malformed = archive_bytes(b"<Relationships", b"document", false);
         let malformed_source = Arc::new(CountingSource::new(malformed));
         assert!(matches!(
-            SourceBackedPackage::from_read_at(malformed_source),
+            SourceBackedPackage::from_read_at(
+                malformed_source,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None
+            ),
             Err(OpcError::QuickXmlError(_))
         ));
 
@@ -20221,7 +20426,14 @@ mod tests {
             .unwrap();
         corrupt[position] ^= 0xff;
         let source = Arc::new(CountingSource::new(corrupt));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let main = package.main_document_part().unwrap();
         assert!(matches!(main.data(), Err(OpcError::ZipError(_))));
     }
@@ -20237,7 +20449,14 @@ mod tests {
         let payload_end = payload_start + DOCUMENT.len();
         let source = Arc::new(CountingSource::new(bytes));
 
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(package.cache_diagnostics().cold_loads, 0);
         assert_eq!(package.cache_diagnostics().retained_entries, 0);
         assert_eq!(package.iter_parts().count(), 2);
@@ -20252,9 +20471,15 @@ mod tests {
     #[test]
     fn source_backed_catalog_matches_eager_part_admission() {
         let bytes = archive_bytes(root_relationships(), b"catalog parity", true);
-        let eager = OpcPackage::from_bytes(&bytes).unwrap();
-        let source =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let eager = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+        let source = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         let mut eager_parts: Vec<_> = eager
             .iter_parts()
@@ -20317,9 +20542,15 @@ mod tests {
     #[test]
     fn source_backed_catalog_matches_eager_relationship_typing_and_non_parts() {
         let bytes = archive_with_document_relationships(document_relationships());
-        let eager = OpcPackage::from_bytes(&bytes).unwrap();
-        let source =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let eager = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+        let source = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         assert_eq!(eager.non_part_members(), source.non_part_members());
         assert_eq!(source.non_part_members().len(), 1);
@@ -20361,9 +20592,12 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_limits(
+            SourceBackedPackage::from_read_at(
                 Arc::new(CountingSource::new(bytes.clone())),
                 per_part,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None
             ),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::PartBytes,
@@ -20377,9 +20611,12 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_limits(
+            SourceBackedPackage::from_read_at(
                 Arc::new(CountingSource::new(bytes.clone())),
                 aggregate,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None
             ),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::TotalPartBytes,
@@ -20393,9 +20630,12 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_limits(
+            SourceBackedPackage::from_read_at(
                 Arc::new(CountingSource::new(bytes)),
                 part_count,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None
             ),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::Parts,
@@ -20434,16 +20674,19 @@ mod tests {
         for (parts, derived) in cases {
             let bytes = archive_with_ordered_xml_parts(&parts);
             assert!(matches!(
-                SourceBackedPackage::from_read_at_with_limits(
+                SourceBackedPackage::from_read_at(
                     Arc::new(CountingSource::new(bytes.clone())),
                     limits,
+                    SourceCacheLimits::default(),
+                    SourceReadPolicy::exact(),
+                    None
                 ),
                 Err(OpcError::Limit {
                     kind: SourceLimitKind::PartBytes,
                     ..
                 })
             ));
-            let eager_error = match OpcPackage::from_bytes_with_limits(&bytes, limits) {
+            let eager_error = match OpcPackage::from_bytes(&bytes, limits) {
                 Ok(_) => panic!("eager package unexpectedly accepted a name conflict"),
                 Err(error) => error,
             };
@@ -20471,9 +20714,12 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_limits(
+            SourceBackedPackage::from_read_at(
                 Arc::new(CountingSource::new(bytes.clone())),
                 limits,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None
             ),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::PartBytes,
@@ -20481,7 +20727,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            OpcPackage::from_bytes_with_limits(&bytes, limits),
+            OpcPackage::from_bytes(&bytes, limits),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::Parts,
                 ..
@@ -20492,18 +20738,32 @@ mod tests {
     #[test]
     fn part_lookup_prefers_exact_names_and_matches_ascii_case_insensitive_targets() {
         let exact_name = PackURI::new("/word/document.xml").unwrap();
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_with_part_names("word/document.xml", &["word/document.xml"]),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_with_part_names(
+                "word/document.xml",
+                &["word/document.xml"],
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
 
         assert_eq!(package.part(&exact_name).unwrap().partname(), &exact_name);
         let case_variant = PackURI::new("/WORD/DOCUMENT.XML").unwrap();
         assert_eq!(package.part(&case_variant).unwrap().partname(), &exact_name);
 
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_with_part_names("WORD/DOCUMENT.XML", &["word/document.xml"]),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_with_part_names(
+                "WORD/DOCUMENT.XML",
+                &["word/document.xml"],
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         assert_eq!(
             package.main_document_part().unwrap().partname(),
@@ -20555,9 +20815,14 @@ mod tests {
             ));
         }
 
-        let normal =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
-                .unwrap();
+        let normal = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_lookup_behavior(&normal);
 
         let validation = match SourceBackedPackage::from_read_at_for_validation(
@@ -20614,9 +20879,14 @@ mod tests {
     fn casefold_lookup_index_is_retained_at_measured_large_catalog_threshold() {
         let bytes = archive_with_descending_xml_parts(SOURCE_CASEFOLD_INDEX_MIN_PARTS);
 
-        let normal =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
-                .unwrap();
+        let normal = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_large_catalog_lookup_behavior(&normal, true);
 
         let validation = match SourceBackedPackage::from_read_at_for_validation(
@@ -20633,10 +20903,12 @@ mod tests {
     fn managed_open_omits_casefold_lookup_index_and_keeps_linear_fallback() {
         let bytes = archive_with_descending_xml_parts(SOURCE_CASEFOLD_INDEX_MIN_PARTS);
         let (budget, _cancellation_source, context) = managed_context_with_cancellation(1);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
 
@@ -20652,9 +20924,13 @@ mod tests {
             "word/document.xml",
             &["word/document.xml", "WORD/DOCUMENT.XML"],
         );
-        let Err(error) =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
-        else {
+        let Err(error) = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        ) else {
             panic!("case-equivalent parts must remain ambiguous");
         };
         assert!(matches!(error, OpcError::EquivalentPartNames { .. }));
@@ -20679,7 +20955,14 @@ mod tests {
             b"cached payload",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = package.main_document_part().unwrap();
         let first = part.data().unwrap();
         let after_first = source.reads.load(Ordering::SeqCst);
@@ -20706,7 +20989,14 @@ mod tests {
             .unwrap();
         bytes[position] ^= 0xff;
         let corrupt_source = Arc::new(CountingSource::new(bytes));
-        let corrupt_package = SourceBackedPackage::from_read_at(corrupt_source.clone()).unwrap();
+        let corrupt_package = SourceBackedPackage::from_read_at(
+            corrupt_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let corrupt_part = corrupt_package.main_document_part().unwrap();
         assert!(corrupt_part.data().is_err());
         let after_failure = corrupt_source.reads.load(Ordering::SeqCst);
@@ -20726,10 +21016,12 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context(1024);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         assert_eq!(budget.used(Resource::Memory), 0);
@@ -20771,10 +21063,12 @@ mod tests {
         ));
         let (budget, _cancellation_source, context) =
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         assert_eq!(
@@ -20809,10 +21103,12 @@ mod tests {
         )));
         let (budget, _cancellation_source, context) =
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context.clone(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context.clone()),
         )
         .unwrap();
         let input_before = budget.used(Resource::InputBytes);
@@ -20846,10 +21142,12 @@ mod tests {
         )));
         let (budget, _cancellation_source, context) =
             managed_context_with_resources(4096, u64::MAX, u64::MAX, (DOCUMENT.len() - 1) as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -20877,10 +21175,12 @@ mod tests {
         // package-level catalog owner is retained by SourceBackedPackage.
         let (budget, _cancellation_source, context) =
             managed_context_with_resources(4096, u64::MAX, 5, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -20910,10 +21210,12 @@ mod tests {
         let source = Arc::new(CountingSource::new(bytes));
         let (budget, _cancellation_source, context) =
             managed_context_with_resources(4096, u64::MAX, u64::MAX, u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.read_bytes.load(Ordering::SeqCst);
@@ -20941,10 +21243,12 @@ mod tests {
             false,
         )));
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let part = package.main_document_part().unwrap();
@@ -21011,10 +21315,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let target = package.main_document_part().unwrap().partname().clone();
@@ -21054,10 +21360,12 @@ mod tests {
         let context = ExecutionContext::new(budget, cancellation, execution_limits);
 
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_execution_context(
+            SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                context,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context)
             ),
             Err(OpcError::Cancelled)
         ));
@@ -21091,10 +21399,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let first = package.main_document_part().unwrap().data().unwrap();
@@ -21251,14 +21561,14 @@ mod tests {
         context: ExecutionContext,
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
     ) -> (Vec<u8>, u64) {
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let observed = Arc::new(AtomicU64::new(0));
         let sink = PermitProbeSink {
             inner: Vec::new(),
@@ -21279,18 +21589,20 @@ mod tests {
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
     ) -> Vec<u8> {
         let package = match context {
-            Some(context) => {
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    Arc::clone(source),
-                    SourceLimits::default(),
-                    SourceCacheLimits::default(),
-                    context,
-                )
-                .unwrap()
-            },
-            None => SourceBackedPackage::from_read_at_with_limits(
+            Some(context) => SourceBackedPackage::from_read_at(
                 Arc::clone(source),
                 SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context),
+            )
+            .unwrap(),
+            None => SourceBackedPackage::from_read_at(
+                Arc::clone(source),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
             )
             .unwrap(),
         };
@@ -21375,14 +21687,14 @@ mod tests {
         let (budget, _cancellation, context) = ordered_read_context(2, 2);
         let workers: Arc<CountingCallerWorkers> = Arc::new(CountingCallerWorkers::default());
         let context = context.with_scoped_workers(workers.clone());
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(&source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(&source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
         let batch = package.read_parts_ordered(&[orphan, document]).unwrap();
@@ -21404,14 +21716,14 @@ mod tests {
         )));
         let source: Arc<dyn ReadAt> = source_probe.clone();
         let (budget, _cancellation, context) = ordered_read_context(2, 0);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(&source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(&source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let baseline = source_probe.reads.load(Ordering::SeqCst);
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
@@ -21437,14 +21749,14 @@ mod tests {
         bytes[position] ^= 0xff;
         let source: Arc<dyn ReadAt> = Arc::new(CountingSource::new(bytes));
         let (budget, _cancellation, context) = ordered_read_context(1, 1);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(&source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(&source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
 
         assert!(package.read_parts_ordered(&[document]).is_err());
@@ -21511,14 +21823,14 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, limits);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(&source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(&source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let mut output = b"untouched".to_vec();
         let error = package
             .write_part_overlays_shared_to_stream(&mut output, scheduled_replacements(15, 6 * 1024))
@@ -21536,14 +21848,14 @@ mod tests {
         let source: Arc<dyn ReadAt> =
             Arc::new(CountingSource::new(deflated_package_bytes(15, 6 * 1024)));
         let (_budget, cancellation_source, context) = scheduled_context(4);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::clone(&source),
-                SourceLimits::default(),
-                SourceCacheLimits::default(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::clone(&source),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         cancellation_source.cancel();
         let mut output = b"untouched".to_vec();
         let error = package
@@ -21561,14 +21873,14 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context(64);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                SourceCacheLimits::new(9, 2).unwrap(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(9, 2).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let first_name = package.catalog.parts[0].partname.clone();
         let second_name = package.catalog.parts[1].partname.clone();
         let first = package.part(&first_name).unwrap().data().unwrap();
@@ -21598,14 +21910,14 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context(64);
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                SourceCacheLimits::new(b"document".len(), 1).unwrap(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::new(b"document".len(), 1).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let first_name = package.catalog.parts[0].partname.clone();
         let second_name = package.catalog.parts[1].partname.clone();
         let first = package.part(&first_name).unwrap().data().unwrap();
@@ -21655,10 +21967,12 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context((b"payload too large".len() - 1) as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -21710,10 +22024,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(child, cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -21775,16 +22091,20 @@ mod tests {
             DOCUMENT,
             false,
         )));
-        let first_package = SourceBackedPackage::from_read_at_with_execution_context(
+        let first_package = SourceBackedPackage::from_read_at(
             first_source,
             SourceLimits::default(),
-            first_context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(first_context),
         )
         .unwrap();
-        let second_package = SourceBackedPackage::from_read_at_with_execution_context(
+        let second_package = SourceBackedPackage::from_read_at(
             second_source.clone(),
             SourceLimits::default(),
-            second_context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(second_context),
         )
         .unwrap();
         let reads_before = second_source.reads.load(Ordering::SeqCst);
@@ -21820,10 +22140,12 @@ mod tests {
             .unwrap();
         let source = Arc::new(SlowPayloadSource::new(bytes, payload_offset));
         let (budget, context) = managed_context(DOCUMENT.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let start = Arc::new(Barrier::new(3));
@@ -21880,10 +22202,12 @@ mod tests {
         let source = Arc::new(SlowPayloadSource::new(bytes, payload_offset));
         let (budget, cancellation_source, context) =
             managed_context_with_cancellation(DOCUMENT.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let start = Arc::new(Barrier::new(3));
@@ -21931,10 +22255,12 @@ mod tests {
             .unwrap();
         let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
         let (budget, context) = managed_context(1024);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         source.armed.store(true, Ordering::SeqCst);
@@ -21963,7 +22289,14 @@ mod tests {
             .unwrap();
         bytes[payload_offset] ^= 0xff;
         let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.armed.store(true, Ordering::SeqCst);
 
         assert!(matches!(
@@ -21988,10 +22321,12 @@ mod tests {
         let (budget, cancellation_source, context) =
             managed_context_with_cancellation(DOCUMENT.len() as u64);
         let source = Arc::new(CancelOnHitVersionSource::new(bytes, cancellation_source));
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         // One observation for the part lookup, then two more inside the
@@ -22028,10 +22363,12 @@ mod tests {
             payload_offset,
             cancellation_source,
         ));
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
 
@@ -22054,10 +22391,12 @@ mod tests {
             cancellation_source,
         ));
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_execution_context(
+            SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                context,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context)
             ),
             Err(OpcError::Cancelled)
         ));
@@ -22074,7 +22413,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         let source = Arc::new(SlowPayloadSource::new(bytes, payload_offset));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let start = Arc::new(Barrier::new(3));
         let (first, second) = std::thread::scope(|scope| {
             let package = &package;
@@ -22123,10 +22469,12 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let hook = Arc::new(TestPublicationHook::new());
@@ -22172,7 +22520,14 @@ mod tests {
             DOCUMENT,
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let hook = Arc::new(TestPublicationHook::new());
         let _hook_guard = package
             .cache
@@ -22220,10 +22575,12 @@ mod tests {
                 false,
             )));
             let (budget, context) = managed_context(65536);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
+            let package = SourceBackedPackage::from_read_at(
                 source,
                 SourceLimits::default(),
-                context,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context),
             )
             .unwrap();
             let hook = Arc::new(TestPublicationHook::new());
@@ -22287,10 +22644,12 @@ mod tests {
                 false,
             )));
             let (budget, cancellation, context) = managed_context_with_cancellation(65536);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
+            let package = SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                context,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context),
             )
             .unwrap();
             let hook = Arc::new(TestPublicationHook::new());
@@ -22339,10 +22698,12 @@ mod tests {
             false,
         )));
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let hook = Arc::new(TestPublicationHook::new());
@@ -22400,10 +22761,12 @@ mod tests {
         bytes[payload_offset] ^= 0xff;
         let source = Arc::new(GatedCorruptSource::new(bytes, payload_offset));
         let (budget, context) = managed_context(DOCUMENT.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let hook = Arc::new(TestPublicationHook::new());
@@ -22455,10 +22818,12 @@ mod tests {
             false,
         )));
         let (budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let _bypass_guard = package.cache.force_test_cache_admission_bypass();
@@ -22483,9 +22848,17 @@ mod tests {
 
     #[test]
     fn cache_cleanup_is_exact_identity_scoped_and_late_success_cannot_resurrect() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"document", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"document",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let first_id = package.catalog.parts[0].entry_id;
         let second_id = package.catalog.parts[1].entry_id;
@@ -22580,9 +22953,17 @@ mod tests {
 
     #[test]
     fn cache_ready_hint_rejects_flights_and_pending_without_touching_state() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"cache hint state", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"cache hint state",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let first_id = package.catalog.parts[0].entry_id;
         let second_id = package.catalog.parts[1].entry_id;
@@ -22672,9 +23053,17 @@ mod tests {
 
     #[test]
     fn cache_evicts_by_byte_weight_and_entry_count_and_rejects_oversized_values() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"document", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"document",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let first_id = package.catalog.parts[0].entry_id;
         let second_id = package.catalog.parts[1].entry_id;
@@ -22835,9 +23224,17 @@ mod tests {
 
     #[test]
     fn try_cache_diagnostics_matches_compatibility_snapshot_when_healthy() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"healthy diagnostics", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"healthy diagnostics",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
 
         assert_eq!(
@@ -22856,10 +23253,12 @@ mod tests {
             false,
         )));
         let (_budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let counter = package
@@ -22884,10 +23283,12 @@ mod tests {
             false,
         )));
         let (_budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let counter = package
@@ -22912,10 +23313,12 @@ mod tests {
             false,
         )));
         let (_budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         package
@@ -22940,12 +23343,16 @@ mod tests {
 
     #[test]
     fn retained_gauge_aggregation_overflow_fails_closed_through_wrapper() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_with_part_names(
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_with_part_names(
                 "word/document.xml",
                 &["word/document.xml", "custom/other.xml"],
-            ),
-        )))
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         assert_eq!(package.catalog.parts.len(), 2);
 
@@ -23031,9 +23438,17 @@ mod tests {
 
     #[test]
     fn poisoned_cache_state_fails_closed_through_wrapper() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"poisoned diagnostics", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"poisoned diagnostics",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _state = package.cache.state.lock().expect("unpoisoned cache state");
@@ -23049,9 +23464,17 @@ mod tests {
 
     #[test]
     fn catalog_entry_id_resolves_to_the_same_payload_as_its_member_name() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"entry identity", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"entry identity",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let catalog = package
@@ -23073,7 +23496,14 @@ mod tests {
             b"stable payload",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = package.main_document_part().unwrap();
         part.data().unwrap();
         source.changed();
@@ -23095,7 +23525,14 @@ mod tests {
             b"document",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(package.iter_parts().count(), 2);
         assert_eq!(package.non_part_members().len(), 1);
         assert_eq!(package.non_part_members()[0].name(), "scratch.bin");
@@ -23122,7 +23559,14 @@ mod tests {
             DOCUMENT,
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let cached_payload = package
             .main_document_part()
             .unwrap()
@@ -23152,7 +23596,14 @@ mod tests {
             DOCUMENT,
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let cached_payload = package
             .main_document_part()
             .unwrap()
@@ -23203,9 +23654,16 @@ mod tests {
     fn borrowed_materialization_preserves_source_and_matches_eager_graph() {
         let bytes = archive_bytes(root_relationships(), b"document", true);
         let source = Arc::new(CountingSource::new(bytes.clone()));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let owned = package.to_opc_package().unwrap();
-        let eager = OpcPackage::from_bytes(&bytes).unwrap();
+        let eager = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
 
         assert_eq!(owned.part_count(), eager.part_count());
         assert_eq!(owned.non_part_members(), eager.non_part_members());
@@ -23242,9 +23700,14 @@ mod tests {
     #[test]
     fn preserving_materialization_retains_positional_source_for_later_edits() {
         let bytes = archive_bytes(root_relationships(), b"<document/>", true);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         let owned = package.to_opc_package_preserving_source().unwrap();
         assert_eq!(
@@ -23263,16 +23726,21 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         changed.write_to(&mut output).unwrap();
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(reopened.get_part(&document).unwrap().blob(), b"<changed/>");
     }
 
     #[test]
     fn preserving_materialization_defers_part_payloads_until_read() {
         let bytes = archive_bytes(root_relationships(), b"<document/>", true);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         // Record 0286: no ordinary payload is inflated by the conversion.
         let owned = package.to_opc_package_preserving_source().unwrap();
@@ -23293,9 +23761,13 @@ mod tests {
         const DEFLATED_DOCUMENT: &[u8] = b"<document>deflated source payload</document>";
         const DEFLATED_SECOND: &[u8] = b"<second>deflated source payload</second>";
         const STORED_ORPHAN: &[u8] = b"<orphan>stored source payload</orphan>";
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            mixed_compression_archive(),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(mixed_compression_archive())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut accounting = OpcOperationAccounting::default();
 
@@ -23353,7 +23825,13 @@ mod tests {
         const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
         const STORED_ORPHAN: &[u8] = b"<orphan>stored source payload</orphan>";
 
-        let package = SourceBackedPackage::from_vec(mixed_compression_archive()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            mixed_compression_archive(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let mut accounting = OpcOperationAccounting::default();
 
         package
@@ -23376,9 +23854,13 @@ mod tests {
 
     #[test]
     fn borrowed_materialization_with_accounting_does_not_charge_preloaded_cache_hits() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            mixed_compression_archive(),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(mixed_compression_archive())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         for part in package.iter_parts() {
             part.data().unwrap();
@@ -23401,10 +23883,12 @@ mod tests {
             true,
         )));
         let (budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -23430,8 +23914,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         bytes[payload_offset] ^= 0xff;
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut accounting = OpcOperationAccounting::default();
 
         assert!(matches!(
@@ -23450,7 +23940,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.armed.store(true, Ordering::SeqCst);
         let mut accounting = OpcOperationAccounting::default();
 
@@ -23469,10 +23966,12 @@ mod tests {
             true,
         )));
         let (budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -23497,10 +23996,12 @@ mod tests {
             true,
         )));
         let (budget, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -23522,7 +24023,14 @@ mod tests {
             b"stable document",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
         source.changed();
 
@@ -23543,7 +24051,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         let source = Arc::new(ChangeDuringPayloadSource::new(bytes, payload_offset));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.armed.store(true, Ordering::SeqCst);
 
         assert!(matches!(
@@ -23561,10 +24076,12 @@ mod tests {
             false,
         )));
         let (budget, cancellation_source, context) = managed_context_with_cancellation(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
@@ -23585,8 +24102,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         bytes[payload_offset] ^= 0xff;
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
 
         assert!(matches!(
             package.to_opc_package(),
@@ -23600,19 +24123,29 @@ mod tests {
     fn borrowed_materialization_preserves_opaque_xml_like_eager_unmarshal() {
         const DOCUMENT: &[u8] = b"<document> <child/></document>";
         let source_bytes = archive_bytes(root_relationships(), DOCUMENT, false);
-        let source_package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let source_package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let materialized = source_package.to_opc_package().unwrap();
-        let eager = OpcPackage::from_bytes(&source_bytes).unwrap();
+        let eager = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
 
         let mut materialized_bytes = Vec::new();
         materialized.write_to(&mut materialized_bytes).unwrap();
         let mut eager_bytes = Vec::new();
         eager.write_to(&mut eager_bytes).unwrap();
-        let materialized_reader =
-            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(materialized_bytes).unwrap();
-        let eager_reader = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(eager_bytes).unwrap();
+        let materialized_reader = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(
+            materialized_bytes,
+            SourceLimits::default(),
+        )
+        .unwrap();
+        let eager_reader =
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(eager_bytes, SourceLimits::default())
+                .unwrap();
         assert_eq!(
             materialized_reader
                 .read_member("word/document.xml")
@@ -23630,8 +24163,14 @@ mod tests {
     #[test]
     fn borrowed_signed_materialization_retains_publication_policy() {
         let source = signed_archive(b"<signed/>");
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let materialized = package.to_opc_package().unwrap();
         assert!(materialized.is_signed());
 
@@ -23648,14 +24187,21 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let source_raw = raw_records(&source_bytes);
         let source = Arc::new(CountingSource::new(source_bytes));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
         package
             .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
             .unwrap();
 
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<after/>");
         assert_eq!(reopened.part_count(), 2);
         assert_eq!(reopened.non_part_members().len(), 1);
@@ -23681,9 +24227,14 @@ mod tests {
         let source_bytes =
             promote_to_zip64(archive_bytes(root_relationships(), b"<before/>", true));
         let source_raw = raw_records(&source_bytes);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert_eq!(package.cache_diagnostics().cold_loads, 0);
 
         let target = PackURI::new("/word/document.xml").unwrap();
@@ -23726,7 +24277,7 @@ mod tests {
             }
         }
 
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(reopened.get_part(&target).unwrap().blob(), replacement);
         assert_eq!(
             reopened
@@ -23744,37 +24295,61 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut vec_output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-            .unwrap()
-            .write_part_overlay_to_stream(&mut vec_output, &target, b"<after/>".to_vec())
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlay_to_stream(&mut vec_output, &target, b"<after/>".to_vec())
+        .unwrap();
         let mut shared_output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes)))
-            .unwrap()
-            .write_part_overlay_shared_to_stream(
-                &mut shared_output,
-                &target,
-                Arc::new(b"<after/>".to_vec()),
-            )
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlay_shared_to_stream(
+            &mut shared_output,
+            &target,
+            Arc::new(b"<after/>".to_vec()),
+        )
+        .unwrap();
         assert_eq!(shared_output, vec_output);
 
         let signed_bytes = signed_archive(b"<signed/>");
         let signed_target = PackURI::new("/word/document.xml").unwrap();
         let mut vec_noop = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(signed_bytes.clone())))
-            .unwrap()
-            .write_part_overlay_to_stream(&mut vec_noop, &signed_target, b"<signed/>".to_vec())
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(signed_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlay_to_stream(&mut vec_noop, &signed_target, b"<signed/>".to_vec())
+        .unwrap();
         let mut shared_noop = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(signed_bytes.clone())))
-            .unwrap()
-            .write_part_overlay_shared_to_stream(
-                &mut shared_noop,
-                &signed_target,
-                Arc::new(b"<signed/>".to_vec()),
-            )
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(signed_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlay_shared_to_stream(
+            &mut shared_noop,
+            &signed_target,
+            Arc::new(b"<signed/>".to_vec()),
+        )
+        .unwrap();
         assert_eq!(vec_noop, signed_bytes);
         assert_eq!(shared_noop, vec_noop);
     }
@@ -23785,30 +24360,42 @@ mod tests {
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
         let mut vec_output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-            .unwrap()
-            .write_part_overlays_to_stream(
-                &mut vec_output,
-                vec![
-                    (orphan.clone(), b"<orphan-after/>".to_vec()),
-                    (document.clone(), b"<document-after/>".to_vec()),
-                ],
-            )
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlays_to_stream(
+            &mut vec_output,
+            vec![
+                (orphan.clone(), b"<orphan-after/>".to_vec()),
+                (document.clone(), b"<document-after/>".to_vec()),
+            ],
+        )
+        .unwrap();
 
         let mut shared_output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes)))
-            .unwrap()
-            .write_part_overlays_shared_to_stream(
-                &mut shared_output,
-                vec![
-                    (orphan.clone(), Arc::new(b"<orphan-after/>".to_vec())),
-                    (document.clone(), Arc::new(b"<document-after/>".to_vec())),
-                ],
-            )
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlays_shared_to_stream(
+            &mut shared_output,
+            vec![
+                (orphan.clone(), Arc::new(b"<orphan-after/>".to_vec())),
+                (document.clone(), Arc::new(b"<document-after/>".to_vec())),
+            ],
+        )
+        .unwrap();
         assert_eq!(shared_output, vec_output);
-        let reopened = OpcPackage::from_bytes(&shared_output).unwrap();
+        let reopened = OpcPackage::from_bytes(&shared_output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&document).unwrap().blob(),
             b"<document-after/>"
@@ -23823,9 +24410,14 @@ mod tests {
     fn shared_overlay_preserves_duplicate_and_limit_refusals_before_output() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let document = PackURI::new("/word/document.xml").unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
             package.write_part_overlays_shared_to_stream(
@@ -23844,9 +24436,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         assert!(matches!(
@@ -23871,7 +24466,14 @@ mod tests {
             b"<before/>",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut sink = BoundedFailingSink {
             accepted: 0,
@@ -23892,8 +24494,14 @@ mod tests {
     fn multi_part_overlay_changes_only_selected_raw_members_and_reopens() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let source_raw = raw_records(&source_bytes);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
         let mut output = Vec::new();
@@ -23907,7 +24515,7 @@ mod tests {
             )
             .unwrap();
 
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&document).unwrap().blob(),
             b"<document-after/>"
@@ -23954,12 +24562,18 @@ mod tests {
         };
 
         let mut unmanaged_output = Vec::new();
-        SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-            .unwrap()
-            .write_part_overlays_to_stream(&mut unmanaged_output, replacements())
-            .unwrap();
+        SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
+        .write_part_overlays_to_stream(&mut unmanaged_output, replacements())
+        .unwrap();
 
-        let reopened = OpcPackage::from_bytes(&unmanaged_output).unwrap();
+        let reopened = OpcPackage::from_bytes(&unmanaged_output, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&document).unwrap().blob(),
             b"<document>changed payload</document>"
@@ -23993,10 +24607,12 @@ mod tests {
         let (budget, _cancellation_source, context) =
             managed_context_with_all_resources(64 * 1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
         let mut managed_output = Vec::new();
-        SourceBackedPackage::from_read_at_with_execution_context(
+        SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap()
         .write_part_overlays_to_stream(&mut managed_output, replacements())
@@ -24017,8 +24633,14 @@ mod tests {
             archive_with_relationship_batches(exact_each, exact_each);
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package
             .write_part_overlays_with_external_relationship_removals_to_stream(
@@ -24029,14 +24651,20 @@ mod tests {
                 ],
             )
             .unwrap();
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert!(reopened.get_part(&document).unwrap().rels().is_empty());
         assert!(reopened.get_part(&orphan).unwrap().rels().is_empty());
 
         let (source_bytes, first_ids, second_ids) =
             archive_with_relationship_batches(exact_each, exact_each + 1);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         output.clear();
         assert!(matches!(
             package.write_part_overlays_with_external_relationship_removals_to_stream(
@@ -24054,9 +24682,14 @@ mod tests {
     #[test]
     fn multi_part_relationship_removal_checks_combined_part_and_archive_totals() {
         let (source_bytes, first_ids, second_ids) = archive_with_relationship_batches(1, 1);
-        let source_package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let source_package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let source_total = source_archive_total(&source_package);
         drop(source_package);
         let large = format!("<after>{}</after>", "x".repeat(4096)).into_bytes();
@@ -24077,9 +24710,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             part_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -24099,9 +24735,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -24118,9 +24757,14 @@ mod tests {
         assert!(output.is_empty());
 
         let (source_bytes, first_ids, second_ids) = archive_with_relationship_batches(1, 1);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut unrestricted = Vec::new();
         package
             .write_part_overlays_with_external_relationship_removals_to_stream(
@@ -24139,8 +24783,14 @@ mod tests {
                 ],
             )
             .unwrap();
-        let published =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(unrestricted))).unwrap();
+        let published = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(unrestricted)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let published_total = source_archive_total(&published);
         assert!(published_total > source_total);
         drop(published);
@@ -24149,9 +24799,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             exact_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut exact_output = Vec::new();
@@ -24179,9 +24832,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             under_limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut under_output = Vec::new();
@@ -24214,8 +24870,14 @@ mod tests {
         let source_bytes = archive_with_document_relationships(document_relationships());
         let source_raw = raw_records(&source_bytes);
         let document = PackURI::new("/word/document.xml").unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package
             .write_part_overlay_with_external_relationship_removals_to_stream(
@@ -24226,7 +24888,7 @@ mod tests {
             )
             .unwrap();
 
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         let main = reopened.get_part(&document).unwrap();
         assert_eq!(main.blob(), b"<after/>");
         assert!(main.rels().get("rExternal").is_none());
@@ -24269,9 +24931,13 @@ mod tests {
             ),
             (vec!["rInternal".to_owned()], "internal relationship"),
         ] {
-            let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-                source_bytes.clone(),
-            )))
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(CountingSource::new(source_bytes.clone())),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
             .unwrap();
             let mut output = Vec::new();
             let error = package
@@ -24300,9 +24966,14 @@ mod tests {
         let exact_bound_ids = (0..MAX_SOURCE_RELATIONSHIP_REMOVALS)
             .map(|index| format!("missing-{index}"))
             .collect();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
             package.write_part_overlay_with_external_relationship_removals_to_stream(
@@ -24318,9 +24989,14 @@ mod tests {
         let over_bound_ids = (0..=MAX_SOURCE_RELATIONSHIP_REMOVALS)
             .map(|index| format!("missing-{index}"))
             .collect();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
             package.write_part_overlay_with_external_relationship_removals_to_stream(
@@ -24338,9 +25014,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         let mut output = Vec::new();
@@ -24366,9 +25045,14 @@ mod tests {
         let document = PackURI::new("/word/document.xml").unwrap();
         let orphan = PackURI::new("/custom/orphan.xml").unwrap();
 
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
             package.write_part_overlays_to_stream(
@@ -24382,9 +25066,14 @@ mod tests {
         ));
         assert!(output.is_empty());
 
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let oversized_set = (0..=MAX_SOURCE_OVERLAY_PARTS)
             .map(|_| (document.clone(), b"<changed/>".to_vec()))
             .collect();
@@ -24401,9 +25090,12 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
         )
         .unwrap();
         assert!(matches!(
@@ -24427,9 +25119,14 @@ mod tests {
         let source_bytes = signed_archive(b"<signed/>");
         let document = PackURI::new("/word/document.xml").unwrap();
         let signature = PackURI::new("/signature/origin.xml").unwrap();
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         package
             .write_part_overlays_to_stream(
@@ -24442,9 +25139,13 @@ mod tests {
             .unwrap();
         assert_eq!(output, source_bytes);
 
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            signed_archive(b"<signed/>"),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(signed_archive(b"<signed/>"))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         output.clear();
         assert!(matches!(
@@ -24464,7 +25165,14 @@ mod tests {
     fn one_part_overlay_exact_noop_preserves_every_source_byte() {
         let source_bytes = archive_bytes(root_relationships(), b"malformed but unchanged", true);
         let source = Arc::new(CountingSource::new(source_bytes.clone()));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
         package
@@ -24476,9 +25184,14 @@ mod tests {
     #[test]
     fn unmanaged_exact_source_publication_remains_unbudgeted() {
         let source_bytes = archive_bytes(root_relationships(), b"unmanaged exact source", true);
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_bytes.clone())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let artifact = package.source_artifact();
         let mut output = Vec::new();
         artifact.write_to(&mut output).unwrap();
@@ -24498,7 +25211,14 @@ mod tests {
             b"warm part read",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let name = PackURI::new("/word/document.xml").unwrap();
 
         // Fill the cache. This read is cold and is measured separately.
@@ -24534,7 +25254,14 @@ mod tests {
             b"cold part read",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let name = PackURI::new("/word/document.xml").unwrap();
 
         let versions_before = source.versions.load(Ordering::SeqCst);
@@ -24563,7 +25290,14 @@ mod tests {
             archive_bytes(root_relationships(), b"monitored stream payload", false),
             64,
         ));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let name = PackURI::new("/word/document.xml").unwrap();
 
         let versions_before = source.versions.load(Ordering::SeqCst);
@@ -24588,7 +25322,14 @@ mod tests {
 
         // A package that never streamed pays only the cold read's own bracket.
         let plain_source = Arc::new(CountingSource::new(bytes.clone()));
-        let plain = SourceBackedPackage::from_read_at(plain_source.clone()).unwrap();
+        let plain = SourceBackedPackage::from_read_at(
+            plain_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let plain_before = plain_source.versions.load(Ordering::SeqCst);
         let plain_data = plain.part(&name).unwrap().data().unwrap();
         let plain_observations = plain_source.versions.load(Ordering::SeqCst) - plain_before;
@@ -24596,7 +25337,14 @@ mod tests {
         // `stream_to` bypasses the part cache, so the read that follows it on
         // the same package is still a cold read of the same Part.
         let streamed_source = Arc::new(CountingSource::new(bytes));
-        let streamed = SourceBackedPackage::from_read_at(streamed_source.clone()).unwrap();
+        let streamed = SourceBackedPackage::from_read_at(
+            streamed_source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut sink = Vec::new();
         streamed.part(&name).unwrap().stream_to(&mut sink).unwrap();
         let streamed_before = streamed_source.versions.load(Ordering::SeqCst);
@@ -24629,7 +25377,14 @@ mod tests {
                 b"change under a cold read",
                 false,
             )));
-            let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+            let package = SourceBackedPackage::from_read_at(
+                source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
             let name = PackURI::new("/word/document.xml").unwrap();
             source.arm_after_versions(skip);
             let error = package
@@ -24653,7 +25408,14 @@ mod tests {
             b"change under a cold read",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let name = PackURI::new("/word/document.xml").unwrap();
         source.arm_after_versions(4);
         let data = package
@@ -24694,7 +25456,14 @@ mod tests {
             b"missing part precedence",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let absent = PackURI::new("/word/absent.xml").unwrap();
 
         assert!(
@@ -24718,7 +25487,14 @@ mod tests {
             b"exact source publication",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let versions_before = source.versions.load(Ordering::SeqCst);
         let mut output = Vec::new();
 
@@ -24738,7 +25514,14 @@ mod tests {
         let mut source_bytes = b"unsupported ZIP prelude".to_vec();
         source_bytes.extend_from_slice(&archive_bytes(root_relationships(), b"<before/>", true));
         let source = Arc::new(CountingSource::new(source_bytes));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
         assert!(matches!(
@@ -24750,9 +25533,13 @@ mod tests {
 
     #[test]
     fn preservation_index_propagates_typed_limit_allocation_and_io_errors() {
-        let mut package =
-            SourceBackedPackage::from_vec(archive_bytes(root_relationships(), b"<before/>", true))
-                .unwrap();
+        let mut package = SourceBackedPackage::from_vec(
+            archive_bytes(root_relationships(), b"<before/>", true),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         package.limits = SourceLimits::builder()
             .max_archive_metadata_bytes(1)
             .unwrap()
@@ -24774,7 +25561,14 @@ mod tests {
             b"<before/>",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.overreport.store(true, Ordering::SeqCst);
         output.clear();
         assert!(matches!(
@@ -24809,7 +25603,14 @@ mod tests {
             b"<before/>",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
             package.write_part_overlay_to_stream(&mut output, &target, b"<broken".to_vec()),
@@ -24819,7 +25620,14 @@ mod tests {
 
         let signed_bytes = signed_archive(b"<signed/>");
         let signed = Arc::new(CountingSource::new(signed_bytes.clone()));
-        let package = SourceBackedPackage::from_read_at(signed).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            signed,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert!(matches!(
             package.write_part_overlay_to_stream(&mut output, &target, b"<changed/>".to_vec()),
             Err(OpcError::SignedSourceRequiresExplicitPolicy)
@@ -24827,7 +25635,14 @@ mod tests {
         assert!(output.is_empty());
 
         let signed = Arc::new(CountingSource::new(signed_bytes.clone()));
-        let package = SourceBackedPackage::from_read_at(signed).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            signed,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         package
             .write_part_overlay_to_stream(&mut output, &target, b"<signed/>".to_vec())
             .unwrap();
@@ -24848,7 +25663,14 @@ mod tests {
             b"<before/>",
             false,
         )));
-        let package = SourceBackedPackage::from_read_at_with_limits(source, limits).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut output = Vec::new();
         assert!(matches!(
@@ -24870,7 +25692,14 @@ mod tests {
             b"<before/>",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.changed();
         let mut output = Vec::new();
         assert!(matches!(
@@ -24884,7 +25713,14 @@ mod tests {
             b"<before/>",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut sink = MutatingSink {
             source,
             bytes: Vec::new(),
@@ -24910,7 +25746,14 @@ mod tests {
             b"<before/>",
             true,
         )));
-        let package = SourceBackedPackage::from_read_at(source).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let target = PackURI::new("/word/document.xml").unwrap();
         let mut sink = BoundedFailingSink {
             accepted: 0,
@@ -24934,10 +25777,12 @@ mod tests {
 
         let (budget, cancellation_source, context) =
             managed_context_with_cancellation(source_bytes.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         cancellation_source.cancel();
@@ -24951,10 +25796,12 @@ mod tests {
 
         let (budget, cancellation_source, context) =
             managed_context_with_cancellation(source_bytes.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut sink = CancelAfterWriteSink {
@@ -24982,10 +25829,12 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let target = PackURI::new("/word/document.xml").unwrap();
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -25002,10 +25851,12 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let (budget, _cancellation_source, context) =
             managed_context_with_output(source_bytes.len() as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25034,10 +25885,12 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let (budget, _cancellation_source, context) =
             managed_context_with_output((source_bytes.len() as u64).saturating_sub(1));
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25068,10 +25921,12 @@ mod tests {
                 u64::MAX,
                 u64::MAX,
             );
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
+            let package = SourceBackedPackage::from_read_at(
                 Arc::new(CountingSource::new(source_bytes.clone())),
                 SourceLimits::default(),
-                context,
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                Some(context),
             )
             .unwrap();
             let artifact = package.source_artifact();
@@ -25101,10 +25956,12 @@ mod tests {
         assert!(source_bytes.len() > SOURCE_PUBLICATION_CHUNK_BYTES * 2);
         let output_limit = SOURCE_PUBLICATION_CHUNK_BYTES as u64 + 100;
         let (budget, _cancellation_source, context) = managed_context_with_output(output_limit);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25167,10 +26024,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(child.clone(), cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25188,10 +26047,12 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let output_bytes = source_bytes.len() as u64;
         let (budget, _cancellation_source, context) = managed_context_with_output(output_bytes);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25215,10 +26076,12 @@ mod tests {
     fn managed_flush_failure_reports_exact_output_charge_as_incomplete() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", false);
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25248,10 +26111,12 @@ mod tests {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let target = PackURI::new("/word/document.xml").unwrap();
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -25259,7 +26124,7 @@ mod tests {
             .write_part_overlay_to_stream(&mut output, &target, b"<after/>".to_vec())
             .unwrap();
 
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
         assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<after/>");
         assert_eq!(budget.used(Resource::OutputBytes), output.len() as u64);
     }
@@ -25273,10 +26138,12 @@ mod tests {
         )));
         let target = PackURI::new("/word/document.xml").unwrap();
         let (budget, _cancellation_source, context) = managed_context_with_output(0);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut output = Vec::new();
@@ -25302,10 +26169,12 @@ mod tests {
         )));
         let target = PackURI::new("/word/document.xml").unwrap();
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut sink = BoundedFailingSink {
@@ -25333,10 +26202,12 @@ mod tests {
         )));
         let target = PackURI::new("/word/document.xml").unwrap();
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut sink = MutatingSink {
@@ -25363,10 +26234,12 @@ mod tests {
     fn managed_short_interrupted_source_copy_charges_only_accepted_bytes() {
         let source_bytes = archive_bytes(root_relationships(), b"<before/>", true);
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(source_bytes.clone())),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25398,10 +26271,12 @@ mod tests {
             false,
         )));
         let (budget, _cancellation_source, context) = managed_context_with_output(u64::MAX);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let artifact = package.source_artifact();
@@ -25450,14 +26325,14 @@ mod tests {
             u64::MAX,
             u64::MAX,
         );
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::new(CountingSource::new(source_bytes.clone())),
-                SourceLimits::default(),
-                SourceCacheLimits::new(1, 1).unwrap(),
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::new(1, 1).unwrap(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let mut sink = MemoryObservingSink {
             budget: &budget,
             bytes: Vec::new(),
@@ -25509,9 +26384,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_uncontended_hit_reports_only_cache_lock() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"diagnostic hit", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"diagnostic hit",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let mut cold_events = Vec::new();
@@ -25540,9 +26423,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_same_part_loader_and_waiter_are_balanced() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"diagnostic waiter", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"diagnostic waiter",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let hook = Arc::new(TestPublicationHook::new());
         let _hook_guard = package
@@ -25594,9 +26485,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_cache_and_flight_scopes_are_reported() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"diagnostic scopes", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"diagnostic scopes",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut idle_events = Vec::new();
         let _ = package.cache_diagnostics_with_observer(|event| idle_events.push(event));
@@ -25640,9 +26539,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_poison_preserves_error_and_event_pair() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"diagnostic poison", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"diagnostic poison",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         std::thread::scope(|scope| {
             let cache = &package.cache;
@@ -25681,8 +26588,14 @@ mod tests {
             .position(|window| window == DOCUMENT)
             .unwrap();
         bytes[payload_offset] ^= 0xff;
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = package.main_document_part().unwrap();
         for _ in 0..2 {
             let mut events = Vec::new();
@@ -25703,10 +26616,12 @@ mod tests {
             payload_offset,
             cancellation_source,
         ));
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut events = Vec::new();
@@ -25725,9 +26640,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_started_panic_has_no_finished_and_cache_recovers() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"started panic", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"started panic",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let mut started = false;
@@ -25764,8 +26687,14 @@ mod tests {
             .unwrap();
         let source = Arc::new(GatedPayloadSource::new(bytes, payload_offset));
         let package = Arc::new(
-            SourceBackedPackage::from_read_at(source.clone())
-                .expect("gated source package should open"),
+            SourceBackedPackage::from_read_at(
+                source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .expect("gated source package should open"),
         );
 
         let (loader_tx, loader_rx) = std::sync::mpsc::channel();
@@ -25897,9 +26826,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_started_nested_publication_flight_panic_recovers() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"nested publication panic", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"nested publication panic",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let mut flight_starts = 0;
@@ -25953,9 +26890,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_finished_panic_drops_guard_and_cache_recovers() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"finished panic", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"finished panic",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -26014,9 +26959,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_finished_panic_does_not_abandon_loader_flight() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"flight panic recovery", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"flight panic recovery",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let part = package.main_document_part().unwrap();
         let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -26043,9 +26996,17 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn performance_diagnostics_reentrancy_contract_refuses_before_lock() {
-        let package = SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(
-            archive_bytes(root_relationships(), b"reentrancy contract", false),
-        )))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(archive_bytes(
+                root_relationships(),
+                b"reentrancy contract",
+                false,
+            ))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
 
         // Re-entering an observed operation from Finished would deadlock by
@@ -26130,7 +27091,13 @@ mod callback_scoped_verified_reader_tests {
     }
 
     fn package() -> SourceBackedPackage {
-        SourceBackedPackage::from_vec(archive_bytes(PAYLOAD)).unwrap()
+        SourceBackedPackage::from_vec(
+            archive_bytes(PAYLOAD),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
     }
 
     struct RejectingSink;
@@ -26174,8 +27141,13 @@ mod callback_scoped_verified_reader_tests {
         assert!(memo.is_initialized());
         assert_eq!(second.fingerprint().unwrap(), fingerprint);
 
-        let reader_package =
-            SourceBackedPackage::from_reader(Cursor::new(archive_bytes(PAYLOAD))).unwrap();
+        let reader_package = SourceBackedPackage::from_reader(
+            Cursor::new(archive_bytes(PAYLOAD)),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let reader_memo = reader_package
             .fingerprint_memo
             .as_ref()
@@ -26197,16 +27169,23 @@ mod callback_scoped_verified_reader_tests {
 
     #[test]
     fn generic_and_managed_ingresses_do_not_retain_fingerprint_memo() {
-        let generic =
-            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))))
-                .unwrap();
+        let generic = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         assert!(generic.fingerprint_memo.is_none());
 
         let (_budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024);
-        let managed = SourceBackedPackage::from_read_at_with_execution_context(
+        let managed = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         assert!(managed.fingerprint_memo.is_none());
@@ -26228,7 +27207,13 @@ mod callback_scoped_verified_reader_tests {
     #[test]
     fn owned_fingerprint_warm_path_preserves_limits_publication_inverse_and_sinks() {
         let source = archive_bytes(b"<document/>");
-        let package = SourceBackedPackage::from_vec(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            source.clone(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let original = package.source_artifact();
         let original_sha256 = original.fingerprint().unwrap();
         assert_eq!(original.fingerprint().unwrap(), original_sha256);
@@ -26246,10 +27231,16 @@ mod callback_scoped_verified_reader_tests {
         package
             .write_part_overlay_to_stream(&mut changed, &target, b"<changed/>".to_vec())
             .unwrap();
-        let reopened = OpcPackage::from_bytes(&changed).unwrap();
+        let reopened = OpcPackage::from_bytes(&changed, SourceLimits::default()).unwrap();
         assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<changed/>");
 
-        let changed_package = SourceBackedPackage::from_vec(changed).unwrap();
+        let changed_package = SourceBackedPackage::from_vec(
+            changed,
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let changed_artifact = changed_package.source_artifact();
         let changed_sha256 = changed_artifact.fingerprint().unwrap();
         assert_eq!(changed_artifact.fingerprint().unwrap(), changed_sha256);
@@ -26271,7 +27262,12 @@ mod callback_scoped_verified_reader_tests {
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPackage::from_vec_with_limits(source, limited),
+            SourceBackedPackage::from_vec(
+                source,
+                limited,
+                crate::SourceCacheLimits::default(),
+                None
+            ),
             Err(OpcError::Limit {
                 kind: super::SourceLimitKind::InputBytes,
                 ..
@@ -26389,7 +27385,7 @@ mod callback_scoped_verified_reader_tests {
             .unwrap_err();
 
         assert!(matches!(error, VerifiedDecodedReaderError::Callback(_)));
-        assert!(error.opc_error().is_none());
+        assert!(error.opc().is_none());
         assert!(matches!(error.callback(), Some(&CallbackFailure)));
     }
 
@@ -26401,7 +27397,14 @@ mod callback_scoped_verified_reader_tests {
             .position(|candidate| candidate == PAYLOAD)
             .unwrap() as u64;
         let source = Arc::new(ChangingSource::new(bytes, trigger_offset));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         source.armed.store(true, Ordering::SeqCst);
         let part = package
             .part(&super::PackURI::new("/word/document.xml").unwrap())
@@ -26413,20 +27416,19 @@ mod callback_scoped_verified_reader_tests {
             })
             .unwrap_err();
 
-        assert!(matches!(
-            error.opc_error(),
-            Some(OpcError::SourceChanged { .. })
-        ));
-        assert!(error.callback_error().is_some());
+        assert!(matches!(error.opc(), Some(OpcError::SourceChanged { .. })));
+        assert!(error.callback().is_some());
     }
 
     #[test]
     fn verified_reader_checks_cancellation_before_callback_and_releases_memory() {
         let (budget, cancellation_source, context) = managed_context(16 * 1024);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         cancellation_source.cancel();
@@ -26437,7 +27439,7 @@ mod callback_scoped_verified_reader_tests {
             .with_verified_decoded_reader(|_| Ok::<_, io::Error>(()))
             .unwrap_err();
 
-        assert!(matches!(error.opc_error(), Some(OpcError::Cancelled)));
+        assert!(matches!(error.opc(), Some(OpcError::Cancelled)));
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
@@ -26457,7 +27459,7 @@ mod callback_scoped_verified_reader_tests {
             .unwrap_err();
 
         assert!(matches!(
-            error.opc_error(),
+            error.opc(),
             Some(OpcError::Limit {
                 kind: super::SourceLimitKind::PartBytes,
                 ..
@@ -26468,9 +27470,14 @@ mod callback_scoped_verified_reader_tests {
     #[test]
     fn verified_reader_managed_accounting_is_precise_and_not_cached() {
         let source_bytes = archive_bytes(PAYLOAD);
-        let probe =
-            SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
-                .unwrap();
+        let probe = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let probe_part = probe
             .part(&super::PackURI::new("/word/document.xml").unwrap())
             .unwrap();
@@ -26482,10 +27489,12 @@ mod callback_scoped_verified_reader_tests {
             .unwrap();
         drop(probe);
         let (budget, _cancellation_source, context) = managed_context(reader_memory);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(source_bytes)),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let part = package

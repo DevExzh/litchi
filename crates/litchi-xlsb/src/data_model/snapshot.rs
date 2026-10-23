@@ -196,11 +196,9 @@ impl SourceState {
         let opc_limits = super::package::opc_capture_limits(limits)?;
         let root_name = litchi_opc::PackURI::new("/")?;
         let workbook_name = workbook.partname();
-        let root_relationships =
-            package.source_relationships_with_limits(&root_name, opc_limits)?;
-        let workbook_relationships =
-            package.source_relationships_with_limits(workbook_name, opc_limits)?;
-        let content_types = package.source_content_types_with_limits(opc_limits)?;
+        let root_relationships = package.source_relationships(&root_name, opc_limits)?;
+        let workbook_relationships = package.source_relationships(workbook_name, opc_limits)?;
+        let content_types = package.source_content_types(opc_limits)?;
         let model_part = model
             .map(|model| {
                 let part_name = litchi_opc::PackURI::new(&model.part.part_name)?;
@@ -208,8 +206,7 @@ impl SourceState {
                     name: model.part.part_name.clone(),
                     content_type: model.part.content_type.clone(),
                     bytes: Arc::clone(&model.part.bytes),
-                    relationships: package
-                        .source_relationships_with_limits(&part_name, opc_limits)?,
+                    relationships: package.source_relationships(&part_name, opc_limits)?,
                 })
             })
             .transpose()?;

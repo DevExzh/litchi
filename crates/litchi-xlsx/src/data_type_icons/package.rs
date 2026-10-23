@@ -155,7 +155,7 @@ struct SourcePart {
 impl SourcePart {
     fn capture(package: &OpcPackage, part: &dyn OpcPart) -> Result<Self> {
         let name = part.partname().clone();
-        let relationships = package.source_relationships(&name)?;
+        let relationships = package.source_relationships(&name, package.read_limits())?;
         let incoming = capture_incoming(package, &name)?;
         Ok(Self {
             name: name.clone(),

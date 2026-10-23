@@ -60,9 +60,9 @@ impl Plan {
                 if package.get_part(part)?.blob() != source.bytes() {
                     return Err(invalid("Connections source changed before owner removal"));
                 }
-                let before = package.source_relationships(workbook)?;
+                let before = package.source_relationships(workbook, package.read_limits())?;
                 let after = before.without_relationship(relationship, before.bytes().len())?;
-                package.try_replace_relationships(&before, &after)?;
+                package.try_replace_relationships(&before, &after, package.read_limits())?;
                 if !package.remove_part(part) {
                     return Err(invalid("missing Connections owner during removal"));
                 }

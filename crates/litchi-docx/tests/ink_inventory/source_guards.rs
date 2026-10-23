@@ -206,12 +206,18 @@ fn adding_an_empty_relationship_member_is_a_stale_source_for_changed_and_noop_pa
     );
     let absent = baseline
         .opc_package()
-        .source_relationships(&PackURI::new("/payload/empty.xml").unwrap())
+        .source_relationships(
+            &PackURI::new("/payload/empty.xml").unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     let present_package = Package::from_reader(Cursor::new(&variant)).unwrap();
     let present = present_package
         .opc_package()
-        .source_relationships(&PackURI::new("/payload/empty.xml").unwrap())
+        .source_relationships(
+            &PackURI::new("/payload/empty.xml").unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     assert_eq!(absent.bytes(), present.bytes());
     assert!(!absent.member_present());

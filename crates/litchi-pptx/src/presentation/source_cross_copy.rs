@@ -6399,19 +6399,17 @@ mod tests {
             )
             .unwrap(),
         );
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                Arc::new(litchi_core::OwnedSource::new(
-                    include_bytes!(
-                        "../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx"
-                    )
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(litchi_core::OwnedSource::new(
+                include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedVideo.pptx")
                     .to_vec(),
-                )),
-                litchi_opc::SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
-                context.clone(),
-            )
-            .unwrap();
+            )),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context.clone()),
+        )
+        .unwrap();
         let source_uri = PackURI::new("/ppt/media/image1.png").unwrap();
         let target_uri = PackURI::new("/ppt/media/copy.png").unwrap();
         let (data, capture) = read_copy_payload(&package.part(&source_uri).unwrap(), true).unwrap();

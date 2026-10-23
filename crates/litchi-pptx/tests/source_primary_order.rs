@@ -83,7 +83,7 @@ fn managed_context(memory_limit: u64) -> (Budget, CancellationSource, ExecutionC
 }
 
 fn presentation_root_len(bytes: &[u8]) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new("/ppt/presentation.xml").unwrap())
         .unwrap()
@@ -92,7 +92,7 @@ fn presentation_root_len(bytes: &[u8]) -> u64 {
 }
 
 fn with_part(bytes: &[u8], path: &str, xml: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(path).unwrap())
         .unwrap()
@@ -115,7 +115,7 @@ fn with_presentation_root_suffix(bytes: &[u8], suffix: &str) -> Vec<u8> {
 }
 
 fn member_bytes(bytes: &[u8], path: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(path).unwrap())
         .unwrap()

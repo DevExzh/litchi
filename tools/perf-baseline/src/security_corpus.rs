@@ -134,7 +134,7 @@ fn real_producer_security_corpus_is_bounded_and_deterministic() -> Result<(), Bo
 fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
     for fixture in SIGNED_FIXTURES {
         let bytes = load_fixture(*fixture)?;
-        let package = OpcPackage::from_bytes_with_limits(&bytes, security_read_limits()?)?;
+        let package = OpcPackage::from_bytes(&bytes, security_read_limits()?)?;
         assert!(
             package.is_signed(),
             "{} lost its signature graph",
@@ -150,13 +150,22 @@ fn signed_ooxml_security() -> Result<(), Box<dyn Error>> {
             report.integrity() == Status::Valid && report.signature() == Status::Valid
         }));
 
-        let source =
-            SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
+        let source = SourceBackedPackage::from_vec(
+            bytes.clone(),
+            security_read_limits()?,
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )?;
         let mut no_op = Vec::new();
         source.write_part_overlays_to_stream(&mut no_op, Vec::new())?;
         assert_eq!(no_op, bytes, "{} changed on exact no-op", fixture.id);
 
-        let source = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+        let source = SourceBackedPackage::from_vec(
+            bytes,
+            security_read_limits()?,
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )?;
         let (target, replacement) = {
             let main = source.main_document_part()?;
             let target = main.partname().clone();
@@ -185,8 +194,12 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
     };
     let bytes = load_fixture(fixture)?;
 
-    let package =
-        SourceBackedPackage::from_vec_with_limits(bytes.clone(), security_read_limits()?)?;
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let no_op = docx.edit_document_variables()?.commit()?;
     assert!(!no_op.diagnostics().changed());
@@ -196,7 +209,12 @@ fn protected_docx_security() -> Result<(), Box<dyn Error>> {
 
     // Record 0355a: a changed commit of a protected document is refused at
     // commit, before any package or output exists.
-    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+    let package = SourceBackedPackage::from_vec(
+        bytes,
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let docx = DocxSourcePackage::from_source_backed_package(package)?;
     let mut edit = docx.edit_document_variables()?;
     edit.set("security_matrix", "must-refuse")?;
@@ -318,7 +336,12 @@ fn external_target_inventory() -> Result<(), Box<dyn Error>> {
         relative_path: EXTERNAL_XLSX_PATH,
         sha256: EXTERNAL_XLSX_SHA256,
     })?;
-    let package = SourceBackedPackage::from_vec_with_limits(bytes, security_read_limits()?)?;
+    let package = SourceBackedPackage::from_vec(
+        bytes,
+        security_read_limits()?,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let inventory = collect_external_targets(&package);
     assert_eq!(
         inventory,
@@ -349,7 +372,12 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     let one_under = SourceLimits::builder()
         .max_input_bytes(u64::try_from(bytes.len().saturating_sub(1))?)?
         .build()?;
-    let error = match SourceBackedPackage::from_vec_with_limits(bytes.clone(), one_under) {
+    let error = match SourceBackedPackage::from_vec(
+        bytes.clone(),
+        one_under,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => return Err("one-under input limit unexpectedly opened".into()),
         Err(error) => error,
     };
@@ -374,10 +402,12 @@ fn bounded_ingress_and_publication() -> Result<(), Box<dyn Error>> {
     )?;
     let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
         security_read_limits()?,
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )?;
     let artifact = package.source_artifact();
     let mut output = Vec::new();

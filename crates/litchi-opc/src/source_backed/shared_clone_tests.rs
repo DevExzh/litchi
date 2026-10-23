@@ -99,11 +99,12 @@ fn context(workers: usize) -> (Budget, CancellationSource, ExecutionContext) {
 }
 
 fn managed(source: &Arc<dyn ReadAt>, context: ExecutionContext) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         Arc::clone(source),
         SourceLimits::default(),
         SourceCacheLimits::default(),
-        context,
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap()
 }
@@ -155,7 +156,13 @@ fn assert_shares_everything(original: &SourceBackedPackage, clone: &SourceBacked
 
 #[test]
 fn owned_ingress_clone_retains_the_shared_fingerprint_after_original_drop() {
-    let original = SourceBackedPackage::from_vec(package_bytes(3, 2 * 1024)).unwrap();
+    let original = SourceBackedPackage::from_vec(
+        package_bytes(3, 2 * 1024),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let clone = original.clone();
     assert_shares_everything(&original, &clone);
     let memo = clone.fingerprint_memo.as_ref().unwrap();
@@ -171,7 +178,14 @@ fn a_clone_shares_every_allocation_of_its_opened_package() {
     let bytes = package_bytes(3, 2 * 1024);
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes));
 
-    let unmanaged = SourceBackedPackage::from_read_at(Arc::clone(&source)).unwrap();
+    let unmanaged = SourceBackedPackage::from_read_at(
+        Arc::clone(&source),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let counts = |package: &SourceBackedPackage| {
         [
             Arc::strong_count(&package.archive),
@@ -199,14 +213,14 @@ fn a_clone_shares_every_allocation_of_its_opened_package() {
     drop(clone);
     assert_eq!(counts(&unmanaged), alone);
 
-    let windowed =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
-            Arc::clone(&source),
-            SourceLimits::default(),
-            SourceCacheLimits::default(),
-            SourceReadPolicy::forward_start(64 * 1024).unwrap(),
-        )
-        .unwrap();
+    let windowed = SourceBackedPackage::from_read_at(
+        Arc::clone(&source),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::forward_start(64 * 1024).unwrap(),
+        None,
+    )
+    .unwrap();
     assert!(windowed.read_ahead.is_some());
     assert_shares_everything(&windowed, &windowed.clone());
 
@@ -217,7 +231,14 @@ fn a_clone_shares_every_allocation_of_its_opened_package() {
 
     // A second open of the same source is a different package: a fresh
     // lineage, catalog, index and cache.
-    let reopened = SourceBackedPackage::from_read_at(Arc::clone(&source)).unwrap();
+    let reopened = SourceBackedPackage::from_read_at(
+        Arc::clone(&source),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     assert!(!unmanaged.is_same_opened_package(&reopened));
     assert_ne!(unmanaged.source_lineage(), reopened.source_lineage());
     assert!(!Arc::ptr_eq(&unmanaged.archive, &reopened.archive));
@@ -287,10 +308,16 @@ fn wave_fixture() -> (Arc<dyn ReadAt>, Vec<(PackURI, Arc<Vec<u8>>)>, Vec<u8>) {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(package_bytes(WAVE_PARTS, WAVE_BYTES)));
     let replacements = replacements(WAVE_PARTS, WAVE_BYTES);
     let mut expected = Vec::new();
-    SourceBackedPackage::from_read_at(Arc::clone(&source))
-        .unwrap()
-        .write_part_overlays_shared_to_stream(&mut expected, replacements.clone())
-        .unwrap();
+    SourceBackedPackage::from_read_at(
+        Arc::clone(&source),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap()
+    .write_part_overlays_shared_to_stream(&mut expected, replacements.clone())
+    .unwrap();
     (source, replacements, expected)
 }
 
@@ -395,14 +422,14 @@ fn clones_run_caller_facility_waves_concurrently_and_release_each_wave() {
 fn a_publication_from_any_clone_fences_the_shared_read_ahead_window() {
     let bytes = package_bytes(2, 2 * 1024);
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
-    let original =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
-            source,
-            SourceLimits::default(),
-            SourceCacheLimits::default(),
-            SourceReadPolicy::forward_start(64 * 1024).unwrap(),
-        )
-        .unwrap();
+    let original = SourceBackedPackage::from_read_at(
+        source,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::forward_start(64 * 1024).unwrap(),
+        None,
+    )
+    .unwrap();
     let document = uri("/word/document.xml");
     let before = original.part(&document).unwrap().data().unwrap();
     let clone = original.clone();

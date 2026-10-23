@@ -471,7 +471,7 @@ impl Manifests {
                         None => false,
                     };
                     if content_types.explicit || current_matches_base {
-                        package.try_replace_content_types_bytes_with_limits(
+                        package.try_replace_content_types_bytes(
                             current_bytes.as_slice(),
                             replacement,
                             limits,

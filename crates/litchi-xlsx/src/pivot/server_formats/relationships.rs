@@ -155,7 +155,7 @@ impl<'package> RelationshipIndex<'package> {
         // The root relationship collection has no source Part and is always
         // represented by `/` in the borrowed edge inventory.
         let root = PackURI::new(PACKAGE_ROOT).map_err(OpcError::InvalidPackUri)?;
-        let root_plan = package.plan_source_relationships_with_limits(&root, limits)?;
+        let root_plan = package.plan_source_relationships(&root, limits)?;
         budget.admit_plan(root_plan, limits)?;
         index_relationships(
             package.rels().iter(),
@@ -169,7 +169,7 @@ impl<'package> RelationshipIndex<'package> {
 
         for name in &part_names {
             let part = package.get_part(name)?;
-            let plan = package.plan_source_relationships_with_limits(name, limits)?;
+            let plan = package.plan_source_relationships(name, limits)?;
             part_member_present.push(plan.member_present());
             budget.admit_plan(plan, limits)?;
             index_relationships(
@@ -186,10 +186,10 @@ impl<'package> RelationshipIndex<'package> {
         // No source XML allocation or parser graph is retained until all
         // aggregate admissions above have succeeded. Capture each owner
         // afresh so a descriptive plan can never authorize stale material.
-        let root_source = package.source_relationships_with_limits(&root, limits)?;
+        let root_source = package.source_relationships(&root, limits)?;
         for (name, member_present) in part_names.iter().zip(part_member_present) {
             let source = if member_present {
-                Some(package.source_relationships_with_limits(name, limits)?)
+                Some(package.source_relationships(name, limits)?)
             } else {
                 None
             };
@@ -387,7 +387,7 @@ where
             target.as_str().len(),
             limits.max_relationship_target_bytes(),
         )?;
-        // `source_relationships_with_limits` charges the authored Target
+        // `source_relationships` charges the authored Target
         // attribute.  The resolved absolute PackURI can be longer because it
         // includes the source-part base path, so canonical graph lookup uses
         // the package member-name ceiling rather than charging that derived

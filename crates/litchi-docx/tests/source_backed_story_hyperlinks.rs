@@ -128,7 +128,8 @@ fn open(bytes: Vec<u8>) -> source_backed::Package {
 }
 
 fn empty_inventory_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     for (part_name, relationship_id) in [
         ("/word/document.xml", "rMain"),
         ("/word/header1.xml", "rLink"),
@@ -183,7 +184,8 @@ impl ReadAt for VersionedSource {
 }
 
 fn nested_owner_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap()
@@ -199,7 +201,8 @@ fn nested_owner_fixture() -> Vec<u8> {
 }
 
 fn mixed_dialect_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let header = package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap();
@@ -214,7 +217,8 @@ fn mixed_dialect_fixture() -> Vec<u8> {
 }
 
 fn prolog_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let document = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -247,7 +251,8 @@ fn package_signature_fixture() -> Vec<u8> {
 }
 
 fn protected_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let main = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -273,7 +278,8 @@ fn protected_fixture() -> Vec<u8> {
 }
 
 fn delete_instruction_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let main = package
         .get_part_mut(&PackURI::new("/word/document.xml").unwrap())
         .unwrap();
@@ -286,7 +292,8 @@ fn delete_instruction_fixture() -> Vec<u8> {
 }
 
 fn mixed_transitional_hyperlink_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let header = package
         .get_part_mut(&PackURI::new("/word/header1.xml").unwrap())
         .unwrap();
@@ -304,7 +311,8 @@ fn mixed_transitional_hyperlink_fixture() -> Vec<u8> {
 }
 
 fn strict_package_with_transitional_hyperlink_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let part_names: Vec<PackURI> = package
         .iter_parts()
         .map(|part| part.partname().clone())
@@ -386,7 +394,8 @@ fn strict_package_with_transitional_hyperlink_fixture() -> Vec<u8> {
 }
 
 fn custom_inbound_owner_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     let mut custom = BlobPart::new(
         PackURI::new("/custom/custom.xml").unwrap(),
         "application/xml".to_owned(),
@@ -452,7 +461,8 @@ fn suspicious_non_part_fixture_with_members(names: &[&str]) -> Vec<u8> {
 }
 
 fn child_relationship_limit_fixture(extra_relationships: usize) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture(false)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(false), litchi_opc::SourceLimits::default()).unwrap();
     for part_name in [
         "/word/header1.xml",
         "/word/footer1.xml",
@@ -525,7 +535,7 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     for name in [
         "document.xml",
         "header1.xml",

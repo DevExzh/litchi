@@ -125,7 +125,7 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         drop(node);
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match &change {
             Change::MasterName { master, name } => {

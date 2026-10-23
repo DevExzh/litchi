@@ -123,7 +123,7 @@ fn deck() -> Vec<u8> {
     }
     let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
 
     add_part(
         &mut opc,
@@ -188,7 +188,7 @@ fn deck() -> Vec<u8> {
 }
 
 fn rewrite(bytes: &[u8], edit: impl FnOnce(&mut OpcPackage)) -> Vec<u8> {
-    let mut opc = OpcPackage::from_bytes(bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     PackageWriter::to_bytes(&opc).unwrap()
 }
@@ -630,7 +630,7 @@ fn source_modern_comments_honor_caller_part_limits_before_decode() {
             xml.replace("</p188:cmLst>", &format!("<!--{padding}--></p188:cmLst>"))
         });
     });
-    let opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation_bytes = opc
         .get_part(&PackURI::new(PRESENTATION).unwrap())
         .unwrap()

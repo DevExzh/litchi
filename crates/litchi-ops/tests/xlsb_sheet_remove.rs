@@ -147,7 +147,8 @@ fn scoped_sheet_query(selector: &str) -> Query<'_> {
 }
 
 fn sheet_parts(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     package
         .iter_parts()
         .filter(|part| part.content_type() == "application/vnd.ms-excel.worksheet")
@@ -155,7 +156,8 @@ fn sheet_parts(bytes: &[u8]) -> usize {
 }
 
 fn chart_parts(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     package
         .iter_parts()
         .filter(|part| part.content_type() == "application/vnd.ms-excel.chartsheet")
@@ -167,7 +169,8 @@ fn chart_parts(bytes: &[u8]) -> usize {
 /// no dependent internal relationship to dispose of; the original fixture
 /// remains the refusal case for a chart-backed tab.
 fn dependency_free_chart_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&mixed_fixture()).expect("parse chart package");
+    let mut package = OpcPackage::from_bytes(&mixed_fixture(), litchi_opc::SourceLimits::default())
+        .expect("parse chart package");
     let chart_sheet = package
         .iter_parts()
         .find(|part| part.content_type() == "application/vnd.ms-excel.chartsheet")

@@ -85,7 +85,8 @@ fn package_cell_name_selection_rejects_ambiguous_names() {
         .expect("build package")
         .write_to(&mut output)
         .expect("valid distinct names");
-    let mut opc = OpcPackage::from_bytes(&output.into_inner()).expect("OPC");
+    let mut opc = OpcPackage::from_bytes(&output.into_inner(), litchi_opc::SourceLimits::default())
+        .expect("OPC");
     let uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = opc.get_part(&uri).expect("workbook part").blob().to_vec();
     let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();

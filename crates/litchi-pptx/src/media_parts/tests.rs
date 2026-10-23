@@ -253,7 +253,7 @@ fn loads_poi_audio_and_video_resources_without_decoding() {
         (POI_AUDIO, Kind::Audio, 52_079usize),
         (POI_VIDEO, Kind::Video, 101_799usize),
     ] {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let media = load(&package, &uri).unwrap();
         assert_eq!(media.pictures.len(), 1);

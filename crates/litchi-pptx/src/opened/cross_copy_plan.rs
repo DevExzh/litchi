@@ -1734,8 +1734,7 @@ fn owned_view(snapshot: &Snapshot, limits: Limits) -> Result<Cow<'_, OpcPackage>
             let _first = snapshot.physical_revision.set((bound, revision));
         },
     }
-    let view =
-        OpcPackage::from_vec_with_limits(bytes, package.source_read_limits().unwrap_or_default())?;
+    let view = OpcPackage::from_vec(bytes, package.read_limits())?;
     if !view.is_unmodified_owned_source() {
         return Err(invalid(
             "cross-slide could not reopen a package's serialization as an owned source",
@@ -1902,27 +1901,18 @@ fn build_candidate(
         },
     };
     let serialized_bytes = serialized.len();
+    let candidate_read_limits = candidate.read_limits();
     // Clean owned ingress proves the destination has built-in parts. Keep
     // the existing path for caller-defined parts and revoked authorization.
     let reopened = match serialized {
         CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_vec_reusing_payloads(
-                bytes,
-                litchi_opc::SourceLimits::default(),
-                &candidate,
-            )?
+            OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
         },
-        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes)?,
+        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits)?,
         CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_shared_vec_reusing_payloads(
-                bytes,
-                litchi_opc::SourceLimits::default(),
-                &candidate,
-            )?
+            OpcPackage::from_shared_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
         },
-        CandidateBytes::Shared(bytes) => {
-            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::SourceLimits::default())?
-        },
+        CandidateBytes::Shared(bytes) => OpcPackage::from_shared_vec(bytes, candidate_read_limits)?,
     };
     // Owned ingress retains the archive it was opened from and republishes it
     // verbatim, so the bytes just hashed are exactly what a serializing hash

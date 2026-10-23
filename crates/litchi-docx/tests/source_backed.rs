@@ -583,7 +583,11 @@ fn composition_binds_reopened_equal_content_untouched_parts_and_source_freshness
             .contains(">composed</w:t>")
     );
 
-    let mut changed = OpcPackage::from_reader(io::Cursor::new(source_bytes.clone())).unwrap();
+    let mut changed = OpcPackage::from_reader(
+        io::Cursor::new(source_bytes.clone()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     changed
         .get_part_mut(&PackURI::new(format!("/{UNUSED_PART}")).unwrap())
         .unwrap()
@@ -768,7 +772,9 @@ fn alt_chunk_payload_overlay_is_one_edit_and_preserves_raw_unselected_members() 
         raw_local_member(&output, ALT_VENDOR_PART),
         raw_local_member(&source_bytes, ALT_VENDOR_PART)
     );
-    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let reopened =
+        OpcPackage::from_reader(io::Cursor::new(output), litchi_opc::SourceLimits::default())
+            .unwrap();
     let target = reopened
         .get_part(&PackURI::new(format!("/{ALT_TARGET}")).unwrap())
         .unwrap();
@@ -805,7 +811,9 @@ fn alt_chunk_real_libreoffice_fixture_preserves_untouched_zip_members() {
             "untouched member {member} changed"
         );
     }
-    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let reopened =
+        OpcPackage::from_reader(io::Cursor::new(output), litchi_opc::SourceLimits::default())
+            .unwrap();
     assert_eq!(
         reopened
             .get_part(&PackURI::new("/word/altChunk.html").unwrap())

@@ -395,7 +395,7 @@ pub(crate) fn prepare_package_budget(
         ));
     }
 
-    let owner_plan = package.plan_source_relationships_with_limits(owner, *limits)?;
+    let owner_plan = package.plan_source_relationships(owner, *limits)?;
     // The source plan above is output-free. Admit the current package ledger
     // before capturing a source token or cloning the proposed edit plan. A
     // package opened under the policy already satisfies this census, but the
@@ -419,7 +419,7 @@ pub(crate) fn prepare_package_budget(
             mode: litchi_opc::TargetMode::Internal,
         });
     }
-    let source = package.source_relationships_with_limits(owner, *limits)?;
+    let source = package.source_relationships(owner, *limits)?;
     let plan = source.plan_edit(&edits, &[], *limits)?;
     let relationship_parts = budget
         .relationship_parts
@@ -552,7 +552,7 @@ fn package_budget(
             owner_plan_seen = true;
             owner_plan
         } else {
-            package.plan_source_relationships_with_limits(candidate, *limits)?
+            package.plan_source_relationships(candidate, *limits)?
         };
         relationship_parts = relationship_parts.saturating_add(usize::from(plan.member_present()));
         relationship_bytes = relationship_bytes.saturating_add(plan.final_len() as u64);

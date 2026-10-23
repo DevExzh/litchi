@@ -3008,7 +3008,7 @@ fn eager_relationship_payload(
         ));
     }
     let package_limits = package.read_limits();
-    let plan = package.plan_source_relationships_with_limits(owner, package_limits)?;
+    let plan = package.plan_source_relationships(owner, package_limits)?;
     if plan.final_len() > maximum {
         return Err(owner_limit(
             litchi_core::Resource::InputBytes,
@@ -3017,7 +3017,7 @@ fn eager_relationship_payload(
             maximum,
         ));
     }
-    let token = package.source_relationships_with_limits(owner, package_limits)?;
+    let token = package.source_relationships(owner, package_limits)?;
     let present = token.member_present();
     let payload = present.then(|| RetainedPayload::relationships(token));
     Ok((present, payload))

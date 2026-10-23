@@ -910,7 +910,7 @@ fn preserve_fixture(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> 
 }
 
 fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
-    let package = OpcPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?);
+    let package = OpcPackage::from_vec(bytes.to_vec(), opc_limits()?);
     if matches!(fixture.oracle, Oracle::Malformed) {
         if package.is_ok() {
             return Err(format!("{} unexpectedly opened as an OPC package", fixture.id).into());
@@ -933,7 +933,12 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             {
                 return Err(format!("{} signature verification failed", fixture.id).into());
             }
-            let source = SourceBackedPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?)?;
+            let source = SourceBackedPackage::from_vec(
+                bytes.to_vec(),
+                opc_limits()?,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             let (target, replacement) = {
                 let main = source.main_document_part()?;
                 let target = main.partname().clone();
@@ -959,7 +964,12 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             {
                 return Err(format!("{} protection marker missing", fixture.id).into());
             }
-            let source = SourceBackedPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?)?;
+            let source = SourceBackedPackage::from_vec(
+                bytes.to_vec(),
+                opc_limits()?,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             let docx = DocxSourcePackage::from_source_backed_package(source)?;
             let mut edit = docx.edit_document_variables()?;
             edit.set("security_matrix", "must-refuse")?;
@@ -1756,7 +1766,7 @@ fn relationship_inventory(fixture: &Fixture, bytes: &[u8]) -> Result<Value> {
             "evidence": "CFB container has no OPC relationship graph",
         }));
     }
-    match OpcPackage::from_vec_with_limits(bytes.to_vec(), opc_limits()?) {
+    match OpcPackage::from_vec(bytes.to_vec(), opc_limits()?) {
         Ok(package) => {
             let count = package.rels().len()
                 + package

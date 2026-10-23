@@ -890,7 +890,9 @@ fn every_repository_stylesheet_reads_with_the_catalog_count() {
         let Ok(bytes) = std::fs::read(&path) else {
             continue;
         };
-        let Ok(package) = litchi_opc::OpcPackage::from_bytes(&bytes) else {
+        let Ok(package) =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        else {
             continue;
         };
         let Ok(workbook) = package.main_document_part() else {

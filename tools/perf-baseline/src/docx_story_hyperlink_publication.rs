@@ -754,7 +754,7 @@ pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     if source_members.is_empty() {
         return Err("DOCX story publication corpus has no ZIP members".into());
     }
-    let package = OpcPackage::from_bytes(&archive)?;
+    let package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = package
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1026,7 +1026,7 @@ fn signed_archive(_corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error::Error
 }
 
 fn unknown_owner_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let mut custom = BlobPart::new(
         PackURI::new("/word/opaque/custom-owner.xml")?,
         "application/xml".to_owned(),

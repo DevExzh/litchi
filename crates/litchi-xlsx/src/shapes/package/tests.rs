@@ -118,7 +118,8 @@ fn loads_shapes_through_the_package_graph() {
 
 #[test]
 fn poi_fixture_text_boxes_parse() {
-    let package = OpcPackage::from_bytes(POI_TEXT_BOXES).unwrap();
+    let package =
+        OpcPackage::from_bytes(POI_TEXT_BOXES, litchi_opc::SourceLimits::default()).unwrap();
     let all = load_shapes(&package).unwrap();
     let names: Vec<_> = all
         .iter()

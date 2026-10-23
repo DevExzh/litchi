@@ -33,7 +33,7 @@ fn fixture(name: &str) -> Vec<u8> {
 /// their relationships), written out and read back so the signature is an
 /// ingressed source signature, as in a file a producer signed.
 fn signed(plain: &[u8]) -> Vec<u8> {
-    let source = OpcPackage::from_bytes(plain).unwrap();
+    let source = OpcPackage::from_bytes(plain, litchi_opc::SourceLimits::default()).unwrap();
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -104,7 +104,11 @@ fn signed(plain: &[u8]) -> Vec<u8> {
         )
         .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    assert!(OpcPackage::from_bytes(&bytes).unwrap().is_signed());
+    assert!(
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .is_signed()
+    );
     bytes
 }
 
@@ -123,7 +127,7 @@ fn save(package: &Package) -> Vec<u8> {
 
 /// Whether `bytes` still carries any OPC signature infrastructure.
 fn carries_signature(bytes: &[u8]) -> bool {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package.is_signed()
         || package
             .iter_parts()

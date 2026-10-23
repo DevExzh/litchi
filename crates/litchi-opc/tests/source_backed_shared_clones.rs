@@ -87,7 +87,13 @@ fn built_package() -> Vec<u8> {
 }
 
 fn open(bytes: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(bytes.to_vec()).expect("fixture must open")
+    SourceBackedPackage::from_vec(
+        bytes.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture must open")
 }
 
 /// One relationship collection in a canonical order.
@@ -411,7 +417,14 @@ fn an_in_place_source_change_refuses_every_clone() {
         bytes: RwLock::new(built_package()),
         revision: AtomicU64::new(0),
     });
-    let original = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let original = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let clone = original.clone();
     let (target, replacement) = edit(&original);
     // Warm the shared cache first: a cached payload is still fenced.
@@ -487,7 +500,7 @@ fn an_atomic_replacement_leaves_every_clone_on_the_opened_file() {
     let path = directory.path().join("package.docx");
     let bytes = fixture("ooxml/docx/drawing.docx");
     std::fs::write(&path, &bytes).unwrap();
-    let original = SourceBackedPackage::from_path(&path).unwrap();
+    let original = SourceBackedPackage::from_path(&path, SourceLimits::default()).unwrap();
     let clone = original.clone();
     let before = read_all(&original);
 
@@ -500,7 +513,7 @@ fn an_atomic_replacement_leaves_every_clone_on_the_opened_file() {
         assert_eq!(read_all(package), before);
         assert_eq!(publish_noop(package.clone()), bytes);
     }
-    let reopened = SourceBackedPackage::from_path(&path).unwrap();
+    let reopened = SourceBackedPackage::from_path(&path, SourceLimits::default()).unwrap();
     assert_eq!(read_all(&reopened), read_all(&open(&replacement)));
     assert_ne!(reopened.source_lineage(), clone.source_lineage());
 }

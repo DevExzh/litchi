@@ -254,6 +254,11 @@ impl Docx {
         self.0.retain_source
     }
 
+    /// The OPC ingress policy retained by this handle for raw re-admission.
+    pub(crate) const fn ooxml_read_limits(&self) -> SourceLimits {
+        self.0.ooxml_limits
+    }
+
     /// Adopt the source-backed package detection built for a path or a
     /// byte buffer. No part payload is read.
     ///
@@ -287,10 +292,14 @@ impl Docx {
             let owned = package.to_owned_package_preserving_source()?;
             return Self::from_owned_package_with_origin(owned, options, origin);
         }
-        Ok(
-            Self::with_owner(DocxOwner::Source(Box::new(package)), None, options)
-                .with_origin(origin),
+        let ooxml_limits = package.source_backed_package()?.read_limits();
+        Ok(Self::with_owner(
+            DocxOwner::Source(Box::new(package)),
+            None,
+            options,
+            ooxml_limits,
         )
+        .with_origin(origin))
     }
 
     /// Build the eager owner from the OPC package detection already parsed
@@ -341,6 +350,7 @@ impl Docx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
+        let ooxml_limits = package.opc_package().read_limits();
         // `document()` pins the main payload but defers XML traversal; the
         // eager route keeps its historical validation boundary with one
         // linear text pass, whose report then holds the packaging, metadata
@@ -348,24 +358,34 @@ impl Docx {
         let document = package.document()?;
         document.text()?;
         let tolerance = document.tolerance_report();
-        Ok(
-            Self::with_owner(DocxOwner::Eager(package), Some(tolerance), options)
-                .with_origin(origin),
+        Ok(Self::with_owner(
+            DocxOwner::Eager(package),
+            Some(tolerance),
+            options,
+            ooxml_limits,
         )
+        .with_origin(origin))
     }
 
     fn with_owner(
         owner: DocxOwner,
         tolerance: Option<ToleranceReport>,
         options: &OpenOptions,
+        ooxml_limits: SourceLimits,
     ) -> Self {
-        Self(Opened::new(Self::state(owner, tolerance, options)))
+        Self(Opened::new(Self::state(
+            owner,
+            tolerance,
+            options,
+            ooxml_limits,
+        )))
     }
 
     fn state(
         owner: DocxOwner,
         tolerance: Option<ToleranceReport>,
         options: &OpenOptions,
+        ooxml_limits: SourceLimits,
     ) -> DocxState {
         DocxState {
             owner,
@@ -376,7 +396,7 @@ impl Docx {
             retain_source: options.retain_source,
             #[cfg(feature = "markdown")]
             markdown: OnceLock::new(),
-            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
+            ooxml_limits,
             body: OnceLock::new(),
             parts: parts::Cache::default(),
         }
@@ -410,7 +430,7 @@ impl Docx {
             signature => signature,
         };
         Self(Opened::adopted(
-            Self::state(owner, tolerance, &options),
+            Self::state(owner, tolerance, &options, self.0.ooxml_limits),
             signature,
             self.0.origin(),
         ))

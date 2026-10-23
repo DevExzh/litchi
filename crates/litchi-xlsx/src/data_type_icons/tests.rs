@@ -226,7 +226,7 @@ fn rewrites_the_selected_view_when_multiple_owners_exist() {
 fn package_with_icon_owner() -> (OpcPackage, PackURI) {
     let bytes =
         include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx");
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let xml = format!(
         r#"<worksheet xmlns="{SML}" xmlns:sdt="{SHOW_DATA_TYPE_ICONS_NAMESPACE}"><sheetViews><sheetView workbookViewId="0"><extLst><ext uri="urn:producer"><u:keep xmlns:u="urn:unknown"/></ext></extLst></sheetView></sheetViews></worksheet>"#
@@ -242,7 +242,7 @@ fn package_with_icon_owner() -> (OpcPackage, PackURI) {
 fn adding_without_an_existing_extension_owner_is_explicitly_refused() {
     let bytes =
         include_bytes!("../../../../test-data/poi/test-data/spreadsheet/right-to-left.xlsx");
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let xml = format!(
         r#"<worksheet xmlns="{SML}" xmlns:sdt="{SHOW_DATA_TYPE_ICONS_NAMESPACE}"><sheetViews><sheetView workbookViewId="0"/></sheetViews></worksheet>"#

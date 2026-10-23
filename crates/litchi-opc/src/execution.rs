@@ -105,7 +105,7 @@ impl OpenSession {
     /// Opens an owned archive under explicit OPC and execution limits.
     ///
     /// The successful package retains authorization for exact owned-source
-    /// no-op publication, exactly like [`OpcPackage::from_vec_with_limits`].
+    /// no-op publication, exactly like [`OpcPackage::from_vec`].
     ///
     /// # Errors
     ///
@@ -503,7 +503,8 @@ mod tests {
     #[test]
     fn explicit_opens_match_serial_parts_deterministically() {
         let bytes = archive();
-        let expected = package_parts(&OpcPackage::from_bytes(&bytes).unwrap());
+        let expected =
+            package_parts(&OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap());
         let limits = SourceLimits::builder()
             .max_input_bytes(bytes.len() as u64)
             .unwrap()
@@ -524,13 +525,15 @@ mod tests {
         let bytes = cache_isolation_archive();
         let (_source, context) = execution_context(16 * MIB);
         let session = OpenSession::new(context).unwrap();
-        let physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let physical =
+            crate::phys_pkg::PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let _reader =
             crate::pkgreader::PackageReader::from_phys_reader_with_session(&physical, &session)
                 .unwrap();
         assert_eq!(physical.archive().cache_size(), 0);
 
-        let serial_physical = crate::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let serial_physical =
+            crate::phys_pkg::PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         let _serial_reader =
             crate::pkgreader::PackageReader::from_phys_reader(&serial_physical).unwrap();
         assert_eq!(serial_physical.archive().cache_size(), 2);

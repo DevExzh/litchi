@@ -525,7 +525,7 @@ fn verify_iteration(
     if semantic_sha256 != plan.semantic_hash {
         return Err("managed benchmark semantic output hash changed".into());
     }
-    let mut package = OpcPackage::from_bytes(&sink.bytes)?;
+    let mut package = OpcPackage::from_bytes(&sink.bytes, litchi_opc::SourceLimits::default())?;
     crate::xlsx_source_editors::replay_patch(&mut package, &plan.inverse_patch.inverse())?;
     let restored = PackageWriter::to_bytes(&package)?;
     if restored != plan.corpus.archive {

@@ -925,16 +925,13 @@ fn plan_final_relationship_topology(
         .map_err(|source| allocation("SVG lifecycle relationship owner index", source))?;
 
     let root = PackURI::new("/").map_err(invalid)?;
-    let root_source = workbook
-        .inner
-        .package
-        .source_relationships_with_limits(&root, limits)?;
+    let root_source = workbook.inner.package.source_relationships(&root, limits)?;
     push_relationship_owner(&mut owners, &mut owner_index, root, Some(root_source), true)?;
     for part in workbook.inner.package.iter_parts() {
         let source = workbook
             .inner
             .package
-            .source_relationships_with_limits(part.partname(), limits)?;
+            .source_relationships(part.partname(), limits)?;
         push_relationship_owner(
             &mut owners,
             &mut owner_index,
@@ -1552,10 +1549,7 @@ fn preflight_candidate_budget(
         )));
     }
 
-    let manifest = workbook
-        .inner
-        .package
-        .source_content_types_with_limits(limits)?;
+    let manifest = workbook.inner.package.source_content_types(limits)?;
     let manifest_candidate = existing_content_types.map_or(&manifest, |change| &change.after);
     let (has_default_svg, existing_svg_overrides) =
         manifest_svg_inventory(manifest_candidate.bytes())?;
@@ -2124,14 +2118,8 @@ pub(super) fn read_guards(
         .map_err(|source| allocation("SVG lifecycle read guards", source))?;
     let limits = source.inner.package.read_limits();
     for owner in owners {
-        let before_relationships = source
-            .inner
-            .package
-            .source_relationships_with_limits(&owner, limits)?;
-        let after_relationships = target
-            .inner
-            .package
-            .source_relationships_with_limits(&owner, limits)?;
+        let before_relationships = source.inner.package.source_relationships(&owner, limits)?;
+        let after_relationships = target.inner.package.source_relationships(&owner, limits)?;
         let before_xml = if owner.as_str() == "/" {
             None
         } else {
@@ -2197,11 +2185,11 @@ pub(super) fn capture_final_guards(
     let source_content_types = source
         .inner
         .package
-        .source_content_types_with_limits(source.inner.package.read_limits())?;
+        .source_content_types(source.inner.package.read_limits())?;
     let target_content_types = target
         .inner
         .package
-        .source_content_types_with_limits(target.inner.package.read_limits())?;
+        .source_content_types(target.inner.package.read_limits())?;
     let mut expected_by_selector = HashMap::new();
     expected_by_selector
         .try_reserve(intents.len())
@@ -2288,7 +2276,7 @@ fn validate_guard_states(
     let content_types = workbook
         .inner
         .package
-        .source_content_types_with_limits(workbook.inner.package.read_limits())?;
+        .source_content_types(workbook.inner.package.read_limits())?;
     for guard in guards {
         let key = (guard.worksheet.clone(), guard.drawing_ordinal);
         if !inventories.contains_key(&key) {
@@ -2347,15 +2335,15 @@ fn capture_final_inventory<'a>(
     Ok(FinalDrawingInventory {
         drawing: drawing_uri.clone(),
         worksheet_xml: worksheet_part.blob_arc(),
-        worksheet_relationships: workbook.inner.package.source_relationships_with_limits(
-            worksheet_uri,
-            workbook.inner.package.read_limits(),
-        )?,
+        worksheet_relationships: workbook
+            .inner
+            .package
+            .source_relationships(worksheet_uri, workbook.inner.package.read_limits())?,
         drawing_xml: drawing_part.blob_arc(),
         drawing_relationships: workbook
             .inner
             .package
-            .source_relationships_with_limits(&drawing_uri, workbook.inner.package.read_limits())?,
+            .source_relationships(&drawing_uri, workbook.inner.package.read_limits())?,
         content_types: content_types.clone(),
         source,
     })
@@ -2842,7 +2830,7 @@ fn new_drawing_plan_state(
     let before_rels = workbook
         .inner
         .package
-        .source_relationships_with_limits(&uri, workbook.inner.package.read_limits())?;
+        .source_relationships(&uri, workbook.inner.package.read_limits())?;
     let scanned = SourceDrawing::scan(before_xml.bytes(), drawing_ordinal, scan_limits(workbook))?;
     let mut source_owners = Vec::new();
     source_owners
@@ -3013,7 +3001,7 @@ fn plan_composed(
     let manifest_before = workbook
         .inner
         .package
-        .source_content_types_with_limits(workbook.inner.package.read_limits())?;
+        .source_content_types(workbook.inner.package.read_limits())?;
     let mut manifest_after = content_types
         .as_ref()
         .map_or_else(|| manifest_before.clone(), |change| change.after.clone());

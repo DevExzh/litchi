@@ -123,7 +123,7 @@ fn write_editor_fixture() -> (NamedTempFile, Vec<u8>) {
 }
 
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()

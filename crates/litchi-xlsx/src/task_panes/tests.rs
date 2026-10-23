@@ -32,7 +32,11 @@ fn opaque_task_pane_extension() -> ExtList {
 }
 
 fn root_task_pane_relationship(package: &Package) -> (String, String) {
-    let parsed = OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap();
+    let parsed = OpcPackage::from_vec(
+        package.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let relationship = parsed
         .rels()
         .iter()
@@ -115,7 +119,7 @@ fn strict_task_panes_round_trip_through_facade() {
     package = transaction.commit().unwrap().into_package();
 
     let bytes = package.to_bytes().unwrap();
-    let xml_package = OpcPackage::from_vec(bytes).unwrap();
+    let xml_package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let relationship = xml_package
         .rels()
         .iter()
@@ -184,7 +188,11 @@ fn unknown_root_parts_survive_task_pane_edits() {
     transaction.add(pane("opaque-survivor")).unwrap();
     package = transaction.commit().unwrap().into_package();
 
-    let parsed = OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap();
+    let parsed = OpcPackage::from_vec(
+        package.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let opaque_name = PackURI::new("/xl/opaque.bin").unwrap();
     assert_eq!(
         parsed.get_part(&opaque_name).unwrap().blob(),

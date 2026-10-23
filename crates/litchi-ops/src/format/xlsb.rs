@@ -219,6 +219,7 @@ impl Xlsb {
             self.0.metadata.clone(),
             self.0.metadata_repairs.clone(),
             &options,
+            self.0.ooxml_limits,
         )
         .with_origin(self.origin())
         .with_signature(signature))
@@ -387,6 +388,11 @@ impl Xlsb {
         self.0.retain_source
     }
 
+    /// The OPC ingress policy retained by this handle for raw re-admission.
+    pub(crate) const fn ooxml_read_limits(&self) -> SourceLimits {
+        self.0.ooxml_limits
+    }
+
     /// Adopt the source-backed package detection validated: read its core
     /// properties, then build the deferred catalog over it. Only the
     /// workbook catalog is read.
@@ -399,6 +405,7 @@ impl Xlsb {
         package: SourceBackedPackage,
         options: &OpenOptions,
     ) -> Result<Self> {
+        let ooxml_limits = package.read_limits();
         let (metadata, metadata_repairs) =
             read_source_backed_metadata(&package).map_err(metadata_error)?;
         let workbook = xlsb::SourceBackedWorkbook::from_source_backed_package(package)?;
@@ -407,12 +414,14 @@ impl Xlsb {
             metadata,
             metadata_repairs,
             options,
+            ooxml_limits,
         ))
     }
 
     /// Build the owning workbook from the OPC package the byte detector
     /// already parsed (`DetectedFormat::Xlsb`).
     pub(crate) fn from_opc_package(package: OpcPackage, options: &OpenOptions) -> Result<Self> {
+        let ooxml_limits = package.read_limits();
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata =
             litchi_ooxml_common::properties::read_with_report(&package, &mut metadata_repairs)
@@ -420,13 +429,20 @@ impl Xlsb {
                 .unwrap_or_default();
         let metadata = super::metadata::with_app_props(metadata, &package);
         let owner = eager_package(xlsb::Package::from_opc(package)?)?;
-        Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
+        Ok(Self::with_owner(
+            owner,
+            metadata,
+            metadata_repairs,
+            options,
+            ooxml_limits,
+        ))
     }
 
     /// Adopt a newly created native package without serializing and reopening
     /// its binary workbook. The native creator has already validated the
     /// package and parsed its read-only projection.
     pub(crate) fn from_package(package: xlsb::Package, options: &OpenOptions) -> Result<Self> {
+        let ooxml_limits = package.opc_package().read_limits();
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata = litchi_ooxml_common::properties::read_with_report(
             package.opc_package(),
@@ -436,7 +452,13 @@ impl Xlsb {
         .unwrap_or_default();
         let metadata = super::metadata::with_app_props(metadata, package.opc_package());
         let owner = eager_package(package)?;
-        Ok(Self::with_owner(owner, metadata, metadata_repairs, options))
+        Ok(Self::with_owner(
+            owner,
+            metadata,
+            metadata_repairs,
+            options,
+            ooxml_limits,
+        ))
     }
 
     fn source_owner(
@@ -455,6 +477,7 @@ impl Xlsb {
         metadata: Metadata,
         metadata_repairs: MetadataRepairs,
         options: &OpenOptions,
+        ooxml_limits: SourceLimits,
     ) -> Self {
         Self(Opened::new(XlsbState {
             owner,
@@ -463,7 +486,7 @@ impl Xlsb {
             metadata,
             metadata_repairs,
             retain_source: options.retain_source,
-            ooxml_limits: options.ooxml_limits.unwrap_or_default(),
+            ooxml_limits,
         }))
     }
 

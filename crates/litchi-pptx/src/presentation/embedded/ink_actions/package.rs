@@ -600,9 +600,9 @@ fn capture_source_readset(package: &OpcPackage, owner: &PackURI) -> Result<Sourc
     let read_limits = package.read_limits();
     let root = PackURI::new("/").map_err(OpcError::InvalidPackUri)?;
     Ok(SourceReadset {
-        content_types: package.source_content_types_with_limits(read_limits)?,
-        owner_relationships: package.source_relationships_with_limits(owner, read_limits)?,
-        package_relationships: package.source_relationships_with_limits(&root, read_limits)?,
+        content_types: package.source_content_types(read_limits)?,
+        owner_relationships: package.source_relationships(owner, read_limits)?,
+        package_relationships: package.source_relationships(&root, read_limits)?,
     })
 }
 
@@ -620,7 +620,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
     let mut total_xml_events = 0usize;
     let mut total_relationships = 0usize;
 
-    let root_source = package.source_relationships_with_limits(&root, limits)?;
+    let root_source = package.source_relationships(&root, limits)?;
     validate_relationship_source(
         &root_source,
         limits,
@@ -631,7 +631,7 @@ fn validate_relationship_sources(package: &OpcPackage) -> Result<()> {
     )?;
 
     for part in package.iter_parts() {
-        let source = package.source_relationships_with_limits(part.partname(), limits)?;
+        let source = package.source_relationships(part.partname(), limits)?;
         validate_relationship_source(
             &source,
             limits,
@@ -735,7 +735,7 @@ fn check_relationship_limit(
 
 fn capture_owner_relationship_source(package: &OpcPackage, owner: &PackURI) -> Result<()> {
     let read_limits = package.read_limits();
-    package.source_relationships_with_limits(owner, read_limits)?;
+    package.source_relationships(owner, read_limits)?;
     Ok(())
 }
 

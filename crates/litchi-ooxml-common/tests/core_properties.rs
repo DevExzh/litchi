@@ -104,8 +104,13 @@ fn retained_metadata_graph_matches_eager_repairs_and_refusals() {
         } else {
             package.relate_to(CORE_PATH.trim_start_matches('/'), relationship);
         }
-        let physical =
-            SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package).unwrap()).unwrap();
+        let physical = SourceBackedPackage::from_vec(
+            PackageWriter::to_bytes(&package).unwrap(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let prepared = physical
             .prepare_topology(SourceTopologyPlan::new())
             .unwrap();

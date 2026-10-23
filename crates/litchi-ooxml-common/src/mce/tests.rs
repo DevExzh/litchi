@@ -1108,9 +1108,12 @@ mod fixture_tests {
 
     #[test]
     fn poi_styles_select_unsupported_vendor_fallbacks() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
-        ))
+        let package = OpcPackage::from_bytes(
+            include_bytes!(
+                "../../../../test-data/poi/test-data/spreadsheet/style-alternate-content.xlsx"
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/styles.xml").unwrap())
@@ -1126,9 +1129,12 @@ mod fixture_tests {
 
     #[test]
     fn libreoffice_pptx_emits_only_fallback_shape() {
-        let package = OpcPackage::from_bytes(include_bytes!(
-            "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
-        ))
+        let package = OpcPackage::from_bytes(
+            include_bytes!(
+                "../../../../test-data/libreoffice-core/oox/qa/unit/data/import-mce.pptx"
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let part = package
             .get_part(&PackURI::new("/ppt/slides/slide1.xml").unwrap())

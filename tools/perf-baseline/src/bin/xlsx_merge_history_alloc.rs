@@ -398,7 +398,8 @@ fn verify_history(
         } else {
             unmerge_fixture
         };
-        let mut replay_package = OpcPackage::from_bytes(fixture)?;
+        let mut replay_package =
+            OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
         patch.apply(&mut replay_package)?;
         let replayed = PackageWriter::to_bytes(&replay_package)?;
         if replayed == fixture {
@@ -407,7 +408,8 @@ fn verify_history(
         replay_checks = replay_checks
             .checked_add(1)
             .ok_or("replay check counter overflow")?;
-        let mut inverse_package = OpcPackage::from_bytes(&replayed)?;
+        let mut inverse_package =
+            OpcPackage::from_bytes(&replayed, litchi_opc::SourceLimits::default())?;
         patch
             .inverse()
             .apply_materialized(&mut inverse_package, 64 * 1024)?;
@@ -710,8 +712,10 @@ fn run_common_replay(
     AllocationDelta,
     AllocationDelta,
 )> {
-    let merge_recipient = OpcPackage::from_bytes(merge_fixture)?;
-    let unmerge_recipient = OpcPackage::from_bytes(unmerge_fixture)?;
+    let merge_recipient =
+        OpcPackage::from_bytes(merge_fixture, litchi_opc::SourceLimits::default())?;
+    let unmerge_recipient =
+        OpcPackage::from_bytes(unmerge_fixture, litchi_opc::SourceLimits::default())?;
     let mut merge_forward_package = merge_recipient.clone();
     patches[0].apply(&mut merge_forward_package)?;
     let merge_forward = PackageWriter::to_bytes(&merge_forward_package)?;
@@ -1049,7 +1053,7 @@ fn fixture(merged: bool) -> AnyResult<Vec<u8>> {
     let committed = edit.commit()?.into_package();
     let mut output = Vec::new();
     committed.write_to(&mut output)?;
-    let mut package = OpcPackage::from_bytes(&output)?;
+    let mut package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/xl/merge-abba-aux.bin")?,
         "application/octet-stream".to_owned(),
@@ -1070,7 +1074,7 @@ fn fixture_identity(merge: &[u8], unmerge: &[u8]) -> AnyResult<FixtureIdentity> 
 }
 
 fn target_sha256(fixture: &[u8]) -> AnyResult<String> {
-    let package = OpcPackage::from_bytes(fixture)?;
+    let package = OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new(WORKSHEET_PART)?;
     Ok(sha256_hex(package.get_part(&worksheet)?.blob()))
 }

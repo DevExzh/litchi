@@ -54,7 +54,7 @@ fn bytes(package: &mut Package) -> Vec<u8> {
 /// their relationships), written out so the signature is an ingressed source
 /// signature, as in a file a producer signed.
 fn sign(plain: &[u8]) -> Vec<u8> {
-    let source = OpcPackage::from_vec(plain.to_vec()).unwrap();
+    let source = OpcPackage::from_vec(plain.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -140,7 +140,8 @@ fn signed_with(edit: impl FnOnce(&mut Package)) -> Vec<u8> {
 
 /// Whether `bytes` still carries any OPC signature infrastructure.
 fn carries_signature(bytes: &[u8]) -> bool {
-    let package = OpcPackage::from_vec(bytes.to_vec()).unwrap();
+    let package =
+        OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default()).unwrap();
     package.is_signed()
         || package
             .iter_parts()
@@ -426,9 +427,11 @@ mod glossary_family {
         let unsigned = open(&signed).unsign();
         let output = bytes(&mut unsigned.apply_glossary(&patch).unwrap().into_package());
         assert!(!carries_signature(&output));
-        let (catalog, _) = glossary::load(&OpcPackage::from_vec(output).unwrap())
-            .unwrap()
-            .unwrap();
+        let (catalog, _) = glossary::load(
+            &OpcPackage::from_vec(output, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
         assert!(catalog.get("Patched").unwrap().is_some());
 
         package = package.unsign();

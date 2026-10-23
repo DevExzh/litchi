@@ -848,9 +848,10 @@ impl Pptx {
         let materialized = match (&source, notes.is_empty()) {
             (Editable::Source(package), false) => {
                 let bytes = package.to_bytes()?;
-                Some(Arc::new(litchi_pptx::Package::from_reader(
-                    std::io::Cursor::new(bytes),
-                )?))
+                Some(super::super::eager_package_from_source(
+                    bytes,
+                    self.0.ooxml_limits,
+                )?)
             },
             _ => None,
         };

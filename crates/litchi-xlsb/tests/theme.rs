@@ -160,7 +160,7 @@ fn relationship_fingerprint(
 fn relationship_xml(workbook: &Workbook, owner: &PackURI) -> Vec<u8> {
     workbook
         .opc_package()
-        .source_relationships(owner)
+        .source_relationships(owner, litchi_opc::SourceLimits::default())
         .expect("capture relationship XML")
         .bytes()
         .to_vec()
@@ -169,7 +169,7 @@ fn relationship_xml(workbook: &Workbook, owner: &PackURI) -> Vec<u8> {
 fn replace_theme_relationship_source_lexically(package: &mut litchi_opc::OpcPackage) {
     let owner = theme_uri();
     let source = package
-        .source_relationships(&owner)
+        .source_relationships(&owner, litchi_opc::SourceLimits::default())
         .expect("capture Theme relationship source");
     let replacement = ["rIdInternalThemeImage", "rIdExternalThemeImage"]
         .into_iter()
@@ -195,7 +195,7 @@ fn replace_theme_relationship_source_lexically(package: &mut litchi_opc::OpcPack
         })
         .expect("reinsert one Theme edge with changed lexical bytes");
     package
-        .try_replace_relationships(&source, &replacement)
+        .try_replace_relationships(&source, &replacement, litchi_opc::SourceLimits::default())
         .expect("replace Theme relationship source token");
 }
 
@@ -798,7 +798,7 @@ fn typed_theme_owner_remove_inverse_restores_xml_graph_and_resources() {
         .to_vec();
     let before_content_types = workbook
         .opc_package()
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("capture content-types XML")
         .bytes()
         .to_vec();
@@ -845,7 +845,7 @@ fn typed_theme_owner_remove_inverse_restores_xml_graph_and_resources() {
     assert_eq!(
         workbook
             .opc_package()
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("capture restored content-types XML")
             .bytes(),
         before_content_types
@@ -1029,14 +1029,14 @@ fn newly_created_theme_inverse_rejects_changed_empty_relationship_member() {
                 )
                 .expect("temporary Theme image relationship");
             let source = package
-                .source_relationships(&created_theme_uri)
+                .source_relationships(&created_theme_uri, litchi_opc::SourceLimits::default())
                 .expect("capture non-empty Theme relationship source");
             let empty = source
                 .without_relationship("rIdTemporaryImage", usize::MAX)
                 .expect("remove temporary Theme image relationship");
             assert!(empty.member_present(), "retain physical empty .rels member");
             package
-                .try_replace_relationships(&source, &empty)
+                .try_replace_relationships(&source, &empty, litchi_opc::SourceLimits::default())
                 .expect("publish physical empty Theme .rels member");
             Ok(())
         })
@@ -1069,7 +1069,7 @@ fn absent_theme_owner_remove_noop_preserves_source_bytes() {
     let before_workbook_relationships = relationship_xml(&workbook, &workbook_uri());
     let before_content_types = workbook
         .opc_package()
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("capture absent content-types XML")
         .bytes()
         .to_vec();
@@ -1091,7 +1091,7 @@ fn absent_theme_owner_remove_noop_preserves_source_bytes() {
     assert_eq!(
         workbook
             .opc_package()
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("capture preserved content-types XML")
             .bytes(),
         before_content_types

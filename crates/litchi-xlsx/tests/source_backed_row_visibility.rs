@@ -254,7 +254,7 @@ fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -309,7 +309,8 @@ fn batch_changes_only_hidden_owners_and_exact_inverse_restores_source() {
     assert_eq!(commit.patch().after().is_hidden(row(1)), Some(true));
     assert_eq!(commit.patch().after().is_hidden(row(2)), Some(false));
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let unused = replay
         .get_part(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -331,7 +332,8 @@ fn batch_changes_only_hidden_owners_and_exact_inverse_restores_source() {
     editor
         .publish_commit_to_stream(&mut published, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&published).unwrap();
+    let published =
+        OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(worksheet_xml(&published), after_xml.as_bytes());
     assert_eq!(
         published
@@ -362,7 +364,7 @@ fn canonical_requests_are_exact_noops() {
 fn changed_publication_reuses_matched_provenance_without_selected_reload() {
     let bytes = ordinary(oversized_row_worksheet_xml(8 * 1024 * 1024 + 64 * 1024));
     let worksheet_data_offset = zip_member_data_offset(&bytes, b"xl/worksheets/sheet1.xml");
-    let unused = OpcPackage::from_bytes(&bytes)
+    let unused = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -387,7 +389,7 @@ fn changed_publication_reuses_matched_provenance_without_selected_reload() {
     assert_eq!(source.matching_small_read_count(), 1);
     assert_eq!(published_snapshot.is_hidden(row(0)), Some(true));
 
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     let reopened = Snapshot::load(&published, "Sheet1").unwrap();
     assert_eq!(reopened.is_hidden(row(0)), Some(true));
     assert_eq!(
@@ -459,7 +461,7 @@ fn stale_package_and_source_revision_are_refused_without_output() {
     edit.hide(row(0)).unwrap();
     let commit = edit.commit().unwrap();
 
-    let mut stale = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut stale = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     stale
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -526,7 +528,8 @@ fn public_snapshot_distinguishes_missing_and_visible_row_owners() {
     let xml = format!(
         r#"<worksheet xmlns="{SML}"><sheetData><row r="2" hidden="false"/></sheetData></worksheet>"#
     );
-    let package = OpcPackage::from_bytes(&ordinary(xml)).unwrap();
+    let package =
+        OpcPackage::from_bytes(&ordinary(xml), litchi_opc::SourceLimits::default()).unwrap();
     let snapshot = Snapshot::load(&package, "Sheet1").unwrap();
     assert_eq!(snapshot.is_hidden(row(0)), None);
     assert_eq!(snapshot.is_hidden(row(1)), Some(false));
@@ -713,7 +716,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     let before_len = before_xml.len();
     let bytes = ordinary(before_xml.clone());
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
-    let unused = OpcPackage::from_bytes(&bytes)
+    let unused = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -739,7 +742,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     assert_eq!(commit.patch().after().source_xml(), after_xml.as_bytes());
     assert_eq!(budget.used(Resource::Memory), exact);
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(worksheet_xml(&replay), after_xml.as_bytes());
     replay_patch(
@@ -760,7 +763,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     editor
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(worksheet_xml(&published), after_xml.as_bytes());
     assert_eq!(
         published
@@ -812,10 +815,12 @@ fn managed_editor_adopts_an_indexed_package_and_releases_budget() {
     let bytes = ordinary(before_xml);
     let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(bytes)),
         litchi_xlsx::SourceLimits::default(),
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let editor = RowVisibilityEditor::from_source_backed_package(package).unwrap();

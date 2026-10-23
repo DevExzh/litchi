@@ -259,7 +259,7 @@ impl Pptx {
             geometry[3].unwrap_or(DEFAULT_BOUNDS.3),
         );
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         native.add_media(
             slide,

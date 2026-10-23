@@ -1255,12 +1255,12 @@ fn preflight_delta(
     maximum: usize,
 ) -> std::result::Result<(), PatchError> {
     let before_content = before
-        .source_content_types()
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types()
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1389,12 +1389,11 @@ fn part_member_size(
         return Ok(1);
     }
     let part = decoded_part(package, name)?;
-    let relationships =
-        package
-            .source_relationships(name)
-            .map_err(|_| PatchError::InvalidText {
-                field: "Ink durable relationship token",
-            })?;
+    let relationships = package
+        .source_relationships(name, package.read_limits())
+        .map_err(|_| PatchError::InvalidText {
+            field: "Ink durable relationship token",
+        })?;
     let mut size = 1usize;
     size = size.saturating_add(framed_size(part.content_type().len()));
     size = size.saturating_add(framed_size(part.blob().len()));
@@ -1416,18 +1415,16 @@ fn parts_equal(
         (true, true) => {
             let left = decoded_part(before, name)?;
             let right = decoded_part(after, name)?;
-            let left_relationships =
-                before
-                    .source_relationships(name)
-                    .map_err(|_| PatchError::InvalidText {
-                        field: "Ink durable relationship token",
-                    })?;
-            let right_relationships =
-                after
-                    .source_relationships(name)
-                    .map_err(|_| PatchError::InvalidText {
-                        field: "Ink durable relationship token",
-                    })?;
+            let left_relationships = before
+                .source_relationships(name, before.read_limits())
+                .map_err(|_| PatchError::InvalidText {
+                    field: "Ink durable relationship token",
+                })?;
+            let right_relationships = after
+                .source_relationships(name, after.read_limits())
+                .map_err(|_| PatchError::InvalidText {
+                    field: "Ink durable relationship token",
+                })?;
             Ok(left.content_type() == right.content_type()
                 && left.blob() == right.blob()
                 && left_relationships.member_present() == right_relationships.member_present()
@@ -1549,12 +1546,12 @@ fn collect_records(
     after: &OpcPackage,
 ) -> std::result::Result<Vec<Record>, PatchError> {
     let before_content = before
-        .source_content_types()
+        .source_content_types(before.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable source content types",
         })?;
     let after_content = after
-        .source_content_types()
+        .source_content_types(after.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable target content types",
         })?;
@@ -1657,12 +1654,11 @@ fn capture_part(
         return Ok(None);
     }
     let part = decoded_part(package, name)?;
-    let relationships =
-        package
-            .source_relationships(name)
-            .map_err(|_| PatchError::InvalidText {
-                field: "Ink durable relationship token",
-            })?;
+    let relationships = package
+        .source_relationships(name, package.read_limits())
+        .map_err(|_| PatchError::InvalidText {
+            field: "Ink durable relationship token",
+        })?;
     Ok(Some(Member {
         content_type: Some(clone_durable_text(
             part.content_type(),
@@ -1699,7 +1695,7 @@ fn clone_durable_text(text: &str, _field: &'static str) -> std::result::Result<S
 
 fn root_relationships(package: &OpcPackage) -> Result<OwnedRelationships> {
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    Ok(package.source_relationships(&root)?)
+    Ok(package.source_relationships(&root, package.read_limits())?)
 }
 
 #[derive(Clone, Copy)]
@@ -1763,7 +1759,7 @@ fn package_fingerprint_with_bounds(
         }
     }
     let content = package
-        .source_content_types()
+        .source_content_types(package.read_limits())
         .map_err(|_| PatchError::InvalidText {
             field: "Ink durable content types",
         })?;
@@ -1788,12 +1784,11 @@ fn package_fingerprint_with_bounds(
         parts.insert(part.partname().as_str().to_owned(), part);
     }
     for (name, part) in parts {
-        let relationships =
-            package
-                .source_relationships(part.partname())
-                .map_err(|_| PatchError::InvalidText {
-                    field: "Ink durable relationship token",
-                })?;
+        let relationships = package
+            .source_relationships(part.partname(), package.read_limits())
+            .map_err(|_| PatchError::InvalidText {
+                field: "Ink durable relationship token",
+            })?;
         hash_section(&mut digest, b"part-name", name.as_bytes());
         hash_section(
             &mut digest,
@@ -2198,7 +2193,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
         }
         match record.kind {
             0 => {
-                let current = package.source_content_types()?;
+                let current = package.source_content_types(package.read_limits())?;
                 let expected = record
                     .before
                     .as_ref()
@@ -2248,7 +2243,7 @@ fn validate_delta_source(package: &OpcPackage, records: &[Record]) -> Result<()>
                         let Some((present, relationships)) = expected.relationships.as_ref() else {
                             return Err(invalid_durable("missing source part relationship token"));
                         };
-                        let current = package.source_relationships(&name)?;
+                        let current = package.source_relationships(&name, package.read_limits())?;
                         if expected.content_type.as_deref() != Some(part.content_type())
                             || expected.payload.as_slice() != part.blob()
                             || *present != current.member_present()
@@ -2288,7 +2283,7 @@ fn apply_delta(
         None
     };
     let target_content_bytes = target_content.map(|member| member.payload.as_slice());
-    let source_content = package.source_content_types()?;
+    let source_content = package.source_content_types(package.read_limits())?;
 
     let mut part_records = Vec::new();
     for record in records.iter().filter(|record| record.kind == 2) {
@@ -2350,7 +2345,7 @@ fn apply_delta(
     let mut processed_owners = BTreeSet::new();
     for (owner_name, additions) in &additions_by_owner {
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current_owner = package.source_relationships(&owner)?;
+        let current_owner = package.source_relationships(&owner, package.read_limits())?;
         let replacement_owner = relationship_targets
             .get(owner_name)
             .ok_or_else(|| invalid_durable("missing Ink owner relationship target"))?;
@@ -2394,10 +2389,15 @@ fn apply_delta(
         )?;
         for record in additions {
             let name = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-            let target_relationships = proof.source_relationships(&name)?;
-            let current_relationships = package.source_relationships(&name)?;
+            let target_relationships = proof.source_relationships(&name, proof.read_limits())?;
+            let current_relationships =
+                package.source_relationships(&name, package.read_limits())?;
             if current_relationships != target_relationships {
-                package.try_replace_relationships(&current_relationships, &target_relationships)?;
+                package.try_replace_relationships(
+                    &current_relationships,
+                    &target_relationships,
+                    package.read_limits(),
+                )?;
             }
         }
         current_content = next_content;
@@ -2410,9 +2410,9 @@ fn apply_delta(
             continue;
         }
         let owner = PackURI::new(owner_name.clone()).map_err(Error::Uri)?;
-        let current = package.source_relationships(&owner)?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current != *replacement {
-            package.try_replace_relationships(&current, replacement)?;
+            package.try_replace_relationships(&current, replacement, package.read_limits())?;
         }
     }
 
@@ -2458,15 +2458,19 @@ fn apply_delta(
     }
 
     if let Some(target) = target_content_bytes {
-        let replacement = proof.source_content_types()?;
+        let replacement = proof.source_content_types(proof.read_limits())?;
         if replacement.bytes() != target {
             return Err(invalid_durable(
                 "Ink durable proof content types changed during OPC parsing",
             ));
         }
-        let current_token = package.source_content_types()?;
-        package.try_replace_content_types(current_token.bytes(), &replacement)?;
-        if package.source_content_types()?.bytes() != target {
+        let current_token = package.source_content_types(package.read_limits())?;
+        package.try_replace_content_types(
+            current_token.bytes(),
+            &replacement,
+            package.read_limits(),
+        )?;
+        if package.source_content_types(package.read_limits())?.bytes() != target {
             return Err(invalid_durable(
                 "content-types transition is not source-preserving",
             ));
@@ -2532,7 +2536,7 @@ fn exact_transition_proof_package(
         proof_maximum,
     )?;
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    let root_relationships = package.source_relationships(&root)?;
+    let root_relationships = package.source_relationships(&root, package.read_limits())?;
     if root_relationships.member_present() {
         proof_add_metadata(
             &mut total,
@@ -2620,7 +2624,7 @@ fn exact_transition_proof_package(
         }
     }
     let proof = writer.finish()?;
-    Ok(OpcPackage::from_bytes(&proof)?)
+    Ok(OpcPackage::from_bytes(&proof, package.read_limits())?)
 }
 
 enum ProofRelationships<'a> {
@@ -2683,7 +2687,7 @@ fn final_proof_part<'a>(
     }
     let name = PackURI::new(name.to_owned()).map_err(Error::Uri)?;
     let part = package.get_part(&name)?;
-    let relationships = package.source_relationships(&name)?;
+    let relationships = package.source_relationships(&name, package.read_limits())?;
     Ok(ProofPart {
         content_type: part.content_type(),
         payload: &[],
@@ -2824,7 +2828,7 @@ fn relationship_tokens(
         let Some((after_present, after_bytes)) = after.relationships.as_ref() else {
             return Err(invalid_durable("missing target owner relationships"));
         };
-        let current = package.source_relationships(&owner)?;
+        let current = package.source_relationships(&owner, package.read_limits())?;
         if current.member_present() != *before_present || current.bytes() != before_bytes {
             return Err(invalid_durable("relationship owner source is stale"));
         }
@@ -2845,7 +2849,7 @@ fn relationship_tokens(
                 return Err(invalid_durable("relationship retargeting is not admitted"));
             }
         }
-        let token = proof.source_relationships(&owner)?;
+        let token = proof.source_relationships(&owner, proof.read_limits())?;
         if token.bytes() != after_bytes || token.member_present() != *after_present {
             return Err(invalid_durable(
                 "relationship proof token does not match target",
@@ -3154,7 +3158,8 @@ mod tests {
                 .expect("stored payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            .expect("corruption is deferred to first decode")
     }
 
     fn is_undecodable_part(result: std::result::Result<impl Sized, PatchError>) -> bool {

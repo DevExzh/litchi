@@ -1221,7 +1221,7 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
         })?)
         .ok_or_else(|| invalid("stylesWithEffects relationship count overflow"))?;
     let root = PackURI::new("/").map_err(Error::Uri)?;
-    let root_token = package.source_relationships_with_limits(&root, limits)?;
+    let root_token = package.source_relationships(&root, limits)?;
     let mut relationship_parts = usize::from(root_token.member_present());
     let mut relationship_xml_bytes = 0_u64;
     let mut relationship_xml_events = 0_usize;
@@ -1231,7 +1231,7 @@ fn capture_aggregate_metrics(package: &OpcPackage) -> Result<AggregateMetrics> {
         relationship_xml_events = relationship_metrics(root_token.bytes())?.0;
     }
     for part in package.iter_parts() {
-        let token = package.source_relationships_with_limits(part.partname(), limits)?;
+        let token = package.source_relationships(part.partname(), limits)?;
         if token.member_present() {
             relationship_parts = relationship_parts
                 .checked_add(1)
@@ -1305,15 +1305,13 @@ fn capture_graph_token(
     };
     let relationships = source
         .as_ref()
-        .map(|source| package.source_relationships_with_limits(source, package.read_limits()))
+        .map(|source| package.source_relationships(source, package.read_limits()))
         .transpose()?;
-    let content_types = package.source_content_types_with_limits(package.read_limits())?;
+    let content_types = package.source_content_types(package.read_limits())?;
     let aggregate = capture_aggregate_metrics(package)?;
     let binding = graph.binding(owner);
     let target_relationships = binding
-        .map(|binding| {
-            package.source_relationships_with_limits(&binding.target, package.read_limits())
-        })
+        .map(|binding| package.source_relationships(&binding.target, package.read_limits()))
         .transpose()?;
     let (planned_target, planned_relationship_id) = if binding.is_none() {
         let planned_target = source
@@ -1511,7 +1509,7 @@ fn readback_existing_resource_replacement(
         ));
     }
     let limits = package.read_limits();
-    let target_relationships = package.source_relationships_with_limits(&binding.target, limits)?;
+    let target_relationships = package.source_relationships(&binding.target, limits)?;
     if desired_graph.target_relationships.as_ref() != Some(&target_relationships) {
         return Err(invalid(
             "stylesWithEffects replacement graph target metadata differs from its source",
@@ -1624,8 +1622,7 @@ fn publish_resource(
         (Some(binding), Some(resource)) => {
             validate_resource_for_package(&resource, package, graph.conformance)?;
             if let Some(desired) = desired_graph {
-                let target_relationships =
-                    package.source_relationships_with_limits(&binding.target, limits)?;
+                let target_relationships = package.source_relationships(&binding.target, limits)?;
                 if desired.target.as_deref() != Some(binding.target.as_str())
                     || desired.relationship_id.as_deref() != Some(binding.relationship_id.as_str())
                     || desired.target_relationships.as_ref() != Some(&target_relationships)
@@ -1635,7 +1632,7 @@ fn publish_resource(
                     ));
                 }
             }
-            let relationship_token = package.source_relationships_with_limits(&source, limits)?;
+            let relationship_token = package.source_relationships(&source, limits)?;
             let relationship_len = relationship_token.bytes().len();
             let (relationship_events, relationship_count) =
                 relationship_metrics(relationship_token.bytes())?;
@@ -1675,11 +1672,9 @@ fn publish_resource(
                 )));
             }
 
-            let current_relationships =
-                package.source_relationships_with_limits(&source, limits)?;
-            let current_content_types = package.source_content_types_with_limits(limits)?;
-            let target_relationships =
-                package.source_relationships_with_limits(&binding.target, limits)?;
+            let current_relationships = package.source_relationships(&source, limits)?;
+            let current_content_types = package.source_content_types(limits)?;
+            let target_relationships = package.source_relationships(&binding.target, limits)?;
             let relationship_part_delta = -i64::from(target_relationships.member_present());
             let (replacement_relationships, replacement_content_types) = if let Some(
                 desired_graph,
@@ -1767,12 +1762,12 @@ fn publish_resource(
                 replacement_content_types.bytes().len() as u64,
                 limits.max_content_types_bytes() as u64,
             )?;
-            package.try_replace_content_types_with_limits(
+            package.try_replace_content_types(
                 current_content_types.bytes(),
                 &replacement_content_types,
                 limits,
             )?;
-            package.try_replace_relationships_with_limits(
+            package.try_replace_relationships(
                 &current_relationships,
                 &replacement_relationships,
                 limits,
@@ -1781,9 +1776,8 @@ fn publish_resource(
         },
         (None, Some(resource)) => {
             validate_resource_for_package(&resource, package, graph.conformance)?;
-            let current_relationships =
-                package.source_relationships_with_limits(&source, limits)?;
-            let current_content_types = package.source_content_types_with_limits(limits)?;
+            let current_relationships = package.source_relationships(&source, limits)?;
+            let current_content_types = package.source_content_types(limits)?;
             let (
                 target,
                 relationship_id,
@@ -1905,8 +1899,8 @@ fn publish_resource(
             )?;
             if let Some(target_relationships) = target_relationships {
                 let current_target_relationships =
-                    package.source_relationships_with_limits(&target_name, limits)?;
-                package.try_replace_relationships_with_limits(
+                    package.source_relationships(&target_name, limits)?;
+                package.try_replace_relationships(
                     &current_target_relationships,
                     &target_relationships,
                     limits,
@@ -2059,7 +2053,7 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects relationship count overflow"))?;
     }
     let mut relationship_events = 0usize;
-    let root_token = package.source_relationships_with_limits(&root, limits)?;
+    let root_token = package.source_relationships(&root, limits)?;
     let mut relationship_parts = usize::from(root_token.member_present());
     if root_token.member_present() {
         relationship_bytes = relationship_bytes
@@ -2070,7 +2064,7 @@ fn preflight_package_limits(
             .ok_or_else(|| invalid("stylesWithEffects relationship event count overflow"))?;
     }
     for part in package.iter_parts() {
-        let token = package.source_relationships_with_limits(part.partname(), limits)?;
+        let token = package.source_relationships(part.partname(), limits)?;
         let removed_part = old_target
             .as_ref()
             .is_some_and(|target| same_uri(target, part.partname()));
@@ -3088,7 +3082,8 @@ mod tests {
                 .expect("stored owner payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("corruption is deferred to first decode")
+        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            .expect("corruption is deferred to first decode")
     }
 
     // Review of the 0759 merge: the graph walk decoded every owner only to

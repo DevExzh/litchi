@@ -35,7 +35,8 @@ fn deck() -> Vec<u8> {
 }
 
 fn rewrite(bytes: &[u8], edit: impl FnOnce(&mut OpcPackage)) -> Vec<u8> {
-    let mut opc = OpcPackage::from_bytes(bytes).expect("OPC package");
+    let mut opc =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC package");
     edit(&mut opc);
     PackageWriter::to_bytes(&opc).expect("rewritten package bytes")
 }
@@ -99,7 +100,8 @@ fn eager_notes_match_source_and_survive_owner_drop() {
 #[test]
 fn eager_notes_do_not_require_the_presentation_notes_graph() {
     let bytes = deck();
-    let mut opc = OpcPackage::from_bytes(&bytes).expect("OPC package");
+    let mut opc =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).expect("OPC package");
     let presentation_uri = PackURI::new("/ppt/presentation.xml").expect("presentation URI");
     let master_uri = opc
         .get_part(&presentation_uri)
@@ -123,7 +125,8 @@ fn eager_notes_do_not_require_the_presentation_notes_graph() {
     let slide = presentation.slide(0).expect("slide lookup").expect("slide");
     assert!(slide.notes().expect("leaf notes read").is_some());
 
-    let mut selected_broken = OpcPackage::from_bytes(&bytes).expect("selected package");
+    let mut selected_broken = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("selected package");
     selected_broken
         .get_part_mut(&master_uri)
         .expect("notes master part")

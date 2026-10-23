@@ -281,7 +281,7 @@ impl Package {
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
         Ok(
-            Self::from_opc_package(OpcPackage::open_with_limits(path, options.source_limits)?)?
+            Self::from_opc_package(OpcPackage::open(path, options.source_limits)?)?
                 .with_semantic_limits(options.semantic_limits),
         )
     }
@@ -330,7 +330,7 @@ impl Package {
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.docx")?;
-    /// let opc = OpcPackage::from_reader(Cursor::new(bytes))?;
+    /// let opc = OpcPackage::from_reader(Cursor::new(bytes), litchi_opc::SourceLimits::default())?;
     /// let pkg = Package::from_opc_package(opc)?;
     /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
     /// ```
@@ -393,11 +393,10 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn from_reader_with_options<R: Read>(reader: R, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Ok(Self::from_opc_package(OpcPackage::from_reader_with_limits(
-            reader,
-            options.source_limits,
-        )?)?
-        .with_semantic_limits(options.semantic_limits))
+        Ok(
+            Self::from_opc_package(OpcPackage::from_reader(reader, options.source_limits)?)?
+                .with_semantic_limits(options.semantic_limits),
+        )
     }
 
     /// Open a password-bearing DOCX reader with standard finite policies.
@@ -487,7 +486,7 @@ impl Package {
     pub fn from_decrypted(opened: crate::encryption::Opened, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
         let source_encryption = opened.mode();
-        let opc = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
+        let opc = OpcPackage::from_vec(opened.into_bytes(), options.source_limits)?;
         let mut package =
             Self::from_opc_package(opc)?.with_semantic_limits(options.semantic_limits);
         package.source_encryption = source_encryption.map_or_else(

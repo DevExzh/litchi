@@ -68,7 +68,7 @@ pub fn try_detect_zip_format_from_reader<R: Read + Seek>(
     reader: &mut R,
     limits: &crate::opc::SourceLimits,
 ) -> crate::opc::Result<Option<FileFormat>> {
-    let catalog = crate::opc::probe_package_catalog_from_reader_with_limits(reader, *limits)?;
+    let catalog = crate::opc::probe_package_catalog_from_reader(reader, *limits)?;
     Ok(detect_ooxml_format_from_catalog(&catalog))
 }
 

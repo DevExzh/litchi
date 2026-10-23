@@ -379,14 +379,19 @@ fn settings_archive(
 }
 
 fn part_bytes(archive: &[u8], uri: &str) -> Vec<u8> {
-    SourceBackedPackage::from_vec(archive.to_vec())
-        .expect("published archive must open")
-        .part(&PackURI::new(uri).expect("part URI must be valid"))
-        .expect("requested part must exist")
-        .data()
-        .expect("part must decode")
-        .as_bytes()
-        .to_vec()
+    SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive must open")
+    .part(&PackURI::new(uri).expect("part URI must be valid"))
+    .expect("requested part must exist")
+    .data()
+    .expect("part must decode")
+    .as_bytes()
+    .to_vec()
 }
 
 fn main_bytes(archive: &[u8]) -> Vec<u8> {

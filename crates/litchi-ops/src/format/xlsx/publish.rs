@@ -280,8 +280,13 @@ mod tests {
             .expect("create workbook")
             .to_bytes()
             .expect("serialize source");
-        let package =
-            litchi_opc::SourceBackedPackage::from_vec(source.clone()).expect("source package");
+        let package = litchi_opc::SourceBackedPackage::from_vec(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("source package");
         let handle =
             Xlsx::from_source_package(package, &OpenOptions::new()).expect("adopt source package");
         let mut output = Vec::new();

@@ -35,7 +35,7 @@ fn package_with_slide_xml(xml: &[u8]) -> Package {
     builder.presentation().unwrap().add_slide().unwrap();
     let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/slides/slide1.xml").unwrap())
         .unwrap()
         .set_blob(xml.to_vec());

@@ -55,7 +55,13 @@ fn archive_bytes(document: &[u8]) -> Vec<u8> {
 }
 
 fn open_package(document: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(archive_bytes(document)).expect("fixture package must open")
+    SourceBackedPackage::from_vec(
+        archive_bytes(document),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open")
 }
 
 fn source_parts(package: &SourceBackedPackage) -> (usize, SourceXmlPart) {
@@ -200,10 +206,12 @@ fn eligible_hint_comparison_consumes_its_bounded_work_charge() {
         )
         .unwrap(),
     );
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let part = package.part(&document_uri()).unwrap();

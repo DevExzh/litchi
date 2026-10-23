@@ -124,7 +124,13 @@ fn package_bytes(include_empty_owned_relationships: bool, include_large_part: bo
     // The hand-authored archive intentionally carries a noncanonical lexical
     // content-types member.  Reopen it once so the source catalog validates
     // the physical graph before the source-backed tests use it.
-    SourceBackedPackage::from_vec(bytes.clone()).expect("fixture source must be admitted");
+    SourceBackedPackage::from_vec(
+        bytes.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture source must be admitted");
     bytes
 }
 
@@ -200,7 +206,12 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
 }
 
 fn publish(source: &[u8], plan: SourceTopologyPlan) -> litchi_opc::Result<Vec<u8>> {
-    let package = SourceBackedPackage::from_vec(source.to_vec())?;
+    let package = SourceBackedPackage::from_vec(
+        source.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     let mut output = Vec::new();
     package.write_topology_to_stream(&mut output, plan)?;
     Ok(output)
@@ -322,7 +333,13 @@ fn raw_metadata_remove_reopen_and_restore_recovers_exact_xml() {
     assert!(optional_member(&removed, "custom/existing.xml").is_none());
     assert!(optional_member(&removed, "custom/_rels/existing.xml.rels").is_none());
 
-    let reopened = SourceBackedPackage::from_vec(removed.clone()).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        removed.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut inverse = SourceTopologyPlan::new();
     inverse
         .try_add_part(
@@ -391,10 +408,15 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
         )
         .unwrap();
     let mut output = Vec::new();
-    let error = SourceBackedPackage::from_vec(source.clone())
-        .unwrap()
-        .write_topology_to_stream(&mut output, stale)
-        .unwrap_err();
+    let error = SourceBackedPackage::from_vec(
+        source.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_topology_to_stream(&mut output, stale)
+    .unwrap_err();
     assert!(matches!(
         error,
         OpcError::SourceBackedOverlayUnavailable { .. }
@@ -421,10 +443,15 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
         )
         .unwrap();
     let mut output = Vec::new();
-    let error = SourceBackedPackage::from_vec(source.clone())
-        .unwrap()
-        .write_topology_to_stream(&mut output, mismatch)
-        .unwrap_err();
+    let error = SourceBackedPackage::from_vec(
+        source.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_topology_to_stream(&mut output, mismatch)
+    .unwrap_err();
     assert!(
         matches!(
             error,
@@ -444,10 +471,15 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
         .try_restore_content_types_xml(Arc::new(original_types.clone()), Arc::new(original_types))
         .unwrap();
     let mut output = Vec::new();
-    let error = SourceBackedPackage::from_vec(source)
-        .unwrap()
-        .write_topology_to_stream(&mut output, content_types_mismatch)
-        .unwrap_err();
+    let error = SourceBackedPackage::from_vec(
+        source,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_topology_to_stream(&mut output, content_types_mismatch)
+    .unwrap_err();
     assert!(
         matches!(
             error,
@@ -466,10 +498,15 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
 
 fn assert_rejected_without_output(source: &[u8], plan: SourceTopologyPlan) {
     let mut output = Vec::new();
-    let error = SourceBackedPackage::from_vec(source.to_vec())
-        .unwrap()
-        .write_topology_to_stream(&mut output, plan)
-        .unwrap_err();
+    let error = SourceBackedPackage::from_vec(
+        source.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_topology_to_stream(&mut output, plan)
+    .unwrap_err();
     assert!(matches!(
         error,
         OpcError::SourceBackedOverlayUnavailable { .. }
@@ -481,7 +518,13 @@ fn assert_rejected_without_output(source: &[u8], plan: SourceTopologyPlan) {
 }
 
 fn assert_relationship_manifest_rejected(source: &[u8], plan: SourceTopologyPlan) {
-    let package = SourceBackedPackage::from_vec(source.to_vec()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut output = Vec::new();
     let error = package
         .write_topology_to_stream(&mut output, plan)
@@ -494,7 +537,13 @@ fn assert_relationship_manifest_rejected(source: &[u8], plan: SourceTopologyPlan
 }
 
 fn assert_content_types_manifest_rejected(source: &[u8], plan: SourceTopologyPlan) {
-    let package = SourceBackedPackage::from_vec(source.to_vec()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut output = Vec::new();
     let error = package
         .write_topology_to_stream(&mut output, plan)
@@ -697,7 +746,13 @@ fn raw_metadata_restores_absent_and_present_empty_relationship_members() {
         empty
     );
 
-    let reopened = SourceBackedPackage::from_vec(with_member).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        with_member,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut remove_member = SourceTopologyPlan::new();
     remove_member
         .try_restore_relationships_xml(pack(EXISTING), Some(Arc::new(empty.clone())), None)
@@ -718,7 +773,13 @@ fn raw_metadata_restores_absent_and_present_empty_relationship_members() {
         .unwrap();
     let absent = publish(&present_source, remove_present).unwrap();
     assert!(optional_member(&absent, "custom/_rels/existing.xml.rels").is_none());
-    let reopened = SourceBackedPackage::from_vec(absent).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        absent,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut restore_present = SourceTopologyPlan::new();
     restore_present
         .try_restore_relationships_xml(pack(EXISTING), None, Some(Arc::new(empty.clone())))
@@ -741,10 +802,12 @@ fn raw_metadata_managed_preparation_releases_reservations_after_cancellation() {
         remove_once(&original_document_relationships, DOCUMENT_DROP_ENTRY);
 
     let (budget, cancellation_source, context) = managed_context(16 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source)),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let baseline = budget.used(Resource::Memory);
@@ -816,10 +879,15 @@ fn signed_raw_metadata_noop_is_exact_but_changed_restore_is_refused() {
         .try_restore_content_types_xml(Arc::new(types), Arc::new(changed_types))
         .unwrap();
     let mut output = Vec::new();
-    let error = SourceBackedPackage::from_vec(source)
-        .unwrap()
-        .write_topology_to_stream(&mut output, changed)
-        .unwrap_err();
+    let error = SourceBackedPackage::from_vec(
+        source,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .write_topology_to_stream(&mut output, changed)
+    .unwrap_err();
     assert!(matches!(
         error,
         OpcError::SignedSourceRequiresExplicitPolicy
@@ -840,7 +908,13 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(source.clone(), part_limits).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.clone(),
+        part_limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut plan = SourceTopologyPlan::new();
     plan.try_restore_content_types_xml(
         Arc::new(original_types.clone()),
@@ -862,7 +936,13 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(source.clone(), member_limits).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.clone(),
+        member_limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut content_types_plan = SourceTopologyPlan::new();
     content_types_plan
         .try_restore_content_types_xml(Arc::new(original_types.clone()), Arc::new(enlarged_types))
@@ -882,7 +962,13 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(source.clone(), member_limits).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.clone(),
+        member_limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut relationship_plan = SourceTopologyPlan::new();
     relationship_plan
         .try_restore_relationships_xml(
@@ -916,7 +1002,13 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(source, member_limits).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source,
+        member_limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut relationship_plan = SourceTopologyPlan::new();
     relationship_plan
         .try_restore_relationships_xml(
@@ -1034,7 +1126,14 @@ fn raw_metadata_restore_keeps_untouched_payloads_lazy() {
     let removed_relationships = remove_once(&original_relationships, DOCUMENT_DROP_ENTRY);
     let denied = stored_member_data_range(&source, UNTOUCHED.trim_start_matches('/'));
     let source_handle = Arc::new(DeniedSource::new(source, denied));
-    let package = SourceBackedPackage::from_read_at(source_handle.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source_handle.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     source_handle.enable_payload_denial();
 
     let mut plan = SourceTopologyPlan::new();
@@ -1065,7 +1164,13 @@ fn raw_metadata_restore_keeps_untouched_payloads_lazy() {
 #[test]
 fn prepared_metadata_reads_exact_source_changed_and_omitted_images() {
     let source = package_bytes(true, false);
-    let package = SourceBackedPackage::from_vec(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        source.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let unchanged = package
         .clone()
         .prepare_topology(SourceTopologyPlan::new())
@@ -1149,10 +1254,15 @@ fn prepared_metadata_reads_appended_relationships_including_present_empty() {
             )
             .unwrap();
         }
-        let prepared = SourceBackedPackage::from_vec(source)
-            .unwrap()
-            .prepare_topology(plan)
-            .unwrap();
+        let prepared = SourceBackedPackage::from_vec(
+            source,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+        .prepare_topology(plan)
+        .unwrap();
         let data = prepared
             .relationships_data_for_with_limit(&pack(EXISTING), usize::MAX)
             .unwrap()
@@ -1179,10 +1289,12 @@ fn prepared_metadata_reads_appended_relationships_including_present_empty() {
 #[test]
 fn prepared_metadata_handles_retain_managed_admissions_and_check_cancellation() {
     let (budget, cancellation, context) = managed_context(16 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(package_bytes(false, false))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let baseline = budget.used(Resource::Memory);
@@ -1234,7 +1346,14 @@ fn prepared_metadata_capture_does_not_read_unrelated_payloads() {
     let bytes = package_bytes(true, true);
     let range = stored_member_data_range(&bytes, UNTOUCHED.trim_start_matches('/'));
     let source = Arc::new(DeniedSource::new(bytes, range));
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     source.enable_payload_denial();
     let mut plan = SourceTopologyPlan::new();
     plan.try_remove_relationship(pack(DOCUMENT), "rIdDrop")
@@ -1268,7 +1387,13 @@ fn prepared_metadata_capture_does_not_read_unrelated_payloads() {
 
 #[test]
 fn prepared_metadata_resolves_equivalent_owner_names() {
-    let package = SourceBackedPackage::from_vec(package_bytes(true, false)).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        package_bytes(true, false),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     for changed in [false, true] {
         let mut plan = SourceTopologyPlan::new();
         if changed {
@@ -1292,7 +1417,14 @@ fn prepared_metadata_resolves_equivalent_owner_names() {
 fn prepared_metadata_capture_rechecks_source_but_captured_bytes_remain_immutable() {
     for changed in [false, true] {
         let source = Arc::new(DeniedSource::new(package_bytes(true, false), 0..0));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let mut plan = SourceTopologyPlan::new();
         if changed {
             plan.try_remove_relationship(pack(DOCUMENT), "rIdDrop")

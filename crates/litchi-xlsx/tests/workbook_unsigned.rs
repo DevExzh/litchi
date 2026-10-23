@@ -56,7 +56,8 @@ fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
             .set("A1", "edited")
             .unwrap();
         let output = edit.commit().unwrap().package().to_bytes().unwrap();
-        let reopened = OpcPackage::from_bytes(&output).unwrap();
+        let reopened =
+            OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
         assert!(!reopened.is_signed(), "{name}");
         assert!(
             reopened

@@ -339,7 +339,8 @@ fn package_with_corrupt_part() -> OpcPackage {
     let name_length = usize::from(u16::from_le_bytes([bytes[header + 26], bytes[header + 27]]));
     let extra_length = usize::from(u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]));
     bytes[header + 30 + name_length + extra_length] ^= 0xff;
-    let package = OpcPackage::from_vec(bytes).expect("the deferred open admits the member");
+    let package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+        .expect("the deferred open admits the member");
     assert!(
         package.get_part(&name).is_err(),
         "the fixture's payload must fail to decode"

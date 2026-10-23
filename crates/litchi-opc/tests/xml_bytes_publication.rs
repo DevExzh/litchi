@@ -14,7 +14,7 @@ fn source_package() -> OpcPackage {
         .unwrap()
         .build()
         .unwrap();
-    OpcPackage::from_vec_with_limits(writer.finish_to_bytes().unwrap(), limits).unwrap()
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), limits).unwrap()
 }
 
 fn xml_of_size(size: usize) -> Arc<Vec<u8>> {

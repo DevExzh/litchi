@@ -242,10 +242,11 @@ impl SourceState {
                 limits.max_relationships,
             ));
         }
-        let workbook_relationships = package.source_relationships(workbook_name)?;
+        let workbook_relationships =
+            package.source_relationships(workbook_name, package.read_limits())?;
         let root_name = litchi_opc::PackURI::new("/")?;
-        let root_relationships = package.source_relationships(&root_name)?;
-        let content_types = package.source_content_types()?;
+        let root_relationships = package.source_relationships(&root_name, package.read_limits())?;
+        let content_types = package.source_content_types(package.read_limits())?;
         if workbook_relationships.bytes().len() > limits.max_part_bytes
             || root_relationships.bytes().len() > limits.max_part_bytes
             || content_types.bytes().len() > limits.max_part_bytes
@@ -270,7 +271,8 @@ impl SourceState {
             .map(|graph| package.get_part(&graph.part_name))
             .transpose()?
             .map(|part| {
-                let relationships = package.source_relationships(part.partname())?;
+                let relationships =
+                    package.source_relationships(part.partname(), package.read_limits())?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: part.partname().as_str().to_string(),
                     content_type: part.content_type().to_string(),

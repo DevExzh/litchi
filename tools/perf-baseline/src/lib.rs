@@ -15166,7 +15166,7 @@ fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
     writer.write_stored("casefold/EQUIVALENT-00000.bin", b"equivalent-upper")?;
     let archive = writer.finish_to_bytes()?;
 
-    let eager_error = match OpcPackage::from_bytes(&archive) {
+    let eager_error = match OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default()) {
         Ok(_) => return Err("malformed OPC case-fold corpus was accepted eagerly".into()),
         Err(error) => error,
     };
@@ -15178,7 +15178,13 @@ fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
     }
 
     let source = Arc::new(InstrumentedSource::new(archive, Vec::new()));
-    let source_error = match SourceBackedPackage::from_read_at(source) {
+    let source_error = match SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    ) {
         Ok(_) => {
             return Err("malformed OPC case-fold corpus was accepted by source-backed open".into());
         },
@@ -15272,7 +15278,7 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     let canonical_name_oracle_sha256 = opc_casefold_canonical_name_digest(&part_names);
     let mut expected_names = part_names.clone();
     expected_names.sort();
-    let eager = OpcPackage::from_bytes(&archive)?;
+    let eager = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let mut eager_names = eager
         .iter_parts()
         .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
@@ -15281,10 +15287,16 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     if eager_names != expected_names {
         return Err("eager OPC case-fold corpus names differ from fixed archive names".into());
     }
-    let source = SourceBackedPackage::from_read_at(Arc::new(InstrumentedSource::new(
-        archive.clone(),
-        ordinary_payload_ranges.clone(),
-    )))?;
+    let source = SourceBackedPackage::from_read_at(
+        Arc::new(InstrumentedSource::new(
+            archive.clone(),
+            ordinary_payload_ranges.clone(),
+        )),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut source_names = source
         .iter_parts()
         .map(|part| part.partname().as_str().trim_start_matches('/').to_owned())
@@ -15449,7 +15461,7 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
         );
     }
 
-    let parsed = OpcPackage::from_bytes(&archive)?;
+    let parsed = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let parsed_part_count = parsed.part_count();
     let parsed_relationship_count = parsed.rels().len()
         + parsed
@@ -17218,7 +17230,7 @@ fn restore_docx_source_edit_v1(bytes: Vec<u8>) -> Result<Vec<u8>, Box<dyn Error>
             );
         },
     }
-    let mut package = OpcPackage::from_bytes(&bytes)?;
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())?;
     let part = package.get_part_mut(&PackURI::new("/word/document.xml")?)?;
     let xml = std::str::from_utf8(part.blob())?;
     const LOCAL: &str =
@@ -17365,7 +17377,7 @@ fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
     )))?;
     let snapshot = source.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let main_xml = opc
         .get_part(&PackURI::new("/word/document.xml")?)?
         .blob()
@@ -17530,7 +17542,7 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = docx_source_edit_bytes()?;
     let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
     verify_semantic_docx(&package, SemanticShape::Medium, &[])?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let entry_count = opc.part_count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
@@ -17580,7 +17592,7 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = pptx_source_edit_bytes()?;
     let package = litchi_pptx::Package::from_bytes(&archive)?;
     verify_pptx_source_edit_semantics(&package, 0)?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let entry_count = opc.part_count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
@@ -17867,7 +17879,7 @@ fn build_pptx_source_backed_cross_copy_corpus(
         .ok_or("source-backed PPTX destination slide is missing")?
         .name()?;
     let destination_slide_count = destination_package.presentation()?.slides()?.len();
-    let source_opc = OpcPackage::from_bytes(&source_archive)?;
+    let source_opc = OpcPackage::from_bytes(&source_archive, litchi_opc::SourceLimits::default())?;
     let source_slide_uri = PackURI::new(format!(
         "/ppt/slides/slide{}.xml",
         PPTX_CROSS_COPY_SOURCE_SLIDE + 1
@@ -18070,7 +18082,7 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         .iter()
         .find_map(|(name, range)| (selected_media_member == name).then_some(range.clone()))
         .ok_or("PPTX source image corpus selected media member is missing")?;
-    let source_opc = OpcPackage::from_bytes(&archive)?;
+    let source_opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let uncompressed_payload_bytes = source_opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20440,7 +20452,7 @@ fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error
     {
         return Err("XLSX calculation corpus has unexpected calculation ID".into());
     }
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     for index in 0..XLSX_CALC_MEDIA_ENTRY_COUNT {
         let uri = PackURI::new(format!("/xl/media/image{}.png", index + 1))?;
         if opc.get_part(&uri)?.blob() != xlsx_calculation_media_payload(index) {
@@ -20496,7 +20508,7 @@ fn build_xlsx_defined_names_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-break-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_BREAK_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20511,7 +20523,7 @@ fn build_xlsx_page_break_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_page_break_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let replaced = xlsx_page_break_oracle_rewrite(opc.get_part(&target_uri)?.blob())?;
     opc.get_part_mut(&target_uri)?.set_blob(replaced);
     let archive = PackageWriter::to_bytes(&opc)?;
@@ -20543,7 +20555,7 @@ fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-margin-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_MARGIN_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20558,7 +20570,7 @@ fn build_xlsx_page_margin_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_page_setup_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-page-setup-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_SETUP_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20573,7 +20585,7 @@ fn build_xlsx_page_setup_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-print-options-media".to_owned();
     corpus.manifest.generator = XLSX_PRINT_OPTIONS_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20588,7 +20600,7 @@ fn build_xlsx_print_options_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_sheet_protection_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let target_payload = opc.get_part(&target_uri)?.blob().to_vec();
     corpus.manifest.name = "xlsx-sheet-protection-media".to_owned();
     corpus.manifest.generator = XLSX_SHEET_PROTECTION_SOURCE_EDIT_CORPUS_GENERATOR;
@@ -20603,7 +20615,7 @@ fn build_xlsx_sheet_protection_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::data_validation::replace_data_validation_collections(
         opc.get_part(&target_uri)?.blob(),
         &xlsx_data_validation_values(false)?,
@@ -20636,7 +20648,7 @@ fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::auto_filter::replace_auto_filter(
         opc.get_part(&target_uri)?.blob(),
         Some(&xlsx_auto_filter_value(false)?),
@@ -20669,7 +20681,7 @@ fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
 fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_calculation_metadata_edit_corpus()?;
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let seeded = litchi_xlsx::conditional_formatting::replace_conditional_formattings(
         opc.get_part(&target_uri)?.blob(),
         &xlsx_conditional_formatting_values(false)?,
@@ -20731,7 +20743,7 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
         &merged
     };
     let archive = source.to_bytes()?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     let target_payload = opc.get_part(&worksheet_uri)?.blob().to_vec();
     let entry_count = opc.part_count();
@@ -23115,7 +23127,10 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     let mut duplicate_seed_edit = duplicate_seed.edit()?;
     duplicate_seed_edit.add("Data")?;
     let duplicate_seed = duplicate_seed_edit.commit()?.package().clone();
-    let mut duplicate_package = OpcPackage::from_bytes(&duplicate_seed.to_bytes()?)?;
+    let mut duplicate_package = OpcPackage::from_bytes(
+        &duplicate_seed.to_bytes()?,
+        litchi_opc::SourceLimits::default(),
+    )?;
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_xml =
         String::from_utf8(duplicate_package.get_part(&workbook_uri)?.blob().to_vec())?;
@@ -23373,7 +23388,7 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let mut archive = workbook.to_bytes()?;
-    let mut package = OpcPackage::from_bytes(&archive)?;
+    let mut package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
     if shape == XlsxCellCrudShape::Noncompact {
         for (sheet_index, cells) in spec
@@ -23400,7 +23415,7 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     archive = PackageWriter::to_bytes(&package)?;
     let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
-    let reopened_package = OpcPackage::from_bytes(&archive)?;
+    let reopened_package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     verify_xlsx_vendor_extension_package(
         &reopened_package,
         shape == XlsxCellCrudShape::VendorExtension,
@@ -23512,7 +23527,7 @@ fn build_xlsx_row_visibility_corpus(
         }
         archive = edit.commit()?.package().to_bytes()?;
     }
-    let mut package = OpcPackage::from_bytes(&archive)?;
+    let mut package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
     for index in 0..XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT {
         package.try_add_part(Box::new(BlobPart::new(
@@ -23701,7 +23716,7 @@ fn xlsx_row_visibility_variant_bytes(
     corpus: &Corpus,
     variant: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
     match variant {
         "protected" | "formula" | "markup-compatibility" => {
@@ -23834,7 +23849,7 @@ fn xlsx_row_visibility_variant_refused(
 /// same document to a reader, a different owner closure to a source-backed
 /// replay.
 fn xlsx_foreign_content_archive(archive: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_bytes(archive)?;
+    let mut package = OpcPackage::from_bytes(archive, litchi_opc::SourceLimits::default())?;
     let workbook = PackURI::new("/xl/workbook.xml")?;
     let part = package.get_part_mut(&workbook)?;
     let mut blob = part.blob().to_vec();
@@ -23899,7 +23914,8 @@ fn xlsx_row_visibility_lifecycle_gates(
         return Err("XLSX row-visibility foreign-source gate accepted output".into());
     }
 
-    let mut stale_package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut stale_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let worksheet = PackURI::new("/xl/worksheets/sheet1.xml")?;
     stale_package
         .get_part_mut(&worksheet)?
@@ -24377,8 +24393,8 @@ fn verify_xlsx_cell_crud_package_identity(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let has_vendor_extension = corpus.manifest.shape == XlsxCellCrudShape::VendorExtension.name();
     verify_xlsx_vendor_extension_package(&source, has_vendor_extension)?;
     verify_xlsx_vendor_extension_package(&candidate, has_vendor_extension)?;
@@ -24491,8 +24507,9 @@ fn xlsx_cell_crud_untouched_member_evidence(
     let allow_calculation_invalidation = corpus.manifest.generator
         == XLSX_CELL_VALUES_SOURCE_EDIT_CORPUS_GENERATOR
         && corpus.archive.as_slice() != output;
-    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate_package = OpcPackage::from_bytes(output)?;
+    let source_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let source_chain = xlsx_calc_chain_identity(&source_package)?;
     let candidate_chain = xlsx_calc_chain_identity(&candidate_package)?;
     let removed_chain = match (source_chain.as_ref(), candidate_chain.as_ref()) {
@@ -24706,7 +24723,8 @@ fn run_xlsx_cell_value_lifecycle_gates(
         verify_xlsx_cell_crud_package_identity(corpus, &published)?;
         let workbook = XlsxPackage::from_bytes(&published)?;
         verify_xlsx_cell_crud_lifecycle_state(&workbook, spec, target, remove)?;
-        let mut applied = OpcPackage::from_bytes(&corpus.archive)?;
+        let mut applied =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         crate::xlsx_source_editors::replay_patch(&mut applied, commit.patch())?;
         let applied_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &applied_bytes)?;
@@ -27110,7 +27128,8 @@ fn build_pptx_selector_oracle(
     shape: SemanticShape,
     edits: &[PptxSelectorEdit],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let mut package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     for operation in edits {
         let part_name = PackURI::new(format!(
             "/ppt/slides/slide{}.xml",
@@ -33483,9 +33502,7 @@ fn verify_rtf_picture_crud_gates(
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
     let forward = source.apply_durable(&decoded)?.into_package();
     let durable_forward_verified = forward.to_bytes()? == expected_output;
-    let inverse = forward
-        .apply_durable(&decoded.inverse())?
-        .into_package();
+    let inverse = forward.apply_durable(&decoded.inverse())?.into_package();
     let durable_inverse_verified = inverse.to_bytes()? == corpus.archive;
     if !volatile_forward_verified
         || !volatile_inverse_verified
@@ -42532,7 +42549,10 @@ fn run_xlsx_open_owned(
         let started = Instant::now();
         // The owned-move route: the archive is moved into the OPC reader
         // without a copy and validated once by the immutable package owner.
-        let workbook = XlsxPackage::from_opc(OpcPackage::from_vec(owned)?)?;
+        let workbook = XlsxPackage::from_opc(OpcPackage::from_vec(
+            owned,
+            litchi_opc::SourceLimits::default(),
+        )?)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         if workbook.workbook_ref().len() != spec.sheet_count {
@@ -46019,7 +46039,7 @@ fn xlsx_cell_values_payload_budget(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<usize, Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let mut names = BTreeSet::new();
     names.insert("/xl/workbook.xml".to_owned());
     for coordinate in updates {
@@ -47091,24 +47111,24 @@ fn opc_cache_package(
 ) -> Result<(Arc<SourceBackedPackage>, Option<Budget>), Box<dyn Error>> {
     match mode {
         OpcCacheMode::Control => Ok((
-            Arc::new(
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                    source,
-                    SourceLimits::default(),
-                    cache_limits,
-                )?,
-            ),
+            Arc::new(SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?),
             None,
         )),
         OpcCacheMode::Managed => {
             let (budget, context) = opc_cache_context(memory_limit, worker_count)?;
-            let package =
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source,
-                    SourceLimits::default(),
-                    cache_limits,
-                    context,
-                )?;
+            let package = SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
+            )?;
             Ok((Arc::new(package), Some(budget)))
         },
     }
@@ -48013,8 +48033,13 @@ fn run_opc_range_source_open(
         let (backing, _target_range) = opc_instrumented_source(corpus)?;
         let source = simulated_source(backing.clone(), config);
         let started = Instant::now();
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("simulated OPC source open part count differs from manifest".into());
         }
@@ -48153,8 +48178,13 @@ fn run_opc_source_open(
         let (source, _target_range) = opc_instrumented_source(corpus)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("source-backed OPC part count differs from corpus manifest".into());
         }
@@ -48534,7 +48564,7 @@ fn run_opc_serial_eager_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
             Some(sample) => Some(sample),
@@ -48676,8 +48706,13 @@ fn run_opc_source_materialize_variant(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("OPC source materialization opened an unexpected part count".into());
         }
@@ -48788,8 +48823,13 @@ fn run_opc_source_cached_main_read(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let cold = verify_opc_main_payload(&package, corpus)?;
         source.reset();
         let allocation_region = allocation_metrics::begin();
@@ -48838,8 +48878,13 @@ fn run_opc_source_concurrent_same_part(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let (source, _target_range) = opc_instrumented_source(corpus)?;
-        let package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if package.main_document_part()?.partname().membername() != corpus.target_name {
             return Err("source-backed OPC main relationship resolved the wrong part".into());
         }
@@ -48924,7 +48969,7 @@ fn expected_opc_overlay_output(
     replacement: &[u8],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
     let target_uri = PackURI::new(format!("/{}", corpus.target_name))?;
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     package
         .get_part_mut(&target_uri)?
         .set_blob(replacement.to_vec());
@@ -48936,7 +48981,7 @@ fn verify_opc_overlay_output(
     output: &[u8],
     replacement: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(output)?;
+    let package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if package.part_count() != corpus.manifest.entry_count {
         return Err("OPC overlay output part count differs from source corpus".into());
     }
@@ -49000,8 +49045,13 @@ fn run_opc_source_overlay_one_part_save(
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
-        let source_package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         source_package.write_part_overlay_to_stream_with_accounting(
             &mut sink,
             &target_uri,
@@ -49129,7 +49179,7 @@ fn expected_opc_multi_overlay_output(
     if !replacements.iter().any(|replacement| replacement.changed) {
         return Ok(corpus.archive.clone());
     }
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     for replacement in replacements {
         package
             .get_part_mut(&replacement.partname)?
@@ -49142,8 +49192,8 @@ fn verify_opc_multi_overlay_semantics(
     expected: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let expected_package = OpcPackage::from_bytes(expected)?;
-    let output_package = OpcPackage::from_bytes(output)?;
+    let expected_package = OpcPackage::from_bytes(expected, litchi_opc::SourceLimits::default())?;
+    let output_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if output_package.part_count() != expected_package.part_count() {
         return Err("multi-Part OPC overlay output part count differs from eager artifact".into());
     }
@@ -49178,8 +49228,9 @@ fn verify_opc_multi_overlay_changes(
     output: &[u8],
     replacements: &[OpcOverlayReplacement],
 ) -> Result<(), Box<dyn Error>> {
-    let source_package = OpcPackage::from_bytes(&corpus.archive)?;
-    let output_package = OpcPackage::from_bytes(output)?;
+    let source_package =
+        OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let output_package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     let mut changed_count = 0usize;
     for replacement in replacements {
         let source_payload = source_package.get_part(&replacement.partname)?.blob();
@@ -49337,8 +49388,13 @@ fn run_opc_source_overlay_multi_part(
         let preparation_duration = preparation_started.elapsed();
 
         let open_started = Instant::now();
-        let source_package =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         if source_package.iter_parts().count() != corpus.manifest.entry_count {
             return Err("multi-Part OPC source open part count differs from corpus".into());
         }
@@ -49401,8 +49457,13 @@ fn run_opc_source_overlay_multi_part(
         verify_opc_multi_overlay_semantics(&expected, &sink.bytes)?;
         verify_opc_multi_overlay_changes(corpus, &sink.bytes, &replacements)?;
         verify_opc_multi_overlay_preservation(corpus, &sink.bytes, &replacements)?;
-        let source_cache_probe =
-            SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), cache_limits)?;
+        let source_cache_probe = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         for replacement in &replacements {
             let data = source_cache_probe.part(&replacement.partname)?.data()?;
             std::hint::black_box(data.as_bytes());
@@ -49422,9 +49483,12 @@ fn run_opc_source_overlay_multi_part(
         }
         let reopened_output_source: Arc<dyn ReadAt> =
             Arc::new(OwnedSource::new(sink.bytes.clone()));
-        let reopened_output_package = SourceBackedPackage::from_read_at_with_cache_limits(
+        let reopened_output_package = SourceBackedPackage::from_read_at(
             reopened_output_source,
+            litchi_opc::SourceLimits::default(),
             cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
         )?;
         let reopened_output_cache = reopened_output_package.cache_diagnostics();
         if reopened_output_cache.hits != 0
@@ -49650,8 +49714,8 @@ fn verify_docx_source_edit_output(corpus: &Corpus, output: &[u8]) -> Result<(), 
     let document = litchi_docx::Package::from_reader(Cursor::new(output))?;
     verify_semantic_docx(&document, SemanticShape::Medium, &[target])?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -49745,8 +49809,8 @@ fn verify_docx_section_layout_output(
     let snapshot = reopened.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&snapshot, expected_columns)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -49869,10 +49933,13 @@ fn verify_docx_section_layout_output(
 fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
-) -> Result<(
-    usize,
-    litchi_docx::document::Commit<litchi_docx::source_backed::Package>,
-), Box<dyn Error>> {
+) -> Result<
+    (
+        usize,
+        litchi_docx::document::Commit<litchi_docx::source_backed::Package>,
+    ),
+    Box<dyn Error>,
+> {
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
     let mut edit = package.edit()?;
@@ -50055,7 +50122,7 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
     }
     writer.write_stored("_xmlsignatures/origin.sigs", b"<origin/>")?;
     let signed = writer.finish_to_bytes()?;
-    if !OpcPackage::from_bytes(&signed)?.is_signed() {
+    if !OpcPackage::from_bytes(&signed, litchi_opc::SourceLimits::default())?.is_signed() {
         return Err("DOCX section-layout signed fixture was not classified as signed".into());
     }
     Ok(signed)
@@ -50756,6 +50823,9 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
             DocxIngressRoute::OwnedVec => {
                 let opc = SourceBackedPackage::from_vec(
                     owned_input.expect("owned-vector route prepares its input"),
+                    litchi_opc::SourceLimits::default(),
+                    litchi_opc::SourceCacheLimits::default(),
+                    None,
                 )?;
                 litchi_docx::source_backed::Package::from_source_backed_package(opc)?
             },
@@ -51250,8 +51320,8 @@ fn verify_pptx_source_edit_output(
     let reopened = litchi_pptx::Package::from_bytes(output)?;
     verify_pptx_source_edit_semantics(&reopened, updated_shapes)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -51302,8 +51372,8 @@ fn verify_pptx_multi_slide_edit_output(
     let reopened = litchi_pptx::Package::from_bytes(output)?;
     verify_pptx_source_edit_semantics_for(&reopened, &updated)?;
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -51503,7 +51573,13 @@ fn publish_pptx_batch_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let mut package = litchi_pptx::Package::from_opc_package(opc)?;
@@ -51674,7 +51750,13 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         return Ok(materializations);
     }
 
-    let package = SourceBackedPackage::from_read_at(source)?;
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let opc = package.into_opc_package()?;
     let materializations = opc.part_count();
     let mut package = litchi_pptx::Package::from_opc_package(opc)?;
@@ -52887,8 +52969,8 @@ fn verify_xlsx_defined_names_edit_output(
         return Err("XLSX defined-name output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -52950,7 +53032,13 @@ fn publish_xlsx_defined_names_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let source_backed = SourceBackedPackage::from_read_at(source)?;
+        let source_backed = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = source_backed.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -53073,8 +53161,8 @@ fn verify_xlsx_calculation_metadata_edit_output(
         return Err("XLSX calculation-edit output has unexpected calculation ID".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -53138,7 +53226,13 @@ fn publish_xlsx_calculation_metadata_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -54103,7 +54197,7 @@ fn xlsx_page_break_expected_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn E
     // Construct the expected package from independently rewritten worksheet
     // bytes; do not call either page-break publication implementation here.
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let rewritten = xlsx_page_break_oracle_rewrite(package.get_part(&target_uri)?.blob())?;
     package.get_part_mut(&target_uri)?.set_blob(rewritten);
     PackageWriter::to_bytes(&package).map_err(Into::into)
@@ -54255,8 +54349,8 @@ fn verify_xlsx_page_break_edit_output(
         return Err("XLSX page-break output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -54327,7 +54421,13 @@ fn publish_xlsx_page_break_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -54454,7 +54554,7 @@ fn run_xlsx_page_break_projection(
         return Err("XLSX page-break projection case requires its fixed projection corpus".into());
     }
     let target_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let expected = xlsx_page_break_oracle_parse(opc.get_part(&target_uri)?.blob())?;
     let expected_digest = xlsx_repeated_page_break_digest(&expected)?;
 
@@ -54561,8 +54661,8 @@ fn verify_xlsx_page_margin_edit_output(
         return Err("XLSX page-margin output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -54624,7 +54724,13 @@ fn publish_xlsx_page_margin_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -54767,8 +54873,8 @@ fn verify_xlsx_page_setup_edit_output(
         return Err("XLSX page-setup output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -54837,7 +54943,13 @@ fn publish_xlsx_page_setup_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -54978,8 +55090,8 @@ fn verify_xlsx_print_options_edit_output(
         return Err("XLSX print-options output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55041,7 +55153,13 @@ fn publish_xlsx_print_options_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
@@ -55218,8 +55336,8 @@ fn verify_xlsx_sheet_protection_edit_output(
         return Err("XLSX sheet-protection output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55285,7 +55403,13 @@ fn publish_xlsx_sheet_protection_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -55515,8 +55639,8 @@ fn verify_xlsx_auto_filter_edit_output(
         return Err("XLSX auto-filter output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -55578,7 +55702,13 @@ fn publish_xlsx_auto_filter_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -56704,7 +56834,7 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
         return Err("XLSX conditional-formatting patch/inverse is not exact".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     // Source-backed patches replay onto source-backed workbooks (record
     // 0360): forward onto a second open of the corpus, inverse onto a
     // reopened copy of that output.
@@ -56714,7 +56844,7 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
     .apply_conditional_formats(commit.patch())?
     .into_package()
     .to_bytes()?;
-    let replay = OpcPackage::from_bytes(&forward)?;
+    let replay = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())?;
     if litchi_xlsx::conditional_formatting::Snapshot::load(&replay, "Sheet1")?.collections()
         != xlsx_conditional_formatting_values(true)?
     {
@@ -56725,7 +56855,7 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
             .apply_conditional_formats(&inverse)?
             .into_package()
             .to_bytes()?;
-    let replay = OpcPackage::from_bytes(&restored)?;
+    let replay = OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default())?;
     for source_part in source
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -56766,8 +56896,8 @@ fn verify_xlsx_conditional_formatting_edit_output(
         return Err("XLSX conditional-formatting output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -56843,7 +56973,13 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -56995,8 +57131,8 @@ fn verify_xlsx_data_validation_edit_output(
         return Err("XLSX data-validation output changed calculation metadata".into());
     }
 
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let candidate = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let candidate = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if source.part_count() != corpus.manifest.entry_count
         || candidate.part_count() != source.part_count()
         || relationship_signatures(source.rels()) != relationship_signatures(candidate.rels())
@@ -57060,7 +57196,13 @@ fn publish_xlsx_data_validation_edit<W: Write>(
         }
         Ok(materializations)
     } else {
-        let package = SourceBackedPackage::from_read_at(source)?;
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let mut opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
@@ -57179,7 +57321,7 @@ fn run_opc_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         let count = package.part_count();
         if count != corpus.manifest.entry_count {
             return Err("OPC open part count differs from generated corpus manifest".into());
@@ -57409,7 +57551,7 @@ fn run_opc_casefold_eager_open(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&owned)?;
+        let package = OpcPackage::from_bytes(&owned, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57441,7 +57583,7 @@ fn run_opc_casefold_owned_open(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_vec(owned)?;
+        let package = OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57503,7 +57645,13 @@ fn run_opc_casefold_source_open(
         let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = SourceBackedPackage::from_read_at(read_at)?;
+        let package = SourceBackedPackage::from_read_at(
+            read_at,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
@@ -57520,7 +57668,13 @@ fn run_opc_casefold_source_open(
                 corpus.ordinary_payload_ranges.clone(),
             ));
             let replay_read_at: Arc<dyn ReadAt> = source.clone();
-            let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+            let replay_package = SourceBackedPackage::from_read_at(
+                replay_read_at,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?;
             let snapshot = source.snapshot();
             let version_calls = source.version_calls();
             let replay_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
@@ -57549,7 +57703,7 @@ fn run_opc_casefold_eager_lookup(
     samples: usize,
 ) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
     let owned = corpus.archive.clone();
-    let package = OpcPackage::from_bytes(&owned)?;
+    let package = OpcPackage::from_bytes(&owned, litchi_opc::SourceLimits::default())?;
     let setup_digest = opc_casefold_eager_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err("eager OPC case-fold lookup setup differs from corpus oracle".into());
@@ -57586,7 +57740,13 @@ fn run_opc_casefold_source_lookup(
     samples: usize,
 ) -> Result<OpcCasefoldRunEvidence, Box<dyn Error>> {
     let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let package = SourceBackedPackage::from_read_at(
+        read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err("source-backed OPC case-fold lookup setup differs from corpus oracle".into());
@@ -57597,7 +57757,13 @@ fn run_opc_casefold_source_lookup(
         corpus.ordinary_payload_ranges.clone(),
     ));
     let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
-    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_package = SourceBackedPackage::from_read_at(
+        replay_read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
     if replay_setup_digest != setup_digest {
         return Err("source-backed OPC case-fold replay setup differs from timed setup".into());
@@ -57712,7 +57878,13 @@ fn run_opc_casefold_source_class_lookup(
         .iter()
         .collect::<Vec<_>>();
     let read_at: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(corpus.archive.clone()));
-    let package = SourceBackedPackage::from_read_at(read_at)?;
+    let package = SourceBackedPackage::from_read_at(
+        read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let setup_digest = opc_casefold_source_name_digest(&package, corpus)?;
     if setup_digest != corpus.canonical_name_oracle_sha256 {
         return Err(
@@ -57725,7 +57897,13 @@ fn run_opc_casefold_source_class_lookup(
         corpus.ordinary_payload_ranges.clone(),
     ));
     let replay_read_at: Arc<dyn ReadAt> = replay_source.clone();
-    let replay_package = SourceBackedPackage::from_read_at(replay_read_at)?;
+    let replay_package = SourceBackedPackage::from_read_at(
+        replay_read_at,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let replay_setup_digest = opc_casefold_source_name_digest(&replay_package, corpus)?;
     if replay_setup_digest != setup_digest {
         return Err(
@@ -57916,7 +58094,7 @@ fn run_opc_casefold_lookup(
         },
         timing_scope: if open {
             if owned_open {
-                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+                "OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default()) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
             } else if source_backed {
                 "SourceBackedPackage::from_read_at over litchi_core::OwnedSource only; source ownership, instrumented replay, and post-open name oracle excluded"
             } else {
@@ -58000,7 +58178,8 @@ fn run_opc_relationship_open(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let package = OpcPackage::from_bytes(&corpus.corpus.archive)?;
+        let package =
+            OpcPackage::from_bytes(&corpus.corpus.archive, litchi_opc::SourceLimits::default())?;
         std::hint::black_box(&package);
         let duration = started.elapsed();
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -58093,7 +58272,7 @@ fn run_opc_open_owned(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = OpcPackage::from_vec(owned)?;
+        let package = OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default())?;
         let count = package.part_count();
         if count != corpus.manifest.entry_count {
             return Err("owned OPC open part count differs from generated corpus manifest".into());
@@ -58121,7 +58300,8 @@ fn run_opc_noop_save(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     let maximum = u64::try_from(corpus.archive.len())?
         .checked_mul(2)
         .and_then(|value| value.checked_add(64 * 1024))
@@ -58240,7 +58420,8 @@ fn run_opc_mutated_save(
         .ok_or("OPC mutation target is empty")?;
     *first ^= 0xff;
 
-    let mut package = OpcPackage::from_vec(corpus.archive.clone())?;
+    let mut package =
+        OpcPackage::from_vec(corpus.archive.clone(), litchi_opc::SourceLimits::default())?;
     package.get_part_mut(&target_uri)?.set_blob(changed_payload);
     let expected = PackageWriter::to_bytes(&package)?;
     let maximum = u64::try_from(expected.len())?
@@ -62400,10 +62581,13 @@ mod tests {
             first.manifest.archive_sha256,
             "1e28b8a9049a82f07e8ea88b2d492ef522d2da793d22fa50e2fe7f354dca3e2a"
         );
-        let source_package = SourceBackedPackage::from_read_at(Arc::new(InstrumentedSource::new(
-            first.archive.clone(),
-            Vec::new(),
-        )))
+        let source_package = SourceBackedPackage::from_read_at(
+            Arc::new(InstrumentedSource::new(first.archive.clone(), Vec::new())),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         assert_eq!(
             source_package
@@ -62943,7 +63127,7 @@ mod tests {
             assert_eq!(summary.operation, "owned_open");
             assert_eq!(
                 summary.timing_scope,
-                "OpcPackage::from_vec(owned) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
+                "OpcPackage::from_vec(owned, litchi_opc::SourceLimits::default()) only; archive clone and post-open package/name/count/payload/exact-source oracles excluded"
             );
             assert_eq!(
                 summary.source_counter_scope,
@@ -65560,7 +65744,8 @@ mod tests {
         let (artifact, _) = super::write_streaming_xlsx(Vec::new(), SemanticShape::Tiny).unwrap();
         super::verify_streaming_xlsx(artifact.clone(), SemanticShape::Tiny).unwrap();
 
-        let mut package = super::OpcPackage::from_bytes(&artifact).unwrap();
+        let mut package =
+            super::OpcPackage::from_bytes(&artifact, litchi_opc::SourceLimits::default()).unwrap();
         let worksheet_uri = super::PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
         let sheet_xml = package.get_part(&worksheet_uri).unwrap().blob().to_vec();
         let row_end = sheet_xml
@@ -65758,7 +65943,8 @@ mod tests {
         let oracle = prepare_opc_materialization_oracle(&corpus).unwrap();
         let first_uri = PackURI::new(format!("/{}", super::entry_name(0))).unwrap();
 
-        let mut corrupted_payload = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_payload =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         let mut payload = corrupted_payload
             .get_part(&first_uri)
             .unwrap()
@@ -65773,7 +65959,8 @@ mod tests {
             .expect_err("payload corruption must fail the prepared oracle");
         assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
 
-        let mut corrupted_metadata = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_metadata =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         corrupted_metadata
             .get_part_mut(&first_uri)
             .unwrap()
@@ -65783,7 +65970,8 @@ mod tests {
             .expect_err("content-type corruption must fail the prepared oracle");
         assert!(error.to_string().contains("Part benchmark/parts/00000.bin"));
 
-        let mut corrupted_relationships = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let mut corrupted_relationships =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         corrupted_relationships.rels_mut().add_relationship(
             "urn:litchi:corrupt".to_owned(),
             super::entry_name(0),
@@ -65794,7 +65982,8 @@ mod tests {
             .expect_err("relationship corruption must fail the prepared oracle");
         assert!(error.to_string().contains("package relationships"));
 
-        let source = OpcPackage::from_bytes(&corpus.archive).unwrap();
+        let source =
+            OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default()).unwrap();
         let mut wrong_main_target = OpcPackage::new();
         for part in source.try_iter_parts() {
             wrong_main_target
@@ -71082,7 +71271,9 @@ mod tests {
         assert_eq!(spec.row_count, 48);
         assert_eq!(spec.column_count, 48);
 
-        let package = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let package =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         let contains =
             |xml: &[u8], needle: &[u8]| xml.windows(needle.len()).any(|window| window == needle);
         for sheet_index in 0..spec.sheet_count {
@@ -71195,8 +71386,12 @@ mod tests {
                 + super::XLSX_VENDOR_EXTENSION_BIN.len()
         );
 
-        let source_package = super::OpcPackage::from_bytes(&first.archive).unwrap();
-        let medium_package = super::OpcPackage::from_bytes(&medium.archive).unwrap();
+        let source_package =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
+        let medium_package =
+            super::OpcPackage::from_bytes(&medium.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(source_package.part_count(), medium_package.part_count() + 2);
         super::verify_xlsx_vendor_extension_package(&source_package, true).unwrap();
         let raw = super::raw_zip_members(&first.archive).unwrap();
@@ -71255,7 +71450,9 @@ mod tests {
         assert_eq!(noop_count, first.manifest.archive_member_count);
         assert!(!noop_digest.is_empty());
 
-        let mut mutated = super::OpcPackage::from_bytes(&first.archive).unwrap();
+        let mut mutated =
+            super::OpcPackage::from_bytes(&first.archive, litchi_opc::SourceLimits::default())
+                .unwrap();
         let styles_uri = super::PackURI::new("/xl/styles.xml").unwrap();
         let mut styles = mutated.get_part(&styles_uri).unwrap().blob().to_vec();
         // Keep the negative-control mutation publishable under the authored
@@ -71274,7 +71471,8 @@ mod tests {
         assert!(
             super::xlsx_cell_crud_untouched_member_evidence(&first, &mutated_bytes, &[],).is_err()
         );
-        let candidate_package = super::OpcPackage::from_bytes(&expected).unwrap();
+        let candidate_package =
+            super::OpcPackage::from_bytes(&expected, litchi_opc::SourceLimits::default()).unwrap();
         super::verify_xlsx_vendor_extension_package(&candidate_package, true).unwrap();
 
         let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();

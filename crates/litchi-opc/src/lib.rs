@@ -19,9 +19,9 @@
 //!
 //! # Bounded ingestion
 //!
-//! Every ordinary package constructor uses [`SourceLimits::default`]. Build a
-//! checked, tighter profile with [`SourceLimits::builder`] and pass it to an
-//! `*_with_limits` constructor. The policy bounds package input; ZIP members,
+//! Every package ingress takes a caller-selected [`SourceLimits`] profile.
+//! Build a checked, tighter profile with [`SourceLimits::builder`]. The policy
+//! bounds package input; ZIP members,
 //! names, metadata, and declared sizes; materialized OPC parts;
 //! `[Content_Types].xml`; and relationship XML, attributes, targets, events,
 //! depth, and graph traversal. It is a Litchi safety policy, not a set of
@@ -80,10 +80,7 @@ pub use package::{
 };
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};
-pub use pkgreader::{
-    PackageCatalog, probe_package_catalog_from_reader,
-    probe_package_catalog_from_reader_with_limits,
-};
+pub use pkgreader::{PackageCatalog, probe_package_catalog_from_reader};
 pub use pkgwriter::PackageWriter;
 pub use prepared::PreparedOoxmlSource;
 pub use rel::{Relationship, Relationships, TargetMode};
@@ -102,7 +99,7 @@ pub use source_backed::{
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};
-pub use validation::{validate_parts, validate_read_at, validate_read_at_with_limits};
+pub use validation::{validate_parts, validate_read_at};
 pub use xml_splice::{
     AuthoredXmlFragment, OwnedAttributeUpdate, OwnedChildElement, OwnedElementEdit,
     OwnedElementUpdate, OwnedXmlPart, SourceXmlPart, XmlSourceRange, XmlSplicePublication,

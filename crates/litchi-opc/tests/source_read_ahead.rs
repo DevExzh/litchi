@@ -167,11 +167,12 @@ fn managed_context(memory: u64, input_bytes: u64) -> (Budget, ExecutionContext) 
 }
 
 fn read_ahead_package(source: Arc<dyn ReadAt>, policy: SourceReadPolicy) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    SourceBackedPackage::from_read_at(
         source,
         SourceLimits::default(),
         cache_limits(),
         policy,
+        None,
     )
     .expect("source-backed read-ahead fixture must open")
 }
@@ -181,18 +182,18 @@ fn managed_read_ahead_package(
     policy: SourceReadPolicy,
     context: ExecutionContext,
 ) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+    SourceBackedPackage::from_read_at(
         source,
         SourceLimits::default(),
         cache_limits(),
         policy,
-        context,
+        Some(context),
     )
     .expect("managed source-backed read-ahead fixture must open")
 }
 
 fn unknown_member(bytes: &[u8]) -> Vec<u8> {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, SourceLimits::default())
         .expect("published archive must be readable")
         .read_member(UNKNOWN_MEMBER)
         .expect("published archive must retain the unknown member")
@@ -437,8 +438,14 @@ fn source_read_policy_is_bounded_and_exact_is_the_default_control() {
     assert!(SourceReadPolicy::forward_start(65_536).is_ok());
 
     let source = archive_bytes();
-    let exact = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source.clone())))
-        .expect("exact control package must open");
+    let exact = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source.clone())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("exact control package must open");
     assert!(
         exact
             .source_read_diagnostics()
@@ -460,14 +467,14 @@ fn source_read_policy_is_bounded_and_exact_is_the_default_control() {
     );
 
     let (_budget, managed_context) = managed_context(8 * 1024 * 1024, u64::MAX);
-    let managed_exact =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(OwnedSource::new(archive_bytes())),
-            SourceLimits::default(),
-            cache_limits(),
-            managed_context,
-        )
-        .expect("managed exact control package must open");
+    let managed_exact = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceLimits::default(),
+        cache_limits(),
+        SourceReadPolicy::exact(),
+        Some(managed_context),
+    )
+    .expect("managed exact control package must open");
     assert!(
         managed_exact
             .source_read_diagnostics()
@@ -729,7 +736,13 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
         .write_to(&mut saved)
         .expect("materialized package save must succeed");
     assert_eq!(unknown_member(&saved), UNKNOWN_PAYLOAD);
-    let reopened = SourceBackedPackage::from_vec(saved).expect("saved package must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        saved,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("saved package must reopen");
     assert_eq!(
         reopened
             .part(&uri(DOCUMENT_URI))
@@ -743,7 +756,7 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
 
 fn assert_document_replacement_and_unknown_preservation(source: &[u8], output: &[u8]) {
     assert_eq!(
-        PhysPkgReader::new(output)
+        PhysPkgReader::new(output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_MEMBER)
             .expect("published document must be readable"),
@@ -760,8 +773,13 @@ fn assert_document_replacement_and_unknown_preservation(source: &[u8], output: &
 }
 
 fn assert_external_relationship_was_removed(output: &[u8]) {
-    let reopened = SourceBackedPackage::from_vec(output.to_vec())
-        .expect("published relationship-removal archive must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published relationship-removal archive must reopen");
     assert_eq!(
         reopened
             .part(&uri(DOCUMENT_URI))
@@ -772,7 +790,7 @@ fn assert_external_relationship_was_removed(output: &[u8]) {
         "the selected external relationship must be absent after publication"
     );
     assert!(
-        PhysPkgReader::new(output)
+        PhysPkgReader::new(output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_RELS_MEMBER)
             .expect("published document relationships must be readable")
@@ -843,7 +861,8 @@ fn batch_replacement_and_deletion_preserve_unknown_physical_records() {
         .expect("batch replacement and deletion must publish");
 
     assert_document_replacement_and_unknown_preservation(&source, &output);
-    let physical = PhysPkgReader::new(&output).expect("published archive must be readable");
+    let physical = PhysPkgReader::new(&output, SourceLimits::default())
+        .expect("published archive must be readable");
     assert!(
         !physical
             .member_names()
@@ -883,13 +902,19 @@ fn non_empty_topology_publication_disables_opt_in_reads_and_adds_a_typed_part() 
         .expect("non-empty topology publication must succeed");
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(added.membername())
             .expect("added topology member must be readable"),
         b"topology payload"
     );
-    let reopened = SourceBackedPackage::from_vec(output).expect("topology output must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("topology output must reopen");
     assert_eq!(
         reopened
             .part(&added)
@@ -935,13 +960,19 @@ fn precompressed_topology_addition_disables_opt_in_reads_before_physical_transfe
         .expect("precompressed topology publication must succeed");
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(added.membername())
             .expect("precompressed topology member must be readable"),
         SECOND_PAYLOAD
     );
-    let reopened = SourceBackedPackage::from_vec(output).expect("topology output must reopen");
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("topology output must reopen");
     assert_eq!(
         reopened
             .part(&added)
@@ -1027,13 +1058,18 @@ fn expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice()
         "expected-artifact preview and emission must use two exact physical traversals"
     );
     assert_eq!(
-        SourceBackedPackage::from_vec(output.clone())
-            .expect("published splice archive must reopen")
-            .part(&uri(DOCUMENT_URI))
-            .expect("published splice document must exist")
-            .data()
-            .expect("published splice document must decode")
-            .as_bytes(),
+        SourceBackedPackage::from_vec(
+            output.clone(),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None
+        )
+        .expect("published splice archive must reopen")
+        .part(&uri(DOCUMENT_URI))
+        .expect("published splice document must exist")
+        .data()
+        .expect("published splice document must decode")
+        .as_bytes(),
         splice_candidate(SPLICE_FRAGMENT)
     );
     assert_eq!(unknown_member(&output), UNKNOWN_PAYLOAD);
@@ -1132,7 +1168,7 @@ fn managed_changed_overlay_releases_window_before_first_write_and_preserves_unkn
         central_without_local_offset(&source_unknown.central)
     );
     assert_eq!(
-        PhysPkgReader::new(&output)
+        PhysPkgReader::new(&output, SourceLimits::default())
             .expect("published archive must be readable")
             .read_member(DOCUMENT_MEMBER)
             .expect("published document must be readable"),

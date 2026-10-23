@@ -36,7 +36,8 @@ fn fixture() -> Vec<u8> {
 fn signed_fixture() -> Vec<u8> {
     use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
 
-    let source = OpcPackage::from_bytes(&fixture()).expect("parse XLSB fixture as OPC");
+    let source = OpcPackage::from_bytes(&fixture(), litchi_opc::SourceLimits::default())
+        .expect("parse XLSB fixture as OPC");
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package

@@ -541,8 +541,8 @@ impl PartPatch {
                 let limits = target.read_limits();
                 let current = RelationshipImage::new(&target, &delta.name)?;
                 if after.relationship_xml.source && current != after.relationship_xml {
-                    let expected = target.source_relationships_with_limits(&delta.name, limits)?;
-                    target.try_replace_relationships_bytes_with_limits(
+                    let expected = target.source_relationships(&delta.name, limits)?;
+                    target.try_replace_relationships_bytes(
                         &expected,
                         Arc::clone(&after.relationship_xml.bytes),
                         after.relationship_xml.member_present,
@@ -560,8 +560,8 @@ impl PartPatch {
             if after.image.source {
                 let limits = target.read_limits();
                 let owner = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
-                let current = target.source_relationships_with_limits(&owner, limits)?;
-                target.try_replace_relationships_bytes_with_limits(
+                let current = target.source_relationships(&owner, limits)?;
+                target.try_replace_relationships_bytes(
                     &current,
                     Arc::clone(&after.image.bytes),
                     after.image.member_present,
@@ -583,11 +583,7 @@ impl PartPatch {
                     let current = ContentTypesImage::publication_bytes(&target)?;
                     let replacement = after.bytes_for(&target)?;
                     if current != replacement {
-                        target.try_replace_content_types_bytes_with_limits(
-                            &current,
-                            replacement,
-                            limits,
-                        )?;
+                        target.try_replace_content_types_bytes(&current, replacement, limits)?;
                     }
                 } else if self.exact_content_types {
                     return Err(Error::PatchConflict {
@@ -804,7 +800,11 @@ mod tests {
                 br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
             )
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -818,23 +818,47 @@ mod tests {
 
         let forward = patch.apply_graph(&before).unwrap();
         assert_eq!(
-            forward.source_content_types().unwrap().bytes(),
-            after.source_content_types().unwrap().bytes()
+            forward
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
+            after
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes()
         );
         let root = PackURI::new("/").unwrap();
         assert_eq!(
-            forward.source_relationships(&root).unwrap().bytes(),
-            after.source_relationships(&root).unwrap().bytes()
+            forward
+                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
+            after
+                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes()
         );
 
         let restored = patch.inverse().apply_graph(&forward).unwrap();
         assert_eq!(
-            restored.source_content_types().unwrap().bytes(),
-            before.source_content_types().unwrap().bytes()
+            restored
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
+            before
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes()
         );
         assert_eq!(
-            restored.source_relationships(&root).unwrap().bytes(),
-            before.source_relationships(&root).unwrap().bytes()
+            restored
+                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
+            before
+                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes()
         );
     }
 
@@ -946,7 +970,7 @@ mod tests {
             vec![4, 5, 6],
         )));
         let current = after
-            .source_content_types_with_limits(after.read_limits())?
+            .source_content_types(after.read_limits())?
             .bytes()
             .to_vec();
         let lexical = current
@@ -958,11 +982,7 @@ mod tests {
                 bytes
             })
             .expect("authored content-types root");
-        after.try_replace_content_types_bytes_with_limits(
-            &current,
-            Arc::new(lexical),
-            after.read_limits(),
-        )?;
+        after.try_replace_content_types_bytes(&current, Arc::new(lexical), after.read_limits())?;
         let patch = PartPatch::capture_all(&before, &after).unwrap();
 
         let mut unrelated = before.clone();
@@ -979,22 +999,22 @@ mod tests {
         let forward = patch.apply_graph(&before).unwrap();
         assert_eq!(
             forward
-                .source_content_types_with_limits(forward.read_limits())
+                .source_content_types(forward.read_limits())
                 .unwrap()
                 .bytes(),
             after
-                .source_content_types_with_limits(after.read_limits())
+                .source_content_types(after.read_limits())
                 .unwrap()
                 .bytes()
         );
         let restored = patch.inverse().apply_graph(&forward).unwrap();
         assert_eq!(
             restored
-                .source_content_types_with_limits(restored.read_limits())
+                .source_content_types(restored.read_limits())
                 .unwrap()
                 .bytes(),
             before
-                .source_content_types_with_limits(before.read_limits())
+                .source_content_types(before.read_limits())
                 .unwrap()
                 .bytes()
         );

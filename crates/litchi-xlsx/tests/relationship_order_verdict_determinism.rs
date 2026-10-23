@@ -110,7 +110,11 @@ fn workbook_with_styles_and_theme() -> Vec<u8> {
 /// captured `PartState`, so no order exists to get wrong. This is the negative
 /// control — it passed before the fix and must keep passing after it.
 fn workbook_with_styles_only() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&workbook_with_styles_and_theme()).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &workbook_with_styles_and_theme(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -136,7 +140,7 @@ fn noop_patch_survives_a_reload(bytes: &[u8]) -> litchi_xlsx::Result<()> {
         "the transaction stages no edit"
     );
     assert!(commit.patch().is_noop(), "the patch is an exact no-op");
-    let mut replay = OpcPackage::from_bytes(bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch())
 }
 
@@ -174,7 +178,7 @@ fn a_genuinely_different_workbook_is_still_refused() {
         .commit()
         .unwrap();
 
-    let mut altered = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut altered = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     altered
         .get_part_mut(&PackURI::new(THEME).unwrap())
         .unwrap()

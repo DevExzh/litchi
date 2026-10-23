@@ -62,7 +62,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     let mut output = Cursor::new(Vec::new());
     workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let sheet_part = package
         .get_part(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
         .unwrap();

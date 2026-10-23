@@ -432,7 +432,8 @@ fn empty_drawing_xml() -> Vec<u8> {
 }
 
 fn two_worksheet_fixture(shared_svg: bool) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&raster_fixture(), litchi_opc::SourceLimits::default()).unwrap();
     let options = DrawingOptions {
         anchors: false,
         admitted_svg: shared_svg,
@@ -550,7 +551,11 @@ fn two_worksheet_fixture(shared_svg: bool) -> Vec<u8> {
 }
 
 fn two_worksheet_detach_attach_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&two_worksheet_fixture(false)).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &two_worksheet_fixture(false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(SVG).unwrap(),
@@ -590,7 +595,8 @@ fn svg_mixed_width_relationship_fixture() -> Vec<u8> {
 }
 
 fn svg_relationship_width_fixture(existing_svg_ids: usize) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&raster_fixture(), litchi_opc::SourceLimits::default()).unwrap();
     let drawing = package
         .get_part_mut(&PackURI::new(DRAWING).unwrap())
         .unwrap();
@@ -619,7 +625,7 @@ fn two_worksheet_single_svg_owner_fixture() -> Vec<u8> {
         assert_eq!(xml.matches(opaque).count(), 1);
         xml.replace(opaque, "")
     });
-    let mut package = OpcPackage::from_bytes(&source).unwrap();
+    let mut package = OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
     let sheet2 = package
         .get_part_mut(&PackURI::new(SHEET2).unwrap())
         .unwrap();
@@ -651,7 +657,8 @@ fn self_closing_sheet2_relationship_fixture() -> Vec<u8> {
 }
 
 fn orphan_relationship_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&raster_fixture()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&raster_fixture(), litchi_opc::SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(ORPHAN_DRAWING).unwrap(),
@@ -674,7 +681,7 @@ fn orphan_relationship_fixture() -> Vec<u8> {
 }
 
 fn part(bytes: &[u8], name: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -683,14 +690,14 @@ fn part(bytes: &[u8], name: &str) -> Vec<u8> {
 }
 
 fn has_part(bytes: &[u8], name: &str) -> bool {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .is_ok()
 }
 
 fn content_type(bytes: &[u8], name: &str) -> String {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -699,7 +706,7 @@ fn content_type(bytes: &[u8], name: &str) -> String {
 }
 
 fn part_name_with_content_type(bytes: &[u8], wanted: &str) -> String {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .iter_parts()
         .find(|part| part.content_type() == wanted)
@@ -710,7 +717,7 @@ fn part_name_with_content_type(bytes: &[u8], wanted: &str) -> String {
 }
 
 fn part_names_with_content_type(bytes: &[u8], wanted: &str) -> Vec<String> {
-    let mut names = OpcPackage::from_bytes(bytes)
+    let mut names = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .iter_parts()
         .filter(|part| part.content_type() == wanted)
@@ -721,7 +728,7 @@ fn part_names_with_content_type(bytes: &[u8], wanted: &str) -> Vec<String> {
 }
 
 fn has_content_type(bytes: &[u8], wanted: &str) -> bool {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .iter_parts()
         .any(|part| part.content_type() == wanted)
@@ -731,14 +738,14 @@ fn rels(bytes: &[u8], name: &str) -> Vec<u8> {
     let name = name.trim_start_matches('/');
     let (directory, file) = name.rsplit_once('/').unwrap();
     let member = format!("{directory}/_rels/{file}.rels");
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .read_member(&member)
         .unwrap()
 }
 
 fn content_types_member(bytes: &[u8]) -> Vec<u8> {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .read_member("[Content_Types].xml")
         .unwrap()
@@ -749,7 +756,7 @@ fn rewrite_physical_member(
     wanted: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     let mut writer = PhysPkgWriter::new();
     let mut rewrite = Some(rewrite);
@@ -767,7 +774,7 @@ fn rewrite_physical_member(
 }
 
 fn append_physical_member(bytes: &[u8], member: &str, payload: &[u8]) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     assert!(!members.iter().any(|name| name == member));
     let mut writer = PhysPkgWriter::new();
@@ -783,7 +790,7 @@ fn append_physical_member(bytes: &[u8], member: &str, payload: &[u8]) -> Vec<u8>
 }
 
 fn remove_physical_member(bytes: &[u8], member: &str) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     assert!(members.iter().any(|name| name == member));
     let mut writer = PhysPkgWriter::new();
@@ -800,7 +807,7 @@ fn remove_physical_member(bytes: &[u8], member: &str) -> Vec<u8> {
 }
 
 fn has_physical_member(bytes: &[u8], member: &str) -> bool {
-    PhysPkgReader::new(bytes)
+    PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .member_names()
         .unwrap()
@@ -955,7 +962,7 @@ fn incoming_root_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn incoming_new_part_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new(NEW_INCOMING_OWNER).unwrap(),
@@ -1002,13 +1009,13 @@ fn changed_svg_payload_fixture(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn missing_svg_part_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert!(package.remove_part(&PackURI::new(SVG).unwrap()));
     PackageWriter::to_bytes(&package).unwrap()
 }
 
 fn outbound_svg_edge_fixture(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SVG).unwrap())
         .unwrap()
@@ -1043,7 +1050,7 @@ fn general_ref_whitespace_fixture() -> Vec<u8> {
 }
 
 fn rewrite_drawing(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(DRAWING).unwrap();
     let drawing = package.get_part_mut(&uri).unwrap();
     let source = String::from_utf8(drawing.blob().to_vec()).unwrap();
@@ -1052,7 +1059,7 @@ fn rewrite_drawing(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<
 }
 
 fn rewrite_sheet(bytes: &[u8], rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(SHEET).unwrap();
     let sheet = package.get_part_mut(&uri).unwrap();
     let source = String::from_utf8(sheet.blob().to_vec()).unwrap();
@@ -1179,11 +1186,13 @@ fn edit_detach(bytes: &[u8], selector: PictureSelector) -> Result<Vec<u8>, Error
 }
 
 fn materialized_part_count(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes).unwrap().part_count()
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .unwrap()
+        .part_count()
 }
 
 fn materialized_part_bytes(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1192,7 +1201,7 @@ fn materialized_part_bytes(bytes: &[u8]) -> usize {
 }
 
 fn largest_materialized_part_bytes(bytes: &[u8]) -> usize {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -1292,7 +1301,7 @@ fn cross_sheet_metadata_limits(
 }
 
 fn relationship_count(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package.rels().len()
         + package
             .iter_parts()
@@ -1301,7 +1310,7 @@ fn relationship_count(bytes: &[u8]) -> usize {
 }
 
 fn relationship_graph_node_count(bytes: &[u8]) -> usize {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let mut nodes = HashSet::new();
     let mut visit = |relationships: &litchi_opc::Relationships| {
         for relationship in relationships.iter() {
@@ -1328,7 +1337,7 @@ fn relationship_member(name: &str) -> bool {
 }
 
 fn relationship_xml_bytes(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -1339,7 +1348,7 @@ fn relationship_xml_bytes(bytes: &[u8]) -> usize {
 }
 
 fn largest_relationship_xml_bytes(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -1365,7 +1374,7 @@ fn xml_event_count(bytes: &[u8]) -> usize {
 }
 
 fn relationship_xml_events(bytes: &[u8]) -> usize {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     reader
         .member_names()
         .unwrap()
@@ -2218,7 +2227,7 @@ fn newly_added_root_incoming_svg_edge_refuses_or_retains_candidate_media() {
             assert!(has_part(&candidate, SVG));
             assert!(
                 String::from_utf8(
-                    PhysPkgReader::new(&candidate)
+                    PhysPkgReader::new(&candidate, litchi_opc::SourceLimits::default())
                         .unwrap()
                         .read_member("_rels/.rels")
                         .unwrap(),
@@ -2988,7 +2997,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     assert!(has_physical_member(&before, SHEET2_RELS_MEMBER));
     assert!(
         String::from_utf8(
-            PhysPkgReader::new(&before)
+            PhysPkgReader::new(&before, litchi_opc::SourceLimits::default())
                 .unwrap()
                 .read_member(SHEET2_RELS_MEMBER)
                 .unwrap(),
@@ -2998,7 +3007,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
     );
     assert!(
         String::from_utf8(
-            PhysPkgReader::new(&before)
+            PhysPkgReader::new(&before, litchi_opc::SourceLimits::default())
                 .unwrap()
                 .read_member(SHEET2_RELS_MEMBER)
                 .unwrap(),
@@ -3009,7 +3018,7 @@ fn self_closing_relationship_root_expansion_accepts_exact_final_event_cap() {
 
     let attached = mixed_svg_and_hyperlink_with_limits(&before, SourceLimits::default()).unwrap();
     let output_sheet2_rels = String::from_utf8(
-        PhysPkgReader::new(&attached)
+        PhysPkgReader::new(&attached, litchi_opc::SourceLimits::default())
             .unwrap()
             .read_member(SHEET2_RELS_MEMBER)
             .unwrap(),

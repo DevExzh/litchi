@@ -1891,7 +1891,9 @@ mod tests {
 
     #[test]
     fn override_selector_quota_precedes_invalid_content_type_parsing() {
-        let source = OpcPackage::new().source_content_types().unwrap();
+        let source = OpcPackage::new()
+            .source_content_types(SourceLimits::default())
+            .unwrap();
         let name = PackURI::new("/custom/item.bin").unwrap();
         let oversized = "invalid ".repeat(2048);
         let error = source
@@ -2135,7 +2137,9 @@ mod tests {
                 else { writer.write_deflated(name, bytes).unwrap(); }
             }
             let source = writer.finish_to_bytes().unwrap();
-            let mut package = OpcPackage::from_bytes(&source).unwrap().clone();
+            let mut package = OpcPackage::from_bytes(&source, SourceLimits::default())
+                .unwrap()
+                .clone();
             assert!(package.preservation_source().is_none());
             let check_original_relationships = |package: &OpcPackage| {
                 let output = PackageWriter::to_bytes(package).unwrap();
@@ -2164,7 +2168,7 @@ mod tests {
                 .retarget("rId7", "https://example.test/changed".into())
                 .unwrap();
             let output = PackageWriter::to_bytes(&package).unwrap();
-            let reopened = OpcPackage::from_bytes(&output).unwrap();
+            let reopened = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
             assert_eq!(
                 reopened.rels().get("rId9").unwrap().target_ref(),
                 "custom/second.bin"
@@ -2231,9 +2235,9 @@ mod tests {
         for owned in [false, true] {
             for insertion in 0..3 {
                 let mut package = if owned {
-                    OpcPackage::from_vec(source.clone()).unwrap()
+                    OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap()
                 } else {
-                    OpcPackage::from_bytes(&source).unwrap()
+                    OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap()
                 };
                 let replacement = Box::new(crate::BlobPart::new(
                     name.clone(),
@@ -2282,9 +2286,9 @@ mod tests {
         let source = writer.finish_to_bytes().unwrap();
         for owned in [false, true] {
             let mut package = if owned {
-                OpcPackage::from_vec(source.clone()).unwrap()
+                OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap()
             } else {
-                OpcPackage::from_bytes(&source).unwrap()
+                OpcPackage::from_bytes(&source, SourceLimits::default()).unwrap()
             };
             let mut replacement = crate::BlobPart::new(
                 name.clone(),
@@ -2621,7 +2625,8 @@ mod tests {
     #[test]
     fn owned_source_round_trips_exactly_to_bytes_and_stream() {
         let source = exact_empty_archive(b"nonzero EOCD comment");
-        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open owned source");
 
         assert_eq!(
             PackageWriter::to_bytes(&package).expect("copy exact source"),
@@ -2638,7 +2643,8 @@ mod tests {
     #[test]
     fn changed_owned_signed_source_refuses_before_output() {
         let (source, first) = signed_source();
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open signed source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open signed source");
         assert!(package.is_signed());
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
 
@@ -2665,7 +2671,8 @@ mod tests {
     fn generic_signature_infrastructure_removal_stays_policy_gated() {
         let (source, _first) = signed_source();
         let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("origin URI");
-        let mut package = OpcPackage::from_vec(source).expect("open signed source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open signed source");
 
         package
             .rels_mut()
@@ -2691,7 +2698,8 @@ mod tests {
     #[test]
     fn untouched_borrowed_signed_source_refuses_without_exact_bytes() {
         let (source, _first) = signed_source();
-        let package = OpcPackage::from_bytes(&source).expect("open borrowed signed source");
+        let package = OpcPackage::from_bytes(&source, SourceLimits::default())
+            .expect("open borrowed signed source");
         assert!(package.is_signed());
         assert!(package.exact_source().is_none());
 
@@ -2714,7 +2722,8 @@ mod tests {
         let source = exact_empty_archive(b"owned source");
 
         let from_reader =
-            OpcPackage::from_reader(io::Cursor::new(source.clone())).expect("open reader source");
+            OpcPackage::from_reader(io::Cursor::new(source.clone()), SourceLimits::default())
+                .expect("open reader source");
         assert_eq!(
             PackageWriter::to_bytes(&from_reader).expect("copy reader source"),
             source
@@ -2723,13 +2732,14 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary directory");
         let path = directory.path().join("source.opc");
         std::fs::write(&path, &source).expect("write source package");
-        let opened = OpcPackage::open(path).expect("open file source");
+        let opened = OpcPackage::open(path, SourceLimits::default()).expect("open file source");
         assert_eq!(
             PackageWriter::to_bytes(&opened).expect("copy file source"),
             source
         );
 
-        let borrowed = OpcPackage::from_bytes(&source).expect("open borrowed source");
+        let borrowed =
+            OpcPackage::from_bytes(&source, SourceLimits::default()).expect("open borrowed source");
         assert!(borrowed.exact_source().is_none());
         assert_ne!(
             PackageWriter::to_bytes(&borrowed).expect("republish borrowed source"),
@@ -2750,7 +2760,8 @@ mod tests {
             PackageWriter::to_bytes(&source_package).expect("serialize source package"),
             b"exact source",
         );
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open owned source");
 
         package
             .get_part_mut(&partname)
@@ -2759,7 +2770,8 @@ mod tests {
         let rewritten = PackageWriter::to_bytes(&package).expect("republish edited package");
 
         assert_ne!(rewritten, source);
-        let reopened = OpcPackage::from_bytes(&rewritten).expect("reopen edited package");
+        let reopened = OpcPackage::from_bytes(&rewritten, SourceLimits::default())
+            .expect("reopen edited package");
         assert_eq!(
             reopened.get_part(&partname).expect("edited part").blob(),
             b"<edited/>"
@@ -2771,7 +2783,8 @@ mod tests {
         let comment = vec![b'x'; u16::MAX as usize];
         let source = exact_empty_archive(&comment);
         assert!(source.len() > EXACT_SOURCE_CHUNK_BYTES);
-        let package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open owned source");
         let mut sink = ChunkSink {
             total: 0,
             writes: 0,
@@ -2789,7 +2802,8 @@ mod tests {
     #[test]
     fn incomplete_exact_source_stream_reports_accepted_bytes() {
         let source = exact_empty_archive(b"exact source");
-        let package = OpcPackage::from_vec(source).expect("open owned source");
+        let package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open owned source");
         let sink = FailAfter {
             written: 0,
             limit: 128,
@@ -2811,7 +2825,8 @@ mod tests {
     fn targeted_part_mutation_raw_copies_every_other_member() {
         let (source, first, _second) = two_part_source(b"preserve targeted comment");
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open owned source");
         package
             .get_part_mut(&first)
             .expect("first part")
@@ -2842,8 +2857,8 @@ mod tests {
         let (source, first, second) = two_part_source(b"closure comment");
         let source_raw = raw_archive(&source);
 
-        let mut relationship_edit =
-            OpcPackage::from_vec(source.clone()).expect("open relationship source");
+        let mut relationship_edit = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open relationship source");
         relationship_edit
             .get_part_mut(&first)
             .expect("first part")
@@ -2865,7 +2880,8 @@ mod tests {
             }
         }
 
-        let mut content_type_edit = OpcPackage::from_vec(source).expect("open content-type source");
+        let mut content_type_edit = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open content-type source");
         content_type_edit
             .get_part_mut(&second)
             .expect("second part")
@@ -2925,14 +2941,16 @@ mod tests {
         // Taking the package relationship seam revokes exact-source
         // authorization without changing a value, so publication takes the
         // preservation route with every member still pristine.
-        let mut pristine = OpcPackage::from_vec(source.clone()).expect("open pristine source");
+        let mut pristine = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open pristine source");
         let _seam = pristine.rels_mut();
         let pristine_output = PackageWriter::to_bytes(&pristine).expect("publish pristine package");
 
         // Removing an absent identifier keeps every value identical but drops
         // every open-time proof, so the same publication has to serialize and
         // byte-compare each member exactly as it did before this change.
-        let mut compared = OpcPackage::from_vec(source.clone()).expect("open compared source");
+        let mut compared = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open compared source");
         compared.rels_mut().remove("rIdAbsent0593");
         for partname in partnames(&compared) {
             compared
@@ -2945,7 +2963,8 @@ mod tests {
             PackageWriter::to_bytes(&compared).expect("publish byte-compared package");
 
         assert_eq!(pristine_output, compared_output);
-        let reopened = OpcPackage::from_bytes(&pristine_output).expect("reopen pristine output");
+        let reopened = OpcPackage::from_bytes(&pristine_output, SourceLimits::default())
+            .expect("reopen pristine output");
         assert_eq!(reopened.part_count(), 2);
     }
 
@@ -2953,10 +2972,12 @@ mod tests {
     fn a_relationship_collection_moved_between_parts_cannot_reuse_its_proof() {
         let (source, first, second) = two_related_parts_source();
 
-        let donor = OpcPackage::from_vec(source.clone()).expect("open donor source");
+        let donor = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open donor source");
         let donated = donor.get_part(&first).expect("donor part").rels().clone();
 
-        let mut package = OpcPackage::from_vec(source).expect("open target source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open target source");
         let _seam = package.rels_mut();
         *package
             .get_part_mut(&second)
@@ -2964,7 +2985,8 @@ mod tests {
             .rels_mut() = donated;
 
         let output = PackageWriter::to_bytes(&package).expect("publish moved collection");
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen moved collection");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen moved collection");
         // The donated proof describes the first part, so the second part's
         // member is serialized and compared rather than copied, and the
         // publication carries the donated relationship instead of the source's.
@@ -2981,7 +3003,8 @@ mod tests {
     fn adding_a_part_still_rebuilds_the_content_types_manifest() {
         let (source, _first, _second) = two_related_parts_source();
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source).expect("open topology source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open topology source");
         let third = PackURI::new("/custom/third.dat").expect("third URI");
         package.add_part(Box::new(crate::BlobPart::new(
             third,
@@ -3001,7 +3024,8 @@ mod tests {
     fn removing_a_part_still_rebuilds_the_content_types_manifest() {
         let (source, first, _second) = two_related_parts_source();
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source).expect("open removal source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open removal source");
         assert!(package.remove_part(&first));
 
         let output = PackageWriter::to_bytes(&package).expect("publish removal");
@@ -3016,7 +3040,8 @@ mod tests {
     fn package_relationship_changes_still_regenerate_the_package_member() {
         let (source, _first, second) = two_related_parts_source();
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open package relationship source");
         package.relate_to(second.membername(), "urn:package:test");
 
         let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
@@ -3030,14 +3055,16 @@ mod tests {
     #[test]
     fn package_relationship_edit_regenerates_using_raw_source_name() {
         let (source, _first, second) = two_part_source(b"package relationship edit");
-        let mut package = OpcPackage::from_vec(source).expect("open package relationship source");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open package relationship source");
         package.relate_to(second.membername(), "urn:package:test");
 
         let output = PackageWriter::to_bytes(&package).expect("publish package relationship edit");
         let raw = raw_archive(&output);
         assert!(raw.central_order.iter().any(|name| name == "_rels/.rels"));
 
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen package relationship edit");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen package relationship edit");
         let relationship = reopened.rels().get("rId1").expect("package relationship");
         assert_eq!(relationship.target_ref(), second.membername());
     }
@@ -3046,7 +3073,8 @@ mod tests {
     fn revoked_part_mutation_preserves_explicit_empty_relationship_member() {
         let (source, partname) = source_with_explicit_empty_part_relationships();
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source).expect("open explicit empty source");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open explicit empty source");
         package
             .get_part_mut(&partname)
             .expect("empty relationship part")
@@ -3073,7 +3101,8 @@ mod tests {
             central_without_local_offset(&source_raw.central_records[&relationships_name])
         );
 
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen changed part");
+        let reopened =
+            OpcPackage::from_bytes(&output, SourceLimits::default()).expect("reopen changed part");
         let part = reopened.get_part(&partname).expect("changed part");
         assert_eq!(part.blob(), b"changed");
         assert!(part.rels().is_empty());
@@ -3082,7 +3111,8 @@ mod tests {
     #[test]
     fn revoked_noop_uses_preservation_copy_all() {
         let (source, _first, _second) = two_part_source(b"copy-all comment");
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open owned source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open owned source");
         let options = package.save_options().clone();
         package.set_save_options(options);
         assert!(package.exact_source().is_none());
@@ -3092,7 +3122,8 @@ mod tests {
             source
         );
 
-        let mut failed = OpcPackage::from_vec(source.clone()).expect("open failure source");
+        let mut failed = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open failure source");
         assert!(
             failed
                 .get_part_mut(&PackURI::new("/missing.bin").unwrap())
@@ -3105,7 +3136,8 @@ mod tests {
     #[test]
     fn targeted_partial_sink_failure_reports_accepted_bytes() {
         let (source, first, _second) = two_part_source(b"partial targeted output");
-        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open owned source");
         package
             .get_part_mut(&first)
             .expect("first part")
@@ -3130,7 +3162,8 @@ mod tests {
     #[test]
     fn targeted_streaming_keeps_generated_writes_bounded() {
         let (source, first, _second) = two_part_source(b"bounded targeted output");
-        let mut package = OpcPackage::from_vec(source).expect("open owned source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open owned source");
         package
             .get_part_mut(&first)
             .unwrap()
@@ -3170,7 +3203,8 @@ mod tests {
                 .any(|member| member.windows(4).any(|window| window == b"PK\x07\x08"))
         );
 
-        let mut package = OpcPackage::from_vec(source).expect("open framed source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open framed source");
         assert_eq!(package.non_part_members()[0].name(), "junk.dat");
         package
             .get_part_mut(&first)
@@ -3197,7 +3231,8 @@ mod tests {
                 central_without_local_offset(&source_raw.central_records[name])
             );
         }
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen framed output");
+        let reopened =
+            OpcPackage::from_bytes(&output, SourceLimits::default()).expect("reopen framed output");
         assert_eq!(reopened.non_part_members()[0].name(), "junk.dat");
     }
 
@@ -3205,7 +3240,8 @@ mod tests {
     fn topology_part_add_preserves_source_and_appends_deterministic_members() {
         let (source, _first, _second) = two_part_source(b"topology addition");
         let source_raw = raw_archive(&source);
-        let mut added = OpcPackage::from_vec(source.clone()).expect("open add source");
+        let mut added =
+            OpcPackage::from_vec(source.clone(), SourceLimits::default()).expect("open add source");
         let first_added = PackURI::new("/custom/zzz.bin").unwrap();
         let second_added = PackURI::new("/custom/aaa.bin").unwrap();
         let mut first_part = crate::BlobPart::new(
@@ -3266,7 +3302,8 @@ mod tests {
                 );
             }
         }
-        let reopened = OpcPackage::from_bytes(&added_output).expect("reopen added package");
+        let reopened = OpcPackage::from_bytes(&added_output, SourceLimits::default())
+            .expect("reopen added package");
         assert_eq!(
             reopened.get_part(&second_added).unwrap().blob(),
             b"third without relationships"
@@ -3308,7 +3345,8 @@ mod tests {
         );
         let source_raw = raw_archive(&source);
 
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open boundary source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open boundary source");
         assert_eq!(package.part_count(), SOURCE_PART_COUNT);
         let added = PackURI::new("/custom/new.bin").unwrap();
         package.add_part(Box::new(crate::BlobPart::new(
@@ -3358,12 +3396,14 @@ mod tests {
             archive_reader.read(added.membername()).unwrap(),
             b"new payload"
         );
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen boundary output");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen boundary output");
         assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 1);
         assert_eq!(reopened.get_part(&added).unwrap().blob(), b"new payload");
 
         let second = PackURI::new("/custom/new-2.bin").unwrap();
-        let mut package = OpcPackage::from_vec(output).expect("reopen owned ZIP64 output");
+        let mut package = OpcPackage::from_vec(output, SourceLimits::default())
+            .expect("reopen owned ZIP64 output");
         package.add_part(Box::new(crate::BlobPart::new(
             second.clone(),
             BINARY_CONTENT_TYPE.to_owned(),
@@ -3419,7 +3459,8 @@ mod tests {
         );
 
         let third = PackURI::new("/custom/new-3.bin").unwrap();
-        let mut package = OpcPackage::from_vec(output_2).expect("reopen 65536-member output");
+        let mut package = OpcPackage::from_vec(output_2, SourceLimits::default())
+            .expect("reopen 65536-member output");
         package.add_part(Box::new(crate::BlobPart::new(
             third.clone(),
             BINARY_CONTENT_TYPE.to_owned(),
@@ -3470,7 +3511,8 @@ mod tests {
             output_3_reader.read(third.membername()).unwrap(),
             b"third payload"
         );
-        let reopened = OpcPackage::from_bytes(&output_3).expect("reopen final boundary output");
+        let reopened = OpcPackage::from_bytes(&output_3, SourceLimits::default())
+            .expect("reopen final boundary output");
         assert_eq!(reopened.part_count(), SOURCE_PART_COUNT + 3);
         assert_eq!(
             reopened.get_part(&second).unwrap().blob(),
@@ -3493,7 +3535,8 @@ mod tests {
         source_package.add_part(Box::new(existing));
         let source = PackageWriter::to_bytes(&source_package).expect("serialize conflict source");
 
-        let mut package = OpcPackage::from_vec(source).expect("open conflict source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open conflict source");
         package.add_part(Box::new(crate::BlobPart::new(
             candidate_name,
             "application/vnd.openxmlformats-package.relationships+xml".to_owned(),
@@ -3520,7 +3563,8 @@ mod tests {
         )));
         let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
 
-        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open prefix source");
         let mut candidate = crate::BlobPart::new(
             candidate_name,
             "application/octet-stream".to_owned(),
@@ -3550,7 +3594,8 @@ mod tests {
         let source =
             PackageWriter::to_bytes(&source_package).expect("serialize relationship source");
 
-        let mut package = OpcPackage::from_vec(source).expect("open relationship source");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open relationship source");
         package.add_part(Box::new(crate::BlobPart::new(
             candidate_name,
             "application/octet-stream".to_owned(),
@@ -3575,7 +3620,8 @@ mod tests {
         )));
         let source = PackageWriter::to_bytes(&source_package).expect("serialize prefix source");
 
-        let mut package = OpcPackage::from_vec(source).expect("open prefix source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open prefix source");
         package.add_part(Box::new(crate::BlobPart::new(
             candidate_name,
             "application/octet-stream".to_owned(),
@@ -3603,12 +3649,14 @@ mod tests {
             "urn:temporary",
         );
 
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open append source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open append source");
         package.add_part(Box::new(appended_part));
         let appended = PackageWriter::to_bytes(&package).expect("publish appended suffix");
         assert_ne!(appended, source);
 
-        let mut reopened = OpcPackage::from_vec(appended).expect("reopen appended suffix");
+        let mut reopened = OpcPackage::from_vec(appended, SourceLimits::default())
+            .expect("reopen appended suffix");
         assert!(reopened.remove_part(&appended_name));
         let restored = PackageWriter::to_bytes(&reopened).expect("remove appended suffix");
 
@@ -3620,7 +3668,8 @@ mod tests {
         let (source, first, second) = two_part_source(b"topology removal");
         let source_raw = raw_archive(&source);
 
-        let mut removed = OpcPackage::from_vec(source.clone()).expect("open remove source");
+        let mut removed = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open remove source");
         assert!(removed.remove_part(&first));
         let removed_output = PackageWriter::to_bytes(&removed).expect("publish removed part");
         let removed_raw = raw_archive(&removed_output);
@@ -3633,13 +3682,13 @@ mod tests {
             central_without_local_offset(&removed_raw.central_records[second.membername()]),
             central_without_local_offset(&source_raw.central_records[second.membername()])
         );
-        let reopened_removed =
-            OpcPackage::from_bytes(&removed_output).expect("reopen removed part output");
+        let reopened_removed = OpcPackage::from_bytes(&removed_output, SourceLimits::default())
+            .expect("reopen removed part output");
         assert!(!reopened_removed.contains_part(&first));
         assert!(reopened_removed.contains_part(&second));
 
-        let mut removed_relationship =
-            OpcPackage::from_vec(source).expect("open relationship removal source");
+        let mut removed_relationship = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open relationship removal source");
         assert!(
             removed_relationship
                 .get_part_mut(&first)
@@ -3661,7 +3710,8 @@ mod tests {
             central_without_local_offset(&source_raw.central_records[first.membername()])
         );
         let reopened_relationship =
-            OpcPackage::from_bytes(&relationship_output).expect("reopen relationship output");
+            OpcPackage::from_bytes(&relationship_output, SourceLimits::default())
+                .expect("reopen relationship output");
         assert!(
             reopened_relationship
                 .get_part(&first)
@@ -3675,7 +3725,8 @@ mod tests {
     fn adding_relationship_member_to_existing_part_preserves_and_appends() {
         let (source, _first, second) = two_part_source(b"relationship presence addition");
         let source_raw = raw_archive(&source);
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open relationship source");
+        let mut package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+            .expect("open relationship source");
         package
             .get_part_mut(&second)
             .unwrap()
@@ -3710,7 +3761,8 @@ mod tests {
                 "{name}"
             );
         }
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen relationship output");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen relationship output");
         let relationships = reopened.get_part(&second).unwrap().rels();
         assert_eq!(relationships.len(), 1);
         assert_eq!(
@@ -3741,22 +3793,30 @@ mod tests {
         let item = PackURI::new("/custom/item1.xml").unwrap();
         for preserve in [true, false] {
             let mut package = if preserve {
-                OpcPackage::from_vec(source.clone()).unwrap()
+                OpcPackage::from_vec(source.clone(), SourceLimits::default()).unwrap()
             } else {
-                OpcPackage::from_bytes(&source).unwrap().clone()
+                OpcPackage::from_bytes(&source, SourceLimits::default())
+                    .unwrap()
+                    .clone()
             };
             assert_eq!(package.preservation_source().is_some(), preserve);
             // The override repeats the type the Default already gives, so the
             // token describes every part exactly as the source manifest did;
             // only its bytes differ.
-            let current = package.source_content_types().unwrap();
+            let current = package
+                .source_content_types(SourceLimits::default())
+                .unwrap();
             let replacement = current
                 .with_part_overrides(&[(&item, "application/xml")], 1 << 20)
                 .unwrap();
             assert_ne!(replacement.bytes(), current.bytes());
             assert!(
                 package
-                    .try_replace_content_types(current.bytes(), &replacement)
+                    .try_replace_content_types(
+                        current.bytes(),
+                        &replacement,
+                        SourceLimits::default()
+                    )
                     .unwrap()
             );
 
@@ -3775,7 +3835,8 @@ mod tests {
     #[test]
     fn topology_add_with_unknown_non_part_refuses_normalization() {
         let (source, _first) = source_with_non_part_framing();
-        let mut package = OpcPackage::from_vec(source).expect("open unknown-member source");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open unknown-member source");
         package.add_part(Box::new(crate::BlobPart::new(
             PackURI::new("/custom/third.bin").unwrap(),
             "application/octet-stream".to_owned(),
@@ -3792,7 +3853,8 @@ mod tests {
         let (source, first, _second) = two_part_source(b"prefixed fallback");
         let mut prefixed = b"unsupported ZIP prelude".to_vec();
         prefixed.extend_from_slice(&source);
-        let mut package = OpcPackage::from_vec(prefixed.clone()).expect("open prefixed OPC");
+        let mut package = OpcPackage::from_vec(prefixed.clone(), SourceLimits::default())
+            .expect("open prefixed OPC");
         assert!(package.preservation_source().is_some());
         assert_eq!(
             PackageWriter::to_bytes(&package).expect("exact prefixed copy"),
@@ -3818,7 +3880,8 @@ mod tests {
         let (source, _first, _second) = two_part_source(b"prefixed no-op");
         let mut prefixed = b"unsupported ZIP prelude".to_vec();
         prefixed.extend_from_slice(&source);
-        let mut package = OpcPackage::from_vec(prefixed).expect("open prefixed OPC");
+        let mut package =
+            OpcPackage::from_vec(prefixed, SourceLimits::default()).expect("open prefixed OPC");
         let options = package.save_options().clone();
         package.set_save_options(options);
 
@@ -3837,7 +3900,8 @@ mod tests {
         let (source, first, _second) = two_part_source(b"trailing fallback");
         let mut suffixed = source;
         suffixed.extend_from_slice(b"trailing bytes outside EOCD");
-        let mut package = OpcPackage::from_vec(suffixed).expect("open suffixed OPC");
+        let mut package =
+            OpcPackage::from_vec(suffixed, SourceLimits::default()).expect("open suffixed OPC");
         package
             .get_part_mut(&first)
             .expect("first part")
@@ -3859,7 +3923,8 @@ mod tests {
                 .unwrap()
                 .is_zip64()
         );
-        let mut package = OpcPackage::from_vec(source.clone()).expect("open ZIP64 OPC");
+        let mut package =
+            OpcPackage::from_vec(source.clone(), SourceLimits::default()).expect("open ZIP64 OPC");
         let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
         package
@@ -3885,7 +3950,8 @@ mod tests {
             central_without_local_offset(&output_raw.central_records[second.membername()]),
             central_without_local_offset(&source_raw.central_records[second.membername()])
         );
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen targeted ZIP64 save");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen targeted ZIP64 save");
         assert_eq!(reopened.get_part(&first).unwrap().blob(), b"ZIP64 changed");
         assert_eq!(reopened.get_part(&second).unwrap().blob(), untouched_second);
 
@@ -3898,7 +3964,8 @@ mod tests {
     fn zip64_targeted_stream_failure_reports_partial_output() {
         let (source, first, _second) = two_part_source(b"ZIP64 sink failure");
         let source = promote_to_zip64(source);
-        let mut package = OpcPackage::from_vec(source).expect("open ZIP64 sink source");
+        let mut package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open ZIP64 sink source");
         package
             .get_part_mut(&first)
             .unwrap()
@@ -3930,7 +3997,8 @@ mod tests {
             entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
         }));
 
-        let mut package = OpcPackage::from_vec(source).expect("open projected ZIP64 OPC");
+        let mut package = OpcPackage::from_vec(source, SourceLimits::default())
+            .expect("open projected ZIP64 OPC");
         let untouched_second = package.get_part(&second).unwrap().blob().to_vec();
         package
             .get_part_mut(&first)
@@ -3952,7 +4020,8 @@ mod tests {
             let entry = entry.expect("central entry");
             entry.file_path().as_ref() == second.membername().as_bytes() && entry.is_zip64()
         }));
-        let reopened = OpcPackage::from_bytes(&output).expect("reopen projected ZIP64 save");
+        let reopened = OpcPackage::from_bytes(&output, SourceLimits::default())
+            .expect("reopen projected ZIP64 save");
         assert_eq!(
             reopened.get_part(&first).expect("changed part").blob(),
             b"projected ZIP64 changed"
@@ -4029,7 +4098,8 @@ mod tests {
             )));
 
             let published = PackageWriter::to_bytes(&package).expect("non-compact XML publishes");
-            let reopened = OpcPackage::from_vec(published).expect("published package reopens");
+            let reopened = OpcPackage::from_vec(published, SourceLimits::default())
+                .expect("published package reopens");
             let uri = PackURI::new(part_name).expect("valid part URI");
             assert_eq!(
                 reopened.get_part(&uri).expect("part survives").blob(),
@@ -4222,10 +4292,12 @@ mod tests {
             .expect("write source RDF");
         let source = physical.finish().expect("finish source package");
 
-        let package = OpcPackage::from_vec(source).expect("open source package");
+        let package =
+            OpcPackage::from_vec(source, SourceLimits::default()).expect("open source package");
         let rewritten = PackageWriter::to_bytes(&package).expect("preserve source RDF");
-        let rewritten_physical = crate::phys_pkg::OwnedPhysPkgReader::from_bytes(rewritten)
-            .expect("open rewritten package");
+        let rewritten_physical =
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(rewritten, SourceLimits::default())
+                .expect("open rewritten package");
         assert_eq!(
             rewritten_physical
                 .read_member("custom/manifest.rdf")
@@ -4262,7 +4334,8 @@ mod tests {
         }
         let bytes = PackageWriter::to_bytes(&package).expect("publish package");
         let physical =
-            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(bytes).expect("open published package");
+            crate::phys_pkg::OwnedPhysPkgReader::from_bytes(bytes, SourceLimits::default())
+                .expect("open published package");
         let mut audited = Vec::new();
         for name in physical.member_names().expect("enumerate members") {
             let media_type = match name.as_str() {
@@ -4361,7 +4434,8 @@ mod tests {
 
         PackageWriter::write(&destination, &package).expect("atomic package write");
 
-        let reopened = OpcPackage::open(destination).expect("reopen package");
+        let reopened =
+            OpcPackage::open(destination, SourceLimits::default()).expect("reopen package");
         assert_eq!(
             reopened.get_part(&partname).expect("saved part").blob(),
             b"payload"

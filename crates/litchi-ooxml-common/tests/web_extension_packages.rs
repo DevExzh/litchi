@@ -42,7 +42,7 @@ fn package_authoring_and_removal_round_trip_inert_task_panes() {
     );
 
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_task_pane(
         web::load(&reopened, &web::Limits::standard())
             .unwrap()
@@ -207,7 +207,7 @@ fn public_web_facade_updates_and_round_trips_crud() {
     )
     .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let panes = web::load(&package, &web::Limits::standard())
         .unwrap()
         .unwrap();

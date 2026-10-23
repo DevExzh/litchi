@@ -833,14 +833,14 @@ mod tests {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     fn source_with_limits(xml: &[u8], limits: SourceLimits) -> OpcPackage {
         let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
-        OpcPackage::from_bytes_with_limits(&writer.finish_to_bytes().unwrap(), limits).unwrap()
+        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), limits).unwrap()
     }
 
     fn bounded_xml() -> Vec<u8> {
@@ -1302,7 +1302,7 @@ mod tests {
             .try_replace_owned_xml_part(xml, after.clone())
             .unwrap();
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
             b"<root value = 'new&amp;value'><!--kept--><child/></root>"
@@ -1316,21 +1316,27 @@ mod tests {
             .try_replace_owned_xml_part(after.bytes(), before.clone())
             .unwrap();
         assert_eq!(
-            OpcPackage::from_bytes(&PackageWriter::to_bytes(&package).unwrap())
-                .unwrap()
-                .get_part(&name)
-                .unwrap()
-                .blob(),
+            OpcPackage::from_bytes(
+                &PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default()
+            )
+            .unwrap()
+            .get_part(&name)
+            .unwrap()
+            .blob(),
             xml
         );
         package.remove_part(&name);
         package.try_add_owned_xml_part(before).unwrap();
         assert_eq!(
-            OpcPackage::from_bytes(&PackageWriter::to_bytes(&package).unwrap())
-                .unwrap()
-                .get_part(&name)
-                .unwrap()
-                .blob(),
+            OpcPackage::from_bytes(
+                &PackageWriter::to_bytes(&package).unwrap(),
+                SourceLimits::default()
+            )
+            .unwrap()
+            .get_part(&name)
+            .unwrap()
+            .blob(),
             xml
         );
     }

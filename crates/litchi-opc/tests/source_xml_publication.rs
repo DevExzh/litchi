@@ -66,12 +66,23 @@ fn archive_bytes(document: &[u8]) -> Vec<u8> {
 }
 
 fn open(document: &[u8]) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(archive_bytes(document)).expect("fixture package must open")
+    SourceBackedPackage::from_vec(
+        archive_bytes(document),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open")
 }
 
 fn open_with_limits(document: &[u8], limits: SourceLimits) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec_with_limits(archive_bytes(document), limits)
-        .expect("fixture package must open with limits")
+    SourceBackedPackage::from_vec(
+        archive_bytes(document),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open with limits")
 }
 
 fn insertion_range(bytes: &[u8]) -> usize {
@@ -156,7 +167,13 @@ fn source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment()
     package
         .write_topology_to_stream(&mut output, plan)
         .expect("source XML replacement must publish");
-    let published = SourceBackedPackage::from_vec(output).expect("published package must reopen");
+    let published = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published package must reopen");
     let published_bytes = published
         .part(&document_uri())
         .expect("published document must exist")
@@ -190,7 +207,13 @@ fn empty_fragment_deletes_only_the_authorized_source_range() {
         .unwrap();
     let mut output = Vec::new();
     package.write_topology_to_stream(&mut output, plan).unwrap();
-    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&document_uri())
@@ -399,7 +422,13 @@ fn source_splice_rejects_reedit_and_overlapping_ranges_without_second_output() {
     package
         .write_topology_to_stream(&mut output, plan)
         .expect("the accepted edit must publish");
-    let published = SourceBackedPackage::from_vec(output).expect("published package must reopen");
+    let published = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published package must reopen");
     let published_bytes = published
         .part(&document_uri())
         .expect("published document must exist")
@@ -481,10 +510,12 @@ fn destination_depth_and_event_limits_refuse_source_xml_additions() {
 fn managed_source_xml_honors_cancellation_and_releases_memory_gauge() {
     let memory = 8 * 1024 * 1024;
     let (budget, cancellation_source, context) = managed_context(memory);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed fixture package must open");
     cancellation_source.cancel();
@@ -500,10 +531,12 @@ fn managed_source_xml_honors_cancellation_and_releases_memory_gauge() {
 
     let (budget, _cancellation_source, context) = managed_context(memory);
     {
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed fixture package must open");
         let source = package
@@ -543,10 +576,12 @@ fn managed_source_xml_refuses_retained_fragment_capacity_over_budget() {
     let memory = 1024 * 1024;
     let (budget, _cancellation_source, context) = managed_context(memory);
     {
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let source = package.part(&document_uri()).unwrap().source_xml().unwrap();
@@ -620,8 +655,13 @@ fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
     ] {
         const SIBLING_STYLES: &[u8] = b"<styles>\n  <style id=\"a\" />\n</styles>";
         let source = archive_bytes_with_sibling(original, SIBLING_STYLES);
-        let package = SourceBackedPackage::from_vec(source.clone())
-            .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
+        let package = SourceBackedPackage::from_vec(
+            source.clone(),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
         let mut output = Vec::new();
         package
             .write_part_overlay_to_stream(
@@ -633,8 +673,20 @@ fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
                 panic!("{label}: non-compact original must publish: {error:?}")
             });
 
-        let before = SourceBackedPackage::from_vec(source).expect("source must reopen");
-        let after = SourceBackedPackage::from_vec(output).expect("published package must reopen");
+        let before = SourceBackedPackage::from_vec(
+            source,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("source must reopen");
+        let after = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("published package must reopen");
         let mut compared = 0_usize;
         for part in before.iter_parts() {
             let name = part.partname().clone();
@@ -674,8 +726,13 @@ fn original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal() {
         ("DOCTYPE", b"<!DOCTYPE document><document/>".as_slice()),
         ("invalid UTF-8", b"<document>\xff</document>".as_slice()),
     ] {
-        let package = SourceBackedPackage::from_vec(archive_bytes(original))
-            .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(original),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
         let mut output = Vec::new();
         let error = package
             .write_part_overlay_to_stream(
@@ -702,7 +759,13 @@ fn original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal() {
 fn an_exact_no_op_still_precedes_both_audits() {
     let malformed = b"<document>".as_slice();
     let source = archive_bytes(malformed);
-    let package = SourceBackedPackage::from_vec(source.clone()).expect("fixture must open");
+    let package = SourceBackedPackage::from_vec(
+        source.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture must open");
     let mut output = Vec::new();
     package
         .write_part_overlay_to_stream(&mut output, &document_uri(), malformed.to_vec())
@@ -716,13 +779,14 @@ fn eager_replacement_preserves_a_utf8_bom_and_still_refuses_a_doctype_before_out
 
     let original = b"<?xml version=\"1.0\"?><document><before/></document>";
     let marked = b"\xef\xbb\xbf<?xml version=\"1.0\"?><document><after/></document>";
-    let mut package = OpcPackage::from_vec(archive_bytes(original)).unwrap();
+    let mut package =
+        OpcPackage::from_vec(archive_bytes(original), SourceLimits::default()).unwrap();
     package
         .get_part_mut(&document_uri())
         .unwrap()
         .set_blob(marked.to_vec());
     let published = PackageWriter::to_bytes(&package).unwrap();
-    let reopened = OpcPackage::from_vec(published).unwrap();
+    let reopened = OpcPackage::from_vec(published, SourceLimits::default()).unwrap();
     assert_eq!(reopened.get_part(&document_uri()).unwrap().blob(), marked);
 
     package
@@ -747,7 +811,7 @@ fn marked_xml_members_in_real_packages_pass_the_source_audit_unchanged() {
     let mut marked = 0;
     for fixture in fixtures {
         let bytes = std::fs::read(root.join(fixture)).unwrap();
-        let archive = PhysPkgReader::new(&bytes).unwrap();
+        let archive = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         for name in archive.member_names().unwrap() {
             if !name.ends_with(".xml") && !name.ends_with(".rels") {
                 continue;
@@ -823,7 +887,13 @@ fn logical_xml_revisions_chain_without_reopening_the_physical_source() {
         .unwrap();
     let mut output = Vec::new();
     prepared.publish_to_stream(&mut output).unwrap();
-    let reopened = SourceBackedPackage::from_vec(output).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        output,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&document_uri())
@@ -945,10 +1015,12 @@ fn revision_hint_cannot_replace_a_physical_source_capture() {
 #[test]
 fn managed_revisions_pin_payload_admissions_without_retaining_the_revision_chain() {
     let (budget, _cancel, context) = managed_context(1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut current = package.part(&document_uri()).unwrap().source_xml().unwrap();
@@ -999,10 +1071,12 @@ fn managed_revisions_pin_payload_admissions_without_retaining_the_revision_chain
 fn revision_holder_refuses_exhausted_memory_and_cancelled_contexts() {
     let memory = 1024 * 1024;
     let (budget, cancel, context) = managed_context(memory);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let source = package.part(&document_uri()).unwrap().source_xml().unwrap();
@@ -1083,7 +1157,13 @@ fn retained_candidates_chain_fork_and_restore_the_original_archive() {
     assert_eq!(bytes, archive_bytes(FORMATTED_DOCUMENT));
     let mut bytes = Vec::new();
     second.publish_to_stream(&mut bytes).unwrap();
-    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        bytes,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened
             .part(&document_uri())
@@ -1097,9 +1177,13 @@ fn retained_candidates_chain_fork_and_restore_the_original_archive() {
 
 #[test]
 fn retained_xml_edits_preserve_added_removed_and_relationship_topology() {
-    let package =
-        SourceBackedPackage::from_vec(archive_bytes_with_sibling(FORMATTED_DOCUMENT, b"<styles/>"))
-            .unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes_with_sibling(FORMATTED_DOCUMENT, b"<styles/>"),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let mut plan = SourceTopologyPlan::new();
     plan.try_remove_part(PackURI::new("/word/styles.xml").unwrap())
         .unwrap();
@@ -1132,7 +1216,13 @@ fn retained_xml_edits_preserve_added_removed_and_relationship_topology() {
     assert!(second.edit_xml(&addition, |_, _| Ok(())).is_err());
     let mut bytes = Vec::new();
     second.publish_to_stream(&mut bytes).unwrap();
-    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        bytes,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert!(
         reopened
             .part(&PackURI::new("/word/styles.xml").unwrap())
@@ -1184,10 +1274,12 @@ fn retained_xml_edits_refuse_swapped_transactions_and_roll_back_failed_callbacks
 #[test]
 fn managed_retained_candidates_release_intermediate_revisions() {
     let (budget, _, context) = managed_context(4 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut current = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
@@ -1230,9 +1322,13 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
         .unwrap()
         .build()
         .unwrap();
-    let package =
-        SourceBackedPackage::from_vec_with_limits(archive_bytes(FORMATTED_DOCUMENT), limits)
-            .unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let root = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
     let first = append_candidate(&root, b"<first/>");
     assert!(matches!(
@@ -1252,10 +1348,12 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
 
     let memory = 4 * 1024 * 1024;
     let (budget, cancel, context) = managed_context(memory);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(FORMATTED_DOCUMENT))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let first = append_candidate(
@@ -1283,7 +1381,8 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
 #[test]
 fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
     let bytes = archive_bytes(FORMATTED_DOCUMENT);
-    let archive = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+    let archive =
+        litchi_opc::phys_pkg::PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
     let total: u64 = archive
         .member_names()
         .unwrap()
@@ -1295,7 +1394,13 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec_with_limits(bytes, limits).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        bytes,
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let root = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
     let first = append_candidate(&root, b"<first/>");
     assert!(matches!(

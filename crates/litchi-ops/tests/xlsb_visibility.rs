@@ -47,7 +47,8 @@ fn fixture() -> Vec<u8> {
 /// Rewrite only the workbook tab states while retaining the original package
 /// member order and all unrelated workbook records.
 fn with_states(bytes: &[u8], states: &[u32]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = package
         .get_part(&workbook_uri)
@@ -121,7 +122,8 @@ fn catalog_fixture() -> Vec<u8> {
 /// Turn one workbook bundle relationship into the validated null
 /// relationship form used by the XLSB catalog for an unbound very-hidden tab.
 fn with_null_relationship(bytes: &[u8], target_position: usize) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("parse catalog package");
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse catalog package");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = package
         .get_part(&workbook_uri)
@@ -694,7 +696,8 @@ fn complete_catalog_visibility_write_preserves_chart_and_unbound_tabs() {
 }
 
 fn chart_parts_except_selection(bytes: &[u8]) -> Vec<Vec<u8>> {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     package
         .iter_parts()
         .filter(|part| part.content_type() == "application/vnd.ms-excel.chartsheet")
@@ -751,7 +754,7 @@ fn hiding_active_or_selected_tabs_updates_view_state_and_inverse_restores_it() {
 }
 
 fn worksheet_selected(bytes: &[u8], uri: &str) -> bool {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part = package.get_part(&PackURI::new(uri).unwrap()).unwrap();
     let record = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(Result::unwrap)
@@ -764,7 +767,7 @@ fn worksheet_selected(bytes: &[u8], uri: &str) -> bool {
 #[test]
 fn multi_window_active_relocation_is_an_explicit_capability_refusal() {
     let bytes = fixture();
-    let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/workbook.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut output = Vec::new();

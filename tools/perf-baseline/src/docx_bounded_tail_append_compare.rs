@@ -29,7 +29,9 @@ use std::{
 };
 
 use litchi_core::{OwnedSource, Position, ReadAt, SourceVersion};
-use litchi_docx::source_backed::paragraph_copy::raw::{Limits as CopyLimits, Patch as CopyRawPatch};
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Limits as CopyLimits, Patch as CopyRawPatch,
+};
 // The DOCX owner follows the source-backed ODF append shape: an edit retains
 // only caller text and the indexed source, `plan` proves the source/candidate,
 // and publication writes the preserved package to a sequential sink.  Keep
@@ -37,8 +39,7 @@ use litchi_docx::source_backed::paragraph_copy::raw::{Limits as CopyLimits, Patc
 use litchi_docx::Package as OwnedDocxPackage;
 use litchi_docx::source_backed::tail_append::{
     CandidateProof as TailAppendCandidateProof, EditOptions as TailAppendEditOptions,
-    Limits as TailAppendLimits,
-    SourceProof as TailAppendSourceProof,
+    Limits as TailAppendLimits, SourceProof as TailAppendSourceProof,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
@@ -934,7 +935,8 @@ fn build_materialized_candidate(
     let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
         .edit_plain_paragraph_copy()?;
-    if edit.projected().paragraph_count() != count || edit.projected().xml_bytes() != source_xml_bytes
+    if edit.projected().paragraph_count() != count
+        || edit.projected().xml_bytes() != source_xml_bytes
     {
         return Err("materialized source snapshot differs from generated XML".into());
     }

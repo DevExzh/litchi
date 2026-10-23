@@ -19,7 +19,9 @@
 use std::path::PathBuf;
 
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, SourceLimits, TargetMode,
+};
 use litchi_xlsx::{Error, Package};
 
 /// The producer-signed fixtures: one signature by `xmlsec`, one by Office 2010.
@@ -40,7 +42,7 @@ fn signed_fixture(name: &str) -> Vec<u8> {
 
 /// An owned open, so an untouched package republishes its exact source bytes.
 fn open(bytes: &[u8]) -> OpcPackage {
-    OpcPackage::from_vec(bytes.to_vec()).unwrap()
+    OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default()).unwrap()
 }
 
 fn publish(package: &OpcPackage) -> Vec<u8> {

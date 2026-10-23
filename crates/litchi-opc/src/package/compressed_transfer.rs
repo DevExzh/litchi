@@ -148,7 +148,7 @@ impl OpcPackage {
     ///
     /// - the package retains the owned source archive it was opened from —
     ///   [`Self::from_vec`], [`Self::open`], [`Self::from_reader`], their
-    ///   `*_with_limits` forms, [`Self::from_vec_reusing_payloads`] and
+    ///   [`Self::from_vec_reusing_payloads`] and
     ///   [`Self::from_vec_with_execution`] — with a source member for this
     ///   part;
     /// - the part still holds the payload allocation it was opened with,

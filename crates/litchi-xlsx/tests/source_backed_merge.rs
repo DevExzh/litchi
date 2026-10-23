@@ -74,7 +74,8 @@ fn shared_strings_fixture() -> Vec<u8> {
     let sheet = format!(
         r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>"#
     );
-    let mut package = OpcPackage::from_bytes(&fixture(&sheet)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(&sheet), litchi_opc::SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/sharedStrings.xml").unwrap(),
@@ -97,7 +98,7 @@ fn shared_strings_fixture() -> Vec<u8> {
 }
 
 fn changed_shared_strings_bytes(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/sharedStrings.xml").unwrap())
         .unwrap()
@@ -106,7 +107,7 @@ fn changed_shared_strings_bytes(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn changed_shared_strings_relationship(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -249,7 +250,8 @@ fn table_fixture(with_existing_merge: bool) -> Vec<u8> {
         ""
     };
     let sheet = format!(r#"<worksheet xmlns="{SML}"><sheetData/>{merge_cells}</worksheet>"#);
-    let mut package = OpcPackage::from_bytes(&fixture(&sheet)).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&fixture(&sheet), litchi_opc::SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/tables/table1.xml").unwrap(),
@@ -275,7 +277,7 @@ fn table_fixture(with_existing_merge: bool) -> Vec<u8> {
 }
 
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -292,7 +294,7 @@ fn package_part_bytes(package: &OpcPackage, name: &str) -> Vec<u8> {
 }
 
 fn part_relationship_count(bytes: &[u8], name: &str) -> usize {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(name).unwrap())
         .unwrap()
@@ -380,7 +382,8 @@ fn source_merge_patch_applies_forward_and_inverse_exactly() {
     let mut edit = editor.edit_merges("Sheet1").unwrap().unwrap();
     edit.merge("A2:B2").unwrap();
     let commit = edit.commit().unwrap();
-    let mut package = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
 
     replay_patch(&mut package, commit.patch()).unwrap();
     assert!(
@@ -406,7 +409,8 @@ fn source_merge_patch_rejects_shared_strings_payload_and_relationship_drift() {
         let mut edit = editor.edit_merges("Sheet1").unwrap().unwrap();
         edit.merge("A2:B2").unwrap();
         let commit = edit.commit().unwrap();
-        let mut package = OpcPackage::from_bytes(&changed_bytes).unwrap();
+        let mut package =
+            OpcPackage::from_bytes(&changed_bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(matches!(
             replay_patch(&mut package, commit.patch()),
             Err(Error::PatchConflict { .. })
@@ -441,7 +445,8 @@ fn source_merge_managed_inverse_uses_recipient_policy() {
     let mut edit = editor.edit_merges("Sheet1").unwrap().unwrap();
     edit.merge("A2:B2").unwrap();
     let commit = edit.commit().unwrap();
-    let mut package = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut package, commit.patch()).unwrap();
     let forward_bytes = PackageWriter::to_bytes(&package).unwrap();
     replay_patch(&mut package, &commit.patch().inverse()).unwrap();
@@ -453,7 +458,8 @@ fn source_merge_managed_inverse_uses_recipient_policy() {
     // The exact restore already uses the unmanaged recipient policy. The
     // explicit materialized route remains available for callers that want a
     // detached semantic patch from the managed producer.
-    let mut materialized_package = OpcPackage::from_bytes(&forward_bytes).unwrap();
+    let mut materialized_package =
+        OpcPackage::from_bytes(&forward_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(
         &mut materialized_package,
         &commit
@@ -828,7 +834,8 @@ fn source_merge_replay_composes_with_unrelated_member_changes() {
     edit.merge("A2:B2").unwrap();
     let commit = edit.commit().unwrap();
 
-    let mut unrelated = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut unrelated =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     unrelated
         .get_part_mut(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -980,6 +987,6 @@ fn replay_patch(
     let workbook =
         SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
     let next = workbook.apply_merges(patch)?.into_package().to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

@@ -192,7 +192,7 @@ fn package_with_model() -> Package {
     builder.presentation().unwrap().add_slide().unwrap();
     let package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     install_model(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

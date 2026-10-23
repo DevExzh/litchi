@@ -157,10 +157,12 @@ impl ReadAt for ShortReadSource {
 fn managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory() {
     let bytes = archive_bytes(b"<document>managed</document>");
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX, u64::MAX);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes)),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let artifact = package.source_artifact();
@@ -189,7 +191,14 @@ fn managed_fingerprint_repeated_calls_charge_work_and_input_and_release_memory()
 fn generic_stable_version_mutation_is_rehashed_on_every_fingerprint() {
     let bytes = archive_bytes(b"<document>stable</document>");
     let source = StableMutableSource::new(bytes);
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let artifact = package.source_artifact();
     let first = artifact.fingerprint().unwrap();
     let reads_after_first = source.reads.load(Ordering::Acquire);
@@ -209,7 +218,14 @@ fn generic_short_reads_are_complete_and_overreported_reads_fail_before_digest() 
     let bytes = archive_bytes(b"<document>short</document>");
     let expected = Sha256::digest(&bytes);
     let source = ShortReadSource::new(bytes.clone(), 7);
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let artifact = package.source_artifact();
     assert_eq!(artifact.fingerprint().unwrap().as_sha256(), &expected[..]);
 

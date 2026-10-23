@@ -395,14 +395,14 @@ fn managed_package(source: Arc<dyn ReadAt>) -> (SourceBackedPackage, Budget) {
     let context = ExecutionContext::new(budget.clone(), token, execution_limits);
     let cache_limits =
         SourceCacheLimits::new(PAYLOAD_BYTES * PART_COUNT * 2, PART_COUNT + 4).unwrap();
-    let package =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            SourceLimits::default(),
-            cache_limits,
-            context,
-        )
-        .unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        SourceLimits::default(),
+        cache_limits,
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .unwrap();
     (package, budget)
 }
 

@@ -139,7 +139,13 @@ fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let package = SourceBackedPackage::from_reader_with_limits(&mut reader, limits).unwrap();
+    let package = SourceBackedPackage::from_reader(
+        &mut reader,
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
 
     assert_eq!(reader.bytes_read, input_length);
     assert_eq!(reader.offset, input_length);
@@ -166,9 +172,14 @@ fn reader_ingress_rejects_input_above_max_input_bytes() {
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let error = SourceBackedPackage::from_reader_with_limits(&mut reader, limits)
-        .err()
-        .expect("input larger than max_input_bytes must be rejected");
+    let error = SourceBackedPackage::from_reader(
+        &mut reader,
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .err()
+    .expect("input larger than max_input_bytes must be rejected");
 
     assert!(matches!(
         error,
@@ -194,8 +205,13 @@ fn reader_ingress_retries_one_interrupted_read() {
         .unwrap();
     let mut reader = InterruptOnceReader::new(source);
 
-    let package = SourceBackedPackage::from_reader_with_limits(&mut reader, limits)
-        .expect("a transient interrupted read must be retried");
+    let package = SourceBackedPackage::from_reader(
+        &mut reader,
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("a transient interrupted read must be retried");
 
     assert!(reader.interrupted);
     assert_eq!(reader.inner.bytes_read, input_length);
@@ -206,7 +222,12 @@ fn reader_ingress_retries_one_interrupted_read() {
 #[test]
 fn reader_ingress_rejects_invalid_read_count_without_panicking() {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        SourceBackedPackage::from_reader_with_limits(InvalidCountReader, SourceLimits::default())
+        SourceBackedPackage::from_reader(
+            InvalidCountReader,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
     }));
     let result = result.expect("an invalid Read count must not panic public ingress");
     let error = match result {
@@ -227,7 +248,12 @@ fn assert_index_limit_is_typed_for_both_sources(
     expected_actual: u64,
     expected_maximum: u64,
 ) {
-    let from_vec = match SourceBackedPackage::from_vec_with_limits(source.to_vec(), limits) {
+    let from_vec = match SourceBackedPackage::from_vec(
+        source.to_vec(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("the vec source must exceed {expected:?}"),
         Err(error) => error,
     };
@@ -240,9 +266,12 @@ fn assert_index_limit_is_typed_for_both_sources(
         } if resource == expected && actual == expected_actual && maximum == expected_maximum
     ));
 
-    let from_read_at = match SourceBackedPackage::from_read_at_with_limits(
+    let from_read_at = match SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source.to_vec())),
         limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
     ) {
         Ok(_) => panic!("the read-at source must exceed {expected:?}"),
         Err(error) => error,
@@ -377,10 +406,16 @@ impl Write for FailingSink {
 #[test]
 fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
     let fail = Arc::new(AtomicBool::new(false));
-    let package = SourceBackedPackage::from_read_at(Arc::new(ToggleReadAt {
-        source: OwnedSource::new(archive_bytes()),
-        fail: Arc::clone(&fail),
-    }))
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(ToggleReadAt {
+            source: OwnedSource::new(archive_bytes()),
+            fail: Arc::clone(&fail),
+        }),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
     .unwrap();
     fail.store(true, Ordering::Release);
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
@@ -391,7 +426,13 @@ fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
         OpcError::IoError(error) if error.kind() == io::ErrorKind::BrokenPipe
     ));
 
-    let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let part = package.part(&pack(DOCUMENT_URI)).unwrap();
     let mut sink = FailingSink;
     let error = part.stream_to(&mut sink).unwrap_err();

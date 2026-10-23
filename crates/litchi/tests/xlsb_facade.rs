@@ -144,7 +144,7 @@ fn chart_first_tabs_bytes() -> Vec<u8> {
 }
 
 fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -177,7 +177,7 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
 }
 
 fn active_book_view_catalog_position(bytes: &[u8]) -> u32 {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let workbook = package.get_part(&workbook_uri).unwrap();
     let mut active_catalog_position = None;
@@ -210,7 +210,11 @@ fn save_eager_workbook(workbook: &xlsb::Workbook) -> Vec<u8> {
 }
 
 fn malformed_second_sheet() -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture_bytes())).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(fixture_bytes()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let sheet = PackURI::new("/xl/worksheets/sheet2.bin").unwrap();
     package
         .get_part_mut(&sheet)
@@ -474,7 +478,7 @@ fn dynamic_owned_bytes_facade_enforces_exact_input_limit() {
 #[test]
 fn dynamic_owned_bytes_facade_enforces_exact_part_limit() {
     let bytes = all_worksheet_bytes();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let largest_part_bytes = package
         .try_iter_parts()
         .map(|part| part.expect("generated package parts decode").blob().len())

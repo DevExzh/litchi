@@ -188,7 +188,7 @@ fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::page_breaks::so
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -246,7 +246,7 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     commit.package().write_to(&mut output).unwrap();
     assert_eq!(
         litchi_xlsx::page_breaks::Snapshot::load(
-            &OpcPackage::from_bytes(&output).unwrap(),
+            &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap(),
             "Sheet1",
         )
         .unwrap()
@@ -309,7 +309,7 @@ fn changed_edit_reopens_and_changes_only_the_selected_worksheet() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -331,8 +331,9 @@ fn changed_edit_reopens_and_changes_only_the_selected_worksheet() {
     // A second write of the committed workbook is byte-identical.
     assert_eq!(commit.package().to_bytes().unwrap(), output);
 
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -416,7 +417,8 @@ fn foreign_changed_and_retargeted_sources_are_rejected() {
     ));
     assert!(output.is_empty());
 
-    let mut retargeted = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut retargeted =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook = retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap();

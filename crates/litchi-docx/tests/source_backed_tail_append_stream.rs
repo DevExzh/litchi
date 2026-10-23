@@ -459,14 +459,19 @@ fn managed_package_with_cancellation(
 }
 
 fn main_bytes(archive: &[u8]) -> Vec<u8> {
-    SourceBackedPackage::from_vec(archive.to_vec())
-        .expect("published archive must reopen")
-        .part(&PackURI::new(MAIN_URI).expect("main URI must be valid"))
-        .expect("main part must exist")
-        .data()
-        .expect("main part must decode")
-        .as_bytes()
-        .to_vec()
+    SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive must reopen")
+    .part(&PackURI::new(MAIN_URI).expect("main URI must be valid"))
+    .expect("main part must exist")
+    .data()
+    .expect("main part must decode")
+    .as_bytes()
+    .to_vec()
 }
 
 fn semantic_texts(archive: &[u8]) -> Vec<String> {
@@ -615,8 +620,13 @@ impl OriginalArtifactProvider for TestOriginalProvider {
         _reference: &OriginalArtifactReference,
     ) -> Result<litchi_opc::SourceArtifact, OriginalArtifactError> {
         let bytes = self.bytes.clone().ok_or(OriginalArtifactError::Missing)?;
-        let package = SourceBackedPackage::from_vec(bytes)
-            .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
+        let package = SourceBackedPackage::from_vec(
+            bytes,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
         Ok(package.source_artifact())
     }
 }
@@ -633,8 +643,13 @@ impl OriginalArtifactProvider for CountingOriginalProvider {
         _reference: &OriginalArtifactReference,
     ) -> Result<litchi_opc::SourceArtifact, OriginalArtifactError> {
         self.opens.fetch_add(1, Ordering::AcqRel);
-        let package = SourceBackedPackage::from_vec(self.bytes.clone())
-            .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
+        let package = SourceBackedPackage::from_vec(
+            self.bytes.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .map_err(|error| OriginalArtifactError::Provider(Box::new(error)))?;
         Ok(package.source_artifact())
     }
 }
@@ -1597,15 +1612,25 @@ fn durable_forward_and_inverse_authorizations_are_compact_canonical_wire() {
     plan.write_to(&mut candidate_archive)
         .expect("durable patch fixture must publish");
     let source_artifact = artifact_proof(
-        &SourceBackedPackage::from_vec(source_archive.clone())
-            .expect("source artifact package must open")
-            .source_artifact(),
+        &SourceBackedPackage::from_vec(
+            source_archive.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("source artifact package must open")
+        .source_artifact(),
     )
     .expect("source artifact fingerprint must be bounded");
     let candidate_artifact = artifact_proof(
-        &SourceBackedPackage::from_vec(candidate_archive.clone())
-            .expect("candidate artifact package must open")
-            .source_artifact(),
+        &SourceBackedPackage::from_vec(
+            candidate_archive.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("candidate artifact package must open")
+        .source_artifact(),
     )
     .expect("candidate artifact fingerprint must be bounded");
     let patch = ParagraphStreamPatch::from_tail_append_proofs(

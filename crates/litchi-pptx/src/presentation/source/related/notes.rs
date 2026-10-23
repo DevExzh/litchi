@@ -79,7 +79,7 @@ impl PartLoader for EagerLoader<'_> {
                 actual: part.content_type().to_owned(),
             });
         }
-        let processed = super::process_eager_part(part, maximum)?;
+        let processed = super::process_eager_part(part, maximum, self.package.read_limits())?;
         operation(&processed)
     }
 
@@ -130,8 +130,11 @@ pub(super) fn validate_eager(
 /// Process one eager notes part with the same bounded MCE policy used by the
 /// source loader. The returned allocation is also the input retained by the
 /// owned shape scene.
-pub(super) fn processed_eager_notes(part: &dyn Part) -> Result<Arc<Vec<u8>>> {
-    Ok(super::process_eager_part(part, MAX_NOTES_XML)?.blob_arc())
+pub(super) fn processed_eager_notes(
+    part: &dyn Part,
+    source_limits: litchi_opc::SourceLimits,
+) -> Result<Arc<Vec<u8>>> {
+    Ok(super::process_eager_part(part, MAX_NOTES_XML, source_limits)?.blob_arc())
 }
 
 fn validate_selected<L: PartLoader>(

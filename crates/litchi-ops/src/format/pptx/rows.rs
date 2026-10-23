@@ -74,7 +74,7 @@ impl Pptx {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match change {
             Change::Insert {
@@ -173,7 +173,7 @@ impl Pptx {
         let slide = slide_table(&table)?;
         let shape = table.handle.position().get();
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         if let Some(name) = &name {
             native.set_shape_name(slide, shape, name)?;
@@ -533,7 +533,7 @@ impl Pptx {
             .count();
         let name = name.unwrap_or_else(|| format!("Table {}", ordinal + 1));
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut edit = base.edit()?;
         edit.add_table(slide, &cells, bounds)?;
         // The new table is the last shape of the slide in pre-order.

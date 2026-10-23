@@ -238,7 +238,7 @@ impl Pptx {
             })?;
         }
         let source = self.editable_owner()?;
-        let base = super::smartart::eager(&source)?;
+        let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         if !colors.is_empty() || name.is_some() {
             let next = palette(&theme.colors, name.as_deref(), &colors);

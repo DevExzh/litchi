@@ -901,7 +901,7 @@ fn marker_admission_matches_the_authoritative_path_on_every_real_worksheet() {
     let mut rewritten_shared = 0usize;
     let mut borrowed = 0usize;
     for path in &paths {
-        let Ok(package) = OpcPackage::open(path) else {
+        let Ok(package) = OpcPackage::open(path, litchi_opc::SourceLimits::default()) else {
             continue;
         };
         for part in package

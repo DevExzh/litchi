@@ -149,8 +149,14 @@ fn topology_plan() -> SourceTopologyPlan {
 }
 
 fn publish(bytes: &[u8], plan: SourceTopologyPlan) -> Vec<u8> {
-    let package =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec()))).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes.to_vec())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let mut output = Vec::new();
     package.write_topology_to_stream(&mut output, plan).unwrap();
     output
@@ -179,15 +185,17 @@ fn topology_publication_splices_marked_manifests_like_unmarked_ones() {
     assert!(!manifest.contains("PartName=\"/custom/existing.xml\""));
     let appended = members(&marked)["word/_rels/document.xml.rels"].clone();
     assert!(appended.ends_with(b"Target=\"../custom/new.xml\"/></Relationships>"));
-    OpcPackage::from_bytes(&marked).unwrap();
+    OpcPackage::from_bytes(&marked, SourceLimits::default()).unwrap();
 }
 
 #[test]
 fn owned_xml_part_ranges_are_byte_ranges_of_marked_bytes() {
     let entries = topology_entries();
     let name = pack("/custom/untouched.xml");
-    let plain_package = OpcPackage::from_bytes(&archive(&entries, |_| false)).unwrap();
-    let marked_package = OpcPackage::from_bytes(&archive(&entries, is_xml_member)).unwrap();
+    let plain_package =
+        OpcPackage::from_bytes(&archive(&entries, |_| false), SourceLimits::default()).unwrap();
+    let marked_package =
+        OpcPackage::from_bytes(&archive(&entries, is_xml_member), SourceLimits::default()).unwrap();
     let plain = plain_package.source_xml_part(&name).unwrap();
     let marked = marked_package.source_xml_part(&name).unwrap();
     assert_eq!(marked.bytes(), [BOM, plain.bytes()].concat().as_slice());
@@ -241,11 +249,13 @@ fn owned_xml_part_ranges_are_byte_ranges_of_marked_bytes() {
 #[test]
 fn eager_round_trip_of_marked_manifests_matches_the_unmarked_round_trip() {
     let entries = topology_entries();
-    let plain =
-        PackageWriter::to_bytes(&OpcPackage::from_bytes(&archive(&entries, |_| false)).unwrap())
-            .unwrap();
+    let plain = PackageWriter::to_bytes(
+        &OpcPackage::from_bytes(&archive(&entries, |_| false), SourceLimits::default()).unwrap(),
+    )
+    .unwrap();
     let marked = PackageWriter::to_bytes(
-        &OpcPackage::from_bytes(&archive(&entries, is_xml_member)).unwrap(),
+        &OpcPackage::from_bytes(&archive(&entries, is_xml_member), SourceLimits::default())
+            .unwrap(),
     )
     .unwrap();
     let kept = assert_equal_but_marks(&marked, &plain);
@@ -299,10 +309,13 @@ fn a_local_replacement_of_a_marked_part_publishes_like_the_unmarked_one() {
         .concat(),
     )
     .unwrap();
-    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(archive(
-        &entries,
-        is_xml_member,
-    ))))
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(archive(&entries, is_xml_member))),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
     .unwrap();
     let mut output = Vec::new();
     assert!(package.write_topology_to_stream(&mut output, plan).is_err());
@@ -322,10 +335,15 @@ fn a_marked_malformed_replacement_is_refused_at_its_physical_offset() {
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_part(pack("/custom/untouched.xml"), replacement)
             .unwrap();
-        let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(archive(
-            &entries,
-            |name| marked && is_xml_member(name),
-        ))))
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(archive(&entries, |name| {
+                marked && is_xml_member(name)
+            }))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
         .unwrap();
         let mut output = Vec::new();
         let error = package

@@ -198,7 +198,8 @@ fn raw_noop_preserves_signatures_and_raw_edits_require_explicit_policy() {
         .is_err()
     );
     assert_eq!(bytes(&package), original);
-    let mut replacement = OpcPackage::from_bytes(&original).unwrap();
+    let mut replacement =
+        OpcPackage::from_bytes(&original, litchi_opc::SourceLimits::default()).unwrap();
     replacement.unsign();
     assert!(
         {

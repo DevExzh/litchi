@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use litchi_opc::{
     AuthoredXmlFragment, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind,
-    SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
+    SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader,
 };
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use soapberry_zip::{ZipArchive, ZipArchiveWriter};
@@ -210,16 +210,22 @@ fn malformed_seeds(valid: &[u8]) -> Vec<Vec<u8>> {
 
 fn assert_ingress_admits(data: &[u8], limits: SourceLimits, label: &str) {
     assert!(
-        SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits).is_ok(),
+        SourceBackedPackage::from_vec(
+            data.to_vec(),
+            limits,
+            litchi_opc::SourceCacheLimits::default(),
+            None
+        )
+        .is_ok(),
         "source-backed ingress must admit {label}"
     );
     assert!(
-        OpcPackage::from_bytes_with_limits(data, limits).is_ok(),
+        OpcPackage::from_bytes(data, limits).is_ok(),
         "eager ingress must admit {label}"
     );
     let mut reader = Cursor::new(data);
     assert!(
-        probe_package_catalog_from_reader_with_limits(&mut reader, limits).is_ok(),
+        probe_package_catalog_from_reader(&mut reader, limits).is_ok(),
         "metadata probe ingress must admit {label}"
     );
 }
@@ -230,20 +236,25 @@ fn assert_ingress_rejects(
     resource: SourceLimitKind,
     label: &str,
 ) {
-    let source_error = match SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) {
+    let source_error = match SourceBackedPackage::from_vec(
+        data.to_vec(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("source-backed ingress unexpectedly admitted boundary input for {label}"),
         Err(error) => error,
     };
     assert_read_limit(source_error, resource, label, "source-backed");
 
-    let eager_error = match OpcPackage::from_bytes_with_limits(data, limits) {
+    let eager_error = match OpcPackage::from_bytes(data, limits) {
         Ok(_) => panic!("eager ingress unexpectedly admitted boundary input"),
         Err(error) => error,
     };
     assert_read_limit(eager_error, resource, label, "eager");
 
     let mut reader = Cursor::new(data);
-    let probe_error = match probe_package_catalog_from_reader_with_limits(&mut reader, limits) {
+    let probe_error = match probe_package_catalog_from_reader(&mut reader, limits) {
         Ok(_) => panic!("metadata probe unexpectedly admitted boundary input"),
         Err(error) => error,
     };
@@ -401,8 +412,13 @@ fn assert_reopened_xml_payloads() {
     let (content_types, root_rels, document_rels) = boundary_manifest();
     let input = archive_bytes(&content_types, &root_rels, &document_rels);
     let limits = opc_harness::tight_limits();
-    let package = SourceBackedPackage::from_vec_with_limits(input, limits)
-        .expect("source payload fixture must open");
+    let package = SourceBackedPackage::from_vec(
+        input,
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source payload fixture must open");
     let document_uri = PackURI::new("/word/document.xml").expect("document URI is valid");
     let copy_uri = PackURI::new("/litchi-fuzz-source-copy.xml").expect("copy URI is valid");
     let source = package
@@ -446,8 +462,13 @@ fn assert_reopened_xml_payloads() {
         .write_topology_to_stream(&mut output, plan)
         .expect("source replacement and copy must publish");
 
-    let source_reopened = SourceBackedPackage::from_vec_with_limits(output.clone(), limits)
-        .expect("source publication must reopen");
+    let source_reopened = SourceBackedPackage::from_vec(
+        output.clone(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source publication must reopen");
     assert_eq!(
         source_reopened
             .part(&document_uri)
@@ -468,7 +489,7 @@ fn assert_reopened_xml_payloads() {
     );
 
     let eager_reopened =
-        OpcPackage::from_bytes_with_limits(&output, limits).expect("eager publication must reopen");
+        OpcPackage::from_bytes(&output, limits).expect("eager publication must reopen");
     assert_eq!(
         eager_reopened
             .get_part(&document_uri)

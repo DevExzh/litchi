@@ -219,14 +219,14 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
             .saturating_mul(2)
             .saturating_add(
                 candidate
-                    .source_relationships(story.part())?
+                    .source_relationships(story.part(), candidate.read_limits())?
                     .bytes()
                     .len()
                     .saturating_mul(2),
             )
             .saturating_add(
                 candidate
-                    .source_content_types()?
+                    .source_content_types(candidate.read_limits())?
                     .bytes()
                     .len()
                     .saturating_mul(2),

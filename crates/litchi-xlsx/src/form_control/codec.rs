@@ -5789,10 +5789,12 @@ mod tests {
     fn managed_source_payload_keeps_reservation_and_exact_bytes_after_owner_drop() {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
             SourceLimits::default(),
-            managed_test_context(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(managed_test_context()),
         )
         .expect("managed fixture package");
         let context = package

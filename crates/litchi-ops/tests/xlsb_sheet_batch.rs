@@ -137,7 +137,8 @@ fn visibility_batch(paths: &[usize], state: &'static str) -> Vec<BatchItem<'stat
 }
 
 fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("parse chart fixture");
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse chart fixture");
     let chart_uri = package
         .iter_parts()
         .find(|part| part.content_type() == "application/vnd.ms-excel.chartsheet")
@@ -185,7 +186,8 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn worksheet_selected(bytes: &[u8], index: usize) -> bool {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let uri = PackURI::new(format!("/xl/worksheets/sheet{index}.bin")).expect("worksheet URI");
     let part = package.get_part(&uri).expect("worksheet part");
     let record = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)

@@ -146,10 +146,10 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         .max_content_type_mappings(source.limits.max_parts().saturating_add(2))?
         .max_relationships_per_part(source.limits.max_parts())?
         .build()?;
-    let types = source.package.source_content_types_with_limits(policy)?;
+    let types = source.package.source_content_types(policy)?;
     let rels = source
         .package
-        .source_relationships_with_limits(&source.presentation_name, policy)?;
+        .source_relationships(&source.presentation_name, policy)?;
     let types_plan = types.plan_edit(
         &[litchi_opc::ContentTypeEdit {
             part_name: &name,

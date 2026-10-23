@@ -1883,8 +1883,10 @@ pub(crate) fn load_with_limits(package: &OpcPackage, limits: &Limits) -> Result<
         if !ids.insert(survey.id()) {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
-        let table_relationships_source = package.source_relationships(&table_part_name)?;
-        let survey_relationships_source = package.source_relationships(part.partname())?;
+        let table_relationships_source =
+            package.source_relationships(&table_part_name, package.read_limits())?;
+        let survey_relationships_source =
+            package.source_relationships(part.partname(), package.read_limits())?;
         values.push(Part {
             survey: Arc::new(survey),
             table_part_name,
@@ -3301,7 +3303,7 @@ impl Snapshot {
             Arc::from(incoming_relationships(package, &entries)?.into_boxed_slice());
         Ok(Self {
             entries,
-            source_content_types: package.source_content_types()?,
+            source_content_types: package.source_content_types(package.read_limits())?,
             incoming_relationships,
             limits: *limits,
         })
@@ -3629,6 +3631,7 @@ impl Edit {
             &self.before.source_content_types,
             self.before.entries(),
             &self.draft,
+            self.target.read_limits().max_content_types_bytes(),
         )?;
         apply_entries(
             &mut candidate,
@@ -3940,8 +3943,12 @@ fn apply_entries(
         }
         add_entry(package, entry, limits)?;
     }
-    let current_content_types = package.source_content_types()?;
-    package.try_replace_content_types(current_content_types.bytes(), content_types)?;
+    let current_content_types = package.source_content_types(package.read_limits())?;
+    package.try_replace_content_types(
+        current_content_types.bytes(),
+        content_types,
+        package.read_limits(),
+    )?;
     Ok(())
 }
 
@@ -3949,6 +3956,7 @@ fn transition_content_types(
     before: &OwnedContentTypes,
     before_entries: &[Part],
     after_entries: &[Part],
+    maximum: usize,
 ) -> Result<OwnedContentTypes> {
     let mut removed = Vec::new();
     for entry in before_entries {
@@ -3968,7 +3976,6 @@ fn transition_content_types(
             additions.push((&entry.part_name, CONTENT_TYPE));
         }
     }
-    let maximum = litchi_opc::SourceLimits::default().max_content_types_bytes();
     let mut result = before.without_parts(&removed, maximum)?;
     if !additions.is_empty() {
         result = result.with_part_overrides(&additions, maximum)?;
@@ -4024,7 +4031,8 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
     // Capture the complete owner member before adding the new edge. The
     // relationship token keeps comments, PIs, prefixes, attribute order and
     // explicit empty-member presence when the edge is spliced in.
-    let table_relationships = package.source_relationships(&entry.table_part_name)?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     if let Some(proof) = &entry.source_proof {
         package.try_add_owned_xml_part(proof.as_ref().clone())?;
     } else {
@@ -4042,10 +4050,14 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         usize::MAX,
     )?;
-    package.try_replace_relationships(&table_relationships, &table_replacement)?;
+    package.try_replace_relationships(
+        &table_relationships,
+        &table_replacement,
+        package.read_limits(),
+    )?;
     if let Some(source) = entry.survey_relationships_source.as_ref() {
-        let current = package.source_relationships(&entry.part_name)?;
-        package.try_replace_relationships(&current, source)?;
+        let current = package.source_relationships(&entry.part_name, package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
     }
     Ok(())
 }
@@ -4063,10 +4075,15 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part) -> Result<()> {
     if relationship.target_ref() != entry.relationship_target {
         return Err(invalid("Survey owner relationship lexical target changed"));
     }
-    let table_relationships = package.source_relationships(&entry.table_part_name)?;
+    let table_relationships =
+        package.source_relationships(&entry.table_part_name, package.read_limits())?;
     let table_replacement =
         table_relationships.without_relationship(&entry.relationship_id, usize::MAX)?;
-    package.try_replace_relationships(&table_relationships, &table_replacement)?;
+    package.try_replace_relationships(
+        &table_relationships,
+        &table_replacement,
+        package.read_limits(),
+    )?;
     if part_is_referenced(package, &entry.part_name) {
         return Err(invalid("Survey part has an unexpected relationship owner"));
     }
@@ -4096,8 +4113,8 @@ fn part_is_referenced(package: &OpcPackage, part_name: &PackURI) -> bool {
 
 fn restore_relationship_provenance(package: &mut OpcPackage, snapshot: &Snapshot) -> Result<()> {
     let restore = |package: &mut OpcPackage, source: &OwnedRelationships| -> Result<()> {
-        let current = package.source_relationships(source.owner())?;
-        package.try_replace_relationships(&current, source)?;
+        let current = package.source_relationships(source.owner(), package.read_limits())?;
+        package.try_replace_relationships(&current, source, package.read_limits())?;
         Ok(())
     };
     for entry in snapshot.entries.iter() {
@@ -4164,7 +4181,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn schema_xml(body: &str) -> Vec<u8> {
@@ -4293,7 +4314,8 @@ mod tests {
             &format!("{second}<!--b-->{new}{first_moved}{second_copy}"),
         );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4317,7 +4339,7 @@ mod tests {
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
@@ -4443,7 +4465,8 @@ mod tests {
                 ),
             );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4458,7 +4481,7 @@ mod tests {
         assert!(survey.questions.values[0].properties.is_some());
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
@@ -4505,7 +4528,8 @@ mod tests {
                 &format!("<!--q--><questionPr xmlns=\"{namespace}\"/><s:extLst>"),
             );
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4514,9 +4538,11 @@ mod tests {
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
         assert!(
-            Snapshot::load(&OpcPackage::from_bytes(&bytes).unwrap())
-                .unwrap()
-                .same_source(&before)
+            Snapshot::load(
+                &OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap()
+            )
+            .unwrap()
+            .same_source(&before)
         );
     }
 
@@ -4653,7 +4679,8 @@ mod tests {
             expected = expected.replace(from, to);
         }
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         assert_eq!(
             reopened.get_part(&name).unwrap().blob(),
@@ -4661,7 +4688,7 @@ mod tests {
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&name).unwrap().blob(), xml.as_bytes());
     }
@@ -4679,10 +4706,11 @@ mod tests {
         transaction.remove(0).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -4852,8 +4880,10 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened =
-            crate::package::Package::from_opc(OpcPackage::from_bytes(&bytes).unwrap()).unwrap();
+        let mut reopened = crate::package::Package::from_opc(
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             reopened.surveys().unwrap().entries()[0].survey().title(),
             Some(title)
@@ -4863,7 +4893,7 @@ mod tests {
             .unwrap()
             .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             restored
                 .get_part(&PackURI::new("/xl/surveys/survey1.xml").unwrap())
@@ -4988,8 +5018,10 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.clone().into_plain_opc()).unwrap();
-        let mut reopened =
-            crate::package::Package::from_opc(OpcPackage::from_bytes(&bytes).unwrap()).unwrap();
+        let mut reopened = crate::package::Package::from_opc(
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap();
         let after = reopened.surveys().unwrap().entries()[0].survey().clone();
         assert_eq!(after.questions, before.questions);
         assert_eq!(after.title(), Some("edited"));
@@ -4998,7 +5030,7 @@ mod tests {
             .unwrap()
             .into_package();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened.into_plain_opc()).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             restored
                 .get_part(&PackURI::new("/xl/surveys/survey1.xml").unwrap())
@@ -5279,7 +5311,7 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&source_package.into_plain_opc()).unwrap();
-        let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         let changed_text = String::from_utf8(changed.to_vec()).unwrap();
@@ -5374,7 +5406,8 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         let changed_text = String::from_utf8(changed.to_vec()).unwrap();
@@ -5427,7 +5460,8 @@ mod tests {
         let remove_patch = remove_transaction.commit().unwrap().patch().clone();
         let remove_bytes =
             litchi_opc::PackageWriter::to_bytes(&remove_package.into_plain_opc()).unwrap();
-        let mut remove_reopened = OpcPackage::from_bytes(&remove_bytes).unwrap();
+        let mut remove_reopened =
+            OpcPackage::from_bytes(&remove_bytes, litchi_opc::SourceLimits::default()).unwrap();
         let remove_name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let remove_changed = remove_reopened.get_part(&remove_name).unwrap().blob();
         let remove_text = String::from_utf8(remove_changed.to_vec()).unwrap();
@@ -5491,7 +5525,8 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package.into_plain_opc()).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = PackURI::new("/xl/surveys/survey1.xml").unwrap();
         let changed = reopened.get_part(&name).unwrap().blob();
         assert_comment_order(changed, &["slot0", "slot1", "slot2"]);
@@ -5514,7 +5549,8 @@ mod tests {
         let remove_patch = remove_transaction.commit().unwrap().patch().clone();
         let remove_bytes =
             litchi_opc::PackageWriter::to_bytes(&remove_package.into_plain_opc()).unwrap();
-        let mut remove_reopened = OpcPackage::from_bytes(&remove_bytes).unwrap();
+        let mut remove_reopened =
+            OpcPackage::from_bytes(&remove_bytes, litchi_opc::SourceLimits::default()).unwrap();
         let remove_changed = remove_reopened.get_part(&name).unwrap().blob();
         assert_comment_order(remove_changed, &["slot0", "slot1", "slot2"]);
         remove_patch.inverse().apply(&mut remove_reopened).unwrap();
@@ -5761,14 +5797,18 @@ mod tests {
         let mut package = noncanonical_graph_source(package_with_survey(XML));
         let table = PackURI::new("/xl/tables/table1.xml").unwrap();
         let survey = PackURI::new("/xl/surveys/survey1.xml").unwrap();
-        let content_types = package.source_content_types().unwrap().bytes().to_vec();
+        let content_types = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let table_relationships = package
-            .source_relationships(&table)
+            .source_relationships(&table, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
         let survey_relationships = package
-            .source_relationships(&survey)
+            .source_relationships(&survey, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
@@ -5777,22 +5817,33 @@ mod tests {
         transaction.remove(0).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let removed = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&removed).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&removed, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&reopened).unwrap().is_empty());
 
         patch.inverse().apply(&mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&restored).unwrap();
+        let restored =
+            OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
-            restored.source_content_types().unwrap().bytes(),
+            restored
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             content_types.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&table).unwrap().bytes(),
+            restored
+                .source_relationships(&table, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             table_relationships.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&survey).unwrap().bytes(),
+            restored
+                .source_relationships(&survey, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             survey_relationships.as_slice()
         );
         assert_eq!(Snapshot::load(&restored).unwrap().len(), 1);
@@ -5803,14 +5854,18 @@ mod tests {
         let mut package = noncanonical_graph_source(package_with_survey(XML));
         let table = PackURI::new("/xl/tables/table1.xml").unwrap();
         let survey = PackURI::new("/xl/surveys/survey1.xml").unwrap();
-        let content_types = package.source_content_types().unwrap().bytes().to_vec();
+        let content_types = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let table_relationships = package
-            .source_relationships(&table)
+            .source_relationships(&table, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
         let survey_relationships = package
-            .source_relationships(&survey)
+            .source_relationships(&survey, litchi_opc::SourceLimits::default())
             .unwrap()
             .bytes()
             .to_vec();
@@ -5821,22 +5876,33 @@ mod tests {
             .unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
         let inserted = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&inserted).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&inserted, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(Snapshot::load(&reopened).unwrap().len(), 2);
 
         patch.inverse().apply(&mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&restored).unwrap();
+        let restored =
+            OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
-            restored.source_content_types().unwrap().bytes(),
+            restored
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             content_types.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&table).unwrap().bytes(),
+            restored
+                .source_relationships(&table, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             table_relationships.as_slice()
         );
         assert_eq!(
-            restored.source_relationships(&survey).unwrap().bytes(),
+            restored
+                .source_relationships(&survey, litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             survey_relationships.as_slice()
         );
         assert_eq!(Snapshot::load(&restored).unwrap().len(), 1);
@@ -6206,7 +6272,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn signature_protected_source() -> OpcPackage {

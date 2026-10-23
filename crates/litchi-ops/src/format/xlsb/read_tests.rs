@@ -44,10 +44,12 @@ fn open(bytes: Vec<u8>, mode: SourceMode) -> File {
 
 fn open_with_execution_context(bytes: Vec<u8>, context: ExecutionContext) -> File {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::from_arc(Arc::new(bytes)));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source,
         SourceLimits::default(),
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("indexed OPC package with execution context");
     let xlsb = super::Xlsb::from_source_package(package, &OpenOptions::new())
@@ -159,8 +161,11 @@ fn chart_workbook() -> Vec<u8> {
 }
 
 fn malformed_second_sheet() -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture("xlsb/Simple.xlsb")))
-        .expect("read OPC package");
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(fixture("xlsb/Simple.xlsb")),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("read OPC package");
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet2.bin").expect("sheet URI"))
         .expect("second worksheet")
@@ -177,8 +182,11 @@ fn malformed_second_sheet() -> Vec<u8> {
 /// binary-index projection can be selected after full materialization refuses
 /// the deferred pivot formula context.
 fn indexed_pivot_workbook() -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(fixture("xlsb/sample.xlsb")))
-        .expect("read indexed OPC package");
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(fixture("xlsb/sample.xlsb")),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("read indexed OPC package");
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").expect("sheet URI"))
         .expect("indexed first worksheet")
@@ -197,8 +205,11 @@ fn indexed_pivot_workbook() -> Vec<u8> {
 }
 
 fn corrupt_index_workbook() -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(indexed_pivot_workbook()))
-        .expect("read indexed pivot OPC package");
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(indexed_pivot_workbook()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("read indexed pivot OPC package");
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/binaryIndex1.bin").expect("index URI"))
         .expect("first worksheet index")

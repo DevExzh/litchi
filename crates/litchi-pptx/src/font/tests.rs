@@ -119,6 +119,7 @@ fn strict_xml_round_trip_and_mce_fallback() {
 fn loads_libreoffice_and_poi_reference_packages() {
     let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
         root().join("test-data/libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx"),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap();
     let mut libreoffice = package(Conformance::Transitional);
@@ -158,6 +159,7 @@ fn loads_libreoffice_and_poi_reference_packages() {
     );
     let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
         root().join("test-data/poi/test-data/slideshow/placeholder-layout-color.pptx"),
+        litchi_opc::SourceLimits::default(),
     )
     .unwrap();
     let mut poi = package(Conformance::Transitional);

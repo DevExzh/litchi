@@ -165,7 +165,7 @@ fn validate_root(xml: &str) -> litchi_pptx::Result<()> {
 fn package_with_handout_master() -> OpcPackage {
     let package = Package::new().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let handout_name = PackURI::new("/ppt/handoutMasters/handoutMaster1.xml").unwrap();
 

@@ -41,7 +41,8 @@ fn create_template_and_metadata_use_leaf_native_state() {
     assert_eq!(observed.author.as_deref(), Some("Created author"));
 
     let bytes = file.to_bytes().expect("publish template");
-    let package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("inspect OPC package");
+    let package = litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        .expect("inspect OPC package");
     assert_eq!(
         package
             .main_document_part()

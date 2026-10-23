@@ -67,7 +67,8 @@ fn calculation_source() -> Package {
 
 fn has_calculation_chain(workbook: &Package) -> bool {
     let bytes = workbook.to_plain_bytes().expect("workbook bytes");
-    let package = OpcPackage::from_bytes(&bytes).expect("OPC package");
+    let package =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).expect("OPC package");
     let workbook_part = package.main_document_part().expect("workbook part");
     let relationship = workbook_part.rels().iter().find(|relationship| {
         matches!(

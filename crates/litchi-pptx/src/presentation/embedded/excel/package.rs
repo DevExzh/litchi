@@ -246,7 +246,7 @@ mod tests {
                 .with_values(vec![10.0, 20.0]),
         );
         let bytes = generate(&chart).unwrap();
-        let package = OpcPackage::from_bytes(&bytes).unwrap();
+        let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(
             package
                 .get_part(&PackURI::new("/xl/workbook.xml").unwrap())

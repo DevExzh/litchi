@@ -2319,7 +2319,7 @@ fn validate_closure_source(
                 0 => return invalid("content-types source cannot be absent".into()),
                 1 => {
                     let owner = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-                    match package.source_relationships(&owner) {
+                    match package.source_relationships(&owner, package.read_limits()) {
                         Ok(token) => {
                             if token.member_present() || !token.bytes().is_empty() {
                                 return invalid(
@@ -2349,14 +2349,16 @@ fn validate_closure_source(
         };
         match record.kind {
             0 => {
-                if package.source_content_types()?.bytes() != expected.payload.as_slice() {
+                if package.source_content_types(package.read_limits())?.bytes()
+                    != expected.payload.as_slice()
+                {
                     return invalid("stale Web Extensions content-types source".into());
                 }
             },
             1 => {
                 let owner = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
                 let (present, bytes) = member_relationship(expected)?;
-                match package.source_relationships(&owner) {
+                match package.source_relationships(&owner, package.read_limits()) {
                     Ok(token) => {
                         if token.member_present() != present || token.bytes() != bytes {
                             return invalid("stale Web Extensions relationship source".into());
@@ -2385,7 +2387,7 @@ fn validate_closure_source(
                 {
                     return invalid("stale Web Extensions source part".into());
                 }
-                let token = package.source_relationships(&name)?;
+                let token = package.source_relationships(&name, package.read_limits())?;
                 let (present, bytes) = member_relationship(expected)?;
                 if token.member_present() != present || token.bytes() != bytes {
                     return invalid("stale Web Extensions source part relationships".into());
@@ -2467,19 +2469,19 @@ fn reconstruct_source(
             continue;
         };
         let owner = PackURI::new(record.name.clone()).map_err(Error::Uri)?;
-        let current = package.source_relationships(&owner).map_err(|error| {
+        let current = package.source_relationships(&owner, package.read_limits()).map_err(|error| {
             Error::Missing(format!(
                 "Web Extensions relationship owner '{}' is unavailable during source reconstruction: {error}",
                 owner.as_str()
             ))
         })?;
-        let replacement = proof.source_relationships(&owner)?;
+        let replacement = proof.source_relationships(&owner, proof.read_limits())?;
         let (present, bytes) = member_relationship(after)?;
         if replacement.member_present() != present || replacement.bytes() != bytes {
             return invalid("Web Extensions relationship proof token mismatch".into());
         }
         if current != replacement {
-            package.try_replace_relationships(&current, &replacement)?;
+            package.try_replace_relationships(&current, &replacement, package.read_limits())?;
         }
     }
     // Part relationship tokens may be changed without a separate owner record
@@ -2492,24 +2494,26 @@ fn reconstruct_source(
         if !package_has_part(package, &record.name)? {
             continue;
         }
-        let current = package.source_relationships(&name).map_err(|error| {
+        let current = package.source_relationships(&name, package.read_limits()).map_err(|error| {
             Error::Missing(format!(
                 "Web Extensions part relationship owner '{}' is unavailable during source reconstruction: {error}",
                 name.as_str()
             ))
         })?;
-        let replacement = proof.source_relationships(&name).map_err(|error| {
-            Error::Missing(format!(
-                "Web Extensions proof part relationship owner '{}' is unavailable: {error}",
-                name.as_str()
-            ))
-        })?;
+        let replacement = proof
+            .source_relationships(&name, proof.read_limits())
+            .map_err(|error| {
+                Error::Missing(format!(
+                    "Web Extensions proof part relationship owner '{}' is unavailable: {error}",
+                    name.as_str()
+                ))
+            })?;
         let (present, bytes) = member_relationship(after)?;
         if replacement.member_present() != present || replacement.bytes() != bytes {
             return invalid("Web Extensions part relationship proof token mismatch".into());
         }
         if current != replacement {
-            package.try_replace_relationships(&current, &replacement)?;
+            package.try_replace_relationships(&current, &replacement, package.read_limits())?;
         }
     }
 
@@ -2529,13 +2533,17 @@ fn reconstruct_source(
             .after
             .as_ref()
             .ok_or_else(|| Error::Invalid("missing Web Extensions target content types".into()))?;
-        let replacement = proof.source_content_types()?;
+        let replacement = proof.source_content_types(proof.read_limits())?;
         if replacement.bytes() != after.payload.as_slice() {
             return invalid("Web Extensions content-types proof token mismatch".into());
         }
-        let current = package.source_content_types()?;
+        let current = package.source_content_types(package.read_limits())?;
         if current.bytes() != replacement.bytes() {
-            package.try_replace_content_types(current.bytes(), &replacement)?;
+            package.try_replace_content_types(
+                current.bytes(),
+                &replacement,
+                package.read_limits(),
+            )?;
         }
     }
     Ok(())
@@ -2597,7 +2605,12 @@ fn exact_proof_package(
         .find(|record| record.kind == 0)
         .and_then(|record| record.after.as_ref())
         .map(|member| member.payload.clone())
-        .unwrap_or(package.source_content_types()?.bytes().to_vec());
+        .unwrap_or(
+            package
+                .source_content_types(package.read_limits())?
+                .bytes()
+                .to_vec(),
+        );
     if content_types_owned.is_empty() {
         return invalid("Web Extensions proof has no content-types XML".into());
     }
@@ -2621,7 +2634,7 @@ fn exact_proof_package(
         });
     }
     let root_name = PackURI::new("/").map_err(Error::Uri)?;
-    let root_current = package.source_relationships(&root_name)?;
+    let root_current = package.source_relationships(&root_name, package.read_limits())?;
     let root_target = relation_target(records, "/", Some(&root_current))?;
     let mut total = content_types.len().saturating_add(PROOF_ENTRY_OVERHEAD);
     for name in &names {
@@ -2665,7 +2678,10 @@ fn exact_proof_package(
             writer.write_stored(&rels, &proof.relationships.1)?;
         }
     }
-    Ok(OpcPackage::from_bytes(&writer.finish()?)?)
+    Ok(OpcPackage::from_bytes(
+        &writer.finish()?,
+        package.read_limits(),
+    )?)
 }
 
 struct ProofPart<'a> {
@@ -2707,7 +2723,7 @@ fn proof_part(
             part_name.as_str()
         ))
     })?;
-    let relationships = package.source_relationships(&part_name)?;
+    let relationships = package.source_relationships(&part_name, package.read_limits())?;
     Ok(ProofPart {
         content_type: part.content_type().to_owned(),
         payload: Vec::new(),

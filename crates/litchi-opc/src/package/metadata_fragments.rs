@@ -132,7 +132,7 @@ impl<'a> Fragment<'a> {
 impl Fragments {
     /// Decode untrusted member XML under explicit byte, event and graph bounds.
     /// Duplicate native keys and nonstandard lexical roots are not editable.
-    pub(super) fn from_bytes_with_limits(
+    pub(super) fn from_bytes(
         kind: Kind,
         bytes: Arc<Vec<u8>>,
         limits: SourceLimits,
@@ -376,8 +376,7 @@ impl<'a> FragmentPlan<'a> {
         // the token in the first place.
         let limits = source.limits().min(limits);
         kind.admit_edit_count(edits.len(), limits)?;
-        let catalog =
-            Fragments::from_bytes_with_limits(kind.clone(), Arc::clone(&source.bytes), limits)?;
+        let catalog = Fragments::from_bytes(kind.clone(), Arc::clone(&source.bytes), limits)?;
         let mut touched = HashSet::new();
         touched.try_reserve(edits.len()).map_err(allocation)?;
         let mut additions = HashMap::new();
@@ -801,10 +800,8 @@ impl Kind {
     fn parse(&self, bytes: &[u8], limits: SourceLimits) -> Result<Parsed> {
         match self {
             Self::Relationships(owner) => {
-                crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
-                    bytes, owner, limits,
-                )
-                .map(Parsed::Relationships)
+                crate::pkgreader::PackageReader::parse_owned_relationships(bytes, owner, limits)
+                    .map(Parsed::Relationships)
             },
             Self::ContentTypes => crate::content_type::ContentTypeMap::from_xml(bytes, limits)
                 .map(Parsed::ContentTypes),

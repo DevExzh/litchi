@@ -23,7 +23,7 @@ impl PreparedTopology {
     /// package.try_add_part(Box::new(BlobPart::new(
     ///     name.clone(), "application/xml".to_owned(), b"<first/>".to_vec(),
     /// )))?;
-    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?)?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
     /// let mut current = source.prepare_topology(SourceTopologyPlan::new())?;
     /// for next in [b"<second/>".as_slice(), b"<third/>".as_slice()] {
     ///     current = current.edit_xml(&name, |xml, edit| {

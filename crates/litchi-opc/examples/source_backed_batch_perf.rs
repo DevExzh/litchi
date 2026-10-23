@@ -628,18 +628,19 @@ fn run_sample(
     };
     let cache_limits = SourceCacheLimits::new(512 * MIB, 1024)?;
     let package = match context {
-        Some(context) => {
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                SourceLimits::default(),
-                cache_limits,
-                context,
-            )?
-        },
-        None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+        Some(context) => SourceBackedPackage::from_read_at(
             source,
             SourceLimits::default(),
             cache_limits,
+            SourceReadPolicy::exact(),
+            Some(context),
+        )?,
+        None => SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            cache_limits,
+            SourceReadPolicy::exact(),
+            None,
         )?,
     };
     let selected = selected_names(corpus)

@@ -528,7 +528,7 @@ mod tests {
     }
 
     fn fixture(bytes: &[u8]) -> OutlineProperties {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
             .unwrap();

@@ -331,7 +331,7 @@ impl PreparedTopology {
     /// package.try_add_part(Box::new(BlobPart::new(
     ///     name.clone(), "application/xml".to_owned(), b"<before/>".to_vec(),
     /// )))?;
-    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?)?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
     /// let mut plan = SourceTopologyPlan::new();
     /// plan.try_replace_part(name.clone(), b"<after/>".to_vec())?;
     /// let candidate = source.prepare_topology(plan)?;

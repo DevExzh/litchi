@@ -447,7 +447,12 @@ fn open_owned_package(
 ) -> Result<litchi_docx::source_backed::Package, Box<dyn Error>> {
     match route {
         Route::OwnedVec => {
-            let opc = SourceBackedPackage::from_vec(input)?;
+            let opc = SourceBackedPackage::from_vec(
+                input,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?;
             Ok(litchi_docx::source_backed::Package::from_source_backed_package(opc)?)
         },
         Route::OwnedReader => {

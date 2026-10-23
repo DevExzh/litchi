@@ -32,7 +32,10 @@ pub(crate) fn preflight_metadata(
             limits.max_graph_parts,
         ));
     }
-    let opc_limits = litchi_opc::SourceLimits::default();
+    // This package may have been admitted under a caller-supplied policy.
+    // Reuse that policy for the metadata pass instead of widening it to the
+    // OPC defaults while the model snapshot is prepared.
+    let opc_limits = package.read_limits();
     let mut relationship_count = 0_usize;
     let mut metadata_bytes = 0_usize;
     preflight_relationships(

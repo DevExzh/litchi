@@ -96,9 +96,7 @@ impl Pptx {
             Editable::Eager(package) => Arc::clone(package),
             Editable::Source(package) => {
                 let bytes = package.to_bytes()?;
-                Arc::new(litchi_pptx::Package::from_reader(std::io::Cursor::new(
-                    bytes,
-                ))?)
+                super::super::eager_package_from_source(bytes, self.0.ooxml_limits)?
             },
         };
         let mut edit = base.edit()?;

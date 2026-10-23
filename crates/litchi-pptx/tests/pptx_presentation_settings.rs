@@ -112,7 +112,7 @@ fn package_readers_reject_external_settings_relationships() {
 fn base_opc() -> OpcPackage {
     let package = Package::new().unwrap();
     let package_bytes = package.to_bytes().unwrap();
-    OpcPackage::from_bytes(&package_bytes).unwrap()
+    OpcPackage::from_bytes(&package_bytes, litchi_opc::SourceLimits::default()).unwrap()
 }
 
 fn package_with_local_settings() -> Package {

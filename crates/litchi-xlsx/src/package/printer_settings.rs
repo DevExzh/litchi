@@ -679,17 +679,23 @@ mod tests {
 
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
-        let poi = OpcPackage::open(root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"))
-            .unwrap();
+        let poi = OpcPackage::open(
+            root().join("test-data/poi/test-data/spreadsheet/sample.xlsx"),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let settings =
             load_printer_settings(&poi, &PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
                 .unwrap()
                 .unwrap();
         assert_eq!(settings.reference.relationship_id, "rId1");
         assert_eq!(settings.resource.data.len(), 2452);
-        let libreoffice = OpcPackage::open(root().join(
-            "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
-        ))
+        let libreoffice = OpcPackage::open(
+            root().join(
+                "test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf136721_letter_sized_paper.xlsx",
+            ),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
         let settings = load_printer_settings(
             &libreoffice,

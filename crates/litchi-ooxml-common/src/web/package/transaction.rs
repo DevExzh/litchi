@@ -341,11 +341,15 @@ impl Patch {
                 let Some(after) = &relationships.after else {
                     continue;
                 };
-                let current = package.source_relationships(after.owner())?;
-                package.try_replace_relationships(&current, after)?;
+                let current = package.source_relationships(after.owner(), after.read_limits())?;
+                package.try_replace_relationships(&current, after, package.read_limits())?;
             }
-            let current = package.source_content_types()?;
-            package.try_replace_content_types(current.bytes(), &lexical.content_types.after)?;
+            let current = package.source_content_types(package.read_limits())?;
+            package.try_replace_content_types(
+                current.bytes(),
+                &lexical.content_types.after,
+                package.read_limits(),
+            )?;
 
             lexical.validate_after(package)?;
         }
@@ -878,7 +882,7 @@ impl LexicalChange {
         destination_parts: &[PackURI],
         limits: Limits,
     ) -> Result<Self> {
-        let before_content_types = package.source_content_types()?;
+        let before_content_types = package.source_content_types(package.read_limits())?;
         check_lexical_bytes(
             before_content_types.bytes().len(),
             &limits,
@@ -981,7 +985,7 @@ impl LexicalChange {
 
         if root.is_some() {
             let owner = PackURI::new("/").map_err(|error| Error::Uri(error.to_string()))?;
-            let before = package.source_relationships(&owner)?;
+            let before = package.source_relationships(&owner, package.read_limits())?;
             let after = match root {
                 Some(root) if root.before != root.after => transition_relationships(
                     &before,
@@ -989,7 +993,7 @@ impl LexicalChange {
                     root.after.as_ref().map(std::slice::from_ref),
                     &limits,
                 )?,
-                _ => candidate.source_relationships(&owner)?,
+                _ => candidate.source_relationships(&owner, candidate.read_limits())?,
             };
             charge_lexical_bytes(&mut total_xml_bytes, before.bytes().len(), &limits)?;
             charge_lexical_bytes(&mut total_xml_bytes, after.bytes().len(), &limits)?;
@@ -1152,7 +1156,7 @@ impl LexicalChange {
         content_types: &OwnedContentTypes,
         after: bool,
     ) -> Result<()> {
-        if package.source_content_types()?.bytes() != content_types.bytes() {
+        if package.source_content_types(package.read_limits())?.bytes() != content_types.bytes() {
             return Err(Error::Relationship(
                 if after {
                     "Web Extensions patch destination content-types source changed"
@@ -1312,13 +1316,13 @@ fn optional_relationships(
 ) -> Result<Option<OwnedRelationships>> {
     if owner.as_str() == "/" {
         return package
-            .source_relationships(owner)
+            .source_relationships(owner, package.read_limits())
             .map(Some)
             .map_err(Into::into);
     }
     match package.get_part(owner) {
         Ok(_) => package
-            .source_relationships(owner)
+            .source_relationships(owner, package.read_limits())
             .map(Some)
             .map_err(Into::into),
         Err(OpcError::PartNotFound(_)) => Ok(None),

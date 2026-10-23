@@ -198,7 +198,13 @@ fn run_package(child_count: usize, broken: Option<(usize, String)>) -> Vec<u8> {
 
 fn open(source: Arc<Recording>) -> Result<SourceBackedPackage, OpcError> {
     let dynamic: Arc<dyn ReadAt> = source;
-    SourceBackedPackage::from_read_at(dynamic)
+    SourceBackedPackage::from_read_at(
+        dynamic,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
 }
 
 fn open_with_policy(
@@ -206,11 +212,12 @@ fn open_with_policy(
     policy: SourceReadPolicy,
 ) -> Result<SourceBackedPackage, OpcError> {
     let dynamic: Arc<dyn ReadAt> = source;
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    SourceBackedPackage::from_read_at(
         dynamic,
         SourceLimits::default(),
         SourceCacheLimits::default(),
         policy,
+        None,
     )
 }
 
@@ -291,11 +298,12 @@ fn verdict(source: Arc<Recording>) -> Verdict {
 
 fn verdict_with_limits(source: Arc<Recording>, limits: SourceLimits) -> Verdict {
     let dynamic: Arc<dyn ReadAt> = source;
-    match SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+    match SourceBackedPackage::from_read_at(
         dynamic,
         limits,
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
+        None,
     ) {
         Err(error) => Verdict {
             outcome: Err(format!("{error:?}")),
@@ -660,11 +668,12 @@ fn a_managed_open_keeps_the_exact_grammar() {
     )
     .expect("execution limits must be valid");
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         dynamic,
         SourceLimits::default(),
         SourceCacheLimits::default(),
-        context,
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed open");
     let managed_reads = without_admission_probes(&bytes, managed_source.take());

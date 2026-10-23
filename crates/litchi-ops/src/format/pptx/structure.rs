@@ -278,7 +278,7 @@ impl Pptx {
         let shorthand = title.is_some() || body.is_some();
         let (target, proof, after) = match &source {
             Editable::Source(_) | Editable::Eager(_) if shorthand => {
-                let package = Self::eager_base(&source)?;
+                let package = self.eager_base(&source)?;
                 let mut edit = package.edit()?;
                 let _ = edit.insert_slide(Position::new(index), &layout)?;
                 edit.set_slide_properties(index, name.as_deref(), hidden)?;

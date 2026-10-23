@@ -1078,10 +1078,12 @@ fn run_parts_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResul
         config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_for_reader,
         SourceLimits::default(),
-        context.clone(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context.clone()),
     )?;
     let uris = part_uris(corpus)?;
     if config.state == State::Primed {

@@ -4942,7 +4942,8 @@ fn revision_v2_preserves_every_pairwise_verdict_over_the_pptx_corpus() -> Result
         let Ok(bytes) = std::fs::read(fixture) else {
             continue;
         };
-        let Ok(opc) = litchi_opc::OpcPackage::from_vec(bytes) else {
+        let Ok(opc) = litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+        else {
             continue;
         };
         let corpus = mutation_corpus(&opc)?;
