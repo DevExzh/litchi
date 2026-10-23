@@ -21,7 +21,7 @@ fn source_definition() -> Definition {
 }
 
 fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.chart")
         .unwrap();

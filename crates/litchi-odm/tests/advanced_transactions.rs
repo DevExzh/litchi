@@ -42,7 +42,7 @@ const META: &str = concat!(
 );
 
 fn source() -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();
@@ -61,7 +61,7 @@ fn source() -> Package {
 }
 
 fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();
@@ -77,7 +77,7 @@ fn master_from_parts(content: &str, styles: &str, chapter: &[u8]) -> Package {
 }
 
 fn master_without_styles(content: &str, chapter: &[u8]) -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();

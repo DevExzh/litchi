@@ -563,7 +563,7 @@ fn streaming_package() -> Vec<u8> {
 }
 
 fn encrypted_package() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption("test-password", Profile::compatible())

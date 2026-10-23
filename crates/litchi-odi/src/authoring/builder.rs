@@ -109,7 +109,10 @@ impl Builder {
             compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
                 .map_err(Error::from)?;
         }
-        let mut writer = PackageWriter::new_bounded(256 * 1024 * 1024);
+        let mut writer = PackageWriter::new_bounded(
+            256 * 1024 * 1024,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", self.content_xml.as_bytes())?;
         if let Some(styles_xml) = self.styles_xml {

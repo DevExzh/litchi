@@ -1458,7 +1458,8 @@ mod tests {
 
     #[test]
     fn detects_packaged_documents_and_restores_nonzero_reader_position() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
@@ -1504,7 +1505,8 @@ mod tests {
             (constants::ODF_SPREADSHEET, Format::Ods),
             (constants::ODF_PRESENTATION, Format::Odp),
         ] {
-            let mut writer = crate::core::PackageWriter::new();
+            let mut writer =
+                crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
             writer
                 .set_mimetype(mimetype)
                 .unwrap_or_else(|error| panic!("test package MIME must be accepted: {error}"));
@@ -1559,7 +1561,8 @@ mod tests {
             ("content.xml", b"<content/>"),
         ]);
 
-        let mut marker_writer = crate::core::PackageWriter::new();
+        let mut marker_writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         marker_writer
             .set_mimetype(constants::ODF_TEXT)
             .expect("test package MIME must be accepted");
@@ -1811,7 +1814,8 @@ mod tests {
 
     #[test]
     fn packaged_detection_rejects_nonconforming_local_mimetype_entries() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
@@ -2256,7 +2260,8 @@ mod tests {
 
     #[test]
     fn positional_packaged_probe_reuses_strict_local_mimetype_grammar() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_PRESENTATION)
             .expect("test package MIME");
@@ -2305,7 +2310,8 @@ mod tests {
     #[test]
     fn prepared_detection_retains_one_bounded_index_and_rejects_hostile_archives() {
         crate::package::reset_index_build_count();
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .unwrap_or_else(|error| panic!("test package mimetype must be accepted: {error}"));
@@ -2374,7 +2380,8 @@ mod tests {
 
     #[test]
     fn rejected_prepared_detection_returns_the_original_allocation() {
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer =
+            crate::core::PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype(constants::ODF_TEXT)
             .expect("test package mimetype must be accepted");

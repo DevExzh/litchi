@@ -6,7 +6,7 @@ fn drawing(body: &str) -> Result<Package> {
     let content = format!(
         r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:drawing><d:page d:name="Page">{body}</d:page></office:drawing></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.graphics")?;
     writer.add_file("content.xml", content.as_bytes())?;
     Ok(Package::from_bytes(&writer.finish_to_bytes()?)?)

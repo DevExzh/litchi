@@ -885,7 +885,9 @@ mod short_signature_tests {
     #[cfg(feature = "odt")]
     #[test]
     fn odt_smart_detection_transfers_the_prepared_index_to_semantic_open() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
             .unwrap();

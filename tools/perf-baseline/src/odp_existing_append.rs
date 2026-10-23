@@ -210,7 +210,7 @@ fn source_archive_from_base(
     let meta = base.get_file("meta.xml")?;
     let opaque = opaque_payload(opaque_variant);
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODP_MIME)?;
     writer.add_file_with_media_type("content.xml", &content, ODP_XML_MEDIA_TYPE)?;
     writer.add_file_with_media_type("styles.xml", &styles, ODP_XML_MEDIA_TYPE)?;

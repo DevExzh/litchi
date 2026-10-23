@@ -86,7 +86,7 @@ fn text_package(mimetype: &str, styles: bool) -> Vec<u8> {
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content {XMLNS}><office:body><office:text>{}</office:text></office:body></office:document-content>"#,
         frames_body()
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if styles {
@@ -106,7 +106,7 @@ fn odg_layers() -> Vec<u8> {
     let content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content {XMLNS}><office:body><office:drawing><draw:page draw:name="One"><draw:layer-set><draw:layer draw:name="layout"/><draw:layer draw:name="notes"/></draw:layer-set><draw:rect draw:name="Box" draw:layer="layout" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><text:p>Box</text:p></draw:rect></draw:page></office:drawing></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -340,7 +340,7 @@ fn odt_parts(mimetype: &str) -> Vec<u8> {
         r#"<semantics><mrow><msup><mi>a</mi><mn>2</mn></msup><mo>+</mo><msup><mi>b</mi><mn>2</mn></msup><mo>=</mo><msup><mi>c</mi><mn>2</mn></msup></mrow>"#,
         r#"<annotation encoding="StarMath 5.0">a^2 + b^2 = c^2</annotation></semantics></math>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();
@@ -433,7 +433,7 @@ fn odp_elements() -> Vec<u8> {
         r#"<chart:series chart:values-cell-range-address="local-table.$C$2:.$C$3" chart:label-cell-address="local-table.$C$1"/>"#,
         r#"</chart:plot-area></chart:chart></office:chart></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

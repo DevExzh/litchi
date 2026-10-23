@@ -44,7 +44,7 @@ fn opaque_package() -> litchi_core::Result<Vec<u8>> {
         ),
         OPAQUE_ROW = OPAQUE_ROW,
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.add_file("content.xml", content.as_bytes())?;
     writer.add_file_with_media_type(

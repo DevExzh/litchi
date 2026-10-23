@@ -927,7 +927,10 @@ impl Package {
             },
         }
         let package = Arc::clone(&self.package);
-        let mut writer = PackageWriter::new_bounded(self.limits.package_bytes);
+        let mut writer = PackageWriter::new_bounded(
+            self.limits.package_bytes,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(&package.package().mimetype()?)?;
         writer.set_encryption(password.to_string(), profile.shared())?;
         for path in ["content.xml", "styles.xml", "meta.xml"] {

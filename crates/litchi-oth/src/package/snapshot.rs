@@ -500,7 +500,10 @@ impl Snapshot {
                 "OTH package edits refuse signed packages".to_string(),
             ));
         }
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
         for (path, change) in [("meta.xml", metadata), ("styles.xml", styles)] {

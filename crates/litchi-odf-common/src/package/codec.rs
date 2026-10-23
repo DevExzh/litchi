@@ -49,8 +49,6 @@ pub(crate) enum ManifestScanAttributes {
     ManifestAndLoext(Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)>),
 }
 
-const DEFAULT_MAX_MANIFEST_BYTES: u64 = 16 * 1024 * 1024;
-
 /// Preserve ZIP resource-limit and allocation failures at the ODF boundary.
 ///
 /// The neutral package layer is the owner of borrowed archive access, so all
@@ -119,17 +117,13 @@ fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
 }
 
 impl<'data> Archive<'data> {
-    /// Open an ODF ZIP archive from a borrowed byte slice.
+    /// Open an ODF ZIP archive from a borrowed byte slice under the caller's
+    /// selected archive policy.
     ///
     /// # Errors
     ///
     /// Returns an error when `data` is not a readable ZIP archive.
-    pub fn new(data: &'data [u8]) -> Result<Self> {
-        Self::new_with_limits(data, ArchiveLimits::default())
-    }
-
-    /// Open an ODF ZIP archive with explicit central-directory limits.
-    pub(crate) fn new_with_limits(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
+    pub fn new(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
         #[cfg(test)]
         super::model::note_index_build();
         let reader = ArchiveReader::new_with_limits(data, limits.into_zip_limits())
@@ -219,19 +213,22 @@ impl<'data> Archive<'data> {
             .map_err(map_archive_error)
     }
 
-    /// Read the package manifest, accepting both common ODF locations.
+    /// Read the package manifest XML under the caller's selected raw XML
+    /// policy, accepting both common ODF locations.
     ///
     /// # Errors
     ///
     /// Returns an error when neither conventional manifest location can be
     /// read as UTF-8.
-    pub fn read_manifest_xml(&self) -> Result<String> {
-        self.read_manifest_xml_with_limit(DEFAULT_MAX_MANIFEST_BYTES, "ODF manifest bytes")
+    pub fn read_manifest_xml(&self, limits: XmlStreamLimits) -> Result<String> {
+        self.read_manifest_xml_bounded(limits.max_bytes(), "ODF manifest bytes")
     }
 
     /// Read the package manifest while checking its declared size before
-    /// materialization.
-    pub fn read_manifest_xml_with_limit(
+    /// materialization. This package-owner seam is crate-private because
+    /// public raw callers must use [`Self::read_manifest_xml`] with an
+    /// explicit XML policy.
+    pub(crate) fn read_manifest_xml_bounded(
         &self,
         maximum: u64,
         scope: &'static str,
@@ -278,13 +275,14 @@ impl<'data> Archive<'data> {
     }
 }
 
-/// Read and parse the family-neutral package manifest.
+/// Read and parse the family-neutral package manifest under the caller's
+/// selected raw XML policy.
 ///
 /// # Errors
 ///
 /// Returns an error when the manifest member cannot be read or parsed.
 pub fn read_manifest(archive: &Archive<'_>, limits: XmlStreamLimits) -> Result<Manifest> {
-    parse_manifest(&archive.read_manifest_xml()?, limits)
+    parse_manifest(&archive.read_manifest_xml(limits)?, limits)
 }
 
 /// Observe a manifest while the neutral parser validates and indexes it.
@@ -584,7 +582,8 @@ fn scan_manifest_and_loext_attributes(
     Ok((manifest, loext))
 }
 
-/// Read the neutral file-entry model from an archive reader.
+/// Read the neutral file-entry model under the caller's selected raw XML
+/// policy.
 ///
 /// # Errors
 ///

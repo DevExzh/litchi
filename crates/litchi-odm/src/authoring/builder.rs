@@ -59,7 +59,8 @@ impl Builder {
         }
         compact_xml::validate(content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         writer.finish_to_bytes()

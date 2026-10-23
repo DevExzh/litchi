@@ -616,7 +616,9 @@ impl Package {
         }
         crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.xml_limits)?;
 
-        let mut writer = crate::core::PackageWriter::new();
+        let mut writer = crate::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(&self.mimetype)?;
         if changed_part == crate::variable_declaration::Part::Content {
             crate::variable_declaration::splice_publication(

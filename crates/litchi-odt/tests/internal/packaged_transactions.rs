@@ -40,7 +40,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     base.add_paragraph("Before").unwrap();
     let base = CoreOwnedPackage::from_bytes(base.to_bytes().unwrap()).unwrap();
     let package = base.package().unwrap();
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -737,7 +737,7 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
 }
 
 fn real_producer_source() -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -877,7 +877,8 @@ fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
 
 #[test]
 fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
-    let mut signed_writer = PackageWriter::new();
+    let mut signed_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     signed_writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -911,7 +912,8 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
         .unwrap();
     assert!(signed_edit.commit().is_err());
 
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

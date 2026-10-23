@@ -106,7 +106,9 @@ fn source_package() -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}" xmlns:text="{TEXT}"><office:body><office:presentation><draw:page draw:name="one"><draw:frame><draw:text-box><text:p>root source</text:p></draw:text-box></draw:frame></draw:page><draw:page draw:name="two"><draw:frame><draw:text-box><text:p>second slide</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#
     );
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
         .expect("ODP MIME");

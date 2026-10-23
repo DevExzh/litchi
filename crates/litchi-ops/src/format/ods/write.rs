@@ -228,7 +228,7 @@ impl Ods {
             let next = Self::from_flat(bytes, &crate::OpenOptions::new().odf_options(options))?;
             return Ok(next.with_origin(self.origin()));
         }
-        Self::from_package(package, self.origin())
+        Self::from_package_with_options(package, self.origin(), self.odf_options())
     }
 
     /// Whether two handles share one immutable state.

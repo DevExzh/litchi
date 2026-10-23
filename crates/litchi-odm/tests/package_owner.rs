@@ -224,7 +224,9 @@ fn a_prepared_package_is_adopted_and_another_family_is_refused() {
     assert_eq!(adopted.as_bytes(), bytes.as_slice());
 
     let content = Package::new().unwrap().document().content_xml().to_owned();
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

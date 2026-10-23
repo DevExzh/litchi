@@ -85,7 +85,7 @@ fn noncompact_source_without_settings_or_declarations_is_refused() {
 #[test]
 fn retained_declarations_and_settings_are_conservatively_refused() {
     const CONTENT: &[u8] = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0"><office:body><office:presentation><presentation:header-decl presentation:name="header">Header</presentation:header-decl><draw:page draw:name="page-a" presentation:use-header-name="header"/><draw:page draw:name="page-b"/><presentation:settings presentation:start-page="page-a"/></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -106,7 +106,7 @@ fn retained_declarations_and_settings_are_conservatively_refused() {
 
 fn compact_producer_deck() -> Vec<u8> {
     const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:vendor="urn:example:producer"><office:body><office:presentation><vendor:deck-token vendor:value="keep"/><draw:page draw:name="page-a" draw:id="id-a"><draw:frame draw:name="shape-a" draw:protect="content"><draw:image xlink:href="Pictures/pixel.png"/><draw:text-box><text:p>A</text:p></draw:text-box></draw:frame><office:annotation office:name="comment-a"><text:p>annotation-a</text:p></office:annotation><vendor:page-token vendor:value="alpha"/></draw:page><draw:page draw:name="page-b" draw:id="id-b"><draw:frame draw:name="shape-b"><draw:text-box><text:p>B</text:p></draw:text-box></draw:frame><presentation:notes><text:p>notes-b</text:p></presentation:notes><vendor:page-token vendor:value="beta"/></draw:page><draw:page draw:name="page-c" draw:id="id-c"><draw:frame draw:name="shape-c"><draw:text-box><text:p>C</text:p></draw:text-box></draw:frame><vendor:transition vendor:type="fade"/><vendor:page-token vendor:value="gamma"/></draw:page></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

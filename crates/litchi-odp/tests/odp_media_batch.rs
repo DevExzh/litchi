@@ -47,7 +47,7 @@ fn mark_zip_encrypted(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
 }
 
 fn source_bytes() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
     writer
@@ -222,7 +222,7 @@ fn exact_replacement_noop_and_batch_limits_preserve_source() {
 
 #[test]
 fn signed_sources_are_read_only_for_media_batches() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
     writer
@@ -241,7 +241,7 @@ fn signed_sources_are_read_only_for_media_batches() {
 
 #[test]
 fn every_signature_owner_name_is_read_only() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
     writer
@@ -338,7 +338,7 @@ fn restoring_an_exact_source_payload_across_calls_is_a_noop() {
 #[test]
 fn reference_index_decodes_entities_percent_escapes_and_relationship_targets() {
     let content = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:presentation><draw:page draw:name="Slide 1"><draw:frame draw:name="Photo"><draw:image xlink:href="Pictures/entity&amp;name.png"/></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content).unwrap();
     writer

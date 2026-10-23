@@ -202,7 +202,9 @@ mod tests {
     #[cfg(feature = "odt")]
     #[test]
     fn an_odf_package_never_reaches_the_tail() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
             .unwrap();

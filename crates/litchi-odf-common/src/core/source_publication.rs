@@ -2036,7 +2036,7 @@ mod tests {
     const TARGET: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:text/></office:body></office:document-content>"#;
 
     fn package_bytes() -> Vec<u8> {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer.set_mimetype(MIME).expect("mimetype");
         writer.add_file("content.xml", SOURCE).expect("content");
         writer

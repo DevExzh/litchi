@@ -369,7 +369,8 @@ impl Archive {
         settings: Part<'_>,
     ) -> Result<Vec<u8>> {
         let source = self.package();
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(&source.mimetype()?)?;
         writer.add_file("content.xml", compact_prolog(content_xml).as_bytes())?;
         write_part(&mut writer, source, "styles.xml", styles)?;

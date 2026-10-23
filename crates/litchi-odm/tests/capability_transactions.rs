@@ -46,7 +46,7 @@ const STYLES: &str = concat!(
 );
 
 fn package(content: &str, signed: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();
@@ -252,7 +252,7 @@ fn changed_signed_and_encrypted_transactions_are_refused_but_noops_are_exact() {
     signed_edit.set_title("invalidates signature").unwrap();
     assert!(signed_edit.commit().is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption("secret", Profile::compatible())
@@ -290,7 +290,7 @@ fn malformed_section_and_style_semantics_are_rejected() {
     let invalid_bool = CONTENT.replace("text:protected=\"true\"", "text:protected=\"maybe\"");
     assert!(Package::from_bytes(&package(&invalid_bool, false)).is_err());
     let invalid_style = STYLES.replace(" style:name=\"Sect1\"", "");
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer.add_file("meta.xml", META.as_bytes()).unwrap();

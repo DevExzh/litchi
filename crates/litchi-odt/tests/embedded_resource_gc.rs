@@ -17,7 +17,7 @@ fn content(body: &str) -> String {
 }
 
 fn package(body: &str, files: &[(&str, &[u8], &str)], directories: &[(&str, &str)]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE).unwrap();
     writer
         .add_file("content.xml", content(body).as_bytes())
@@ -309,7 +309,7 @@ fn object_ole_and_styles_owners_are_part_of_the_shared_reference_closure() {
         "<office:styles><draw:frame><draw:image xlink:href=\"Pictures/style.png\"/>",
         "</draw:frame></office:styles></office:document-styles>"
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE).unwrap();
     writer
         .add_file(
@@ -351,7 +351,8 @@ fn object_ole_and_styles_owners_are_part_of_the_shared_reference_closure() {
 fn signatures_and_document_protection_are_typed_refusals() {
     const SETTINGS: &[u8] = br#"<office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:config="urn:oasis:names:tc:opendocument:xmlns:config:1.0"><office:settings><config:config-item-set config:name="ooo:configuration-settings"><config:config-item config:name="LoadReadonly" config:type="boolean">true</config:config-item></config:config-item-set></office:settings></office:document-settings>"#;
     let build = |protected: bool, signed: bool| {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(MIMETYPE).unwrap();
         writer
             .add_file("content.xml", content("<text:p>orphan</text:p>").as_bytes())
@@ -486,7 +487,7 @@ fn nested_xml_references_are_resolved_relative_to_their_package_part() {
 
 #[test]
 fn encrypted_snapshot_planning_returns_a_typed_refusal_without_decryption() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE).unwrap();
     writer
         .set_encryption("secret", Profile::compatible())

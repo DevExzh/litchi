@@ -18,7 +18,7 @@ const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-s
 const META: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.0"><office:meta><dc:title>Compact</dc:title></office:meta></office:document-meta>"#;
 
 fn package(content: &str) -> Result<Vec<u8>, Error> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     writer.add_file("content.xml", content.as_bytes())?;
     writer.add_file("styles.xml", STYLES.as_bytes())?;

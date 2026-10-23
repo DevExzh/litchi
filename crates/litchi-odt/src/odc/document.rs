@@ -31,7 +31,8 @@ impl Document {
 
     fn create_with_mimetype(definition: &Definition, mimetype: &str) -> Result<Self> {
         let content = serialize_content(definition)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(mimetype)?;
         writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
         Self::from_vec(writer.finish_to_bytes()?)
@@ -203,7 +204,8 @@ mod tests {
     use litchi_odf_common::namespace::CHARTNS;
 
     fn package(mimetype: &str, content: &str) -> Vec<u8> {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(mimetype).unwrap();
         writer
             .add_file(constants::ODF_CONTENT, content.as_bytes())

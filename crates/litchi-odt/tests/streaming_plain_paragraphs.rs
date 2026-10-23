@@ -161,7 +161,7 @@ fn assert_five_member_topology(bytes: &[u8]) {
 }
 
 fn repack_with_content(source: &[u8], content: &[u8]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(std::str::from_utf8(ODT_MIME).expect("ODT MIME is UTF-8"))
         .expect("set ODT MIME");

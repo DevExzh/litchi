@@ -27,7 +27,7 @@ fn package(content: &str) -> Vec<u8> {
 }
 
 fn package_with_macro(content: &str, with_macro: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -55,7 +55,7 @@ fn package_with_auxiliary_xml(
     auxiliary_xml: &[u8],
     media_type: &str,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

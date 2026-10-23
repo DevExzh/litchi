@@ -7506,7 +7506,8 @@ mod extended_data_style_tests {
     }
 
     fn package_with_content(content: &str) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(constants::ODF_SPREADSHEET)?;
         writer.add_file("content.xml", content.as_bytes())?;
         writer.finish_to_bytes()

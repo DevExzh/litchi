@@ -10,7 +10,7 @@ const CONTENT: &str = include_str!("fixtures/libreoffice-master-document-content
 
 #[test]
 fn real_master_document_xml_and_auxiliary_entries_remain_exact_and_opaque() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text-master")
         .unwrap();

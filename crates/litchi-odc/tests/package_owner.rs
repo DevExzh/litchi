@@ -245,7 +245,9 @@ fn a_prepared_detection_result_is_adopted_and_other_families_are_refused() {
         bytes.as_slice()
     );
 
-    let mut text = litchi_odf_common::core::PackageWriter::new();
+    let mut text = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     text.set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
     text.add_file(

@@ -776,7 +776,7 @@ pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Resu
         ),
         other => return Err(Error::unsupported_format(Some(other))),
     };
-    let file = OdfTree::from_owner(owner, None)?;
+    let file = OdfTree::from_owner(owner, None, litchi_odf_common::OpenOptions::new())?;
     match options.metadata_value() {
         None => Ok(file),
         Some(metadata) => create_metadata(file, metadata),
@@ -820,5 +820,5 @@ fn created<P: litchi_odf_common::metadata::Owner>(
     let mut edit = litchi_odf_common::metadata::Edit::new(package);
     crate::format::odf_metadata::stage_created(&mut edit, metadata, format)?;
     let (next, _, _) = crate::format::odf_metadata::commit(edit, format)?;
-    OdfTree::from_owner(wrap(next), None)
+    OdfTree::from_owner(wrap(next), None, litchi_odf_common::OpenOptions::new())
 }

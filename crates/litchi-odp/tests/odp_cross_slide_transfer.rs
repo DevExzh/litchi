@@ -20,7 +20,7 @@ fn content(pages: &str) -> String {
 }
 
 fn package(content_xml: &str, with_macro: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file("content.xml", content_xml.as_bytes())
@@ -49,7 +49,7 @@ fn package(content_xml: &str, with_macro: bool) -> Vec<u8> {
 }
 
 fn package_with_extra(content_xml: &str, path: &str, payload: &[u8], media_type: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file("content.xml", content_xml.as_bytes())

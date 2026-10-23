@@ -412,7 +412,7 @@ fn signed_real_odb_is_inventoried_and_changed_publication_is_refused() {
 fn encrypted_package_open_and_edit_lifecycle_is_explicit_and_fail_closed() {
     use litchi_odf_common::core::{PackageWriter, Profile};
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(litchi_odf_common::constants::ODF_DATABASE)
         .unwrap();

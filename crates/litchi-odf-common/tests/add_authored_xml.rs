@@ -36,7 +36,10 @@ impl Write for SharedSink {
 }
 
 fn shared_writer(bytes: &Rc<RefCell<Vec<u8>>>) -> PackageWriter<SharedSink> {
-    PackageWriter::with_writer(SharedSink(Rc::clone(bytes)))
+    PackageWriter::with_writer(
+        SharedSink(Rc::clone(bytes)),
+        StreamingArchiveLimits::default(),
+    )
 }
 
 fn signer() -> DocumentSigner {
@@ -54,7 +57,7 @@ fn authored_package_with(content: &[u8]) -> Vec<u8> {
     // bounded controls below.  In particular, do not compare `new()` plus the
     // compatibility `set_mimetype` path to a caller-owned sink publication.
     let mut sink = Vec::new();
-    let mut writer = PackageWriter::with_writer(&mut sink);
+    let mut writer = PackageWriter::with_writer(&mut sink, StreamingArchiveLimits::default());
     writer.set_mimetype_streaming(MIME).unwrap();
     writer
         .add_authored_xml("content.xml", content, XML_MEDIA_TYPE)
@@ -232,12 +235,15 @@ fn assert_authored_io_marker(error: &PackageWriterError) {
 #[test]
 fn authored_xml_io_failure_retains_marker_and_poisoned_finalize() {
     let bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(MarkerSink {
-        bytes: Rc::clone(&bytes),
-        // Leave enough room for the mimetype and the beginning of the authored
-        // member, then fail during its local header/data publication.
-        remaining: 128,
-    });
+    let mut writer = PackageWriter::with_writer(
+        MarkerSink {
+            bytes: Rc::clone(&bytes),
+            // Leave enough room for the mimetype and the beginning of the authored
+            // member, then fail during its local header/data publication.
+            remaining: 128,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     let before_member = bytes.borrow().len();
     let error = writer
@@ -260,7 +266,7 @@ fn authored_xml_io_failure_retains_marker_and_poisoned_finalize() {
 fn output_limited_writer(sink: &mut Vec<u8>, maximum_output: u64) -> PackageWriter<&mut Vec<u8>> {
     let limits = StreamingArchiveLimits::new(3, 32, maximum_output.min(64 * 1024))
         .with_byte_limits(64 * 1024, 64 * 1024, maximum_output);
-    PackageWriter::with_writer_and_limits(sink, limits)
+    PackageWriter::with_writer(sink, limits)
 }
 
 #[test]
@@ -316,7 +322,7 @@ fn metadata_limits(max_metadata_bytes: u64) -> StreamingArchiveLimits {
 fn metadata_limited_package(max_metadata_bytes: u64) -> Result<Vec<u8>, PackageWriterError> {
     let limits = metadata_limits(max_metadata_bytes);
     let mut sink = Vec::new();
-    let mut writer = PackageWriter::with_writer_and_limits(&mut sink, limits);
+    let mut writer = PackageWriter::with_writer(&mut sink, limits);
     writer.set_mimetype_streaming(MIME)?;
     writer.add_authored_xml("content.xml", AUTHORED_XML, XML_MEDIA_TYPE)?;
     let _ = writer.finish_to_writer()?;

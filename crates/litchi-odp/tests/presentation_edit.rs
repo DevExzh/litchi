@@ -72,7 +72,7 @@ fn patch_refuses_a_different_source_snapshot() {
 #[test]
 fn retained_unknown_slide_is_preserved_or_rewrite_is_refused() {
     const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:opaque"><office:body><office:presentation><draw:page draw:name="source"><vendor:opaque vendor:type="vendor-gear"/></draw:page></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -205,7 +205,7 @@ fn changed_publication_preserves_noncompact_referenced_xml() {
 
 #[test]
 fn changed_publication_accepts_semantic_xml_whitespace() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -256,7 +256,7 @@ fn identical_transactions_emit_deterministic_bytes() {
 #[test]
 fn incomplete_source_page_coverage_is_refused_without_panicking() {
     let content = br#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:mimetype="application/vnd.oasis.opendocument.presentation"><office:body><office:presentation><draw:page draw:name="one"/></office:presentation></office:body></office:document>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

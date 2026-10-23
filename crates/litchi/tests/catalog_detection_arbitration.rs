@@ -83,7 +83,9 @@ fn pptx_package() -> Vec<u8> {
     feature = "odp"
 ))]
 fn odf_package(mimetype: &str, content: &[u8]) -> Vec<u8> {
-    let mut writer = litchi::odf_common::core::PackageWriter::new();
+    let mut writer = litchi::odf_common::core::PackageWriter::new(
+        litchi::odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(mimetype).expect("ODF MIME is valid");
     writer
         .add_file("content.xml", content)
@@ -105,7 +107,9 @@ mod document_limit_arbitration {
     const DOCX_DOCUMENT: &[u8] = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>OOXML wins</w:t></w:r></w:p></w:body></w:document>"#;
 
     fn odt_docx_polyglot(catalog_name: &str) -> Vec<u8> {
-        let mut writer = litchi::odf_common::core::PackageWriter::new();
+        let mut writer = litchi::odf_common::core::PackageWriter::new(
+            litchi::odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(ODT_MIME).expect("ODT MIME is valid");
         for (name, data) in [
             ("content.xml", ODT_CONTENT),

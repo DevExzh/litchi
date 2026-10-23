@@ -12,7 +12,7 @@ const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 
 fn package_with_content(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(constants::ODF_SPREADSHEET)
         .expect("fixed ODS mimetype");

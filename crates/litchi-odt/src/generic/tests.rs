@@ -29,7 +29,7 @@ fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec
 }
 
 fn package(mimetype: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer
         .add_file(
@@ -88,16 +88,16 @@ fn opens_every_document_family_and_template_losslessly() {
 
 #[test]
 fn rejects_non_odf_missing_content_and_invalid_xml_bytes() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/zip").unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
     assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_DRAWING).unwrap();
     assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_CHART).unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
     let package = writer.finish_to_bytes().unwrap();

@@ -20,7 +20,7 @@ fn package(
     styles_xml: Option<&str>,
     meta_xml: Option<&str>,
 ) -> Result<Vec<u8>, Error> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     writer.add_file("content.xml", content_xml)?;
     if let Some(styles_xml) = styles_xml {

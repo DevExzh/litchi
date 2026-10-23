@@ -64,6 +64,9 @@ struct OdsState {
 
 struct Inner {
     owner: OdsOwner,
+    /// The caller-selected ODF ingress policy retained across publication
+    /// and raw package reads.
+    odf_options: litchi_odf_common::OpenOptions,
     /// Worksheet names for the generic sheet traits, which borrow them;
     /// built on their first use.
     names: OnceLock<Box<[String]>>,
@@ -119,10 +122,10 @@ impl Ods {
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Ods`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
-        let package =
-            Package::from_prepared_package_with_options(prepared, options.odf_open_options())
-                .map_err(odf_error)?;
-        Self::from_package(package, None)
+        let odf_options = options.odf_open_options();
+        let package = Package::from_prepared_package_with_options(prepared, odf_options)
+            .map_err(odf_error)?;
+        Self::from_package_with_options(package, None, odf_options)
     }
 
     /// Adopts the source-backed owner the path route built over the file.
@@ -134,7 +137,7 @@ impl Ods {
     #[cfg(any(unix, windows))]
     pub(crate) fn from_source(
         spreadsheet: Box<litchi_ods::SourceBackedSpreadsheet>,
-        _options: &OpenOptions,
+        options: &OpenOptions,
     ) -> Result<Self> {
         spreadsheet.check_source().map_err(odf_error)?;
         Ok(Self::from_owner(
@@ -143,6 +146,7 @@ impl Ods {
                 package: OnceLock::new(),
             },
             None,
+            options.odf_open_options(),
         ))
     }
 
@@ -151,23 +155,41 @@ impl Ods {
         let flat =
             litchi_ods::flat::Workbook::from_bytes_with_options(&bytes, options.odf_open_options())
                 .map_err(odf_error)?;
-        Ok(Self::from_owner(OdsOwner::Flat(flat), None))
+        Ok(Self::from_owner(
+            OdsOwner::Flat(flat),
+            None,
+            options.odf_open_options(),
+        ))
     }
 
     /// Adopts an immutable package (creation and committed edits), keeping
     /// `origin` for `File::save`.
     pub(crate) fn from_package(package: Package, origin: Option<Arc<Path>>) -> Result<Self> {
+        Self::from_package_with_options(package, origin, litchi_odf_common::OpenOptions::new())
+    }
+
+    fn from_package_with_options(
+        package: Package,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self> {
         let workbook = package.workbook().map_err(odf_error)?;
         Ok(Self::from_owner(
             OdsOwner::Eager { package, workbook },
             origin,
+            odf_options,
         ))
     }
 
-    fn from_owner(owner: OdsOwner, origin: Option<Arc<Path>>) -> Self {
+    fn from_owner(
+        owner: OdsOwner,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Self {
         Self(Arc::new(OdsState {
             inner: Arc::new(Inner {
                 owner,
+                odf_options,
                 names: OnceLock::new(),
                 cache: index::Cache::default(),
             }),
@@ -185,6 +207,11 @@ impl Ods {
 
     fn owner(&self) -> &OdsOwner {
         &self.0.inner.owner
+    }
+
+    /// The ODF ingress policy retained by this handle.
+    pub(crate) fn odf_options(&self) -> litchi_odf_common::OpenOptions {
+        self.0.inner.odf_options
     }
 
     /// The path a path-backed open read.

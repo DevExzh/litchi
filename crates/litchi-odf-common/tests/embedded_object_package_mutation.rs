@@ -19,7 +19,7 @@ fn package(inner: &str, files: &[(&str, &[u8], &str)]) -> Vec<u8> {
     let content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text><text:p litchi:unknown="preserved" xmlns:litchi="urn:litchi:unknown">sentinel</text:p>{inner}</office:text></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())

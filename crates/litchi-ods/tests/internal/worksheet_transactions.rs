@@ -71,7 +71,7 @@ fn row_splice_content() -> String {
 }
 
 fn row_splice_package() -> litchi_core::Result<Vec<u8>> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.add_file("content.xml", row_splice_content().as_bytes())?;
     let opaque_payload = vec![0x5a; 128 * 1024];

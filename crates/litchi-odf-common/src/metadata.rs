@@ -34,7 +34,7 @@
 //!
 //! # fn main() -> Result<(), Error> {
 //! # let bytes = {
-//! #     let mut writer = litchi_odf_common::core::PackageWriter::new();
+//! #     let mut writer = litchi_odf_common::core::PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
 //! #     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
 //! #     writer.add_file("content.xml", br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:body><office:text/></office:body></office:document-content>"#)?;
 //! #     writer.add_file("meta.xml", br#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3"><office:meta/></office:document-meta>"#)?;
@@ -279,7 +279,10 @@ impl Assignments {
         xml.push_str("\"><office:meta>");
         xml.push_str(&children);
         xml.push_str("</office:meta></office:document-meta>");
-        let mut writer = crate::core::PackageWriter::new_bounded(MAX_PACKAGE_BYTES);
+        let mut writer = crate::core::PackageWriter::new_bounded(
+            MAX_PACKAGE_BYTES,
+            crate::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(&package.mimetype()?)?;
         writer.add_file("meta.xml", xml.as_bytes())?;
         writer.copy_source_files_from_except(package, &std::collections::HashSet::new())?;

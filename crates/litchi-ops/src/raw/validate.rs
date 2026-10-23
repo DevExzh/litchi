@@ -208,7 +208,7 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
             if bytes.starts_with(b"PK") {
                 litchi_odf_common::validate_package(
                     &bytes,
-                    litchi_odf_common::OdfValidationLimits::default(),
+                    odf_validation_limits(file),
                     ValidationLimits::default(),
                 )
                 .map_err(Error::Odf)?
@@ -219,6 +219,26 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         _ => return Err(refused(file)),
     };
     Ok(Validation { format, report })
+}
+
+/// Keep generic validation's own explicit report policy while intersecting
+/// its package-admission dimensions with the ODF owner that admitted `file`.
+/// Validation is a separate API: its XML-event, depth and report ceilings
+/// intentionally remain the validator defaults rather than being invented as
+/// new `OpenOptions` fields.
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn odf_validation_limits(file: &File) -> litchi_odf_common::OdfValidationLimits {
+    let source = file.odf_read_limits().source_limits_value();
+    litchi_odf_common::OdfValidationLimits::default()
+        .with_max_input_bytes(source.max_input_bytes())
+        .with_max_entries(source.max_members())
+        .with_max_mimetype_bytes(source.max_mimetype_bytes())
+        .with_max_manifest_bytes(source.max_manifest_bytes())
+        .with_max_archive_member_name_bytes(source.max_archive_member_name_bytes())
+        .with_max_archive_metadata_bytes(source.max_archive_metadata_bytes())
+        .with_max_archive_compressed_bytes(source.max_archive_compressed_bytes())
+        .with_max_archive_entry_bytes(source.max_entry_bytes())
+        .with_max_archive_total_bytes(source.max_aggregate_bytes())
 }
 
 fn refused(file: &File) -> OpsError {

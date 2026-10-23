@@ -537,7 +537,8 @@ fn central_file_comments_are_charged_to_the_raw_metadata_ceiling() {
 fn reports_encryption_signature_external_and_macro_presence_only() {
     use litchi_odf_common::core::{PackageWriter, Profile};
 
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

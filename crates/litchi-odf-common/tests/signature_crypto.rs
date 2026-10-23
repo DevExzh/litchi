@@ -31,7 +31,7 @@ fn signed_package(
     canonicalization: CanonicalizationAlgorithm,
     encrypted: bool,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_document_signer(signer(algorithm).with_canonicalization(canonicalization))
@@ -240,7 +240,7 @@ fn rejects_spoofed_and_duplicate_package_reference_paths() {
 
 #[test]
 fn late_signing_configuration_failure_is_atomic() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", b"<root/>").unwrap();
     assert!(

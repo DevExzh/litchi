@@ -7,7 +7,7 @@ const MIME: &str = "application/vnd.oasis.opendocument.text-master";
 const CONTENT: &str = include_str!("fixtures/libreoffice-master-document-content.xml");
 
 fn package(content: &str, meta_xml: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if let Some(source_meta_xml) = meta_xml {
@@ -44,7 +44,7 @@ fn metadata_title_is_projected_from_the_source_snapshot() {
 #[test]
 fn real_master_fixture_title_transaction_is_reversible_and_preserves_opaque_parts() {
     let meta = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta></office:document-meta>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer

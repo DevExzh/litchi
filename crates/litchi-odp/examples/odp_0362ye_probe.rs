@@ -184,7 +184,9 @@ fn odp() -> Vec<u8> {
         ));
     }
     content.push_str("</office:presentation></office:body></office:document-content>");
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .expect("mimetype");

@@ -4,14 +4,14 @@
     reason = "Test assertions intentionally unwrap known-valid package fixture construction failures."
 )]
 
-use super::{Archive, read_manifest};
+use super::{Archive, ArchiveLimits, read_manifest};
 use super::{Entry, Manifest, is_media_path, parse_manifest};
 use crate::XmlStreamLimits;
 
 #[test]
 fn archive_reads_a_real_package_without_family_models() {
     let data = include_bytes!("../../../../test-data/odf/odt/shape-text-in-paragraph.odt");
-    let archive = Archive::new(data).expect("ODF archive");
+    let archive = Archive::new(data, ArchiveLimits::default()).expect("ODF archive");
     assert!(archive.contains("mimetype"));
     assert!(archive.contains("content.xml"));
     assert!(archive.is_stored("mimetype").unwrap());
@@ -20,8 +20,28 @@ fn archive_reads_a_real_package_without_family_models() {
 }
 
 #[test]
+fn archive_manifest_xml_obeys_the_selected_raw_xml_policy() {
+    let data = include_bytes!("../../../../test-data/odf/odt/shape-text-in-paragraph.odt");
+    let archive = Archive::new(data, ArchiveLimits::default()).expect("ODF archive");
+    let narrow = XmlStreamLimits::new(1_060, 256, 4_000_000, 1_000_000, 64 * 1024)
+        .expect("test XML policy is finite");
+    assert!(archive.read_manifest_xml(narrow).is_err());
+    assert!(!archive
+        .read_manifest_xml(XmlStreamLimits::default())
+        .expect("default raw XML policy admits fixture")
+        .is_empty());
+}
+
+#[test]
+fn archive_admission_obeys_the_selected_catalog_policy() {
+    let data = include_bytes!("../../../../test-data/odf/odt/shape-text-in-paragraph.odt");
+    let narrow = ArchiveLimits::default().with_max_files(1);
+    assert!(Archive::new(data, narrow).is_err());
+}
+
+#[test]
 fn archive_rejects_invalid_zip_bytes() {
-    assert!(Archive::new(b"not a zip").is_err());
+    assert!(Archive::new(b"not a zip", ArchiveLimits::default()).is_err());
 }
 
 #[test]

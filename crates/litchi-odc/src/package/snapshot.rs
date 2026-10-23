@@ -263,7 +263,10 @@ impl Snapshot {
             compact_xml::validate(content.as_bytes(), compact_limits).map_err(Error::from)?;
         }
         crate::codec::validate(content)?;
-        let mut writer = PackageWriter::new_bounded(self.0.limits.max_package_bytes());
+        let mut writer = PackageWriter::new_bounded(
+            self.0.limits.max_package_bytes(),
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(self.0.kind.mime_type())?;
         if let Some(patch) = content_splice {
             publish_content_splice(self.0.package.package(), patch, content, &mut writer)?;

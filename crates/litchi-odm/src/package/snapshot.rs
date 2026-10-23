@@ -211,7 +211,10 @@ impl Snapshot {
     ) -> Result<Self> {
         let archive = self.0.package.package();
         ensure_editable(archive, &self.files()?)?;
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         let compact_content = crate::codec::compact_source_xml(content_xml)?;
         add_preserving_media_type(

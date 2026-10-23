@@ -85,7 +85,8 @@ fn package(slides: usize) -> Vec<u8> {
     }
     content.push_str("</office:presentation></office:body></office:document-content>");
 
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()

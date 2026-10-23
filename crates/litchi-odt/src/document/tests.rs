@@ -7,7 +7,7 @@ use crate::core::PackageWriter;
 use crate::elements::parser::OrderElement;
 
 fn document(content: &str) -> Document {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
@@ -29,7 +29,7 @@ fn raw_package(content: &[u8]) -> Vec<u8> {
 #[test]
 fn prepared_detection_transfers_the_same_archive_index_into_semantic_open() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><o:body><o:text><t:p>prepared</t:p></o:text></o:body></o:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())
@@ -55,7 +55,7 @@ fn prepared_detection_transfers_the_same_archive_index_into_semantic_open() {
 #[test]
 fn prepared_detection_rejects_a_wrong_family_before_semantic_open() {
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())

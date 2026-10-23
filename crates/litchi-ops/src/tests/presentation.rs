@@ -651,7 +651,9 @@ mod source_pptx_path {
     #[cfg(feature = "odp")]
     #[test]
     fn odp_source_owner_and_unknown_zip_fallback() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_PRESENTATION)
             .unwrap();

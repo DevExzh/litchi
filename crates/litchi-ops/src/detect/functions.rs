@@ -535,7 +535,9 @@ mod tests {
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
     ))]
     fn packaged_odf_detection_handles_ordinary_and_malformed_catalogs() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
             .unwrap();
@@ -557,7 +559,9 @@ mod tests {
         assert_eq!(reader.position(), 3);
         assert_eq!(super::super::opc_probe_count(), 0);
 
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer
             .set_mimetype(litchi_odf_common::constants::ODF_TEXT)
             .unwrap();
@@ -609,7 +613,9 @@ mod tests {
         ));
 
         for (mimetype, expected) in cases {
-            let mut writer = litchi_odf_common::core::PackageWriter::new();
+            let mut writer = litchi_odf_common::core::PackageWriter::new(
+                litchi_odf_common::core::StreamingArchiveLimits::default(),
+            );
             writer.set_mimetype(mimetype).unwrap();
             writer.add_file("content.xml", b"<content/>").unwrap();
             let package = writer.finish_to_bytes().unwrap();

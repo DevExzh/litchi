@@ -51,7 +51,7 @@ fn appending_line_break_uses_odf_inline_markup_and_preserves_rich_content() {
     assert!(content.contains("<text:line-break/>"));
 
     let rich_xml = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text><t:p><t:span t:style-name="Emphasis">rich</t:span></t:p></office:text></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

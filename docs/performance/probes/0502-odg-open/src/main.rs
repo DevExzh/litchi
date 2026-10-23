@@ -1,4 +1,4 @@
-use litchi_odf_common::core::PackageWriter;
+use litchi_odf_common::core::{PackageWriter, StreamingArchiveLimits};
 use litchi_odg::Drawing;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -188,7 +188,7 @@ fn sha256(bytes: &[u8]) -> String {
 
 fn package_for(spec: CorpusSpec) -> Vec<u8> {
     let content = content_for(spec);
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if spec.rich {

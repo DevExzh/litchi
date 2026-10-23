@@ -37,7 +37,7 @@ fn table(name: &str, token: &str) -> String {
 }
 
 fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(constants::ODF_SPREADSHEET)
         .expect("fixed ODS mimetype");
@@ -456,7 +456,7 @@ fn dependent_package_members_signatures_and_encryption_refuse() -> Result<()> {
         assert_eq!(edit.as_bytes(), source);
     }
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.set_encryption("secret", Profile::compatible())?;
     writer.add_file("content.xml", ordinary.as_bytes())?;
