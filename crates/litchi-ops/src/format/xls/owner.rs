@@ -26,8 +26,6 @@ pub(super) struct SheetHandle<'f> {
     metadata: &'f SheetMetadata,
 }
 
-pub(super) type EagerCells<'a> = Box<dyn Iterator<Item = &'a litchi_xls::Cell> + Send + Sync + 'a>;
-
 impl<'f> SheetHandle<'f> {
     pub(super) fn at(file: &'f Xls, position: usize) -> Result<Option<Self>> {
         let Some(entry) = file.owner().sheet_catalog()?.get(position) else {
@@ -205,7 +203,10 @@ impl<'f> SheetHandle<'f> {
     /// Borrow the eager worksheet's native cell iterator when the owner has
     /// already parsed its cells. Returning `None` preserves the source-backed
     /// fallback until a resumable positional cell cursor is available.
-    pub(super) fn eager_cells(&self, file: &'f Xls) -> Result<Option<EagerCells<'f>>> {
+    pub(super) fn eager_cells(
+        &self,
+        file: &'f Xls,
+    ) -> Result<Option<litchi_xls::worksheet::StoredCells<'f>>> {
         if self.package.source_workbook().is_some() {
             return Ok(None);
         }
@@ -220,7 +221,7 @@ impl<'f> SheetHandle<'f> {
         let worksheet = reader
             .xls_worksheet(worksheet_index)
             .map_err(|error| worksheet_error(error.to_string()))?;
-        Ok(Some(Box::new(worksheet.stored_cells())))
+        Ok(Some(worksheet.stored_cells()))
     }
 }
 
