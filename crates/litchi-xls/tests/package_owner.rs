@@ -532,7 +532,7 @@ fn primary_structural_edits_preserve_leaf_dependency_checks() {
 #[test]
 fn primary_signed_and_encrypted_sources_are_refused() {
     let signed = Package::from_bytes(&signed_package()).unwrap();
-    let mut unchanged = signed.edit().unwrap();
+    let unchanged = signed.edit().unwrap();
     assert!(!unchanged.commit().unwrap().diagnostics().changed());
     let mut changed = signed.edit().unwrap();
     changed
