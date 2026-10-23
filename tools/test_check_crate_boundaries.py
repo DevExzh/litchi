@@ -27012,6 +27012,43 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
+    def test_numbers_identity_boundary_rejects_same_source_provenance_endpoint(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<(&[u8], &[u8])> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| (\n"
+                "            provenance.original_header(),\n"
+                "            provenance.original_canonical_header(),\n"
+                "        ))\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers() == self.source_headers()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "must compare self and other source_headers values" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_numbers_identity_boundary_rejects_incomplete_shared_source_provenance(
         self,
     ) -> None:

@@ -45414,6 +45414,13 @@ def audit_numbers_identity_boundary_source_topology(
             source_headers_calls = re.findall(
                 r"\bsource_headers\s*\(", helper_body
             )
+            source_headers_comparison = re.search(
+                r"(?:\bself\s*\.\s*source_headers\s*\(\)\s*==\s*"
+                r"other\s*\.\s*source_headers\s*\(\)|"
+                r"\bother\s*\.\s*source_headers\s*\(\)\s*==\s*"
+                r"self\s*\.\s*source_headers\s*\(\))",
+                helper_body,
+            )
             if source_headers_calls:
                 if len(source_headers_calls) < 2:
                     violations.append(
@@ -45421,10 +45428,19 @@ def audit_numbers_identity_boundary_source_topology(
                         "same_content_ignoring_offsets must compare both "
                         "source_headers values"
                     )
+                elif source_headers_comparison is None:
+                    violations.append(
+                        "focused litchi-iwa-core archive helper "
+                        "same_content_ignoring_offsets must compare self and "
+                        "other source_headers values"
+                    )
                 source_headers_body = _rust_any_function_body(
                     core_code, "source_headers"
                 )
-                if source_headers_body is not None and len(source_headers_calls) >= 2:
+                if (
+                    source_headers_body is not None
+                    and source_headers_comparison is not None
+                ):
                     resolved_fields.update(
                         field_name
                         for field_name in (
