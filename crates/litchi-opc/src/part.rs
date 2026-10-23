@@ -129,6 +129,18 @@ pub trait Part: PartClone + Send + Sync {
         Ok(())
     }
 
+    /// Return this part's admitted payload length without materializing a
+    /// deferred source member.
+    ///
+    /// Built-in parts opened from an owned source answer from the checked
+    /// central-directory size retained at admission. Their first byte access
+    /// still verifies that size against the retained archive and decoded
+    /// payload. Other implementations use the default fallible byte access.
+    fn payload_len(&self) -> Result<usize> {
+        self.ensure_payload()?;
+        Ok(self.blob().len())
+    }
+
     /// The payload if it is already available, without decoding anything.
     ///
     /// `None` means the part still holds the payload its source member
@@ -352,6 +364,10 @@ impl Part for BlobPart {
 
     fn ensure_payload(&self) -> Result<()> {
         self.blob.force().map(|_| ())
+    }
+
+    fn payload_len(&self) -> Result<usize> {
+        self.blob.payload_len()
     }
 
     fn decoded_blob(&self) -> Option<&[u8]> {
@@ -632,6 +648,10 @@ impl Part for XmlPart {
         self.xml_bytes.force().map(|_| ())
     }
 
+    fn payload_len(&self) -> Result<usize> {
+        self.xml_bytes.payload_len()
+    }
+
     fn decoded_blob(&self) -> Option<&[u8]> {
         self.xml_bytes.decoded().map(|blob| blob.as_slice())
     }
@@ -714,6 +734,18 @@ impl<'part> PartMetadata<'part> {
     #[must_use]
     pub fn rels(&self) -> &'part Relationships {
         self.part.rels()
+    }
+
+    /// Return the part's admitted payload length without decoding a deferred
+    /// source member.
+    ///
+    /// A source-backed part reports the central-directory length that was
+    /// checked against its retained [`SourceLimits`](crate::SourceLimits)
+    /// policy when the package was opened. The first byte access still checks
+    /// the retained metadata and decoded length, so this projection does not
+    /// turn attacker-controlled size metadata into published bytes.
+    pub fn payload_len(&self) -> Result<usize> {
+        self.part.payload_len()
     }
 
     /// Get the target reference for a relationship ID.

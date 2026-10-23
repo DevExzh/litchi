@@ -229,14 +229,16 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
         "slicerCache",
         X14,
         limits,
-    )?;
-    crate::raw::check_part_budget_with_ledger(
-        package,
-        &budget,
-        1,
-        xml.len(),
-        &[(&workbook_name, updated.len())],
-        limits,
+        |replacement_len| {
+            crate::raw::check_part_budget_with_ledger(
+                package,
+                &budget,
+                1,
+                xml.len(),
+                &[(&workbook_name, replacement_len)],
+                limits,
+            )
+        },
     )?;
     crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
@@ -421,6 +423,7 @@ fn rewrite_or_insert(
     item: &str,
     family_ns: &str,
     limits: &SourceLimits,
+    mut admit: impl FnMut(usize) -> Result<()>,
 ) -> Result<Vec<u8>> {
     let (core, rel) = root_namespaces(xml)?;
     let mut reader = NsReader::from_reader(xml);
@@ -511,6 +514,7 @@ fn rewrite_or_insert(
         {
             return Err(invalid("rewritten Slicer Cache XML exceeds limit"));
         }
+        admit(size)?;
         let mut output = Vec::with_capacity(size);
         output.extend_from_slice(&xml[..start]);
         output.extend_from_slice(&fragment);
@@ -529,6 +533,7 @@ fn rewrite_or_insert(
     {
         return Err(invalid("rewritten Slicer Cache XML exceeds limit"));
     }
+    admit(size)?;
     let mut output = Vec::with_capacity(size);
     output.extend_from_slice(&xml[..close]);
     output.extend_from_slice(b"<extLst>");

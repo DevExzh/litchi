@@ -1556,6 +1556,7 @@ impl PackageReader {
                 Some(srels) => srels,
                 None => Self::load_rels_lazy(archive, &partname, limits, ledger)?,
             };
+            let declared_len = archive.metadata(partname.membername())?.uncompressed_size();
             let mut member = String::new();
             member
                 .try_reserve_exact(partname.membername().len())
@@ -1564,7 +1565,11 @@ impl PackageReader {
             sparts.push(SerializedPart {
                 partname,
                 content_type,
-                payload: PartPayload::deferred(&deferred_source, member.into_boxed_str()),
+                payload: PartPayload::deferred(
+                    &deferred_source,
+                    member.into_boxed_str(),
+                    declared_len,
+                ),
                 srels,
             });
         }

@@ -334,6 +334,11 @@ pub(crate) fn store_timeline_caches_prepared_limited(
         ));
     }
     let budget = crate::raw::prepare_package_budget(package, workbook_name, &additions, limits)?;
+    let added_bytes = prepared.iter().try_fold(0usize, |total, cache| {
+        total
+            .checked_add(cache.xml.len())
+            .ok_or_else(|| limit("aggregate part bytes"))
+    })?;
     let refs: Vec<String> = prepared
         .iter()
         .map(|cache| cache.value.relationship_id.clone())
@@ -354,19 +359,16 @@ pub(crate) fn store_timeline_caches_prepared_limited(
         TIMELINE_CACHE_EXTENSION_URI,
         &fragment,
         limits,
-    )?;
-    let added_bytes = prepared.iter().try_fold(0usize, |total, cache| {
-        total
-            .checked_add(cache.xml.len())
-            .ok_or_else(|| limit("aggregate part bytes"))
-    })?;
-    crate::raw::check_part_budget_with_ledger(
-        package,
-        &budget,
-        prepared.len(),
-        added_bytes,
-        &[(workbook_name, updated.len())],
-        limits,
+        |replacement_len| {
+            crate::raw::check_part_budget_with_ledger(
+                package,
+                &budget,
+                prepared.len(),
+                added_bytes,
+                &[(workbook_name, replacement_len)],
+                limits,
+            )
+        },
     )?;
     crate::signature_policy::ensure_unsigned(package)?;
     for cache in prepared {
@@ -652,14 +654,16 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
         TIMELINES_EXTENSION_URI,
         &fragment,
         limits,
-    )?;
-    crate::raw::check_part_budget_with_ledger(
-        package,
-        &budget,
-        1,
-        prepared.xml.len(),
-        &[(&worksheet_uri, updated.len())],
-        limits,
+        |replacement_len| {
+            crate::raw::check_part_budget_with_ledger(
+                package,
+                &budget,
+                1,
+                prepared.xml.len(),
+                &[(&worksheet_uri, replacement_len)],
+                limits,
+            )
+        },
     )?;
     crate::signature_policy::ensure_unsigned(package)?;
     package.add_part(Box::new(BlobPart::new(
@@ -775,6 +779,7 @@ fn insert_extension(
     uri: &str,
     fragment: &[u8],
     limits: &SourceLimits,
+    mut admit: impl FnMut(usize) -> Result<()>,
 ) -> Result<Vec<u8>> {
     if root
         .children
@@ -837,6 +842,7 @@ fn insert_extension(
                     {
                         return Err(limit("rewrite bytes"));
                     }
+                    admit(size)?;
                     let mut output = Vec::with_capacity(size);
                     output.extend_from_slice(&xml[..start]);
                     output.extend_from_slice(fragment);
@@ -872,6 +878,7 @@ fn insert_extension(
         {
             return Err(limit("rewrite bytes"));
         }
+        admit(size)?;
         let raw = &xml[start..end];
         let close = raw
             .windows(2)
@@ -905,6 +912,7 @@ fn insert_extension(
     {
         return Err(limit("rewrite bytes"));
     }
+    admit(size)?;
     let mut output = Vec::with_capacity(size);
     output.extend_from_slice(&xml[..position]);
     output.extend_from_slice(&wrapper);

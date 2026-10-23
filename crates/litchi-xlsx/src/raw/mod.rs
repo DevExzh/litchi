@@ -319,6 +319,61 @@ pub(crate) struct PackageBudget {
     owner_plan: litchi_opc::RelationshipSourcePlan,
 }
 
+impl PackageBudget {
+    /// Refuse an already over-limit package before a raw operation captures
+    /// source XML or stages its proposed relationship plan.
+    fn check_baseline(
+        &self,
+        package: &litchi_opc::OpcPackage,
+        limits: &litchi_opc::SourceLimits,
+    ) -> crate::Result<()> {
+        let part_count = package.part_count();
+        if part_count > limits.max_parts() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::Parts,
+                part_count as u64,
+                limits.max_parts() as u64,
+            ));
+        }
+        if self.part_bytes > limits.max_total_part_bytes() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::TotalPartBytes,
+                self.part_bytes,
+                limits.max_total_part_bytes(),
+            ));
+        }
+        if self.relationship_parts > limits.max_relationship_parts() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::RelationshipParts,
+                self.relationship_parts as u64,
+                limits.max_relationship_parts() as u64,
+            ));
+        }
+        if self.relationship_bytes > limits.max_total_relationship_xml_bytes() as u64 {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
+                self.relationship_bytes,
+                limits.max_total_relationship_xml_bytes() as u64,
+            ));
+        }
+        if self.relationship_events > limits.max_total_relationship_xml_events() as u64 {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents,
+                self.relationship_events,
+                limits.max_total_relationship_xml_events() as u64,
+            ));
+        }
+        if self.relationship_count > limits.max_total_relationships() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::TotalRelationships,
+                self.relationship_count as u64,
+                limits.max_total_relationships() as u64,
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Admit one raw insertion's relationships and aggregate payload in one
 /// package pass before any relationship mutation or payload publication runs.
 /// Existing source relationship members retain their exact bytes; the
@@ -340,6 +395,15 @@ pub(crate) fn prepare_package_budget(
         ));
     }
 
+    let owner_plan = package.plan_source_relationships_with_limits(owner, *limits)?;
+    // The source plan above is output-free. Admit the current package ledger
+    // before capturing a source token or cloning the proposed edit plan. A
+    // package opened under the policy already satisfies this census, but the
+    // low-level OPC authoring methods can add payloads or relationships without
+    // re-running the aggregate checks; raw edits must refuse that state before
+    // allocating another source-bound value.
+    let budget = package_budget(package, owner, owner_plan, limits)?;
+    budget.check_baseline(package, limits)?;
     let mut edits = Vec::new();
     edits.try_reserve_exact(additions.len()).map_err(|source| {
         crate::Error::Package(litchi_opc::OpcError::Allocation {
@@ -355,10 +419,8 @@ pub(crate) fn prepare_package_budget(
             mode: litchi_opc::TargetMode::Internal,
         });
     }
-    let owner_plan = package.plan_source_relationships_with_limits(owner, *limits)?;
     let source = package.source_relationships_with_limits(owner, *limits)?;
     let plan = source.plan_edit(&edits, &[], *limits)?;
-    let budget = package_budget(package, owner, owner_plan, limits)?;
     let relationship_parts = budget
         .relationship_parts
         .saturating_sub(usize::from(budget.owner_plan.member_present()))
@@ -436,7 +498,10 @@ pub(crate) fn check_part_budget_with_ledger(
     }
     let mut total = budget.part_bytes;
     for (name, replacement_len) in replacements {
-        let old = package.get_part(name)?.blob().len() as u64;
+        let old = package
+            .part_metadata(name)
+            .ok_or_else(|| litchi_opc::OpcError::PartNotFound(name.to_string()))?
+            .payload_len()? as u64;
         total = total
             .saturating_sub(old)
             .saturating_add(*replacement_len as u64);
@@ -453,8 +518,9 @@ pub(crate) fn check_part_budget_with_ledger(
 }
 
 /// Return relationship and payload totals from one operation-local package
-/// pass. Payload access is intentional: aggregate part-byte admission must
-/// account for the exact bytes that would remain after the replacement.
+/// pass. The payload projection is intentionally size-only: aggregate
+/// part-byte admission must account for the exact bytes that would remain
+/// after the replacement without inflating deferred source members.
 fn package_budget(
     package: &litchi_opc::OpcPackage,
     owner: &litchi_opc::PackURI,
@@ -473,6 +539,15 @@ fn package_budget(
     let mut add = |candidate: &litchi_opc::PackURI,
                    payload_len: Option<usize>|
      -> crate::Result<()> {
+        if let Some(payload_len) = payload_len {
+            if payload_len as u64 > limits.max_part_bytes() {
+                return Err(limit_error(
+                    litchi_opc::SourceLimitKind::PartBytes,
+                    payload_len as u64,
+                    limits.max_part_bytes(),
+                ));
+            }
+        }
         let plan = if candidate == owner {
             owner_plan_seen = true;
             owner_plan
@@ -490,10 +565,9 @@ fn package_budget(
     };
 
     add(&root, None)?;
-    for part in package.try_iter_parts() {
-        let part = part?;
+    for part in package.iter_parts() {
         let partname = part.partname();
-        let payload_len = part.blob().len();
+        let payload_len = part.payload_len()?;
         add(partname, Some(payload_len))?;
     }
     if !owner_plan_seen {
