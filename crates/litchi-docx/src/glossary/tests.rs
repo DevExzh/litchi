@@ -960,9 +960,9 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
         MAX_GRAPH_METADATA_BYTES,
     )
     .expect("graph-byte boundary policy");
-    let mut package = package();
+    let mut graph_package = package();
     let error = raw::put(
-        &mut package,
+        &mut graph_package,
         &raw::Graph::new(Catalog::new(), Conformance::Transitional),
         &graph_limit,
     )
@@ -974,7 +974,11 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
             ..
         }
     ));
-    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
+    assert!(
+        raw::load(&graph_package, &Limits::DEFAULT)
+            .unwrap()
+            .is_none()
+    );
 
     let metadata = "/word/document.xml".len()
         + "/word/glossary/document.xml".len()
