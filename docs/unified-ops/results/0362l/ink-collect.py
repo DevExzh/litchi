@@ -9,6 +9,19 @@ import tomllib
 
 ROUTES = ("forward", "inverse", "noop", "forward_write", "inverse_write", "noop_write")
 METRICS = ("allocations", "allocated", "retained", "peak")
+QUALIFY_SCHEMA = "litchi.docx-durable-ink.qualify.v2"
+ABBA_SCHEMA = "litchi.docx-durable-ink-abba.v2"
+STREAM_SCHEMA = "litchi.docx-durable-ink-stream.v1"
+VALIDATION_NAMES = {
+    "forward.docx",
+    "forward.json",
+    "inverse.docx",
+    "inverse.json",
+    "noop.docx",
+    "noop.json",
+    "source.docx",
+    "streaming.json",
+}
 
 
 def load(path):
@@ -35,10 +48,44 @@ def command(row):
     verify(row["stderr"])
 
 
+def validate_build_refs(build):
+    assert set(build["endpoints"]) == {"base", "candidate"}
+    assert set(build["resolved_refs"]) == {"base", "candidate"}
+    assert build["resolved_refs"]["base"] != build["resolved_refs"]["candidate"]
+    for label in ("base", "candidate"):
+        endpoint = build["endpoints"][label]
+        assert endpoint["source"]["commit"] == build["resolved_refs"][label]
+
+
+def validate_calibration_case(case, target_ns, minimum_ns):
+    """Independently validate calibration and accepted ABBA sample bounds."""
+    assert case["calibrations"]
+    route, count = case["route"], case["count"]
+    for calibration in case["calibrations"]:
+        assert set(calibration) == {"A", "B"}
+        values = list(calibration.values())
+        for value in values:
+            assert (value["route"], value["iterations"]) == (route, count)
+            assert isinstance(value["ns"], int) and value["ns"] > 0
+        for key in ("checksum", "output_bytes", "output_sha256"):
+            assert len({value[key] for value in values}) == 1
+    assert min(value["ns"] for value in case["calibrations"][-1].values()) >= target_ns
+    for block in case["blocks"]:
+        legs = block["legs"]
+        assert [leg["side"] for leg in legs] == list("ABBA")
+        for leg in legs:
+            value = leg["value"]
+            assert (value["route"], value["iterations"]) == (route, count)
+            assert isinstance(value["ns"], int) and value["ns"] >= minimum_ns
+
+
 def collect_build(directory):
     path = directory / "build.json"
     build = load(path)
+    assert build["schema"] == QUALIFY_SCHEMA
+    assert build["workload"] == "docx-durable-ink"
     assert build["status"] == "complete"
+    validate_build_refs(build)
     for key in ("builder", "probe", "input_lock"):
         verify(build[key])
     source_maps = []
@@ -63,17 +110,43 @@ def collect_build(directory):
         for row in endpoint["binaries"].values():
             verify(row)
         for rows in endpoint["validation"].values():
-            assert len(rows) == 6
+            assert {Path(row["path"]).name for row in rows} == VALIDATION_NAMES
             for row in rows:
                 verify(row)
     base, candidate = (build["endpoints"][key] for key in ("base", "candidate"))
     for key in ("registry", "rustc", "cargo"):
         assert base[key] == candidate[key], key
     assert base["lock"]["sha256"] == candidate["lock"]["sha256"]
-    expected = {Path(row["path"]).name: row["sha256"] for row in base["validation"]["native"]}
+    expected = {
+        Path(row["path"]).name: row["sha256"] for row in base["validation"]["native"]
+        if Path(row["path"]).name != "streaming.json"
+    }
+    base_stream = None
     for endpoint in (base, candidate):
         for rows in endpoint["validation"].values():
-            assert {Path(row["path"]).name: row["sha256"] for row in rows} == expected
+            actual = {
+                Path(row["path"]).name: row["sha256"] for row in rows
+                if Path(row["path"]).name != "streaming.json"
+            }
+            assert actual == expected
+            stream = load(next(row["path"] for row in rows
+                               if Path(row["path"]).name == "streaming.json"))
+            assert stream["schema"] == STREAM_SCHEMA
+            assert stream["read_chunk"] > 0
+            assert stream["sink_window"] > 0
+            assert stream["base_bytes"] > 0 and stream["target_bytes"] > 0
+            assert [row["route"] for row in stream["routes"]] == ["forward", "inverse", "noop"]
+            signature = [
+                (row["route"], row["bytes"], row["sha256"]) for row in stream["routes"]
+            ]
+            current_stream = (
+                stream["read_chunk"], stream["sink_window"], stream["base_bytes"],
+                stream["target_bytes"], signature
+            )
+            if base_stream is None:
+                base_stream = current_stream
+            else:
+                assert current_stream == base_stream
     shared = ("crates/litchi-core/", "crates/litchi-opc/", "crates/litchi-ooxml-common/", "crates/litchi-drawingml/")
     assert {k: v for k, v in source_maps[0].items() if k.startswith(shared)} == {
         k: v for k, v in source_maps[1].items() if k.startswith(shared)}
@@ -83,6 +156,8 @@ def collect_build(directory):
 def collect_allocations(directory, build):
     path = directory / "manifest.json"
     data = load(path)
+    assert data["schema"] == "litchi.docx-durable-ink-allocation.v1"
+    assert data["workload"] == "docx-durable-ink"
     assert data["status"] == "complete" and data["build"] == build["receipt"]
     assert [row["route"] for row in data["rows"]] == list(ROUTES)
     rows = []
@@ -119,15 +194,22 @@ def collect_native(directory, build):
         if not attempt.is_dir():
             continue
         manifest = load(attempt / "manifest.json")
+        assert manifest["schema"] == ABBA_SCHEMA
+        assert manifest["workload"] == "docx-durable-ink"
+        assert manifest["build_manifest"] == build["receipt"]
         assert manifest["binaries"] == binaries
         assert (manifest["target_ns"], manifest["minimum_ns"]) == (500_000_000, 150_000_000)
         verify(manifest["runner"])
+        verify(manifest["build_manifest"])
         if runner is None:
             runner = manifest["runner"]
         assert runner == manifest["runner"]
         completed = 0
         for case in manifest["cases"]:
             assert case["route"] in cases
+            validate_calibration_case(
+                case, manifest["target_ns"], manifest["minimum_ns"]
+            )
             for index, block in enumerate(case["blocks"]):
                 legs = block["legs"]
                 assert [leg["side"] for leg in legs] == list("ABBA")
@@ -172,12 +254,23 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--allocation", default="allocation-a1")
+    parser.add_argument(
+        "--allocation",
+        help="optional allocation receipt directory (for example allocation-a1)",
+    )
     args = parser.parse_args()
     directory, out = args.directory.resolve(), args.out.resolve()
     build = collect_build(directory)
-    allocations = collect_allocations(directory / args.allocation, build)
+    allocations = (
+        collect_allocations(directory / args.allocation, build)
+        if args.allocation
+        else dict(status="not-run; native timing is qualified independently")
+    )
     native, files = collect_native(directory, build)
+    if not native["attempts"] or not any(
+        attempt["raw_status"] == "complete" for attempt in native["attempts"]
+    ):
+        raise RuntimeError("native durable Ink timing qualification has not completed")
     out.mkdir(parents=True, exist_ok=True)
     # Keep the unabridged inventory outside Git; the reduced evidence links it.
     inventory = directory / "native-artifacts.json"

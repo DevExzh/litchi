@@ -10,9 +10,106 @@ use litchi_docx::{
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 use sha2::{Digest, Sha256};
 use std::hint::black_box;
-use std::io::Cursor;
+use std::io::{self, Cursor, Read, Write};
 use std::path::Path;
 use std::time::Instant;
+
+const READ_CHUNK: usize = 4096;
+const SINK_WINDOW: usize = 8192;
+
+/// A reader with a fixed read window.  It is used only while preparing the
+/// fixture, so the timed operation never includes input construction.  The
+/// counters make the preflight prove that the replay path accepts a bounded
+/// streaming reader rather than relying on one bulk read.
+struct ChunkedReader<'a> {
+    input: Cursor<&'a [u8]>,
+    reads: usize,
+    bytes: usize,
+}
+
+impl<'a> ChunkedReader<'a> {
+    fn new(input: &'a [u8]) -> Self {
+        Self {
+            input: Cursor::new(input),
+            reads: 0,
+            bytes: 0,
+        }
+    }
+}
+
+impl Read for ChunkedReader<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let end = buffer.len().min(READ_CHUNK);
+        let count = self.input.read(&mut buffer[..end])?;
+        self.reads += usize::from(count != 0);
+        self.bytes += count;
+        Ok(count)
+    }
+}
+
+/// A fixed-state sink for publication preflight.  It retains only the hash
+/// state and counters; output bytes never accumulate in a `Vec`.
+struct DigestSink {
+    digest: Sha256,
+    bytes: usize,
+    writes: usize,
+    max_write: usize,
+}
+
+impl DigestSink {
+    fn new() -> Self {
+        Self {
+            digest: Sha256::new(),
+            bytes: 0,
+            writes: 0,
+            max_write: 0,
+        }
+    }
+
+    fn finish(self) -> StreamEvidence {
+        StreamEvidence {
+            bytes: self.bytes,
+            writes: self.writes,
+            max_write: self.max_write,
+            sha256: digest(self.digest.finalize().as_slice()),
+        }
+    }
+}
+
+impl Write for DigestSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let count = bytes.len().min(SINK_WINDOW);
+        self.digest.update(&bytes[..count]);
+        self.bytes += count;
+        self.writes += 1;
+        self.max_write = self.max_write.max(count);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[derive(Clone)]
+struct StreamEvidence {
+    bytes: usize,
+    writes: usize,
+    max_write: usize,
+    sha256: String,
+}
+
+fn open_bounded(bytes: &[u8]) -> (Package, usize, usize) {
+    let mut reader = ChunkedReader::new(bytes);
+    let package = Package::from_reader(&mut reader).unwrap();
+    (package, reader.reads, reader.bytes)
+}
+
+fn stream(package: &Package) -> StreamEvidence {
+    let mut sink = DigestSink::new();
+    package.write_to(&mut sink).unwrap();
+    sink.finish()
+}
 
 #[cfg(feature = "allocations")]
 mod allocation {
@@ -149,7 +246,7 @@ struct Fixture {
 impl Fixture {
     fn new() -> Self {
         let original = fixture();
-        let base = Package::from_reader(Cursor::new(&original)).unwrap();
+        let (base, _, _) = open_bounded(&original);
         let mut edit = base.edit_ink().unwrap();
         edit.insert(
             Destination::main(Position::new(500)),
@@ -167,7 +264,8 @@ impl Fixture {
         let forward =
             CorePatch::<Reversible>::from_deterministic_json(&wire, patch_limits()).unwrap();
         let inverse = forward.inverse();
-        let target = Package::from_reader(Cursor::new(encode(authored.package()))).unwrap();
+        let target_bytes = encode(authored.package());
+        let (target, _, _) = open_bounded(&target_bytes);
         let noop = base
             .edit_ink()
             .unwrap()
@@ -206,12 +304,40 @@ fn validate_outputs(out: &Path) {
     let forward = apply(&fixture.base, &fixture.forward);
     let inverse = apply(&fixture.target, &fixture.inverse);
     let noop = apply(&fixture.base, &fixture.noop);
+    let (matching_base, base_reads, base_bytes) = open_bounded(&fixture.original);
+    let target_bytes = encode(&fixture.target);
+    let (matching_target, target_reads, target_read_bytes) = open_bounded(&target_bytes);
+    assert!(base_reads > 0 && target_reads > 0);
+    assert_eq!(base_bytes, fixture.original.len());
+    assert_eq!(target_read_bytes, target_bytes.len());
+    let matching_forward = apply(&matching_base, &fixture.forward);
+    let matching_inverse = apply(&matching_target, &fixture.inverse);
+    let matching_noop = apply(&matching_base, &fixture.noop);
     assert_eq!(forward.ink().unwrap().annotations().len(), 1);
     assert_eq!(inverse.ink().unwrap().annotations().len(), 0);
     assert_eq!(encode(&forward), encode(&fixture.target));
     assert_eq!(encode(&inverse), encode(&fixture.base));
     assert_eq!(encode(&noop), fixture.original);
     assert_eq!(encode(&fixture.base), fixture.original);
+    assert_eq!(encode(&matching_forward), target_bytes);
+    assert_eq!(encode(&matching_inverse), fixture.original);
+    assert_eq!(encode(&matching_noop), fixture.original);
+    let streamed = [
+        ("forward", &forward),
+        ("inverse", &inverse),
+        ("noop", &noop),
+    ]
+    .into_iter()
+    .map(|(name, package)| {
+        let encoded = encode(package);
+        let evidence = stream(package);
+        assert_eq!(evidence.bytes, encoded.len());
+        assert_eq!(evidence.sha256, digest(&encoded));
+        assert!(evidence.writes > 0);
+        assert!(evidence.max_write <= SINK_WINDOW);
+        (name, encoded.len(), evidence)
+    })
+    .collect::<Vec<_>>();
     for (name, bytes) in [
         ("source.docx", fixture.original),
         ("forward.docx", encode(&forward)),
@@ -225,9 +351,29 @@ fn validate_outputs(out: &Path) {
             "inverse.json",
             fixture.inverse.to_deterministic_json().unwrap(),
         ),
+        ("noop.json", fixture.noop.to_deterministic_json().unwrap()),
     ] {
         std::fs::write(out.join(name), bytes).unwrap();
     }
+    let mut streaming =
+        String::from("{\"schema\":\"litchi.docx-durable-ink-stream.v1\",\"read_chunk\":");
+    streaming.push_str(&READ_CHUNK.to_string());
+    streaming.push_str(",\"sink_window\":");
+    streaming.push_str(&SINK_WINDOW.to_string());
+    streaming.push_str(&format!(
+        ",\"base_reads\":{base_reads},\"base_bytes\":{base_bytes},\"target_reads\":{target_reads},\"target_bytes\":{target_read_bytes},\"routes\":["
+    ));
+    for (index, (name, bytes, evidence)) in streamed.iter().enumerate() {
+        if index != 0 {
+            streaming.push(',');
+        }
+        streaming.push_str(&format!(
+            "{{\"route\":\"{name}\",\"bytes\":{bytes},\"writes\":{},\"max_write\":{},\"sha256\":\"{}\"}}",
+            evidence.writes, evidence.max_write, evidence.sha256
+        ));
+    }
+    streaming.push_str("]}\n");
+    std::fs::write(out.join("streaming.json"), streaming).unwrap();
 }
 fn main() {
     let mut args = std::env::args().skip(1);
