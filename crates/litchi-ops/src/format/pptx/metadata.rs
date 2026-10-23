@@ -94,7 +94,18 @@ impl Pptx {
         if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
-        let assignments = metadata::admit(props, FileFormat::Pptx)?;
+        // The native metadata transaction treats an empty update as a
+        // genuine no-op and retains the complete property-family scope for
+        // replay.  Preserve that proof at the facade boundary instead of
+        // turning an empty `/metadata` setter into an InvalidArgument.  Root
+        // metadata shorthand still reaches this route only when it names a
+        // property, so other empty mutation targets keep their ordinary
+        // admission behavior.
+        let assignments = if props.is_empty() {
+            Assignments::default()
+        } else {
+            metadata::admit(props, FileFormat::Pptx)?
+        };
         self.set_metadata(&assignments, props.len(), limits)
             .map(Some)
     }

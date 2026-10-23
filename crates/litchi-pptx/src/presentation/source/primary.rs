@@ -2280,8 +2280,14 @@ impl Edit {
         } else {
             self.local_after_budget(&target_key, before_len, shape_removals)?
         };
-        let bounded_snapshot = snapshot.with_max_patch_bytes(output_limit);
-        let reservation = reserve(&self.working, &bounded_snapshot)?;
+        // The retained-patch ceiling is an exact wire bound, not a parser or
+        // candidate-allocation budget.  Reserve source edit memory against
+        // the snapshot's native/source policy; applying the exact patch
+        // ceiling here made a small fitting patch reject when the unchanged
+        // slide XML was larger than that ceiling.  The bounded edit below
+        // still enforces the candidate output bound, and commit performs the
+        // final exact envelope admission.
+        let reservation = reserve(&self.working, &snapshot)?;
         let mut edit = snapshot.edit_checked_with_max_patch_bytes(output_limit)?;
         let changed = stage(&mut edit)?;
         if changed == 0 {
