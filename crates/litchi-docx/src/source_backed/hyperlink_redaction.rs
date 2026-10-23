@@ -75,7 +75,7 @@ impl Change for RedactionChange {
                         )
                     },
                     move |target| {
-                        let (replacement, removed_ids) = redact::publication_parts(&stream_patch);
+                        let (replacement, removed_ids) = record::publication_parts(&stream_patch);
                         stream_base.stream_relationship_overlays(
                             target,
                             [(stream_main.clone(), replacement, removed_ids)],

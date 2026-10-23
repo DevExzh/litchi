@@ -183,3 +183,17 @@ receipts. Neither harness group was reached. The inactive incremental cache
 (498,384,649 bytes) was moved intact outside the capped target, with 564 file
 hashes in `.coord/replay-integration/cache-archive-20261023/manifest.json`;
 current builds disable incremental compilation. No measured binary was removed.
+
+The fifteenth attempt on `65136c31d7` passed OPC/ZIP and reached the broader
+format consumers. Workspace compilation stopped with exit 101 after 231.48
+seconds. The DOCX adapter now uses the current redaction module spelling and
+the existing public empty-topology exact-copy path. XLSB theme present/absent
+transitions retain their captured `opc_limits` in both initializers.
+
+Detachment's stale two-argument restore call also exposed a policy bypass;
+record 0362rna now routes it through shared full-base authentication and
+recipient semantic admission. Record 0362um repairs 340 denied qualifications
+and the stale XLSX raw constructor calls. The ODP probe's required compile-time
+route environment is being isolated from ordinary all-target builds.
+[consumer-v15.json](results/0362uf/consumer-v15.json) records both commands;
+neither harness check was reached.

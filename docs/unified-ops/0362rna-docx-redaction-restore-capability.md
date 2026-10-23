@@ -20,3 +20,13 @@ Source commit: `7753b2c0a2`. Formatting and artifact guards passed. Combined
 compiler, semantic, corpus, and performance qualification remain pending.
 This repair applies existing redaction rules; the comprehensive item-22 audit
 remains the sole deferred work.
+
+The assembled compiler exposed the detachment family's older custom restore
+branch. Detachment now uses the shared source-freshness and recipient-policy
+path, including its tighter-hyperlink-budget regression. A retained owner
+patch authenticates a foreign complete base once and rejects mismatches before
+scoped publication. Detached record patches without a retained owner pair
+keep their family-scoped validation. A story-text regression changes only an
+unrelated archive part to prove this distinction. Foreign redaction inverses
+still return their fixed unsupported-operation refusal before hashing; this
+preserves the existing wrong-base and equal-base refusal classifications.

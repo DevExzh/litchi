@@ -101,7 +101,9 @@ impl Deferred {
                 Some(policy) => Ok(package
                     .clone()
                     .write_exact_source_with_policy(writer, policy)?),
-                None => Ok(package.clone().write_exact_source(writer)?),
+                None => Ok(package
+                    .clone()
+                    .write_topology_to_stream(writer, litchi_opc::SourceTopologyPlan::new())?),
             },
             None => {
                 self.base.trim_clean_paragraph_index_for_operation();
@@ -600,34 +602,40 @@ macro_rules! source_family {
             // permits foreign restoration.
             if let Some((before, after)) = &patch.restore {
                 let same_semantic_limits = package.semantic_limits() == before.semantic_limits();
-                // same_owner is the package-local provenance proof. Package
-                // clones and semantic-limit projections retain the cache;
-                // every physical, execution, effective-topology, and
-                // deferred boundary goes through with_execution and mints a
-                // fresh cache. Reuse the committed owner only under that
-                // proof, so an ordinary same-owner inverse does not hash or
-                // materialize its artifact again.
-                if same_semantic_limits
-                    && package.same_owner(before)
-                    && after.semantic_limits() == package.semantic_limits()
-                {
-                    return Ok(Commit::new(
-                        after.clone(),
-                        patch.clone(),
-                        ($report)(&patch.change),
-                    ));
-                }
-                if same_semantic_limits
-                    && crate::source_backed::deferred::Change::allows_foreign_restore(
+                // Cache identity proves the recorded base without hashing. A
+                // changed recipient policy still runs the family publisher.
+                if package.same_owner(before) {
+                    if same_semantic_limits && after.semantic_limits() == package.semantic_limits() {
+                        return Ok(Commit::new(
+                            after.clone(),
+                            patch.clone(),
+                            ($report)(&patch.change),
+                        ));
+                    }
+                } else {
+                    // Forward-only redaction refuses every foreign inverse,
+                    // including a different artifact. Preserve that typed
+                    // refusal before attempting content authentication.
+                    if !crate::source_backed::deferred::Change::allows_foreign_restore(
                         &patch.change,
-                    )
-                    && package.same_artifact(before)?
-                {
-                    return Ok(Commit::new(
-                        package.restored(after)?,
-                        patch.clone(),
-                        ($report)(&patch.change),
-                    ));
+                    ) {
+                        return commit_change(package, patch.change.clone());
+                    }
+                    // A retained owner patch records a complete artifact base.
+                    // A mismatch must not fall back to a scoped record patch.
+                    if !package.same_artifact(before)? {
+                        return Err(crate::Error::conflict(
+                            $what,
+                            "the patch base does not match the supplied source",
+                        ).into());
+                    }
+                    if same_semantic_limits {
+                        return Ok(Commit::new(
+                            package.restored(after)?,
+                            patch.clone(),
+                            ($report)(&patch.change),
+                        ));
+                    }
                 }
             }
             commit_change(package, patch.change.clone())
@@ -855,5 +863,35 @@ mod tests {
             facade_cancel.cancel();
             assert!(next.check_source().is_err());
         }
+    }
+
+    #[test]
+    fn retained_story_patch_rejects_a_changed_unrelated_archive_part() {
+        fn with_opaque(marker: u8) -> Package {
+            let mut archive =
+                OpcPackage::from_vec(package_bytes(), litchi_opc::SourceLimits::default()).unwrap();
+            archive
+                .try_add_part(Box::new(BlobPart::new(
+                    PackURI::new("/opaque.bin").unwrap(),
+                    "application/octet-stream".to_owned(),
+                    vec![marker],
+                )))
+                .unwrap();
+            Package::from_bytes(&PackageWriter::to_bytes(&archive).unwrap()).unwrap()
+        }
+        let producer = with_opaque(1);
+        let mut edit = producer
+            .edit_story_text(story_text::Selector::Main)
+            .unwrap();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let foreign = with_opaque(2);
+        assert!(matches!(
+            foreign.apply_story_text(commit.patch()),
+            Err(story_text::Error::Document(
+                crate::Error::PatchConflict { .. }
+            ))
+        ));
     }
 }

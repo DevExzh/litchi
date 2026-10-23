@@ -39,12 +39,6 @@ impl Change for DetachmentChange {
 
 source_family!("external-hyperlink detachment", DetachmentChange);
 
-impl Patch {
-    fn restore_pair(&self) -> Option<(&Package, &Package)> {
-        self.restore.as_ref().map(|(before, after)| (before, after))
-    }
-}
-
 impl From<record::Patch> for Patch {
     /// Replay a detached record patch onto a package whose main document
     /// and relationships hold its before state.
@@ -121,19 +115,6 @@ impl Package {
     /// Returns [`crate::Error::PatchConflict`] for another main-document or
     /// relationship state.
     pub fn apply_external_hyperlink_detachment(&self, patch: &Patch) -> Result<Commit> {
-        if let Some((before, after)) = patch.restore_pair() {
-            if !self.same_artifact(before)? {
-                return Err(crate::Error::conflict(
-                    "external_hyperlink_detachment",
-                    "the patch base does not match the supplied source",
-                ));
-            }
-            return Ok(Commit::new(
-                self.restored(before, after)?,
-                patch.clone(),
-                Diagnostics::new(!patch.is_noop()),
-            ));
-        }
         apply_change(self, patch)
     }
 }

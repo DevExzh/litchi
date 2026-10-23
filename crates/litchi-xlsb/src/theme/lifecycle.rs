@@ -517,6 +517,7 @@ impl OwnerSource {
             }
         };
         Ok(Self {
+            opc_limits: self.opc_limits,
             workbook_name: self.workbook_name.clone(),
             workbook_relationships,
             part_names,
@@ -562,6 +563,7 @@ impl OwnerSource {
             content_types_output_limit(self.opc_limits),
         )?;
         Ok(Self {
+            opc_limits: self.opc_limits,
             workbook_name: self.workbook_name.clone(),
             workbook_relationships,
             part_names,
