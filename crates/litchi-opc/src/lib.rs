@@ -85,20 +85,19 @@ pub use pkgwriter::PackageWriter;
 pub use prepared::PreparedOoxmlSource;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
-    AuthorizedPrecompressedPart, EffectiveContentType, EffectivePart, EffectivePartData,
-    EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedMetadataData,
-    PreparedPartData, PreparedPartView, PreparedTopology, ReplacementSpan,
-    RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
     ArtifactStream, ArtifactStreamError, ArtifactStreamGuard, ArtifactStreamPolicy,
-    ArtifactStreamPublication, ArtifactStreamTarget, SourceArtifactRestoreProof,
-    SourceBackedPackage,
-    SourceCacheCounterDelta,
-    SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
-    SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
-    SourcePartSpliceProof, SourcePartSplicePublication, SourcePartSpliceReplay,
-    SourcePartSpliceReplayError, SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
-    SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget,
-    SourceTopologyPlan, VerifiedDecodedReaderError,
+    ArtifactStreamPublication, ArtifactStreamTarget, AuthorizedPrecompressedPart,
+    EffectiveContentType, EffectivePart, EffectivePartData, EffectiveTopology, PartBatch, PartData,
+    PartReadSession, PartView, PreparedMetadataData, PreparedPartData, PreparedPartView,
+    PreparedTopology, ReplacementSpan, RetainedPrecompressedPart, SourceArtifact,
+    SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
+    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
+    SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
+    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
+    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceReadDiagnostics,
+    SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget, SourceTopologyPlan,
+    VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};

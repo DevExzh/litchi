@@ -251,13 +251,15 @@ impl Iwork {
     /// only.
     pub(crate) fn detect_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Detected> {
         let shared: Arc<[u8]> = Arc::from(bytes);
-        let prepared =
-            match litchi_iwa_detect::PreparedSource::from_shared_bytes(Arc::clone(&shared), litchi_iwa_detect::Limits::default()) {
-                Ok(Some(prepared)) => prepared,
-                // A container the iWork detector refuses is not claimed: the
-                // input is reported as unrecognized, as before iWork joined.
-                Ok(None) | Err(_) => return Ok(Detected::Declined(shared.to_vec())),
-            };
+        let prepared = match litchi_iwa_detect::PreparedSource::from_shared_bytes(
+            Arc::clone(&shared),
+            litchi_iwa_detect::Limits::default(),
+        ) {
+            Ok(Some(prepared)) => prepared,
+            // A container the iWork detector refuses is not claimed: the
+            // input is reported as unrecognized, as before iWork joined.
+            Ok(None) | Err(_) => return Ok(Detected::Declined(shared.to_vec())),
+        };
         let owner = match prepared.format() {
             #[cfg(feature = "pages")]
             litchi_iwa_detect::Format::Pages => {

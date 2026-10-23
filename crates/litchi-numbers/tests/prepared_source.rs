@@ -18,8 +18,11 @@ fn prepared_source_handoff_matches_global_compatibility_projection()
     let source: Arc<[u8]> = std::fs::read(fixture_path())?.into();
     let source_lifetime = Arc::downgrade(&source);
     let expected = compatibility_tables_from_bytes(&source)?;
-    let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source), litchi_iwa_detect::Limits::default())?
-        .ok_or_else(|| std::io::Error::other("native Numbers fixture was not detected"))?;
+    let prepared = PreparedSource::from_shared_bytes(
+        Arc::clone(&source),
+        litchi_iwa_detect::Limits::default(),
+    )?
+    .ok_or_else(|| std::io::Error::other("native Numbers fixture was not detected"))?;
     assert_eq!(prepared.format(), Format::Numbers);
     drop(source);
     assert!(source_lifetime.upgrade().is_some());

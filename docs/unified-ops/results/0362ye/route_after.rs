@@ -14,24 +14,15 @@ pub(super) fn open(source: Arc<dyn ReadAt>, _sink: &mut super::Digest) {
 
 pub(super) fn first_slide(source: Arc<dyn ReadAt>, sink: &mut super::Digest) {
     let presentation = owner(source);
-    let slide = presentation
-        .slide(0)
-        .expect("slide")
-        .expect("first slide");
+    let slide = presentation.slide(0).expect("slide").expect("first slide");
     sink.update_text(&slide.all_text());
 }
 
 pub(super) fn repeat_slide(source: Arc<dyn ReadAt>, sink: &mut super::Digest) {
     let presentation = owner(source);
-    let first = presentation
-        .slide(0)
-        .expect("slide")
-        .expect("first slide");
+    let first = presentation.slide(0).expect("slide").expect("first slide");
     sink.update_text(&first.all_text());
-    let second = presentation
-        .slide(1)
-        .expect("slide")
-        .expect("second slide");
+    let second = presentation.slide(1).expect("slide").expect("second slide");
     sink.update_text(&second.all_text());
 }
 

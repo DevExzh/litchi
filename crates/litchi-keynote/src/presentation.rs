@@ -306,10 +306,9 @@ impl Presentation {
             .source_limits_value()
             .detector_limits()
             .map_err(map_detection_error)?;
-        let source =
-            litchi_iwa_detect::PreparedSource::from_shared_bytes(bytes, source_limits)
-                .map_err(map_detection_error)?
-                .ok_or(Error::InvalidFormat)?;
+        let source = litchi_iwa_detect::PreparedSource::from_shared_bytes(bytes, source_limits)
+            .map_err(map_detection_error)?
+            .ok_or(Error::InvalidFormat)?;
         if source.format() != litchi_iwa_detect::Format::Keynote {
             return Err(Error::UnexpectedFormat {
                 detected: crate::package::file_format(source.format()),

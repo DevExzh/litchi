@@ -972,8 +972,11 @@ fn apply_rejects_semantic_prepared_source_but_keeps_noop_exact() -> TestResult {
     use litchi_iwa_detect::PreparedSource;
 
     let source: Arc<[u8]> = body_fixture::direct_package()?.into();
-    let exact_prepared = PreparedSource::from_shared_bytes(Arc::clone(&source), litchi_iwa_detect::Limits::default())?
-        .ok_or("fixture was not detected as Pages")?;
+    let exact_prepared = PreparedSource::from_shared_bytes(
+        Arc::clone(&source),
+        litchi_iwa_detect::Limits::default(),
+    )?
+    .ok_or("fixture was not detected as Pages")?;
     let exact_package = Package::__from_prepared_source(exact_prepared)?;
     let semantic_prepared = PreparedSource::__from_shared_bytes_with_pages_metadata(
         Arc::clone(&source),

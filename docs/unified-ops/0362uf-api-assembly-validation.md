@@ -274,3 +274,11 @@ both restore paths, with independent native/facade cancellation assertions
 unchanged. Production refusal behavior is untouched.
 [consumer-v19.json](results/0362uf/consumer-v19.json) preserves the failure;
 subsequent compiler and harness groups were not reached.
+
+The workspace formatting gate initially reports 22 files, including the ODP
+probe source included by its example. Applying the configured formatter and
+rerunning `cargo fmt --all --check` passes.
+[format-assembly.json](results/0362uf/format-assembly.json) records the original
+check, the exact applied source-diff hash and the passing rerun. Historical
+probe measurements remain tied to their recorded source revisions; formatting
+does not promote them to final native qualification.

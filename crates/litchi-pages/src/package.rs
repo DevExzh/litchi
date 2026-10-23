@@ -4496,11 +4496,12 @@ mod tests {
     fn semantic_prepared_source_releases_physical_source() -> PackageResult<()> {
         let source: Arc<[u8]> = package_bytes(Some("Detached"), true, true)?.into();
         let weak_source = Arc::downgrade(&source);
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source), litchi_iwa_detect::Limits::default())
-            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
-            .ok_or_else(|| {
-                PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
-            })?;
+        let prepared = PreparedSource::from_shared_bytes(
+            Arc::clone(&source),
+            litchi_iwa_detect::Limits::default(),
+        )
+        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+        .ok_or_else(|| PackageError::InvalidFormat("Pages fixture was not detected".to_owned()))?;
         drop(source);
         assert!(weak_source.upgrade().is_some());
 

@@ -800,18 +800,11 @@ fn raw_glossary_replay_reopens_matches_and_chains_edits() {
 #[test]
 fn glossary_replay_uses_recipient_limits_for_broad_raw_patches() {
     let source = batch_source();
-    let producer_limits = story_text::Limits::new(
-        128 * 1024,
-        8,
-        10_000,
-        64,
-        128 * 1024,
-        8,
-        128 * 1024,
-    )
-    .unwrap()
-    .with_secondary_entry_limits(3, 16 * 1024, 256)
-    .unwrap();
+    let producer_limits =
+        story_text::Limits::new(128 * 1024, 8, 10_000, 64, 128 * 1024, 8, 128 * 1024)
+            .unwrap()
+            .with_secondary_entry_limits(3, 16 * 1024, 256)
+            .unwrap();
     let producer = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
     let snapshot = producer
@@ -823,34 +816,25 @@ fn glossary_replay_uses_recipient_limits_for_broad_raw_patches() {
         .unwrap();
     let patch = tree.patch().unwrap();
 
-    let accepted_limits = story_text::Limits::new(128 * 1024, 8, 10_000, 64, 64 * 1024, 8, 128 * 1024)
-        .unwrap()
-        .with_secondary_entry_limits(3, 16 * 1024, 256)
-        .unwrap();
+    let accepted_limits =
+        story_text::Limits::new(128 * 1024, 8, 10_000, 64, 64 * 1024, 8, 128 * 1024)
+            .unwrap()
+            .with_secondary_entry_limits(3, 16 * 1024, 256)
+            .unwrap();
     let accepted = open(&source)
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(accepted_limits))
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
     let accepted_target = patch.apply(&accepted).unwrap();
     assert_eq!(accepted_target.limits_value(), accepted_limits);
 
-    let narrow_limits = story_text::Limits::new(
-        128 * 1024,
-        8,
-        10_000,
-        64,
-        glossary_bytes,
-        8,
-        128 * 1024,
-    )
-    .unwrap()
-    .with_secondary_entry_limits(3, 16 * 1024, 256)
-    .unwrap();
-    let narrow = open(&source).with_semantic_limits(
-        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
-    );
+    let narrow_limits =
+        story_text::Limits::new(128 * 1024, 8, 10_000, 64, glossary_bytes, 8, 128 * 1024)
+            .unwrap()
+            .with_secondary_entry_limits(3, 16 * 1024, 256)
+            .unwrap();
+    let narrow = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(narrow_limits));
     let narrow_snapshot = narrow
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
@@ -1639,7 +1623,8 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
 }
 
 #[test]
-fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_accepts_matching_copy() {
+fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_accepts_matching_copy()
+{
     let source = batch_source();
     let versioned = Arc::new(VersionedSource {
         bytes: source.clone(),

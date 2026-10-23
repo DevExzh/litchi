@@ -110,7 +110,10 @@ fn source_text_event_buffer_peak_does_not_follow_document_size() {
     // The sink keeps only one slide and the parser clears its event buffer on
     // every read. The larger document may need more transient parser state,
     // but retaining every event would add roughly one full content.xml here.
-    assert!(large < 2 * 1024 * 1024, "unexpected retained event data: {large}");
+    assert!(
+        large < 2 * 1024 * 1024,
+        "unexpected retained event data: {large}"
+    );
     assert!(
         large < small.saturating_mul(8).saturating_add(512 * 1024),
         "peak grew with event count: small={small}, large={large}"

@@ -1,0 +1,87 @@
+{
+  "checks": [
+    {
+      "source": "6a7263f0f426b7411c68bf1b08d739abfd90959f",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 1,
+      "seconds": 27.92652893400009,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v1/check.log",
+      "bytes": 92119,
+      "sha256": "705894c817242c1c0795725e39c9280ec1d23be88b192232a88f8278cf9e55de",
+      "files": [
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi/src/detection_smart/iwork_tail.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-docx/tests/source_backed_glossary_story_text.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-iwa/src/bundle.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-iwa/src/charts/metadata_extractor.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-iwa/src/lib.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-iwa/src/package.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-iwa-detect/src/lib.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-keynote/src/package.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-keynote/src/presentation.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-keynote/tests/prepared_source.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-numbers/tests/prepared_source.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-odb/tests/advanced_transactions.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-odg/tests/package_semantics.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-odp/examples/../../../docs/unified-ops/results/0362ye/route_after.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-odp/tests/sequential_text_scaling.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-opc/src/lib.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-opc/src/source_backed/artifact_restore.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-opc/src/source_backed/splice.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-opc/src/source_backed.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-ops/src/format/iwork.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-pages/src/package.rs",
+        "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-pages/tests/body_table_appearance.rs"
+      ]
+    },
+    {
+      "base": "75fb774d28bc2b68274eb1abfb88fee71040c2f0",
+      "applied_diff_sha256": "b9983c88ecf30bdd2e0d113979625841c50e620ba65903c411970ebc27603faf",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 29.254170318999968,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v2/check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "formatted_files": [
+    "crates/litchi-docx/tests/source_backed_glossary_story_text.rs",
+    "crates/litchi-iwa-detect/src/lib.rs",
+    "crates/litchi-iwa/src/bundle.rs",
+    "crates/litchi-iwa/src/charts/metadata_extractor.rs",
+    "crates/litchi-iwa/src/lib.rs",
+    "crates/litchi-iwa/src/package.rs",
+    "crates/litchi-keynote/src/package.rs",
+    "crates/litchi-keynote/src/presentation.rs",
+    "crates/litchi-keynote/tests/prepared_source.rs",
+    "crates/litchi-numbers/tests/prepared_source.rs",
+    "crates/litchi-odb/tests/advanced_transactions.rs",
+    "crates/litchi-odg/tests/package_semantics.rs",
+    "crates/litchi-odp/tests/sequential_text_scaling.rs",
+    "crates/litchi-opc/src/lib.rs",
+    "crates/litchi-opc/src/source_backed.rs",
+    "crates/litchi-opc/src/source_backed/artifact_restore.rs",
+    "crates/litchi-opc/src/source_backed/splice.rs",
+    "crates/litchi-ops/src/format/iwork.rs",
+    "crates/litchi-pages/src/package.rs",
+    "crates/litchi-pages/tests/body_table_appearance.rs",
+    "crates/litchi/src/detection_smart/iwork_tail.rs",
+    "docs/unified-ops/results/0362ye/route_after.rs"
+  ],
+  "patch": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v2/applied.patch",
+    "bytes": 85461,
+    "sha256": "b9983c88ecf30bdd2e0d113979625841c50e620ba65903c411970ebc27603faf"
+  },
+  "note": "Workspace formatter applied to 22 files; follow-up check passes. Historical probe measurements remain tied to their recorded source commits."
+}

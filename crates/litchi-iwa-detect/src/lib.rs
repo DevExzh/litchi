@@ -698,10 +698,7 @@ impl PreparedSource {
     /// malformed, or exceeds a physical resource ceiling. An entry set with
     /// no recognized canonical application root returns `Ok(None)`.
     #[doc(hidden)]
-    pub fn from_frozen_entries(
-        value: FrozenEntryStore,
-        limits: Limits,
-    ) -> Result<Option<Self>> {
+    pub fn from_frozen_entries(value: FrozenEntryStore, limits: Limits) -> Result<Option<Self>> {
         let logical = LogicalSourceCatalog::from_frozen_entries(value, archive_limits(limits)?)
             .map_err(map_archive_error)?;
         let Some(format) = component_catalog(logical.components())? else {
@@ -2590,51 +2587,58 @@ mod tests {
             Some(Format::Pages)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Keynote,
-                &[
-                    "Index/MasterSlide-12.iwa",
-                    "Index/Slide-1.iwa",
-                    "Index/TemplateSlide-31.iwa",
-                    "Index/CalculationEngine-81.iwa"
-                ]
-            ), Limits::default())
+            bytes(
+                &document_package(
+                    Format::Keynote,
+                    &[
+                        "Index/MasterSlide-12.iwa",
+                        "Index/Slide-1.iwa",
+                        "Index/TemplateSlide-31.iwa",
+                        "Index/CalculationEngine-81.iwa"
+                    ]
+                ),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Keynote)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Numbers,
-                &["Index/CalculationEngine-174.iwa"]
-            ), Limits::default())
+            bytes(
+                &document_package(Format::Numbers, &["Index/CalculationEngine-174.iwa"]),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Numbers)
         );
         assert_eq!(
-            bytes(&document_package(
-                Format::Pages,
-                &["Index/CalculationEngine.iwa"]
-            ), Limits::default())
+            bytes(
+                &document_package(Format::Pages, &["Index/CalculationEngine.iwa"]),
+                Limits::default()
+            )
             .unwrap(),
             Some(Format::Pages)
         );
-        assert!(bytes(
-            &document_package(Format::Numbers, &["Index/Slide-1.iwa"]),
-            Limits::default()
-        )
-        .is_err());
         assert!(
-            bytes(&document_package(
-                Format::Pages,
-                &["Index/MasterSlide-12.iwa"]
-            ), Limits::default())
+            bytes(
+                &document_package(Format::Numbers, &["Index/Slide-1.iwa"]),
+                Limits::default()
+            )
             .is_err()
         );
-        assert!(bytes(
-            &package(&[("Index/Document.iwa", b"not iwa")]),
-            Limits::default()
-        )
-        .is_err());
+        assert!(
+            bytes(
+                &document_package(Format::Pages, &["Index/MasterSlide-12.iwa"]),
+                Limits::default()
+            )
+            .is_err()
+        );
+        assert!(
+            bytes(
+                &package(&[("Index/Document.iwa", b"not iwa")]),
+                Limits::default()
+            )
+            .is_err()
+        );
         assert_eq!(
             bytes(
                 &package(&[("Index/Unknown.iwa", b"iwa")]),
@@ -2644,11 +2648,7 @@ mod tests {
             None
         );
         assert_eq!(
-            bytes(
-                &package(&[("Data/image.png", b"iwa")]),
-                Limits::default()
-            )
-            .unwrap(),
+            bytes(&package(&[("Data/image.png", b"iwa")]), Limits::default()).unwrap(),
             None
         );
 
@@ -2868,16 +2868,17 @@ mod tests {
     fn frozen_logical_preparation_matches_packaged_classification() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
-                .unwrap()
-                .expect("recognized logical source");
+            let prepared =
+                PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
+                    .unwrap()
+                    .expect("recognized logical source");
             assert_eq!(prepared.format(), expected);
             assert!(prepared.__into_source_catalog().is_none());
 
             let component_prepared =
                 PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
-                .unwrap()
-                .expect("recognized logical source");
+                    .unwrap()
+                    .expect("recognized logical source");
             let (logical, retained_limits) = component_prepared.__into_components();
             let packaged = SourceCatalog::from_bytes(&bytes, Default::default()).unwrap();
             assert_eq!(retained_limits, archive_limits(Limits::default()).unwrap());
@@ -3553,10 +3554,7 @@ mod tests {
     fn checked_limits_preserve_defaults_and_bound_each_layer() {
         let valid = document_package(Format::Pages, &[]);
         let defaults = Limits::default();
-        assert_eq!(
-            bytes(&valid, defaults).unwrap(),
-            Some(Format::Pages)
-        );
+        assert_eq!(bytes(&valid, defaults).unwrap(), Some(Format::Pages));
         assert_eq!(defaults.max_input_bytes(), Limits::HARD_MAX_INPUT_BYTES);
         assert_eq!(defaults.max_files(), Limits::HARD_MAX_FILES);
         assert_eq!(defaults.max_entry_size(), Limits::HARD_MAX_ENTRY_SIZE);

@@ -1,18 +1,18 @@
 //! Authenticated exact restoration using an explicitly supplied original artifact.
 
+use super::PackURI;
 use super::splice::{
     check_inverse_state, fingerprint_inverse_snapshot, finish_inverse_publication,
 };
-use super::PackURI;
 use super::{
     ContextCheckedSink, Counted, OpcError, OutputBudgetedSink, Result,
     SOURCE_PUBLICATION_CHUNK_BYTES, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCheckedSink, SourceSnapshot, finish_source_publication, map_execution_error,
     map_io_error, overlay_unavailable, read_source_at_with_context,
 };
+use crate::SpliceResource;
 use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::pkgreader::PackageReader;
-use crate::SpliceResource;
 use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use sha2::{Digest as _, Sha256};
 use std::collections::{HashMap, HashSet};
@@ -171,10 +171,8 @@ fn build_admission_physical_lookup(
                 .map_err(map_execution_error)
         })
         .transpose()?;
-    let mut by_folded_name: HashMap<
-        String,
-        (soapberry_zip::office::EntryId, usize),
-    > = HashMap::new();
+    let mut by_folded_name: HashMap<String, (soapberry_zip::office::EntryId, usize)> =
+        HashMap::new();
     by_folded_name
         .try_reserve(archive.len())
         .map_err(|source| OpcError::Allocation {
@@ -190,10 +188,8 @@ fn build_admission_physical_lookup(
                 .map(|context| context.check().map_err(map_execution_error))
                 .transpose()?;
         }
-        let folded = super::folded_ascii_name(
-            name,
-            "source-backed OPC folded structural member name",
-        )?;
+        let folded =
+            super::folded_ascii_name(name, "source-backed OPC folded structural member name")?;
         if let Some((_, count)) = by_folded_name.get_mut(&folded) {
             *count = count
                 .checked_add(1)
@@ -754,11 +750,8 @@ impl<'a> ArtifactStreamTarget<'a> {
                 Some(policy),
             )),
             (Err(operation), Some(guard), Some(policy)) => {
-                let secondary = ArtifactStreamError::incomplete(
-                    self.written,
-                    operation,
-                    Some(policy),
-                );
+                let secondary =
+                    ArtifactStreamError::incomplete(self.written, operation, Some(policy));
                 Err(ArtifactStreamError::incomplete(
                     self.written,
                     ArtifactStreamError::producer(guard),
@@ -1102,10 +1095,8 @@ pub trait ArtifactStream {
 impl<'recipient> ArtifactStreamPolicy<'recipient> {
     fn for_recipient(package: &'recipient SourceBackedPackage) -> Result<Self> {
         let recipient_context = package.cache.context();
-        let recipient_output_reservation_failures = package
-            .source
-            .output_reservation_failures
-            .clone();
+        let recipient_output_reservation_failures =
+            package.source.output_reservation_failures.clone();
         if recipient_context.is_some() && recipient_output_reservation_failures.is_none() {
             return Err(overlay_unavailable(
                 "managed artifact stream output counter is unavailable",
@@ -1152,8 +1143,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
     }
 
     pub(crate) fn check_recipient(&self) -> Result<()> {
-        self.recipient_context
-            .map_or(Ok(()), |context| context.check().map_err(map_execution_error))
+        self.recipient_context.map_or(Ok(()), |context| {
+            context.check().map_err(map_execution_error)
+        })
     }
 
     /// Return the complete resource profile of the recipient package.
@@ -1252,7 +1244,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         let member_count = u64::try_from(view.archive.len())
             .map_err(|_| overlay_unavailable("recipient member count exceeds u64"))?;
-        limits.check(SourceLimitKind::Members, member_count, limits.max_members() as u64)?;
+        limits.check(
+            SourceLimitKind::Members,
+            member_count,
+            limits.max_members() as u64,
+        )?;
         let total_entries = u64::try_from(view.archive.preservation_entry_count())
             .map_err(|_| overlay_unavailable("recipient ZIP entry count exceeds u64"))?;
         limits.check(
@@ -1330,7 +1326,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
 
         let part_count = u64::try_from(view.catalog.parts.len())
             .map_err(|_| overlay_unavailable("recipient Part count exceeds u64"))?;
-        limits.check(SourceLimitKind::Parts, part_count, limits.max_parts() as u64)?;
+        limits.check(
+            SourceLimitKind::Parts,
+            part_count,
+            limits.max_parts() as u64,
+        )?;
         let mut total_part_bytes = 0_u64;
         for (index, part) in view.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
@@ -1365,7 +1365,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             .archive
             .entry_id(&view.catalog.content_types_member)
             .ok_or_else(|| OpcError::PartNotFound(view.catalog.content_types_member.clone()))?;
-        let content_types_bytes = view.archive.metadata_for(content_types_entry)?.uncompressed_size();
+        let content_types_bytes = view
+            .archive
+            .metadata_for(content_types_entry)?
+            .uncompressed_size();
         limits.check(
             SourceLimitKind::ContentTypesBytes,
             content_types_bytes,
@@ -1468,7 +1471,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 SourceLimitKind::RelationshipXmlBytes,
                 limits.max_relationship_xml_bytes() as u64,
                 limits,
-            )? else {
+            )?
+            else {
                 return Err(overlay_unavailable(
                     "source relationship XML is unavailable for recipient admission",
                 ));
@@ -1530,9 +1534,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits,
         )?;
         while let Some(owner) = work.pop() {
-            if let Some(relationships) = admitted_relationships_by_owner
-                .by_folded_name
-                .get(&owner)
+            if let Some(relationships) = admitted_relationships_by_owner.by_folded_name.get(&owner)
             {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
@@ -1663,8 +1665,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             return self.admit_source_catalog(package);
         }
         let limits = self.recipient_limits;
-        let physical_members =
-            build_admission_physical_lookup(&package.source, &package.archive)?;
+        let physical_members = build_admission_physical_lookup(&package.source, &package.archive)?;
         let folded_parts = build_admission_part_lookup(&package.source, &package.catalog)?;
         let effective = state.effective_data();
         let retained = state.retained();
@@ -1675,7 +1676,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
 
         let part_count = u64::try_from(effective.parts.len())
             .map_err(|_| overlay_unavailable("recipient effective Part count exceeds u64"))?;
-        limits.check(SourceLimitKind::Parts, part_count, limits.max_parts() as u64)?;
+        limits.check(
+            SourceLimitKind::Parts,
+            part_count,
+            limits.max_parts() as u64,
+        )?;
         limits.check(
             SourceLimitKind::TotalPartBytes,
             totals.parts,
@@ -1789,11 +1794,16 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
         }
         let member_count = retained_members
-            .checked_add(u64::try_from(generated_names.len()).map_err(|_| {
-                overlay_unavailable("generated member count exceeds u64")
-            })?)
+            .checked_add(
+                u64::try_from(generated_names.len())
+                    .map_err(|_| overlay_unavailable("generated member count exceeds u64"))?,
+            )
             .ok_or_else(|| overlay_unavailable("recipient member count overflows"))?;
-        limits.check(SourceLimitKind::Members, member_count, limits.max_members() as u64)?;
+        limits.check(
+            SourceLimitKind::Members,
+            member_count,
+            limits.max_members() as u64,
+        )?;
         let source_entry_count = u64::try_from(package.archive.preservation_entry_count())
             .map_err(|_| overlay_unavailable("source ZIP entry count exceeds u64"))?;
         let omitted_entry_count = u64::try_from(retained.omitted_members.len())
@@ -1887,12 +1897,22 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             content_types_bytes,
             limits.max_content_types_bytes() as u64,
         )?;
-        limits.check(SourceLimitKind::PartBytes, content_types_bytes, limits.max_part_bytes())?;
-        limits.check(SourceLimitKind::EntryBytes, content_types_bytes, limits.max_entry_bytes())?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            content_types_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::EntryBytes,
+            content_types_bytes,
+            limits.max_entry_bytes(),
+        )?;
         let mapping_count = effective
             .content_types
             .as_ref()
-            .map_or(package.catalog.content_types.mapping_count(), |map| map.mapping_count());
+            .map_or(package.catalog.content_types.mapping_count(), |map| {
+                map.mapping_count()
+            });
         limits.check(
             SourceLimitKind::ContentTypeMappings,
             mapping_count as u64,
@@ -1915,9 +1935,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 )?);
             }
         }
-        relationship_owners.insert(
-            PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?,
-        );
+        relationship_owners
+            .insert(PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?);
         for part in &effective.parts {
             relationship_owners.insert(part.partname(package).clone());
         }
@@ -1953,7 +1972,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     super::relationship_xml_event_count(xml, limits)?,
                     relationships,
                 )
-            } else if package.catalog.relationship_xml_metrics.contains_key(&owner) {
+            } else if package
+                .catalog
+                .relationship_xml_metrics
+                .contains_key(&owner)
+            {
                 let Some(xml) = read_structural_member(
                     &package.source,
                     &package.archive,
@@ -1962,7 +1985,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
                     limits,
-                )? else {
+                )?
+                else {
                     return Err(overlay_unavailable(
                         "source relationship XML is unavailable for effective topology",
                     ));
@@ -1981,7 +2005,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
                     limits,
-                )? else {
+                )?
+                else {
                     continue;
                 };
                 let relationships = parse_relationship_xml(&xml.bytes, &owner, limits)?;
@@ -2049,16 +2074,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         // graph bound.
         let mut graph = HashSet::new();
         let mut work = Vec::new();
-        enqueue_graph_targets(
-            package_relationships,
-            &mut graph,
-            &mut work,
-            limits,
-        )?;
+        enqueue_graph_targets(package_relationships, &mut graph, &mut work, limits)?;
         while let Some(owner) = work.pop() {
-            if let Some(relationships) = admitted_relationships_by_owner
-                .by_folded_name
-                .get(&owner)
+            if let Some(relationships) = admitted_relationships_by_owner.by_folded_name.get(&owner)
             {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
@@ -2081,8 +2099,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         package.source.ensure_current()?;
         package.cache.check_context().map_err(map_execution_error)?;
         let limits = self.recipient_limits;
-        let physical_members =
-            build_admission_physical_lookup(&package.source, &package.archive)?;
+        let physical_members = build_admission_physical_lookup(&package.source, &package.archive)?;
         let folded_parts = build_admission_part_lookup(&package.source, &package.catalog)?;
         let content_types_name = package.catalog.content_types_member.as_str();
         let is_omitted = |name: &str| {
@@ -2103,9 +2120,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .find(|member| member.name.eq_ignore_ascii_case(name))
                 .map(|member| member.payload.as_slice())
         };
-        let final_payload = |name: &str| {
-            changed_payload(name).or_else(|| appended_payload(name))
-        };
+        let final_payload = |name: &str| changed_payload(name).or_else(|| appended_payload(name));
         let mut appended_names = HashSet::new();
         appended_names
             .try_reserve(appended.len())
@@ -2163,7 +2178,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             )?;
             let metadata = package.archive.metadata_for(entry_id)?;
             let changed = changed_payload(name);
-            let bytes = changed.map_or(metadata.uncompressed_size(), |payload| payload.len() as u64);
+            let bytes =
+                changed.map_or(metadata.uncompressed_size(), |payload| payload.len() as u64);
             limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
             if changed.is_none() {
                 limits.check(
@@ -2194,7 +2210,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
             }
         }
-        limits.check(SourceLimitKind::Members, members, limits.max_members() as u64)?;
+        limits.check(
+            SourceLimitKind::Members,
+            members,
+            limits.max_members() as u64,
+        )?;
         let source_entry_count = u64::try_from(package.archive.preservation_entry_count())
             .map_err(|_| overlay_unavailable("source ZIP entry count exceeds u64"))?;
         let omitted_entry_count = u64::try_from(omitted_members.len())
@@ -2231,7 +2251,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
             let changed = changed_payload(member);
             let bytes = changed.map_or(
-                package.archive.metadata_for(part.entry_id)?.uncompressed_size(),
+                package
+                    .archive
+                    .metadata_for(part.entry_id)?
+                    .uncompressed_size(),
                 |payload| payload.len() as u64,
             );
             limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
@@ -2281,32 +2304,40 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             if let Some(payload) = final_payload(content_types_name) {
                 let parsed = super::ContentTypeMap::from_xml(payload, limits)?;
                 (payload.len() as u64, parsed.mapping_count() as u64)
-        } else {
-            let entry = package
-                .archive
-                .entry_id(content_types_name)
-                .ok_or_else(|| OpcError::PartNotFound(content_types_name.to_owned()))?;
-            let bytes = package.archive.metadata_for(entry)?.uncompressed_size();
-            if let Some(xml) = read_structural_member(
-                &package.source,
-                &package.archive,
-                &physical_members,
-                content_types_name,
-                SourceLimitKind::ContentTypesBytes,
-                limits.max_content_types_bytes() as u64,
-                limits,
-            )? {
-                admit_content_types_xml(&xml.bytes, limits)?;
-            }
-            (bytes, package.catalog.content_types.mapping_count() as u64)
-        };
+            } else {
+                let entry = package
+                    .archive
+                    .entry_id(content_types_name)
+                    .ok_or_else(|| OpcError::PartNotFound(content_types_name.to_owned()))?;
+                let bytes = package.archive.metadata_for(entry)?.uncompressed_size();
+                if let Some(xml) = read_structural_member(
+                    &package.source,
+                    &package.archive,
+                    &physical_members,
+                    content_types_name,
+                    SourceLimitKind::ContentTypesBytes,
+                    limits.max_content_types_bytes() as u64,
+                    limits,
+                )? {
+                    admit_content_types_xml(&xml.bytes, limits)?;
+                }
+                (bytes, package.catalog.content_types.mapping_count() as u64)
+            };
         limits.check(
             SourceLimitKind::ContentTypesBytes,
             content_types_bytes,
             limits.max_content_types_bytes() as u64,
         )?;
-        limits.check(SourceLimitKind::PartBytes, content_types_bytes, limits.max_part_bytes())?;
-        limits.check(SourceLimitKind::EntryBytes, content_types_bytes, limits.max_entry_bytes())?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            content_types_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::EntryBytes,
+            content_types_bytes,
+            limits.max_entry_bytes(),
+        )?;
         limits.check(
             SourceLimitKind::ContentTypeMappings,
             content_type_mapping_count,
@@ -2364,7 +2395,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
                     limits,
-                )? else {
+                )?
+                else {
                     return Err(overlay_unavailable(
                         "source relationship XML is unavailable for overlay admission",
                     ));
@@ -2400,8 +2432,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         let relationship_map_by_owner =
             folded_relationship_lookup(&package.source, &relationship_map)?;
 
-        let root_owner =
-            PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let root_owner = PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let root_key = super::folded_ascii_name(
             root_owner.as_str(),
             "source-backed OPC folded relationship graph owner",
@@ -2494,9 +2525,7 @@ fn enqueue_graph_targets(
 }
 
 pub(crate) enum ArtifactPolicySink<W> {
-    Budgeted(OutputBudgetedSink<
-        ContextCheckedSink<ContextCheckedSink<SourceCheckedSink<W>>>,
-    >),
+    Budgeted(OutputBudgetedSink<ContextCheckedSink<ContextCheckedSink<SourceCheckedSink<W>>>>),
     Cooperative(ContextCheckedSink<ContextCheckedSink<SourceCheckedSink<W>>>),
 }
 
@@ -2575,7 +2604,12 @@ pub(crate) fn write_exact_snapshot_with_policy<W: Write>(
     const STACK_BYTES: usize = 4 * 1024;
     let mut buffer = [0_u8; STACK_BYTES];
     let mut written = 0_u64;
-    let mut sink = policy_source_sink(policy, Counted::new(writer, &mut written), source, source.context.as_ref())?;
+    let mut sink = policy_source_sink(
+        policy,
+        Counted::new(writer, &mut written),
+        source,
+        source.context.as_ref(),
+    )?;
     let mut offset = 0_u64;
     let result = (|| {
         while offset < source.length {
@@ -2671,17 +2705,16 @@ struct BoundedProbeSink {
 
 impl BoundedProbeSink {
     fn new(limit: u64) -> Self {
-        Self {
-            accepted: 0,
-            limit,
-        }
+        Self { accepted: 0, limit }
     }
 }
 
 impl Write for BoundedProbeSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let remaining = self.limit.saturating_sub(self.accepted);
-        let accepted = bytes.len().min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        let accepted = bytes
+            .len()
+            .min(usize::try_from(remaining).unwrap_or(usize::MAX));
         if accepted == 0 {
             return Ok(0);
         }
@@ -2701,10 +2734,7 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
     name: &'static str,
     policy: &ArtifactStreamPolicy<'_>,
 ) -> std::result::Result<(), ArtifactStreamError<S::Error>> {
-    let policy_error = policy
-        .check_recipient()
-        .err()
-        .map(ArtifactStreamError::opc);
+    let policy_error = policy.check_recipient().err().map(ArtifactStreamError::opc);
     let initial_freshness = artifact
         .check_fresh()
         .err()
@@ -2712,11 +2742,9 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
     let initial_error = match (policy_error, initial_freshness) {
         (None, None) => None,
         (Some(error), None) | (None, Some(error)) => Some(error),
-        (Some(policy), Some(freshness)) => Some(ArtifactStreamError::incomplete(
-            0,
-            policy,
-            Some(freshness),
-        )),
+        (Some(policy), Some(freshness)) => {
+            Some(ArtifactStreamError::incomplete(0, policy, Some(freshness)))
+        },
     };
     if let Some(initial_error) = initial_error {
         let final_freshness = artifact
@@ -2745,9 +2773,11 @@ fn preflight_stream<S: ArtifactStream + ?Sized>(
     let result = match (result, policy_result) {
         (Ok(()), None) => Ok(()),
         (Err(error), None) | (Ok(()), Some(error)) => Err(error),
-        (Err(error), Some(policy_error)) => {
-            Err(ArtifactStreamError::incomplete(0, error, Some(policy_error)))
-        },
+        (Err(error), Some(policy_error)) => Err(ArtifactStreamError::incomplete(
+            0,
+            error,
+            Some(policy_error),
+        )),
     };
     let freshness = artifact
         .check_fresh()
@@ -2793,9 +2823,7 @@ where
     SCurrent: ArtifactStream + ?Sized,
     SOriginal: ArtifactStream<Error = SCurrent::Error> + ?Sized,
 {
-    let current_freshness = current
-        .check_fresh()
-        .map_err(ArtifactStreamError::producer);
+    let current_freshness = current.check_fresh().map_err(ArtifactStreamError::producer);
     let original_freshness = original
         .check_fresh()
         .map_err(ArtifactStreamError::producer);
@@ -2803,11 +2831,9 @@ where
         (Ok(()), Ok(())) => Ok(()),
         (Err(current), Ok(())) => Err(current),
         (Ok(()), Err(original)) => Err(original),
-        (Err(current), Err(original)) => Err(ArtifactStreamError::incomplete(
-            0,
-            current,
-            Some(original),
-        )),
+        (Err(current), Err(original)) => {
+            Err(ArtifactStreamError::incomplete(0, current, Some(original)))
+        },
     };
     if let Err(freshness) = freshness {
         return match (written != 0, result) {
@@ -2842,15 +2868,12 @@ impl SourceBackedPackage {
         let policy = if let Some(policy) = outer_policy {
             policy
         } else {
-            policy_owned = ArtifactStreamPolicy::for_recipient(self)
-                .map_err(ArtifactStreamError::opc)?;
+            policy_owned =
+                ArtifactStreamPolicy::for_recipient(self).map_err(ArtifactStreamError::opc)?;
             &policy_owned
         };
         let probe = policy.probe();
-        let policy_error = policy
-            .check_recipient()
-            .err()
-            .map(ArtifactStreamError::opc);
+        let policy_error = policy.check_recipient().err().map(ArtifactStreamError::opc);
         let initial_freshness = stream
             .check_fresh()
             .err()
@@ -2858,11 +2881,9 @@ impl SourceBackedPackage {
         let initial_error = match (policy_error, initial_freshness) {
             (None, None) => None,
             (Some(error), None) | (None, Some(error)) => Some(error),
-            (Some(policy), Some(freshness)) => Some(ArtifactStreamError::incomplete(
-                0,
-                policy,
-                Some(freshness),
-            )),
+            (Some(policy), Some(freshness)) => {
+                Some(ArtifactStreamError::incomplete(0, policy, Some(freshness)))
+            },
         };
         if let Some(initial_error) = initial_error {
             let final_freshness = stream
@@ -2891,21 +2912,17 @@ impl SourceBackedPackage {
         let result = match (result, policy_result) {
             (Ok(()), None) => Ok(()),
             (Err(error), None) | (Ok(()), Some(error)) => Err(error),
-            (Err(error), Some(policy_error)) => {
-                Err(ArtifactStreamError::incomplete(0, error, Some(policy_error)))
-            },
+            (Err(error), Some(policy_error)) => Err(ArtifactStreamError::incomplete(
+                0,
+                error,
+                Some(policy_error),
+            )),
         };
-        let freshness = stream
-            .check_fresh()
-            .map_err(ArtifactStreamError::producer);
+        let freshness = stream.check_fresh().map_err(ArtifactStreamError::producer);
         if let Err(freshness) = freshness {
             return match result {
                 Ok(()) => Err(freshness),
-                Err(error) => Err(ArtifactStreamError::incomplete(
-                    0,
-                    freshness,
-                    Some(error),
-                )),
+                Err(error) => Err(ArtifactStreamError::incomplete(0, freshness, Some(error))),
             };
         }
         if let Err(error) = result {
@@ -2960,15 +2977,17 @@ impl SourceBackedPackage {
         let policy = if let Some(policy) = outer_policy {
             policy
         } else {
-            policy_owned = ArtifactStreamPolicy::for_recipient(self)
-                .map_err(ArtifactStreamError::opc)?;
+            policy_owned =
+                ArtifactStreamPolicy::for_recipient(self).map_err(ArtifactStreamError::opc)?;
             &policy_owned
         };
         if max_output_bytes == 0 || max_output_bytes == u64::MAX {
-            return Err(ArtifactStreamError::opc(OpcError::InvalidSourcePartSpliceLimit {
-                resource: SpliceResource::OutputBytes,
-                value: max_output_bytes,
-            }));
+            return Err(ArtifactStreamError::opc(
+                OpcError::InvalidSourcePartSpliceLimit {
+                    resource: SpliceResource::OutputBytes,
+                    value: max_output_bytes,
+                },
+            ));
         }
         if proof.original_len > max_output_bytes {
             return Err(ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
@@ -2997,11 +3016,7 @@ impl SourceBackedPackage {
             (Err(current), Ok(())) => return Err(current),
             (Ok(()), Err(original)) => return Err(original),
             (Err(current), Err(original)) => {
-                return Err(ArtifactStreamError::incomplete(
-                    0,
-                    current,
-                    Some(original),
-                ));
+                return Err(ArtifactStreamError::incomplete(0, current, Some(original)));
             },
         }
 
@@ -3051,9 +3066,11 @@ impl SourceBackedPackage {
         let result = match (result, policy_result) {
             (Ok(()), None) => Ok(()),
             (Err(error), None) | (Ok(()), Some(error)) => Err(error),
-            (Err(error), Some(policy_error)) => {
-                Err(ArtifactStreamError::incomplete(written, error, Some(policy_error)))
-            },
+            (Err(error), Some(policy_error)) => Err(ArtifactStreamError::incomplete(
+                written,
+                error,
+                Some(policy_error),
+            )),
         };
         finish_streamed_publication(result, current, original, written)
     }
@@ -3288,8 +3305,8 @@ mod tests {
         reason = "focused policy tests deliberately panic on fixture errors"
     )]
 
-    use super::*;
     use super::super::{PolicyAppendedEntry, SourceCacheLimits};
+    use super::*;
     use soapberry_zip::office::StreamingArchiveWriter;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
@@ -3302,7 +3319,9 @@ mod tests {
         const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
         const DOCUMENT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
         let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .unwrap();
         writer
             .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
             .unwrap();
@@ -3332,7 +3351,9 @@ mod tests {
         const DOCUMENT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
         const ORPHAN_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
         let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .unwrap();
         writer
             .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
             .unwrap();
@@ -3379,7 +3400,9 @@ mod tests {
         const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
         const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
         let mut writer = StreamingArchiveWriter::new();
-        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("[Content_Types].xml", CONTENT_TYPES)
+            .unwrap();
         writer
             .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
             .unwrap();
@@ -3469,7 +3492,7 @@ mod tests {
             "original",
             &policy,
         )
-            .expect_err("the bounded probe must reject a fourth byte");
+        .expect_err("the bounded probe must reject a fourth byte");
         assert!(matches!(
             error,
             ArtifactStreamError::Opc(OpcError::SourceArtifactMismatch {
@@ -3497,7 +3520,7 @@ mod tests {
             "original",
             &policy,
         )
-            .expect("matching length and digest should pass");
+        .expect("matching length and digest should pass");
         let error = preflight_stream(
             &stream,
             stream.len(),
@@ -3505,7 +3528,7 @@ mod tests {
             "original",
             &policy,
         )
-            .expect_err("a changed digest must be rejected");
+        .expect_err("a changed digest must be rejected");
         assert!(matches!(
             error,
             ArtifactStreamError::Opc(OpcError::SourceArtifactMismatch {
@@ -3563,7 +3586,13 @@ mod tests {
             .catalog
             .parts
             .iter()
-            .map(|part| package.archive.metadata_for(part.entry_id).unwrap().uncompressed_size())
+            .map(|part| {
+                package
+                    .archive
+                    .metadata_for(part.entry_id)
+                    .unwrap()
+                    .uncompressed_size()
+            })
             .sum::<u64>();
         let exact = SourceLimits::builder()
             .max_parts(package.catalog.parts.len() + 1)
@@ -3572,9 +3601,11 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(exact)
-            .admit_changed_overlays(&package, &[], &[], &[appended])
-            .is_ok());
+        assert!(
+            test_policy(exact)
+                .admit_changed_overlays(&package, &[], &[], &[appended])
+                .is_ok()
+        );
 
         let one_under = SourceLimits::builder()
             .max_parts(package.catalog.parts.len())
@@ -3583,14 +3614,16 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(one_under)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &[],
-                &[appended_member("custom/new.bin", b"new-part")],
-            )
-            .is_err());
+        assert!(
+            test_policy(one_under)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &[],
+                    &[appended_member("custom/new.bin", b"new-part")],
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -3602,28 +3635,32 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(exact)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["[Content_Types].xml".to_owned()],
-                &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
-            )
-            .is_ok());
+        assert!(
+            test_policy(exact)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["[Content_Types].xml".to_owned()],
+                    &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
+                )
+                .is_ok()
+        );
 
         let one_under = SourceLimits::builder()
             .max_content_types_bytes(CONTENT_TYPES.len() - 1)
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(one_under)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["[Content_Types].xml".to_owned()],
-                &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
-            )
-            .is_err());
+        assert!(
+            test_policy(one_under)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["[Content_Types].xml".to_owned()],
+                    &[appended_member("[Content_Types].xml", CONTENT_TYPES)],
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -3635,28 +3672,32 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(exact)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["_rels/.rels".to_owned()],
-                &[appended_member("_rels/.rels", RELATIONSHIPS)],
-            )
-            .is_ok());
+        assert!(
+            test_policy(exact)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["_rels/.rels".to_owned()],
+                    &[appended_member("_rels/.rels", RELATIONSHIPS)],
+                )
+                .is_ok()
+        );
 
         let one_under = SourceLimits::builder()
             .max_total_relationship_xml_bytes(RELATIONSHIPS.len() - 1)
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(one_under)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["_rels/.rels".to_owned()],
-                &[appended_member("_rels/.rels", RELATIONSHIPS)],
-            )
-            .is_err());
+        assert!(
+            test_policy(one_under)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["_rels/.rels".to_owned()],
+                    &[appended_member("_rels/.rels", RELATIONSHIPS)],
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -3668,28 +3709,32 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(exact)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["_rels/.rels".to_owned()],
-                &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
-            )
-            .is_ok());
+        assert!(
+            test_policy(exact)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["_rels/.rels".to_owned()],
+                    &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
+                )
+                .is_ok()
+        );
 
         let one_under = SourceLimits::builder()
             .max_relationship_graph_nodes(1)
             .unwrap()
             .build()
             .unwrap();
-        assert!(test_policy(one_under)
-            .admit_changed_overlays(
-                &package,
-                &[],
-                &["_rels/.rels".to_owned()],
-                &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
-            )
-            .is_err());
+        assert!(
+            test_policy(one_under)
+                .admit_changed_overlays(
+                    &package,
+                    &[],
+                    &["_rels/.rels".to_owned()],
+                    &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
+                )
+                .is_err()
+        );
     }
 
     #[test]

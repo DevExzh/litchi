@@ -3009,11 +3009,8 @@ impl PolicyAppendedEntry {
         compression: soapberry_zip::CompressionMethod,
     ) -> Self {
         let name = name.into();
-        let entry = soapberry_zip::RegeneratedEntry::new_shared(
-            name.clone(),
-            Arc::clone(&payload),
-        )
-        .compression_method(compression);
+        let entry = soapberry_zip::RegeneratedEntry::new_shared(name.clone(), Arc::clone(&payload))
+            .compression_method(compression);
         Self {
             entry: Arc::new(entry),
             name,
@@ -3021,10 +3018,7 @@ impl PolicyAppendedEntry {
         }
     }
 
-    fn new_precompressed(
-        name: impl Into<String>,
-        payload: &AuthorizedPrecompressedPart,
-    ) -> Self {
+    fn new_precompressed(name: impl Into<String>, payload: &AuthorizedPrecompressedPart) -> Self {
         let name = name.into();
         let entry = soapberry_zip::RegeneratedEntry::new_precompressed_shared(
             name.clone(),
@@ -11229,7 +11223,9 @@ impl SourceBackedPackage {
                 additions
                     .len()
                     .checked_add(new_relationship_member_count)
-                    .ok_or_else(|| overlay_unavailable("topology policy append count overflows usize"))?,
+                    .ok_or_else(|| {
+                        overlay_unavailable("topology policy append count overflows usize")
+                    })?,
             )
             .map_err(|source| OpcError::Allocation {
                 resource: "source-backed OPC topology policy appended members",
@@ -11333,10 +11329,7 @@ impl SourceBackedPackage {
                             payload.expected_decoded(),
                         )?;
                     }
-                    PolicyAppendedEntry::new_precompressed(
-                        addition.partname.membername(),
-                        payload,
-                    )
+                    PolicyAppendedEntry::new_precompressed(addition.partname.membername(), payload)
                 },
             };
             appended.push(Arc::clone(&policy_entry.entry));
@@ -11375,10 +11368,7 @@ impl SourceBackedPackage {
                 appended.capacity(),
                 size_of::<Arc<soapberry_zip::RegeneratedEntry>>(),
             ),
-            (
-                policy_appended.capacity(),
-                size_of::<PolicyAppendedEntry>(),
-            ),
+            (policy_appended.capacity(), size_of::<PolicyAppendedEntry>()),
             (
                 transfer_sources
                     .as_ref()
@@ -11566,7 +11556,14 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
     ) -> Result<()> {
-        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new, None, None)
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            None,
+            None,
+        )
     }
 
     /// Policy-aware counterpart for a deferred artifact producer.
@@ -11701,7 +11698,9 @@ impl SourceBackedPackage {
             // managed oversized-cache bypass releases its reservation.
             drop(original);
             return match (accounting, policy) {
-                (Some(accounting), None) => self.write_exact_source_with_accounting(writer, accounting),
+                (Some(accounting), None) => {
+                    self.write_exact_source_with_accounting(writer, accounting)
+                },
                 (None, Some(policy)) => self.write_exact_source_with_policy(writer, policy),
                 (None, None) => self.write_exact_source(writer),
                 (Some(_), Some(_)) => Err(overlay_unavailable(
@@ -11739,12 +11738,9 @@ impl SourceBackedPackage {
                 &[],
                 accounting,
             ),
-            (None, Some(policy)) => self.write_changed_overlays_with_appended_with_policy(
-                writer,
-                &changed,
-                &[],
-                policy,
-            ),
+            (None, Some(policy)) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
             (None, None) => self.write_changed_overlays(writer, &changed),
             (Some(_), Some(_)) => Err(overlay_unavailable(
                 "accounting and artifact stream policy cannot be combined",
@@ -11785,7 +11781,9 @@ impl SourceBackedPackage {
 
     /// Policy-aware single-Part publication with external relationship
     /// removals.
-    pub fn write_part_overlay_with_external_relationship_removals_to_stream_with_policy<W: Write>(
+    pub fn write_part_overlay_with_external_relationship_removals_to_stream_with_policy<
+        W: Write,
+    >(
         self,
         writer: W,
         partname: &PackURI,
@@ -11818,9 +11816,12 @@ impl SourceBackedPackage {
         }
         if removed_relationship_ids.is_empty() {
             return match policy {
-                Some(policy) => {
-                    self.write_part_overlay_to_stream_with_policy(writer, partname, replacement, policy)
-                }
+                Some(policy) => self.write_part_overlay_to_stream_with_policy(
+                    writer,
+                    partname,
+                    replacement,
+                    policy,
+                ),
                 None => self.write_part_overlay_to_stream(writer, partname, replacement),
             };
         }
@@ -11910,12 +11911,9 @@ impl SourceBackedPackage {
             },
         ];
         match policy {
-            Some(policy) => self.write_changed_overlays_with_appended_with_policy(
-                writer,
-                &changed,
-                &[],
-                policy,
-            ),
+            Some(policy) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
             None => self.write_changed_overlays(writer, &changed),
         }
     }
@@ -12187,12 +12185,9 @@ impl SourceBackedPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         match policy {
-            Some(policy) => self.write_changed_overlays_with_appended_with_policy(
-                writer,
-                &changed,
-                &[],
-                policy,
-            ),
+            Some(policy) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
             None => self.write_changed_overlays(writer, &changed),
         }
     }
@@ -12233,13 +12228,7 @@ impl SourceBackedPackage {
         replacements: Vec<(PackURI, Vec<u8>)>,
         policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(
-            writer,
-            replacements,
-            Vec::new(),
-            Arc::new,
-            Some(policy),
-        )
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new, Some(policy))
     }
 
     /// Replace a bounded set of existing ordinary Parts with caller-owned
@@ -12324,13 +12313,7 @@ impl SourceBackedPackage {
         deletions: Vec<PackURI>,
         policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(
-            writer,
-            replacements,
-            deletions,
-            Arc::new,
-            Some(policy),
-        )
+        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new, Some(policy))
     }
 
     /// Shared-payload counterpart to
@@ -12536,11 +12519,9 @@ impl SourceBackedPackage {
                 &[],
                 policy,
             ),
-            None => self.write_changed_overlays_with_omissions(
-                writer,
-                &replacements,
-                &omitted_members,
-            ),
+            None => {
+                self.write_changed_overlays_with_omissions(writer, &replacements, &omitted_members)
+            },
         }
     }
 
@@ -13063,16 +13044,8 @@ impl SourceBackedPackage {
                 member_name_bytes,
                 limits.max_archive_member_name_bytes(),
             )?;
-            limits.check(
-                SourceLimitKind::PartBytes,
-                bytes,
-                limits.max_part_bytes(),
-            )?;
-            limits.check(
-                SourceLimitKind::EntryBytes,
-                bytes,
-                limits.max_entry_bytes(),
-            )?;
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
             if let Some(compressed_bytes) = compressed_bytes {
                 limits.check(
                     SourceLimitKind::ArchiveCompressedBytes,
@@ -13095,21 +13068,13 @@ impl SourceBackedPackage {
         }
         if let Some(summary) = content_types_replacement {
             let bytes = summary.bytes;
-            limits.check(
-                SourceLimitKind::PartBytes,
-                bytes,
-                limits.max_part_bytes(),
-            )?;
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
             limits.check(
                 SourceLimitKind::ContentTypesBytes,
                 bytes,
                 limits.max_content_types_bytes() as u64,
             )?;
-            limits.check(
-                SourceLimitKind::EntryBytes,
-                bytes,
-                limits.max_entry_bytes(),
-            )?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
             let entry = self
                 .archive
                 .entry_id(&self.catalog.content_types_member)
@@ -13149,11 +13114,7 @@ impl SourceBackedPackage {
                 bytes,
                 limits.max_relationship_xml_bytes() as u64,
             )?;
-            limits.check(
-                SourceLimitKind::EntryBytes,
-                bytes,
-                limits.max_entry_bytes(),
-            )?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
             if let Some(entry) = publication.existing_entry() {
                 let original = self.archive.metadata_for(entry)?.uncompressed_size();
                 archive_total = adjusted_overlay_total(
@@ -14273,16 +14234,13 @@ impl SourceBackedPackage {
                         .map_err(map_preservation_admission_error)
                         .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
                     None => index
-                        .write_to_with_admission(
-                            &plan,
-                            Chunked { inner: policy_sink },
-                            |profile| policy.admit_preservation_profile(profile),
-                        )
+                        .write_to_with_admission(&plan, Chunked { inner: policy_sink }, |profile| {
+                            policy.admit_preservation_profile(profile)
+                        })
                         .map_err(map_preservation_admission_error)
                         .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
                 }
             }
-
         } else if let Some(context) = self.cache.context() {
             let Some(output_reservation_failures) =
                 self.source.output_reservation_failures.as_ref()
@@ -16049,9 +16007,7 @@ fn map_preservation_admission_error(
     error: soapberry_zip::PreservationAdmissionError<OpcError>,
 ) -> OpcError {
     match error {
-        soapberry_zip::PreservationAdmissionError::Archive(error) => {
-            map_preservation_error(error)
-        },
+        soapberry_zip::PreservationAdmissionError::Archive(error) => map_preservation_error(error),
         soapberry_zip::PreservationAdmissionError::Admission(error) => error,
     }
 }

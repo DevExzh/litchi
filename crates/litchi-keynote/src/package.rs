@@ -5149,7 +5149,11 @@ mod tests {
     fn prepared_source_skips_redundant_keynote_classification()
     -> Result<(), Box<dyn std::error::Error>> {
         let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
-        let Some(prepared) = PreparedSource::from_shared_bytes(Arc::clone(&source), litchi_iwa_detect::Limits::default())? else {
+        let Some(prepared) = PreparedSource::from_shared_bytes(
+            Arc::clone(&source),
+            litchi_iwa_detect::Limits::default(),
+        )?
+        else {
             panic!("the native fixture must be recognized as Keynote");
         };
 

@@ -589,7 +589,10 @@ impl<'package> SourcePartSplicePlan<'package> {
                 Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
                 Err(error) => return Err(error),
             };
-            (publication.candidate_artifact_len, publication.candidate_artifact)
+            (
+                publication.candidate_artifact_len,
+                publication.candidate_artifact,
+            )
         };
         if preview_len != expected_len {
             return Err(OpcError::SourceArtifactMismatch {
@@ -690,7 +693,8 @@ impl<'package> SourcePartSplicePlan<'package> {
             )?;
             let mut hashing = HashingSink::new(writer);
             if let Some(policy) = policy {
-                self.source_artifact.write_to_with_policy(&mut hashing, policy)?;
+                self.source_artifact
+                    .write_to_with_policy(&mut hashing, policy)?;
             } else if charge_output {
                 match accounting.as_deref_mut() {
                     Some(report) => self
@@ -774,11 +778,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         )
         .map_err(map_preservation_error)?;
         if let Some(policy) = policy {
-            policy.admit_splice_candidate(
-                &self.package,
-                self.target,
-                self.proof.candidate_len,
-            )?;
+            policy.admit_splice_candidate(&self.package, self.target, self.proof.candidate_len)?;
         }
 
         let source_snapshot = self.package.source.clone();

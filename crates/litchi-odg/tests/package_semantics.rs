@@ -658,10 +658,7 @@ fn durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources() {
     );
 
     let stale = Package::from_bytes(&package(&CONTENT.replace("Photo", "Changed"))).unwrap();
-    assert!(matches!(
-        reopened.apply(&stale),
-        Err(Error::PatchConflict)
-    ));
+    assert!(matches!(reopened.apply(&stale), Err(Error::PatchConflict)));
 }
 
 #[test]

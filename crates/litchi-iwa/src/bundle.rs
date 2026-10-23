@@ -1598,8 +1598,8 @@ mod tests {
             return;
         }
 
-        let bundle = Bundle::open(bundle_path, BundleLimits::default())
-            .expect("Failed to open test.pages");
+        let bundle =
+            Bundle::open(bundle_path, BundleLimits::default()).expect("Failed to open test.pages");
 
         // Verify bundle has expected structure
         assert!(

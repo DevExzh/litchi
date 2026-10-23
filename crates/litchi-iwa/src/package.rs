@@ -10,8 +10,8 @@ use crate::archive::{Archive, Limits as IwaArchiveLimits};
 use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
-use litchi_core::edit::{Commit as SharedCommit, Diagnostics};
 use litchi_core::ReadAt;
+use litchi_core::edit::{Commit as SharedCommit, Diagnostics};
 use litchi_iwa_archive::package::{
     GetOrInsertError, PackageEntry, PackageEntryStoreError, PackageState, ParseError, Patch,
     is_legacy_operation_storage,
@@ -1193,11 +1193,7 @@ impl Edit {
     }
 
     /// Serialize and replace a staged parsed `.iwa` package member.
-    pub fn replace_archive(
-        &mut self,
-        name: &str,
-        archive: &Archive,
-    ) -> Result<Option<Vec<u8>>> {
+    pub fn replace_archive(&mut self, name: &str, archive: &Archive) -> Result<Option<Vec<u8>>> {
         self.candidate.replace_archive(name, archive)
     }
 
@@ -1691,8 +1687,7 @@ mod tests {
             .is_err()
         );
         assert!(
-            PackageLimits::from_values(PackageLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1,)
-                .is_err()
+            PackageLimits::from_values(PackageLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1,).is_err()
         );
         assert!(
             PackageLimits::from_values(
@@ -2263,7 +2258,10 @@ mod tests {
         let commit = edit.commit()?;
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_empty());
-        assert_eq!(commit.package().entry("Data/asset"), source.entry("Data/asset"));
+        assert_eq!(
+            commit.package().entry("Data/asset"),
+            source.entry("Data/asset")
+        );
         assert_eq!(source.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
         Ok(())
     }
@@ -2278,7 +2276,10 @@ mod tests {
         let source = package.clone();
 
         let mut edit = source.edit();
-        edit.candidate_mut().entry_mut("Data/asset").unwrap().push(5);
+        edit.candidate_mut()
+            .entry_mut("Data/asset")
+            .unwrap()
+            .push(5);
         let error = edit.commit();
 
         assert!(error.unwrap_err().to_string().contains("member"));
@@ -2327,11 +2328,7 @@ mod tests {
             Some("Index/CalculationEngine-174.iwa")
         );
         assert_eq!(
-            package
-                .archive("Index/Document.iwa")
-                .unwrap()
-                .objects
-                .len(),
+            package.archive("Index/Document.iwa").unwrap().objects.len(),
             1
         );
     }

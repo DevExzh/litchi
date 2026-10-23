@@ -176,10 +176,10 @@ pub use litchi_core::edit::Diagnostics;
 pub use litchi_iwa_archive::LimitKind;
 pub use litchi_iwa_archive::package::Patch;
 pub use media::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaManager, MediaStats};
-pub use package::{Commit, Edit, Package};
 /// The host package under its crate-internal name, distinct from the leaf
 /// crates' `Package` types that host modules import alongside it.
 pub(crate) use package::Package as HostPackage;
+pub use package::{Commit, Edit, Package};
 pub use shapes::DrawableTitleCaption;
 pub use text::{
     Format, Fragment, Run, Storage, TextDecorations, TextPointSize, TextStrikethrough, TextStyle,
