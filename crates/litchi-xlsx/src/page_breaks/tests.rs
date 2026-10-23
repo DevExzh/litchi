@@ -261,7 +261,11 @@ fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
 
     let mut probe = source.edit_page_breaks("Sheet1").unwrap();
     probe.set_horizontal(collection.clone()).unwrap();
-    let required = probe.commit().unwrap().patch().retained_bytes();
+    let (after, patch) = probe.commit().unwrap().into_parts();
+    let required = source
+        .retained_bytes()
+        .saturating_add(after.retained_bytes())
+        .saturating_add(patch.retained_bytes());
     assert!(required > 0);
 
     let mut rejected = source
@@ -284,5 +288,11 @@ fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
         .unwrap();
     exact.set_horizontal(collection).unwrap();
     let commit = exact.commit().unwrap();
-    assert_eq!(commit.patch().retained_bytes(), required);
+    assert_eq!(
+        source
+            .retained_bytes()
+            .saturating_add(commit.package().retained_bytes())
+            .saturating_add(commit.patch().retained_bytes()),
+        required
+    );
 }

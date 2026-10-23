@@ -234,6 +234,20 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         if !self.changed() {
             let patch = Patch(super::Patch::new(self.before.clone(), self.before));
+            if let Some(maximum) = self.max_retained_bytes {
+                let endpoint_bytes = self.target.retained_bytes();
+                let observed = endpoint_bytes
+                    .saturating_add(endpoint_bytes)
+                    .saturating_add(patch.retained_bytes());
+                if observed > maximum {
+                    return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::Memory,
+                        observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                        scope: "XLSX page-break retained package".into(),
+                    }));
+                }
+            }
             return Ok(Commit::new(
                 self.target.into_package(),
                 patch,
@@ -249,22 +263,12 @@ impl Edit {
             });
         }
         let output = super::replace(self.before.source_xml(), &self.staged)?;
-        if let Some(maximum) = self.max_retained_bytes {
-            let observed = self
-                .before
-                .source_arc()
-                .map(|before| before.capacity())
-                .unwrap_or(0)
-                .saturating_add(output.capacity());
-            if observed > maximum {
-                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
-                    resource: litchi_core::Resource::Memory,
-                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
-                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                    scope: "XLSX page-break retained patch".into(),
-                }));
-            }
-        }
+        let estimated_patch_bytes = self
+            .before
+            .source_arc()
+            .map(|before| before.capacity())
+            .unwrap_or(0)
+            .saturating_add(output.capacity());
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
             .get_part_mut(self.before.worksheet_part_name())?
@@ -275,8 +279,41 @@ impl Edit {
                 "page-break publication changed the staged semantic state",
             ));
         }
-        let patch = Patch(super::Patch::new(self.before, snapshot));
         let package = self.target.publish(candidate)?;
+        let endpoint_charge = self
+            .max_retained_bytes
+            .map(|_| (self.target.retained_bytes(), package.retained_bytes()));
+        if let Some(maximum) = self.max_retained_bytes {
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
+                .saturating_add(estimated_patch_bytes);
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX page-break retained package".into(),
+                }));
+            }
+        }
+        let patch = Patch(super::Patch::new(self.before, snapshot));
+        if let Some(maximum) = self.max_retained_bytes {
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
+                .saturating_add(patch.retained_bytes());
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX page-break retained package".into(),
+                }));
+            }
+        }
         Ok(Commit::new(package, patch, Diagnostics::new(true)))
     }
 }

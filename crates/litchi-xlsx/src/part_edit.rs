@@ -307,6 +307,15 @@ pub(crate) struct PartPatch {
     exact_content_types: bool,
 }
 
+/// Metadata-only admission for one part patch.  Whole-graph callers retain
+/// the changed names so capture can materialize only those deltas after the
+/// census, rather than walking every part a second time.
+#[derive(Debug, Default)]
+struct RetainedEstimate {
+    bytes: usize,
+    changed_names: BTreeSet<String>,
+}
+
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
         self.deltas.is_empty() && self.root.is_none() && self.content_types.is_none()
@@ -330,12 +339,17 @@ impl PartPatch {
     /// allocator overhead and parser/cache state; callers charge package
     /// endpoints separately when they retain them alongside this patch.
     pub(crate) fn retained_bytes(&self) -> usize {
+        // These fields are canonical strings copied with `str::to_owned` by
+        // `State::read`; charge their logical bytes so the metadata-only
+        // estimator below has the same definition without rebuilding them.
+        // Blob and exact relationship-member images retain their Vec
+        // capacities because those buffers are the native patch payload.
         fn relationship_bytes(relationship: &Relationship) -> usize {
             relationship
                 .id
-                .capacity()
-                .saturating_add(relationship.kind.capacity())
-                .saturating_add(relationship.target.capacity())
+                .len()
+                .saturating_add(relationship.kind.len())
+                .saturating_add(relationship.target.len())
         }
 
         fn image_bytes(image: &RelationshipImage) -> usize {
@@ -345,7 +359,7 @@ impl PartPatch {
         fn state_bytes(state: &State) -> usize {
             state
                 .content_type
-                .capacity()
+                .len()
                 .saturating_add(state.blob.capacity())
                 .saturating_add(
                     state
@@ -394,7 +408,7 @@ impl PartPatch {
         after: &OpcPackage,
         names: &BTreeSet<String>,
         all: bool,
-    ) -> Result<usize> {
+    ) -> Result<RetainedEstimate> {
         fn relationship_bytes(relationship: &litchi_opc::Relationship) -> usize {
             relationship
                 .r_id()
@@ -405,7 +419,7 @@ impl PartPatch {
 
         fn relationship_image_bytes(package: &OpcPackage, owner: &PackURI) -> Result<usize> {
             if let Some((bytes, _)) = package.retained_relationships_xml(owner)? {
-                return Ok(bytes.len());
+                return Ok(bytes.capacity());
             }
             // The OPC relationship planner exposes the exact canonical member
             // length without materializing the XML. This keeps admission
@@ -437,6 +451,7 @@ impl PartPatch {
         }
 
         let mut observed = 0usize;
+        let mut changed_names = BTreeSet::new();
         let mut add_delta = |name: &PackURI,
                              before_part: Option<&dyn Part>,
                              after_part: Option<&dyn Part>|
@@ -449,6 +464,7 @@ impl PartPatch {
                 _ => true,
             };
             if changed {
+                changed_names.insert(name.as_str().to_owned());
                 observed = observed
                     .saturating_add(name.as_str().len())
                     .saturating_add(
@@ -519,16 +535,19 @@ impl PartPatch {
 
         if !before.same_retained_content_types(after)? {
             let before_bytes = before
-                .content_types_source_bytes()
+                .retained_content_types_xml()?
                 .map_or(0, |bytes| bytes.capacity());
             let after_bytes = after
-                .content_types_source_bytes()
+                .retained_content_types_xml()?
                 .map_or(0, |bytes| bytes.capacity());
             observed = observed
                 .saturating_add(before_bytes)
                 .saturating_add(after_bytes);
         }
-        Ok(observed)
+        Ok(RetainedEstimate {
+            bytes: observed,
+            changed_names,
+        })
     }
 
     pub(crate) fn inverse(&self) -> Self {
@@ -967,32 +986,67 @@ impl Staged {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
-        if let Some(maximum) = self.max_retained_bytes {
-            let observed = PartPatch::estimate_retained_bytes(
-                self.source.opc(),
-                &staged,
-                &self.touched,
-                self.all,
-            )?;
+        let source = self.source;
+        let mut endpoint_charge = None;
+        let mut estimated_names = None;
+        let target = if let Some(maximum) = self.max_retained_bytes {
+            let estimate =
+                PartPatch::estimate_retained_bytes(source.opc(), &staged, &self.touched, self.all)?;
+            // Build the exact target owner once, before patch capture, so the
+            // admission charge covers the real source and target endpoints
+            // rather than assuming the edit preserves package size.
+            let target = source.derive(staged.clone())?;
+            let source_bytes = source.retained_bytes();
+            let target_bytes = target.retained_bytes();
+            let observed = source_bytes
+                .saturating_add(target_bytes)
+                .saturating_add(estimate.bytes);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
                     resource: litchi_core::Resource::Memory,
                     observed: u64::try_from(observed).unwrap_or(u64::MAX),
                     limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                    scope: "XLSX part edit retained patch".into(),
+                    scope: "XLSX part edit retained package".into(),
+                }));
+            }
+            endpoint_charge = Some((source_bytes, target_bytes));
+            if self.all {
+                estimated_names = Some(estimate.changed_names);
+            }
+            Some(target)
+        } else {
+            None
+        };
+        let patch = if let Some(names) = estimated_names {
+            PartPatch::capture(source.opc(), &staged, &names)?
+        } else if self.all {
+            PartPatch::capture_all(source.opc(), &staged)?
+        } else {
+            PartPatch::capture(source.opc(), &staged, &self.touched)?
+        };
+        if patch.is_noop() {
+            return Ok((source, patch));
+        }
+        crate::signature_policy::ensure_unsigned(&staged)?;
+        let package = match target {
+            Some(target) => target,
+            None => source.derive(staged)?,
+        };
+        if let Some(maximum) = self.max_retained_bytes {
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
+                .saturating_add(patch.retained_bytes());
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX part edit retained package".into(),
                 }));
             }
         }
-        let patch = if self.all {
-            PartPatch::capture_all(self.source.opc(), &staged)?
-        } else {
-            PartPatch::capture(self.source.opc(), &staged, &self.touched)?
-        };
-        if patch.is_noop() {
-            return Ok((self.source, patch));
-        }
-        crate::signature_policy::ensure_unsigned(&staged)?;
-        let package = self.source.derive(staged)?;
         Ok((package, patch))
     }
 }

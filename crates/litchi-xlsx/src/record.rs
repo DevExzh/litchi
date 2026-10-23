@@ -37,6 +37,12 @@ impl Source {
         self.package
     }
 
+    /// Conservative retained-data charge for the source endpoint kept by a
+    /// record-family edit.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.package.retained_bytes()
+    }
+
     /// Validate `staged` as a complete workbook and publish it as a new
     /// package under the source's policies.
     /// A changed graph of a signed package is refused with

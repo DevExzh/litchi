@@ -16,6 +16,7 @@
 //!   part.
 
 use std::borrow::Cow;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::selector::{Path, Predicate, Step};
@@ -35,11 +36,89 @@ use crate::placement::Placement;
 use crate::props::Props;
 use crate::registry::{Access, Alias, Constraint, Entry, Operation, Table};
 use crate::target::TargetArg;
-use crate::transaction::SemanticLimits;
+use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::{Scalar, ValueType};
 
 fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Xlsx)
+}
+
+fn staged_limit(observed: usize, maximum: usize) -> Error {
+    Error::from(TransactionError::Limit {
+        kind: LimitKind::StagedBytes,
+        observed,
+        maximum,
+    })
+    .with_format(FileFormat::Xlsx)
+}
+
+fn expanded_limit(observed: usize, maximum: usize) -> Error {
+    Error::from(TransactionError::Limit {
+        kind: LimitKind::ExpandedTargets,
+        observed,
+        maximum,
+    })
+    .with_format(FileFormat::Xlsx)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StageLedger {
+    observed: usize,
+    maximum: usize,
+}
+
+impl StageLedger {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            observed: 0,
+            maximum,
+        }
+    }
+
+    fn ensure(&self, additional: usize, property: &'static str) -> Result<()> {
+        let observed = self.observed.saturating_add(additional);
+        if observed > self.maximum {
+            return Err(staged_limit(observed, self.maximum).with_property(property));
+        }
+        Ok(())
+    }
+
+    fn add(&mut self, additional: usize, property: &'static str) -> Result<()> {
+        self.ensure(additional, property)?;
+        self.observed = self.observed.saturating_add(additional);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ExpansionLedger {
+    observed: usize,
+    maximum: usize,
+}
+
+impl ExpansionLedger {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            observed: 0,
+            maximum,
+        }
+    }
+
+    fn add(&mut self, additional: usize, property: &'static str) -> Result<()> {
+        let observed = self.observed.saturating_add(additional);
+        if observed > self.maximum {
+            return Err(expanded_limit(observed, self.maximum).with_property(property));
+        }
+        self.observed = observed;
+        Ok(())
+    }
+}
+
+fn scalar_text_bytes(scalar: Option<Scalar<'_>>) -> usize {
+    match scalar {
+        Some(Scalar::Text(value) | Scalar::Token(value)) => value.len(),
+        _ => 0,
+    }
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -590,6 +669,9 @@ impl Xlsx {
             ));
         }
         let mut props = AddProps::default();
+        let mut staged = StageLedger::new(limits.max_staged_bytes());
+        let mut expanded = ExpansionLedger::new(limits.max_expanded_targets());
+        expanded.add(1, "chart")?;
         let mut range = None;
         let mut name = None;
         let mut origin = [0_u32; 2];
@@ -598,6 +680,10 @@ impl Xlsx {
         // `series{N}.values` given as a cell range, on any sheet (record
         // 0338): the series number and the range's absolute reference.
         let mut references: Vec<(usize, String, &'static str)> = Vec::new();
+        // Range-backed series are admitted before the native workbook is
+        // promoted.  The promoted owner is then reused for every range read
+        // and for the final chart edit.
+        let mut range_series: Vec<(usize, String, &'static str)> = Vec::new();
         let mut numbers: Vec<usize> = Vec::new();
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
@@ -613,28 +699,48 @@ impl Xlsx {
             entry.prepare(Operation::Add, value, |setter, scalar| {
                 match setter {
                     ChartSetter::ChartType => {
-                        props.variant =
-                            Some(shared::parse_variant(&text(scalar).unwrap_or_default())?);
+                        let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
+                        props.variant = Some(shared::parse_variant(&value)?);
                     },
-                    ChartSetter::Title => props.title = text(scalar),
+                    ChartSetter::Title => {
+                        let value = text(scalar);
+                        staged.add(value.as_ref().map_or(0, String::len), entry.spec.name)?;
+                        props.title = value;
+                    },
                     ChartSetter::Legend => {
-                        props.legend =
-                            Some(shared::parse_legend(&text(scalar).unwrap_or_default())?);
+                        let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
+                        props.legend = Some(shared::parse_legend(&value)?);
                     },
                     ChartSetter::Categories => {
-                        props.categories = Some(shared::parse_list(
-                            &text(scalar).unwrap_or_default(),
-                            "categories",
-                        )?);
+                        let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
+                        props.categories = Some(shared::parse_list(&value, "categories")?);
                     },
-                    ChartSetter::CatTitle => props.category_axis_title = text(scalar),
-                    ChartSetter::AxisTitle => props.value_axis_title = text(scalar),
+                    ChartSetter::CatTitle => {
+                        let value = text(scalar);
+                        staged.add(value.as_ref().map_or(0, String::len), entry.spec.name)?;
+                        props.category_axis_title = value;
+                    },
+                    ChartSetter::AxisTitle => {
+                        let value = text(scalar);
+                        staged.add(value.as_ref().map_or(0, String::len), entry.spec.name)?;
+                        props.value_axis_title = value;
+                    },
                     ChartSetter::Data => {
-                        props.data = Some(shared::parse_data(&text(scalar).unwrap_or_default())?);
+                        let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
+                        props.data = Some(shared::parse_data(&value)?);
                     },
-                    ChartSetter::DataRange => range = text(scalar),
+                    ChartSetter::DataRange => {
+                        let value = text(scalar);
+                        staged.add(value.as_ref().map_or(0, String::len), entry.spec.name)?;
+                        range = value;
+                    },
                     ChartSetter::Name => {
                         let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
                         if value.contains('\0') {
                             return Err(error(Code::InvalidValue, "the name contains NUL")
                                 .with_property("name"));
@@ -645,25 +751,25 @@ impl Xlsx {
                     ChartSetter::Y => origin[1] = int(scalar),
                     ChartSetter::Width => span[0] = int(scalar),
                     ChartSetter::Height => span[1] = int(scalar),
-                    ChartSetter::Format(key) => props.format(key, scalar)?,
+                    ChartSetter::Format(key) => {
+                        staged.add(scalar_text_bytes(scalar), entry.spec.name)?;
+                        props.format(key, scalar)?;
+                    },
                     ChartSetter::Numbered(number) => {
                         numbers.push(usize::from(number) + 1);
-                        props.numbered_series(
-                            usize::from(number) + 1,
-                            &text(scalar).unwrap_or_default(),
-                        )?;
+                        let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
+                        props.numbered_series(usize::from(number) + 1, &value)?;
                     },
                     ChartSetter::Dotted(number, field) => {
                         let number = usize::from(number) + 1;
                         let value = text(scalar).unwrap_or_default();
+                        staged.add(value.len(), entry.spec.name)?;
                         if field != shared::SeriesField::Color {
                             numbers.push(number);
                         }
                         if field == shared::SeriesField::Values && is_range(&value) {
-                            let (values, reference) =
-                                self.series_range(sheet, &value, entry.spec.name)?;
-                            references.push((number, reference, entry.spec.name));
-                            props.dotted_series(number, field, &values)?;
+                            range_series.push((number, value, entry.spec.name));
                         } else {
                             props.dotted_series(number, field, &value)?;
                         }
@@ -672,17 +778,44 @@ impl Xlsx {
                 Ok(())
             })?;
         }
+        if range.is_some() && props.data.is_some() {
+            return Err(error(
+                Code::InvalidArgument,
+                "a chart takes data or dataRange, not both",
+            )
+            .with_property("dataRange"));
+        }
+        // Admit the range shape and its minimum logical payload before
+        // promotion or any worksheet cell is materialized.  The exact text
+        // and reference charge is checked again while the promoted owner is
+        // read below.
+        for (_, range, key) in &range_series {
+            Self::admit_series_range(range, *key, &mut expanded, &staged)?;
+        }
+        if let Some(range) = range.as_deref() {
+            Self::admit_data_range(range, &mut expanded, &staged)?;
+        }
+        let source = if range_series.is_empty() && range.is_none() {
+            None
+        } else {
+            Some(self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?)
+        };
+        if let Some(source) = source.as_ref() {
+            for (number, range, key) in range_series {
+                let (values, reference) =
+                    self.series_range(source, sheet, &range, key, &mut staged)?;
+                references.push((number, reference, key));
+                props.dotted_series(number, shared::SeriesField::Values, &values)?;
+            }
+        }
         let binding = match range {
-            Some(range) => {
-                if props.data.is_some() {
-                    return Err(error(
-                        Code::InvalidArgument,
-                        "a chart takes data or dataRange, not both",
-                    )
-                    .with_property("dataRange"));
-                }
-                Some(self.read_range(sheet, &range, &mut props)?)
-            },
+            Some(range) => Some(self.read_range(
+                source.as_ref().expect("dataRange promoted source"),
+                sheet,
+                &range,
+                &mut props,
+                &mut staged,
+            )?),
             None => None,
         };
         if !references.is_empty() {
@@ -736,7 +869,10 @@ impl Xlsx {
             );
         }
         let anchor = xlsx::chart::Anchor::new(origin[0], origin[1], to_col, to_row);
-        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let source = match source {
+            Some(source) => source,
+            None => self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?,
+        };
         let name = match name.or_else(|| spec.title().map(str::to_owned)) {
             Some(name) => name,
             // Counting reads the sheet's drawing: only for an unnamed chart.
@@ -769,6 +905,86 @@ impl Xlsx {
         ))
     }
 
+    fn range_cell_count(rect: &xlsx::Rect) -> Option<(usize, usize, usize)> {
+        let rows = usize::try_from(rect.end().0.saturating_sub(rect.start().row().get())).ok()?;
+        let columns =
+            usize::try_from(rect.end().1.saturating_sub(rect.start().column().get())).ok()?;
+        let cells = rows.checked_mul(columns)?;
+        Some((rows, columns, cells))
+    }
+
+    fn admit_series_range(
+        range: &str,
+        key: &'static str,
+        expanded: &mut ExpansionLedger,
+        staged: &StageLedger,
+    ) -> Result<()> {
+        let range = range.trim();
+        let rect = range
+            .rsplit_once('!')
+            .map_or(range, |(_, cells)| cells)
+            .replace('$', "")
+            .parse::<xlsx::Rect>()
+            .map_err(|_| {
+                Error::new(Code::InvalidValue, "the series range is not an A1 range")
+                    .with_property(key)
+                    .with_format(FileFormat::Xlsx)
+            })?;
+        let (rows, columns, cells) = Self::range_cell_count(&rect)
+            .ok_or_else(|| expanded_limit(usize::MAX, expanded.maximum))?;
+        if rows != 1 && columns != 1 {
+            return Err(Error::new(
+                Code::InvalidValue,
+                "the series range is one row or one column",
+            )
+            .with_property(key)
+            .with_format(FileFormat::Xlsx));
+        }
+        // Every selected cell contributes at least one byte to the rendered
+        // numeric payload.  The exact rendered string and absolute reference are
+        // charged again once the worksheet owner has been promoted.
+        expanded.add(cells, key)?;
+        staged.ensure(cells, key)?;
+        Ok(())
+    }
+
+    fn admit_data_range(
+        range: &str,
+        expanded: &mut ExpansionLedger,
+        staged: &StageLedger,
+    ) -> Result<()> {
+        let range = range.trim();
+        let rect = range
+            .rsplit_once('!')
+            .map_or(range, |(_, cells)| cells)
+            .replace('$', "")
+            .parse::<xlsx::Rect>()
+            .map_err(|_| {
+                Error::new(Code::InvalidValue, "dataRange is not an A1 range")
+                    .with_property("dataRange")
+                    .with_format(FileFormat::Xlsx)
+            })?;
+        let (rows, columns, cells) = Self::range_cell_count(&rect)
+            .ok_or_else(|| expanded_limit(usize::MAX, expanded.maximum))?;
+        if rows <= 1 || columns <= 1 {
+            return Err(Error::new(
+                Code::InvalidValue,
+                "dataRange needs a header row, a category column and at least one value",
+            )
+            .with_property("dataRange")
+            .with_format(FileFormat::Xlsx));
+        }
+        expanded.add(cells, "dataRange")?;
+        let value_cells = rows
+            .saturating_sub(1)
+            .saturating_mul(columns.saturating_sub(1));
+        let observed = value_cells
+            .checked_mul(size_of::<f64>())
+            .ok_or_else(|| staged_limit(usize::MAX, staged.maximum))?;
+        staged.ensure(observed, "dataRange")?;
+        Ok(())
+    }
+
     /// Read the values of a `series{N}.values` cell range (`Sheet1!B2:B13`,
     /// `'My Data'!$C$1:$C$4` or `B2:B5` on the chart's sheet; record 0338):
     /// the values as inline text the shared admission parses, and the
@@ -776,9 +992,11 @@ impl Xlsx {
     /// or one column; a cell without a number reads as 0, as `dataRange`.
     fn series_range(
         &self,
+        package: &xlsx::Package,
         sheet: usize,
         range: &str,
         key: &'static str,
+        staged: &mut StageLedger,
     ) -> Result<(String, String)> {
         let invalid = |message: &'static str| {
             Error::new(Code::InvalidValue, message)
@@ -812,7 +1030,7 @@ impl Xlsx {
         if first_row != last_row && first_column != last_column {
             return Err(invalid("the series range is one row or one column"));
         }
-        let package = self.editor_for_write()?;
+        Self::range_cell_count(&rect).ok_or_else(|| staged_limit(usize::MAX, staged.maximum))?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -823,13 +1041,18 @@ impl Xlsx {
                 let address = xlsx::Address::at(row, column)
                     .map_err(|_| invalid("the series range is outside the worksheet"))?;
                 let number = match worksheet.cell(address)?.stored() {
-                    Some(xlsx::Cell::Value(value)) => cell_value(value).1,
+                    Some(xlsx::Cell::Value(value)) => cell_number(value),
                     Some(xlsx::Cell::Formula(formula)) => formula
                         .cached()
-                        .and_then(|cache| cell_value(cache.value()).1),
+                        .and_then(|cache| cell_number(cache.value())),
                     _ => None,
                 };
-                values.push(number.unwrap_or(0.0).to_string());
+                let value = number.unwrap_or(0.0).to_string();
+                staged.add(
+                    value.len().saturating_add(usize::from(!values.is_empty())),
+                    key,
+                )?;
+                values.push(value);
             }
         }
         let column = |index: u32| litchi_drawingml::chart::authoring::column_name(index as usize);
@@ -850,17 +1073,27 @@ impl Xlsx {
                 last_row + 1
             )
         };
-        Ok((values.join(","), reference))
+        staged.add(reference.len(), key)?;
+        let rendered = values.join(",");
+        Ok((rendered, reference))
     }
 
     /// Read `Sheet!A1:E13`: series names in the first row, categories in the
     /// first column, values below; the chart refers to these cells.
-    fn read_range(&self, sheet: usize, range: &str, props: &mut AddProps) -> Result<Binding> {
+    fn read_range(
+        &self,
+        package: &xlsx::Package,
+        sheet: usize,
+        range: &str,
+        props: &mut AddProps,
+        staged: &mut StageLedger,
+    ) -> Result<Binding> {
         let invalid = |message: &'static str| {
             Error::new(Code::InvalidValue, message)
                 .with_property("dataRange")
                 .with_format(FileFormat::Xlsx)
         };
+        let range = range.trim();
         let (sheet_name, cells) = match range.rsplit_once('!') {
             Some((name, cells)) => (name.trim_matches('\'').replace("''", "'"), cells),
             None => (super::node::sheet_name(self, sheet).to_owned(), range),
@@ -869,7 +1102,6 @@ impl Xlsx {
             .replace('$', "")
             .parse::<xlsx::Rect>()
             .map_err(|_| invalid("dataRange is not an A1 range"))?;
-        let package = self.editor_for_write()?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -885,35 +1117,60 @@ impl Xlsx {
                 "dataRange needs a header row, a category column and at least one value",
             ));
         }
+        let (rows, columns, _) = Self::range_cell_count(&rect)
+            .ok_or_else(|| staged_limit(usize::MAX, staged.maximum))?;
+        let value_cells = rows
+            .saturating_sub(1)
+            .saturating_mul(columns.saturating_sub(1));
+        let minimum_values = value_cells
+            .checked_mul(size_of::<f64>())
+            .ok_or_else(|| staged_limit(usize::MAX, staged.maximum))?;
+        staged.ensure(minimum_values, "dataRange")?;
         let cell = |row: u32, column: u32| -> Result<(Option<String>, Option<f64>)> {
             let address = xlsx::Address::at(row, column)
                 .map_err(|_| invalid("dataRange is outside the worksheet"))?;
             Ok(match worksheet.cell(address)?.stored() {
-                Some(xlsx::Cell::Value(value)) => cell_value(value),
+                Some(xlsx::Cell::Value(value)) => cell_value(value, staged)?,
                 Some(xlsx::Cell::Formula(formula)) => formula
                     .cached()
-                    .map_or((None, None), |cache| cell_value(cache.value())),
+                    .map_or(Ok((None, None)), |cache| cell_value(cache.value(), staged))?,
                 _ => (None, None),
             })
         };
+        let number = |row: u32, column: u32| -> Result<Option<f64>> {
+            let address = xlsx::Address::at(row, column)
+                .map_err(|_| invalid("dataRange is outside the worksheet"))?;
+            Ok(match worksheet.cell(address)?.stored() {
+                Some(xlsx::Cell::Value(value)) => cell_number(value),
+                Some(xlsx::Cell::Formula(formula)) => formula
+                    .cached()
+                    .and_then(|cache| cell_number(cache.value())),
+                _ => None,
+            })
+        };
         let mut categories = Vec::new();
-        for row in first_row + 1..=last_row {
-            let (label, number) = cell(row, first_column)?;
-            categories.push(
-                label
-                    .or_else(|| number.map(|value| value.to_string()))
-                    .unwrap_or_default(),
-            );
+        if props.categories.is_none() {
+            for row in first_row + 1..=last_row {
+                let (label, value) = cell(row, first_column)?;
+                let value = label
+                    .or_else(|| value.map(|value| value.to_string()))
+                    .unwrap_or_default();
+                staged.add(value.len(), "dataRange")?;
+                categories.push(value);
+            }
         }
         let mut series = Vec::new();
         for column in first_column + 1..=last_column {
-            let (header, number) = cell(first_row, column)?;
+            let (header, value) = cell(first_row, column)?;
             let name = header
-                .or_else(|| number.map(|value| value.to_string()))
+                .or_else(|| value.map(|value| value.to_string()))
                 .unwrap_or_else(|| format!("Series {}", column - first_column));
+            staged.add(name.len(), "dataRange")?;
             let mut values = Vec::new();
             for row in first_row + 1..=last_row {
-                values.push(cell(row, column)?.1.unwrap_or(0.0));
+                let value = number(row, column)?.unwrap_or(0.0);
+                staged.add(size_of::<f64>(), "dataRange")?;
+                values.push(value);
             }
             series.push(Series::new(name, values));
         }
@@ -921,8 +1178,10 @@ impl Xlsx {
             props.categories = Some(categories);
         }
         props.data = Some(series);
+        let sheet_name = worksheet.name().to_owned();
+        staged.add(sheet_name.len(), "dataRange")?;
         Ok(Binding::Sheet {
-            sheet: worksheet.name().to_owned(),
+            sheet: sheet_name,
             row: first_row as usize,
             column: first_column as usize,
         })
@@ -950,6 +1209,9 @@ impl Xlsx {
             return Ok(None);
         };
         let mut edit = ChartEdit::default();
+        let mut staged = StageLedger::new(limits.max_staged_bytes());
+        let mut expanded = ExpansionLedger::new(limits.max_expanded_targets());
+        expanded.add(1, "chart")?;
         let mut geometry = [None::<u32>; 4];
         let summary = || item.summary();
         for (key, value) in props.iter() {
@@ -960,6 +1222,7 @@ impl Xlsx {
                         .map_err(|e| e.with_property(key.as_str().to_owned()))?;
                     let name = entry.spec.name;
                     entry.prepare(Operation::Set, value, |setter, scalar| {
+                        staged.add(scalar_text_bytes(scalar), name)?;
                         match setter {
                             ChartSetter::Title => edit.title = Some(text(scalar)),
                             ChartSetter::Legend => {
@@ -1023,7 +1286,9 @@ impl Xlsx {
                     let (_, entry) = SERIES_WRITE_TABLE
                         .resolve(key.as_str())
                         .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                    let name = entry.spec.name;
                     entry.prepare(Operation::Set, value, |setter, scalar| {
+                        staged.add(scalar_text_bytes(scalar), name)?;
                         match setter {
                             SeriesSetter::Name => edit.series_names.push((index, text(scalar))),
                             SeriesSetter::Values => edit.series_values.push((
@@ -1049,7 +1314,9 @@ impl Xlsx {
                     let (_, entry) = AXIS_WRITE_TABLE
                         .resolve(key.as_str())
                         .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                    let name = entry.spec.name;
                     entry.prepare(Operation::Set, value, |setter, scalar| {
+                        staged.add(scalar_text_bytes(scalar), name)?;
                         match setter {
                             AxisSetter::Title => edit.axis_titles.push((axis.id, text(scalar))),
                             AxisSetter::Min | AxisSetter::Max => edit.axis_bound(
@@ -1198,14 +1465,27 @@ fn quote_sheet(name: &str) -> String {
     }
 }
 
-fn cell_value(value: &xlsx::Value) -> (Option<String>, Option<f64>) {
+fn cell_number(value: &xlsx::Value) -> Option<f64> {
     match value {
-        xlsx::Value::Number(number) => (None, number.as_f64()),
+        xlsx::Value::Number(number) => number.as_f64(),
+        xlsx::Value::Text(text) => text.as_str().trim().parse::<f64>().ok(),
+        _ => None,
+    }
+}
+
+fn cell_value(value: &xlsx::Value, staged: &StageLedger) -> Result<(Option<String>, Option<f64>)> {
+    match value {
+        xlsx::Value::Number(number) => Ok((None, number.as_f64())),
         xlsx::Value::Text(text) => {
             let text = text.as_str();
-            (Some(text.to_owned()), text.trim().parse::<f64>().ok())
+            staged.ensure(text.len(), "dataRange")?;
+            Ok((Some(text.to_owned()), text.trim().parse::<f64>().ok()))
         },
-        xlsx::Value::Bool(value) => (Some(if *value { "TRUE" } else { "FALSE" }.to_owned()), None),
-        _ => (None, None),
+        xlsx::Value::Bool(value) => {
+            let text = if *value { "TRUE" } else { "FALSE" };
+            staged.ensure(text.len(), "dataRange")?;
+            Ok((Some(text.to_owned()), None))
+        },
+        _ => Ok((None, None)),
     }
 }
