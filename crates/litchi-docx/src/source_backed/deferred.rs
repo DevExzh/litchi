@@ -819,8 +819,8 @@ mod tests {
                 },
                 move |target| {
                     target
-                        .publish_source_package(&stream_physical)
-                        .map_err(Error::from)
+                        .publish_source_package(stream_physical.clone())
+                        .map_err(crate::Error::from)
                 },
             )
             .unwrap();

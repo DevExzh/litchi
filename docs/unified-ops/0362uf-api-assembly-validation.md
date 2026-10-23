@@ -282,3 +282,10 @@ rerunning `cargo fmt --all --check` passes.
 check, the exact applied source-diff hash and the passing rerun. Historical
 probe measurements remain tied to their recorded source revisions; formatting
 does not promote them to final native qualification.
+
+The twentieth attempt on `692ebc4fdd` stops during the DOCX test build: the
+new fixture needs the crate error type in scope and a cloned owned source for
+`ArtifactStreamTarget::publish_source_package`. Both test-only errors are
+corrected without changing production behavior.
+[consumer-v20.json](results/0362uf/consumer-v20.json) retains the compiler
+receipt; later groups were not reached.

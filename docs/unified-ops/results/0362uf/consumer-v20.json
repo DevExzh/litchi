@@ -1,0 +1,27 @@
+{
+  "source": "692ebc4fddd0950753912bb103880a49ee6057de",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-docx",
+        "--lib"
+      ],
+      "exit": 101,
+      "seconds": 33.85064848100046,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v20/check-0.log",
+      "bytes": 212694,
+      "sha256": "e6a507b64b321e541008bc37b75878fb5bd228b1bdd5025ec90faa7583c2068c",
+      "target_bytes_before": 18619724084,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "DOCX test-only fixture failed compilation: missing Error scope and borrowed source passed to an owning ArtifactStreamTarget method. Both corrected; no production change. Later groups not reached."
+}
