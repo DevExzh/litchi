@@ -1051,7 +1051,7 @@ mod probe {
             "oth",
             "oth_paragraph_text",
             "deterministic_builder",
-            "litchi_oth::Builder::paragraph",
+            "litchi_oth::Builder::paragraph(before)",
             &source,
             &changed_output,
             &file_changed_output,
