@@ -306,10 +306,7 @@ impl Run {
                 empty.operations = authored_operations;
                 Ok((base, empty))
             },
-            Ok(mut commit) => {
-                commit.operations = authored_operations;
-                Ok((base, commit))
-            },
+            Ok(commit) => Ok((base, commit)),
             Err(error) => Err(locate_failure(&base, &items, error, snapshot_budget)),
         }
     }
