@@ -942,7 +942,7 @@ impl Plan {
             core,
             app,
             custom,
-            changed_fields: changed_fields.into_boxed_slice()
+            changed_fields: changed_fields.into_boxed_slice(),
             planned_retained_bytes,
         })
     }
