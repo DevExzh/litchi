@@ -1,0 +1,8 @@
+{
+  "source": "17f077cee43d76d0f35d5c9bfdfb68e65ef92108",
+  "status": "preflight interrupted",
+  "evidence": "runner PID74330 and du PID74747 absent; no command-state/log/check receipt exists",
+  "cargo_started": false,
+  "exit": null,
+  "note": "Resource preflight ended before any command-state/log receipt. No Cargo or harness result inferred."
+}

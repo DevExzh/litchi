@@ -97,3 +97,18 @@ assertions. The DOCX section assertion now explicitly extracts its error
 without requiring Debug on the private success type. The IWA assertion uses
 the directly re-exported Patch name without a denied redundant qualification.
 No public behavior changes in those two corrections.
+
+## Follow-up consumer diagnostics
+
+The seventh attempt ended during the resource preflight, before a command log
+or exit receipt existed. Its runner and target-size process were confirmed
+absent; [consumer-v7.json](results/0362uf/consumer-v7.json) records that no
+compiler or harness result can be inferred.
+
+The eighth attempt on `7abf64f495` completed the workspace diagnostic pass
+with exit 101 after 439.95 seconds. Remaining errors are mixed core/ODF staging
+boundaries in formula and ODB writes, an ODP source-backed test result boundary,
+stale XLSX raw-aggregate test calls, and missing ODS test imports. The log and
+source receipt are preserved in [consumer-v8.json](results/0362uf/consumer-v8.json).
+The harness group was not reached. Record 0362uj repairs these consumers while
+retaining typed causes, cold payload accounting, and the existing assertions.

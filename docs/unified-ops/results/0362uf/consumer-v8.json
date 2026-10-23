@@ -1,0 +1,25 @@
+{
+  "source": "7abf64f495c298cf5591ab1f73ef3ed4cd5472b2",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 439.947903064,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v8/check-0.log",
+      "bytes": 34232,
+      "sha256": "8144ccd0e597790bc18a871362ac5bb69178d1323f13c3f242457b16c3a5422a",
+      "target_bytes_before": 18306733348,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Workspace diagnostic pass completed: mixed core/ODF facade boundaries, ODP test result types, XLSX raw aggregate test consumers, and ODS test imports require correction. Harness not reached."
+}
