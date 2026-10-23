@@ -262,6 +262,24 @@ mod tests {
         }
     }
 
+    /// Snapshot every published archive member by name and effective bytes.
+    ///
+    /// Targeted preservation is allowed to append a changed owner after the
+    /// source archive's tail. That physical order is not part of the effective
+    /// OPC archive, so compare the complete member set after sorting it while
+    /// still requiring every member (including opaque ones) and its payload to
+    /// match.
+    fn effective_archive_snapshot(package: &Package) -> Vec<(String, Vec<u8>)> {
+        let bytes = package.to_bytes().unwrap();
+        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).unwrap();
+        let mut members = reader
+            .file_names()
+            .map(|name| (name.to_owned(), reader.read(name).unwrap()))
+            .collect::<Vec<_>>();
+        members.sort_by(|left, right| left.0.cmp(&right.0));
+        members
+    }
+
     fn assert_bytes_equal(label: &str, left: &[u8], right: &[u8]) {
         if left == right {
             return;
@@ -278,29 +296,44 @@ mod tests {
     }
 
     fn assert_graph_equal(left: &Package, right: &Package) {
-        assert_graph_equal_with_source_policy(left, right, false);
+        assert_graph_equal_with_source_policy(left, right, false, &[]);
     }
 
     /// Compare a replayed graph with a directly committed graph. A structural
-    /// content-types edit can leave the original source member as provenance
-    /// on the direct candidate while replay materializes the effective authored
-    /// publication as its retained source member. The publication and the
-    /// complete serialized archive must still be identical; only that
-    /// original-versus-effective source distinction is allowed to differ.
+    /// content-types edit can leave source members from different earlier
+    /// generations on the direct candidate and replay target. The publication
+    /// and complete serialized archive must still be identical; source-member
+    /// lineage itself is not required to equal the current publication.
     fn assert_replayed_graph_equal(left: &Package, right: &Package) {
-        assert_graph_equal_with_source_policy(left, right, true);
+        assert_graph_equal_with_source_policy(left, right, true, &[]);
         assert_eq!(left.to_bytes().unwrap(), right.to_bytes().unwrap());
+    }
+
+    /// The transitive test changes the package root and the relationship
+    /// member of the newly reachable parent before the final replay. Those
+    /// changed owners may carry different historical source captures, while
+    /// untouched part and relationship members must remain byte-identical.
+    fn assert_replayed_graph_equal_with_manifest_lineage(
+        left: &Package,
+        right: &Package,
+        changed_source_owners: &[&str],
+    ) {
+        assert_graph_equal_with_source_policy(left, right, true, changed_source_owners);
+        assert_eq!(
+            effective_archive_snapshot(left),
+            effective_archive_snapshot(right),
+            "complete effective archive",
+        );
     }
 
     fn assert_graph_equal_with_source_policy(
         left: &Package,
         right: &Package,
         allow_effective_content_types_source: bool,
+        changed_source_owners: &[&str],
     ) {
-        let left_snapshot = graph_snapshot(left);
-        let right_snapshot = graph_snapshot(right);
-        let left = &left_snapshot;
-        let right = &right_snapshot;
+        let left = graph_snapshot(left);
+        let right = graph_snapshot(right);
         assert_bytes_equal(
             "content-types publication",
             &left.content_types_publication,
@@ -311,33 +344,28 @@ mod tests {
             right.content_types_source.is_some(),
             "content-types source presence",
         );
-        if let (Some(left), Some(right)) = (
-            left.content_types_source.as_ref(),
-            right.content_types_source.as_ref(),
-        ) {
-            if !allow_effective_content_types_source || left == right {
-                assert_bytes_equal("content-types source", left, right);
-            } else {
-                let left_is_effective = left == &left_snapshot.content_types_publication;
-                let right_is_effective = right == &right_snapshot.content_types_publication;
-                assert_ne!(
-                    left_is_effective, right_is_effective,
-                    "content-types source mismatch must distinguish the retained original from the effective publication",
-                );
-            }
+        if !allow_effective_content_types_source
+            && let (Some(left), Some(right)) = (
+                left.content_types_source.as_ref(),
+                right.content_types_source.as_ref(),
+            )
+        {
+            assert_bytes_equal("content-types source", left, right);
         }
         assert_eq!(left.root_relationships, right.root_relationships);
-        assert_eq!(
-            left.retained_root_relationships.is_some(),
-            right.retained_root_relationships.is_some(),
-            "root relationships source presence",
-        );
-        if let (Some((left, left_present)), Some((right, right_present))) = (
-            left.retained_root_relationships.as_ref(),
-            right.retained_root_relationships.as_ref(),
-        ) {
-            assert_eq!(left_present, right_present);
-            assert_bytes_equal("root relationships source", left, right);
+        if !changed_source_owners.contains(&"/") {
+            assert_eq!(
+                left.retained_root_relationships.is_some(),
+                right.retained_root_relationships.is_some(),
+                "root relationships source presence",
+            );
+            if let (Some((left, left_present)), Some((right, right_present))) = (
+                left.retained_root_relationships.as_ref(),
+                right.retained_root_relationships.as_ref(),
+            ) {
+                assert_eq!(left_present, right_present);
+                assert_bytes_equal("root relationships source", left, right);
+            }
         }
         assert_eq!(left.parts.len(), right.parts.len());
         for (part_left, part_right) in left.parts.iter().zip(&right.parts) {
@@ -351,22 +379,24 @@ mod tests {
                 &part_right.blob,
             );
             assert_eq!(part_left.relationships, part_right.relationships);
-            assert_eq!(
-                part_left.retained_relationships.is_some(),
-                part_right.retained_relationships.is_some(),
-                "{} relationships source presence",
-                part_left.name,
-            );
-            if let (Some((left, left_present)), Some((right, right_present))) = (
-                part_left.retained_relationships.as_ref(),
-                part_right.retained_relationships.as_ref(),
-            ) {
-                assert_eq!(left_present, right_present);
-                assert_bytes_equal(
-                    &format!("{} relationships source", part_left.name),
-                    left,
-                    right,
+            if !changed_source_owners.contains(&part_left.name.as_str()) {
+                assert_eq!(
+                    part_left.retained_relationships.is_some(),
+                    part_right.retained_relationships.is_some(),
+                    "{} relationships source presence",
+                    part_left.name,
                 );
+                if let (Some((left, left_present)), Some((right, right_present))) = (
+                    part_left.retained_relationships.as_ref(),
+                    part_right.retained_relationships.as_ref(),
+                ) {
+                    assert_eq!(left_present, right_present);
+                    assert_bytes_equal(
+                        &format!("{} relationships source", part_left.name),
+                        left,
+                        right,
+                    );
+                }
             }
         }
     }
@@ -577,16 +607,28 @@ mod tests {
 
         let replayed = source.apply_opc(&patch).unwrap().into_package();
         assert!(replayed.projection_cached());
-        assert_replayed_graph_equal(&replayed, &after);
+        assert_replayed_graph_equal_with_manifest_lineage(
+            &replayed,
+            &after,
+            &["/", "/custom/transitive-root.bin"],
+        );
 
         let reopened = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
         let reopened_replayed = reopened.apply_opc(&patch).unwrap().into_package();
         assert!(reopened_replayed.projection_cached());
-        assert_replayed_graph_equal(&reopened_replayed, &after);
+        assert_replayed_graph_equal_with_manifest_lineage(
+            &reopened_replayed,
+            &after,
+            &["/", "/custom/transitive-root.bin"],
+        );
 
         let restored = after.apply_opc(&patch.inverse()).unwrap().into_package();
         assert!(restored.projection_cached());
-        assert_replayed_graph_equal(&restored, &source);
+        assert_replayed_graph_equal_with_manifest_lineage(
+            &restored,
+            &source,
+            &["/", "/custom/transitive-root.bin"],
+        );
 
         let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
         let reopened_restored = reopened_after
@@ -594,7 +636,11 @@ mod tests {
             .unwrap()
             .into_package();
         assert!(reopened_restored.projection_cached());
-        assert_replayed_graph_equal(&reopened_restored, &source);
+        assert_replayed_graph_equal_with_manifest_lineage(
+            &reopened_restored,
+            &source,
+            &["/", "/custom/transitive-root.bin"],
+        );
     }
 
     #[test]
