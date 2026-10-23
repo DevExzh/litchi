@@ -52,3 +52,10 @@ Final baseline/candidate refs, a fresh external output directory, a
 coordinator-approved quiet CPU, and completed release builds are prerequisites
 for native qualification. No binary or timing result is committed by this
 source-only preparation change.
+
+The source-only failure-case guards can be run without Cargo:
+
+~~~sh
+python3 -B -m unittest \
+  docs/unified-ops/results/0362l/test_ink_qualification.py
+~~~

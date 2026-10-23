@@ -48,12 +48,44 @@ def command(row):
     verify(row["stderr"])
 
 
+def validate_build_refs(build):
+    assert set(build["endpoints"]) == {"base", "candidate"}
+    assert set(build["resolved_refs"]) == {"base", "candidate"}
+    assert build["resolved_refs"]["base"] != build["resolved_refs"]["candidate"]
+    for label in ("base", "candidate"):
+        endpoint = build["endpoints"][label]
+        assert endpoint["source"]["commit"] == build["resolved_refs"][label]
+
+
+def validate_calibration_case(case, target_ns, minimum_ns):
+    """Independently validate calibration and accepted ABBA sample bounds."""
+    assert case["calibrations"]
+    route, count = case["route"], case["count"]
+    for calibration in case["calibrations"]:
+        assert set(calibration) == {"A", "B"}
+        values = list(calibration.values())
+        for value in values:
+            assert (value["route"], value["iterations"]) == (route, count)
+            assert isinstance(value["ns"], int) and value["ns"] > 0
+        for key in ("checksum", "output_bytes", "output_sha256"):
+            assert len({value[key] for value in values}) == 1
+    assert min(value["ns"] for value in case["calibrations"][-1].values()) >= target_ns
+    for block in case["blocks"]:
+        legs = block["legs"]
+        assert [leg["side"] for leg in legs] == list("ABBA")
+        for leg in legs:
+            value = leg["value"]
+            assert (value["route"], value["iterations"]) == (route, count)
+            assert isinstance(value["ns"], int) and value["ns"] >= minimum_ns
+
+
 def collect_build(directory):
     path = directory / "build.json"
     build = load(path)
     assert build["schema"] == QUALIFY_SCHEMA
     assert build["workload"] == "docx-durable-ink"
     assert build["status"] == "complete"
+    validate_build_refs(build)
     for key in ("builder", "probe", "input_lock"):
         verify(build[key])
     source_maps = []
@@ -175,6 +207,9 @@ def collect_native(directory, build):
         completed = 0
         for case in manifest["cases"]:
             assert case["route"] in cases
+            validate_calibration_case(
+                case, manifest["target_ns"], manifest["minimum_ns"]
+            )
             for index, block in enumerate(case["blocks"]):
                 legs = block["legs"]
                 assert [leg["side"] for leg in legs] == list("ABBA")

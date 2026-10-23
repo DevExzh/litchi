@@ -121,19 +121,64 @@ def program(arguments):
     return name
 
 
-def quiet(output, label, child=None):
-    rows = []
-    for entry in Path("/proc").iterdir():
-        if not entry.name.isdigit():
-            continue
+def _recheck_vanished(entry):
+    try:
+        entry.stat()
+    except FileNotFoundError:
+        return True
+    except PermissionError as error:
+        raise RuntimeError(f"cannot recheck process {entry}: permission denied") from error
+    except OSError as error:
+        raise RuntimeError(f"cannot recheck process {entry}: {error}") from error
+    return False
+
+
+def process_row(entry):
+    """Read one /proc row, tolerating only a proven process disappearance."""
+    for attempt in range(2):
         try:
             stat = (entry / "stat").read_text()
-            parent = int(stat[stat.rfind(")") + 2:].split()[1])
-            arguments = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace")
+            fields = stat[stat.rfind(")") + 2:].split()
+            if len(fields) < 2:
+                raise ValueError("truncated stat")
+            parent = int(fields[1])
+            arguments = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(
+                errors="replace"
+            )
             executable = os.readlink(entry / "exe")
-            rows.append(dict(pid=int(entry.name), parent=parent, exe=executable, args=arguments))
-        except (FileNotFoundError, ProcessLookupError, PermissionError):
-            continue
+            return dict(pid=int(entry.name), parent=parent, exe=executable, args=arguments)
+        except (FileNotFoundError, ProcessLookupError) as error:
+            if _recheck_vanished(entry):
+                return None
+            if attempt == 0:
+                time.sleep(0.001)
+                continue
+            raise RuntimeError(f"process {entry} disappeared during inspection") from error
+        except PermissionError as error:
+            raise RuntimeError(f"cannot inspect process {entry}: permission denied") from error
+        except Exception as error:
+            raise RuntimeError(f"cannot inspect process {entry}: {error}") from error
+    raise AssertionError("unreachable process inspection retry")
+
+
+def process_snapshot(proc_root=Path("/proc")):
+    try:
+        entries = sorted(proc_root.iterdir(), key=lambda entry: entry.name)
+    except PermissionError as error:
+        raise RuntimeError(f"cannot enumerate {proc_root}: permission denied") from error
+    except OSError as error:
+        raise RuntimeError(f"cannot enumerate {proc_root}: {error}") from error
+    rows = []
+    for entry in entries:
+        if entry.name.isdigit():
+            row = process_row(entry)
+            if row is not None:
+                rows.append(row)
+    return rows
+
+
+def quiet(output, label, child=None):
+    rows = process_snapshot()
     parents = {row["pid"]: row["parent"] for row in rows}
     exempt = set()
     current = os.getpid()

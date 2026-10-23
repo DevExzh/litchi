@@ -312,6 +312,7 @@ fn validate_outputs(out: &Path) {
     assert_eq!(target_read_bytes, target_bytes.len());
     let matching_forward = apply(&matching_base, &fixture.forward);
     let matching_inverse = apply(&matching_target, &fixture.inverse);
+    let matching_noop = apply(&matching_base, &fixture.noop);
     assert_eq!(forward.ink().unwrap().annotations().len(), 1);
     assert_eq!(inverse.ink().unwrap().annotations().len(), 0);
     assert_eq!(encode(&forward), encode(&fixture.target));
@@ -320,6 +321,7 @@ fn validate_outputs(out: &Path) {
     assert_eq!(encode(&fixture.base), fixture.original);
     assert_eq!(encode(&matching_forward), target_bytes);
     assert_eq!(encode(&matching_inverse), fixture.original);
+    assert_eq!(encode(&matching_noop), fixture.original);
     let streamed = [
         ("forward", &forward),
         ("inverse", &inverse),

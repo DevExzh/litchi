@@ -78,7 +78,8 @@ def command(directory, label, argv, cwd, env=None):
 
 
 def snapshot(out, label, commit, lock):
-    commit = resolve_ref(commit)
+    if len(commit) != 40 or any(character not in '0123456789abcdef' for character in commit):
+        raise ValueError(f'{label} must receive a resolved commit SHA, got {commit!r}')
     source = out / f'source-{label}'
     source.mkdir()
     archive = out / f'source-{label}.tar'
@@ -126,7 +127,7 @@ def build(args):
     )
     save(out / 'build.json', manifest)
     common_lock = None
-    for label, commit in (('base', args.base), ('candidate', args.candidate)):
+    for label, commit in (('base', base_commit), ('candidate', candidate_commit)):
         source, provenance = snapshot(out, label, commit, args.lock)
         project = out / f'project-{label}'
         (project / 'src').mkdir(parents=True)
