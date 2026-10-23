@@ -34,7 +34,9 @@ fn merge_inner(
     options: &Options,
     limits: &SemanticLimits,
 ) -> Result<(Option<Commit>, Summary)> {
-    let editor = owning_editor(file)?.with_snapshot_budget(limits.max_snapshot_bytes())?;
+    let options = litchi_docx::document::EditOptions::default()
+        .max_snapshot_bytes(limits.max_snapshot_bytes());
+    let editor = owning_editor(file, options)?;
     let WorkEdit::Eager(mut edit) = WorkEdit::from(editor)? else {
         return Err(Error::new(
             Code::InternalError,
@@ -66,14 +68,19 @@ fn merge_inner(
 /// it. An unsigned source-backed owner goes straight to its materialized
 /// package, whose edit applies the same admission a source edit would;
 /// every other state takes [`Docx::edit`]'s policy first.
-pub(super) fn owning_editor(file: &Docx) -> Result<DocxEditor> {
+pub(super) fn owning_editor(
+    file: &Docx,
+    options: litchi_docx::document::EditOptions,
+) -> Result<DocxEditor> {
     if let (Signature::Unsigned, DocxOwner::Source(package), true) =
         (file.signature(), file.owner(), file.0.retain_source)
     {
         let promoted = file.promoted(package)?;
-        return Ok(DocxEditor::Edit(Box::new(promoted.edit()?)));
+        return Ok(DocxEditor::Edit(Box::new(
+            promoted.edit_with_options(options).map_err(Error::from)?,
+        )));
     }
-    let editor = file.edit()?;
+    let editor = file.edit_with_options(options)?;
     file.eager_editor(editor)
 }
 

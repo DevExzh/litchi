@@ -80,13 +80,9 @@ impl Docx {
     /// editor committed empty (the main document is unchanged), and the
     /// coordinator compares the endpoints' core properties to see the change
     /// (record 0338).
-    pub(super) fn set_metadata(
-        &self,
-        props: &Props<'_>,
-        snapshot_budget: usize,
-    ) -> Result<Commit> {
+    pub(super) fn set_metadata(&self, props: &Props<'_>, snapshot_budget: usize) -> Result<Commit> {
         let file = self.commit_metadata(props)?;
-        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let (patch, diagnostics) = WorkEdit::from(editor)?.commit_patch()?;
         Ok(Commit::from_parts(file, patch, diagnostics))
     }

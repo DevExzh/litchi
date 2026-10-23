@@ -61,9 +61,10 @@ impl Package {
         &self,
         options: crate::document::EditOptions,
     ) -> Result<crate::document::Edit, crate::document::Error> {
-        self.document_snapshot().map(|snapshot| {
-            crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options)
-        })
+        self.document_snapshot_with_options(Some(&options))
+            .map(|snapshot| {
+                crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options)
+            })
     }
 
     /// Start a bounded composition tied to this package's complete artifact.
@@ -148,9 +149,19 @@ impl Package {
     /// Returns a typed transaction error when the package state is stale or
     /// the main document is missing, malformed, or over its resource bounds.
     pub fn document_snapshot(&self) -> Result<crate::document::Snapshot, crate::document::Error> {
+        self.document_snapshot_with_options(None)
+    }
+
+    fn document_snapshot_with_options(
+        &self,
+        options: Option<&crate::document::EditOptions>,
+    ) -> Result<crate::document::Snapshot, crate::document::Error> {
         self.ensure_story_opc_current("document_snapshot")?;
         let main = self.opc.main_document_part().map_err(Error::from)?;
         let xml = main.blob_arc();
+        if let Some(options) = options {
+            options.admit_source_bytes(u64::try_from(xml.len()).unwrap_or(u64::MAX))?;
+        }
         self.admit_main_document(&xml, "document_snapshot")?;
         crate::document::Snapshot::from_shared_xml(xml)
     }

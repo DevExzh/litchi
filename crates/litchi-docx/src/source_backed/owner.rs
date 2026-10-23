@@ -176,6 +176,7 @@ impl Package {
                 "apply",
                 !patch.is_noop(),
                 Some(patch.source()),
+                None,
             )?;
             let target = patch.apply(&current)?;
             if patch
@@ -257,6 +258,7 @@ impl Package {
         operation: &'static str,
         source_authorized: bool,
         before: Option<&Snapshot>,
+        edit_options: Option<&crate::document::EditOptions>,
     ) -> TransactionResult<(PackURI, Snapshot)> {
         self.check_source()?;
         let result = (|| {
@@ -279,11 +281,15 @@ impl Package {
                     operation,
                     source_authorized,
                     before,
+                    edit_options,
                 );
             }
 
             let main = topology.main_document_part().map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
+            if let Some(options) = edit_options {
+                options.admit_source_bytes(main.declared_uncompressed_size()?)?;
+            }
             let name = main.partname().clone();
             let lineage = topology.physical_source_lineage();
             let version = topology.physical_source_version().map_err(Error::from)?;

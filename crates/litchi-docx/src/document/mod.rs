@@ -114,6 +114,21 @@ impl EditOptions {
     pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
         self.max_snapshot_bytes
     }
+
+    pub(crate) fn admit_source_bytes(&self, source_bytes: u64) -> Result<()> {
+        let Some(maximum) = self.max_snapshot_bytes else {
+            return Ok(());
+        };
+        let maximum_u64 = u64::try_from(maximum).unwrap_or(u64::MAX);
+        if source_bytes > maximum_u64 {
+            return Err(Error::Limit {
+                kind: LimitKind::ProjectedXmlBytes,
+                observed: usize::try_from(source_bytes).unwrap_or(usize::MAX),
+                maximum,
+            });
+        }
+        Ok(())
+    }
 }
 
 pub use transaction::{

@@ -1313,7 +1313,8 @@ impl Package {
         &self,
         options: crate::document::EditOptions,
     ) -> TransactionResult<crate::document::Edit<Self>> {
-        let (_, snapshot) = self.main_document_snapshot("edit", true)?;
+        let (_, snapshot) =
+            self.main_document_snapshot_with_before("edit", true, None, Some(&options))?;
         Ok(crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options))
     }
 
@@ -1954,7 +1955,7 @@ impl Package {
         operation: &'static str,
         source_authorized: bool,
     ) -> TransactionResult<(PackURI, Snapshot)> {
-        self.main_document_snapshot_with_before(operation, source_authorized, None)
+        self.main_document_snapshot_with_before(operation, source_authorized, None, None)
     }
 
     fn main_document_snapshot_with_before(
@@ -1962,6 +1963,7 @@ impl Package {
         operation: &'static str,
         source_authorized: bool,
         before: Option<&Snapshot>,
+        edit_options: Option<&crate::document::EditOptions>,
     ) -> TransactionResult<(PackURI, Snapshot)> {
         if let Some(topology) = &self.effective {
             return self.effective_document_snapshot(
@@ -1969,6 +1971,7 @@ impl Package {
                 operation,
                 source_authorized,
                 before,
+                edit_options,
             );
         }
 
@@ -1984,6 +1987,9 @@ impl Package {
                 .main_document_part()
                 .map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
+            if let Some(options) = edit_options {
+                options.admit_source_bytes(main.declared_uncompressed_size()?)?;
+            }
             let partname = main.partname();
             let context = self.physical_package()?.execution_context();
             let managed = self.physical_package()?.cache_diagnostics().budget_managed;

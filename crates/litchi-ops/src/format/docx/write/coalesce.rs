@@ -162,7 +162,7 @@ impl Run {
     /// before commit, so admitting only the final pair would let an
     /// intermediate `Snapshot` escape the facade's retention ceiling.
     pub(crate) fn new_with_snapshot_budget(base: &Docx, snapshot_budget: usize) -> Result<Self> {
-        let editor = base.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = base.edit_with_snapshot_budget(snapshot_budget)?;
         Ok(Self {
             base: base.clone(),
             edit: WorkEdit::from(editor)?,
@@ -301,7 +301,7 @@ fn replay_with_snapshot_budget(
     snapshot_budget: usize,
 ) -> Result<Commit> {
     let result = (|| {
-        let editor = base.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = base.edit_with_snapshot_budget(snapshot_budget)?;
         let mut edit = WorkEdit::from(editor)?;
         for item in items {
             item.plan
