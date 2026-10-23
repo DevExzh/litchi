@@ -15,7 +15,7 @@ use crate::format::metadata::{self, Assignments};
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
-use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
+use crate::transaction::SemanticLimits;
 
 fn native(error: xlsx::metadata::Error) -> crate::Error {
     metadata::native_error(error, FileFormat::Xlsx)
@@ -76,22 +76,12 @@ impl Xlsx {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let source = self.editor_for_metadata_with_snapshot_limit(limits.max_snapshot_bytes())?;
         // Metadata editing does not use the worksheet native editor. Admit
-        // the source owner before the common property editor materializes an
-        // after-image. The common planner admits the exact escaped XML patch;
-        // `Commit::from_metadata` then projects the target endpoint from the
-        // actual changed property payload instead of assuming it is the same
-        // size as the source.
-        let endpoint = source.retained_bytes();
-        if endpoint > limits.max_snapshot_bytes() {
-            return Err(TransactionError::Limit {
-                kind: LimitKind::SnapshotBytes,
-                observed: endpoint,
-                maximum: limits.max_snapshot_bytes(),
-            }
-            .into());
-        }
+        // the source-backed endpoint before promotion. Once promoted, the
+        // common planner admits the exact source/target/patch projection
+        // before it materializes any replacement XML; `Commit::from_metadata`
+        // then checks the same endpoints defensively.
         let (target, metadata, changed, native_patch_bytes) = commit(
             &source,
             |value| assignments.apply(value),

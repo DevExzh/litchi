@@ -81,6 +81,7 @@ pub enum LimitKind {
 #[must_use]
 pub struct EditOptions {
     max_retained_bytes: Option<usize>,
+    owner: Option<OwnerAdmission>,
 }
 
 impl EditOptions {
@@ -88,6 +89,7 @@ impl EditOptions {
     pub const fn new() -> Self {
         Self {
             max_retained_bytes: None,
+            owner: None,
         }
     }
 
@@ -101,6 +103,15 @@ impl EditOptions {
     #[must_use]
     pub const fn max_retained_bytes_value(self) -> Option<usize> {
         self.max_retained_bytes
+    }
+
+    /// Supplies the immutable host-owner census used by the exact package
+    /// endpoint admission. This is a format bridge; ordinary callers keep
+    /// the default patch-only policy.
+    #[doc(hidden)]
+    pub const fn with_owner_admission(mut self, owner: OwnerAdmission) -> Self {
+        self.owner = Some(owner);
+        self
     }
 }
 
@@ -230,6 +241,14 @@ impl Family {
             Self::App => "/docProps/app",
             Self::Custom => "/docProps/custom",
         }
+    }
+}
+
+const fn family_index(family: Family) -> usize {
+    match family {
+        Family::Core => 0,
+        Family::App => 1,
+        Family::Custom => 2,
     }
 }
 
@@ -463,6 +482,22 @@ impl Snapshot {
             .present
             .as_ref()
             .map(|present| &present.part)
+    }
+
+    /// The package-level relationship selecting `family`, when present.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn relationship_id_value(&self, family: Family) -> Option<&str> {
+        self.family(family)
+            .present
+            .as_ref()
+            .map(|present| present.relationship_id.as_str())
+    }
+
+    /// The part name selected if `family` is created by a later edit.
+    #[must_use]
+    pub fn new_part_name(&self, family: Family) -> &PackURI {
+        &self.family(family).new_part
     }
 
     /// The exact bytes of the part of `family`, when present.
@@ -750,6 +785,156 @@ pub struct Plan {
     options: EditOptions,
 }
 
+/// Retained endpoint accounting supplied by a host's immutable package.
+///
+/// The common planner combines this owner census with its prepared family
+/// lengths before it allocates replacement payloads. It carries no package,
+/// snapshot or publication handle and is therefore safe to retain in
+/// [`EditOptions`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[doc(hidden)]
+pub struct OwnerAdmission {
+    source_bytes: usize,
+    source_archive_bytes: usize,
+    /// Retained semantic caches that the host drops while reopening a
+    /// changed target. A no-op keeps these caches and therefore does not use
+    /// this projection.
+    discarded_target_bytes: usize,
+    families: [FamilyAdmission; 3],
+}
+
+impl OwnerAdmission {
+    /// Creates a host endpoint census in `Family::Core`, `Family::App`, and
+    /// `Family::Custom` order.
+    #[doc(hidden)]
+    pub const fn new(
+        source_bytes: usize,
+        source_archive_bytes: usize,
+        discarded_target_bytes: usize,
+        families: [FamilyAdmission; 3],
+    ) -> Self {
+        Self {
+            source_bytes,
+            source_archive_bytes,
+            discarded_target_bytes,
+            families,
+        }
+    }
+}
+
+/// Fixed retained bytes for one property family in a host owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[doc(hidden)]
+pub struct FamilyAdmission {
+    present_part_bytes: Option<usize>,
+    present_relationship_bytes: Option<usize>,
+    created_part_bytes: usize,
+    created_relationship_base_bytes: usize,
+}
+
+impl FamilyAdmission {
+    /// Creates one family census. Part values exclude their payload; the
+    /// planner adds the exact before/after payload capacities itself.
+    #[doc(hidden)]
+    pub const fn new(
+        present_part_bytes: Option<usize>,
+        present_relationship_bytes: Option<usize>,
+        created_part_bytes: usize,
+        created_relationship_base_bytes: usize,
+    ) -> Self {
+        Self {
+            present_part_bytes,
+            present_relationship_bytes,
+            created_part_bytes,
+            created_relationship_base_bytes,
+        }
+    }
+}
+
+impl OwnerAdmission {
+    fn family(&self, family: Family) -> &FamilyAdmission {
+        &self.families[family_index(family)]
+    }
+
+    fn check(&self, prepared: &PreparedPlan, maximum: Option<usize>) -> Result<()> {
+        let Some(maximum) = maximum else {
+            return Ok(());
+        };
+        let mut target = if prepared.planned_changes.iter().all(Option::is_none) {
+            self.source_bytes
+        } else {
+            self.source_bytes
+                .checked_sub(self.source_archive_bytes)
+                .and_then(|value| value.checked_sub(self.discarded_target_bytes))
+                .ok_or_else(|| {
+                    Error::Invalid(
+                        "metadata target endpoint underflowed its source archive or discarded cache"
+                            .to_owned(),
+                    )
+                })?
+        };
+        for change in prepared.planned_changes.iter().flatten() {
+            let family = self.family(change.family);
+            target = match (change.before_len, change.after_len) {
+                (Some(before), Some(after)) => target
+                    .checked_sub(before)
+                    .and_then(|value| value.checked_add(after))
+                    .ok_or_else(|| {
+                        Error::Invalid(
+                            "metadata replacement endpoint accounting overflowed".to_owned(),
+                        )
+                    })?,
+                (Some(before), None) => {
+                    let part_bytes = family.present_part_bytes.ok_or_else(|| {
+                        Error::Invalid("metadata removal part disappeared".to_owned())
+                    })?;
+                    let relationship_bytes =
+                        family.present_relationship_bytes.ok_or_else(|| {
+                            Error::Invalid("metadata removal relationship disappeared".to_owned())
+                        })?;
+                    target
+                        .checked_sub(
+                            part_bytes
+                                .saturating_add(before)
+                                .saturating_add(relationship_bytes),
+                        )
+                        .ok_or_else(|| {
+                            Error::Invalid("metadata removal endpoint underflowed".to_owned())
+                        })?
+                },
+                (None, Some(after)) => target
+                    .checked_add(family.created_part_bytes)
+                    .and_then(|value| value.checked_add(after))
+                    .and_then(|value| value.checked_add(family.created_relationship_base_bytes))
+                    .and_then(|value| value.checked_add(change.relationship_id.len()))
+                    .ok_or_else(|| {
+                        Error::Invalid("metadata creation endpoint overflowed".to_owned())
+                    })?,
+                (None, None) => {
+                    return Err(Error::Invalid(
+                        "metadata admission carried an empty topology change".to_owned(),
+                    ));
+                },
+            };
+        }
+        let observed = self
+            .source_bytes
+            .checked_add(target)
+            .and_then(|value| value.checked_add(prepared.planned_retained_bytes))
+            .ok_or_else(|| {
+                Error::Invalid("metadata retained-byte accounting overflowed".to_owned())
+            })?;
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
+            });
+        }
+        Ok(())
+    }
+}
+
 impl Plan {
     /// The snapshot this plan started from.
     #[must_use]
@@ -941,31 +1126,34 @@ impl Plan {
         let mut relationship_ids = base.relationship_ids.clone();
         let mut retained_changes = 0usize;
         let mut changed = false;
+        let mut planned_changes = std::array::from_fn(|_| None);
         if let Some(core) = &core {
-            retained_changes = retained_changes.saturating_add(planned_change_bytes(
+            let (bytes, change) = planned_change_bytes(
                 &base,
                 Family::Core,
                 Some(core.after_len),
                 &mut relationship_ids,
-            )?);
+            )?;
+            retained_changes = retained_changes.saturating_add(bytes);
+            planned_changes[family_index(Family::Core)] = Some(change);
             changed = true;
         }
         if let Some(app) = &app {
-            retained_changes = retained_changes.saturating_add(planned_change_bytes(
-                &base,
-                Family::App,
-                app.after_len,
-                &mut relationship_ids,
-            )?);
+            let (bytes, change) =
+                planned_change_bytes(&base, Family::App, app.after_len, &mut relationship_ids)?;
+            retained_changes = retained_changes.saturating_add(bytes);
+            planned_changes[family_index(Family::App)] = Some(change);
             changed = true;
         }
         if let Some(custom) = &custom {
-            retained_changes = retained_changes.saturating_add(planned_change_bytes(
+            let (bytes, change) = planned_change_bytes(
                 &base,
                 Family::Custom,
                 custom.after_len,
                 &mut relationship_ids,
-            )?);
+            )?;
+            retained_changes = retained_changes.saturating_add(bytes);
+            planned_changes[family_index(Family::Custom)] = Some(change);
             changed = true;
         }
         let planned_retained_bytes = if changed {
@@ -980,6 +1168,7 @@ impl Plan {
             app,
             custom,
             changed_fields: changed_fields.into_boxed_slice(),
+            planned_changes,
             planned_retained_bytes,
         })
     }
@@ -997,28 +1186,9 @@ impl Plan {
     /// [`Error::Limit`] for an exceeded bound.
     pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
         let maximum = self.options.max_retained_bytes_value();
+        let owner = self.options.owner;
         let prepared = self.prepare()?;
-        if let Some(maximum) = maximum
-            && prepared.planned_retained_bytes > maximum
-        {
-            return Err(Error::Limit {
-                kind: LimitKind::RetainedBytes,
-                observed: prepared.planned_retained_bytes,
-                maximum,
-            });
-        }
-        let result = prepared.finish_prepared();
-        if let Ok((_, patch, _)) = &result
-            && let Some(maximum) = maximum
-            && patch.retained_bytes() > maximum
-        {
-            return Err(Error::Limit {
-                kind: LimitKind::RetainedBytes,
-                observed: patch.retained_bytes(),
-                maximum,
-            });
-        }
-        result
+        prepared.finish_with_limit(maximum, owner)
     }
 }
 
@@ -1033,6 +1203,17 @@ fn exact_part(part: &PackURI) -> Result<PackURI> {
     PackURI::new(retained_string(part.as_str())).map_err(Error::Invalid)
 }
 
+#[derive(Debug, Clone)]
+struct PreparedChange {
+    family: Family,
+    part: PackURI,
+    relationship_id: String,
+    relationship_type: String,
+    relationship_target: String,
+    before_len: Option<usize>,
+    after_len: Option<usize>,
+}
+
 #[derive(Debug)]
 struct PreparedPlan {
     base: Snapshot,
@@ -1040,6 +1221,7 @@ struct PreparedPlan {
     app: Option<PreparedApp>,
     custom: Option<PreparedCustom>,
     changed_fields: Box<[Field]>,
+    planned_changes: [Option<PreparedChange>; 3],
     planned_retained_bytes: usize,
 }
 
@@ -1064,6 +1246,46 @@ struct PreparedCustom {
 }
 
 impl PreparedPlan {
+    fn check_planned_limit(
+        &self,
+        maximum: Option<usize>,
+        owner: Option<OwnerAdmission>,
+    ) -> Result<()> {
+        if let Some(maximum) = maximum
+            && self.planned_retained_bytes > maximum
+        {
+            return Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed: self.planned_retained_bytes,
+                maximum,
+            });
+        }
+        if let Some(owner) = owner {
+            owner.check(self, maximum)?;
+        }
+        Ok(())
+    }
+
+    fn finish_with_limit(
+        self,
+        maximum: Option<usize>,
+        owner: Option<OwnerAdmission>,
+    ) -> Result<(Snapshot, Patch, Diagnostics)> {
+        self.check_planned_limit(maximum, owner)?;
+        let result = self.finish_prepared();
+        if let Ok((_, patch, _)) = &result
+            && let Some(maximum) = maximum
+            && patch.retained_bytes() > maximum
+        {
+            return Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed: patch.retained_bytes(),
+                maximum,
+            });
+        }
+        result
+    }
+
     fn finish_prepared(self) -> Result<(Snapshot, Patch, Diagnostics)> {
         let Self {
             base,
@@ -1071,21 +1293,17 @@ impl PreparedPlan {
             app,
             custom,
             mut changed_fields,
+            mut planned_changes,
             ..
         } = self;
         let mut after = base.clone();
         let mut changes = Vec::new();
         if let Some(core) = core {
+            let planned = take_planned_change(&mut planned_changes, Family::Core)?;
             let merged = core.target;
             let bytes = super::write::encode_preflighted(&merged, core.dialect, core.after_len)?
                 .into_bytes();
-            if let Some(change) = stage_change(
-                &mut after,
-                Family::Core,
-                false,
-                Some(bytes),
-                core.dialect.relationship_type(),
-            )? {
+            if let Some(change) = stage_prepared_change(&mut after, planned, Some(bytes))? {
                 changes.push(change);
                 after.core_dialect = after.core_dialect.or(Some(core.dialect));
                 after.core_value = Some(merged);
@@ -1094,6 +1312,7 @@ impl PreparedPlan {
         }
 
         if let Some(app) = app {
+            let planned = take_planned_change(&mut planned_changes, Family::App)?;
             let after_bytes = match (&base.app.present, &app.target) {
                 (Some(present), Some(props)) => Some(app::splice_planned(
                     &present.bytes,
@@ -1110,18 +1329,13 @@ impl PreparedPlan {
                 )?),
                 (_, None) => None,
             };
-            if let Some(change) = stage_change(
-                &mut after,
-                Family::App,
-                app.target.is_none(),
-                after_bytes,
-                rt::EXTENDED_PROPERTIES,
-            )? {
+            if let Some(change) = stage_prepared_change(&mut after, planned, after_bytes)? {
                 changes.push(change);
             }
         }
 
         if let Some(custom) = custom {
+            let planned = take_planned_change(&mut planned_changes, Family::Custom)?;
             let after_bytes = if custom.target.is_empty() {
                 None
             } else {
@@ -1132,13 +1346,7 @@ impl PreparedPlan {
                     })?,
                 )?)
             };
-            if let Some(change) = stage_change(
-                &mut after,
-                Family::Custom,
-                custom.target.is_empty(),
-                after_bytes,
-                rt::CUSTOM_PROPERTIES,
-            )? {
+            if let Some(change) = stage_prepared_change(&mut after, planned, after_bytes)? {
                 changes.push(change);
                 after.custom_value = custom.target;
             }
@@ -1172,12 +1380,109 @@ impl PreparedPlan {
     }
 }
 
+fn take_planned_change(
+    planned_changes: &mut [Option<PreparedChange>; 3],
+    family: Family,
+) -> Result<PreparedChange> {
+    planned_changes[family_index(family)]
+        .take()
+        .ok_or(Error::Internal("missing prepared property change"))
+}
+
+/// Publish one already-planned family while reusing its topology strings and
+/// admitted lengths. The prepared descriptor is consumed into the final patch;
+/// no family graph or relationship-ID scan is repeated here.
+fn stage_prepared_change(
+    after: &mut Snapshot,
+    prepared: PreparedChange,
+    bytes: Option<Vec<u8>>,
+) -> Result<Option<Change>> {
+    let family = prepared.family;
+    let state = after.family(family).clone();
+    let is_removal = prepared.after_len.is_none();
+    if let Some(bytes) = bytes.as_ref()
+        && Some(bytes.len()) != prepared.after_len
+    {
+        return Err(Error::Internal("prepared property length changed"));
+    }
+    match (state.present, prepared.before_len, is_removal, bytes) {
+        (Some(present), Some(_), true, None) => {
+            if let Some(reason) = state.shared_by {
+                return Err(Error::Invalid(reason));
+            }
+            after.relationship_ids.remove(&prepared.relationship_id);
+            let slot = after.family_mut(family);
+            slot.new_part = prepared.part.clone();
+            slot.present = None;
+            Ok(Some(Change {
+                family,
+                part: prepared.part,
+                relationship_id: prepared.relationship_id,
+                relationship_type: prepared.relationship_type,
+                relationship_target: prepared.relationship_target,
+                before: Some(present.bytes),
+                after: None,
+                free_relationship_id: false,
+            }))
+        },
+        (Some(present), Some(_), false, Some(bytes)) => {
+            if bytes.as_slice() == present.bytes.as_slice() {
+                return Ok(None);
+            }
+            let bytes = Arc::new(bytes);
+            let slot = after.family_mut(family);
+            let Some(slot) = slot.present.as_mut() else {
+                return Err(Error::Internal("prepared property part disappeared"));
+            };
+            slot.bytes = Arc::clone(&bytes);
+            let change = Change {
+                family,
+                part: prepared.part,
+                relationship_id: prepared.relationship_id,
+                relationship_type: prepared.relationship_type,
+                relationship_target: prepared.relationship_target,
+                before: Some(present.bytes),
+                after: Some(bytes),
+                free_relationship_id: false,
+            };
+            Ok(Some(change))
+        },
+        (None, None, false, Some(bytes)) => {
+            let bytes = Arc::new(bytes);
+            let present = Present {
+                part: prepared.part.clone(),
+                relationship_id: prepared.relationship_id.clone(),
+                relationship_type: prepared.relationship_type.clone(),
+                relationship_target: prepared.relationship_target.clone(),
+                bytes: Arc::clone(&bytes),
+            };
+            after
+                .relationship_ids
+                .insert(prepared.relationship_id.clone());
+            let slot = after.family_mut(family);
+            slot.present = Some(present);
+            slot.shared_by = None;
+            Ok(Some(Change {
+                family,
+                part: prepared.part,
+                relationship_id: prepared.relationship_id,
+                relationship_type: prepared.relationship_type,
+                relationship_target: prepared.relationship_target,
+                before: None,
+                after: Some(bytes),
+                free_relationship_id: false,
+            }))
+        },
+        (_, _, _, _) => Err(Error::Internal("prepared property topology changed")),
+    }
+}
+
 fn planned_change_bytes(
     snapshot: &Snapshot,
     family: Family,
     after_len: Option<usize>,
     relationship_ids: &mut BTreeSet<String>,
-) -> Result<usize> {
+) -> Result<(usize, PreparedChange)> {
     let state = snapshot.family(family);
     if after_len.is_none()
         && let Some(present) = state.present.as_ref()
@@ -1187,14 +1492,14 @@ fn planned_change_bytes(
         // the same order as `stage_change`, which removes it immediately.
         relationship_ids.remove(&present.relationship_id);
     }
-    let (part_len, relationship_id_len, relationship_type_len, relationship_target_len, before_len) =
+    let (part, relationship_id, relationship_type, relationship_target, before_len) =
         match &state.present {
             Some(present) => (
-                retained_string(present.part.as_str()).capacity(),
-                retained_string(&present.relationship_id).capacity(),
-                retained_string(&present.relationship_type).capacity(),
-                retained_string(&present.relationship_target).capacity(),
-                present.bytes.capacity(),
+                exact_part(&present.part)?,
+                retained_string(&present.relationship_id),
+                retained_string(&present.relationship_type),
+                retained_string(&present.relationship_target),
+                Some(present.bytes.capacity()),
             ),
             None => {
                 let relationship_id = retained_string(&next_relationship_id(relationship_ids)?);
@@ -1207,21 +1512,31 @@ fn planned_change_bytes(
                     Family::Custom => rt::CUSTOM_PROPERTIES,
                 });
                 (
-                    retained_string(state.new_part.as_str()).capacity(),
-                    relationship_id.capacity(),
-                    relationship_type.capacity(),
-                    relationship_target.capacity(),
-                    0,
+                    exact_part(&state.new_part)?,
+                    relationship_id,
+                    relationship_type,
+                    relationship_target,
+                    None,
                 )
             },
         };
-    Ok(size_of::<Change>()
-        .saturating_add(part_len)
-        .saturating_add(relationship_id_len)
-        .saturating_add(relationship_type_len)
-        .saturating_add(relationship_target_len)
-        .saturating_add(before_len)
-        .saturating_add(after_len.unwrap_or(0)))
+    let change = PreparedChange {
+        family,
+        part,
+        relationship_id,
+        relationship_type,
+        relationship_target,
+        before_len,
+        after_len,
+    };
+    let bytes = size_of::<Change>()
+        .saturating_add(change.part.as_str().len())
+        .saturating_add(change.relationship_id.capacity())
+        .saturating_add(change.relationship_type.capacity())
+        .saturating_add(change.relationship_target.capacity())
+        .saturating_add(change.before_len.unwrap_or(0))
+        .saturating_add(change.after_len.unwrap_or(0));
+    Ok((bytes, change))
 }
 
 fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
@@ -1298,6 +1613,23 @@ impl Edit {
             package: package.clone(),
             plan: snapshot.plan_with_options(options),
         })
+    }
+
+    /// Start an edit from a snapshot already captured by the host bridge.
+    ///
+    /// This keeps owner-specific admission policy in [`EditOptions`] without
+    /// capturing the same property families twice. The snapshot remains an
+    /// immutable read view; only [`Self::commit`] publishes a package.
+    #[doc(hidden)]
+    pub fn new_with_snapshot(
+        package: &OpcPackage,
+        snapshot: Snapshot,
+        options: EditOptions,
+    ) -> Self {
+        Self {
+            package: package.clone(),
+            plan: snapshot.plan_with_options(options),
+        }
     }
 
     /// The snapshot this edit started from.
@@ -1393,90 +1725,6 @@ impl Edit {
         patch.apply(&mut package)?;
         Ok(Commit::new(package, patch, diagnostics))
     }
-}
-
-/// Turn one family's target bytes into a change, and update `after`.
-///
-/// `remove` stages the removal of a present part; otherwise `bytes` is the
-/// new payload, `None` when it equals the current one.
-fn stage_change(
-    after: &mut Snapshot,
-    family: Family,
-    remove: bool,
-    bytes: Option<Vec<u8>>,
-    new_relationship_type: &str,
-) -> Result<Option<Change>> {
-    let state = after.family(family).clone();
-    let change = match (state.present, remove, bytes) {
-        (Some(present), true, _) => {
-            if let Some(reason) = state.shared_by {
-                return Err(Error::Invalid(reason));
-            }
-            after.relationship_ids.remove(&present.relationship_id);
-            let slot = after.family_mut(family);
-            slot.new_part = exact_part(&present.part)?;
-            slot.present = None;
-            Change {
-                family,
-                part: exact_part(&present.part)?,
-                relationship_id: retained_string(&present.relationship_id),
-                relationship_type: retained_string(&present.relationship_type),
-                relationship_target: retained_string(&present.relationship_target),
-                before: Some(present.bytes),
-                after: None,
-                free_relationship_id: false,
-            }
-        },
-        (Some(present), false, Some(bytes)) => {
-            if bytes.as_slice() == present.bytes.as_slice() {
-                return Ok(None);
-            }
-            let bytes = Arc::new(bytes);
-            let slot = after.family_mut(family);
-            if let Some(slot) = slot.present.as_mut() {
-                slot.bytes = Arc::clone(&bytes);
-            }
-            Change {
-                family,
-                part: exact_part(&present.part)?,
-                relationship_id: retained_string(&present.relationship_id),
-                relationship_type: retained_string(&present.relationship_type),
-                relationship_target: retained_string(&present.relationship_target),
-                before: Some(present.bytes),
-                after: Some(bytes),
-                free_relationship_id: false,
-            }
-        },
-        (None, false, Some(bytes)) => {
-            let relationship_id = retained_string(&next_relationship_id(&after.relationship_ids)?);
-            after.relationship_ids.insert(relationship_id.clone());
-            let part = exact_part(&state.new_part)?;
-            let bytes = Arc::new(bytes);
-            let present = Present {
-                relationship_type: retained_string(new_relationship_type),
-                relationship_target: retained_string(part.as_str().trim_start_matches('/')),
-                bytes: Arc::clone(&bytes),
-                part: part.clone(),
-                relationship_id: relationship_id.clone(),
-            };
-            let change = Change {
-                family,
-                part,
-                relationship_id,
-                relationship_type: present.relationship_type.clone(),
-                relationship_target: present.relationship_target.clone(),
-                before: None,
-                after: Some(bytes),
-                free_relationship_id: false,
-            };
-            let slot = after.family_mut(family);
-            slot.present = Some(present);
-            slot.shared_by = None;
-            change
-        },
-        (_, _, None) | (None, true, _) => return Ok(None),
-    };
-    Ok(Some(change))
 }
 
 fn next_relationship_id(used: &BTreeSet<String>) -> Result<String> {
