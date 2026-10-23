@@ -45,6 +45,11 @@ const SLIDES_CACHE_MAX_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 const SLIDES_CACHE_MAX_COUNT: usize = 256;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
+// A small source may safely retain its validated XML so repeated text writes
+// reuse decompression. Larger sources stay reader-backed even when a caller
+// repeats a query; this ceiling is independent of the public content_xml()
+// accessor, which remains an explicit materialization request.
+const SEMANTIC_CONTENT_MEMO_MAX_SOURCE_BYTES: u64 = 1024 * 1024;
 const STREAM_PROBE_WINDOW_BYTES: usize = 4096;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
@@ -1187,9 +1192,11 @@ impl SourceBackedPresentation {
 
     /// Stream one semantic text object per slide into `output` in document order.
     ///
-    /// The validated source content is decoded for this pass and is not
-    /// retained as the raw XML cache; package media is not read. Output may
-    /// be partial when parsing, limits, or the sink fail.
+    /// The validated source content is decoded for this pass; when its
+    /// declared size fits the bounded small-source memo it may be retained
+    /// for a repeated text write, while larger sources remain streaming.
+    /// Package media is not read. Output may be partial when parsing, limits,
+    /// or the sink fail.
     /// This method does not flush or roll back the sink and provides no
     /// cancellation hook. The paragraph separator applies to all paragraph,
     /// title/body, and shape-text boundaries within each slide; the slide
@@ -1227,6 +1234,24 @@ impl SourceBackedPresentation {
             })?;
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
+        if let Some(content_xml) = self
+            .small_content_xml_snapshot()
+            .map_err(|source| TextOutputError::Document {
+                source,
+                progress: writer.progress(),
+            })?
+        {
+            let result = Parser::write_slides_text_to(
+                content_xml,
+                &mut writer,
+                paragraph_separator,
+            );
+            let progress = writer.progress();
+            if let Err(source) = self.check_source() {
+                return Err(TextOutputError::Document { source, progress });
+            }
+            return result.map(|()| writer.finish());
+        }
         let result = self
             .package
             .with_verified_member_reader("content.xml", |reader| {
@@ -1268,6 +1293,17 @@ impl SourceBackedPresentation {
             return Err(TextOutputError::Document { source, progress });
         }
         result.map(|()| writer.finish())
+    }
+
+    /// Reuse one bounded decoded content member for repeated text writes.
+    /// The source-size check is performed before materialization, and the
+    /// existing content snapshot retains source-version reconciliation around
+    /// the read and publication.
+    fn small_content_xml_snapshot(&self) -> Result<Option<&str>> {
+        if self.content_xml_bytes > SEMANTIC_CONTENT_MEMO_MAX_SOURCE_BYTES {
+            return Ok(None);
+        }
+        self.content_xml_snapshot().map(Some)
     }
 
     fn text_from_cache(&self, cache: &Option<String>) -> Result<String> {
@@ -1503,6 +1539,10 @@ mod tests {
         assert_eq!(owner.content_xml_bytes, content.len() as u64);
 
         assert!(owner.slide(0).unwrap().is_some());
+        let mut output = Vec::new();
+        owner
+            .write_text_to(&mut output, TextOutputOptions::default())
+            .unwrap();
         assert!(
             owner.content_xml.get().is_none(),
             "semantic projections must not retain the raw XML cache"

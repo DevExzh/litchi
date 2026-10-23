@@ -412,6 +412,29 @@ fn source_backed_sink_matches_owned_and_does_not_use_text_cache() {
 }
 
 #[test]
+fn source_backed_sink_reuses_small_content_for_repeat_write() {
+    let source = Arc::new(CountingSource::new(representative_package()));
+    let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+    let mut first = Vec::new();
+    presentation
+        .write_text_to(&mut first, TextOutputOptions::default())
+        .unwrap();
+    let reads_after_first_write = source.reads.load(Ordering::Relaxed);
+
+    let mut second = Vec::new();
+    presentation
+        .write_text_to(&mut second, TextOutputOptions::default())
+        .unwrap();
+
+    assert_eq!(second, first);
+    assert_eq!(
+        source.reads.load(Ordering::Relaxed),
+        reads_after_first_write,
+        "a small source write replay reuses the validated decoded member"
+    );
+}
+
+#[test]
 fn source_backed_sink_rejects_oversized_text_space_attribute() {
     let count = "1".repeat(1_048_577);
     let content = format!(
