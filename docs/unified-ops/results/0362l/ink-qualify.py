@@ -142,6 +142,7 @@ def build(args):
         input_lock=artifact(args.lock),
         requested_refs={'base': args.base, 'candidate': args.candidate},
         resolved_refs={'base': base_commit, 'candidate': candidate_commit},
+        comparison='integrated-route',
         endpoints={},
     )
     save(out / 'build.json', manifest)
