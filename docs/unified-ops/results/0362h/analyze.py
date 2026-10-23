@@ -15,6 +15,7 @@ import sys
 
 MIN_SAMPLE_NS = 150_000_000
 SHA256 = set("0123456789abcdef")
+FULL_COMMIT = SHA256
 CHANGED_SUFFIXES = {
     "set_commit", "set_publication", "batch_commit", "batch_publication",
     "import_commit", "import_publication", "merge_commit", "merge_publication",
@@ -67,11 +68,19 @@ def check_endpoint(value, label: str) -> dict:
     check_artifact(value.get("manifest"), f"{label}.manifest")
     for name in ("binary", "source", "lock", "probe", "fixture"):
         check_artifact(value.get(name), f"{label}.{name}")
-    if not isinstance(value.get("source_commit"), str) or not value["source_commit"]:
-        fail(f"{label}.source_commit is missing")
+    for name in (
+        "dependency_projection", "workspace_manifest", "package_manifest", "toolchain",
+        "source_assembly", "build_receipt", "validation",
+    ):
+        check_artifact(value.get(name), f"{label}.{name}")
+    source_commit = value.get("source_commit")
+    if not isinstance(source_commit, str) or len(source_commit) != 40 or set(source_commit) - FULL_COMMIT:
+        fail(f"{label}.source_commit is not a full commit id")
     dependency = value.get("dependency_projection_sha256")
     if not isinstance(dependency, str) or len(dependency) != 64 or set(dependency) - SHA256:
         fail(f"{label}.dependency_projection_sha256 is invalid")
+    if value["dependency_projection"]["sha256"] != dependency:
+        fail(f"{label}.dependency_projection_sha256 does not identify the projection artifact")
     return value
 
 

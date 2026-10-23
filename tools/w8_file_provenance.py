@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -33,7 +34,8 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
-COMMIT = re.compile(r"^[0-9a-f]{7,64}$")
+FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+REVIEWED_PROBE_SHA256 = "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
 EXPECTED_FAMILIES = (
     "docx", "odt", "doc", "rtf", "xlsx", "xlsb", "xls", "ods",
     "pptx", "ppt", "odp",
@@ -69,6 +71,20 @@ def artifact(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise fail(f"artifact is not a regular file: {path}")
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest(path)}
+
+
+def same_artifact(actual: dict[str, Any], expected: object, label: str) -> None:
+    if not isinstance(expected, dict):
+        raise fail(f"{label} artifact is missing")
+    for key in ("bytes", "sha256"):
+        if expected.get(key) != actual[key]:
+            raise fail(f"{label} {key} does not match its supplied file")
+
+
+def checked_commit(value: object, label: str) -> str:
+    if not isinstance(value, str) or not FULL_COMMIT.fullmatch(value):
+        raise fail(f"{label} must be a full 40-character commit id")
+    return value
 
 
 def canonical(value: object) -> bytes:
@@ -186,6 +202,12 @@ FIXTURE_RECIPE = {
 def fixture_descriptor(probe: Path) -> dict[str, Any]:
     probe = safe_location(probe, "probe")
     source = read_text(probe, "probe")
+    probe_hash = digest(probe)
+    if probe_hash != REVIEWED_PROBE_SHA256:
+        raise fail(
+            "probe is not the reviewed 109-route source; expected "
+            f"{REVIEWED_PROBE_SHA256}, got {probe_hash}"
+        )
     families = function_segment(source, "family_names")
     parsed_families = re.findall(r'"([a-z]+)"', families)
     if tuple(parsed_families) != EXPECTED_FAMILIES:
@@ -231,7 +253,7 @@ def fixture_descriptor(probe: Path) -> dict[str, Any]:
     return {
         "schema": "litchi_w8_fixture_descriptor.v1",
         "generator": "tools/w8_file_provenance.py",
-        "probe": {"name": probe.name, "bytes": probe_bytes, "sha256": digest(probe)},
+        "probe": {"name": probe.name, "bytes": probe_bytes, "sha256": probe_hash},
         "constants": constants,
         "families": list(EXPECTED_FAMILIES),
         "recipe": FIXTURE_RECIPE,
@@ -258,6 +280,56 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise fail(f"{label} must contain a JSON object")
     return value
+
+
+def fixture_routes(value: dict[str, Any], label: str = "fixture descriptor") -> list[str]:
+    if value.get("schema") != "litchi_w8_fixture_descriptor.v1":
+        raise fail(f"{label} schema is not supported")
+    if value.get("probe", {}).get("sha256") != REVIEWED_PROBE_SHA256:
+        raise fail(f"{label} is not bound to the reviewed probe")
+    families = value.get("families")
+    routes = value.get("routes")
+    if families != list(EXPECTED_FAMILIES) or not isinstance(routes, dict):
+        raise fail(f"{label} family or route declaration is incomplete")
+    expected: list[str] = []
+    for family in EXPECTED_FAMILIES:
+        entries = routes.get(family)
+        if not isinstance(entries, list) or not entries or not all(isinstance(route, str) for route in entries):
+            raise fail(f"{label} route declaration for {family} is incomplete")
+        expected.extend(f"{family}/{route}" for route in entries)
+    if len(expected) != 109 or len(set(expected)) != 109 or value.get("route_count") != 109:
+        raise fail(f"{label} does not describe the complete 109-route workload")
+    if set(value.get("route_suffix_vocabulary", [])) != {
+        "open_get", "save", "repeated_save", "set_commit", "set_publication",
+        "batch_commit", "batch_publication", "import_commit", "import_publication",
+        "merge_commit", "merge_publication", "refresh_commit", "refresh_publication",
+    }:
+        raise fail(f"{label} route vocabulary is incomplete")
+    recipe = value.get("recipe")
+    if recipe != FIXTURE_RECIPE:
+        raise fail(f"{label} fixture recipe differs from the reviewed recipe")
+    constants = value.get("constants")
+    if constants != {"target_ns": 500_000_000, "max_calls": 2_000_000, "paragraphs": 1_000, "shapes": 100}:
+        raise fail(f"{label} calibration/workload constants differ from the reviewed probe")
+    if value.get("api") != {
+        "commit_extraction": "into_file",
+        "route_list": "--mode list --route '*'",
+        "route_validate": "--mode validate --route FAMILY/ROUTE",
+    }:
+        raise fail(f"{label} API markers are incomplete")
+    return expected
+
+
+def verified_fixture(probe: Path, fixture: Path) -> tuple[dict[str, Any], list[str]]:
+    probe = safe_location(probe, "probe")
+    fixture = safe_location(fixture, "fixture descriptor")
+    expected = fixture_descriptor(probe)
+    value = load_json(fixture, "fixture descriptor")
+    if canonical(value) != fixture.read_bytes():
+        raise fail("fixture descriptor is not canonical JSON")
+    if value != expected:
+        raise fail("fixture descriptor does not match the reviewed probe recipe")
+    return value, fixture_routes(value)
 
 
 def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
@@ -318,9 +390,7 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
         toolchain_data = tomllib.loads(toolchain_text)
     except tomllib.TOMLDecodeError as error:
         raise fail(f"toolchain is not valid TOML: {error}") from error
-    fixture_data = load_json(fixture, "fixture descriptor")
-    if fixture_data.get("schema") != "litchi_w8_fixture_descriptor.v1":
-        raise fail("fixture descriptor schema is not supported")
+    fixture_data, routes = verified_fixture(probe, fixture)
     probe_artifact = artifact(probe)
     fixture_probe = fixture_data.get("probe")
     if not isinstance(fixture_probe, dict) or fixture_probe.get("sha256") != probe_artifact["sha256"]:
@@ -354,7 +424,7 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
             "probe_sha256": probe_artifact["sha256"],
             "fixture_sha256": digest(fixture),
             "fixture_schema": fixture_data["schema"],
-            "route_count": fixture_data.get("route_count"),
+            "route_count": len(routes),
         },
         # Keep the direct package declaration in the projection: lockfiles
         # alone do not record feature declarations or optional dependency
@@ -367,24 +437,245 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def source_commit(value: str) -> str:
-    if not COMMIT.fullmatch(value):
-        raise fail(f"source commit is not a hexadecimal commit id: {value!r}")
+def source_assembly(args: argparse.Namespace) -> dict[str, Any]:
+    source = artifact(safe_location(args.source, "source archive"))
+    commit = checked_commit(args.source_commit, "source commit")
+    description = args.description.strip()
+    if not description:
+        raise fail("source assembly requires a nonempty overlay description")
+    overlay: dict[str, Any] = {"kind": args.overlay_kind, "description": description}
+    if args.overlay_kind == "compatibility":
+        if not args.overlay_base_commit or not args.overlay_patch:
+            raise fail("compatibility source assembly requires base commit and overlay patch")
+        overlay["base_commit"] = checked_commit(args.overlay_base_commit, "overlay base commit")
+        overlay["patch"] = artifact(safe_location(args.overlay_patch, "overlay patch"))
+    elif args.overlay_base_commit or args.overlay_patch:
+        raise fail("a no-overlay source assembly cannot carry base commit or patch")
+    return {
+        "schema": "litchi_w8_source_assembly.v1",
+        "resolved_commit": commit,
+        "source_commit": commit,
+        "source_archive": source,
+        "overlay": overlay,
+    }
+
+
+def verified_source_assembly(path: Path, source: dict[str, Any], commit: str) -> dict[str, Any]:
+    value = load_json(path, "source assembly")
+    if canonical(value) != path.read_bytes():
+        raise fail("source assembly is not canonical JSON")
+    if value.get("schema") != "litchi_w8_source_assembly.v1":
+        raise fail("source assembly schema is not supported")
+    if checked_commit(value.get("resolved_commit"), "source assembly resolved commit") != commit:
+        raise fail("source assembly commit differs from endpoint source commit")
+    if checked_commit(value.get("source_commit"), "source assembly source commit") != commit:
+        raise fail("source assembly source commit differs from endpoint source commit")
+    same_artifact(source, value.get("source_archive"), "source assembly archive")
+    overlay = value.get("overlay")
+    if not isinstance(overlay, dict) or not isinstance(overlay.get("description"), str) or not overlay["description"].strip():
+        raise fail("source assembly overlay description is missing")
+    kind = overlay.get("kind")
+    if kind == "compatibility":
+        checked_commit(overlay.get("base_commit"), "source assembly overlay base commit")
+        patch = overlay.get("patch")
+        if not isinstance(patch, dict):
+            raise fail("compatibility source assembly lacks its patch artifact")
+        same_artifact(artifact(Path(patch.get("path", ""))), patch, "source assembly overlay patch")
+    elif kind != "none":
+        raise fail("source assembly overlay kind must be none or compatibility")
+    return value
+
+
+def verified_projection(path: Path, args: argparse.Namespace) -> tuple[dict[str, Any], dict[str, Any]]:
+    path = safe_location(path, "dependency projection")
+    projection_artifact = artifact(path)
+    value = load_json(path, "dependency projection")
+    if value.get("schema") != "litchi_w8_dependency_projection.v1":
+        raise fail("dependency projection schema is not supported")
+    if canonical(value) != path.read_bytes():
+        raise fail("dependency projection is not canonical JSON")
+    expected = dependency_projection(args)
+    if value != expected:
+        raise fail("dependency projection does not match supplied lock, manifests, features and workload")
+    return value, projection_artifact
+
+
+def verified_validation(
+    path: Path,
+    source_commit: str,
+    source: dict[str, Any],
+    binary: dict[str, Any],
+    lock: dict[str, Any],
+    probe: dict[str, Any],
+    routes: list[str],
+) -> dict[str, Any]:
+    value = load_json(path, "untimed validation receipt")
+    if value.get("schema") != "litchi_file_untimed_validation.v1":
+        raise fail("untimed validation receipt schema is not supported")
+    if checked_commit(value.get("source_commit"), "untimed validation source commit") != source_commit:
+        raise fail("untimed validation receipt source commit differs from endpoint source")
+    if value.get("route_count") != 109:
+        raise fail("untimed validation receipt is not the complete 109-route matrix")
+    outcomes = value.get("outcomes")
+    if not isinstance(outcomes, list) or len(outcomes) != 109:
+        raise fail("untimed validation receipt has no complete outcome list")
+    outcome_routes = [item.get("route") for item in outcomes if isinstance(item, dict)]
+    if outcome_routes != routes or len(set(outcome_routes)) != 109:
+        raise fail("untimed validation receipt route order differs from the reviewed fixture")
+    for index, outcome in enumerate(outcomes):
+        if not isinstance(outcome, dict) or outcome.get("index") != index:
+            raise fail("untimed validation receipt outcome indexes are incomplete")
+        for key in ("semantic_equal", "semantic_state_valid", "source_state_preserved", "source_state_exact", "exact_noop"):
+            if outcome.get(key) is not True:
+                raise fail(f"untimed validation receipt route {outcome.get('route')} is not fully validated")
+    artifacts = value.get("artifacts")
+    if not isinstance(artifacts, dict):
+        raise fail("untimed validation receipt artifacts are missing")
+    for name, expected in (("source", source), ("binary", binary), ("lock", lock), ("probe", probe)):
+        receipt_artifact = artifacts.get(name)
+        if not isinstance(receipt_artifact, dict):
+            raise fail(f"untimed validation receipt lacks {name} artifact")
+        same_artifact(expected, receipt_artifact, f"untimed validation {name}")
+        actual_receipt_artifact = artifact(Path(receipt_artifact.get("path", "")))
+        same_artifact(actual_receipt_artifact, receipt_artifact, f"untimed validation {name} receipt")
+    routes_artifact = artifacts.get("routes")
+    if not isinstance(routes_artifact, dict):
+        raise fail("untimed validation receipt lacks raw routes artifact")
+    same_artifact(artifact(Path(routes_artifact.get("path", ""))), routes_artifact, "untimed validation routes")
+    return value
+
+
+def verified_build_receipt(
+    path: Path,
+    source_commit: str,
+    source: dict[str, Any],
+    source_assembly: dict[str, Any],
+    binary: dict[str, Any],
+    lock: dict[str, Any],
+    probe: dict[str, Any],
+    fixture: dict[str, Any],
+    projection_sha256: str,
+    workspace_manifest: dict[str, Any],
+    package_manifest: dict[str, Any],
+    toolchain: dict[str, Any],
+    features: dict[str, Any],
+    target: str,
+    profile: str,
+) -> dict[str, Any]:
+    value = load_json(path, "build receipt")
+    if value.get("schema") != "litchi_w8_build_receipt.v1" or value.get("status") != "complete":
+        raise fail("build receipt is not a complete W8 build receipt")
+    if checked_commit(value.get("source_commit"), "build receipt source commit") != source_commit:
+        raise fail("build receipt source commit differs from endpoint source")
+    for name, expected in (
+        ("source_archive", source), ("source_assembly", source_assembly), ("binary", binary),
+        ("lock", lock), ("probe", probe), ("fixture", fixture),
+    ):
+        receipt_artifact = value.get(name)
+        if not isinstance(receipt_artifact, dict):
+            raise fail(f"build receipt lacks {name}")
+        same_artifact(expected, receipt_artifact, f"build receipt {name}")
+        same_artifact(artifact(Path(receipt_artifact.get("path", ""))), receipt_artifact, f"build receipt {name} file")
+    if not isinstance(value.get("dependency_projection_sha256"), str) or not SHA256.fullmatch(value["dependency_projection_sha256"]):
+        raise fail("build receipt dependency projection hash is missing")
+    if value["dependency_projection_sha256"] != projection_sha256:
+        raise fail("build receipt dependency projection differs from endpoint projection")
+    if value.get("workspace_manifest_sha256") != workspace_manifest["sha256"] or value.get("package_manifest_sha256") != package_manifest["sha256"]:
+        raise fail("build receipt manifest identities differ from endpoint manifests")
+    if value.get("toolchain_sha256") != toolchain["sha256"]:
+        raise fail("build receipt toolchain differs from endpoint toolchain")
+    if value.get("features") != features or value.get("target") != target or value.get("profile") != profile:
+        raise fail("build receipt build selection differs from dependency projection")
+    if not isinstance(value.get("build_command"), str) or not value["build_command"].strip():
+        raise fail("build receipt has no build command")
+    compiler_artifacts = value.get("compiler_artifacts")
+    if not isinstance(compiler_artifacts, list) or not compiler_artifacts:
+        raise fail("build receipt has no compiler artifact hashes")
+    for index, compiler_artifact in enumerate(compiler_artifacts):
+        if not isinstance(compiler_artifact, dict) or not compiler_artifact.get("name"):
+            raise fail(f"build receipt compiler artifact {index} is incomplete")
+        same_artifact(artifact(Path(compiler_artifact.get("path", ""))), compiler_artifact, f"build receipt compiler artifact {index}")
     return value
 
 
 def endpoint_manifest(args: argparse.Namespace) -> dict[str, Any]:
-    projection = safe_location(args.dependency_projection, "dependency projection")
-    projection_artifact = artifact(projection)
+    workspace = safe_location(args.workspace, "workspace")
+    workspace_manifest_path = safe_location(args.workspace_manifest, "workspace manifest")
+    package_manifest_path = safe_location(args.package_manifest, "package manifest")
+    toolchain_path = safe_location(args.toolchain, "toolchain")
+    if workspace_manifest_path != workspace / "Cargo.toml":
+        raise fail("workspace manifest is not the supplied workspace Cargo.toml")
+    try:
+        package_manifest_path.relative_to(workspace)
+    except ValueError as error:
+        raise fail("package manifest is outside the supplied workspace") from error
+    workspace_manifest = artifact(workspace_manifest_path)
+    package_manifest = artifact(package_manifest_path)
+    toolchain = artifact(toolchain_path)
+    lock = artifact(safe_location(args.lock, "lockfile"))
+    probe = artifact(safe_location(args.probe, "probe"))
+    fixture_path = safe_location(args.fixture, "fixture descriptor")
+    fixture, routes = verified_fixture(args.probe, fixture_path)
+    fixture_artifact = artifact(fixture_path)
+    source = artifact(safe_location(args.source, "source archive"))
+    binary_path = safe_location(args.binary, "binary")
+    binary = artifact(binary_path)
+    if not os.access(binary_path, os.X_OK):
+        raise fail(f"binary is not executable: {binary_path}")
+    commit = checked_commit(args.source_commit, "source commit")
+    source_assembly_path = safe_location(args.source_assembly, "source assembly")
+    source_assembly_artifact = artifact(source_assembly_path)
+    verified_source_assembly(source_assembly_path, source, commit)
+    projection_args = argparse.Namespace(
+        workspace=workspace,
+        package_manifest=package_manifest_path,
+        lock=args.lock,
+        toolchain=toolchain_path,
+        probe=args.probe,
+        fixture=args.fixture,
+        features=args.features,
+        all_features=args.all_features,
+        target=args.target,
+        profile=args.profile,
+    )
+    projection, projection_artifact = verified_projection(args.dependency_projection, projection_args)
+    features = {
+        "package": projection["features"]["package"],
+        "selected": projection["features"]["selected"],
+        "all_features": projection["features"]["all_features"],
+    }
+    build_receipt_path = safe_location(args.build_receipt, "build receipt")
+    build_receipt_artifact = artifact(build_receipt_path)
+    build_receipt = verified_build_receipt(
+        build_receipt_path, commit, source, source_assembly_artifact, binary, lock, probe,
+        fixture_artifact, projection_artifact["sha256"], workspace_manifest, package_manifest, toolchain,
+        features, args.target, args.profile,
+    )
+    # Keep the receipt's own identity in the endpoint: runtime verification
+    # must not trust only a filename supplied by the caller.
+    del build_receipt
+    validation_path = safe_location(args.validation_receipt, "untimed validation receipt")
+    validation_artifact = artifact(validation_path)
+    verified_validation(validation_path, commit, source, binary, lock, probe, routes)
     return {
         "schema": "litchi_file_endpoint.v1",
-        "source_commit": source_commit(args.source_commit),
+        "source_commit": commit,
         "dependency_projection_sha256": projection_artifact["sha256"],
-        "binary": artifact(safe_location(args.binary, "binary")),
-        "source": artifact(safe_location(args.source, "source archive")),
-        "lock": artifact(safe_location(args.lock, "lockfile")),
-        "probe": artifact(safe_location(args.probe, "probe")),
-        "fixture": artifact(safe_location(args.fixture, "fixture descriptor")),
+        "binary": binary,
+        "source": source,
+        "lock": lock,
+        "probe": probe,
+        "fixture": fixture_artifact,
+        "dependency_projection": projection_artifact,
+        "workspace_manifest": workspace_manifest,
+        "package_manifest": package_manifest,
+        "toolchain": toolchain,
+        "source_assembly": source_assembly_artifact,
+        "build_receipt": build_receipt_artifact,
+        "validation": validation_artifact,
+        "features": features,
+        "target": args.target,
+        "profile": args.profile,
     }
 
 
@@ -406,10 +697,26 @@ def parser() -> argparse.ArgumentParser:
     dependency.add_argument("--target", required=True)
     dependency.add_argument("--profile", default="release")
     dependency.add_argument("--output", required=True, type=Path)
+    assembly = commands.add_parser("source", help="write explicit source/compatibility assembly metadata")
+    assembly.add_argument("--source", required=True, type=Path)
+    assembly.add_argument("--source-commit", required=True)
+    assembly.add_argument("--overlay-kind", choices=("none", "compatibility"), required=True)
+    assembly.add_argument("--overlay-base-commit")
+    assembly.add_argument("--overlay-patch", type=Path)
+    assembly.add_argument("--description", required=True)
+    assembly.add_argument("--output", required=True, type=Path)
     endpoint = commands.add_parser("endpoint", help="write a W8 endpoint manifest")
-    for name in ("binary", "source", "lock", "probe", "fixture", "dependency-projection", "output"):
+    for name in (
+        "binary", "source", "lock", "probe", "fixture", "dependency-projection",
+        "workspace", "workspace-manifest", "package-manifest", "toolchain",
+        "source-assembly", "build-receipt", "validation-receipt", "output",
+    ):
         endpoint.add_argument(f"--{name}", required=True, type=Path)
     endpoint.add_argument("--source-commit", required=True)
+    endpoint.add_argument("--feature", dest="features", action="append", default=[])
+    endpoint.add_argument("--all-features", action="store_true")
+    endpoint.add_argument("--target", required=True)
+    endpoint.add_argument("--profile", default="release")
     return root
 
 
@@ -419,6 +726,8 @@ def main(argv: list[str] | None = None) -> int:
         result = write_new(args.output, fixture_descriptor(args.probe))
     elif args.command == "dependency":
         result = write_new(args.output, dependency_projection(args))
+    elif args.command == "source":
+        result = write_new(args.output, source_assembly(args))
     else:
         result = write_new(args.output, endpoint_manifest(args))
     print(json.dumps(result, sort_keys=True))

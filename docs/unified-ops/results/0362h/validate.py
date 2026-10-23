@@ -17,6 +17,7 @@ import sys
 from analyze import semantic as analyze_semantic
 
 EXPECTED_ROUTE_COUNT = 109
+FULL_COMMIT = set("0123456789abcdef")
 
 
 def sha256(path: Path) -> str:
@@ -133,6 +134,11 @@ def main() -> int:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--build-command", required=True)
     args = parser.parse_args()
+    if (
+        len(args.source_commit) != 40
+        or set(args.source_commit) - FULL_COMMIT
+    ):
+        raise RuntimeError("--source-commit must be a full 40-character commit id")
     binary = args.binary.resolve()
     output = args.output.resolve()
     if output.exists() and any(output.iterdir()):

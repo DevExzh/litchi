@@ -1,9 +1,11 @@
-"""Tests for the W8 fixture and dependency provenance generator."""
+"""Tests for W8 fixture/dependency provenance and endpoint identity gates."""
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -25,6 +27,7 @@ class FixtureDescriptor(unittest.TestCase):
         self.assertEqual(descriptor["constants"]["paragraphs"], 1_000)
         self.assertEqual(descriptor["constants"]["shapes"], 100)
         self.assertEqual(descriptor["api"]["commit_extraction"], "into_file")
+        self.assertEqual(descriptor["probe"]["sha256"], provenance.REVIEWED_PROBE_SHA256)
         self.assertEqual(descriptor["recipe"]["xlsb"]["import_rows"], 100)
         self.assertEqual(descriptor["recipe"]["odp"]["batch"], 100)
 
@@ -51,6 +54,21 @@ class FixtureDescriptor(unittest.TestCase):
             )
             with self.assertRaises(provenance.ProvenanceError):
                 provenance.fixture_descriptor(altered)
+
+    def test_changed_payload_marker_or_extraction_is_rejected_by_probe_pin(self):
+        source = PROBE.read_text(encoding="utf-8")
+        changes = (
+            ("Replaced text", "Changed payload"),
+            ('"/body/p[1]"', '"/body/p[2]"'),
+            ("into_file()", "file()"),
+        )
+        for old, new in changes:
+            with self.subTest(old=old):
+                with tempfile.TemporaryDirectory() as tmp:
+                    altered = Path(tmp) / PROBE.name
+                    altered.write_text(source.replace(old, new, 1), encoding="utf-8")
+                    with self.assertRaises(provenance.ProvenanceError):
+                        provenance.fixture_descriptor(altered)
 
 
 class DependencyProjection(unittest.TestCase):
@@ -91,16 +109,8 @@ class DependencyProjection(unittest.TestCase):
                 encoding="utf-8",
             )
             fixture = root / "fixture.json"
-            probe = root / "probe.rs"
-            probe.write_text("probe", encoding="utf-8")
-            fixture.write_text(
-                json.dumps({
-                    "schema": "litchi_w8_fixture_descriptor.v1",
-                    "probe": {"sha256": provenance.digest(probe)},
-                    "route_count": 109,
-                }),
-                encoding="utf-8",
-            )
+            probe = PROBE
+            fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(probe)))
             projection = provenance.dependency_projection(self.projection_args(root, lock, fixture, probe))
             self.assertEqual(projection["lock"]["packages"][0]["name"], "litchi-ops")
             self.assertEqual(projection["features"]["selected"], ["docx", "xlsx"])
@@ -122,15 +132,248 @@ class DependencyProjection(unittest.TestCase):
                 "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
                 encoding="utf-8",
             )
-            probe = root / "probe.rs"
+            probe = PROBE
             fixture = root / "fixture.json"
-            probe.write_text("actual", encoding="utf-8")
-            fixture.write_text(json.dumps({
-                "schema": "litchi_w8_fixture_descriptor.v1",
-                "probe": {"sha256": "0" * 64},
-            }), encoding="utf-8")
+            fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(probe)))
+            altered = json.loads(fixture.read_text(encoding="utf-8"))
+            altered["route_count"] = 108
+            fixture.write_bytes(provenance.canonical(altered))
             with self.assertRaises(provenance.ProvenanceError):
                 provenance.dependency_projection(self.projection_args(root, lock, fixture, probe))
+
+    def test_projection_rejects_schema_and_probe_hash_without_complete_recipe(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_dir = root / "crates/litchi-ops"
+            package_dir.mkdir(parents=True)
+            (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+            (root / "rust-toolchain.toml").write_text("[toolchain]\nchannel = \"1.95.0\"\n", encoding="utf-8")
+            (package_dir / "Cargo.toml").write_text(
+                "[package]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n[features]\ndocx = []\n",
+                encoding="utf-8",
+            )
+            lock = root / "Cargo.lock"
+            lock.write_text(
+                "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
+                encoding="utf-8",
+            )
+            fixture = root / "fixture.json"
+            fixture.write_bytes(
+                provenance.canonical(
+                    {
+                        "schema": "litchi_w8_fixture_descriptor.v1",
+                        "probe": {"sha256": provenance.REVIEWED_PROBE_SHA256},
+                    }
+                )
+            )
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.dependency_projection(self.projection_args(root, lock, fixture, PROBE))
+
+
+class EndpointManifest(unittest.TestCase):
+    commit = "a" * 40
+    overlay_base = "b" * 40
+
+    def inputs(self, root: Path) -> tuple[argparse.Namespace, dict[str, Path], dict[str, object]]:
+        package_dir = root / "crates/litchi-ops"
+        package_dir.mkdir(parents=True)
+        workspace_manifest = root / "Cargo.toml"
+        workspace_manifest.write_text("[workspace]\n", encoding="utf-8")
+        toolchain = root / "rust-toolchain.toml"
+        toolchain.write_text(
+            "[toolchain]\nchannel = \"1.95.0\"\ncomponents = [\"clippy\"]\n",
+            encoding="utf-8",
+        )
+        package_manifest = package_dir / "Cargo.toml"
+        package_manifest.write_text(
+            "[package]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n"
+            "[features]\ndocx = []\nxlsx = []\n",
+            encoding="utf-8",
+        )
+        lock = root / "Cargo.lock"
+        lock.write_text(
+            "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
+            encoding="utf-8",
+        )
+        fixture = root / "fixture.json"
+        fixture_value = provenance.fixture_descriptor(PROBE)
+        fixture.write_bytes(provenance.canonical(fixture_value))
+
+        projection_args = argparse.Namespace(
+            workspace=root,
+            package_manifest=package_manifest,
+            lock=lock,
+            toolchain=toolchain,
+            probe=PROBE,
+            fixture=fixture,
+            features=["docx,xlsx"],
+            all_features=False,
+            target="x86_64-unknown-linux-gnu",
+            profile="release",
+        )
+        projection_value = provenance.dependency_projection(projection_args)
+        projection = root / "projection.json"
+        projection.write_bytes(provenance.canonical(projection_value))
+
+        source = root / "source.tar"
+        source.write_bytes(b"audited source archive")
+        binary = root / "endpoint"
+        binary.write_bytes(b"not a native executable in this unit test\n")
+        os.chmod(binary, 0o755)
+        overlay_patch = root / "compatibility.patch"
+        overlay_patch.write_bytes(b"reviewed compatibility overlay")
+        source_assembly = root / "source-assembly.json"
+        source_assembly_value = provenance.source_assembly(
+            argparse.Namespace(
+                source=source,
+                source_commit=self.commit,
+                overlay_kind="compatibility",
+                overlay_base_commit=self.overlay_base,
+                overlay_patch=overlay_patch,
+                description="audited compatibility overlay for the historical baseline",
+            )
+        )
+        source_assembly.write_bytes(provenance.canonical(source_assembly_value))
+
+        compiler = root / "compiler-artifact"
+        compiler.write_bytes(b"compiler receipt artifact")
+        raw_routes = root / "routes.jsonl"
+        raw_routes.write_text("reviewed route receipt\n", encoding="utf-8")
+        routes = provenance.fixture_routes(fixture_value)
+        validation = root / "validation.json"
+        validation_value = {
+            "schema": "litchi_file_untimed_validation.v1",
+            "source_commit": self.commit,
+            "route_count": len(routes),
+            "artifacts": {
+                "source": provenance.artifact(source),
+                "binary": provenance.artifact(binary),
+                "lock": provenance.artifact(lock),
+                "probe": provenance.artifact(PROBE),
+                "routes": provenance.artifact(raw_routes),
+            },
+            "outcomes": [
+                {
+                    "index": index,
+                    "route": route,
+                    "semantic_equal": True,
+                    "semantic_state_valid": True,
+                    "source_state_preserved": True,
+                    "source_state_exact": True,
+                    "exact_noop": True,
+                }
+                for index, route in enumerate(routes)
+            ],
+        }
+        validation.write_bytes(provenance.canonical(validation_value))
+        build = root / "build.json"
+        build_value = {
+            "schema": "litchi_w8_build_receipt.v1",
+            "status": "complete",
+            "source_commit": self.commit,
+            "source_archive": provenance.artifact(source),
+            "source_assembly": provenance.artifact(source_assembly),
+            "binary": provenance.artifact(binary),
+            "lock": provenance.artifact(lock),
+            "probe": provenance.artifact(PROBE),
+            "fixture": provenance.artifact(fixture),
+            "dependency_projection_sha256": provenance.digest(projection),
+            "workspace_manifest_sha256": provenance.digest(workspace_manifest),
+            "package_manifest_sha256": provenance.digest(package_manifest),
+            "toolchain_sha256": provenance.digest(toolchain),
+            "features": projection_value["features"],
+            "target": projection_value["build"]["target"],
+            "profile": projection_value["build"]["profile"],
+            "build_command": "recorded external release build",
+            "compiler_artifacts": [{"name": "rustc", **provenance.artifact(compiler)}],
+        }
+        build.write_bytes(provenance.canonical(build_value))
+        args = argparse.Namespace(
+            binary=binary,
+            source=source,
+            lock=lock,
+            probe=PROBE,
+            fixture=fixture,
+            dependency_projection=projection,
+            workspace=root,
+            workspace_manifest=workspace_manifest,
+            package_manifest=package_manifest,
+            toolchain=toolchain,
+            source_assembly=source_assembly,
+            build_receipt=build,
+            validation_receipt=validation,
+            source_commit=self.commit,
+            features=["docx,xlsx"],
+            all_features=False,
+            target="x86_64-unknown-linux-gnu",
+            profile="release",
+        )
+        paths = {"lock": lock, "validation": validation, "projection": projection}
+        values = {"routes": routes, "projection": projection_value}
+        return args, paths, values
+
+    @staticmethod
+    def runner_module():
+        path = ROOT / "docs/unified-ops/results/0362h/run.py"
+        spec = importlib.util.spec_from_file_location("w8_file_run", path)
+        if spec is None or spec.loader is None:
+            raise AssertionError(f"cannot load {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_endpoint_binds_projection_and_receipts_to_current_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args, paths, values = self.inputs(Path(tmp))
+            endpoint = provenance.endpoint_manifest(args)
+            self.assertEqual(endpoint["source_commit"], self.commit)
+            self.assertEqual(endpoint["dependency_projection"]["sha256"], provenance.digest(paths["projection"]))
+            self.assertEqual(len(values["routes"]), 109)
+
+            paths["lock"].write_text(
+                paths["lock"].read_text(encoding="utf-8") + "\n# stale join\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.endpoint_manifest(args)
+
+    def test_endpoint_rejects_short_source_commit_and_incomplete_validation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args, paths, _ = self.inputs(Path(tmp))
+            args.source_commit = "f2bbbc8d07"
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.endpoint_manifest(args)
+
+            args.source_commit = self.commit
+            value = json.loads(paths["validation"].read_text(encoding="utf-8"))
+            value["route_count"] = 108
+            paths["validation"].write_bytes(provenance.canonical(value))
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.endpoint_manifest(args)
+
+    def test_runtime_rejects_projection_with_only_schema_and_probe_hash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args, paths, _ = self.inputs(Path(tmp))
+            endpoint = provenance.endpoint_manifest(args)
+            endpoint_path = Path(tmp) / "endpoint.json"
+            endpoint_path.write_bytes(provenance.canonical(endpoint))
+            runner = self.runner_module()
+            checked = runner.endpoint_manifest(endpoint_path, args.binary, "test")
+            self.assertEqual(len(checked["routes"]), 109)
+
+            paths["projection"].write_bytes(
+                provenance.canonical(
+                    {
+                        "schema": "litchi_w8_dependency_projection.v1",
+                        "workload": {"probe_sha256": provenance.REVIEWED_PROBE_SHA256},
+                    }
+                )
+            )
+            endpoint["dependency_projection"] = provenance.artifact(paths["projection"])
+            endpoint["dependency_projection_sha256"] = provenance.digest(paths["projection"])
+            endpoint_path.write_bytes(provenance.canonical(endpoint))
+            with self.assertRaises(RuntimeError):
+                runner.endpoint_manifest(endpoint_path, args.binary, "partial")
 
 
 if __name__ == "__main__":

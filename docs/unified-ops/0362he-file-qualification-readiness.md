@@ -22,13 +22,17 @@ bound or route guard fails descriptor generation until the recipe is reviewed.
 
 The `dependency` command parses the supplied `Cargo.lock`, workspace and
 `litchi-ops` manifests, selected feature set, target, release profile and
-`rust-toolchain.toml`.  It also verifies that the fixture descriptor is bound
-to the supplied probe, then writes a canonical
-`litchi_w8_dependency_projection.v1`.  The projection contains the resolved
-package graph and hashes of all source inputs; it does not run Cargo.  The
-`endpoint` command hashes the binary, source archive, lock, probe, fixture
-descriptor and dependency projection into the `litchi_file_endpoint.v1`
-manifest expected by `results/0362h/run.py`.
+`rust-toolchain.toml`.  It re-generates the fixture descriptor from the
+reviewed probe and compares the complete canonical descriptor, rather than
+accepting a schema plus a probe hash.  The resulting
+`litchi_w8_dependency_projection.v1` contains the resolved package graph and
+hashes of every source input; it does not run Cargo.  The `source` command
+records the full resolved source commit and, where needed, an explicitly
+described compatibility overlay and patch artifact.  The `endpoint` command
+then binds the executable, source assembly, lock, probe, fixture, projection,
+workspace/package manifests, toolchain, build receipt and complete untimed
+109-route validation receipt into the `litchi_file_endpoint.v1` manifest
+expected by `results/0362h/run.py`.
 
 Keep all generated descriptors, lockfiles, source archives, manifests and
 binaries in `.coord` or another external scratch directory.  The tool rejects
@@ -45,6 +49,10 @@ SRC=/path/to/source-checkout
 PROBE="$SRC/crates/litchi-ops/examples/file_w8_qualified_probe.rs"
 LOCK=/path/to/locked/Cargo.lock
 OUT=/path/to/external/.coord/w8-file-provenance
+SOURCE_ARCHIVE=/path/to/source.tar
+BASE=/path/to/historical-baseline-checkout
+OVERLAY_BASE="$(git -C "$BASE" rev-parse HEAD)"
+OVERLAY_PATCH=/path/to/reviewed-compatibility.patch
 mkdir -p "$OUT"
 
 python3 tools/w8_file_provenance.py fixture \
@@ -57,20 +65,40 @@ python3 tools/w8_file_provenance.py dependency \
   --all-features --target x86_64-unknown-linux-gnu --profile release \
   --output "$OUT/dependency.json"
 
+python3 tools/w8_file_provenance.py source \
+  --source "$SOURCE_ARCHIVE" \
+  --source-commit "$(git -C "$SRC" rev-parse HEAD)" \
+  --overlay-kind compatibility --overlay-base-commit "$OVERLAY_BASE" \
+  --overlay-patch "$OVERLAY_PATCH" \
+  --description "audited compatibility overlay rooted at the selected baseline" \
+  --output "$OUT/source-assembly.json"
+
 python3 tools/w8_file_provenance.py endpoint \
   --binary /path/to/protected/endpoint \
-  --source /path/to/source.tar \
+  --source "$SOURCE_ARCHIVE" \
   --lock "$LOCK" --probe "$PROBE" --fixture "$OUT/fixture.json" \
   --dependency-projection "$OUT/dependency.json" \
+  --workspace "$SRC" --workspace-manifest "$SRC/Cargo.toml" \
+  --package-manifest "$SRC/crates/litchi-ops/Cargo.toml" \
+  --toolchain "$SRC/rust-toolchain.toml" \
+  --source-assembly "$OUT/source-assembly.json" \
+  --build-receipt /path/to/external/build-receipt.json \
+  --validation-receipt /path/to/external/untimed-validation.json \
   --source-commit "$(git -C "$SRC" rev-parse HEAD)" \
+  --all-features --target x86_64-unknown-linux-gnu --profile release \
   --output "$OUT/endpoint.json"
 ```
 
 Generate the fixture and dependency projection once for the shared workload
 and use the resulting identities in both endpoint manifests.  The runner
-requires the lock, projection, probe and fixture hashes to be identical on
-both endpoints; only source commits and binaries may differ.  A stale or
-changed identity therefore stops before any ABBA process starts.
+requires the lock, projection, probe, fixture, feature selection, target,
+profile and dependency/source metadata to be internally consistent on each
+endpoint, and requires the shared lock/projection/probe/fixture identities to
+match across endpoints.  It rechecks the complete fixture/projection shape,
+full source commit, overlay artifact and build/compiler receipt before any
+route calibration.  It only starts timing after both endpoint route lists
+match the complete 109-route fixture; a nonempty or partial route list is not
+qualification evidence.
 
 ## Baseline decision before an expensive build
 
