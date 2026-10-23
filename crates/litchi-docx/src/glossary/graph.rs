@@ -25,8 +25,8 @@
 //! Low-level glossary OPC graph vocabulary and relationship closure validation.
 
 use super::codec::{
-    Content, Node, bounded, invalid, read_with_limits, valid_ncname, validate_catalog_limits,
-    validate_physical_part, validate_raw_part, write_with_limits,
+    Content, Node, bounded, invalid, plan_write_with_limits, read_with_limits, valid_ncname,
+    validate_catalog_limits, validate_physical_part, validate_raw_part, write_plan_with_limits,
 };
 use super::model::{Catalog, Conformance};
 use super::package::Owner;
@@ -321,16 +321,23 @@ pub mod raw {
         Ok(())
     }
 
-    fn admit_part(
+    pub(in crate::glossary) fn admit_part(
         name: &str,
         content_type: &str,
         data_bytes: usize,
         limits: &Limits,
     ) -> Result<()> {
-        if name.len() > limits.name_bytes() || content_type.len() > limits.string_bytes() {
+        if name.len() > limits.name_bytes() {
             return Err(Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::StringBytes,
-                actual: name.len().max(content_type.len()),
+                actual: name.len(),
+                maximum: limits.name_bytes(),
+            });
+        }
+        if content_type.len() > limits.string_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: content_type.len(),
                 maximum: limits.string_bytes(),
             });
         }
@@ -359,7 +366,10 @@ pub mod raw {
         super::validate_raw_part(name, content_type, data_bytes)
     }
 
-    fn admit_relationships(relationships: &[Rel], limits: &Limits) -> Result<()> {
+    pub(in crate::glossary) fn admit_relationships(
+        relationships: &[Rel],
+        limits: &Limits,
+    ) -> Result<()> {
         if relationships.len() > limits.values() {
             return Err(Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::Relationship,
@@ -410,125 +420,46 @@ pub mod raw {
     pub(in crate::glossary) fn admit_graph(graph: &Graph, limits: &Limits) -> Result<()> {
         super::validate_catalog_limits(&graph.catalog, limits)?;
         admit_catalog(&graph.catalog, limits)?;
-        if graph.parts.len() > limits.parts().min(MAX_VALUES) {
-            return Err(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::AuxiliaryPart,
-                actual: graph.parts.len(),
-                maximum: limits.parts().min(MAX_VALUES),
-            });
-        }
-        if graph.root_name.len() > limits.name_bytes() {
-            return Err(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::StringBytes,
-                actual: graph.root_name.len(),
-                maximum: limits.name_bytes(),
-            });
-        }
-        let mut total = 0usize;
-        let mut metadata = graph.root_name.len();
-        if metadata > limits.metadata_bytes() {
-            return Err(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::GraphMetadataBytes,
-                actual: metadata,
-                maximum: limits.metadata_bytes(),
-            });
-        }
-        for value in [graph.owner_main.as_deref()].into_iter().flatten() {
-            if value.len() > limits.name_bytes() {
-                return Err(Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::StringBytes,
-                    actual: value.len(),
-                    maximum: limits.name_bytes(),
-                });
-            }
-            super::add_selected_metadata(&mut metadata, value, limits)?;
-        }
-        for value in [graph.owner_id.as_deref(), graph.owner_target.as_deref()]
-            .into_iter()
-            .flatten()
-        {
-            if value.len() > limits.string_bytes() {
-                return Err(Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::StringBytes,
-                    actual: value.len(),
-                    maximum: limits.string_bytes(),
-                });
-            }
-            super::add_selected_metadata(&mut metadata, value, limits)?;
-        }
-        admit_relationships(&graph.rels, limits)?;
-        let mut relationship_count = graph.rels.len();
-        for relationship in &graph.rels {
-            for value in [&relationship.id, &relationship.kind, &relationship.target] {
-                super::add_selected_metadata(&mut metadata, value, limits)?;
-            }
-        }
-        if let Some(xml) = graph.root_xml() {
-            admit_xml(xml, limits)?;
-            total = total.checked_add(xml.len()).ok_or(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::GraphBytes,
-                actual: usize::MAX,
-                maximum: limits.graph_bytes(),
-            })?;
-        }
-        for part in &graph.parts {
-            admit_part(part.name(), part.content_type(), part.data().len(), limits)?;
-            admit_relationships(&part.rels, limits)?;
-            relationship_count =
-                relationship_count
-                    .checked_add(part.rels.len())
-                    .ok_or(Error::GlossaryLimit {
-                        kind: crate::glossary::LimitKind::GraphWideRelationship,
-                        actual: usize::MAX,
-                        maximum: limits.values(),
-                    })?;
-            if relationship_count > limits.values() {
-                return Err(Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::GraphWideRelationship,
-                    actual: relationship_count,
-                    maximum: limits.values(),
-                });
-            }
-            if is_xml_content_type(&part.content_type) {
-                admit_xml(part.data(), limits)?;
-            }
-            total = total
-                .checked_add(part.data().len())
-                .ok_or(Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::GraphBytes,
-                    actual: usize::MAX,
-                    maximum: limits.graph_bytes(),
-                })?;
-            super::add_selected_metadata(&mut metadata, part.name(), limits)?;
-            super::add_selected_metadata(&mut metadata, part.content_type(), limits)?;
-            for relationship in &part.rels {
-                for value in [&relationship.id, &relationship.kind, &relationship.target] {
-                    super::add_selected_metadata(&mut metadata, value, limits)?;
-                }
-            }
-            if part.relationships().len() > limits.values() {
-                return Err(Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::Relationship,
-                    actual: part.relationships().len(),
-                    maximum: limits.values(),
-                });
-            }
-        }
-        if graph.parts.len() > MAX_VALUES || total > MAX_GRAPH_BYTES || total > limits.graph_bytes()
-        {
-            return Err(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::GraphBytes,
-                actual: total,
-                maximum: limits.graph_bytes().min(MAX_GRAPH_BYTES),
-            });
-        }
-        if metadata > MAX_GRAPH_METADATA_BYTES || metadata > limits.metadata_bytes() {
-            return Err(Error::GlossaryLimit {
-                kind: crate::glossary::LimitKind::GraphMetadataBytes,
-                actual: metadata,
-                maximum: limits.metadata_bytes().min(MAX_GRAPH_METADATA_BYTES),
-            });
-        }
+        let generated_root_bytes = if graph.root_xml().is_none() {
+            Some(
+                super::super::codec::plan_write_with_limits(
+                    &graph.catalog,
+                    graph.conformance,
+                    limits,
+                )?
+                .bytes,
+            )
+        } else {
+            None
+        };
+        let owner = graph
+            .owner_main
+            .as_deref()
+            .zip(graph.owner_id.as_deref())
+            .zip(graph.owner_target.as_deref())
+            .map(|((main, id), target)| (main, id, target));
+        super::admit_graph_ledger(graph, limits, graph.root_xml(), generated_root_bytes, owner)?;
+        Ok(())
+    }
+
+    pub(in crate::glossary) fn admit_graph_with_owner(
+        graph: &Graph,
+        limits: &Limits,
+        root_xml: Option<&[u8]>,
+        generated_root_bytes: Option<usize>,
+        owner_main: &str,
+        owner_id: &str,
+        owner_target: &str,
+    ) -> Result<()> {
+        super::validate_catalog_limits(&graph.catalog, limits)?;
+        admit_catalog(&graph.catalog, limits)?;
+        super::admit_graph_ledger(
+            graph,
+            limits,
+            root_xml,
+            generated_root_bytes,
+            Some((owner_main, owner_id, owner_target)),
+        )?;
         Ok(())
     }
 
@@ -689,6 +620,273 @@ pub mod raw {
     }
 }
 
+/// Admit the exact graph closure that a raw graph publication will own.
+///
+/// The source loader and the publisher must charge the same ledger: the
+/// owner identity seed, the glossary root's own name/content type and bytes,
+/// followed by every auxiliary part and relationship.  Keeping this pass
+/// independent of package staging lets callers reject a selected policy
+/// before cloning or retaining any destination parts.
+fn admit_graph_ledger(
+    graph: &raw::Graph,
+    limits: &raw::Limits,
+    root_xml: Option<&[u8]>,
+    generated_root_bytes: Option<usize>,
+    owner: Option<(&str, &str, &str)>,
+) -> Result<ClosureLedger> {
+    let part_limit = limits.parts().min(MAX_VALUES);
+    if graph.parts.len() > part_limit {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::AuxiliaryPart,
+            actual: graph.parts.len(),
+            maximum: part_limit,
+        });
+    }
+    let root_xml_bytes = match (root_xml, generated_root_bytes) {
+        (Some(xml), None) => {
+            raw::admit_xml(xml, limits)?;
+            xml.len()
+        },
+        (None, Some(bytes)) => {
+            if bytes > limits.xml_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlBytes,
+                    actual: bytes,
+                    maximum: limits.xml_bytes(),
+                });
+            }
+            if bytes > limits.dom_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::DomBytes,
+                    actual: bytes,
+                    maximum: limits.dom_bytes(),
+                });
+            }
+            bytes
+        },
+        (None, None) => 0,
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                "glossary graph supplied both source and generated XML",
+            ));
+        },
+    };
+
+    let mut ledger = ClosureLedger::default();
+    admit_graph_name(&graph.root_name, limits)?;
+    let root_uri = PackURI::new(&graph.root_name).map_err(Error::Uri)?;
+    if is_signature_part(&root_uri) || is_reserved_physical_part(&root_uri) {
+        return Err(invalid(
+            "glossary root cannot use reserved OPC package infrastructure",
+        ));
+    }
+    if let Some((owner_main, owner_id, owner_target)) = owner {
+        validate_owner_identity(owner_main, owner_id, owner_target, limits)?;
+        ledger.metadata_bytes = owner_metadata_seed_values(
+            owner_main,
+            &graph.root_name,
+            owner_id,
+            owner_target,
+            limits,
+        )?;
+    } else {
+        add_selected_metadata(&mut ledger.metadata_bytes, &graph.root_name, limits)?;
+        if let Some(owner_main) = graph.owner_main.as_deref() {
+            if owner_main.len() > limits.name_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::StringBytes,
+                    actual: owner_main.len(),
+                    maximum: limits.name_bytes(),
+                });
+            }
+            bounded(owner_main)?;
+            PackURI::new(owner_main).map_err(Error::Uri)?;
+            add_selected_metadata(&mut ledger.metadata_bytes, owner_main, limits)?;
+        }
+        if let Some(owner_id) = graph.owner_id.as_deref() {
+            admit_graph_string(owner_id, limits)?;
+            if !valid_ncname(owner_id) {
+                return Err(invalid(
+                    "glossary owner relationship ID is not an XML NCName",
+                ));
+            }
+            add_selected_metadata(&mut ledger.metadata_bytes, owner_id, limits)?;
+        }
+        if let Some(owner_target) = graph.owner_target.as_deref() {
+            admit_graph_string(owner_target, limits)?;
+            if owner_target.is_empty() || owner_target.chars().any(char::is_control) {
+                return Err(invalid("glossary owner relationship target is invalid"));
+            }
+            add_selected_metadata(&mut ledger.metadata_bytes, owner_target, limits)?;
+        }
+    }
+
+    admit_graph_name(&graph.root_name, limits)?;
+    add_selected_metadata(&mut ledger.metadata_bytes, &graph.root_name, limits)?;
+    admit_graph_string(CT, limits)?;
+    add_selected_metadata(&mut ledger.metadata_bytes, CT, limits)?;
+    add_graph_bytes(&mut ledger.total_bytes, root_xml_bytes, limits)?;
+    admit_graph_relationships(
+        &graph.rels,
+        graph.conformance,
+        &mut ledger.relationship_count,
+        &mut ledger.metadata_bytes,
+        limits,
+    )?;
+
+    let mut part_names = HashSet::new();
+    part_names
+        .try_reserve(graph.parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary graph part names",
+            source,
+        })?;
+    for part in &graph.parts {
+        raw::admit_part(&part.name, &part.content_type, part.data().len(), limits)?;
+        let part_uri = validate_physical_part(&part.name, &part.content_type, part.data().len())?;
+        if part_uri == root_uri {
+            return Err(invalid(format!(
+                "glossary auxiliary part '{}' conflicts with the root",
+                part_uri.as_str()
+            )));
+        }
+        if !part_names.insert(part_uri.clone()) {
+            return Err(invalid(format!(
+                "duplicate glossary auxiliary part '{part_uri}'"
+            )));
+        }
+        add_selected_metadata(&mut ledger.metadata_bytes, &part.name, limits)?;
+        add_selected_metadata(&mut ledger.metadata_bytes, &part.content_type, limits)?;
+        add_graph_bytes(&mut ledger.total_bytes, part.data().len(), limits)?;
+        if is_xml_content_type(&part.content_type) {
+            raw::admit_xml(part.data(), limits)?;
+        }
+        admit_graph_relationships(
+            &part.rels,
+            graph.conformance,
+            &mut ledger.relationship_count,
+            &mut ledger.metadata_bytes,
+            limits,
+        )?;
+    }
+    ledger.part_count = graph.parts.len();
+    Ok(ledger)
+}
+
+fn admit_graph_name(value: &str, limits: &raw::Limits) -> Result<()> {
+    if value.len() > limits.name_bytes() {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len(),
+            maximum: limits.name_bytes(),
+        });
+    }
+    bounded(value)
+}
+
+fn is_xml_content_type(content_type: &str) -> bool {
+    content_type.ends_with("+xml")
+        || content_type.eq_ignore_ascii_case("application/xml")
+        || content_type.eq_ignore_ascii_case("text/xml")
+}
+
+fn admit_graph_string(value: &str, limits: &raw::Limits) -> Result<()> {
+    if value.len() > limits.string_bytes() {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len(),
+            maximum: limits.string_bytes(),
+        });
+    }
+    bounded(value)
+}
+
+fn validate_owner_identity(
+    owner_main: &str,
+    owner_id: &str,
+    owner_target: &str,
+    limits: &raw::Limits,
+) -> Result<()> {
+    admit_graph_name(owner_main, limits)?;
+    PackURI::new(owner_main).map_err(Error::Uri)?;
+    admit_graph_string(owner_id, limits)?;
+    if !valid_ncname(owner_id) {
+        return Err(invalid(
+            "glossary owner relationship ID is not an XML NCName",
+        ));
+    }
+    admit_graph_string(owner_target, limits)?;
+    if owner_target.is_empty() || owner_target.chars().any(char::is_control) {
+        return Err(invalid("glossary owner relationship target is invalid"));
+    }
+    Ok(())
+}
+
+fn add_graph_bytes(total: &mut usize, bytes: usize, limits: &raw::Limits) -> Result<()> {
+    *total = total.checked_add(bytes).ok_or(Error::GlossaryLimit {
+        kind: crate::glossary::LimitKind::GraphBytes,
+        actual: usize::MAX,
+        maximum: limits.graph_bytes().min(MAX_GRAPH_BYTES),
+    })?;
+    if *total > limits.graph_bytes() || *total > MAX_GRAPH_BYTES {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphBytes,
+            actual: *total,
+            maximum: limits.graph_bytes().min(MAX_GRAPH_BYTES),
+        });
+    }
+    Ok(())
+}
+
+fn admit_graph_relationships(
+    relationships: &[raw::Rel],
+    conformance: Conformance,
+    total_count: &mut usize,
+    metadata_bytes: &mut usize,
+    limits: &raw::Limits,
+) -> Result<()> {
+    let relationship_limit = limits.values().min(MAX_VALUES);
+    if relationships.len() > relationship_limit {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::Relationship,
+            actual: relationships.len(),
+            maximum: relationship_limit,
+        });
+    }
+    *total_count = total_count
+        .checked_add(relationships.len())
+        .ok_or(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphWideRelationship,
+            actual: usize::MAX,
+            maximum: relationship_limit,
+        })?;
+    if *total_count > relationship_limit {
+        return Err(Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::GraphWideRelationship,
+            actual: *total_count,
+            maximum: relationship_limit,
+        });
+    }
+    for relationship in relationships {
+        for value in [
+            relationship.id.as_str(),
+            relationship.kind.as_str(),
+            relationship.target.as_str(),
+        ] {
+            admit_graph_string(value, limits)?;
+            add_selected_metadata(metadata_bytes, value, limits)?;
+        }
+        validate_relationship_metadata(&relationship.id, &relationship.kind, &relationship.target)?;
+        relationship_kind(conformance, &relationship.kind).ok_or_else(|| {
+            invalid(format!(
+                "unsupported glossary relationship type '{}' for {conformance:?} conformance",
+                relationship.kind
+            ))
+        })?;
+    }
+    Ok(())
+}
+
 pub(in crate::glossary) fn load_graph_with_limits(
     package: &OpcPackage,
     limits: &raw::Limits,
@@ -797,19 +995,94 @@ pub(in crate::glossary) fn copy_relationships(part: &dyn Part) -> Result<Vec<raw
     Ok(rels)
 }
 
+struct OwnerPlan {
+    id: String,
+    insert: bool,
+}
+
+fn plan_owner_relationship(
+    main: &dyn Part,
+    current_owner_id: Option<&str>,
+    requested_id: Option<&str>,
+    relationship_type: &str,
+    target: &str,
+) -> Result<OwnerPlan> {
+    let occupied = |candidate: &str| {
+        main.rels().iter().any(|relationship| {
+            Some(relationship.r_id()) != current_owner_id && relationship.r_id() == candidate
+        })
+    };
+    if let Some(requested_id) = requested_id.filter(|candidate| !occupied(candidate)) {
+        return Ok(OwnerPlan {
+            id: requested_id.to_owned(),
+            insert: true,
+        });
+    }
+    if let Some(existing) = main
+        .rels()
+        .iter()
+        .filter(|relationship| {
+            Some(relationship.r_id()) != current_owner_id
+                && !relationship.is_external()
+                && relationship.reltype() == relationship_type
+                && relationship.target_ref() == target
+        })
+        .map(|relationship| relationship.r_id())
+        .min()
+    {
+        return Ok(OwnerPlan {
+            id: existing.to_owned(),
+            insert: false,
+        });
+    }
+    let mut next = 1u32;
+    loop {
+        let candidate = format!("rId{next}");
+        if !occupied(&candidate) {
+            return Ok(OwnerPlan {
+                id: candidate,
+                insert: true,
+            });
+        }
+        next = next
+            .checked_add(1)
+            .ok_or_else(|| invalid("no glossary relationship ID is available"))?;
+    }
+}
+
 pub(in crate::glossary) fn put_graph_checked(
     package: &mut OpcPackage,
     value: &raw::Graph,
     limits: &raw::Limits,
 ) -> Result<bool> {
     validate_package_conformance(package, value.conformance)?;
-    raw::admit_graph(value, limits)?;
+    admit_graph_name(&value.root_name, limits)?;
+    if let Some(owner_main) = value.owner_main.as_deref() {
+        admit_graph_name(owner_main, limits)?;
+    }
+    if let Some(owner_id) = value.owner_id.as_deref() {
+        admit_graph_string(owner_id, limits)?;
+    }
+    if let Some(owner_target) = value.owner_target.as_deref() {
+        admit_graph_string(owner_target, limits)?;
+    }
     validate_raw_graph_metadata(value)?;
+    validate_catalog_limits(&value.catalog, limits)?;
+    raw::admit_catalog(&value.catalog, limits)?;
     let preserve_root = if let Some(xml) = &value.root_xml {
         let (source, source_conformance) = read_with_limits(xml.as_slice(), limits)?;
         source_conformance == value.conformance && source == value.catalog
     } else {
         false
+    };
+    let generated_plan = if preserve_root {
+        None
+    } else {
+        Some(plan_write_with_limits(
+            &value.catalog,
+            value.conformance,
+            limits,
+        )?)
     };
     let root_uri = PackURI::new(&value.root_name).map_err(Error::Uri)?;
     if is_signature_part(&root_uri) || is_reserved_physical_part(&root_uri) {
@@ -817,6 +1090,55 @@ pub(in crate::glossary) fn put_graph_checked(
             "glossary root cannot use reserved OPC package infrastructure",
         ));
     }
+    let current = load_graph_with_limits(package, limits)?;
+    let main = package.main_document_part()?.partname().clone();
+    let generated_target = root_uri.relative_ref(main.base_uri());
+    let owner_target = if value.owner_main.as_deref() == Some(main.as_str()) {
+        value
+            .owner_target
+            .clone()
+            .unwrap_or_else(|| generated_target.clone())
+    } else {
+        generated_target
+    };
+    admit_graph_string(&owner_target, limits)?;
+    if owner_target.is_empty() || owner_target.chars().any(char::is_control) {
+        return Err(invalid("glossary owner relationship target is invalid"));
+    }
+    if let Some(owner_id) = value.owner_id.as_deref() {
+        admit_graph_string(owner_id, limits)?;
+        if !valid_ncname(owner_id) {
+            return Err(invalid(
+                "glossary owner relationship ID is not an XML NCName",
+            ));
+        }
+    }
+    let owner_plan = {
+        let main_part = package.main_document_part()?;
+        admit_graph_name(main_part.partname().as_str(), limits)?;
+        plan_owner_relationship(
+            main_part,
+            current.as_ref().and_then(|graph| graph.owner_id.as_deref()),
+            value.owner_id.as_deref(),
+            value.conformance.glossary_relationship(),
+            &owner_target,
+        )?
+    };
+    raw::admit_graph_with_owner(
+        value,
+        limits,
+        preserve_root.then(|| {
+            value
+                .root_xml
+                .as_ref()
+                .expect("preserved glossary XML is present")
+                .as_slice()
+        }),
+        generated_plan.as_ref().map(|plan| plan.bytes),
+        main.as_str(),
+        &owner_plan.id,
+        &owner_target,
+    )?;
     let mut root = if preserve_root {
         BlobPart::new_shared(
             root_uri.clone(),
@@ -828,7 +1150,11 @@ pub(in crate::glossary) fn put_graph_checked(
                 .clone(),
         )
     } else {
-        let xml = write_with_limits(&value.catalog, value.conformance, limits)?;
+        let plan = generated_plan
+            .as_ref()
+            .ok_or_else(|| invalid("generated glossary write plan is missing"))?;
+        let xml = write_plan_with_limits(&value.catalog, value.conformance, plan, limits)?;
+        raw::admit_xml(&xml, limits)?;
         BlobPart::new(root_uri.clone(), CT.to_owned(), xml)
     };
     let canonical_catalog;
@@ -893,7 +1219,6 @@ pub(in crate::glossary) fn put_graph_checked(
         }
     }
 
-    let current = load_graph_with_limits(package, limits)?;
     if let Some(current) = current.as_ref()
         && graph_matches_catalog(current, value, effective_catalog, Some(&staged_root_xml))?
     {
@@ -918,7 +1243,6 @@ pub(in crate::glossary) fn put_graph_checked(
         HashSet::new()
     };
 
-    let main = package.main_document_part()?.partname().clone();
     crate::signature_policy::ensure_unsigned(package)?;
     let mut candidate = package.clone();
     if let Some(owner_id) = current.as_ref().and_then(|graph| graph.owner_id.as_deref()) {
@@ -931,31 +1255,17 @@ pub(in crate::glossary) fn put_graph_checked(
         candidate.try_add_part(Box::new(part))?;
     }
     candidate.try_add_part(Box::new(root))?;
-    let generated_target = root_uri.relative_ref(main.base_uri());
-    let owner_target = if value.owner_main.as_deref() == Some(main.as_str()) {
-        value.owner_target.as_deref().unwrap_or(&generated_target)
-    } else {
-        &generated_target
-    };
-    let owner_relationships = candidate.get_part_mut(&main)?.rels_mut();
-    let preserve_owner_id = value
-        .owner_id
-        .as_ref()
-        .filter(|owner_id| owner_relationships.get(owner_id).is_none());
-    let owner_id = if let Some(owner_id) = preserve_owner_id {
-        owner_relationships.try_add_relationship(
-            value.conformance.glossary_relationship().to_owned(),
-            owner_target.to_owned(),
-            owner_id.clone(),
-            litchi_opc::TargetMode::Internal,
-        )?;
-        owner_id.clone()
-    } else {
-        owner_relationships
-            .get_or_add(value.conformance.glossary_relationship(), owner_target)
-            .r_id()
-            .to_owned()
-    };
+    if owner_plan.insert {
+        candidate
+            .get_part_mut(&main)?
+            .rels_mut()
+            .try_add_relationship(
+                value.conformance.glossary_relationship().to_owned(),
+                owner_target.clone(),
+                owner_plan.id.clone(),
+                litchi_opc::TargetMode::Internal,
+            )?;
+    }
 
     validate_all_internal_targets(&candidate)?;
     let round_trip = load_graph_with_limits(&candidate, limits)?
@@ -966,8 +1276,8 @@ pub(in crate::glossary) fn put_graph_checked(
         effective_catalog,
         Some(&staged_root_xml),
         main.as_str(),
-        &owner_id,
-        owner_target,
+        &owner_plan.id,
+        &owner_target,
     )? {
         return Err(invalid("staged glossary graph did not round-trip"));
     }
@@ -1419,6 +1729,7 @@ pub(in crate::glossary) fn validate_raw_graph_metadata(graph: &raw::Graph) -> Re
     let mut relationship_count = 0usize;
     let mut metadata_bytes = 0usize;
     add_graph_metadata(&mut metadata_bytes, &graph.root_name)?;
+    add_graph_metadata(&mut metadata_bytes, CT)?;
     if let Some(owner_main) = &graph.owner_main {
         bounded(owner_main)?;
         PackURI::new(owner_main).map_err(Error::Uri)?;

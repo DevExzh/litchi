@@ -22,7 +22,7 @@ use super::graph::{
     remove_graph_with_limits, validate_raw_graph_metadata, validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
-use super::{MAX_VALUES, OpcPackage, PackURI, Result};
+use super::{CT, MAX_VALUES, OpcPackage, PackURI, Result};
 
 /// Stable fingerprint of the complete glossary source graph.
 pub type Revision = u64;
@@ -397,10 +397,12 @@ impl Transaction {
     pub fn replace_part(
         &mut self,
         name: &str,
-        content_type: impl Into<String>,
+        content_type: impl AsRef<str>,
         data: Vec<u8>,
         relationships: Vec<raw::Rel>,
     ) -> Result<bool> {
+        let content_type = content_type.as_ref();
+        preflight_part_name_and_type(name, content_type, &self.limits)?;
         let requested = PackURI::new(name).map_err(crate::Error::Uri)?;
         let graph = self
             .draft
@@ -411,7 +413,6 @@ impl Transaction {
             .parts
             .get(old_index)
             .ok_or_else(|| invalid("glossary auxiliary part index changed"))?;
-        let content_type = content_type.into();
         if old.content_type == content_type
             && old.data() == data.as_slice()
             && old.relationships() == relationships.as_slice()
@@ -422,7 +423,7 @@ impl Transaction {
             graph,
             old_index,
             name,
-            &content_type,
+            content_type,
             &data,
             &relationships,
             &self.limits,
@@ -564,6 +565,11 @@ impl Transaction {
             .draft
             .clone()
             .unwrap_or_else(|| raw::Graph::new(Catalog::new(), self.before.conformance));
+        if graph.owner_main.is_none() && graph.owner_id.is_none() && graph.owner_target.is_none() {
+            graph.owner_main = Some(self.empty_seed.main.clone());
+            graph.owner_id = Some(self.empty_seed.owner_id.clone());
+            graph.owner_target = Some(self.empty_seed.owner_target.clone());
+        }
         graph.catalog.bind_edit_limits(&self.limits);
         graph
     }
@@ -739,14 +745,20 @@ struct EmptyGraphSeed {
     conformance: Conformance,
 }
 
-fn graph_usage(graph: &raw::Graph) -> Result<GraphUsage> {
+fn graph_usage(graph: &raw::Graph, limits: &super::Limits) -> Result<GraphUsage> {
     let mut usage = GraphUsage {
         metadata: graph.root_name.len(),
         relationships: graph.rels.len(),
         parts: graph.parts.len(),
         ..GraphUsage::default()
     };
-    add_usage_bytes(&mut usage.bytes, graph.root_xml().map_or(0, <[u8]>::len))?;
+    add_usage_metadata(&mut usage.metadata, &graph.root_name)?;
+    add_usage_metadata(&mut usage.metadata, CT)?;
+    let root_bytes = graph.root_xml().map_or_else(
+        || plan_write_with_limits(&graph.catalog, graph.conformance, limits).map(|plan| plan.bytes),
+        |xml| Ok(xml.len()),
+    )?;
+    add_usage_bytes(&mut usage.bytes, root_bytes)?;
     for value in [
         graph.owner_main.as_deref(),
         graph.owner_id.as_deref(),
@@ -794,6 +806,8 @@ fn generated_graph_usage(seed: &EmptyGraphSeed, limits: &super::Limits) -> Resul
         ..GraphUsage::default()
     };
     selected_metadata(&mut usage, &seed.root, true, limits)?;
+    selected_metadata(&mut usage, &seed.root, true, limits)?;
+    selected_metadata(&mut usage, CT, false, limits)?;
     selected_metadata(&mut usage, &seed.main, true, limits)?;
     selected_metadata(&mut usage, &seed.owner_id, false, limits)?;
     selected_metadata(&mut usage, &seed.owner_target, false, limits)?;
@@ -852,7 +866,7 @@ fn staged_graph_usage(
     empty_usage: &GraphUsage,
     limits: &super::Limits,
 ) -> Result<GraphUsage> {
-    let usage = draft.map_or_else(|| Ok(*empty_usage), graph_usage)?;
+    let usage = draft.map_or_else(|| Ok(*empty_usage), |graph| graph_usage(graph, limits))?;
     let root_name = draft.map_or(DEFAULT_ROOT_NAME, |graph| graph.root_name.as_str());
     if root_name.len() > limits.name_bytes() {
         return Err(crate::Error::GlossaryLimit {
@@ -1175,6 +1189,28 @@ fn preflight_replace_part_input(
         .and_then(|value| value.checked_add(new_usage.relationships))
         .ok_or_else(|| invalid("glossary relationship count underflow"))?;
     check_usage(usage, limits)
+}
+
+fn preflight_part_name_and_type(
+    name: &str,
+    content_type: &str,
+    limits: &super::Limits,
+) -> Result<()> {
+    if name.len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: name.len(),
+            maximum: limits.name_bytes(),
+        });
+    }
+    if content_type.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: content_type.len(),
+            maximum: limits.string_bytes(),
+        });
+    }
+    Ok(())
 }
 
 fn preflight_replace_part_data(

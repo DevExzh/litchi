@@ -866,6 +866,37 @@ fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
         )
         .is_err()
     );
+    let name_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        1,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .expect("narrow name policy");
+    let error = raw::Part::new(
+        "/word/glossary/media/name-too-long.bin",
+        "application/octet-stream",
+        Vec::new(),
+        &name_limit,
+    )
+    .expect_err("part names use the selected name budget");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::StringBytes,
+            actual,
+            maximum: 1,
+        } if actual == "/word/glossary/media/name-too-long.bin".len()
+    ));
 
     let mut part = raw::Part::new(
         "/word/glossary/media/kept.bin",
@@ -906,6 +937,82 @@ fn raw_part_limits_reject_before_retaining_payload_or_relationships() {
         .is_err()
     );
     assert!(part.relationships().is_empty());
+}
+
+#[test]
+fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
+    let root_bytes = write(&Catalog::new(), Conformance::Transitional)
+        .expect("empty glossary XML")
+        .len();
+    let graph_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        root_bytes - 1,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .expect("graph-byte boundary policy");
+    let mut package = package();
+    let error = raw::put(
+        &mut package,
+        &raw::Graph::new(Catalog::new(), Conformance::Transitional),
+        &graph_limit,
+    )
+    .expect_err("generated root must be charged before staging");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::GraphBytes,
+            ..
+        }
+    ));
+    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
+
+    let metadata = "/word/document.xml".len()
+        + "/word/glossary/document.xml".len()
+        + "rId1".len()
+        + "glossary/document.xml".len()
+        + "/word/glossary/document.xml".len()
+        + CT.len();
+    let metadata_limit = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        MAX_GRAPH_BYTES,
+        metadata - 1,
+    )
+    .expect("metadata boundary policy");
+    let mut package = package();
+    let error = raw::put(
+        &mut package,
+        &raw::Graph::new(Catalog::new(), Conformance::Transitional),
+        &metadata_limit,
+    )
+    .expect_err("generated owner metadata must be charged before staging");
+    assert!(matches!(
+        error,
+        Error::GlossaryLimit {
+            kind: LimitKind::GraphMetadataBytes,
+            ..
+        }
+    ));
+    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
 }
 
 #[test]

@@ -172,7 +172,7 @@ impl Edit {
     pub fn replace_part(
         &mut self,
         name: &str,
-        content_type: impl Into<String>,
+        content_type: impl AsRef<str>,
         data: Vec<u8>,
         relationships: Vec<raw::Rel>,
     ) -> Result<bool> {

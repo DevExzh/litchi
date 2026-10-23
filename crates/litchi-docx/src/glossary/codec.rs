@@ -89,6 +89,15 @@ pub(in crate::glossary) fn write_with_limits(
 ) -> Result<Vec<u8>> {
     validate_catalog_limits(value, limits)?;
     let plan = plan_write_with_limits(value, conformance, limits)?;
+    write_plan_with_limits(value, conformance, &plan, limits)
+}
+
+pub(in crate::glossary) fn write_plan_with_limits(
+    value: &Catalog,
+    conformance: Conformance,
+    plan: &WritePlan,
+    limits: &super::Limits,
+) -> Result<Vec<u8>> {
     if plan.bytes > limits.xml_bytes() {
         return Err(Error::GlossaryLimit {
             kind: crate::glossary::LimitKind::XmlBytes,
