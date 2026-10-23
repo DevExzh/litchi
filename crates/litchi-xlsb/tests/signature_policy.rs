@@ -319,7 +319,7 @@ fn threaded_comment_edits_refuse_a_signed_package() {
     assert!(matches!(error, PackageError::Signed), "{error:?}");
     // Clearing an absent graph changes nothing and is not refused.
     let mut edit = package.edit_threaded_comments().unwrap();
-    assert!(!edit.clear());
+    assert!(!edit.clear().unwrap());
     assert_eq!(save(edit.commit().unwrap().package()), bytes);
 }
 

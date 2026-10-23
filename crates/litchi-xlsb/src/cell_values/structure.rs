@@ -335,8 +335,8 @@ impl Operation {
 #[derive(Debug, Clone)]
 pub struct Edit {
     base: crate::Package,
-    before: Arc<Vec<u8>>,
-    sheet_catalog: Arc<[SheetTarget]>,
+    before: Option<Arc<Vec<u8>>>,
+    sheet_catalog: Option<Arc<[SheetTarget]>>,
     operations: Vec<Operation>,
     operation_indexes: BTreeMap<Selection, Vec<usize>>,
     limits: TransferLimits,
@@ -347,25 +347,50 @@ pub struct Edit {
 impl Edit {
     pub(crate) fn new(package: &crate::Package, limits: TransferLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let workbook = package.workbook()?;
-        let sheet_catalog = workbook
-            .sheets()
-            .map(|tab| SheetTarget {
-                name: tab.name().to_owned(),
-                kind: tab.kind(),
-                state: tab.state(),
-            })
-            .collect::<Vec<_>>();
         Ok(Self {
             base: package.clone(),
-            before: Arc::new(package.to_bytes()?),
-            sheet_catalog: sheet_catalog.into(),
+            before: None,
+            sheet_catalog: None,
             operations: Vec::new(),
             operation_indexes: BTreeMap::new(),
             limits,
             external_link_limits: package.external_link_limits(),
             drawing_load_policy: package.drawing_load_policy(),
         })
+    }
+
+    /// Materialize the source catalog and exact package image at the first
+    /// operation that needs them. Entry and discard therefore retain only the
+    /// immutable package owner and finite edit policy.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.sheet_catalog.is_none() {
+            let workbook = self.base.workbook()?;
+            let sheet_catalog = workbook
+                .sheets()
+                .map(|tab| SheetTarget {
+                    name: tab.name().to_owned(),
+                    kind: tab.kind(),
+                    state: tab.state(),
+                })
+                .collect::<Vec<_>>();
+            self.sheet_catalog = Some(sheet_catalog.into());
+        }
+        if self.before.is_none() {
+            self.before = Some(Arc::new(self.base.to_bytes()?));
+        }
+        Ok(())
+    }
+
+    fn catalog(&self) -> Result<&[SheetTarget]> {
+        self.sheet_catalog.as_deref().ok_or(Error::InvalidFormat(
+            "workbook edit catalog is not prepared",
+        ))
+    }
+
+    fn before_image(&self) -> Result<&Arc<Vec<u8>>> {
+        self.before
+            .as_ref()
+            .ok_or(Error::InvalidFormat("workbook edit source is not prepared"))
     }
 
     /// Plan a workbook-tab name change without mutating the source workbook.
@@ -393,9 +418,9 @@ impl Edit {
         selector: impl Into<Selector<'a>>,
         name: String,
     ) -> Result<Option<bool>> {
+        self.ensure_prepared()?;
         let selector = selector.into();
-        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
-        else {
+        let Some(catalog_position) = resolve_catalog_position(self.catalog()?, &selector)? else {
             return Ok(None);
         };
         let name_index = self
@@ -407,7 +432,7 @@ impl Edit {
                 })
             });
         let current = name_index.map_or_else(
-            || self.sheet_catalog[catalog_position].name.as_str(),
+            || self.catalog()?[catalog_position].name.as_str(),
             |index| match &self.operations[index] {
                 Operation::SetSheetName { name, .. } => name.as_str(),
                 Operation::RenameSheet { .. }
@@ -420,7 +445,7 @@ impl Edit {
                 | Operation::TransferDrawing { .. }
                 | Operation::SetMergedRanges { .. }
                 | Operation::SetDefinedName { .. } => {
-                    self.sheet_catalog[catalog_position].name.as_str()
+                    self.catalog()?[catalog_position].name.as_str()
                 },
             },
         );
@@ -428,7 +453,7 @@ impl Edit {
         if changed {
             validate_sheet_name_value(&name)?;
             validate_staged_sheet_name(
-                &self.sheet_catalog,
+                self.catalog()?,
                 &self.operations,
                 &self.operation_indexes,
                 catalog_position,
@@ -482,6 +507,7 @@ impl Edit {
     /// # Ok::<(), litchi_xlsb::package::PackageError>(())
     /// ```
     pub fn reorder_sheets(&mut self, selectors: &[Selector<'_>]) -> Result<bool> {
+        self.ensure_prepared()?;
         if self
             .operations
             .iter()
@@ -493,7 +519,7 @@ impl Edit {
                 "sheet reordering cannot be combined with other workbook operations",
             ));
         }
-        if selectors.len() != self.sheet_catalog.len() {
+        if selectors.len() != self.catalog()?.len() {
             return Err(Error::InvalidFormat(
                 "sheet order must select every catalog tab exactly once",
             ));
@@ -506,14 +532,14 @@ impl Edit {
                 source,
             })?;
         let mut seen = Vec::new();
-        seen.try_reserve_exact(self.sheet_catalog.len())
+        seen.try_reserve_exact(self.catalog()?.len())
             .map_err(|source| Error::Allocation {
                 resource: "XLSB sheet order selector set",
                 source,
             })?;
-        seen.resize(self.sheet_catalog.len(), false);
+        seen.resize(self.catalog()?.len(), false);
         for selector in selectors {
-            let catalog_position = resolve_catalog_position(&self.sheet_catalog, selector)?
+            let catalog_position = resolve_catalog_position(self.catalog()?, selector)?
                 .ok_or(Error::WorksheetNotFound(None))?;
             let used = seen.get_mut(catalog_position).ok_or(Error::InvalidFormat(
                 "sheet order position is out of bounds",
@@ -620,6 +646,7 @@ impl Edit {
         name: String,
         state: State,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         if self
             .operations
             .iter()
@@ -644,20 +671,18 @@ impl Edit {
             .iter()
             .filter(|operation| matches!(operation, Operation::InsertSheet { .. }))
             .count();
-        let staged_len = self
-            .sheet_catalog
-            .len()
-            .checked_add(staged_insertions)
-            .ok_or(Error::CapacityOverflow {
+        let staged_len = self.catalog()?.len().checked_add(staged_insertions).ok_or(
+            Error::CapacityOverflow {
                 resource: "staged XLSB sheet catalog",
-            })?;
+            },
+        )?;
         if catalog_position > staged_len {
             return Err(Error::InvalidFormat(
                 "sheet insertion position exceeds staged catalog length",
             ));
         }
         validate_sheet_name_value(&name)?;
-        validate_staged_insert_sheet_name(&self.sheet_catalog, &self.operations, &name)?;
+        validate_staged_insert_sheet_name(self.catalog()?, &self.operations, &name)?;
         let operation = Operation::InsertSheet {
             catalog_position,
             name,
@@ -679,7 +704,7 @@ impl Edit {
         let minimum_patch_bytes = MAGIC
             .len()
             .checked_add(24)
-            .and_then(|size| size.checked_add(self.before.len()))
+            .and_then(|size| size.checked_add(self.before_image()?.len()))
             .and_then(|size| size.checked_add(operation_bytes))
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch bytes",
@@ -707,7 +732,7 @@ impl Edit {
             })?;
         candidate.extend(self.operations.iter().cloned());
         candidate.push(operation.clone());
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         self.stage(operation)
     }
 
@@ -745,8 +770,9 @@ impl Edit {
     /// the staged operation. A selector that is absent from the immutable
     /// source catalog returns `None`.
     pub fn remove_sheet<'a>(&mut self, selector: impl Into<Selector<'a>>) -> Result<Option<bool>> {
+        self.ensure_prepared()?;
         let selector = selector.into();
-        let Some(position) = resolve_catalog_position(&self.sheet_catalog, &selector)? else {
+        let Some(position) = resolve_catalog_position(self.catalog()?, &selector)? else {
             return Ok(None);
         };
         if self
@@ -836,7 +862,7 @@ impl Edit {
         let minimum_patch_bytes = MAGIC
             .len()
             .checked_add(24)
-            .and_then(|size| size.checked_add(self.before.len()))
+            .and_then(|size| size.checked_add(self.before_image()?.len()))
             .and_then(|size| size.checked_add(operation_bytes))
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch bytes",
@@ -868,7 +894,7 @@ impl Edit {
         } else {
             candidate.push(operation.clone());
         }
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         if let Some(index) = existing_index {
             self.operations[index] = operation;
             Ok(Some(true))
@@ -914,12 +940,12 @@ impl Edit {
         selector: impl Into<Selector<'a>>,
         state: State,
     ) -> Result<Option<bool>> {
+        self.ensure_prepared()?;
         let selector = selector.into();
-        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
-        else {
+        let Some(catalog_position) = resolve_catalog_position(self.catalog()?, &selector)? else {
             return Ok(None);
         };
-        let tab = &self.sheet_catalog[catalog_position];
+        let tab = &self.catalog()?[catalog_position];
         if tab.kind == Kind::Unbound && state != State::VeryHidden {
             return Err(Error::InvalidRelationship(
                 "unbound XLSB sheet tabs must be very hidden",
@@ -995,6 +1021,7 @@ impl Edit {
         selector: impl Into<Selector<'a>>,
         range: crate::merged_cells::MergedCell,
     ) -> Result<Option<bool>> {
+        self.ensure_prepared()?;
         self.change_merges(selector.into(), range, true)
     }
 
@@ -1012,6 +1039,7 @@ impl Edit {
         selector: impl Into<Selector<'a>>,
         range: crate::merged_cells::MergedCell,
     ) -> Result<Option<bool>> {
+        self.ensure_prepared()?;
         self.change_merges(selector.into(), range, false)
     }
 
@@ -1021,11 +1049,11 @@ impl Edit {
         range: crate::merged_cells::MergedCell,
         merge: bool,
     ) -> Result<Option<bool>> {
-        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
-        else {
+        self.ensure_prepared()?;
+        let Some(catalog_position) = resolve_catalog_position(self.catalog()?, &selector)? else {
             return Ok(None);
         };
-        if self.sheet_catalog[catalog_position].kind != Kind::Worksheet {
+        if self.catalog()?[catalog_position].kind != Kind::Worksheet {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedTarget,
                 "edit",
@@ -1133,18 +1161,19 @@ impl Edit {
         sheet: impl Into<Selector<'b>>,
         range: crate::formula::Range,
     ) -> Result<Option<()>> {
+        self.ensure_prepared()?;
         crate::named_ranges::validate_name(name)?;
         let scope = match scope {
-            Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
+            Some(selector) => match resolve_catalog_position(self.catalog()?, &selector)? {
                 Some(position) => Some(position),
                 None => return Ok(None),
             },
             None => None,
         };
-        let Some(sheet) = resolve_catalog_position(&self.sheet_catalog, &sheet.into())? else {
+        let Some(sheet) = resolve_catalog_position(self.catalog()?, &sheet.into())? else {
             return Ok(None);
         };
-        if self.sheet_catalog[sheet].kind != Kind::Worksheet {
+        if self.catalog()?[sheet].kind != Kind::Worksheet {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "edit",
@@ -1175,9 +1204,10 @@ impl Edit {
         name: &str,
         scope: Option<Selector<'a>>,
     ) -> Result<Option<()>> {
+        self.ensure_prepared()?;
         crate::named_ranges::validate_name(name)?;
         let scope = match scope {
-            Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
+            Some(selector) => match resolve_catalog_position(self.catalog()?, &selector)? {
                 Some(position) => Some(position),
                 None => return Ok(None),
             },
@@ -1192,6 +1222,7 @@ impl Edit {
     }
 
     fn stage_defined_name(&mut self, operation: Operation) -> Result<()> {
+        self.ensure_prepared()?;
         let selection = operation.selection();
         let staged = self
             .operation_indexes
@@ -1202,7 +1233,7 @@ impl Edit {
             Some(index) => candidate[index] = operation.clone(),
             None => candidate.push(operation.clone()),
         }
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         match staged {
             Some(index) => {
                 self.operations[index] = operation;
@@ -1233,6 +1264,7 @@ impl Edit {
         target_sheet: usize,
         target_reference: Reference,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         let source = Arc::from(workbook_bytes(source)?);
         let operation = Operation::TransferCell {
             source,
@@ -1243,7 +1275,7 @@ impl Edit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         self.stage(operation)
     }
 
@@ -1331,13 +1363,14 @@ impl Edit {
     /// existing standard drawing, the new anchor is inserted before the root
     /// close while all prior XML bytes, anchors, and relationships are retained.
     pub fn insert_image(&mut self, sheet: usize, image: crate::writer::Image) -> Result<()> {
+        self.ensure_prepared()?;
         let operation = Operation::AddImage {
             sheet,
             image: ImagePlan::from_image(&image),
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         self.stage(operation)
     }
 
@@ -1405,6 +1438,7 @@ impl Edit {
         source_anchor: usize,
         target_sheet: usize,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         let source = Arc::from(workbook_bytes(source)?);
         let operation = Operation::TransferDrawing {
             source,
@@ -1414,7 +1448,7 @@ impl Edit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        let _validated_candidate = replay_package(&self.base, self.before_image()?, &candidate)?;
         self.stage(operation)
     }
 
@@ -1426,6 +1460,7 @@ impl Edit {
         style: &AuthoredStyle,
         shared: bool,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         let mut donor = self.base.materialize_workbook()?;
         let style_index = author_style(&mut donor, style)?;
         let font_id = donor
@@ -1466,16 +1501,22 @@ impl Edit {
     ///
     /// Returns an error when replay, complete workbook readback, or bounds fail.
     pub fn commit(self) -> Result<Commit> {
-        let (after, package) = replay_package(&self.base, &self.before, &self.operations)?;
+        let mut this = self;
+        this.ensure_prepared()?;
+        let before = this
+            .before
+            .take()
+            .ok_or(Error::InvalidFormat("workbook edit source is not prepared"))?;
+        let (after, package) = replay_package(&this.base, &before, &this.operations)?;
         let patch = Patch {
-            before: self.before,
+            before,
             after,
-            operations: self.operations,
-            external_link_limits: self.external_link_limits,
-            drawing_load_policy: self.drawing_load_policy,
-            raw_limits: self.base.raw_limits_value(),
+            operations: this.operations,
+            external_link_limits: this.external_link_limits,
+            drawing_load_policy: this.drawing_load_policy,
+            raw_limits: this.base.raw_limits_value(),
         };
-        let _bounded_encoding = patch.to_bytes(self.limits)?;
+        let _bounded_encoding = patch.to_bytes(this.limits)?;
         let diagnostics = Diagnostics::new(!patch.is_noop());
         Ok(Commit::new(package, patch, diagnostics))
     }
@@ -2302,6 +2343,15 @@ mod replay_admission_tests {
             admit_archive_before_copy(&bytes, limits).is_err(),
             "the borrowed preflight must reject an archive whose member count exceeds the recipient budget"
         );
+    }
+
+    #[test]
+    fn structural_edit_constructor_and_drop_do_not_capture_package_image() {
+        let cold = Package::from(Package::new().unwrap().into_opc());
+        assert!(!cold.projection_cached());
+        let edit = super::Edit::new(&cold, super::TransferLimits::DEFAULT).unwrap();
+        drop(edit);
+        assert!(!cold.projection_cached());
     }
 }
 

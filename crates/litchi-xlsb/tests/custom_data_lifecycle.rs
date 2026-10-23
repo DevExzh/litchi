@@ -500,7 +500,7 @@ fn public_custom_data_crud_reads_typed_properties_and_inert_bytes() {
         .insert(CustomData::new("uid-B", vec![7, 8]))
         .expect("insert storage");
     assert_eq!(inserted.as_str(), "uid-B");
-    assert_eq!(transaction.storages().len(), 2);
+    assert_eq!(transaction.storages().expect("staged storages").len(), 2);
     let upserted = transaction
         .upsert(CustomData::new("uid-B", vec![9]))
         .expect("upsert storage");
@@ -578,8 +578,14 @@ fn rename_to_a_later_uid_commits_across_sorted_catalog_and_inverts_exactly() {
         .package
         .edit_custom_data()
         .expect("UID-order rename transaction");
-    assert_eq!(transaction.storages()[0].id(), "uid-A");
-    assert_eq!(transaction.storages()[1].id(), "uid-B");
+    assert_eq!(
+        transaction.storages().expect("staged storages")[0].id(),
+        "uid-A"
+    );
+    assert_eq!(
+        transaction.storages().expect("staged storages")[1].id(),
+        "uid-B"
+    );
     transaction
         .rename(StorageSelector::Id("uid-A"), "uid-Z")
         .expect("rename to later UID stages");
@@ -817,7 +823,7 @@ fn referenced_remove_requires_disposition_and_detach_is_reversible() {
         reject.remove(StorageSelector::Id("uid-A")),
         Err(PackageError::CustomDataReferenced { connections: 2, .. })
     ));
-    assert!(!reject.changed());
+    assert!(!reject.changed().expect("changed state"));
 
     let mut detach = fixture
         .package
@@ -1293,8 +1299,11 @@ fn storage_cardinality_limit_admits_exact_capacity_and_rejects_one_under() {
             maximum: 1,
         })
     ));
-    assert_eq!(one_under.storages().len(), 1);
-    assert_eq!(one_under.storages()[0].id(), "uid-Z");
+    assert_eq!(one_under.storages().expect("staged storages").len(), 1);
+    assert_eq!(
+        one_under.storages().expect("staged storages")[0].id(),
+        "uid-Z"
+    );
 }
 
 #[test]
@@ -1388,7 +1397,9 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
             b"staged within transaction".to_vec(),
         )
         .expect("staging does not publish output");
-    let before_staged = limited.storages()[0].data().to_vec();
+    let before_staged = limited.storages().expect("staged storages")[0]
+        .data()
+        .to_vec();
     assert!(matches!(limited.commit(), Err(PackageError::Limit { .. })));
     assert_eq!(before_staged, b"staged within transaction");
 
@@ -1401,14 +1412,19 @@ fn limits_and_cancellation_reject_before_publication_and_keep_staging_atomic() {
                 .execution_context(context),
         )
         .expect("cancellable transaction starts");
-    let before_id = cancelled.storages()[0].id().to_owned();
+    let before_id = cancelled.storages().expect("staged storages")[0]
+        .id()
+        .to_owned();
     cancellation_source.cancel();
     assert!(matches!(
         cancelled.rename(StorageSelector::Index(0), "cancelled"),
         Err(PackageError::Execution(_))
     ));
-    assert!(!cancelled.changed());
-    assert_eq!(cancelled.storages()[0].id(), before_id);
+    assert!(!cancelled.changed().expect("changed state"));
+    assert_eq!(
+        cancelled.storages().expect("staged storages")[0].id(),
+        before_id
+    );
 
     let (cancelled_before_read, context) = managed_context();
     cancelled_before_read.cancel();

@@ -103,7 +103,7 @@ impl Edit {
         match inspect(
             self.staged.opc(),
             &Scope::Caches(self.workbook_uri()?),
-            self.staged.workbook().semantic_limits().xml_parts_value(),
+            self.staged.workbook()?.semantic_limits().xml_parts_value(),
         )?
         .0
         {
@@ -123,7 +123,7 @@ impl Edit {
         match inspect(
             self.staged.opc(),
             &Scope::Views(self.staged.worksheet(sheet)?),
-            self.staged.workbook().semantic_limits().xml_parts_value(),
+            self.staged.workbook()?.semantic_limits().xml_parts_value(),
         )?
         .0
         {
@@ -133,7 +133,7 @@ impl Edit {
     }
 
     fn stage(&mut self, scope: Scope, content: Content) -> Result<bool> {
-        let xml_limits = self.staged.workbook().semantic_limits().xml_parts_value();
+        let xml_limits = self.staged.workbook()?.semantic_limits().xml_parts_value();
         validate_content(&content, xml_limits)?;
         let (stored, canonical) = inspect(self.staged.opc(), &scope, xml_limits)?;
         if stored == content {
@@ -174,7 +174,7 @@ impl Edit {
     pub fn set_caches(&mut self, caches: Vec<Cache>) -> Result<bool> {
         validate_caches(
             &caches,
-            self.staged.workbook().semantic_limits().xml_parts_value(),
+            self.staged.workbook()?.semantic_limits().xml_parts_value(),
         )?;
         let scope = Scope::Caches(self.workbook_uri()?);
         self.stage(scope, Content::Caches(caches))
@@ -289,7 +289,7 @@ impl Edit {
         let present = super::package::load_views(
             self.staged.opc(),
             &worksheet,
-            self.staged.workbook().semantic_limits().xml_parts_value(),
+            self.staged.workbook()?.semantic_limits().xml_parts_value(),
         )?
         .is_some();
         self.set_views(sheet, Views::new())?;

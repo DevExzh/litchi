@@ -314,9 +314,9 @@ fn invalid_edits_and_source_conflicts_are_atomic() {
     let snapshot = read(&package).unwrap();
 
     let mut invalid = start_edit(&package);
-    let before_graph = invalid.graph().clone();
+    let before_graph = invalid.graph().unwrap().clone();
     assert!(invalid.set_people(People::default()).is_err());
-    assert_eq!(invalid.graph(), &before_graph);
+    assert_eq!(invalid.graph().unwrap(), &before_graph);
 
     let mut changed = start_edit(&package);
     let mut alice = snapshot.people().unwrap().persons[0].clone();

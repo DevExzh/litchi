@@ -21,7 +21,8 @@ crate::part_edit::limits_options!(super::SemanticLimits, "Data Model");
 #[derive(Clone, Debug)]
 pub struct Edit {
     source: crate::Package,
-    before: Snapshot,
+    limits: super::SemanticLimits,
+    before: Option<Snapshot>,
     definition: Option<Definition>,
     payload: Option<Arc<Vec<u8>>>,
     validated_time_grouping_edit: bool,
@@ -41,44 +42,64 @@ enum PayloadEditKind {
 }
 
 impl Edit {
-    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
-        let definition = before.definition().cloned();
-        let payload = before.part().map(|part| Arc::clone(&part.bytes));
-        let identity_baseline = definition.clone();
+    pub(crate) fn new(source: crate::Package, limits: super::SemanticLimits) -> Self {
         Self {
             source,
-            before,
-            definition,
-            payload,
+            limits,
+            before: None,
+            definition: None,
+            payload: None,
             validated_time_grouping_edit: false,
-            identity_baseline,
+            identity_baseline: None,
             payload_edit_kind: PayloadEditKind::None,
         }
     }
 
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::read_with_limits(self.source.opc_package(), self.limits)?;
+        self.definition = before.definition().cloned();
+        self.payload = before.part().map(|part| Arc::clone(&part.bytes));
+        self.identity_baseline = self.definition.clone();
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("Data Model edit is not prepared"))
+    }
+
     /// Immutable source snapshot used by stale-source checks.
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Borrow the currently staged typed workbook metadata.
-    pub fn definition(&self) -> Option<&Definition> {
-        self.definition.as_ref()
+    pub fn definition(&mut self) -> Result<Option<&Definition>> {
+        self.ensure_prepared()?;
+        Ok(self.definition.as_ref())
     }
 
     /// Borrow the currently staged opaque payload bytes.
-    pub fn payload(&self) -> Option<&[u8]> {
-        self.payload.as_ref().map(|value| value.as_slice())
+    pub fn payload(&mut self) -> Result<Option<&[u8]>> {
+        self.ensure_prepared()?;
+        Ok(self.payload.as_ref().map(|value| value.as_slice()))
     }
 
     /// Replace typed workbook metadata while retaining the existing payload.
     pub fn set_definition(&mut self, definition: Definition) -> Result<bool> {
+        self.ensure_prepared()?;
         if self.payload.is_none() {
             return Err(invalid(
                 "cannot set Data Model workbook records without a model payload",
             ));
         }
-        validate_definition(&definition, self.before.limits())?;
+        validate_definition(&definition, self.limits)?;
         self.validate_connection_closure(&definition)?;
         if self.definition.as_ref() == Some(&definition) {
             return Ok(false);
@@ -93,12 +114,13 @@ impl Edit {
         &mut self,
         edit: impl FnOnce(&mut Definition) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut definition = self.definition.clone().ok_or_else(|| {
             invalid("cannot edit Data Model workbook records when the model is absent")
         })?;
         let before = definition.clone();
         edit(&mut definition)?;
-        validate_definition(&definition, self.before.limits())?;
+        validate_definition(&definition, self.limits)?;
         self.validate_connection_closure(&definition)?;
         if definition == before {
             return Ok(false);
@@ -120,6 +142,7 @@ impl Edit {
     /// neutral closure owner.  Errors leave this detached transaction
     /// unchanged.
     pub fn rename_table(&mut self, table_id: &str, new_name: &str) -> Result<bool> {
+        self.ensure_prepared()?;
         let current = self
             .definition
             .clone()
@@ -156,7 +179,7 @@ impl Edit {
             table_id,
             &current,
             new_name,
-            self.before.limits().max_part_bytes,
+            self.limits.max_part_bytes,
         )?;
 
         // Build and validate the entire outer semantic candidate before
@@ -179,7 +202,7 @@ impl Edit {
                 grouping.table_name = replacement_name.clone();
             }
         }
-        validate_definition(&definition, self.before.limits())?;
+        validate_definition(&definition, self.limits)?;
         self.validate_connection_closure(&definition)?;
         validate_time_groupings(&renamed_payload, &definition.time_groupings)?;
 
@@ -198,6 +221,7 @@ impl Edit {
     /// regeneration and calculated-column creation remain a separate writer
     /// operation and are refused when the referenced columns are absent.
     pub fn add_time_grouping(&mut self, grouping: TimeGrouping) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut definition = self.current_definition()?;
         if definition.time_groupings.iter().any(|existing| {
             existing.table_name == grouping.table_name && existing.column_id == grouping.column_id
@@ -223,6 +247,7 @@ impl Edit {
         column_id: &str,
         grouping: TimeGrouping,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut definition = self.current_definition()?;
         let Some(index) = definition.time_groupings.iter().position(|existing| {
             existing.table_name == table_name && existing.column_id == column_id
@@ -258,6 +283,7 @@ impl Edit {
     /// source closure before publication, so a removal cannot conceal an
     /// unrelated dangling reference.
     pub fn remove_time_grouping(&mut self, table_name: &str, column_id: &str) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut definition = self.current_definition()?;
         let Some(index) = definition.time_groupings.iter().position(|existing| {
             existing.table_name == table_name && existing.column_id == column_id
@@ -283,7 +309,7 @@ impl Edit {
                 "cannot edit Data Model time groupings without a model payload",
             ));
         }
-        validate_definition(definition, self.before.limits())?;
+        validate_definition(definition, self.limits)?;
         self.validate_connection_closure(definition)?;
         let Some(payload) = self.payload.as_ref().map(Arc::as_ref) else {
             return Err(invalid(
@@ -295,6 +321,7 @@ impl Edit {
 
     /// Replace the inert payload while retaining typed workbook metadata.
     pub fn replace_payload(&mut self, payload: Vec<u8>) -> Result<bool> {
+        self.ensure_prepared()?;
         let definition = self
             .definition
             .as_ref()
@@ -304,14 +331,14 @@ impl Edit {
             content_type: super::package::DATA_MODEL_CONTENT_TYPE.to_string(),
             bytes: Arc::new(payload),
         };
-        validate_definition(definition, self.before.limits())?;
+        validate_definition(definition, self.limits)?;
         self.validate_connection_closure(definition)?;
         validate_payload(&part)?;
-        if part.bytes.len() > self.before.limits().max_part_bytes {
+        if part.bytes.len() > self.limits.max_part_bytes {
             return Err(Error::limit(
                 crate::data_model::LimitKind::PayloadBytes,
                 part.bytes.len(),
-                self.before.limits().max_part_bytes,
+                self.limits.max_part_bytes,
             ));
         }
         if self
@@ -321,7 +348,7 @@ impl Edit {
         {
             return Ok(false);
         }
-        if self.identity_baseline.as_ref() != self.before.definition() {
+        if self.identity_baseline.as_ref() != self.snapshot()?.definition() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "edit_data_model",
@@ -336,17 +363,18 @@ impl Edit {
 
     /// Replace or remove the complete model pair after validating both owners.
     pub fn replace_model(&mut self, model: Option<Model>) -> Result<bool> {
+        self.ensure_prepared()?;
         let current_payload = self.payload.as_ref().map(|payload| payload.as_slice());
         let (definition, payload) = match model {
             Some(model) => {
-                validate_definition(&model.definition, self.before.limits())?;
+                validate_definition(&model.definition, self.limits)?;
                 self.validate_connection_closure(&model.definition)?;
                 validate_payload(&model.part)?;
-                if model.part.bytes.len() > self.before.limits().max_part_bytes {
+                if model.part.bytes.len() > self.limits.max_part_bytes {
                     return Err(Error::limit(
                         crate::data_model::LimitKind::PayloadBytes,
                         model.part.bytes.len(),
-                        self.before.limits().max_part_bytes,
+                        self.limits.max_part_bytes,
                     ));
                 }
                 validate_time_groupings(model.part.bytes(), &model.definition.time_groupings)?;
@@ -354,7 +382,7 @@ impl Edit {
                     self.identity_baseline.as_ref(),
                     &model.definition,
                 )?;
-                if self.identity_baseline.as_ref() != self.before.definition()
+                if self.identity_baseline.as_ref() != self.snapshot()?.definition()
                     && self.payload.as_ref().map(|payload| payload.as_slice())
                         != Some(model.part.bytes())
                 {
@@ -386,8 +414,16 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        *self = Self::new(self.source.clone(), self.before.clone());
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let definition = self.snapshot()?.definition().cloned();
+        let payload = self.snapshot()?.part().map(|part| Arc::clone(&part.bytes));
+        self.definition = definition;
+        self.payload = payload;
+        self.identity_baseline = self.definition.clone();
+        self.validated_time_grouping_edit = false;
+        self.payload_edit_kind = PayloadEditKind::None;
+        Ok(())
     }
 
     /// Validate the staged Data Model, publish it to a new package and read
@@ -398,12 +434,13 @@ impl Edit {
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook, the
     /// closure, identity and payload refusals, and the workbook validation
     /// errors of the result.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
+        let before = self.snapshot()?;
         let after_model = match (&self.definition, &self.payload) {
             (None, None) => None,
             (Some(definition), Some(payload)) => {
-                let (part_name, content_type) = self
-                    .before
+                let (part_name, content_type) = before
                     .part()
                     .map(|part| (part.part_name.clone(), part.content_type.clone()))
                     .unwrap_or_else(|| {
@@ -432,13 +469,16 @@ impl Edit {
                 ));
             },
         };
-        let unchanged = match (self.before.model(), after_model.as_ref()) {
+        let unchanged = match (before.model(), after_model.as_ref()) {
             (None, None) => true,
             (Some(before), Some(after)) => before == after,
             _ => false,
         };
         if unchanged {
-            let before = self.before;
+            let before = self
+                .before
+                .take()
+                .ok_or_else(|| invalid("Data Model edit is not prepared"))?;
             return Ok(Commit::new(
                 self.source,
                 Patch::new(before.clone(), before),
@@ -449,7 +489,7 @@ impl Edit {
         if let Some(after_definition) = after_definition {
             self.validate_connection_closure(after_definition)?;
             if self.validated_time_grouping_edit {
-                let before_payload = self.before.part().map(ModelPart::bytes);
+                let before_payload = before.part().map(ModelPart::bytes);
                 let after_payload = self.payload.as_ref().map(|value| value.as_slice());
                 if self.payload_edit_kind != PayloadEditKind::IdentityRename
                     && before_payload != after_payload
@@ -475,28 +515,30 @@ impl Edit {
                 validate_time_groupings(after_payload, &after_definition.time_groupings)?;
             }
         }
-        if self.before.package().is_signed()
-            || self.before.package().requires_signature_edit_policy()
-        {
+        if before.package().is_signed() || before.package().requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let mut candidate = self.before.package().as_ref().clone();
-        super::patch::materialize_models(&mut candidate, &self.before, after_model.as_ref())?;
-        let after = Snapshot::read_with_limits(&candidate, self.before.limits())?;
+        let mut candidate = before.package().as_ref().clone();
+        super::patch::materialize_models(&mut candidate, before, after_model.as_ref())?;
+        let after = Snapshot::read_with_limits(&candidate, before.limits())?;
         if after.model() != after_model.as_ref() {
             return Err(invalid(
                 "Data Model transaction readback did not match staged model",
             ));
         }
-        if after.same_source(&self.before) {
+        if after.same_source(before) {
             return Err(invalid(
                 "changed Data Model transaction produced no source change",
             ));
         }
         let package = self.source.reparse_candidate(candidate)?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("Data Model edit is not prepared"))?;
         Ok(Commit::new(
             package,
-            Patch::new(self.before, after),
+            Patch::new(before, after),
             litchi_core::edit::Diagnostics::CHANGED,
         ))
     }
@@ -504,7 +546,7 @@ impl Edit {
     fn validate_connection_closure(&self, definition: &Definition) -> Result<()> {
         validate_definition_connection_names(
             definition,
-            self.before
+            self.snapshot()?
                 .connection_names()
                 .map(|names| names.iter().map(String::as_str)),
         )

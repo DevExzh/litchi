@@ -83,7 +83,7 @@ impl ThemeSteps for Workbook {
         let package = self.to_package();
         Ok(ThemeState {
             snapshot: package.theme()?,
-            part_name: package.edit_theme()?.part_name().to_owned(),
+            part_name: package.edit_theme()?.part_name()?.to_owned(),
         })
     }
 

@@ -134,7 +134,9 @@ impl Edit {
         if panes.is_empty() {
             return self.clear();
         }
-        self.staged.workbook().validate_task_pane_bindings(&panes)?;
+        self.staged
+            .workbook()?
+            .validate_task_pane_bindings(&panes)?;
         let patch = common_web::plan_put(
             self.staged.opc(),
             panes,
@@ -162,7 +164,7 @@ impl Edit {
             return Ok(false);
         }
         self.staged
-            .workbook()
+            .workbook()?
             .validate_task_pane_bindings(&Panes::new())?;
         let patch = common_web::plan_remove(self.staged.opc(), &common_web::Limits::standard())?;
         self.stage(&patch)

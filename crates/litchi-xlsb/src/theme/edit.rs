@@ -17,7 +17,7 @@
 //! # fn main() -> Result<(), litchi_xlsb::package::PackageError> {
 //! let package = Package::new()?;
 //! let mut edit = package.edit_theme()?;
-//! if edit.theme().is_some() {
+//! if edit.theme()?.is_some() {
 //!     edit.set_name("Litchi")?;
 //! }
 //! let (after, patch) = edit.commit()?.into_parts();
@@ -119,7 +119,8 @@ impl Patch {
 #[derive(Debug, Clone)]
 pub struct Edit {
     source: Package,
-    draft: OwnerDraft,
+    limits: Limits,
+    draft: Option<OwnerDraft>,
 }
 
 impl Package {
@@ -151,10 +152,10 @@ impl Package {
         let limits = options
             .limits
             .unwrap_or_else(|| self.semantic_limits().theme_value());
-        let owner = read_owner(self.opc_package(), limits)?;
         Ok(Edit {
             source: self.clone(),
-            draft: owner.edit(),
+            limits,
+            draft: None,
         })
     }
 
@@ -185,29 +186,60 @@ impl Package {
 }
 
 impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.draft.is_some() {
+            return Ok(());
+        }
+        self.draft = Some(read_owner(self.source.opc_package(), self.limits)?.edit());
+        Ok(())
+    }
+
+    fn draft(&self) -> Result<&OwnerDraft> {
+        self.draft
+            .as_ref()
+            .ok_or(crate::package::error::Error::InvalidFormat(
+                "Theme edit is not prepared",
+            ))
+    }
+
+    fn draft_mut(&mut self) -> Result<&mut OwnerDraft> {
+        self.draft
+            .as_mut()
+            .ok_or(crate::package::error::Error::InvalidFormat(
+                "Theme edit is not prepared",
+            ))
+    }
+
     /// The staged typed Theme, or `None` when the part is absent or its
     /// removal is staged.
     #[must_use]
-    pub fn theme(&self) -> Option<&Theme> {
-        self.draft.theme()
+    pub fn theme(&mut self) -> Result<Option<&Theme>> {
+        self.ensure_prepared()?;
+        Ok(self.draft()?.theme())
     }
 
     /// The part name of the present Theme, or the one a new Theme is
     /// created at.
     #[must_use]
-    pub fn part_name(&self) -> &str {
-        self.draft.before().part_name()
+    pub fn part_name(&mut self) -> Result<&str> {
+        self.ensure_prepared()?;
+        Ok(self.draft()?.before().part_name())
     }
 
     /// The staged applied-theme family metadata.
     #[must_use]
-    pub fn family(&self) -> Option<&Family> {
-        self.draft.family()
+    pub fn family(&mut self) -> Result<Option<&Family>> {
+        self.ensure_prepared()?;
+        Ok(self.draft()?.family())
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.draft.before().edit();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let before = self.draft()?.before().clone();
+        let draft = before.edit();
+        self.draft = Some(draft);
+        Ok(())
     }
 
     /// Create, replace or remove the complete typed Theme. Returns whether
@@ -218,7 +250,8 @@ impl Edit {
     /// Returns the Theme model validation errors; a new Theme needs a
     /// non-empty name.
     pub fn replace(&mut self, theme: Option<Theme>) -> Result<bool> {
-        self.draft.replace(theme)
+        self.ensure_prepared()?;
+        self.draft_mut()?.replace(theme)
     }
 
     /// Create or replace the complete typed Theme.
@@ -227,7 +260,8 @@ impl Edit {
     ///
     /// The errors of [`Self::replace`].
     pub fn set_theme(&mut self, theme: Theme) -> Result<bool> {
-        self.draft.set_theme(theme)
+        self.ensure_prepared()?;
+        self.draft_mut()?.set_theme(theme)
     }
 
     /// Change the Theme display name.
@@ -237,7 +271,8 @@ impl Edit {
     /// Returns an error when the Theme is absent and the model validation
     /// errors.
     pub fn set_name(&mut self, name: impl Into<String>) -> Result<bool> {
-        self.draft.set_name(name)
+        self.ensure_prepared()?;
+        self.draft_mut()?.set_name(name)
     }
 
     /// Replace the complete twelve-slot color palette.
@@ -247,7 +282,8 @@ impl Edit {
     /// Returns an error when the Theme is absent and the model validation
     /// errors.
     pub fn set_palette(&mut self, colors: Palette) -> Result<bool> {
-        self.draft.set_palette(colors)
+        self.ensure_prepared()?;
+        self.draft_mut()?.set_palette(colors)
     }
 
     /// Replace the complete major/minor font set.
@@ -257,7 +293,8 @@ impl Edit {
     /// Returns an error when the Theme is absent and the model validation
     /// errors.
     pub fn set_fonts(&mut self, fonts: FontSet) -> Result<bool> {
-        self.draft.set_fonts(fonts)
+        self.ensure_prepared()?;
+        self.draft_mut()?.set_fonts(fonts)
     }
 
     /// Set or replace the applied-theme family metadata.
@@ -266,7 +303,8 @@ impl Edit {
     ///
     /// Returns the family validation errors.
     pub fn set_family(&mut self, family: Family) -> Result<bool> {
-        self.draft.set_family(family)
+        self.ensure_prepared()?;
+        self.draft_mut()?.set_family(family)
     }
 
     /// Remove the applied-theme family metadata while retaining the Theme.
@@ -275,7 +313,8 @@ impl Edit {
     ///
     /// Infallible today; the `Result` keeps the verb shape.
     pub fn remove_family(&mut self) -> Result<bool> {
-        self.draft.remove_family()
+        self.ensure_prepared()?;
+        self.draft_mut()?.remove_family()
     }
 
     /// Remove the Theme part and its Workbook owner edge.
@@ -284,7 +323,8 @@ impl Edit {
     ///
     /// Infallible today; the `Result` keeps the verb shape.
     pub fn remove(&mut self) -> Result<bool> {
-        self.draft.remove()
+        self.ensure_prepared()?;
+        self.draft_mut()?.remove()
     }
 
     /// Validate the staged Theme, publish it to a new package and read it
@@ -294,8 +334,15 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook, a
     /// stale source closure, and the Theme codec and read-back errors.
-    pub fn commit(self) -> Result<Commit> {
-        let commit = self.draft.commit()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
+        let draft = self
+            .draft
+            .take()
+            .ok_or(crate::package::error::Error::InvalidFormat(
+                "Theme edit is not prepared",
+            ))?;
+        let commit = draft.commit()?;
         let changed = commit.changed();
         let (_, patch) = commit.into_parts();
         let patch = Patch(patch);

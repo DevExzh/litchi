@@ -136,7 +136,8 @@ impl Edit {
         let commit = draft.commit().map_err(|_error| {
             crate::part_edit::invalid("the worksheet sparkline records are not valid")
         })?;
-        validate_commit_context(&commit, &self.staged.workbook().formula_context)?;
+        let workbook = self.staged.workbook()?;
+        validate_commit_context(&commit, &workbook.formula_context)?;
         if commit.is_noop() {
             return Ok(false);
         }

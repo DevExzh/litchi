@@ -40,10 +40,7 @@ impl crate::Package {
         let limits = options
             .limits_value()
             .unwrap_or_else(|| self.semantic_limits().volatile_dependencies_value());
-        Ok(Edit::new(
-            self.clone(),
-            Snapshot::read_with_limits(self.opc_package(), limits)?,
-        ))
+        Ok(Edit::new(self.clone(), limits))
     }
 
     /// Apply a source-checked Volatile Dependencies patch to a new package;
