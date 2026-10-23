@@ -153,7 +153,8 @@ impl SourceLimits {
     ///
     /// A format operation may tighten the policy supplied at open time, but
     /// it must never widen that retained policy.  The componentwise minimum
-    /// preserves the consistency relationships checked by [`Self::build`].
+    /// preserves the consistency relationships checked by
+    /// [`SourceLimitsBuilder::build`].
     #[must_use]
     pub fn min(self, other: Self) -> Self {
         Self {

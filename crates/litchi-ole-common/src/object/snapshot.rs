@@ -93,7 +93,7 @@ pub(crate) struct PackageState {
 
 /// Immutable, cheap-to-clone owner of a captured OLE object package.
 ///
-/// The owner keeps one [`Arc`] to [`PackageState`].  Cloning a package is
+/// The owner keeps one [`Arc`] to its immutable state. Cloning a package is
 /// therefore O(1) and shares the published source bytes, captured topology,
 /// stream allocations, limits, and layout policy through that state.  A
 /// default edit retains the same state until its first mutation; an edit that

@@ -374,3 +374,11 @@ failure. A preflight first blocked an overlapping Numbers worker; the
 documentation command ran only after that build ended. A broader diagnostic
 run with `--keep-going` will collect remaining documentation failures before
 the exact gate command is rerun. No memory kill occurred.
+
+The third isolated documentation attempt uses `--keep-going` on
+`e4ef015084` and reports two remaining errors after 291.99 seconds: OPC
+linked a builder method through `SourceLimits`, and public OLE package docs
+linked private `PackageState`. The links are corrected without exposing
+private state or changing behavior.
+[wsdoc-assembly-v3.json](results/0362uf/wsdoc-assembly-v3.json) records the
+complete diagnosed batch. The exact workspace gate command is rerun next.
