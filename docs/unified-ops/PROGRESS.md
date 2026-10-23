@@ -2687,3 +2687,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   fresh F3 qualification remain required. The complete gate, native measures,
   corpus replay/dispositions and final inventory/glossary remain open.
   Only the comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, Numbers/XLS runtime and ninth cleanup):
+  Main integration reaches `eed44807af`. Workspace Clippy passes on
+  `c3a9a0cef4`, followed by 488 passing Numbers library tests and four ignored
+  cases. Record 0362uf retains exact commands and log hashes. The glossary
+  now closes integrated DOCX helper/model and ODF raw-limit source rows;
+  fresh rustdoc inventory, native/performance and final-gate statuses remain
+  explicitly open. These documentation changes do not claim acceptance.
+
+  Diagnostic composition reaches `374fb0e5d9`. Common OOXML passes 482 tests
+  on `af09b4fcf9`. A generated numeric XLS fixture repairs seven setup failures
+  without weakening the new freshness assertions. The full XLS unit and
+  integration run then passes 1,863 tests across 85 suites, with one ignored,
+  on `374fb0e5d9`. XLSX library tests are still running on that frozen source.
+  Native compiler checking has reached the facade, where the complete batch
+  of consumer type/import/borrow diagnostics is assigned for repair.
+
+  The second XLSX cell proposal fixes plain/rich transfers, source styles,
+  ordinary transfer atomicity, existing merges and hyperlink aggregation,
+  but review still returns effective-style composition, bounded no-op joins,
+  exact no-op admission and repeated rich-text source scans. Separate workers
+  own cell accounting, bulk rich reads and metadata endpoint admission.
+  None is accepted as an exception. DOC final qualification is preparing a
+  controlled, provenance-recorded baseline that retains current error codes.
+
+  The ninth cleanup removes two clean merged leaves and reclaims
+  12,518,628,337 apparent checkout bytes. Two ignored files totaling 151,969
+  bytes are held in an external hashed quarantine with a restore script;
+  branch references, active/dirty leaves, build targets and measurements are
+  retained. Receipt `95904ba027` is merged into the main integration.
+
+  Full combined runtime/gates, native and quiet-host qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain required.
+  Source integration has not been accepted into trunk. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
