@@ -58,3 +58,21 @@ messages and failure conditions are unchanged.
 [The v24 receipt](results/0362up/core-clippy-shared-v24.json) retains both full
 commands, tested source and external log hashes. Final combined verification
 and native qualification remain required.
+
+The complete composed workspace rerun on
+`8225b82dde7bac272e9e77789a78751ae07aaa2a` passes:
+
+```text
+cargo clippy --offline --locked --workspace --all-targets --all-features --keep-going --message-format=json-render-diagnostics -- -D warnings
+```
+
+The run completed in 199.602 seconds with the one-job 20G memory cap and an
+external target of 4,397,247,763 bytes. The 2,403,707-byte raw log remains
+external at `.coord/budget-validation/clippy-composed-v25/check-0.log`,
+SHA-256 `bbd34401c4ee66836da9fe8c66066c3f4308192f64ac81bdc08bbec5830a40c5`.
+The reduced receipt is `results/0362up/clippy-composed-v25.json`; source and
+lock identity were rechecked after completion. The glossary and inventory
+tool suites also pass 60 tests with the reviewed replay proposal helper.
+This closes the composed consumer lint returns. ODG joined composition is
+still returned for ordered-state corrections; the complete final gate,
+inventory and native qualification remain required.
