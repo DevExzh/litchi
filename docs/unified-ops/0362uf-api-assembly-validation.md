@@ -344,3 +344,8 @@ is assigned for behavior-preserving repair, including enum-size rationale,
 fallible test handling and glossary item ordering.
 [clippy-workspace-v3.json](results/0362uf/clippy-workspace-v3.json) preserves
 the exact source, command and log hash. This remains a partial gate result.
+
+The formatting check on `3107f05f23` reports one newly simplified ODF test
+assertion. The configured formatter corrects its wrapping without changing
+behavior. [format-assembly-v2.json](results/0362uf/format-assembly-v2.json)
+preserves the initial failed check; the assembled rerun follows this repair.

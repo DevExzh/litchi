@@ -1,0 +1,129 @@
+{
+  "source": {
+    "commit": "3107f05f233c8ddb98a58cf8110dea586df2cae3",
+    "status": "",
+    "branch": "uo2/coordinator-replay-integration",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+    }
+  },
+  "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+  "policy": {
+    "runner_files": {
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+    },
+    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "memory_max": "20G",
+    "build_jobs": 1,
+    "test_threads": 1,
+    "target_guard_before": 19200000000,
+    "target_guard_after": 20000000000,
+    "free_guard": 12000000000
+  },
+  "selection": {
+    "only": [
+      "fmt"
+    ],
+    "start_at": null,
+    "indexes": [
+      0
+    ],
+    "full_step_count": 53,
+    "partial": true
+  },
+  "started": 1792769819.6110718,
+  "rows": [
+    {
+      "index": 0,
+      "total": 53,
+      "name": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "environment": {
+        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
+        "CARGO_NET_OFFLINE": "true",
+        "LITCHI_MEM_MAX": "20G",
+        "CARGO_BUILD_JOBS": "1",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_INCREMENTAL": "0"
+      },
+      "exit": 1,
+      "seconds": 28.882758855819702,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3107/00-fmt.log",
+      "log_bytes": 678,
+      "log_sha256": "f47458fe7574e6148a7b17b44ccacfeeb359dee2ca3a1a69755129809cd0859b",
+      "target_bytes_after": 19050143571,
+      "source_after": {
+        "commit": "3107f05f233c8ddb98a58cf8110dea586df2cae3",
+        "status": "",
+        "branch": "uo2/coordinator-replay-integration",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+        "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378"
+      },
+      "cargo_target_trace": [
+        {
+          "pid": "2246431",
+          "cargo_command": "fmt",
+          "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+        }
+      ],
+      "cargo_target_sizes": {
+        "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target": {
+          "bytes": 19050143571
+        }
+      },
+      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3107/00-cargo-targets.tsv",
+      "cargo_target_trace_bytes": 69,
+      "cargo_target_trace_sha256": "0da528237e288e0a235e80b939bcefa4bc6f29cab582300d2d6adcc16b7b6fdd",
+      "preflight": {
+        "started": 1792769820.9958808,
+        "target_bytes": 19050143571,
+        "free_bytes": 1931015385088,
+        "builders": [
+          {
+            "pid": 2234598,
+            "ppid": 2234594,
+            "executable": "cargo",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/cargo check --offline --locked --all-targets --all-features --keep-going -p litchi-docx -p litchi-pptx -p litchi-xlsx -p litchi-xlsb -p litchi-ops"
+          },
+          {
+            "pid": 2246407,
+            "ppid": 2234598,
+            "executable": "rustc",
+            "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_odf_formula --edition=2024 crates/litchi-odf-formula/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=ae2bd2bf73980bf2 -C extra-filename=-521fb0b7a6c58758 --out-dir /home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps -C strip=debuginfo -L dependency=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps --extern litchi_core=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_core-a00b00250fcfc49c.rmeta --extern litchi_odf_common=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_odf_common-18a16f214f1586a0.rmeta --extern quick_xml=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libquick_xml-68220c8f6684876f.rmeta"
+          }
+        ]
+      },
+      "free_bytes_after": 1930730958848,
+      "effective_exit": 1,
+      "status": "failed"
+    }
+  ],
+  "updated": 1792769849.8788583
+}
