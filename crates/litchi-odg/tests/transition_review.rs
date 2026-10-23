@@ -632,6 +632,234 @@ fn projected_sub_edit_style_state_conflicts_with_a_later_shared_retarget() {
 }
 
 #[test]
+fn superseded_style_retargets_do_not_conflict_with_another_group() {
+    let content = CONTENT_AUTOMATIC
+        .replace(
+            r#"<draw:page draw:name="Page 1" draw:style-name="dp1"/>"#,
+            r#"<draw:page draw:name="Page 1" draw:style-name="dp2"/>"#,
+        )
+        .replace(
+            r#"<draw:page draw:name="Page 2" draw:style-name="dp2"/>"#,
+            r#"<draw:page draw:name="Page 2" draw:style-name="dp1"/>"#,
+        );
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
+    let mut style_edit = source.edit();
+    style_edit.set_page_style_name(0, "dp1").unwrap();
+    let first_style_wire: serde_json::Value = serde_json::from_slice(
+        &style_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let first_style_operation = first_style_wire["operations"][0].clone();
+    let mut second_style_operation = first_style_operation.clone();
+    second_style_operation["forward"]["value"] = serde_json::Value::String("dp2".to_owned());
+    second_style_operation["inverse"]["value"] = serde_json::Value::String("dp1".to_owned());
+    let mut style_wire = first_style_wire;
+    style_wire["operations"] =
+        serde_json::Value::Array(vec![first_style_operation, second_style_operation]);
+    let style_payload =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&style_wire).unwrap())
+            .unwrap();
+    assert_eq!(style_payload.operations().len(), 2);
+
+    let mut transition_edit = source.edit();
+    transition_edit
+        .set_page_transition(1, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let transition_commit = transition_edit.commit().unwrap();
+    let mut same_page_transition_edit = source.edit();
+    same_page_transition_edit
+        .set_page_transition(0, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let same_page_transition_commit = same_page_transition_edit.commit().unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let make_plan = |style_id: &str, transition_id: &str| {
+        let mut joined = source.joined_edits(limits);
+        let lineage = joined.lineage().clone();
+        joined
+            .join(
+                edit::SubEdit::new(
+                    lineage,
+                    limits,
+                    style_id,
+                    Vec::<String>::new(),
+                    vec!["page/0#page.style.set".to_owned()],
+                    style_payload.clone(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        joined
+            .join(
+                transition_commit
+                    .patch()
+                    .prepare(transition_id, limits)
+                    .unwrap(),
+            )
+            .unwrap();
+        joined
+    };
+
+    for (style_id, transition_id) in [
+        ("a-superseded-style", "z-superseded-transition"),
+        ("z-superseded-style", "a-superseded-transition"),
+    ] {
+        let mut owner = source.edit();
+        owner.join(make_plan(style_id, transition_id)).unwrap();
+        let commit = owner.commit().unwrap();
+        assert_eq!(commit.package().pages()[0].style_name(), Some("dp2"));
+        assert_eq!(
+            commit.package().pages()[1].transition().unwrap().style(),
+            Some("fade-from-right")
+        );
+    }
+
+    let mut same_page_joined = source.joined_edits(limits);
+    let same_page_lineage = same_page_joined.lineage().clone();
+    same_page_joined
+        .join(
+            edit::SubEdit::new(
+                same_page_lineage,
+                limits,
+                "same-page-superseded-style",
+                Vec::<String>::new(),
+                vec!["page/0#page.style.set".to_owned()],
+                style_payload.clone(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    same_page_joined
+        .join(
+            same_page_transition_commit
+                .patch()
+                .prepare("same-page-transition", limits)
+                .unwrap(),
+        )
+        .unwrap();
+    let mut same_page_owner = source.edit();
+    same_page_owner.join(same_page_joined).unwrap();
+    let same_page_commit = same_page_owner.commit().unwrap();
+    assert_eq!(
+        same_page_commit.package().pages()[0].style_name(),
+        Some("dp2")
+    );
+    assert_eq!(
+        same_page_commit.package().pages()[0]
+            .transition()
+            .unwrap()
+            .style(),
+        Some("fade-from-right")
+    );
+
+    let mut intermediate_wire: serde_json::Value =
+        serde_json::from_slice(&style_payload.to_deterministic_json().unwrap()).unwrap();
+    let transition_wire: serde_json::Value = serde_json::from_slice(
+        &same_page_transition_commit
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let style_first_operation = intermediate_wire["operations"][0].clone();
+    let style_last_operation = intermediate_wire["operations"][1].clone();
+    intermediate_wire["operations"] = serde_json::Value::Array(vec![
+        style_first_operation,
+        transition_wire["operations"][0].clone(),
+        style_last_operation,
+    ]);
+    let intermediate_payload = edit::DurablePatch::from_deterministic_json(
+        &serde_json::to_vec(&intermediate_wire).unwrap(),
+    )
+    .unwrap();
+    let mut intermediate_joined = source.joined_edits(limits);
+    let intermediate_lineage = intermediate_joined.lineage().clone();
+    intermediate_joined
+        .join(
+            edit::SubEdit::new(
+                intermediate_lineage,
+                limits,
+                "intermediate-transition",
+                Vec::<String>::new(),
+                vec![
+                    "page/0#page.style.set".to_owned(),
+                    "page/0#page.transition.set".to_owned(),
+                ],
+                intermediate_payload,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    intermediate_joined
+        .join(
+            transition_commit
+                .patch()
+                .prepare("intermediate-independent-transition", limits)
+                .unwrap(),
+        )
+        .unwrap();
+    let mut intermediate_owner = source.edit();
+    let error = match intermediate_owner.join(intermediate_joined) {
+        Ok(_) => panic!("intermediate style dependency was retired with its retarget"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(!intermediate_owner.commit().unwrap().diagnostics().changed());
+
+    let mut ordinary_before = source.edit();
+    ordinary_before.set_page_style_name(0, "dp1").unwrap();
+    ordinary_before.set_page_style_name(0, "dp2").unwrap();
+    ordinary_before
+        .join({
+            let mut joined = source.joined_edits(limits);
+            joined
+                .join(
+                    transition_commit
+                        .patch()
+                        .prepare("superseded-ordinary-before", limits)
+                        .unwrap(),
+                )
+                .unwrap();
+            joined
+        })
+        .unwrap();
+    let before_commit = ordinary_before.commit().unwrap();
+    assert_eq!(before_commit.package().pages()[0].style_name(), Some("dp2"));
+
+    let mut ordinary_after = source.edit();
+    ordinary_after
+        .join({
+            let mut joined = source.joined_edits(limits);
+            joined
+                .join(
+                    transition_commit
+                        .patch()
+                        .prepare("superseded-ordinary-after", limits)
+                        .unwrap(),
+                )
+                .unwrap();
+            joined
+        })
+        .unwrap();
+    ordinary_after.set_page_style_name(0, "dp1").unwrap();
+    ordinary_after.set_page_style_name(0, "dp2").unwrap();
+    let after_commit = ordinary_after.commit().unwrap();
+    assert_eq!(after_commit.package().pages()[0].style_name(), Some("dp2"));
+}
+
+#[test]
 fn joined_page_name_renames_validate_final_names() {
     let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);

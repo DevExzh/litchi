@@ -6425,6 +6425,7 @@ enum StyleDependencyEvent {
     Retarget {
         group: usize,
         page: usize,
+        source_style: Option<String>,
         destination: String,
     },
     Transition {
@@ -6452,7 +6453,7 @@ fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> Resu
         return Ok(false);
     }
     let events = projected_joined_style_events(source, joined)?;
-    style_events_conflict(&events)
+    style_events_conflict(&effective_style_events(events))
 }
 
 fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<bool> {
@@ -6471,6 +6472,7 @@ fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<
                 events.push(StyleDependencyEvent::Retarget {
                     group: ORDINARY_STYLE_GROUP,
                     page: value.page,
+                    source_style: projection.page_style(value.page),
                     destination: value.after.clone(),
                 });
                 projection.set_page_style(value.page, value.after.clone());
@@ -6491,7 +6493,7 @@ fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<
         projection,
         joined,
     )?);
-    style_events_conflict(&events)
+    style_events_conflict(&effective_style_events(events))
 }
 
 fn has_style_dependency_operation<'a>(
@@ -6547,6 +6549,7 @@ fn projected_joined_style_events_from_projection(
                     events.push(StyleDependencyEvent::Retarget {
                         group,
                         page,
+                        source_style: projection.page_style(page),
                         destination: destination.clone(),
                     });
                     projection.set_page_style(page, destination);
@@ -6565,6 +6568,54 @@ fn projected_joined_style_events_from_projection(
         }
     }
     Ok(events)
+}
+
+fn effective_style_events(events: Vec<StyleDependencyEvent>) -> Vec<StyleDependencyEvent> {
+    // Cross-group dependency checks observe each group's effective final style
+    // state.  Retargets overwritten later in the same group are not external
+    // dependencies; transitions remain because they observe the intermediate
+    // style at their position in the ordered payload.
+    let mut initial_styles = BTreeMap::new();
+    let mut final_retargets = BTreeMap::new();
+    for (index, event) in events.iter().enumerate() {
+        if let StyleDependencyEvent::Retarget {
+            group,
+            page,
+            source_style,
+            ..
+        } = event
+        {
+            initial_styles
+                .entry((*group, *page))
+                .or_insert_with(|| source_style.clone());
+            final_retargets.insert((*group, *page), index);
+        }
+    }
+    events
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, event)| match &event {
+            StyleDependencyEvent::Retarget {
+                group,
+                page,
+                source_style: _,
+                destination,
+            } => {
+                if final_retargets.get(&(*group, *page)) != Some(&index) {
+                    return None;
+                }
+                if initial_styles
+                    .get(&(*group, *page))
+                    .and_then(Option::as_deref)
+                    == Some(destination.as_str())
+                {
+                    return None;
+                }
+                Some(event)
+            },
+            StyleDependencyEvent::Transition { .. } => Some(event),
+        })
+        .collect()
 }
 
 fn style_events_conflict(events: &[StyleDependencyEvent]) -> Result<bool> {
