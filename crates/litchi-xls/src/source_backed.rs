@@ -126,6 +126,12 @@ macro_rules! source_family {
 
         fn replay(workbook: &crate::SourceBackedWorkbook, patch: &Patch) -> crate::Result<Commit> {
             if workbook.same_workbook(&patch.before) {
+                // Arc identity is a safe content fast path only while the
+                // original dynamic source is still current.  A source-backed
+                // owner may outlive a mutable source, so the fence must run
+                // before returning the retained after-owner for both forward
+                // and inverse same-owner replay.
+                workbook.ensure_original_source_current()?;
                 return Ok(Commit::new(
                     patch.after.clone(),
                     patch.clone(),

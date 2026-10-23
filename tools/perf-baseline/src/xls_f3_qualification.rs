@@ -330,6 +330,29 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     };
     require_commit_source_changed(error, "stage/mutate/commit")?;
 
+    // Replay must not let Arc identity bypass the original-source fence.  The
+    // forward patch's before-owner is this same workbook, so mutating its
+    // source exercises the fast path directly.
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let commit = commit_fixture(&workbook, fixture)?;
+    source.mutate();
+    let error = match workbook.apply_cells(commit.patch()) {
+        Ok(_) => return Err("XLS F3 stale same-owner forward replay was accepted".into()),
+        Err(error) => error,
+    };
+    require_commit_source_changed(error, "same-owner forward replay")?;
+
+    // The inverse patch's before-owner is the committed package.  Keep the
+    // recipient identical to that owner so this covers the inverse fast path,
+    // not only the independent-content replay route.
+    let inverse = commit.patch().inverse();
+    let error = match commit.package().apply_cells(&inverse) {
+        Ok(_) => return Err("XLS F3 stale same-owner inverse replay was accepted".into()),
+        Err(error) => error,
+    };
+    require_commit_source_changed(error, "same-owner inverse replay")?;
+
     // A mutation after a deferred commit must also be caught when the first
     // semantic read asks effective_inner to materialize the composed target.
     let source = Arc::new(VersionedSource::new(&fixture.archive));
