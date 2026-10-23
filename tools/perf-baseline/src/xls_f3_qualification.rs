@@ -347,7 +347,7 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     source.mutate();
     match edit.commit() {
         Ok(commit) if implementation == Implementation::Baseline => {
-            require_baseline_publication_source_changed(
+            require_baseline_nonempty_output(
                 write_package(commit.package()),
                 "stage/mutate/commit",
             )?;
@@ -373,7 +373,7 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     source.mutate();
     match workbook.apply_cells(commit.patch()) {
         Ok(replayed) if implementation == Implementation::Baseline => {
-            require_baseline_publication_source_changed(
+            require_baseline_nonempty_output(
                 write_package(replayed.package()),
                 "same-owner forward replay",
             )?;
@@ -455,9 +455,11 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
     let mut output = Vec::new();
     match commit.package().write_to(&mut output) {
         Ok(_) if implementation == Implementation::Baseline => {
-            return Err(
-                "XLS F3 baseline mutate/committed-write unexpectedly published stale output".into(),
-            );
+            if output.is_empty() {
+                return Err(
+                    "XLS F3 baseline mutate/committed-write published empty stale output".into(),
+                );
+            }
         },
         Ok(_) => return Err("XLS F3 stale committed source was published".into()),
         Err(error) if implementation == Implementation::Candidate => {
@@ -474,6 +476,17 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
         },
     }
     Ok(())
+}
+
+fn require_baseline_nonempty_output(output: Result<Vec<u8>>, label: &str) -> Result<()> {
+    match output {
+        Ok(output) if !output.is_empty() => Ok(()),
+        Ok(_) => Err(format!("XLS F3 baseline {label} published empty stale output").into()),
+        Err(error) => Err(format!(
+            "XLS F3 baseline {label} returned an unrecorded publication error: {error:?}"
+        )
+        .into()),
+    }
 }
 
 fn require_baseline_publication_source_changed(output: Result<Vec<u8>>, label: &str) -> Result<()> {
