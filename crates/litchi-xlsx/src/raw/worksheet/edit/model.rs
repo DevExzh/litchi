@@ -12,7 +12,7 @@ use crate::layout::{self, Descent};
 use crate::outline::Outline;
 use crate::row::Height;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Payload {
     Set(Content),
     /// Reuse one exact workbook shared-string item, retaining rich runs.
@@ -49,7 +49,7 @@ pub(crate) enum StyleEffect {
 ///
 /// `Remove` owns the whole record. An `Update` may independently change its
 /// payload and local style, allowing proven-disjoint effects to be joined.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Action {
     Update {
         payload: Option<Payload>,

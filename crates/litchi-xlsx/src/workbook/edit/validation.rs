@@ -18,7 +18,7 @@ use crate::sheet::Name;
 use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::Bindings as WebBindings;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub(super) struct SheetActions {
     pub(super) rename: Option<Name>,
     pub(super) visibility: Option<TabAction>,
@@ -215,7 +215,7 @@ pub(super) struct MoveIntent {
     pub(super) to: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct OrderPlan {
     pub(super) positions: Vec<usize>,
     pub(super) moves: Vec<MoveIntent>,
@@ -234,14 +234,14 @@ pub(super) enum Placement {
     After(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct Added {
     pub(super) name: Name,
     pub(super) actions: SheetActions,
     pub(super) placement: Placement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) enum PanesAction {
     Put {
         panes: common_web::Panes,

@@ -26,8 +26,8 @@ pub use drawing::{
 };
 pub use edit::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, Diagnostics, DurablePatch, Edit, EditOptions,
-    JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange, Patch, SealedPatch,
-    State, ThreeWayPlan,
+    JoinError, JoinFailure, JoinNormalization, MergeChoice, MergeLimits, NewSheet, PackageChange,
+    Patch, SealedPatch, State, ThreeWayPlan,
 };
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;

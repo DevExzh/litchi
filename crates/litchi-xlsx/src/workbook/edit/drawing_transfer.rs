@@ -29,7 +29,7 @@ const MAX_ANCHORS: usize = 100_000;
 const MAX_REFERENCES: usize = 4_096;
 const MAX_URI_ATTEMPTS: u32 = 10_000;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct Plan {
     pub(super) source_position: usize,
     pub(super) source_name: Box<str>,
