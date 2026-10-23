@@ -48,7 +48,8 @@ The ordinary route (`doc/leaf_write`) produced identical raw output SHA
 legs. The mixed-formatting test, refusal atomicity, inverse, and exact no-op
 checks passed in the candidate's full DOC library run (1,210 passed, 2
 ignored); the baseline overlay also compiled and its retained-render test
-passed.
+passed. The all-feature `litchi-ops` `doc_unified_ops` integration suite also
+passed all 13 tests.
 
 The 1k route preserves rendered output but not raw container bytes. The
 candidate emits a compact 182,784-byte OLE file (`bd016a…`); the baseline emits

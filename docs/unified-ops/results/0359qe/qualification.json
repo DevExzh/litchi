@@ -139,6 +139,7 @@
   },
   "tests": {
     "candidate_litchi_doc_lib": "1210 passed, 0 failed, 2 ignored",
+    "candidate_litchi_ops_doc_unified_ops": "13 passed, 0 failed",
     "candidate_mixed_body_formatting": "passed",
     "baseline_overlay_build": "passed",
     "baseline_retained_render_test": "passed",
