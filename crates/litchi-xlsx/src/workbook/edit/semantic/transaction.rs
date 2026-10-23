@@ -174,6 +174,29 @@ enum CellTransfer {
     Move,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct TransferStyles {
+    font: Option<FontChange>,
+    alignment: Option<AlignmentChange>,
+    fill: Option<FillChange>,
+    border: Option<BorderChange>,
+    protection: Option<ProtectionChange>,
+    quote_prefix: Option<Option<bool>>,
+    number_format: Option<Option<Arc<str>>>,
+}
+
+impl TransferStyles {
+    const fn is_empty(&self) -> bool {
+        self.font.is_none()
+            && self.alignment.is_none()
+            && self.fill.is_none()
+            && self.border.is_none()
+            && self.protection.is_none()
+            && self.quote_prefix.is_none()
+            && self.number_format.is_none()
+    }
+}
+
 /// Verify a large worksheet's sparse cell rewrite without materializing every
 /// unchanged cell a second time.
 ///
@@ -276,6 +299,29 @@ fn verify_sparse_changed_cells(
         }
     }
     Ok(true)
+}
+
+/// Compare a staged rich-text payload with the source's exact run structure.
+///
+/// `State` deliberately exposes the ordinary cell value, so comparing only
+/// its content would collapse a same-text rich-text rewrite and lose run
+/// properties. Keep that compact state for the common path, but consult the
+/// source rich reader when a rich payload would otherwise look like a no-op.
+fn rich_payload_matches_source(
+    sheet: &Worksheet,
+    address: Address,
+    action: &Action,
+) -> Result<bool> {
+    let source = sheet.rich_text(address)?;
+    match action.payload() {
+        Some(Payload::Rich(rich)) => Ok(source.as_ref() == Some(rich.as_ref())),
+        // A plain payload would erase an existing inline/shared rich run even
+        // when `State` reports the same visible text. Preserve that authored
+        // representation so a plain-to-rich or rich-to-plain edit is not
+        // collapsed into a semantic no-op.
+        Some(_) => Ok(source.is_none()),
+        None => Ok(true),
+    }
 }
 
 fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
@@ -533,9 +579,14 @@ impl CaptureBudget {
     /// Unbounded edits do not pay this census cost while they are being
     /// authored; a mixed-budget join is the first operation that needs their
     /// already-staged native captures admitted against the bounded side.
-    fn from_staged(base: &Workbook, maximum: usize, edit: &Edit) -> Result<Self> {
+    fn from_staged(
+        base: &Workbook,
+        maximum: usize,
+        sheets: &BTreeMap<usize, SheetActions>,
+        added: &[Added],
+    ) -> Result<Self> {
         let mut budget = Self::new(base, maximum);
-        for (position, actions) in &edit.sheets {
+        for (position, actions) in sheets {
             let mut addresses = BTreeSet::new();
             addresses.extend(actions.cells.keys().copied());
             addresses.extend(actions.fonts.keys().copied());
@@ -555,24 +606,102 @@ impl CaptureBudget {
             if addresses.is_empty() {
                 continue;
             }
+            let source = base
+                .sheet(*position)?
+                .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
+            let store = source.store()?;
+            let base_merges = store.merge_ranges().to_vec();
+            let mut projected_merges = base_merges.clone();
+            for intent in &actions.merges {
+                let range = intent.range();
+                match intent {
+                    MergeIntent::Add(_) => {
+                        if !projected_merges.contains(&range) {
+                            projected_merges.push(range);
+                        }
+                    },
+                    MergeIntent::Remove(_) => {
+                        if let Some(index) = projected_merges.iter().position(|item| *item == range)
+                        {
+                            projected_merges.remove(index);
+                        }
+                    },
+                }
+            }
+            let mut effective_merge_starts = BTreeSet::new();
+            for range in &base_merges {
+                if !projected_merges.contains(range) {
+                    effective_merge_starts.insert(range.start());
+                }
+            }
+            for range in &projected_merges {
+                if !base_merges.contains(range) {
+                    effective_merge_starts.insert(range.start());
+                }
+            }
             let worksheet =
                 worksheet_capture_bytes(base, *position)?.saturating_add(size_of::<PartChange>());
             budget.worksheets.insert(*position, worksheet);
             for address in addresses {
-                if let Some(capture) = staged_cell_capture(actions, address) {
-                    budget.cells.insert((*position, address), capture);
+                let action_effective = if let Some(action) = actions.cells.get(&address) {
+                    let before = store.entry(address);
+                    let before_state = State::read(before, base);
+                    let after_state = State::after(before, action, base);
+                    before_state != after_state
+                        || !rich_payload_matches_source(&source, address, action)?
+                } else {
+                    false
+                };
+                let has_other_facet = actions.fonts.contains_key(&address)
+                    || actions.alignments.contains_key(&address)
+                    || actions.fills.contains_key(&address)
+                    || actions.borders.contains_key(&address)
+                    || actions.protections.contains_key(&address)
+                    || actions.quote_prefixes.contains_key(&address)
+                    || actions.number_formats.contains_key(&address)
+                    || effective_merge_starts.contains(&address)
+                    || actions
+                        .hyperlinks
+                        .keys()
+                        .any(|key| Address::at(key.0, key.1).ok() == Some(address));
+                if action_effective || has_other_facet {
+                    if let Some(capture) = staged_cell_capture(
+                        actions,
+                        address,
+                        action_effective,
+                        effective_merge_starts.contains(&address),
+                    ) {
+                        budget.cells.insert((*position, address), capture);
+                    }
                 }
             }
+            if !budget.cells.keys().any(|key| key.0 == *position) {
+                budget.worksheets.remove(position);
+            }
         }
-        for (index, added) in edit.added.iter().enumerate() {
+        for (index, added) in added.iter().enumerate() {
             let mut addresses = BTreeSet::new();
             addresses.extend(added.actions.cells.keys().copied());
+            addresses.extend(added.actions.fonts.keys().copied());
+            addresses.extend(added.actions.alignments.keys().copied());
+            addresses.extend(added.actions.fills.keys().copied());
+            addresses.extend(added.actions.borders.keys().copied());
+            addresses.extend(added.actions.protections.keys().copied());
+            addresses.extend(added.actions.quote_prefixes.keys().copied());
+            addresses.extend(added.actions.number_formats.keys().copied());
             addresses.extend(
                 added
                     .actions
                     .merges
                     .iter()
                     .map(|intent| intent.range().start()),
+            );
+            addresses.extend(
+                added
+                    .actions
+                    .hyperlinks
+                    .keys()
+                    .filter_map(|key| Address::at(key.0, key.1).ok()),
             );
             budget.added_sheets.insert(
                 index,
@@ -581,7 +710,7 @@ impl CaptureBudget {
                     .saturating_add(added.name.as_str().len()),
             );
             for address in addresses {
-                if let Some(capture) = staged_cell_capture(&added.actions, address) {
+                if let Some(capture) = staged_cell_capture(&added.actions, address, true, true) {
                     budget.added_cells.insert((index, address), capture);
                 }
             }
@@ -651,22 +780,18 @@ impl CaptureBudget {
                 .cells
                 .entry(*key)
                 .and_modify(|current| {
-                    current.payload = current.payload.saturating_add(capture.payload);
-                    current.style_effect =
-                        current.style_effect.saturating_add(capture.style_effect);
-                    current.font = current.font.saturating_add(capture.font);
-                    current.alignment = current.alignment.saturating_add(capture.alignment);
-                    current.fill = current.fill.saturating_add(capture.fill);
-                    current.border = current.border.saturating_add(capture.border);
-                    current.protection = current.protection.saturating_add(capture.protection);
-                    current.quote_prefix =
-                        current.quote_prefix.saturating_add(capture.quote_prefix);
-                    current.number_format =
-                        current.number_format.saturating_add(capture.number_format);
-                    current.structural = current.structural.saturating_add(capture.structural);
-                    current.relationship =
-                        current.relationship.saturating_add(capture.relationship);
-                    current.remove = current.remove.saturating_add(capture.remove);
+                    current.payload = current.payload.max(capture.payload);
+                    current.style_effect = current.style_effect.max(capture.style_effect);
+                    current.font = current.font.max(capture.font);
+                    current.alignment = current.alignment.max(capture.alignment);
+                    current.fill = current.fill.max(capture.fill);
+                    current.border = current.border.max(capture.border);
+                    current.protection = current.protection.max(capture.protection);
+                    current.quote_prefix = current.quote_prefix.max(capture.quote_prefix);
+                    current.number_format = current.number_format.max(capture.number_format);
+                    current.structural = current.structural.max(capture.structural);
+                    current.relationship = current.relationship.max(capture.relationship);
+                    current.remove = current.remove.max(capture.remove);
                     current.active |= capture.active;
                 })
                 .or_insert(*capture);
@@ -685,22 +810,18 @@ impl CaptureBudget {
                 .added_cells
                 .entry(key)
                 .and_modify(|current| {
-                    current.payload = current.payload.saturating_add(capture.payload);
-                    current.style_effect =
-                        current.style_effect.saturating_add(capture.style_effect);
-                    current.font = current.font.saturating_add(capture.font);
-                    current.alignment = current.alignment.saturating_add(capture.alignment);
-                    current.fill = current.fill.saturating_add(capture.fill);
-                    current.border = current.border.saturating_add(capture.border);
-                    current.protection = current.protection.saturating_add(capture.protection);
-                    current.quote_prefix =
-                        current.quote_prefix.saturating_add(capture.quote_prefix);
-                    current.number_format =
-                        current.number_format.saturating_add(capture.number_format);
-                    current.structural = current.structural.saturating_add(capture.structural);
-                    current.relationship =
-                        current.relationship.saturating_add(capture.relationship);
-                    current.remove = current.remove.saturating_add(capture.remove);
+                    current.payload = current.payload.max(capture.payload);
+                    current.style_effect = current.style_effect.max(capture.style_effect);
+                    current.font = current.font.max(capture.font);
+                    current.alignment = current.alignment.max(capture.alignment);
+                    current.fill = current.fill.max(capture.fill);
+                    current.border = current.border.max(capture.border);
+                    current.protection = current.protection.max(capture.protection);
+                    current.quote_prefix = current.quote_prefix.max(capture.quote_prefix);
+                    current.number_format = current.number_format.max(capture.number_format);
+                    current.structural = current.structural.max(capture.structural);
+                    current.relationship = current.relationship.max(capture.relationship);
+                    current.remove = current.remove.max(capture.remove);
                     current.active |= capture.active;
                 })
                 .or_insert(*capture);
@@ -1099,6 +1220,43 @@ impl Edit {
             budget.worksheets.remove(&position);
         }
         budget.recompute_reserved();
+    }
+
+    fn recompute_capture_budget(&mut self) {
+        if let Some(budget) = self.capture_budget.as_mut() {
+            budget.recompute_reserved();
+        }
+    }
+
+    /// Drop the cell facets superseded by a complete transfer replacement.
+    /// Relationship and structural captures belong to independent worksheet
+    /// graphs and therefore remain charged. Recompute once for the whole
+    /// operation rather than clearing each facet through the O(n) public
+    /// helper repeatedly.
+    fn release_transfer_capture(&mut self, position: usize, address: Address) {
+        let Some(budget) = self.capture_budget.as_mut() else {
+            return;
+        };
+        let Some(capture) = budget.cells.get_mut(&(position, address)) else {
+            return;
+        };
+        capture.payload = 0;
+        capture.style_effect = 0;
+        capture.font = 0;
+        capture.alignment = 0;
+        capture.fill = 0;
+        capture.border = 0;
+        capture.protection = 0;
+        capture.quote_prefix = 0;
+        capture.number_format = 0;
+        capture.remove = 0;
+        capture.active = capture.structural != 0 || capture.relationship != 0;
+        if !capture.active {
+            budget.cells.remove(&(position, address));
+        }
+        if !budget.cells.keys().any(|key| key.0 == position) {
+            budget.worksheets.remove(&position);
+        }
     }
 
     /// Admit a cell's native before-image before a caller reads the projected
@@ -2014,6 +2172,157 @@ impl Edit {
         self.transfer_cells(source, range, target, anchor, CellTransfer::Move)
     }
 
+    fn pending_transfer_styles(&self, position: usize, address: Address) -> TransferStyles {
+        let Some(actions) = self.sheets.get(&position) else {
+            return TransferStyles::default();
+        };
+        TransferStyles {
+            font: actions.fonts.get(&address).cloned(),
+            alignment: actions.alignments.get(&address).copied(),
+            fill: actions.fills.get(&address).cloned(),
+            border: actions.borders.get(&address).cloned(),
+            protection: actions.protections.get(&address).copied(),
+            quote_prefix: actions.quote_prefixes.get(&address).copied(),
+            number_format: actions.number_formats.get(&address).cloned(),
+        }
+    }
+
+    fn preflight_transfer_styles(
+        &mut self,
+        position: usize,
+        address: Address,
+        styles: &TransferStyles,
+    ) -> Result<Vec<CaptureReservation>> {
+        let mut reservations = Vec::with_capacity(7);
+        let result = (|| -> Result<()> {
+            let mut admit = |facet, bytes| -> Result<()> {
+                reservations
+                    .push(self.preflight_cell_capture_with_facet(position, address, facet, bytes)?);
+                Ok(())
+            };
+            if let Some(change) = &styles.font {
+                admit(CaptureFacet::Font, change.retained_bytes())?;
+            }
+            if let Some(change) = &styles.alignment {
+                admit(CaptureFacet::Alignment, change.retained_bytes())?;
+            }
+            if let Some(change) = &styles.fill {
+                admit(CaptureFacet::Fill, change.retained_bytes())?;
+            }
+            if let Some(change) = &styles.border {
+                admit(CaptureFacet::Border, change.retained_bytes())?;
+            }
+            if let Some(change) = &styles.protection {
+                admit(CaptureFacet::Protection, change.retained_bytes())?;
+            }
+            if styles.quote_prefix.is_some() {
+                admit(CaptureFacet::QuotePrefix, size_of::<Option<bool>>())?;
+            }
+            if let Some(value) = &styles.number_format {
+                admit(
+                    CaptureFacet::NumberFormat,
+                    size_of::<Option<Arc<str>>>()
+                        .saturating_add(value.as_ref().map_or(0, |value| value.len())),
+                )?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            self.rollback_capture_reservations(&mut reservations);
+            return Err(error);
+        }
+        Ok(reservations)
+    }
+
+    fn discard_transfer_styles(&mut self, position: usize, address: Address) -> Result<()> {
+        self.discard_fill(position, address)?;
+        self.discard_border(position, address)?;
+        let actions = self.sheets.entry(position).or_default();
+        actions.fonts.remove(&address);
+        actions.alignments.remove(&address);
+        actions.protections.remove(&address);
+        actions.quote_prefixes.remove(&address);
+        actions.number_formats.remove(&address);
+        Ok(())
+    }
+
+    fn stage_transfer_styles(
+        &mut self,
+        position: usize,
+        address: Address,
+        styles: TransferStyles,
+    ) -> Result<()> {
+        if let Some(change) = styles.font {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .fonts
+                .insert(address, change);
+        }
+        if let Some(change) = styles.alignment {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .alignments
+                .insert(address, change);
+        }
+        if let Some(change) = styles.fill {
+            self.stage_fill(position, address, &change)?;
+        }
+        if let Some(change) = styles.border {
+            self.stage_border(position, address, &change)?;
+        }
+        if let Some(change) = styles.protection {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .protections
+                .insert(address, change);
+        }
+        if let Some(value) = styles.quote_prefix {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .quote_prefixes
+                .insert(address, value);
+        }
+        if let Some(value) = styles.number_format {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .number_formats
+                .insert(address, value);
+        }
+        Ok(())
+    }
+
+    fn pending_transfer_rich_text(
+        &self,
+        sheet: &Worksheet,
+        address: Address,
+    ) -> Result<Option<crate::RichText>> {
+        if let Some(action) = self
+            .sheets
+            .get(&sheet.position())
+            .and_then(|actions| actions.cells.get(&address))
+        {
+            match action.payload() {
+                Some(Payload::Rich(rich)) => return Ok(Some((**rich).clone())),
+                Some(_) => return Ok(None),
+                None => {},
+            }
+        }
+        let inline_rich = sheet
+            .store()?
+            .entry(address)
+            .is_some_and(|stored| stored.inline_rich);
+        if inline_rich {
+            sheet.rich_text(address)
+        } else {
+            Ok(None)
+        }
+    }
+
     fn transfer_cells<'source, 'range, 'target, 'anchor>(
         &mut self,
         source: impl Into<Selector<'source>>,
@@ -2105,32 +2414,89 @@ impl Edit {
                         feature: "overwriting unmodeled cell encodings",
                     });
                 }
-                let state = self.pending_cell_state(&source_sheet, source_address)?;
-                let action = transfer_action(state, source_address, target_address)?;
-                staged.push((source_address, target_address, action));
+                let source_state = self.pending_cell_state(&source_sheet, source_address)?;
+                let source_styles =
+                    self.pending_transfer_styles(source_sheet.position(), source_address);
+                let target_state = self.pending_cell_state(&target_sheet, target_address)?;
+                let target_styles =
+                    self.pending_transfer_styles(target_sheet.position(), target_address);
+                let source_rich = self.pending_transfer_rich_text(&source_sheet, source_address)?;
+                let target_rich = self.pending_transfer_rich_text(&target_sheet, target_address)?;
+                let action = if let Some(rich) = source_rich.clone() {
+                    Action::rich(rich)
+                } else {
+                    transfer_action(source_state.clone(), source_address, target_address)?
+                };
+                let source_noop = matches!(&source_state, State::Missing)
+                    && self
+                        .sheets
+                        .get(&source_sheet.position())
+                        .and_then(|actions| actions.cells.get(&source_address))
+                        .is_none()
+                    && source_styles.is_empty();
+                let rich_noop = match (&source_rich, &target_rich) {
+                    (Some(source), Some(target)) => source == target,
+                    (None, None) => true,
+                    _ => false,
+                };
+                let target_noop =
+                    source_state == target_state && source_styles == target_styles && rich_noop;
+                staged.push((
+                    source_address,
+                    target_address,
+                    action,
+                    source_styles,
+                    source_noop,
+                    target_noop,
+                ));
             }
         }
 
+        // A transfer replaces the destination cell's prior payload and all
+        // authored local style facets. Release those old semantic charges
+        // before admission so a replacement is charged for its final state,
+        // not for both generations. Keep a budget snapshot so a rejected
+        // plan restores the caller's ledger byte-for-byte.
+        let capture_budget_before = self.capture_budget.clone();
+        for (source_address, target_address, _, _, source_noop, target_noop) in &staged {
+            if matches!(mode, CellTransfer::Move) && !source_noop {
+                self.release_transfer_capture(source_sheet.position(), *source_address);
+            }
+            if !target_noop {
+                self.release_transfer_capture(target_sheet.position(), *target_address);
+            }
+        }
+        self.recompute_capture_budget();
+
         let mut capture_reservations = Vec::new();
         let admission = (|| -> Result<()> {
-            for (source_address, target_address, action) in &staged {
-                if matches!(mode, CellTransfer::Move) {
+            for (source_address, target_address, action, styles, source_noop, target_noop) in
+                &staged
+            {
+                if matches!(mode, CellTransfer::Move) && !source_noop {
                     capture_reservations.extend(self.preflight_transfer_action(
                         source_sheet.position(),
                         *source_address,
                         &Action::Remove,
                     )?);
                 }
-                capture_reservations.extend(self.preflight_transfer_action(
-                    target_sheet.position(),
-                    *target_address,
-                    action,
-                )?);
+                if !target_noop {
+                    capture_reservations.extend(self.preflight_transfer_action(
+                        target_sheet.position(),
+                        *target_address,
+                        action,
+                    )?);
+                    capture_reservations.extend(self.preflight_transfer_styles(
+                        target_sheet.position(),
+                        *target_address,
+                        styles,
+                    )?);
+                }
             }
             Ok(())
         })();
         if let Err(error) = admission {
-            self.rollback_capture_reservations(&mut capture_reservations);
+            self.capture_budget = capture_budget_before.clone();
             return Err(error);
         }
         let mutation = (|| -> Result<()> {
@@ -2138,25 +2504,32 @@ impl Edit {
                 self.drawings.insert(target_sheet.position(), drawing);
             }
             if matches!(mode, CellTransfer::Move) {
-                for (source_address, _, _) in &staged {
-                    self.discard_fill(source_sheet.position(), *source_address)?;
-                    self.discard_border(source_sheet.position(), *source_address)?;
+                for (source_address, _, _, _, source_noop, _) in &staged {
+                    if !source_noop {
+                        self.discard_transfer_styles(source_sheet.position(), *source_address)?;
+                    }
                 }
                 let source_actions = self.actions(source_sheet.position());
-                for (source_address, _, _) in &staged {
-                    source_actions.insert(*source_address, Action::Remove);
+                for (source_address, _, _, _, source_noop, _) in &staged {
+                    if !source_noop {
+                        source_actions.insert(*source_address, Action::Remove);
+                    }
                 }
             }
-            for (_, target_address, action) in staged {
-                self.discard_fill(target_sheet.position(), target_address)?;
-                self.discard_border(target_sheet.position(), target_address)?;
+            for (_, target_address, action, styles, _, target_noop) in staged {
+                if target_noop {
+                    continue;
+                }
+                self.discard_transfer_styles(target_sheet.position(), target_address)?;
                 let target_actions = self.actions(target_sheet.position());
                 target_actions.insert(target_address, action);
+                self.stage_transfer_styles(target_sheet.position(), target_address, styles)?;
             }
             Ok(())
         })();
         if let Err(error) = mutation {
             self.rollback_capture_reservations(&mut capture_reservations);
+            self.capture_budget = capture_budget_before;
             return Err(error);
         }
         Ok(Some(self))
@@ -2387,7 +2760,12 @@ impl Edit {
                 },
             },
             (Some(left), None) => {
-                let derived = match CaptureBudget::from_staged(&other.base, left.maximum, &other) {
+                let derived = match CaptureBudget::from_staged(
+                    &other.base,
+                    left.maximum,
+                    &other.sheets,
+                    &other.added,
+                ) {
                     Ok(derived) => derived,
                     Err(_error) => {
                         return Err(JoinError {
@@ -2412,7 +2790,12 @@ impl Edit {
                 }
             },
             (None, Some(right)) => {
-                let derived = match CaptureBudget::from_staged(&self.base, right.maximum, self) {
+                let derived = match CaptureBudget::from_staged(
+                    &self.base,
+                    right.maximum,
+                    &self.sheets,
+                    &self.added,
+                ) {
                     Ok(derived) => derived,
                     Err(_error) => {
                         return Err(JoinError {
@@ -2733,7 +3116,7 @@ impl Edit {
             svg_projected_owners: _,
             svg_staged_payload_bytes: _,
             svg_base_part_bytes,
-            capture_budget,
+            mut capture_budget,
         } = self;
         let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
@@ -2756,6 +3139,21 @@ impl Edit {
         let mut content_types = None;
         let (styles_part_changed, projected_style_count) =
             lower_style_requests(&base, &mut sheets, &mut parts)?;
+
+        // Style lowering canonicalizes property-level requests into their
+        // final cell actions. Rebuild the bounded ledger from that published
+        // shape so an equal typed style, a canceled request, or a merged
+        // replacement does not retain a stale pre-lowering charge. This is
+        // only paid by bounded edits and is still metadata-only for deferred
+        // worksheet parts.
+        if let Some(previous) = capture_budget.take() {
+            capture_budget = Some(CaptureBudget::from_staged(
+                &base,
+                previous.maximum,
+                &sheets,
+                &added,
+            )?);
+        }
 
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
@@ -3244,7 +3642,9 @@ impl Edit {
                 }
                 let before_state = State::read(before, &base);
                 let after_state = State::after(before, &action, &base);
-                if before_state == after_state {
+                if before_state == after_state
+                    && rich_payload_matches_source(&sheet, address, &action)?
+                {
                     continue;
                 }
                 needs_recalculation |= State::calculation_content(&before_state)
@@ -5463,10 +5863,17 @@ fn worksheet_capture_bytes(base: &Workbook, position: usize) -> Result<usize> {
     }
 }
 
-fn staged_cell_capture(actions: &SheetActions, address: Address) -> Option<CellCapture> {
+fn staged_cell_capture(
+    actions: &SheetActions,
+    address: Address,
+    include_action: bool,
+    include_structural: bool,
+) -> Option<CellCapture> {
     let mut capture = CellCapture::default();
-    if let Some(action) = actions.cells.get(&address) {
-        apply_action_capture(&mut capture, action);
+    if include_action {
+        if let Some(action) = actions.cells.get(&address) {
+            apply_action_capture(&mut capture, action);
+        }
     }
     if let Some(change) = actions.fonts.get(&address) {
         capture.apply(CaptureFacet::Font, change.retained_bytes());
@@ -5493,11 +5900,7 @@ fn staged_cell_capture(actions: &SheetActions, address: Address) -> Option<CellC
                 .saturating_add(value.as_ref().map_or(0, |value| value.len())),
         );
     }
-    if actions
-        .merges
-        .iter()
-        .any(|intent| intent.range().start() == address)
-    {
+    if include_structural {
         capture.apply(CaptureFacet::Structural, 0);
     }
     for ((row, column, _, _), action) in &actions.hyperlinks {

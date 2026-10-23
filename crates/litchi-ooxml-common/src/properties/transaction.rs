@@ -74,6 +74,36 @@ pub enum LimitKind {
     RetainedBytes,
 }
 
+/// Options selected before a document-property edit captures its replacement
+/// families. The retained ceiling covers the exact semantic patch, including
+/// before/after payloads and change descriptors.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    max_retained_bytes: Option<usize>,
+}
+
+impl EditOptions {
+    /// Creates an unbounded metadata edit.
+    pub const fn new() -> Self {
+        Self {
+            max_retained_bytes: None,
+        }
+    }
+
+    /// Sets the retained-patch ceiling for this edit.
+    pub const fn max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = Some(maximum);
+        self
+    }
+
+    /// Returns the selected retained-patch ceiling.
+    #[must_use]
+    pub const fn max_retained_bytes_value(self) -> Option<usize> {
+        self.max_retained_bytes
+    }
+}
+
 /// Why a metadata read, edit or patch failed.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -447,22 +477,22 @@ impl Snapshot {
     /// Start a detached [`Plan`] of a change of this snapshot.
     #[must_use]
     pub fn plan(&self) -> Plan {
-        self.plan_with_retained_limit(None)
+        self.plan_with_options(EditOptions::default())
     }
 
-    /// Start a detached plan with an optional retained-patch admission limit.
+    /// Start a detached plan with explicit edit options.
     ///
     /// The limit is retained by the plan, so [`Plan::finish`] performs its
     /// exact pre-capture admission before it materializes any replacement
     /// property payload.
     #[must_use]
-    pub fn plan_with_retained_limit(&self, maximum: Option<usize>) -> Plan {
+    pub fn plan_with_options(&self, options: EditOptions) -> Plan {
         Plan {
             base: self.clone(),
             metadata: None,
             app: None,
             custom: None,
-            max_retained_bytes: maximum,
+            options,
         }
     }
 
@@ -717,7 +747,7 @@ pub struct Plan {
     metadata: Option<Metadata>,
     app: Option<Option<app::Props>>,
     custom: Option<custom::Props>,
-    max_retained_bytes: Option<usize>,
+    options: EditOptions,
 }
 
 impl Plan {
@@ -807,7 +837,7 @@ impl Plan {
             metadata,
             app: staged_app,
             custom,
-            max_retained_bytes: _,
+            options: _,
         } = self;
         let (core_metadata, app_target, changed_fields) = match metadata {
             Some(target) => {
@@ -873,12 +903,19 @@ impl Plan {
             if target == current {
                 None
             } else {
-                let after_len = match (&base.app.present, &target) {
-                    (Some(present), Some(props)) => app::splice_len(&present.bytes, props)?,
-                    (None, Some(props)) => Some(app::encode_new_len(props)?),
-                    (_, None) => None,
+                let (after_len, plan) = match (&base.app.present, &target) {
+                    (Some(present), Some(props)) => {
+                        let plan = app::plan_splice(&present.bytes, props)?;
+                        (plan.as_ref().map(|plan| plan.output_len()), plan)
+                    },
+                    (None, Some(props)) => (Some(app::encode_new_len(props)?), None),
+                    (_, None) => (None, None),
                 };
-                Some(PreparedApp { target, after_len })
+                Some(PreparedApp {
+                    target,
+                    after_len,
+                    plan,
+                })
             }
         } else {
             None
@@ -959,7 +996,7 @@ impl Plan {
     /// or removing a part another relationship targets; and
     /// [`Error::Limit`] for an exceeded bound.
     pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
-        let maximum = self.max_retained_bytes;
+        let maximum = self.options.max_retained_bytes_value();
         let prepared = self.prepare()?;
         if let Some(maximum) = maximum
             && prepared.planned_retained_bytes > maximum
@@ -1017,6 +1054,7 @@ struct PreparedCore {
 struct PreparedApp {
     target: Option<app::Props>,
     after_len: Option<usize>,
+    plan: Option<app::SplicePlan>,
 }
 
 #[derive(Debug)]
@@ -1039,7 +1077,8 @@ impl PreparedPlan {
         let mut changes = Vec::new();
         if let Some(core) = core {
             let merged = core.target;
-            let bytes = super::write::encode(&merged, core.dialect)?.into_bytes();
+            let bytes = super::write::encode_preflighted(&merged, core.dialect, core.after_len)?
+                .into_bytes();
             if let Some(change) = stage_change(
                 &mut after,
                 Family::Core,
@@ -1056,8 +1095,19 @@ impl PreparedPlan {
 
         if let Some(app) = app {
             let after_bytes = match (&base.app.present, &app.target) {
-                (Some(present), Some(props)) => app::splice(&present.bytes, props)?,
-                (None, Some(props)) => Some(app::encode_new(props)?),
+                (Some(present), Some(props)) => Some(app::splice_planned(
+                    &present.bytes,
+                    props,
+                    app.plan.ok_or_else(|| {
+                        Error::Invalid("missing prepared application-properties layout".to_owned())
+                    })?,
+                )?),
+                (None, Some(props)) => Some(app::encode_new_preflighted(
+                    props,
+                    app.after_len.ok_or_else(|| {
+                        Error::Invalid("missing prepared application-properties length".to_owned())
+                    })?,
+                )?),
                 (_, None) => None,
             };
             if let Some(change) = stage_change(
@@ -1075,7 +1125,12 @@ impl PreparedPlan {
             let after_bytes = if custom.target.is_empty() {
                 None
             } else {
-                Some(custom.target.encode()?)
+                Some(custom::encode_preflighted(
+                    &custom.target,
+                    custom.after_len.ok_or_else(|| {
+                        Error::Invalid("missing prepared custom-properties length".to_owned())
+                    })?,
+                )?)
             };
             if let Some(change) = stage_change(
                 &mut after,
@@ -1124,10 +1179,18 @@ fn planned_change_bytes(
     relationship_ids: &mut BTreeSet<String>,
 ) -> Result<usize> {
     let state = snapshot.family(family);
+    if after_len.is_none()
+        && let Some(present) = state.present.as_ref()
+    {
+        // A removed family's relationship ID is free for a later family
+        // creation in the same prepared plan. Keep the admission ledger in
+        // the same order as `stage_change`, which removes it immediately.
+        relationship_ids.remove(&present.relationship_id);
+    }
     let (part_len, relationship_id_len, relationship_type_len, relationship_target_len, before_len) =
         match &state.present {
             Some(present) => (
-                present.part.as_str().len(),
+                retained_string(present.part.as_str()).capacity(),
                 retained_string(&present.relationship_id).capacity(),
                 retained_string(&present.relationship_type).capacity(),
                 retained_string(&present.relationship_target).capacity(),
@@ -1144,7 +1207,7 @@ fn planned_change_bytes(
                     Family::Custom => rt::CUSTOM_PROPERTIES,
                 });
                 (
-                    state.new_part.as_str().len(),
+                    retained_string(state.new_part.as_str()).capacity(),
                     relationship_id.capacity(),
                     relationship_type.capacity(),
                     relationship_target.capacity(),
@@ -1220,21 +1283,20 @@ impl Edit {
     ///
     /// The errors of [`Snapshot::read`].
     pub fn new(package: &OpcPackage, host: Host) -> Result<Self> {
-        Self::new_with_retained_limit(package, host, None)
+        Self::new_with_options(package, host, EditOptions::default())
     }
 
-    /// Capture `package` and retain an optional exact patch ceiling in the
-    /// edit's plan. The normal [`Edit::commit`] path then performs admission
-    /// before it materializes any replacement property payload.
-    pub fn new_with_retained_limit(
+    /// Capture `package` with edit options selected before replacement payload
+    /// materialization.
+    pub fn new_with_options(
         package: &OpcPackage,
         host: Host,
-        maximum: Option<usize>,
+        options: EditOptions,
     ) -> Result<Self> {
         let snapshot = Snapshot::read(package, host)?;
         Ok(Self {
             package: package.clone(),
-            plan: snapshot.plan_with_retained_limit(maximum),
+            plan: snapshot.plan_with_options(options),
         })
     }
 
@@ -1306,8 +1368,8 @@ impl Edit {
 
     /// Discard every staged change, keeping the edit.
     pub fn reset(&mut self) {
-        let maximum = self.plan.max_retained_bytes;
-        self.plan = self.plan.base.plan_with_retained_limit(maximum);
+        let options = self.plan.options;
+        self.plan = self.plan.base.plan_with_options(options);
     }
 
     /// Compute the exact patch of the staged values and publish it as a new

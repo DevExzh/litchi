@@ -1266,6 +1266,85 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
         restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
+
+    // The inverse direction is also observable: adding a run property to
+    // ordinary text must not be collapsed merely because the visible text is
+    // unchanged.
+    let plain = crate::Package::new().expect("plain workbook");
+    let mut rich = crate::RichText::plain("same");
+    rich.run_mut(0)
+        .expect("plain run")
+        .apply_font(&FontChange::new().italic(Some(true)))
+        .expect("plain run formatting");
+    let mut edit = plain.edit().expect("plain edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set_rich_text("A1", rich)
+        .expect("plain-to-rich edit");
+    let plain_to_rich = edit.commit().expect("plain-to-rich commit");
+    assert!(!plain_to_rich.patch().is_noop());
+}
+
+#[test]
+fn same_text_rich_run_property_change_is_not_collapsed_as_a_noop() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>same</t></r></is></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("rich inline workbook");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let mut rich = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .rich_text("A1")
+        .expect("rich read")
+        .expect("rich value");
+    rich.run_mut(0)
+        .expect("first run")
+        .apply_font(&FontChange::new().italic(Some(true)))
+        .expect("run formatting");
+
+    let mut edit = source.edit().expect("edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set_rich_text("A1", rich)
+        .expect("same-text rich edit");
+    let committed = edit.commit().expect("commit rich edit");
+    assert!(!committed.patch().is_noop());
+    let target = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .rich_text("A1")
+        .expect("rich target read")
+        .expect("rich target");
+    assert_eq!(target.text(), "same");
+    assert_eq!(
+        target.runs()[0].font().expect("target font").italic(),
+        Some(true)
+    );
+
+    let replayed = source.apply(committed.patch()).expect("replay rich edit");
+    assert_eq!(
+        replayed.package().to_bytes().expect("replayed bytes"),
+        committed.package().to_bytes().expect("target bytes")
+    );
+    let restored = committed
+        .package()
+        .apply(&committed.patch().inverse())
+        .expect("inverse rich edit");
+    assert_eq!(
+        restored.package().to_bytes().expect("restored bytes"),
+        source_bytes
+    );
 }
 
 #[test]

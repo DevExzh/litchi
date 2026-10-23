@@ -222,10 +222,14 @@ impl Package {
     pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             package: self.clone(),
-            inner: properties::Edit::new_with_retained_limit(
+            inner: properties::Edit::new_with_options(
                 self.opc(),
                 Host::Excel,
-                options.max_retained_bytes_value(),
+                options
+                    .max_retained_bytes_value()
+                    .map_or_else(properties::EditOptions::default, |maximum| {
+                        properties::EditOptions::new().max_retained_bytes(maximum)
+                    }),
             )?,
         })
     }
