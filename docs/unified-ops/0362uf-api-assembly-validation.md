@@ -147,3 +147,11 @@ edge. Offline Cargo metadata refreshed that ignored lock.
 refreshed lock hash; it establishes no Rust compilation result. The isolated
 XLSX raw harness now also has a tracked offline-generated lock for reproducible
 `--locked` qualification.
+
+The twelfth attempt on `7858571ad0` compiled the OPC library and its unit
+tests, then stopped on external test policy imports and qualifications left
+by the constructor migration. The focused group finished with exit 101
+after 11.73 seconds. [consumer-v12.json](results/0362uf/consumer-v12.json)
+retains the source and full log hash. Record 0362ul repairs every diagnosed
+external consumer, including the last one-argument owning constructor.
+Workspace and harness groups were not reached.
