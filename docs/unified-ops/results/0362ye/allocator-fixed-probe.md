@@ -6,14 +6,14 @@ archive is the tracked `odp_0362ye_probe` fixture (2,000 slides, 4 MiB media).
 
 | route | e4a baseline peak / allocated | current peak / allocated | output bytes | output SipHash |
 |---|---:|---:|---:|---:|
-| `open` | 693231 / 777196 | 83233 / 167605 | 0 | 15130871412783076140 |
-| `first_slide` | 693231 / 3210784 | 89988 / 2681513 | 47 | 15128627771916252792 |
-| `first_text` | 1500637 / 4672388 | 990939 / 4143117 | 105779 | 7807713202416953651 |
-| `write_text` | 693231 / 2350086 | 694399 / 2432088 | 105778 | 18333823960124859280 |
-| `repeat_write_text` | 693231 / 3922976 | 694399 / 4005356 | 211556 | 6976564693146433600 |
-| `unchanged_write` | 6074765 / 6782817 | 5484747 / 6173226 | 4215428 | 12221861870545843138 |
-| `append_commit_write` | 612845 / 5737255 | 612893 / 5853815 | 4215645 | 5546059324926701325 |
-| `replay` | 612845 / 5737255 | 612893 / 5853831 | 4215645 | 5546059324926701325 |
+| `open` | 693231 / 777196 | 83233 / 167925 | 0 | 15130871412783076140 |
+| `first_slide` | 693231 / 3210784 | 89988 / 2681833 | 47 | 15128627771916252792 |
+| `first_text` | 1500637 / 4672388 | 990939 / 4143437 | 105779 | 7807713202416953651 |
+| `write_text` | 693231 / 2350086 | 694399 / 2432408 | 105778 | 18333823960124859280 |
+| `repeat_write_text` | 693231 / 3922976 | 694399 / 4005676 | 211556 | 6976564693146433600 |
+| `unchanged_write` | 6074765 / 6782817 | 5484747 / 6175554 | 4215428 | 12221861870545843138 |
+| `append_commit_write` | 612845 / 5737255 | 612893 / 5821367 | 4215645 | 5546059324926701325 |
+| `replay` | 612845 / 5737255 | 612893 / 5821383 | 4215645 | 5546059324926701325 |
 
 The earlier fixed-buffer candidate binary is kept outside the repository at
 `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target/release/examples/odp_0362ye_probe`
@@ -21,8 +21,8 @@ The earlier fixed-buffer candidate binary is kept outside the repository at
 `032047b9f559c291cc07b1052e5425b688a2e91784220c7ef57672d091136bf0`).
 The final source build used for the current Callgrind and allocator rows is
 `/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/target/release/examples/odp_0362ye_probe`
-(3,600,944 bytes, SHA-256
-`8f9260bd53df7e615cef498de21ed4124af205c1e4cfe7bc98f3c631eed0e3fc`).
+(3,621,528 bytes, SHA-256
+`9e76c655cc0dab3d057c99a4bc8b5e5aa90a5ee3d53ffa4207a6ac4adada0a8d`).
 The baseline binary is
 `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target/release/examples/odp_0362ye_probe`
 (3,096,104 bytes, SHA-256
@@ -31,38 +31,61 @@ The baseline binary is
 The candidate was built and run with:
 
 ```text
-ODP_PROBE_ROUTE=docs/unified-ops/results/0362ye/route_after.rs \
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
 CARGO_TARGET_DIR=$CANDIDATE_TARGET TMPDIR=$ODP_TMP \
 cargo build --offline -p litchi-odp --example odp_0362ye_probe --release
 $CANDIDATE_TARGET/release/examples/odp_0362ye_probe open
 ```
 
-The baseline used the same command with `route_before.rs` and its protected
-target. This is allocation evidence; the route-local Callgrind comparison
-below uses the same fixed baseline binary and the final bounded-writer candidate.
+The baseline used the same build command with its protected target and the
+standalone source selected `route_before.rs` at compile time. The route
+scripts accept an explicit fourth argument (`before` or `after`) and verify
+that the binary's mode matches the requested route:
+
+```text
+docs/unified-ops/results/0362ye/run_allocator_routes.sh "$BIN" baseline "$OUT" before
+docs/unified-ops/results/0362ye/run_callgrind.sh "$BIN" baseline "$OUT" before
+```
+
+The checked-in Cargo example is the current route by default, so an ordinary
+all-target build and an unqualified example run need no environment. The
+standalone record source retains `ODP_PROBE_ROUTE=.../route_before.rs` for the
+historical baseline harness. This is allocation evidence; the route-local
+Callgrind comparison below uses the same fixed baseline binary and the final
+bounded-writer candidate.
+
+The source hashes for this reproduction are:
+
+```text
+crates/litchi-odp/examples/odp_0362ye_probe.rs             3c681256eea27485ba71adff85c8c9090f81689ddb4a62675e65801a9614187d
+docs/unified-ops/results/0362ye/odp_0362ye_probe.rs         9d709068b90f685fd45b367320296484020c4af45bd42da32d7ac13d5ac41650
+docs/unified-ops/results/0362ye/route_before.rs             fc08a3d65ec38c9053b1927e25943762c06c6894026e186b011bfb0dab028bb9
+docs/unified-ops/results/0362ye/route_after.rs              f27df012df0ca59cfc7845a659dd5e31c8a109ae1ebac8b07a8c888f17197dc6
+docs/unified-ops/results/0362ye/run_allocator_routes.sh    91895e7b45b66ad9d2fd8f71994a9d353b4c27a5214781cb05491734d60ab4b1
+docs/unified-ops/results/0362ye/run_callgrind.sh            475e0e8f18307b4a37483c7d28c02ff530560cf75c322871b9719ce1e5189c1c
+```
 
 ## Route-local Callgrind
 
 The fixed baseline rows are from
 `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/callgrind-4b6e2c23bc`;
 the final candidate rows are in
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/callgrind-small-content-memo-v3`.
+`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/callgrind-probe-build-current`.
 Both use `run_callgrind.sh`, one process per route, and the same ten route
 arguments. The captures remain outside the repository.
 
 | route | baseline Ir | candidate Ir | ratio |
 |---|---:|---:|---:|
-| `open` | 829,907,975 | 829,845,718 | 0.999925× |
-| `first_slide` | 886,558,187 | 894,428,325 | 1.008877× |
-| `repeat_slide` | 954,665,843 | 970,662,735 | 1.016757× |
-| `first_text` | 899,838,108 | 907,901,737 | 1.008961× |
-| `repeat_text` | 969,740,535 | 985,835,158 | 1.016597× |
-| `write_text` | 877,897,998 | 882,989,662 | 1.005800× |
-| `repeat_write_text` | 925,853,231 | 933,871,499 | 1.008660× |
-| `unchanged_write` | 845,074,834 | 845,015,987 | 0.999930× |
-| `append_commit_write` | 1,349,361,627 | 1,351,625,561 | 1.001678× |
-| `replay` | 1,349,364,328 | 1,351,593,973 | 1.001652× |
+| `open` | 829,907,975 | 829,854,316 | 0.999935× |
+| `first_slide` | 886,558,187 | 894,715,442 | 1.009201× |
+| `repeat_slide` | 954,665,843 | 970,787,891 | 1.016888× |
+| `first_text` | 899,838,108 | 908,198,425 | 1.009291× |
+| `repeat_text` | 969,740,535 | 986,165,319 | 1.016937× |
+| `write_text` | 877,897,998 | 883,060,231 | 1.005880× |
+| `repeat_write_text` | 925,853,231 | 933,908,431 | 1.008700× |
+| `unchanged_write` | 845,074,834 | 845,054,190 | 0.999976× |
+| `append_commit_write` | 1,349,361,627 | 1,351,637,536 | 1.001687× |
+| `replay` | 1,349,364,328 | 1,351,606,782 | 1.001662× |
 
 The semantic-read instruction deltas are the bounded-memory path change, not
 an additional repair scan. The e4a baseline reads its retained `content.xml`

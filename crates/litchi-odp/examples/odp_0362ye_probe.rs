@@ -274,6 +274,5 @@ fn main() {
     }
 }
 
-mod route {
-    include!(env!("ODP_PROBE_ROUTE"));
-}
+#[path = "../../../docs/unified-ops/results/0362ye/route_after.rs"]
+mod route;
