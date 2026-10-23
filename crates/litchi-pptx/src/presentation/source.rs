@@ -2521,15 +2521,6 @@ impl SourceBackedSlideSnapshot {
         Ok(edit)
     }
 
-    /// Borrowed-operation view with a temporary output ceiling.  The view is
-    /// used only for admission/reservation; committed patch identity restores
-    /// the original source policy.
-    pub(crate) fn with_max_patch_bytes(&self, maximum: usize) -> Self {
-        let mut snapshot = self.clone();
-        snapshot.max_output_bytes = snapshot.max_output_bytes.min(maximum);
-        snapshot
-    }
-
     fn check_execution(&self) -> Result<()> {
         check_execution_context(self.context.as_ref())
     }
