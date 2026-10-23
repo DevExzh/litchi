@@ -893,7 +893,7 @@ fn reference_line_object(identifier: u64, reference_line: &Line) -> Result<Archi
                 "reference-line object has no message metadata after construction".to_owned(),
             )
         })?
-        .versions = STANDARD_MESSAGE_VERSION.to_vec();
+        .versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     Ok(object)
 }
 

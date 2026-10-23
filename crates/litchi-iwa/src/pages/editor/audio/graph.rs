@@ -837,7 +837,7 @@ fn pages_audio_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = object_references.to_vec();
     info.data_references = data_references.to_vec();
     Ok(object)

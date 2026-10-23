@@ -331,7 +331,8 @@ pub(super) fn add_table(
             owner_data,
             Vec::new(),
         )?;
-        owner_object.archive_info.message_infos[0].versions = FORMULA_OWNER_VERSIONS.to_vec();
+        owner_object.archive_info.message_infos[0].versions =
+            FORMULA_OWNER_VERSIONS.to_vec().into();
         workspace
             .insert(&engine_member, owner_object)
             .map_err(lift)?;

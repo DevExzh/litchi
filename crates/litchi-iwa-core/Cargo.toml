@@ -11,6 +11,7 @@ rust-version.workspace = true
 [dependencies]
 litchi-iwa-common = { workspace = true }
 litchi-iwa-protos = { workspace = true }
+smallvec          = { workspace = true, features = ["union"] }
 snap              = { workspace = true }
 thiserror         = { workspace = true }
 

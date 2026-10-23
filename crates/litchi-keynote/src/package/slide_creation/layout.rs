@@ -703,7 +703,7 @@ fn prepare_slide_number(
     )
     .map_err(crate::package::structure::StructureError::from)
     .lift()?;
-    object.archive_info.message_infos[0].versions = IWORK_MESSAGE_VERSIONS.to_vec();
+    object.archive_info.message_infos[0].versions = IWORK_MESSAGE_VERSIONS.to_vec().into();
     workspace.insert(member, object).lift()?;
     graph::rewrite(
         workspace,

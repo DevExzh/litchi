@@ -297,7 +297,7 @@ fn clone_message_info_with_identity_remap(
 
     let message_info = MessageInfo {
         type_: source.type_,
-        versions: try_copy_slice(&source.versions, "IWA clone message versions")?,
+        versions: try_copy_versions(&source.versions, "IWA clone message versions")?,
         length: replacement_length,
         field_infos,
         object_references: map_object_references(

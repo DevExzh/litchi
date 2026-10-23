@@ -631,7 +631,7 @@ pub(super) fn chart_attachment_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(drawable_id);
     Ok(object)
 }

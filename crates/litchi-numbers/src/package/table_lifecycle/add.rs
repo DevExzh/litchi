@@ -919,7 +919,8 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             Vec::new(),
             limits,
         )?;
-        owner_object.archive_info.message_infos[0].versions = FORMULA_OWNER_VERSIONS.to_vec();
+        owner_object.archive_info.message_infos[0].versions =
+            FORMULA_OWNER_VERSIONS.to_vec().into();
         working.insert(&component, owner_object)?;
         inserted.push((new_owner, component.clone()));
         let engine_data = engine_payload(&engine_data, new_owner, internal, uid)?;

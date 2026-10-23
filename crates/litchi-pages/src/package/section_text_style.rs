@@ -858,7 +858,7 @@ fn publish(
                 .find(|(message, _)| message.type_ == CHARACTER_STYLE_MESSAGE_TYPE)
                 .map(|(_, info)| info.versions.clone())
         })
-        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec());
+        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec().into());
 
     let mut created: Vec<u64> = Vec::new();
     let mut taken = registry.uuids.clone();

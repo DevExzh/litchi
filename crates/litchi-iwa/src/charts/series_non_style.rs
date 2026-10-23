@@ -770,7 +770,7 @@ fn chart_series_non_style_object(identifier: u64, data: Vec<u8>) -> Result<Archi
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     Ok(object)
 }
 

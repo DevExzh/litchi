@@ -1764,7 +1764,7 @@ pub(super) fn new_archive_object(
         .message_infos
         .get_mut(0)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = object_references.to_vec();
     info.data_references = data_references.to_vec();
     Ok(object)

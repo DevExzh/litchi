@@ -1224,7 +1224,7 @@ fn verify_message_header(
         .message_infos
         .first()
         .ok_or(SlideAudioCreationError::Verification)?;
-    if info.versions != versions
+    if info.versions.as_slice() != versions
         || info.object_references != object_references
         || info.data_references != data_references
     {

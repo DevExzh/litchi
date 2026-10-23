@@ -542,7 +542,7 @@ fn table_object(
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = IWA_OBJECT_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = IWA_OBJECT_VERSION.to_vec().into();
     object.archive_info.message_infos[0].object_references = references.to_vec();
     Ok(object)
 }

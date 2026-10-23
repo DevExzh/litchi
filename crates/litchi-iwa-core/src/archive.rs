@@ -37,6 +37,7 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_common::{Error as WireError, LimitKind as WireLimitKind, WireLimits};
 use litchi_iwa_protos::archive_codec;
+use smallvec::SmallVec;
 
 use crate::{Error, HeaderKind, HeaderOperation, LimitKind, Limits, Result};
 
@@ -60,8 +61,8 @@ use identity_clone::{
 
 const MAX_VARINT_BYTES: usize = 10;
 const DEFAULT_MESSAGE_VERSIONS: [u32; 3] = [1, 0, 5];
-const MINIMAL_MESSAGE_INFO_MEMORY: usize =
-    size_of::<MessageInfo>() + DEFAULT_MESSAGE_VERSIONS.len() * size_of::<u32>();
+const MESSAGE_VERSIONS_INLINE_CAPACITY: usize = DEFAULT_MESSAGE_VERSIONS.len();
+const MINIMAL_MESSAGE_INFO_MEMORY: usize = size_of::<MessageInfo>();
 
 #[cfg(test)]
 thread_local! {
@@ -186,6 +187,7 @@ struct MessageInfoCollectionAdmission {
     header_fields: usize,
     max_message_nesting: usize,
     header_memory: usize,
+    minimal_spill_memory: usize,
     metadata_items: usize,
     message_count: usize,
 }
@@ -199,6 +201,7 @@ impl MessageInfoCollectionAdmission {
             header_fields: 0,
             max_message_nesting: Self::MINIMAL_ONLY_MARKER,
             header_memory: 0,
+            minimal_spill_memory: 0,
             metadata_items: 0,
             message_count: 0,
         }
@@ -220,6 +223,7 @@ impl MessageInfoCollectionAdmission {
         self.header_memory = self
             .message_count
             .checked_mul(MINIMAL_MESSAGE_INFO_MEMORY)
+            .and_then(|value| value.checked_add(self.minimal_spill_memory))
             .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
         self.metadata_items = self
             .message_count
@@ -255,6 +259,7 @@ impl MessageInfoCollectionAdmission {
             let header_memory = self
                 .message_count
                 .checked_mul(MINIMAL_MESSAGE_INFO_MEMORY)
+                .and_then(|value| value.checked_add(self.minimal_spill_memory))
                 .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
             let metadata_items = self
                 .message_count
@@ -307,7 +312,13 @@ impl MessageInfoCollectionAdmission {
     /// separate from the strict-profile path so the common route does not
     /// repeat fixed memory, field and metadata arithmetic for every push.
     #[inline]
-    fn push_minimal_default(&mut self, type_: u32, length: u32, limits: Limits) -> Result<()> {
+    fn push_minimal_default(
+        &mut self,
+        type_: u32,
+        length: u32,
+        version_memory: usize,
+        limits: Limits,
+    ) -> Result<()> {
         let message_count = self
             .message_count
             .checked_add(1)
@@ -322,12 +333,34 @@ impl MessageInfoCollectionAdmission {
         let encoded_length = minimal_message_info_field_length(type_, length)?;
         self.encoded_messages_length =
             checked_encoded_add(self.encoded_messages_length, encoded_length)?;
+        if self.is_minimal_only() {
+            self.minimal_spill_memory =
+                checked_memory_add(self.minimal_spill_memory, version_memory)?;
+        } else {
+            self.header_fields = self
+                .header_fields
+                .checked_add(4)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+            self.header_memory = checked_memory_add(self.header_memory, version_memory)?;
+            self.header_memory =
+                checked_memory_add(self.header_memory, MINIMAL_MESSAGE_INFO_MEMORY)?;
+            self.metadata_items = self
+                .metadata_items
+                .checked_add(1 + DEFAULT_MESSAGE_VERSIONS.len())
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        }
         self.message_count = message_count;
         Ok(())
     }
 
     #[inline]
-    fn push_minimal(&mut self, type_: u32, length: u32, limits: Limits) -> Result<()> {
+    fn push_minimal(
+        &mut self,
+        type_: u32,
+        length: u32,
+        version_memory: usize,
+        limits: Limits,
+    ) -> Result<()> {
         let message_count = self
             .message_count
             .checked_add(1)
@@ -341,7 +374,7 @@ impl MessageInfoCollectionAdmission {
         }
 
         let encoded_length = minimal_message_info_encoded_length(type_, length)?;
-        let header_memory = MINIMAL_MESSAGE_INFO_MEMORY;
+        let header_memory = checked_memory_add(MINIMAL_MESSAGE_INFO_MEMORY, version_memory)?;
         if !limits.is_default_profile() {
             check_constructor_header(
                 encoded_length,
@@ -366,6 +399,9 @@ impl MessageInfoCollectionAdmission {
                 .metadata_items
                 .checked_add(1 + DEFAULT_MESSAGE_VERSIONS.len())
                 .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        } else {
+            self.minimal_spill_memory =
+                checked_memory_add(self.minimal_spill_memory, version_memory)?;
         }
         self.message_count = message_count;
         Ok(())
@@ -1022,7 +1058,9 @@ fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
         return false;
     }
     for message_info in message_infos {
-        if message_info.versions != DEFAULT_MESSAGE_VERSIONS {
+        if message_info.versions.spilled()
+            || message_info.versions.as_slice() != DEFAULT_MESSAGE_VERSIONS
+        {
             return false;
         }
         let shape = message_info.field_infos.len()
@@ -1044,7 +1082,9 @@ fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageInfo {
     pub type_: u32,
-    pub versions: Vec<u32>,
+    /// Version metadata stored inline for the conventional three-value shape,
+    /// with a heap-backed fallback for arbitrary sequences.
+    pub versions: SmallVec<[u32; MESSAGE_VERSIONS_INLINE_CAPACITY]>,
     pub length: u32,
     pub field_infos: Vec<FieldInfo>,
     pub object_references: Vec<u64>,
@@ -1060,8 +1100,9 @@ impl MessageInfo {
     /// Construct the conventional metadata for a newly created payload.
     ///
     /// `length` is checked against the message-byte budget before it is
-    /// narrowed to the wire `u32` representation. The fixed version vector
-    /// is allocated only after the header and metadata budgets are admitted.
+    /// narrowed to the wire `u32` representation. The conventional version
+    /// sequence is stored inline after the header and metadata budgets are
+    /// admitted.
     #[inline]
     pub fn new(type_: u32, length: usize, limits: Limits) -> Result<Self> {
         let default_limits = limits.is_default_profile();
@@ -1076,13 +1117,7 @@ impl MessageInfo {
         if !default_limits {
             check_minimal_message_info_constructor(type_, length, limits)?;
         }
-        let mut versions = Vec::new();
-        versions
-            .try_reserve_exact(DEFAULT_MESSAGE_VERSIONS.len())
-            .map_err(|_| {
-                Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
-            })?;
-        versions.extend(DEFAULT_MESSAGE_VERSIONS);
+        let versions = SmallVec::from_buf(DEFAULT_MESSAGE_VERSIONS);
         Ok(Self {
             type_,
             versions,
@@ -1103,13 +1138,7 @@ impl MessageInfo {
         MESSAGE_INFO_CONSTRUCTIONS.with(|count| {
             count.set(count.get().saturating_add(1));
         });
-        let mut versions = Vec::new();
-        versions
-            .try_reserve_exact(DEFAULT_MESSAGE_VERSIONS.len())
-            .map_err(|_| {
-                Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
-            })?;
-        versions.extend(DEFAULT_MESSAGE_VERSIONS);
+        let versions = SmallVec::from_buf(DEFAULT_MESSAGE_VERSIONS);
         Ok(Self {
             type_,
             versions,
@@ -1286,16 +1315,19 @@ impl MessageInfoCollection {
                 .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
             check_message_length(length, limits)?;
             if let Some(collection_admission) = self.admission.as_mut() {
+                let version_memory = message_versions_memory(&message_info.versions)?;
                 if limits.is_default_profile() {
                     collection_admission.push_minimal_default(
                         message_info.type_,
                         message_info.length,
+                        version_memory,
                         limits,
                     )?;
                 } else {
                     collection_admission.push_minimal(
                         message_info.type_,
                         message_info.length,
+                        version_memory,
                         limits,
                     )?;
                 }
@@ -1313,8 +1345,8 @@ impl MessageInfoCollection {
     /// Add conventional metadata while accumulating its admission totals.
     ///
     /// This is the single-pass authoring route for the common
-    /// `MessageInfo::new` shape: the fixed version vector is constructed once,
-    /// and the collection certificate records the exact aggregate totals.
+    /// `MessageInfo::new` shape: the fixed version sequence stays inline, and
+    /// the collection certificate records the exact aggregate totals.
     pub fn push_new(&mut self, type_: u32, length: usize) -> Result<()> {
         let limits = self
             .limits
@@ -1336,10 +1368,11 @@ impl MessageInfoCollection {
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
         let message_info = MessageInfo::try_new(type_, length)?;
         if let Some(collection_admission) = self.admission.as_mut() {
+            let version_memory = message_versions_memory(&message_info.versions)?;
             if limits.is_default_profile() {
-                collection_admission.push_minimal_default(type_, length, limits)?;
+                collection_admission.push_minimal_default(type_, length, version_memory, limits)?;
             } else {
-                collection_admission.push_minimal(type_, length, limits)?;
+                collection_admission.push_minimal(type_, length, version_memory, limits)?;
             }
         }
         self.message_infos.push(message_info);
@@ -1560,8 +1593,8 @@ fn check_minimal_message_info_constructor(type_: u32, length: u32, limits: Limit
 /// Preflight the conventional metadata that [`ArchiveObject::new`] will
 /// construct from raw payloads.
 ///
-/// The caller owns the payload vector already, but the message metadata and
-/// fixed version vectors are new allocations.  Keep the complete neutral
+/// The caller owns the payload vector already, but the message metadata is a
+/// new allocation. Keep the complete neutral
 /// header admission before reserving either collection.  The loop also
 /// computes the canonical header length, so the successful constructor does
 /// not need to walk the freshly allocated metadata a second time.
@@ -1596,8 +1629,8 @@ fn preflight_archive_object_constructor(
         check_message_length(message.data.len(), limits)?;
 
         // MessageInfo::validate runs before ArchiveInfo's aggregate checks.
-        // Preserve that error precedence while avoiding the fixed-version
-        // allocation performed by MessageInfo::try_new.
+        // Preserve that error precedence while avoiding repeated version
+        // storage work performed by MessageInfo::try_new.
         if DEFAULT_MESSAGE_VERSIONS.len() > limits.max_metadata_items() {
             return Err(limit(
                 LimitKind::MetadataItems,
@@ -1636,6 +1669,23 @@ fn preflight_archive_object_constructor(
 
 fn minimal_message_info_memory() -> Result<usize> {
     Ok(MINIMAL_MESSAGE_INFO_MEMORY)
+}
+
+/// Account the separately owned version buffer without charging the inline
+/// three-value representation twice. A spilled `SmallVec` owns the complete
+/// sequence in its heap buffer; the neutral budget intentionally follows the
+/// existing logical-length contract rather than allocator capacity.
+fn message_versions_memory(
+    versions: &SmallVec<[u32; MESSAGE_VERSIONS_INLINE_CAPACITY]>,
+) -> Result<usize> {
+    if versions.spilled() {
+        versions
+            .len()
+            .checked_mul(size_of::<u32>())
+            .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))
+    } else {
+        Ok(0)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1802,9 +1852,11 @@ fn message_info_admission(info: &MessageInfo, limits: Limits) -> Result<MessageI
             .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
     }
 
-    let mut header_memory = size_of::<MessageInfo>();
+    let mut header_memory = checked_memory_add(
+        size_of::<MessageInfo>(),
+        message_versions_memory(&info.versions)?,
+    )?;
     for (length, element_size) in [
-        (info.versions.len(), size_of::<u32>()),
         (info.object_references.len(), size_of::<u64>()),
         (info.data_references.len(), size_of::<u64>()),
         (info.diff_merge_version.len(), size_of::<u32>()),
@@ -2016,17 +2068,17 @@ fn check_minimal_archive_info_default(
         .and_then(|value| value.checked_add(message_count.checked_mul(3)?))
         .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
     let header_nesting = usize::from(message_count != 0);
-    let message_memory = minimal_message_info_memory()?;
-    let header_memory = size_of::<ArchiveInfo>()
-        .checked_add(
-            message_count
-                .checked_mul(message_memory)
-                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
-        )
-        .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+    let mut header_memory = size_of::<ArchiveInfo>();
     let mut header_length = varint_field_length(1, identifier)?;
     let mut metadata_items = message_count;
     for message_info in &info.message_infos {
+        header_memory = checked_memory_add(
+            header_memory,
+            checked_memory_add(
+                minimal_message_info_memory()?,
+                message_versions_memory(&message_info.versions)?,
+            )?,
+        )?;
         let message_length = usize::try_from(message_info.length)
             .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
         check_message_length(message_length, limits)?;
@@ -2050,7 +2102,8 @@ fn check_minimal_archive_info_default(
 
 #[inline]
 fn is_minimal_message_info(info: &MessageInfo) -> bool {
-    info.versions == DEFAULT_MESSAGE_VERSIONS
+    !info.versions.spilled()
+        && info.versions.as_slice() == DEFAULT_MESSAGE_VERSIONS
         && info.field_infos.is_empty()
         && info.object_references.is_empty()
         && info.data_references.is_empty()
@@ -2079,17 +2132,16 @@ fn check_minimal_archive_info_constructor(
         .and_then(|value| value.checked_add(message_count.checked_mul(3)?))
         .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
     let header_nesting = usize::from(message_count != 0);
-    let message_memory = minimal_message_info_memory()?;
     let mut header_memory = size_of::<ArchiveInfo>();
-    header_memory = header_memory
-        .checked_add(
-            message_count
-                .checked_mul(message_memory)
-                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
-        )
-        .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
     let mut header_length = varint_field_length(1, identifier)?;
     for message_info in &info.message_infos {
+        header_memory = checked_memory_add(
+            header_memory,
+            checked_memory_add(
+                minimal_message_info_memory()?,
+                message_versions_memory(&message_info.versions)?,
+            )?,
+        )?;
         let message_length = usize::try_from(message_info.length)
             .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
         check_message_length(message_length, limits)?;
@@ -2183,9 +2235,11 @@ fn field_info_memory(info: &FieldInfo) -> Result<usize> {
 
 #[cfg(test)]
 fn message_info_memory(info: &MessageInfo) -> Result<usize> {
-    let mut memory = size_of::<MessageInfo>();
+    let mut memory = checked_memory_add(
+        size_of::<MessageInfo>(),
+        message_versions_memory(&info.versions)?,
+    )?;
     for (length, element_size) in [
-        (info.versions.len(), size_of::<u32>()),
         (info.object_references.len(), size_of::<u64>()),
         (info.data_references.len(), size_of::<u64>()),
         (info.diff_merge_version.len(), size_of::<u32>()),
@@ -8655,7 +8709,7 @@ fn message_info_from_codec(value: archive_codec::MessageInfo) -> Result<MessageI
 
     Ok(MessageInfo {
         type_: value.r#type,
-        versions: value.version,
+        versions: SmallVec::from_vec(value.version),
         length: value.length,
         field_infos,
         object_references: value.object_references,
@@ -8776,6 +8830,18 @@ fn field_path_to_codec(value: &FieldPath) -> Result<archive_codec::FieldPath> {
 
 fn try_copy_slice<T: Copy>(source: &[T], resource: &'static str) -> Result<Vec<T>> {
     let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|_| Error::allocation(resource, source.len()))?;
+    output.extend_from_slice(source);
+    Ok(output)
+}
+
+fn try_copy_versions(
+    source: &[u32],
+    resource: &'static str,
+) -> Result<SmallVec<[u32; MESSAGE_VERSIONS_INLINE_CAPACITY]>> {
+    let mut output = SmallVec::new();
     output
         .try_reserve_exact(source.len())
         .map_err(|_| Error::allocation(resource, source.len()))?;
@@ -10242,7 +10308,7 @@ mod tests {
         )?;
         object.archive_info.should_merge = Some(false);
         let message = &mut object.archive_info.message_infos[0];
-        message.versions = vec![0, 127, 128, u32::MAX];
+        message.versions = vec![0, 127, 128, u32::MAX].into();
         message.object_references = vec![1, 128, u64::MAX];
         message.data_references = vec![2, 129];
         message.base_message_index = Some(u32::MAX);
@@ -10377,7 +10443,37 @@ mod tests {
         )));
 
         let info = ArchiveInfo::new(0, vec![message], limits)?;
-        assert_eq!(info.message_infos[0].versions, [u32::MAX, 0, 5]);
+        assert_eq!(info.message_infos[0].versions.as_slice(), [u32::MAX, 0, 5]);
+        Ok(())
+    }
+
+    #[test]
+    fn spilled_default_versions_do_not_use_the_minimal_collection_ledger() -> Result<()> {
+        let defaults = Limits::default();
+        let spilled_message = || {
+            let mut message = MessageInfo::new(7, 1, defaults).expect("default metadata");
+            message.versions.reserve(1);
+            message
+        };
+        let message = spilled_message();
+        assert!(message.versions.spilled());
+        assert_eq!(message.versions.as_slice(), DEFAULT_MESSAGE_VERSIONS);
+
+        let raw = ArchiveInfo {
+            identifier: Some(42),
+            message_infos: vec![message],
+            should_merge: None,
+        };
+        let expected = check_archive_info_constructor(&raw, defaults)?;
+        let limits = defaults.with_header_memory_bytes(expected.header_memory)?;
+        let mut collection = MessageInfoCollection::new(limits)?;
+        collection.push(spilled_message())?;
+        let admitted = ArchiveInfo::new(42, collection, limits)?;
+        assert!(admitted.message_infos[0].versions.spilled());
+        assert_eq!(
+            admitted.message_infos[0].versions.as_slice(),
+            DEFAULT_MESSAGE_VERSIONS
+        );
         Ok(())
     }
 
@@ -10609,7 +10705,7 @@ mod tests {
                 ..
             }
         ));
-        let message_memory = size_of::<MessageInfo>() + 3 * size_of::<u32>();
+        let message_memory = size_of::<MessageInfo>();
         assert_eq!(message_info_memory(&message)?, message_memory);
         assert!(
             MessageInfo::new(7, 1, defaults.with_header_memory_bytes(message_memory)?,).is_ok()
@@ -10627,6 +10723,11 @@ mod tests {
                 ..
             }
         ));
+        let mut spilled_message = message.clone();
+        spilled_message.versions.push(9);
+        assert!(spilled_message.versions.spilled());
+        let spilled_memory = size_of::<MessageInfo>() + 4 * size_of::<u32>();
+        assert_eq!(message_info_memory(&spilled_message)?, spilled_memory);
         assert!(MessageInfo::new(7, 1, defaults.with_header_fields(3)?).is_ok());
         let error = MessageInfo::new(7, 1, defaults.with_header_fields(2)?)
             .expect_err("one MessageInfo field below the header budget must be refused");
@@ -10804,8 +10905,7 @@ mod tests {
         ));
 
         let expected_field_memory = size_of::<FieldInfo>() + 2 * size_of::<u32>();
-        let expected_message_memory =
-            size_of::<MessageInfo>() + 3 * size_of::<u32>() + expected_field_memory;
+        let expected_message_memory = size_of::<MessageInfo>() + expected_field_memory;
         let archive_memory = size_of::<ArchiveInfo>() + expected_message_memory;
         assert_eq!(
             field_info_memory(&nested.message_infos[0].field_infos[0])?,

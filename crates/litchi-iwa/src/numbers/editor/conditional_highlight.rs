@@ -528,7 +528,7 @@ fn append_conditional_style_entry(
             Default::default(),
         )?;
         object.archive_info.message_infos[message_index].versions =
-            CONDITIONAL_LIST_MESSAGE_VERSION.to_vec();
+            CONDITIONAL_LIST_MESSAGE_VERSION.to_vec().into();
         add_message_object_reference(object, message_index, style_set_id, style_set_id);
         Ok(())
     })?;

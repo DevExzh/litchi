@@ -628,7 +628,7 @@ mod tests {
             Default::default(),
         )?;
         let message = &mut object.archive_info.message_infos[0];
-        message.versions = vec![1, 2];
+        message.versions = vec![1, 2].into();
         message.object_references = vec![10, 11];
         message.data_references = vec![20];
         message.diff_merge_version = vec![3];

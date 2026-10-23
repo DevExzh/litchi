@@ -1558,7 +1558,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
         .position(|message| message.type_ == SETTINGS_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("native settings message is missing"))?;
     let settings_info = settings_object.archive_info.message_infos[settings_index].clone();
-    assert_eq!(settings_info.versions, [1, 0, 5]);
+    assert_eq!(settings_info.versions.as_slice(), [1, 0, 5]);
     let gap_info = settings_info
         .field_infos
         .iter()

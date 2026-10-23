@@ -986,7 +986,7 @@ fn promote_plain_cell(
             }],
             Default::default(),
         )?;
-        object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+        object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec().into();
         package.update_archive(&archive_name, |archive| {
             Ok(archive.insert_object(object, Default::default())?)
         })?;
@@ -1003,7 +1003,8 @@ fn promote_plain_cell(
         }],
         Default::default(),
     )?;
-    storage_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    storage_object.archive_info.message_infos[0].versions =
+        STANDARD_MESSAGE_VERSION.to_vec().into();
     storage_object.archive_info.message_infos[0].object_references = storage_references;
 
     let payload = tst::RichTextPayloadArchive {
@@ -1022,7 +1023,8 @@ fn promote_plain_cell(
         }],
         Default::default(),
     )?;
-    payload_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    payload_object.archive_info.message_infos[0].versions =
+        STANDARD_MESSAGE_VERSION.to_vec().into();
     payload_object.archive_info.message_infos[0]
         .object_references
         .push(storage_id);

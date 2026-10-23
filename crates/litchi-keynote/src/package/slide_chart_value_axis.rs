@@ -292,10 +292,15 @@ fn message_info_heap(
             length
         }
     };
-    footprint.add_vector::<u32>(
-        capacity(info.versions.len(), info.versions.capacity()),
-        scratch,
-    )?;
+    // An inline SmallVec clone has no source-owned heap allocation. The
+    // compatibility conversion still allocates its target Vec, so retain the
+    // logical-length charge for scratch conversions.
+    let versions_capacity = if use_capacity && !info.versions.spilled() {
+        0
+    } else {
+        capacity(info.versions.len(), info.versions.capacity())
+    };
+    footprint.add_vector::<u32>(versions_capacity, scratch)?;
     footprint.add_vector::<FieldInfo>(
         capacity(info.field_infos.len(), info.field_infos.capacity()),
         scratch,
@@ -2555,6 +2560,32 @@ impl ValueAxisBudget {
             0,
             0,
         )
+    }
+}
+
+#[cfg(test)]
+mod message_info_heap_tests {
+    use super::message_info_heap;
+    use litchi_iwa_core::{Limits, MessageInfo};
+    use std::mem::size_of;
+
+    #[test]
+    fn inline_versions_have_no_source_heap_charge_but_conversion_still_has_one() {
+        let message = MessageInfo::new(7, 1, Limits::default()).expect("default metadata");
+        let source = message_info_heap(&message, true, false).expect("source footprint");
+        assert_eq!(source.allocations, 0);
+        assert_eq!(source.bytes, 0);
+
+        let conversion = message_info_heap(&message, false, true).expect("conversion footprint");
+        assert_eq!(conversion.allocations, 1);
+        assert_eq!(conversion.scratch, 3 * size_of::<u32>());
+
+        let mut spilled = message.clone();
+        spilled.versions.reserve(1);
+        assert!(spilled.versions.spilled());
+        let spilled_source = message_info_heap(&spilled, true, false).expect("spilled footprint");
+        assert_eq!(spilled_source.allocations, 1);
+        assert!(spilled_source.bytes >= 4 * size_of::<u32>());
     }
 }
 

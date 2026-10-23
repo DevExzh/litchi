@@ -834,7 +834,7 @@ fn insert_owner(
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = OWNER_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = OWNER_MESSAGE_VERSION.to_vec().into();
     object.archive_info.message_infos[0].object_references = tile_id.into_iter().collect();
     Ok(archive.insert_object(object, Default::default())?)
 }
@@ -852,7 +852,7 @@ fn insert_tile(
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = TILE_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = TILE_MESSAGE_VERSION.to_vec().into();
     Ok(archive.insert_object(object, Default::default())?)
 }
 

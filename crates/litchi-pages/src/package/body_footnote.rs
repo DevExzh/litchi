@@ -3041,7 +3041,7 @@ fn graph_objects(
     if let Some(identifier) = write.list_style_identifier() {
         storage_references.push(identifier.get());
     }
-    reference.archive_info.message_infos[0].versions = vec![1, 0, 5];
+    reference.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
     reference.archive_info.message_infos[0].object_references =
         vec![write.storage_identifier().get()];
     let mut storage = ArchiveObject::new(
@@ -3053,7 +3053,7 @@ fn graph_objects(
         limits,
     )
     .map_err(map_core_error)?;
-    storage.archive_info.message_infos[0].versions = vec![1, 0, 5];
+    storage.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
     storage.archive_info.message_infos[0].object_references = storage_references;
     let mut marker = ArchiveObject::new(
         write.marker_identifier().get(),
@@ -3064,7 +3064,7 @@ fn graph_objects(
         limits,
     )
     .map_err(map_core_error)?;
-    marker.archive_info.message_infos[0].versions = vec![1, 0, 5];
+    marker.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
     Ok([reference, storage, marker])
 }
 

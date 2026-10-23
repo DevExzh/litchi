@@ -182,7 +182,7 @@ fn object(
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("source fixture object has no message info"))?;
-    info.versions = vec![1, 0, 5];
+    info.versions = vec![1, 0, 5].into();
     info.object_references = references.to_vec();
     Ok(object)
 }

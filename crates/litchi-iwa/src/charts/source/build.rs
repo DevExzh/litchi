@@ -329,7 +329,7 @@ fn chart_object(
         .ok_or_else(|| {
             Error::InvalidFormat("source-built chart object has no message metadata".to_owned())
         })?;
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = references.to_vec();
     Ok(object)
 }

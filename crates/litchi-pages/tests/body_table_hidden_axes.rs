@@ -2435,7 +2435,7 @@ fn qualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8>>
         map.messages[message_index].type_ = 6_200;
         let info = &mut map.archive_info.message_infos[message_index];
         info.type_ = 6_200;
-        info.versions = vec![1, 0, 5];
+        info.versions = vec![1, 0, 5].into();
         Ok(())
     })
 }
@@ -2447,7 +2447,7 @@ fn unqualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8
         info.type_ = 6_200;
         // A legacy type without the native archive version tuple is not a
         // qualified Pages UID-map route.
-        info.versions = vec![1, 0, 4];
+        info.versions = vec![1, 0, 4].into();
         Ok(())
     })
 }
@@ -4336,7 +4336,7 @@ fn native_formula_owner_version_mismatch(package: &[u8]) -> TestResult<Vec<u8>> 
         NATIVE_FORMULA_OWNER_IDENTIFIER,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5];
+            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5].into();
             Ok(())
         },
     )
@@ -4653,7 +4653,7 @@ fn formula_owner_bad_versions(package: &[u8], identifier: u64) -> TestResult<Vec
         identifier,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0];
+            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0].into();
             Ok(())
         },
     )
@@ -4900,7 +4900,7 @@ fn assert_rejected_without_mutation(
 fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
     let source = normal_package()?;
     let mixed = rewrite_model_metadata(&source, 0, |model, message_index| {
-        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10];
+        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10].into();
         Ok(())
     })?;
     let package = Package::from_bytes(&mixed)?;

@@ -542,7 +542,7 @@ pub(super) fn prepare_slide_number(
         }],
         Default::default(),
     )?;
-    attachment.archive_info.message_infos[0].versions = IWORK_MESSAGE_VERSIONS.to_vec();
+    attachment.archive_info.message_infos[0].versions = IWORK_MESSAGE_VERSIONS.to_vec().into();
     Ok(Some(attachment))
 }
 

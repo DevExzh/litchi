@@ -2724,7 +2724,7 @@ fn canonical_standin(identifier: u64) -> Result<ArchiveObject, Error> {
         Default::default(),
     )
     .map_err(map_core_error)?;
-    object.archive_info.message_infos[0].versions = vec![10, 1, 0];
+    object.archive_info.message_infos[0].versions = vec![10, 1, 0].into();
     Ok(object)
 }
 
@@ -2803,7 +2803,7 @@ fn caption_graph_objects(
             Default::default(),
         )
         .map_err(map_core_error)?;
-        object.archive_info.message_infos[0].versions = vec![1, 0, 5];
+        object.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
         object.archive_info.message_infos[0].object_references = references;
         objects.push(object);
     }
