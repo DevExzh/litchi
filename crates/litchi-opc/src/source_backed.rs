@@ -9297,8 +9297,7 @@ impl SourceBackedPackage {
                 raw.replacement.len() as u64,
                 self.limits.max_part_bytes(),
             )?;
-            usize::try_from(raw.replacement.len())
-                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?
+            raw.replacement.len()
         } else if additions.is_empty()
             && removals.is_empty()
             && !raw_relationships

@@ -143,3 +143,14 @@ untouched payload/relationship images. Final native DOCX, the complete gate,
 inventory and performance qualification remain required.
 [facade-xlsb-runtime-v17.json](results/0362up/facade-xlsb-runtime-v17.json)
 retains both commands, test summaries and external log identities.
+
+## Complete DOCX runtime pass and composed lint correction
+
+All 1,519 all-feature DOCX library tests pass on `47caed4627`, including
+strict whole-cell refusal and marker-preserving paragraph/replay routes.
+Workspace Clippy then reports four OPC lints. Borrowing sink lifetimes now
+end in lexical scopes after guard-error extraction, generic constraints are
+co-located without changing them, and a redundant usize conversion is removed.
+No lint allowance or policy change is introduced.
+[docx-clippy-runtime-v18.json](results/0362up/docx-clippy-runtime-v18.json)
+retains both complete commands and log identities.
