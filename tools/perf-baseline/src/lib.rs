@@ -53,6 +53,7 @@ mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
 mod unified_ops;
+mod xls_f3_corpus;
 pub mod xls_f3_qualification;
 mod xls_numeric;
 mod xlsx_attribute_fixtures;
@@ -28836,47 +28837,7 @@ fn xls_comment_opaque_stream_name(index: usize) -> String {
 }
 
 fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut workbook_builder = litchi_xls::writer::Builder::new();
-    let comments = workbook_builder.add_worksheet("Comments")?;
-    for index in 0..XLS_COMMENTS_SOURCE_COUNT {
-        let value = xls_comment_value(index, false)?;
-        workbook_builder.add_comment(
-            comments,
-            u32::try_from(index)?,
-            1,
-            value.author(),
-            value.text(),
-        )?;
-    }
-    let untouched = workbook_builder.add_worksheet("Untouched")?;
-    workbook_builder.write_number(untouched, 20, 4, 42.0)?;
-    workbook_builder.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
-    let mut workbook_package = Cursor::new(Vec::new());
-    workbook_builder.build()?.write_to(&mut workbook_package)?;
-    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
-    let workbook_stream = parsed.open_stream(&["Workbook"])?;
-
-    let mut writer = OleWriter::new();
-    writer.create_stream_owned(&["Workbook"], workbook_stream)?;
-    writer.create_storage(&["OpaquePayloads"])?;
-    for index in 0..XLS_COMMENTS_OPAQUE_STREAM_COUNT {
-        let name = xls_comment_opaque_stream_name(index);
-        writer.create_stream_owned(
-            &["OpaquePayloads", name.as_str()],
-            payload_bytes(
-                PayloadKind::Incompressible,
-                10_000 + index,
-                XLS_COMMENTS_OPAQUE_STREAM_BYTES,
-            ),
-        )?;
-    }
-    writer.create_stream(
-        &["OpaqueMetadata"],
-        b"litchi-xls-comments-opaque-metadata-v1",
-    )?;
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
-    let archive = output.into_inner();
+    let archive = xls_f3_corpus::build_xls_comments_fixture()?;
 
     verify_xls_comments_static_guards(&archive)?;
     let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
