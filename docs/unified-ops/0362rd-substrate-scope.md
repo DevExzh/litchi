@@ -5,6 +5,10 @@ change and no build or benchmark result. It records the boundary that a
 coordinator can use to schedule the remaining work without treating a shared
 crate as an unexamined exception.
 
+The original survey was made from the 0362 integration tree. A source-only
+refresh at assembled commit `94123c0efb` is reflected below where later
+commits closed a named row; no fresh rustdoc or build result is implied.
+
 The source survey was made from the 0362 integration tree. Consumer counts
 below are `rg -l` planning counts over tracked `crates/` sources; they include
 definitions and tests where the expression matches, so they are not a claim
@@ -55,7 +59,7 @@ The resulting classification is:
 | Surface | Textual basis | Status |
 |---|---|---|
 | Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and the W6 writer’s public ZIP limit/error types. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”; the concrete ODF repair must still distinguish a canonical re-export from a migration alias. |
-| Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | Required canonicalization for the Office package substrate, but it should be one atomic OPC lane with DOCX/PPTX/XLSX/XLSB consumers. Its absence from the 0351 wave table is a scheduling qualification, not a permanent exception. |
+| Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | The required source/consumer canonicalization is integrated by 0362rl across DOCX/PPTX/XLSX/XLSB and raw consumers. Its absence from the 0351 wave table remains a qualification boundary: rerun the profile and native checks before calling the substrate lane fully gated. |
 | Standalone CFB or soapberry-ZIP methods with no public format operation or free foreign-result signature | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. A typed foreign causal source nested in a crate-owned error is a separate, permitted boundary shape. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
 
 This distinction is narrower than a blanket exemption. For example,
@@ -189,26 +193,16 @@ not be used to justify an owned wrapper. The lane must measure streamed output
 and memory, including the ODF streaming profiles, after selecting the canonical
 name and error boundary.
 
-## W5 format-domain aliases that must not be deferred as substrate work
+## W5 format-domain aliases (closed by the assembled tree)
 
-The current assembly exposes two direct format-domain alias families:
-
-* `crates/litchi-crypto/src/spaces.rs:242-257` exposes
-  `spaces::Revision::value` and `spaces::Revision::fingerprint`; the latter is
-  documented as an alias for `value`. The `spaces` module is re-exported from
-  the DOC crate (`crates/litchi-doc/src/lib.rs:186`), so this is a public W5
-  format surface.
-* `crates/litchi-ole-common/src/ole1.rs:1280-1308` exposes
-  `ole1::Revision::value` and `ole1::Revision::fingerprint`, with the latter
-  documented as an alias, and `ole1::Snapshot = ObjectSnapshot`, documented as
-  a module-level alias. `ole1` is public from `litchi-ole-common`.
-
-The narrow W5 alias lane should remove those aliases, migrate any internal
-uses to the canonical names/types, and check the DOC/PPT/XLS/RTF/ograph,
-ole-common and crypto public paths. No generic CFB or ZIP exemption applies to
-these names. Other `Snapshot` and `Revision` types were not classified from a
-name alone; only declarations whose source documentation explicitly says
-“alias” are included here.
+The original survey identified two direct format-domain alias families. The
+subsequent W5 commits `953f9720bc` and `c905a7d63d` removed them and migrated
+their consumers: current `litchi-crypto::spaces::Revision` and
+`litchi-ole-common::ole1::Revision` expose only the canonical `value`, and the
+former `ole1::Snapshot` alias is gone. No generic CFB or ZIP exemption was
+used. This section therefore supplies historical scope evidence, not an open
+W5 alias exception; a fresh rustdoc inventory is still required before
+claiming the whole substrate profile passed.
 
 ## Shared substrate classification
 
@@ -223,8 +217,10 @@ raw `OpcPackage`; their raw escape is `Package::edit_opc`, while
 (`.coord/w4-xlsx/brief-common.md:82-95`). ADR 0034 also explicitly names OPC's
 `ReadLimits` to `SourceLimits` rename (`docs/adr/0034...:169-181`).
 
-The current public OPC substrate still contains 31 declarations with a
-`*_with_limits` suffix, including:
+The original 0362 survey recorded 31 public declarations with a
+`*_with_limits` suffix. A source-only audit of assembled commit `94123c0efb`
+finds no public OPC declaration with that suffix; the remaining occurrences
+are private or test helpers. The old list was:
 
 * `phys_pkg::{open,from_bytes,from_reader,new}_with_limits`;
 * `package::{open,from_reader,from_vec,from_shared_vec,from_bytes}_with_limits`
@@ -234,7 +230,7 @@ The current public OPC substrate still contains 31 declarations with a
 * package-catalog probing, relationship parsing/replacement and validation
   `_with_limits` methods.
 
-The corresponding limit-less twins are public in the same modules. A source
+The corresponding limit-less twins were public in the surveyed tree. A source
 survey finds direct `litchi_opc::` users in 182 DOCX, 331 PPTX, 281 XLSX, 126
 XLSB and 51 ops source files (the counts include tests and definitions). The
 perf-baseline source has 98 `litchi_opc::` lines in 42 files and 204
@@ -242,14 +238,12 @@ perf-baseline source has 98 `litchi_opc::` lines in 42 files and 204
 OPC surface belongs in an atomic substrate wave with all four OOXML families,
 ops, facade/raw callers, tests, examples, fuzz and perf-baseline.
 
-The OPC alias debt is separate from the limit migration:
+The OPC alias debt was also rechecked separately from the old limit migration:
 
-* `VerifiedDecodedReaderError` (`src/source_backed.rs:4873-4941`) has six
-  aliases: `opc_error`, `error`, `callback_error`, `into_opc_error`,
-  `into_error` and `into_callback_error`.
-* `OpcOperationAccounting` (`src/accounting.rs:125-141`) has three aliases:
-  `deflate_payload_bytes_read`, `decompressed_deflate_bytes_produced` and
-  `decompressed_deflate_bytes_accepted`.
+* `VerifiedDecodedReaderError` now exposes the canonical `opc`, `callback`,
+  `into_opc` and `into_callback` accessors; the old alias spellings are gone.
+* `OpcOperationAccounting` now exposes the canonical payload/accounting names;
+  the old duplicate spellings are gone.
 
 The survey found no public OPC operation or free `Result` signature whose
 return or argument type is a `soapberry_zip` transport type. The public,
@@ -261,8 +255,10 @@ private `ArchiveAccess` and worker helpers also use foreign `Result` types, but
 they do not enter the OPC public surface. Under the settled error reading, a
 foreign causal payload inside the crate-owned `OpcError` is a typed source, not
 a free transport API leak; it requires no wrapper or string-flattening rewrite.
-Thus the dedicated OPC lane is required by the raw limit and alias rules, while
-a blanket ZIP API rewrite is not justified by these retained causes.
+Thus the old dedicated OPC limit/alias findings are closed in the assembled
+source; a fresh rustdoc inventory is still required before claiming the whole
+OPC profile passed. A blanket ZIP API rewrite is not justified by these
+retained causes.
 
 ### `litchi-cfb`: dedicated CFB substrate lane
 
@@ -303,12 +299,13 @@ assigned W3 `litchi-ppt` and excluded `litchi-ole-common`, `litchi-ograph` and
 ### `soapberry-zip`: generic physical transport lane, with one immediate ODF leak
 
 The generic ZIP crate is absent from the wave table and its Cargo description
-calls it a ZIP reader shared by OOXML, ODF and iWork. Its public office APIs
-have twelve `*_with_limits`/`with_limits` declarations, including archive
-reader/indexer constructors, preservation indexing, lazy reader constructors
-and `StreamingArchiveWriter::with_limits` (`crates/soapberry-zip/src/office.rs`),
-plus `PreservationIndex::new_with_limits`
-(`src/preserve.rs:586`). It also has explicit alias debt:
+calls it a ZIP reader shared by OOXML, ODF and iWork. The assembled source
+still has twelve public `*_with_limits`/`with_limits` declarations, including
+archive reader/indexer constructors, preservation indexing, lazy reader
+constructors and `StreamingArchiveWriter::with_limits`
+(`crates/soapberry-zip/src/office.rs`), plus
+`PreservationIndex::new_with_limits` (`src/preserve.rs:786`). It also has
+explicit alias debt:
 
 * `VerifiedEntryReaderError`'s `archive_error`, `transport_error`,
   `callback_error` and `into_callback_error` (`src/office.rs:2118-2147`);
@@ -343,27 +340,34 @@ do not by themselves expand the current ODF owner scope.
 
 1. **W6 ODF raw/alias lane:** 0362rda removes the six source-member aliases,
    canonicalizes the writer limit re-export and migrates every named ODF
-   consumer. The remaining lane work is to make archive/manifest limits
-   caller-selected where the public raw/codec contract requires it, decide the
-   writer error boundary and default policy, then run ODF
-   round-trip/parser-hardening, streaming and facade tests and measure memory
-   and output performance.
-2. **W5 domain alias lane:** remove the two `Revision::fingerprint`
-   methods and `ole1::Snapshot`; migrate all consumers and glossary rows with
-   no CFB/ZIP exception.
+   consumer. The remaining archive/manifest/raw-writer work is assigned to
+   `odf_raw_contract`: make limits caller-selected where the public raw/codec
+   contract requires it, decide the writer error boundary and default policy,
+   then run ODF round-trip/parser-hardening, streaming and facade tests and
+   measure memory and output performance.
+2. **W5 domain alias lane:** closed by `953f9720bc` and `c905a7d63d`; the
+   current source has no `Revision::fingerprint` or `ole1::Snapshot` alias.
 3. **W4 format boundary:** keep the W4 change limited to public XLSX/XLSB
    routes and the shared OOXML staging rule. Any public `&mut OpcPackage`
    helper outside the raw `edit_opc`/codec boundary is W4 debt and needs a
    Package route in the same commit.
-4. **OPC substrate lane:** canonicalize limits and aliases across DOCX/PPTX/
-   XLSX/XLSB, ops and all raw/perf/test consumers; preserve source-backed
-   cache, splice and publication performance.
-5. **CFB substrate lane:** canonicalize CFB ingress and writer limits, remove
-   `update_stream`, and migrate the legacy, encrypted-OOXML and raw Reader
-   consumers together.
-6. **soapberry ZIP lane:** canonicalize generic reader/writer limits and
-   aliases, including `ErrorKind::Io`, and migrate every direct consumer with
-   streaming/deflate ABBA evidence.
+4. **OPC substrate lane:** source/consumer canonicalization is closed by
+   `0362rl` in the assembled tree: limits and aliases were migrated across
+   DOCX/PPTX/XLSX/XLSB, ops and raw/perf/test consumers. A fresh rustdoc
+   profile and native qualification are still required before calling the
+   substrate lane fully gated; preserve source-backed cache, splice and
+   publication performance while doing so.
+5. **CFB substrate follow-up (separate scope):** the current source still has
+   public default/`*_with_limits` ingress, validation and writer methods plus
+   `OleWriter::update_stream` (`file.rs:1055`, `shared.rs:650,680,780`,
+   `validation.rs:91`, `writer/core.rs:1297`, `writer/sequential.rs:197`).
+   This is not current format-wave debt merely because DOC/PPT/XLS depend on
+   CFB; a future owner must decide its scope and migrate consumers together.
+6. **soapberry ZIP follow-up (separate scope):** the current source still has
+   public office transport `*_with_limits` methods in `office.rs` and
+   `preserve.rs:786`, plus its documented aliases. This is not a blanket
+   current format requirement; a public format re-export or foreign surface
+   remains required in that owning format lane.
 
 Before each lane is merged, rerun `tools/api_debt_inventory.py` and the API
 glossary gate over the full workspace, then show that all listed consumers
