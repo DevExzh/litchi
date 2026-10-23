@@ -32,8 +32,8 @@ pub(crate) fn refresh(
     let names = file.workbook()?.worksheet_names()?;
     handle.check_source()?;
     let result = (|| {
-        let source = handle.editor()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = handle.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = super::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut fields: Vec<Field> = Vec::with_capacity(report.formulas().len());
         let mut writes = 0usize;
         let mut staged = 0usize;
@@ -100,7 +100,15 @@ pub(crate) fn refresh(
             return Ok((None, summary));
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Some(Commit::from_native(handle, source, native)?), summary))
+        Ok((
+            Some(Commit::from_native_with_limit(
+                handle,
+                source,
+                native,
+                limits.max_snapshot_bytes(),
+            )?),
+            summary,
+        ))
     })();
     let freshness = handle.check_source();
     freshness.and(result)

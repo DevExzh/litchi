@@ -155,6 +155,19 @@ impl SemanticLimits {
     pub const fn max_snapshot_bytes(self) -> usize {
         self.snapshot_bytes
     }
+
+    /// Copy these semantic limits with only the native snapshot ceiling
+    /// reduced to the transaction's remaining budget.  The coordinator keeps
+    /// its full edit profile separately; this view is passed to one leaf so
+    /// it can reject an oversized native capture before allocating it.
+    pub(crate) const fn with_snapshot_budget(self, snapshot_bytes: usize) -> Self {
+        Self {
+            operations: self.operations,
+            snapshot_bytes,
+            expanded_targets: self.expanded_targets,
+            staged_bytes: self.staged_bytes,
+        }
+    }
 }
 
 /// Consuming builder for [`SemanticLimits`].
@@ -277,5 +290,25 @@ mod tests {
         send_sync::<crate::transaction::Patch>();
         send_sync::<crate::transaction::Commit>();
         send_sync::<crate::transaction::Edit>();
+    }
+
+    #[test]
+    fn snapshot_budget_view_preserves_the_edit_profile() {
+        let limits = SemanticLimits::builder()
+            .max_operations(7)
+            .unwrap()
+            .max_snapshot_bytes(101)
+            .unwrap()
+            .max_expanded_targets(11)
+            .unwrap()
+            .max_staged_bytes(13)
+            .unwrap()
+            .build()
+            .unwrap();
+        let remaining = limits.with_snapshot_budget(17);
+        assert_eq!(remaining.max_operations(), 7);
+        assert_eq!(remaining.max_snapshot_bytes(), 17);
+        assert_eq!(remaining.max_expanded_targets(), 11);
+        assert_eq!(remaining.max_staged_bytes(), 13);
     }
 }

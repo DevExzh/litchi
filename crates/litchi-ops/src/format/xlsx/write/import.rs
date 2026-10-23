@@ -55,8 +55,8 @@ pub(crate) fn import(
             .check_grid(row, column, MAX_ROWS, MAX_COLUMNS)
             .map_err(|error| error.with_format(FileFormat::Xlsx))?;
         let date1904 = file.is_1904_date_system();
-        let source = file.editor()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(_limits.max_snapshot_bytes())?;
+        let mut edit = super::edit_with_snapshot_limit(&source, _limits.max_snapshot_bytes())?;
         let mut summary = Summary::at(origin, table);
         {
             let mut worksheet = edit.sheet(sheet).map_err(native_error)?.ok_or_else(|| {
@@ -141,7 +141,10 @@ pub(crate) fn import(
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Commit::from_native(file, source, native)?, summary))
+        Ok((
+            Commit::from_native_with_limit(file, source, native, _limits.max_snapshot_bytes())?,
+            summary,
+        ))
     })();
     let freshness = file.check_source();
     freshness.and(result)

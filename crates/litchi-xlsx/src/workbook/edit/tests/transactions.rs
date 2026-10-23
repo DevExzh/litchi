@@ -2,9 +2,37 @@
 
 use super::super::*;
 use super::support::part_text;
+use std::mem::size_of;
 
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
+
+#[test]
+fn primary_edit_capture_budget_rejects_before_cell_staging() {
+    let source = crate::Package::new().expect("source workbook");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(size_of::<Edit>())
+        .saturating_add(size_of::<Patch>())
+        .saturating_add(size_of::<Commit>());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("base capture fits the budget");
+    let error = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "capture")
+        .expect_err("worksheet capture should be rejected before staging");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Workbook(LimitKind::SnapshotBytes),
+            ..
+        }
+    ));
+}
 
 fn strict_unknown_worksheet() -> crate::Package {
     let source = crate::Package::new().expect("source workbook");

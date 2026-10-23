@@ -24,6 +24,21 @@ use std::io::{self, Cursor, Read, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
+const SIGNATURE_ENTRIES: [&str; 4] = [
+    "_xmlsignatures",
+    "_signatures",
+    "DigitalSignature",
+    "\u{0005}DigitalSignature",
+];
+
+fn has_signature(ole: &OleFile<Cursor<Vec<u8>>>) -> bool {
+    SIGNATURE_ENTRIES.iter().any(|name| ole.exists(&[*name]))
+}
+
+fn has_shared_signature(ole: &SharedOleFile) -> bool {
+    SIGNATURE_ENTRIES.iter().any(|name| ole.exists(&[*name]))
+}
+
 /// The parsed eager raw reader retained by the canonical owner.
 ///
 /// The `Reader` name is supplied by the raw-reader migration.  Keeping this
@@ -235,6 +250,7 @@ pub struct Package {
 struct PackageInner {
     state: PackageState,
     policy: RetainedPolicy,
+    signed: bool,
     metadata: OnceLock<Metadata>,
     edit_snapshot: Option<crate::cell_values::Snapshot>,
     /// The Workbook stream, read once for worksheet-feature reads.
@@ -347,13 +363,16 @@ impl Package {
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<Cursor<Vec<u8>>>>> {
         crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
+        let signed = has_signature(&ole_file);
         let metadata = eager_metadata(&mut ole_file);
         let reader = match RawReader::from_ole_file_or_password_required(ole_file, options) {
             Ok(Ok(reader)) => reader,
             Ok(Err(ole_file)) => return Ok(Err(ole_file)),
             Err(error) => return Err(Error::Reader(error)),
         };
-        Ok(Ok(Self::from_reader_parts(reader, options, metadata)?))
+        Ok(Ok(Self::from_reader_parts(
+            reader, options, metadata, signed,
+        )?))
     }
 
     /// Open an already parsed in-memory CFB file.
@@ -362,9 +381,10 @@ impl Package {
         options: OpenOptions<'_>,
     ) -> Result<Self> {
         crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
+        let signed = has_signature(&ole_file);
         let metadata = eager_metadata(&mut ole_file);
         let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
-        Self::from_reader_parts(reader, options, metadata)
+        Self::from_reader_parts(reader, options, metadata, signed)
     }
 
     /// Adopt a source-backed semantic reader and the exact CFB view it came
@@ -374,6 +394,7 @@ impl Package {
     pub fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
         let workbook = workbook.materialized()?;
         let cfb = workbook.shared_cfb();
+        let signed = has_shared_signature(&cfb);
         let source_limits = workbook.retained_limits();
         let leniency = workbook.retained_leniency();
         Ok(Self {
@@ -389,6 +410,7 @@ impl Package {
                     limits: source_limits,
                     leniency,
                 },
+                signed,
                 metadata: OnceLock::new(),
                 edit_snapshot: None,
                 workbook_stream: OnceLock::new(),
@@ -401,15 +423,17 @@ impl Package {
             litchi_cfb::OleFileLimits::new(options.source_limits_value().max_input_bytes() as u64)?;
         let mut ole_file = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
         crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
+        let signed = has_signature(&ole_file);
         let metadata = eager_metadata(&mut ole_file);
         let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
-        Self::from_reader_parts(reader, options, metadata)
+        Self::from_reader_parts(reader, options, metadata, signed)
     }
 
     fn from_reader_parts(
         reader: RawReader,
         options: OpenOptions<'_>,
         metadata: Metadata,
+        signed: bool,
     ) -> Result<Self> {
         let encryption = reader.encryption();
         let metadata_cache = OnceLock::new();
@@ -425,6 +449,7 @@ impl Package {
                     leniency: options.leniency_value(),
                     compatibility_profile: options.compatibility_profile_value(),
                 },
+                signed,
                 metadata: metadata_cache,
                 edit_snapshot: None,
                 workbook_stream: OnceLock::new(),
@@ -783,16 +808,32 @@ impl Package {
         }
         match &self.inner.state {
             PackageState::Eager { reader, .. } => {
-                crate::cell_values::Snapshot::from_slice_with_limits_and_cfb(
-                    reader.get_ref().get_ref(),
-                    limits,
-                    cfb_limits,
-                )
-                .map_err(Error::Reader)
+                if self.inner.signed {
+                    let probe = litchi_ole_common::object::Probe::open_with_options(
+                        reader.get_ref().get_ref().clone(),
+                        litchi_ole_common::object::OpenOptions::new()
+                            .limits(limits)
+                            .cfb_limits(cfb_limits),
+                    )
+                    .map_err(Error::Object)?;
+                    crate::cell_values::Snapshot::from_probe(probe).map_err(Error::Reader)
+                } else {
+                    crate::cell_values::Snapshot::from_slice_with_limits_and_cfb(
+                        reader.get_ref().get_ref(),
+                        limits,
+                        cfb_limits,
+                    )
+                    .map_err(Error::Reader)
+                }
             },
             PackageState::Source { cfb, .. } => {
-                crate::cell_values::Snapshot::from_shared_ole_file(cfb, limits, cfb_limits)
-                    .map_err(Error::Reader)
+                if self.inner.signed {
+                    crate::cell_values::Snapshot::from_shared_probe(cfb, limits, cfb_limits)
+                        .map_err(Error::Reader)
+                } else {
+                    crate::cell_values::Snapshot::from_shared_ole_file(cfb, limits, cfb_limits)
+                        .map_err(Error::Reader)
+                }
             },
         }
     }

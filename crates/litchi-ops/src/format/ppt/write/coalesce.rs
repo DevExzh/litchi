@@ -7,7 +7,9 @@
 //! presentation projection as its only read model and publishes one native
 //! package edit.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::FileFormat;
@@ -49,6 +51,8 @@ pub(crate) struct Plan {
     anchor: Option<litchi_ppt::Anchor>,
     changed: bool,
     staged_bytes: usize,
+    /// Original shape text retained for a signed cancellation proof.
+    original_text: Option<String>,
 }
 
 impl Plan {
@@ -88,7 +92,9 @@ pub(crate) struct Run {
     max_staged_bytes: usize,
     max_expanded_targets: usize,
     limits: SemanticLimits,
+    max_snapshot_bytes: usize,
     scene: Option<SceneCache>,
+    allow_repeated: bool,
 }
 
 const NATIVE_MAX_OPERATIONS: usize = litchi_ppt::package::edit::MAX_OPERATIONS;
@@ -96,17 +102,26 @@ const NATIVE_MAX_OPERATIONS: usize = litchi_ppt::package::edit::MAX_OPERATIONS;
 impl Run {
     /// Start a source-checked native edit and preflight the retained snapshot
     /// lower bound before the native editor captures its before image.
-    pub(crate) fn new(base: &Ppt, limits: &SemanticLimits) -> Result<Self> {
-        base.check_source()?;
-        let package = base.editable_package()?;
-        let before_bytes =
-            usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
-        let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
-        if minimum > limits.max_snapshot_bytes() {
-            return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+    pub(crate) fn new(
+        base: &Ppt,
+        limits: &SemanticLimits,
+        remaining_snapshot: usize,
+    ) -> Result<Self> {
+        base.check_source_for_write()?;
+        let before_bytes = base.retained_source_len().unwrap_or(0);
+        let minimum = before_bytes
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(snapshot_limit(minimum, remaining_snapshot));
         }
+        let package = if base.signature() == crate::format::signature::Signature::Signed {
+            base.editable_package_for_write_with_snapshot_limit(remaining_snapshot)?
+        } else {
+            base.editable_package_with_snapshot_limit(remaining_snapshot)?
+        };
         let edit = package.edit().map_err(native_edit_error)?;
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(Self {
             base: base.clone(),
             source: package,
@@ -119,7 +134,9 @@ impl Run {
             max_staged_bytes: limits.max_staged_bytes(),
             max_expanded_targets: limits.max_expanded_targets(),
             limits: *limits,
+            max_snapshot_bytes: remaining_snapshot,
             scene: None,
+            allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
         })
     }
 
@@ -143,6 +160,7 @@ impl Run {
     /// Close the run before a repeated native target or any aggregate limit.
     pub(crate) fn requires_barrier(&self, plan: &Plan, _limits: &SemanticLimits) -> bool {
         self.seen.contains(&plan.key())
+            && !(self.allow_repeated && plan.text.is_some() && plan.anchor.is_none())
             || self
                 .target_count
                 .checked_add(1)
@@ -166,7 +184,24 @@ impl Run {
             )
             .with_format(FileFormat::Ppt));
         }
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
+        let authored = plan
+            .text
+            .as_ref()
+            .map_or(0, |text| text.len())
+            .saturating_add(plan.anchor.map_or(0, |_| size_of::<litchi_ppt::Anchor>()));
+        let observed = self
+            .base
+            .retained_source_len()
+            .unwrap_or(0)
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>())
+            .saturating_add(self.staged_bytes.saturating_add(plan.charge()))
+            .saturating_add(authored)
+            .saturating_add(size_of::<Item>());
+        if observed > self.max_snapshot_bytes {
+            return Err(snapshot_limit(observed, self.max_snapshot_bytes));
+        }
         self.items
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
@@ -184,7 +219,7 @@ impl Run {
             .native_operations
             .saturating_add(plan.native_operations());
         self.items.push(Item { plan, index });
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         Ok(changed)
     }
 
@@ -198,20 +233,85 @@ impl Run {
             mut edit,
             items,
             limits,
+            max_snapshot_bytes,
+            allow_repeated,
             ..
         } = self;
-        base.check_source()?;
+        let snapshot_limits = limits.with_snapshot_budget(max_snapshot_bytes);
+        let logical_noop = allow_repeated && logical_noop(&items);
+        // Native text/anchor setters may expand one authored command into
+        // several physical operations.  The unified leaf diagnostic is the
+        // authored command count, just like the XLS/XLSX/XLSB adapters; the
+        // native count remains enforced by `requires_barrier` above.
+        let authored_operations = items.len();
+        let original = matches!(
+            base.signature(),
+            crate::format::signature::Signature::Signed
+        )
+        .then(|| base.original_package_for_noop())
+        .transpose()?;
+        base.check_source_for_write()?;
         let result = (|| {
             stage_all(&mut edit, &items)?;
             let native = edit.commit().map_err(native_edit_error)?;
-            super::finish_commit(&base, native, &limits)
+            let mut commit = super::finish_commit(&base, native, &snapshot_limits)?;
+            commit.operations = authored_operations;
+            let staged_snapshot_bytes = commit.snapshot_bytes;
+            if logical_noop {
+                // Keep the staged native commit for validation, then replace
+                // its changed patch with an identity patch over the original
+                // signed package.  The leaf remains a real no-op, while the
+                // authored operation count stays in transaction diagnostics.
+                let original = original
+                    .as_ref()
+                    .ok_or_else(|| Error::signed(FileFormat::Ppt))?;
+                base.preflight_snapshot_bytes(max_snapshot_bytes, 0)?;
+                let empty = original
+                    .edit()
+                    .map_err(native_edit_error)?
+                    .commit()
+                    .map_err(native_edit_error)?;
+                commit = super::finish_commit(&base, empty, &snapshot_limits)?;
+                commit.operations = authored_operations;
+                commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
+            }
+            Ok(commit)
         })();
-        let freshness = base.check_source();
+        let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(commit) => Ok((commit.before.clone(), commit)),
             Err(error) => Err(locate_failure(&base, &source, &items, error)),
         }
     }
+}
+
+/// Compare the final direct text assignment for each shape with the text read
+/// from the immutable run base.  Geometry and mixed plans intentionally fail
+/// this proof until their complete native state is retained in the plan.
+fn logical_noop(items: &[Item]) -> bool {
+    let mut originals = std::collections::HashMap::<(usize, usize), String>::new();
+    let mut finals = std::collections::HashMap::<(usize, usize), String>::new();
+    for item in items {
+        let plan = &item.plan;
+        let Some(original) = plan.original_text.as_ref() else {
+            return false;
+        };
+        if plan.anchor.is_some() {
+            return false;
+        }
+        let key = plan.key();
+        originals
+            .entry((key.0, key.1))
+            .or_insert_with(|| original.clone());
+        let Some(text) = plan.text.as_ref() else {
+            return false;
+        };
+        finals.insert((key.0, key.1), text.clone());
+    }
+    !finals.is_empty()
+        && finals
+            .into_iter()
+            .all(|(key, value)| originals.get(&key) == Some(&value))
 }
 
 /// Admit one direct shape path. `None` is a deliberate barrier signal: the
@@ -305,20 +405,25 @@ pub(crate) fn shape_plan(
     let has_geometry = values.has_geometry();
     let geometry = values.geometry;
     // Geometry-only and empty payloads follow the one-shot writer's admission
-    // path without decoding a text body. A requested text value still reads
-    // the same native aggregate as the node projection, so equal text is
-    // retained for native validation of the editable body.
-    let text_changed = if let Some(text) = values.text.as_deref() {
-        // These native accessors expose the same text as ShapeEnum::text,
-        // without cloning an already-owned body solely for comparison.
-        match shape {
-            ShapeEnum::TextBox(textbox) => textbox.text() != text,
-            ShapeEnum::AutoShape(autoshape) => autoshape.text() != text,
-            _ => shape.text().map_err(Error::from)? != text,
-        }
+    // path without decoding a text body. A requested text value reads the
+    // native body once. Unsigned plans borrow the body for comparison, while
+    // signed plans retain the same read as their cancellation proof.
+    let current_text = if values.text.is_some() {
+        Some(match shape {
+            ShapeEnum::TextBox(textbox) => Cow::Borrowed(textbox.text()),
+            ShapeEnum::AutoShape(autoshape) => Cow::Borrowed(autoshape.text()),
+            _ => Cow::Owned(shape.text().map_err(Error::from)?),
+        })
     } else {
-        false
+        None
     };
+    let text_changed = values
+        .text
+        .as_deref()
+        .is_some_and(|text| current_text.as_deref() != Some(text));
+    let original_text = (file.signature() == crate::format::signature::Signature::Signed)
+        .then(|| current_text.map(|text| text.into_owned()))
+        .flatten();
     let text = values.text;
     let anchor = if has_geometry {
         let source = Arc::clone(&cached.source);
@@ -342,6 +447,7 @@ pub(crate) fn shape_plan(
         anchor,
         changed,
         staged_bytes,
+        original_text,
     }))
 }
 
@@ -387,7 +493,11 @@ fn direct_path(path: &Path<'_>) -> Option<(usize, DirectKind, usize)> {
 }
 
 fn stage_all(edit: &mut litchi_ppt::package::edit::Edit, items: &[Item]) -> Result<()> {
-    let text_only = items.iter().all(|item| item.plan.anchor.is_none());
+    let text_only = items.iter().all(|item| item.plan.anchor.is_none())
+        && (!items.iter().any(|item| item.plan.original_text.is_some()) || {
+            let mut targets = HashSet::new();
+            items.iter().all(|item| targets.insert(item.plan.key()))
+        });
     if text_only {
         let mut replacements = Vec::new();
         replacements
@@ -474,7 +584,7 @@ fn locate_failure(base: &Ppt, source: &litchi_ppt::Package, items: &[Item], erro
             },
         }
     }
-    base.check_source()
+    base.check_source_for_write()
         .map(|_| failure.with_item(items[high - 1].index))
         .unwrap_or_else(|freshness| freshness.with_item(first.index))
 }

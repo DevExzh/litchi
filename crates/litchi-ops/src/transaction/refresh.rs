@@ -130,6 +130,11 @@ impl Edit {
         self.check()?;
         self.flush_pending()?;
         let index = self.operations;
+        let operation_limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         let result = (|| {
             if index >= self.limits.max_operations() {
                 return Err(Error::Limit {
@@ -139,7 +144,7 @@ impl Edit {
                 }
                 .into());
             }
-            let (steps, summary) = run_steps(&self.current, options, &self.limits)?;
+            let (steps, summary) = run_steps(&self.current, options, &operation_limits)?;
             let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
                 bytes.saturating_add(step.snapshot_bytes)
             });

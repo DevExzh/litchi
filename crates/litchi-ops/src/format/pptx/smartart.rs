@@ -352,7 +352,11 @@ impl Pptx {
             ));
         }
         let position = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if matches!(&change, Change::Text { .. } | Change::Rebuild { .. }) {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         let parts = native.smartart(slide as usize, position)?;
@@ -368,6 +372,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
@@ -487,6 +493,8 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -708,6 +716,8 @@ impl Pptx {
         let base = eager(&source, self.0.ooxml_limits)?;
         let (target, patch) = base.edit()?.commit()?.into_parts();
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after: self.clone(),
             source,
             target: Editable::Eager(Arc::new(target)),

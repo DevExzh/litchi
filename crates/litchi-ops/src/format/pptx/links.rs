@@ -320,7 +320,12 @@ fn admit(
 
 impl Pptx {
     /// Write `link` (`None` removes) on `owner` in one native edit.
-    fn write_link(&self, owner: &Owner, link: Option<&Link>) -> Result<Commit> {
+    fn write_link(
+        &self,
+        owner: &Owner,
+        link: Option<&Link>,
+        allow_signed_noop: bool,
+    ) -> Result<Commit> {
         let tree = match owner {
             Owner::Shape(tree) => tree,
             Owner::Run(text) => &text.shape,
@@ -341,7 +346,11 @@ impl Pptx {
             ));
         }
         let shape = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if allow_signed_noop {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match owner {
@@ -362,6 +371,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
@@ -406,7 +417,7 @@ impl Pptx {
             target,
             tooltip: assignment.tooltip.flatten(),
         };
-        let commit = self.write_link(&owner, Some(&link))?;
+        let commit = self.write_link(&owner, Some(&link), false)?;
         let text = format!("{path}/hyperlink");
         let path = Path::parse(&text)
             .map(Path::into_owned)
@@ -439,7 +450,7 @@ impl Pptx {
                 tooltip: assignment.tooltip.flatten(),
             }),
         };
-        self.write_link(&item.owner, link.as_ref()).map(Some)
+        self.write_link(&item.owner, link.as_ref(), true).map(Some)
     }
 
     /// A `remove` of a hyperlink path; `None` for other targets.
@@ -452,7 +463,7 @@ impl Pptx {
             return Ok(None);
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        self.write_link(&item.owner, None).map(Some)
+        self.write_link(&item.owner, None, false).map(Some)
     }
 
     fn hyperlink_target(&self, target: &TargetArg<'_>) -> Result<Option<LinkItem>> {
@@ -622,15 +633,33 @@ impl Pptx {
             },
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let second = file.write_link(&owner, link.as_ref())?;
+        let mut second = file.write_link(&owner, link.as_ref(), true)?;
         Ok(Some(match first {
             None => second,
-            Some(first) => Commit {
-                after: second.after,
-                source: first.source,
-                target: second.target,
-                proof: second.proof,
-                operations: first.operations.saturating_add(second.operations),
+            Some(mut first) => {
+                // Both native edits have already captured a proof.  The
+                // combined facade step retains the first source and the
+                // second target, but its peak staged charge still includes
+                // both edits before the first proof is discarded.
+                let (first_snapshot_bytes, second_snapshot_bytes) =
+                    if file.signature() == super::Signature::Signed {
+                        (
+                            first.measure_snapshot_bytes(),
+                            second.measure_snapshot_bytes(),
+                        )
+                    } else {
+                        (0, 0)
+                    };
+                let snapshot_bytes = first_snapshot_bytes.saturating_add(second_snapshot_bytes);
+                Commit {
+                    snapshot_bytes,
+                    after: second.after,
+                    source: first.source,
+                    target: second.target,
+                    proof: second.proof,
+                    operations: first.operations.saturating_add(second.operations),
+                    retained_cache: std::sync::OnceLock::from(second_snapshot_bytes),
+                }
             },
         }))
     }

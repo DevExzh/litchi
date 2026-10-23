@@ -8,6 +8,7 @@
 
 use litchi_core::Position;
 use litchi_xls::cell_values::{CellError, FormulaCache, Reference, Selector, Value as NativeValue};
+use std::mem::size_of;
 
 use super::super::Xls;
 use super::{WriteCommit, finish_commit, native_edit_error, native_value_error};
@@ -34,7 +35,7 @@ pub(crate) fn refresh(
     let names = file.workbook()?.worksheet_names()?;
     handle.check_source()?;
     let result = (|| {
-        handle.admit_edit()?;
+        handle.admit_edit_for_write()?;
         let mut fields: Vec<Field> = Vec::with_capacity(report.formulas().len());
         let mut planned: Vec<(usize, Reference, FormulaCache, usize)> = Vec::new();
         for formula in report.formulas() {
@@ -67,7 +68,25 @@ pub(crate) fn refresh(
             let base = commits
                 .last()
                 .map_or_else(|| handle.clone(), |commit| commit.after.clone());
-            let mut edit = base.editable_package()?.edit().map_err(native_edit_error)?;
+            let used = commits.iter().fold(0usize, |total, commit| {
+                total.saturating_add(commit.snapshot_bytes)
+            });
+            let remaining = limits.max_snapshot_bytes().saturating_sub(used);
+            let chunk_limits = limits.with_snapshot_budget(remaining);
+            let additional = chunk.iter().fold(0usize, |total, (_, _, cache, _)| {
+                let payload = match cache {
+                    FormulaCache::String(text) => text.len(),
+                    _ => 0,
+                };
+                total
+                    .saturating_add(payload)
+                    .saturating_add(size_of::<NativeValue>())
+            });
+            base.preflight_snapshot_bytes(remaining, additional)?;
+            let mut edit = base
+                .editable_package_for_write_with_snapshot_limit(remaining)?
+                .edit()
+                .map_err(native_edit_error)?;
             let mut staged = 0usize;
             for (sheet, reference, cache, index) in chunk {
                 let written = edit.set_value(
@@ -88,7 +107,7 @@ pub(crate) fn refresh(
                 continue;
             }
             let native = edit.commit().map_err(native_edit_error)?;
-            commits.push(finish_commit(&base, native, staged, limits)?);
+            commits.push(finish_commit(&base, native, staged, &chunk_limits)?);
         }
         Ok((commits, Summary::from_fields(fields)))
     })();

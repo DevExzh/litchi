@@ -15,9 +15,7 @@ use super::Nav;
 use super::Xlsb;
 use super::node::{Item, Node};
 use super::spec::{Kind, MERGE_WRITE_TABLE};
-use super::write::{
-    Commit, NativeStructureOptions, check_snapshot_limits, native_error, package_from_editor,
-};
+use super::write::{Commit, NativeStructureOptions, native_error, package_from_editor};
 use crate::error::{Code, Error, Result};
 use crate::props::Props;
 use crate::registry::Operation;
@@ -73,7 +71,7 @@ pub(super) fn set_merges_with_limits(
         return Ok(None);
     };
     let targets = resolve_ranges(file, target, limits)?;
-    let editor = file.editor()?;
+    let editor = file.editor_for_write()?;
     let package = package_from_editor(editor);
     let native_limits = litchi_xlsb::cell_values::TransferLimits::new(
         limits.max_snapshot_bytes(),
@@ -96,8 +94,7 @@ pub(super) fn set_merges_with_limits(
         })?;
     }
     let native = edit.commit().map_err(native_error)?;
-    let commit = Commit::from_native(file, native)?;
-    check_snapshot_limits(commit.patch(), limits)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     Ok(Some(commit))
 }
 
@@ -185,7 +182,7 @@ fn resolve_ranges(
                 .with_format(FileFormat::Xlsb),
         );
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     Ok(targets)
 }
 

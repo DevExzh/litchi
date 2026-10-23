@@ -163,7 +163,7 @@ impl Pptx {
                 "mutation selector matched no element",
             ));
         }
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         // A layout change edits the slide's relationships, which the
         // source-backed slide edit does not stage: a source owner is promoted
         // (record 0346).
@@ -218,6 +218,8 @@ impl Pptx {
             self.clone()
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target,

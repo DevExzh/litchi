@@ -154,7 +154,17 @@ impl Run {
     pub(crate) fn new(base: &Docx) -> Result<Self> {
         Ok(Self {
             base: base.clone(),
-            edit: WorkEdit::from(base.edit()?)?,
+            // The transaction owner may be signed.  `edit_for_write` keeps
+            // that source-backed writer private while allowing the native
+            // patch to prove a cancellation; the outer transaction still
+            // rejects every nonempty final change.
+            edit: WorkEdit::from(
+                if base.signature() == crate::format::signature::Signature::Signed {
+                    base.edit_for_write()?
+                } else {
+                    base.edit()?
+                },
+            )?,
             items: Vec::new(),
             last_target: None,
             texted: BTreeSet::new(),
@@ -267,9 +277,27 @@ impl Run {
         let Self {
             base, edit, items, ..
         } = self;
+        let authored_operations = items.len();
         let result = base.owner().finish(edit.commit(&base));
         match result {
-            Ok(commit) => Ok((base, commit)),
+            Ok(commit)
+                if base.signature() == crate::format::signature::Signature::Signed
+                    && commit.patch.is_noop() =>
+            {
+                // The staged patch may contain cancelled native operations.
+                // Replace that operation-bearing patch with a fresh empty
+                // edit over the original signed owner, so the leaf history,
+                // inverse and unified facade all carry the same canonical
+                // no-op endpoint.  The staged commit remains the validation
+                // proof; only its no-op patch is discarded.
+                let mut empty = WorkEdit::from(base.edit_for_write()?)?.commit(&base)?;
+                empty.operations = authored_operations;
+                Ok((base, empty))
+            },
+            Ok(mut commit) => {
+                commit.operations = authored_operations;
+                Ok((base, commit))
+            },
             Err(error) => Err(locate_failure(&base, &items, error)),
         }
     }
@@ -277,7 +305,13 @@ impl Run {
 
 fn replay(base: &Docx, items: &[Item]) -> Result<Commit> {
     let result = (|| {
-        let mut edit = WorkEdit::from(base.edit()?)?;
+        let mut edit = WorkEdit::from(
+            if base.signature() == crate::format::signature::Signature::Signed {
+                base.edit_for_write()?
+            } else {
+                base.edit()?
+            },
+        )?;
         for item in items {
             item.plan
                 .stage(&mut edit)

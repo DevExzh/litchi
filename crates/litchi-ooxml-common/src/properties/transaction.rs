@@ -34,6 +34,7 @@
 //! caller sets it (ADR 0006, determinism).
 
 use std::collections::BTreeSet;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::metadata::{Field, Metadata};
@@ -1287,6 +1288,36 @@ impl Patch {
     #[must_use]
     pub fn changes(&self) -> &[Change] {
         &self.changes
+    }
+
+    /// Conservative retained-data charge for this metadata patch.
+    ///
+    /// The package endpoints are charged by the owning format. This method
+    /// covers the patch's own change descriptors, relationship strings,
+    /// property-part payloads, and the complete before/after scope retained
+    /// by an exact no-op. Scope entries are intentionally charged even when
+    /// they share an `Arc` with a changed entry: history admission accounts
+    /// for every retained patch owner independently and never relies on an
+    /// allocator-layout assumption.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        fn change_bytes(change: &Change) -> usize {
+            size_of::<Change>()
+                .saturating_add(change.part.as_str().len())
+                .saturating_add(change.relationship_id.capacity())
+                .saturating_add(change.relationship_type.capacity())
+                .saturating_add(change.relationship_target.capacity())
+                .saturating_add(change.before.as_ref().map_or(0, |bytes| bytes.capacity()))
+                .saturating_add(change.after.as_ref().map_or(0, |bytes| bytes.capacity()))
+        }
+
+        self.changes
+            .iter()
+            .chain(self.scope.iter().flat_map(|scope| scope.iter()))
+            .chain(self.after_scope.iter().flat_map(|scope| scope.iter()))
+            .fold(size_of::<Self>(), |total, change| {
+                total.saturating_add(change_bytes(change))
+            })
     }
 
     /// The patch that restores the before state of every change.

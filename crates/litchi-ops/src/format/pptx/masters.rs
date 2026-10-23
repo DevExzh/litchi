@@ -124,7 +124,7 @@ impl Pptx {
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         drop(node);
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match &change {
@@ -167,6 +167,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),

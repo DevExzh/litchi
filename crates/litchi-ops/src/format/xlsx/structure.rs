@@ -12,7 +12,7 @@ use litchi_xlsx as xlsx;
 
 use super::node::Node;
 use super::spec::Kind;
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
@@ -34,18 +34,34 @@ impl Xlsx {
         parent: PathArg<'p>,
         node: NewNode<'n>,
     ) -> Result<(Commit, Path<'static>)> {
-        self.0.owner.finish(|| self.add_inner(parent, node))
+        self.add_with_limits(parent, node, &SemanticLimits::default())
+    }
+
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: PathArg<'p>,
+        node: NewNode<'n>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
+        self.0
+            .owner
+            .finish(|| self.add_inner(parent, node, limits))
+            .and_then(|(commit, path)| {
+                self.enforce_signed_noop(commit)
+                    .map(|commit| (commit, path))
+            })
     }
 
     fn add_inner<'p, 'n>(
         &self,
         parent: PathArg<'p>,
         node: NewNode<'n>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
         // Admit the owning editor first.  This keeps retention, signatures and
         // encryption policy ahead of authored property conversion, matching
         // the cell and DOCX write adapters.
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         // The element kind first (record 0269, finding X1): a kind the
         // workbook cannot add is `unsupported_element` whatever its parent;
         // an addable kind under the wrong parent is `unsupported_type`.
@@ -53,20 +69,20 @@ impl Xlsx {
         let parent = resolve_path(self, &parent)?;
         if matches!(kind, NewKind::Chart) {
             drop(source);
-            return self.add_chart(&parent, node);
+            return self.add_chart(&parent, node, limits);
         }
         if let NewKind::Feature(kind, implied) = kind {
             drop(source);
-            return self.add_feature(&parent, kind, implied, node);
+            return self.add_feature(&parent, kind, implied, node, limits);
         }
         // A worksheet cell and a rich-text run (record 0338).
         if matches!(kind, NewKind::Cell) {
             drop(source);
-            return self.add_cell(&parent, &node, &SemanticLimits::default());
+            return self.add_cell(&parent, &node, limits);
         }
         if matches!(kind, NewKind::Run) {
             drop(source);
-            return self.add_run_node(&parent, &node);
+            return self.add_run_node(&parent, &node, limits);
         }
         if parent.element() != Kind::Workbook {
             return Err(Error::new(
@@ -97,7 +113,7 @@ impl Xlsx {
                 })?
             },
         };
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let position = add_at(
             &mut edit,
             name,
@@ -106,7 +122,8 @@ impl Xlsx {
             self,
         )?;
         let native = edit.commit().map_err(native_error)?;
-        let commit = Commit::from_native(self, source, native)?;
+        let commit =
+            Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())?;
         Ok((commit, sheet_path(position)))
     }
 
@@ -122,25 +139,28 @@ impl Xlsx {
         target: TargetArg<'p>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        self.0.owner.finish(|| self.remove_inner(target, limits))
+        self.0
+            .owner
+            .finish(|| self.remove_inner(target, limits))
+            .and_then(|commit| self.enforce_signed_noop(commit))
     }
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, limits: &SemanticLimits) -> Result<Commit> {
-        if let Some(commit) = self.try_remove_run(&target)? {
+        if let Some(commit) = self.try_remove_run(&target, limits)? {
             return Ok(commit);
         }
-        if let Some(commit) = self.try_remove_chart(&target)? {
+        if let Some(commit) = self.try_remove_chart(&target, limits)? {
             return Ok(commit);
         }
-        if let Some(commit) = self.try_remove_feature(&target)? {
+        if let Some(commit) = self.try_remove_feature(&target, limits)? {
             return Ok(commit);
         }
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let positions = super::sheet_write::resolve_sheet_targets(self, &target, limits)?
             .ok_or_else(unsupported_removal_target)?;
         check_removal_limits(positions.len(), limits)?;
         self.check_source()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         for position in positions {
             if edit.remove(position).map_err(native_error)?.is_none() {
                 return Err(Error::new(
@@ -151,7 +171,7 @@ impl Xlsx {
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(self, source, native)
+        Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())
     }
 
     /// Move one sheet tab to a checked placement.
@@ -160,16 +180,33 @@ impl Xlsx {
         path: PathArg<'p>,
         placement: Placement<'q>,
     ) -> Result<Commit> {
-        self.0.owner.finish(|| self.move_inner(path, placement))
+        self.move_to_with_limits(path, placement, &SemanticLimits::default())
     }
 
-    fn move_inner<'p, 'q>(&self, path: PathArg<'p>, placement: Placement<'q>) -> Result<Commit> {
-        let source = self.editor()?;
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: PathArg<'p>,
+        placement: Placement<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        self.0
+            .owner
+            .finish(|| self.move_inner(path, placement, limits))
+            .and_then(|commit| self.enforce_signed_noop(commit))
+    }
+
+    fn move_inner<'p, 'q>(
+        &self,
+        path: PathArg<'p>,
+        placement: Placement<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let node = resolve_path(self, &path)?;
         let source_position = sheet_position(&node)?;
         let destination = move_destination(self, &placement)?;
         self.check_source()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let moved = match destination {
             MoveDestination::Position(position) => edit
                 .move_to(source_position, position)
@@ -189,20 +226,37 @@ impl Xlsx {
             .with_format(FileFormat::Xlsx));
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(self, source, native)
+        Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())
     }
 
     /// Exchange two sheet tabs while retaining one native transaction.
     pub(crate) fn swap<'p, 'q>(&self, left: PathArg<'p>, right: PathArg<'q>) -> Result<Commit> {
-        self.0.owner.finish(|| self.swap_inner(left, right))
+        self.swap_with_limits(left, right, &SemanticLimits::default())
     }
 
-    fn swap_inner<'p, 'q>(&self, left: PathArg<'p>, right: PathArg<'q>) -> Result<Commit> {
-        let source = self.editor()?;
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: PathArg<'p>,
+        right: PathArg<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        self.0
+            .owner
+            .finish(|| self.swap_inner(left, right, limits))
+            .and_then(|commit| self.enforce_signed_noop(commit))
+    }
+
+    fn swap_inner<'p, 'q>(
+        &self,
+        left: PathArg<'p>,
+        right: PathArg<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let left = sheet_position(&resolve_path(self, &left)?)?;
         let right = sheet_position(&resolve_path(self, &right)?)?;
         self.check_source()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         if left != right {
             // Each `move_to` resolves its source identity against the
             // immutable base snapshot and applies its destination to the
@@ -218,7 +272,15 @@ impl Xlsx {
                 .ok_or_else(|| not_found("the second XLSX sheet disappeared"))?;
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(self, source, native)
+        Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())
+    }
+
+    fn enforce_signed_noop(&self, commit: Commit) -> Result<Commit> {
+        if self.signature() == super::Signature::Signed && !commit.is_noop_for(self) {
+            Err(Error::signed(FileFormat::Xlsx))
+        } else {
+            Ok(commit)
+        }
     }
 }
 

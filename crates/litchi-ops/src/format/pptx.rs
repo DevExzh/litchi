@@ -422,6 +422,17 @@ impl Pptx {
         self.check_source_for_replay()
     }
 
+    /// Check the owner for a mutation that may still prove an exact signed
+    /// no-op.  The native editor is allowed to stage that proof, while its
+    /// changed result remains refused at the commit fence.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        if self.signature() == Signature::Signed {
+            self.check_source_for_replay()
+        } else {
+            self.check_source()
+        }
+    }
+
     /// Check retained source freshness and the protection policy that is
     /// independent of the signature disposition. Exact no-op patch replay
     /// uses this after proving the recipient bytes match the patch base.
@@ -438,6 +449,21 @@ impl Pptx {
     }
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Return the O(1) source-size lower bound used before a native editor is
+    /// admitted.  This is only an allocation preflight; the exact retained
+    /// proof is still charged after the edit commits.  In particular, eager
+    /// owners may expose their already-indexed OPC source length without
+    /// forcing any lazy presentation payloads.
+    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
+        match &self.0.owner {
+            PptxOwner::Source(presentation) => Ok(Some(
+                usize::try_from(presentation.source_backed_package().source_artifact().len())
+                    .unwrap_or(usize::MAX),
+            )),
+            PptxOwner::Eager(package) => Ok(package.opc()?.exact_source_len()),
+        }
     }
 
     /// This handle's key for [`crate::path::fence::Scope`].
@@ -1089,10 +1115,47 @@ impl Pptx {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Pptx));
         }
+        self.editable_owner_after_source_check(false)
+    }
+
+    /// Acquire the retained owner for a setter that may prove an exact
+    /// signed no-op. A changed result is rejected by the setter commit fence;
+    /// this helper only lets the native editor establish whether the request
+    /// changed the package at all.
+    pub(crate) fn editable_owner_for_write(&self) -> Result<Editable> {
+        if self.0.signature() == Signature::Signed && !self.0.retain_source {
+            return Err(source_not_retained());
+        }
+        self.editable_owner_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    /// Return the original native owner for a canonical signed no-op patch.
+    /// Changed writes use the unsigned promotion above; the identity patch
+    /// must retain the signature parts and exact source binding.
+    pub(crate) fn original_owner_for_noop(&self) -> Result<Editable> {
         if !self.0.retain_source {
             return Err(source_not_retained());
         }
-        self.check_source()?;
+        self.check_source_for_replay()?;
+        match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                pptx::source::Package::from_presentation(presentation)
+                    .map(Editable::Source)
+                    .map_err(Error::from)
+            },
+            PptxOwner::Eager(package) => Ok(Editable::Eager(Arc::clone(package))),
+        }
+    }
+
+    fn editable_owner_after_source_check(&self, allow_signed: bool) -> Result<Editable> {
+        if !self.0.retain_source {
+            return Err(source_not_retained());
+        }
+        if allow_signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
+        }
         if self.0.signature() == Signature::RemovalAuthorized {
             return self.promote_unsigned().map(Editable::Eager);
         }

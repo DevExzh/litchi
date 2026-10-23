@@ -41,14 +41,51 @@ impl Xls {
             }
             .into());
         }
-        let package = self.editable_package()?;
+        self.preflight_snapshot_bytes(
+            limits.max_snapshot_bytes(),
+            std::mem::size_of::<litchi_xls::package::metadata::Edit>(),
+        )?;
+        let package =
+            self.editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut edit = package.edit_metadata()?;
         let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Xls)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();
-        let snapshot_bytes =
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Xls));
+        }
+        let staged_snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // Re-root the identity patch on the retained signed package;
+                // the writable probe used an unsigned private package.
+                let original = self.original_package_for_noop()?;
+                let minimum = self
+                    .retained_source_len()
+                    .saturating_mul(2)
+                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
+                    .saturating_add(std::mem::size_of::<litchi_xls::package::metadata::Edit>());
+                if minimum > limits.max_snapshot_bytes() {
+                    return Err(TransactionError::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: minimum,
+                        maximum: limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
+                let canonical_snapshot_bytes =
+                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,
@@ -57,7 +94,7 @@ impl Xls {
             }
             .into());
         }
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after: if changed {

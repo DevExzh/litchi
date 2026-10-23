@@ -6,6 +6,7 @@
 //! and delegates semantic reads to the native Workbook projection.
 
 use std::io::Cursor;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -94,13 +95,23 @@ impl Xls {
         Ok(())
     }
 
+    /// Admit a native edit that may still prove an exact signed no-op. A
+    /// changed package is rejected by the publication fence.
+    pub(crate) fn admit_edit_for_write(&self) -> Result<()> {
+        self.check_source_for_write()?;
+        if self.is_encrypted() {
+            return Err(litchi_xls::package::Error::EncryptionPolicy.into());
+        }
+        Ok(())
+    }
+
     /// Return the native package that may receive one immutable edit.
     ///
     /// An explicitly authorized signature removal starts from an unsigned
     /// copy of the exact source. Ordinary unsigned handles retain the native
     /// owner and therefore retain its source policy and lazy route.
     pub(crate) fn editable_package(&self) -> Result<Package> {
-        self.admit_edit()?;
+        self.admit_edit_for_write()?;
         if self.signature() == Signature::RemovalAuthorized {
             let bytes = signature::unsign_compound_file(
                 self.owner().source_bytes()?,
@@ -111,6 +122,76 @@ impl Xls {
                 bytes,
             )?);
         }
+        Ok(self.owner().clone())
+    }
+
+    /// Admit an ordinary unsigned native edit against the remaining
+    /// before/after snapshot budget before its package owner is cloned.
+    pub(crate) fn editable_package_with_snapshot_limit(&self, maximum: usize) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package()
+    }
+
+    /// Return the retained package for a setter that may prove an exact
+    /// signed no-op. Removal-authorized handles use an explicit unsigned
+    /// replacement; signed handles keep their original package until the
+    /// publication fence sees whether the native patch changed.
+    pub(crate) fn editable_package_for_write(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        if matches!(
+            self.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
+            let bytes = signature::unsign_compound_file(
+                self.owner().source_bytes()?,
+                litchi_sign::cfb::Format::Xls,
+            )?;
+            return Ok(litchi_xls::raw::package_from_replacement_bytes(
+                self.owner(),
+                bytes,
+            )?);
+        }
+        Ok(self.owner().clone())
+    }
+
+    /// Admit the native before/after package capture against the transaction's
+    /// remaining snapshot budget before signature removal or package cloning
+    /// can allocate its private edit owner.
+    pub(crate) fn editable_package_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package_for_write()
+    }
+
+    /// Check the native package, edit handoff and caller-authored staging
+    /// against the remaining snapshot budget before a private XLS edit owner
+    /// can be materialized. The patch's exact retained charge is still
+    /// authoritative after commit.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let observed = self
+            .retained_source_len()
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_xls::Patch>())
+            .saturating_add(size_of::<litchi_xls::package::edit::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Return the original native package for a canonical signed no-op patch.
+    /// The ordinary write owner is unsigned before staging a changed edit;
+    /// an empty cancellation patch must retain the signed CFB source instead.
+    pub(crate) fn original_package_for_noop(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
         Ok(self.owner().clone())
     }
 
@@ -149,10 +230,20 @@ impl Xls {
         props: impl crate::props::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::set_with_limits(self, target, props, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
+    }
+
+    fn enforce_signed_noop(&self, result: Result<WriteCommit>) -> Result<WriteCommit> {
+        result.and_then(|commit| {
+            if self.signature() != Signature::Signed || commit.after.same_snapshot(self) {
+                Ok(commit)
+            } else {
+                Err(signature::refusal(FileFormat::Xls))
+            }
+        })
     }
 
     /// Remove stored cells selected by a path or scoped query.
@@ -169,7 +260,7 @@ impl Xls {
         self.check_source()?;
         let result = write::remove_with_limits(self, target, limits);
         self.check_source()?;
-        result
+        self.enforce_signed_noop(result)
     }
 
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
@@ -224,6 +315,12 @@ impl Xls {
             }
         }
         Ok(())
+    }
+
+    /// Source freshness for a mutation that may still prove an exact signed
+    /// no-op. Changed native results are rejected at publication.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        self.check_source()
     }
 
     pub(crate) fn date_1904(&self) -> Result<bool> {
@@ -293,6 +390,17 @@ impl Xls {
 
     pub(super) fn owner(&self) -> &Package {
         &self.0.package
+    }
+
+    /// The retained compound-file length, when the native package exposes
+    /// one. This O(1) lower bound is used before a private edit owner is
+    /// materialized; native patch accounting remains the hard post-commit
+    /// limit check.
+    pub(crate) fn retained_source_len(&self) -> usize {
+        self.owner()
+            .source()
+            .map(|source| usize::try_from(source.file_size()).unwrap_or(usize::MAX))
+            .unwrap_or(0)
     }
 
     /// The handle's sheet-step cache (record 0315).

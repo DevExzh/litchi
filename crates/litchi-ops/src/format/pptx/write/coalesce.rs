@@ -21,7 +21,7 @@
 //! writes keep the ordinary writer, which promotes it.
 
 use super::text::{self, TextValues};
-use super::{Commit, Editable, Pptx, Target, admit_shape_props, allocation, error};
+use super::{Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error};
 use crate::format::pptx::spec::{Kind, PARAGRAPH_WRITE_TABLE, RUN_WRITE_TABLE};
 use crate::format::pptx::steps;
 use crate::registry::Operation;
@@ -33,7 +33,8 @@ use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::mem::size_of;
 use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
@@ -49,6 +50,8 @@ pub(crate) struct Plan {
     /// staging; `changed` is then unknown until the commit.
     reported: bool,
     staged_bytes: usize,
+    /// Original target text used to prove a signed cancellation.
+    original_text: Option<String>,
     /// Whether the target is a text body of the slide's notes page (record
     /// 0346), which a separate native call edits.
     notes: bool,
@@ -62,7 +65,7 @@ struct Format {
 }
 
 /// What part of a shape's text a plan touches.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 enum Scope {
     /// The whole shape: its text, geometry or every paragraph.
     Shape,
@@ -210,13 +213,43 @@ struct CachedScene {
 /// A notes page's body placeholder: its notes-scene position and the
 /// paragraphs and text runs of its body; `None` when the slide has none
 /// (records 0346, 0348).
-pub(crate) type NotesBody = Option<(usize, Arc<litchi_pptx::shape::BodyTextIndex>)>;
+pub(crate) type NotesBody = Option<(
+    usize,
+    Arc<litchi_pptx::shape::BodyTextIndex>,
+    Option<Arc<litchi_drawingml::text::body::Body>>,
+)>;
+
+type CapturedBody = Arc<litchi_drawingml::text::body::Body>;
+type CapturedRow = Vec<Option<CapturedBody>>;
 
 /// One table's cells, by row and position in the row: the paragraphs and
 /// text runs plans address (record 0348). Their properties and text are not
 /// read: the leaf reports each cell plan's change when the run stages it.
 pub(crate) struct Cells {
     index: litchi_pptx::table::CellTextIndex,
+    /// Full cell bodies are retained only for signed text plans, where they
+    /// provide the native value used by the cancellation proof. Ordinary
+    /// unsigned runs keep the historical index-only path.
+    bodies: Option<Vec<CapturedRow>>,
+}
+
+impl Cells {
+    fn capture_charge(&self) -> usize {
+        let Some(rows) = &self.bodies else {
+            return 0;
+        };
+        rows.iter()
+            .fold(std::mem::size_of_val(rows.as_slice()), |total, row| {
+                total
+                    .saturating_add(std::mem::size_of_val(row.as_slice()))
+                    .saturating_add(
+                        row.iter()
+                            .flatten()
+                            .map(|body| body_capture_charge(body))
+                            .sum::<usize>(),
+                    )
+            })
+    }
 }
 
 #[allow(
@@ -237,6 +270,7 @@ pub(crate) struct Run {
     /// The scopes each shape's plans touch.
     seen: HashMap<(usize, usize, bool), Touched>,
     staged_bytes: usize,
+    max_snapshot_bytes: usize,
     target_count: usize,
     max_staged_bytes: usize,
     max_expanded_targets: usize,
@@ -244,6 +278,7 @@ pub(crate) struct Run {
     /// scene alive makes each additional ordinal path a cheap indexed lookup;
     /// replacing it when the slide changes bounds derived-cache retention.
     scene: Option<(usize, CachedScene)>,
+    allow_repeated: bool,
 }
 
 impl Pptx {
@@ -257,18 +292,31 @@ impl Pptx {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Plan>> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let mut scene = None;
         let result = shape_plan(self, target, props, limits, &mut scene);
-        self.check_source().and(result)
+        self.check_source_for_write().and(result)
     }
 }
 
 impl Run {
     /// Start one native edit and its bounded direct-path resolution cache.
-    pub(crate) fn new(base: &Pptx, limits: &SemanticLimits) -> Result<Self> {
-        base.check_source()?;
-        let source = base.editable_owner()?;
+    pub(crate) fn new(
+        base: &Pptx,
+        limits: &SemanticLimits,
+        remaining_snapshot: usize,
+    ) -> Result<Self> {
+        base.check_source_for_write()?;
+        let source_bytes = base.retained_source_len()?.unwrap_or(0);
+        let minimum = source_bytes.saturating_add(size_of::<litchi_pptx::opened::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(super::snapshot_limit(minimum, remaining_snapshot));
+        }
+        let source = if base.signature() == crate::format::signature::Signature::Signed {
+            base.editable_owner_for_write()?
+        } else {
+            base.editable_owner()?
+        };
         let edit = match &source {
             Editable::Eager(package) => match base.take_spare_edit(package) {
                 Some(edit) => NativeEdit::Eager(edit),
@@ -276,7 +324,7 @@ impl Run {
             },
             Editable::Source(_) => new_native_edit(&source)?,
         };
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(Self {
             base: base.clone(),
             source,
@@ -284,10 +332,12 @@ impl Run {
             items: Vec::new(),
             seen: HashMap::new(),
             staged_bytes: 0,
+            max_snapshot_bytes: remaining_snapshot,
             target_count: 0,
             max_staged_bytes: limits.max_staged_bytes(),
             max_expanded_targets: limits.max_expanded_targets(),
             scene: None,
+            allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
         })
     }
 
@@ -300,9 +350,9 @@ impl Run {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Plan>> {
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         let result = shape_plan(&self.base, target, props, limits, &mut self.scene);
-        self.base.check_source().and(result)
+        self.base.check_source_for_write().and(result)
     }
 
     pub(crate) fn first_index(&self) -> Option<usize> {
@@ -329,6 +379,9 @@ impl Run {
     /// aggregate setters instead of reparsing the same slide per command.
     /// Whether `plan` touches text an earlier plan of the run touches.
     fn overlaps(&self, plan: &Plan) -> bool {
+        if self.allow_repeated && plan.text.is_some() && plan.format.is_none() && !plan.notes {
+            return false;
+        }
         let scope = plan.scope();
         self.seen
             .get(&plan.key())
@@ -352,7 +405,7 @@ impl Run {
             )
             .with_format(FileFormat::Pptx));
         }
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         self.items
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
@@ -367,7 +420,7 @@ impl Run {
         self.staged_bytes = self.staged_bytes.saturating_add(charge);
         self.target_count = self.target_count.saturating_add(1);
         self.items.push(Item { plan, index });
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         Ok(changed)
     }
 
@@ -385,21 +438,106 @@ impl Run {
             source,
             mut edit,
             items,
+            allow_repeated,
+            max_snapshot_bytes,
             ..
         } = self;
-        base.check_source()?;
+        let logical_noop = allow_repeated && logical_noop(&items);
+        let authored_operations = items.len();
+        base.check_source_for_write()?;
         let result = (|| {
             let mut changes = Vec::new();
             let operations = stage_all(&mut edit, &items, &mut changes)?;
-            let (after, commit) = commit_native(&base, source, edit, operations)?;
+            let (mut after, mut commit) = commit_native(&base, source, edit, operations)?;
+            commit.operations = authored_operations;
+            // The native proof retains endpoints for both signed and
+            // unsigned packages.  Measure it once through the commit cache
+            // so unsigned runs are charged and cannot bypass the snapshot
+            // limit.
+            let staged_snapshot_bytes = commit.measure_snapshot_bytes();
+            bound(
+                LimitKind::SnapshotBytes,
+                staged_snapshot_bytes,
+                max_snapshot_bytes,
+            )?;
+            let canonical_noop = base.signature() == crate::format::signature::Signature::Signed
+                && (logical_noop || proof_is_noop(&commit.proof));
+            if canonical_noop {
+                // The staged commit validates all intermediate operations. Its
+                // changed patch is then discarded in favor of a native empty
+                // edit over the original signed owner.
+                let original = base.original_owner_for_noop()?;
+                (after, commit) = commit_native(
+                    &base,
+                    original.clone(),
+                    new_native_edit(&original)?,
+                    operations,
+                )?;
+                commit.operations = authored_operations;
+                commit.snapshot_bytes = commit.snapshot_bytes().max(staged_snapshot_bytes);
+                bound(
+                    LimitKind::SnapshotBytes,
+                    commit.snapshot_bytes(),
+                    max_snapshot_bytes,
+                )?;
+            }
             Ok((after, commit, changes))
         })();
-        let freshness = base.check_source();
+        let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(value) => Ok(value),
             Err(error) => Err(locate_failure(&base, &items, error)),
         }
     }
+}
+
+fn proof_is_noop(proof: &Proof) -> bool {
+    match proof {
+        Proof::Source(patch) => patch.is_noop(),
+        Proof::Eager(patch) => patch.is_noop(),
+        Proof::Metadata(patch) => patch.is_noop(),
+    }
+}
+
+/// Compare each text plan's final assignment with the immutable base. Geometry
+/// and formatting-only plans retain no complete original state and therefore
+/// remain a real commit unless the native patch itself proves an exact no-op.
+fn logical_noop(items: &[Item]) -> bool {
+    let mut originals = std::collections::HashMap::<(usize, usize, bool, Scope), String>::new();
+    let mut finals = std::collections::HashMap::<(usize, usize, bool, Scope), String>::new();
+    for item in items {
+        let plan = &item.plan;
+        let Some(original) = plan.original_text.as_ref() else {
+            return false;
+        };
+        if plan.has_geometry()
+            || plan
+                .format
+                .as_ref()
+                .is_some_and(|format| !format.values.is_text_only())
+        {
+            return false;
+        }
+        let key = (
+            plan.target.slide,
+            plan.target.position,
+            plan.notes,
+            plan.scope(),
+        );
+        originals.entry(key).or_insert_with(|| original.clone());
+        let text = match plan.text.as_ref() {
+            Some(text) => text.clone(),
+            None => match plan.format.as_ref().and_then(|format| format.values.text()) {
+                Some(text) => text.to_owned(),
+                None => return false,
+            },
+        };
+        finals.insert(key, text);
+    }
+    !finals.is_empty()
+        && finals
+            .into_iter()
+            .all(|(key, value)| originals.get(&key) == Some(&value))
 }
 
 /// The path and payload admission shared by the one-shot and run planners.
@@ -442,7 +580,7 @@ fn shape_plan(
         return Ok(None);
     }
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let staged_bytes = values.charge();
+    let mut staged_bytes = values.charge();
     bound(
         LimitKind::StagedBytes,
         staged_bytes,
@@ -509,10 +647,19 @@ fn shape_plan(
         } else {
             None
         };
+    let current_text = values.text.as_ref().and_then(|_| {
+        common.text().map(|text| {
+            if file.signature() == crate::format::signature::Signature::Signed {
+                std::borrow::Cow::Owned(text.to_owned())
+            } else {
+                std::borrow::Cow::Borrowed(text)
+            }
+        })
+    });
     let mut changed = values
         .text
         .as_deref()
-        .is_some_and(|text| common.text() != Some(text));
+        .is_some_and(|text| current_text.as_deref() != Some(text));
     if let Some(requested) = values.geometry[0]
         && current_bounds.is_none_or(|bounds| bounds.0 != requested)
     {
@@ -533,6 +680,9 @@ fn shape_plan(
     {
         changed = true;
     }
+    let original_text = (file.signature() == crate::format::signature::Signature::Signed)
+        .then_some(current_text)
+        .flatten();
     Ok(Some(Plan {
         target: Target {
             slot: true,
@@ -545,6 +695,7 @@ fn shape_plan(
         changed,
         reported: false,
         staged_bytes,
+        original_text,
         notes: false,
     }))
 }
@@ -628,7 +779,7 @@ fn format_plan(
     scene_cache: &mut Option<(usize, CachedScene)>,
 ) -> Result<Option<Plan>> {
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let staged_bytes = values.charge();
+    let mut staged_bytes = values.charge();
     bound(
         LimitKind::StagedBytes,
         staged_bytes,
@@ -656,13 +807,14 @@ fn format_plan(
         return Ok(None);
     };
     let shape = handle.position();
-    let (target, scope, changed) = match scope {
+    let (target, scope, changed, original_text) = match scope {
         Scope::Shape => (
             TextTarget::Shape { shape },
             Scope::Shape,
             body.paragraphs
                 .iter()
                 .any(|paragraph| values.paragraph_changed(paragraph)),
+            None,
         ),
         Scope::Paragraph(index) => {
             let Some(paragraph) = body.paragraphs.get(index) else {
@@ -675,6 +827,9 @@ fn format_plan(
                 },
                 Scope::Paragraph(index),
                 paragraph_changed(&values, paragraph),
+                (file.signature() == crate::format::signature::Signature::Signed
+                    && values.text().is_some())
+                .then(|| paragraph.text()),
             )
         },
         Scope::Run(paragraph_index, ordinal) => {
@@ -698,6 +853,9 @@ fn format_plan(
                 },
                 Scope::Run(paragraph_index, index),
                 values.run_changed(run),
+                (file.signature() == crate::format::signature::Signature::Signed
+                    && values.text().is_some())
+                .then(|| run.text.clone()),
             )
         },
         // Cell scopes are planned by `story_plan`.
@@ -719,6 +877,7 @@ fn format_plan(
         changed,
         reported: false,
         staged_bytes,
+        original_text,
         notes: false,
     }))
 }
@@ -841,7 +1000,7 @@ fn story_plan(
         return Ok(None);
     }
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let staged_bytes = values.charge();
+    let mut staged_bytes = values.charge();
     bound(
         LimitKind::StagedBytes,
         staged_bytes,
@@ -862,13 +1021,33 @@ fn story_plan(
             "PPTX shape scene cache was lost during admission",
         ));
     };
-    let (shape, target, scope, changed) = match story.cell {
+    let (shape, target, scope, changed, original_text) = match story.cell {
         None => {
-            if cached.notes.is_none() {
-                let body = file.notes_body(story.slide, || read_notes(file, story.slide))?;
+            let notes_was_cached = cached.notes.is_some();
+            if !notes_was_cached {
+                let capture_text = file.signature() == crate::format::signature::Signature::Signed;
+                let remaining = limits.max_staged_bytes().saturating_sub(staged_bytes);
+                let body = file.notes_body(story.slide, || {
+                    read_notes(file, story.slide, capture_text, remaining)
+                })?;
                 cached.notes = Some(body);
             }
-            let Some(Some((position, index))) = &cached.notes else {
+            if !notes_was_cached {
+                let charge = cached
+                    .notes
+                    .as_ref()
+                    .and_then(|notes| notes.as_ref())
+                    .and_then(|(_, _, body)| body.as_ref())
+                    .map(body_capture_charge)
+                    .unwrap_or(0);
+                staged_bytes = staged_bytes.saturating_add(charge);
+                bound(
+                    LimitKind::StagedBytes,
+                    staged_bytes,
+                    limits.max_staged_bytes(),
+                )?;
+            }
+            let Some(Some((position, index, body))) = &cached.notes else {
                 return Ok(None);
             };
             // The paragraph and listed run the text step names, and the
@@ -885,6 +1064,9 @@ fn story_plan(
             };
             let shape = Position::new(*position);
             let changed = false;
+            let original_text = body
+                .as_ref()
+                .and_then(|body| story_text(body, story.paragraph, story.run));
             let (target, scope) = match run {
                 None => (
                     TextTarget::Paragraph {
@@ -902,7 +1084,7 @@ fn story_plan(
                     Scope::Run(paragraph, run),
                 ),
             };
-            (shape, target, scope, changed)
+            (shape, target, scope, changed, original_text)
         },
         Some((table, row, column)) => {
             let Some(&frame) = cached.tables.get(table) else {
@@ -911,13 +1093,24 @@ fn story_plan(
             let cells = match cached.cells.get(&frame) {
                 Some(cells) => Arc::clone(cells),
                 None => {
-                    let Some(cells) =
-                        file.table_cells(story.slide, frame, || read_cells(cached, frame))?
+                    let capture_text =
+                        file.signature() == crate::format::signature::Signature::Signed;
+                    let remaining = limits.max_staged_bytes().saturating_sub(staged_bytes);
+                    let Some(cells) = file.table_cells(story.slide, frame, || {
+                        read_cells(cached, frame, capture_text, remaining)
+                    })?
                     else {
                         return Ok(None);
                     };
                     cached.cells.try_reserve(1).map_err(allocation)?;
+                    let capture_charge = cells.capture_charge();
                     cached.cells.insert(frame, Arc::clone(&cells));
+                    staged_bytes = staged_bytes.saturating_add(capture_charge);
+                    bound(
+                        LimitKind::StagedBytes,
+                        staged_bytes,
+                        limits.max_staged_bytes(),
+                    )?;
                     cells
                 },
             };
@@ -926,6 +1119,10 @@ fn story_plan(
                 return Ok(None);
             }
             let shape = Position::new(frame);
+            let original_text = cells.bodies.as_ref().and_then(|bodies| {
+                let body = bodies.get(row)?.get(column)?.as_ref()?;
+                story_text(body, story.paragraph, story.run)
+            });
             let (row_at, column_at) = (Position::new(row), Position::new(column));
             // The leaf reports the change when the run stages the plan
             // (record 0348).
@@ -940,6 +1137,7 @@ fn story_plan(
                     },
                     Scope::Cell(row, column),
                     unknown,
+                    original_text,
                 ),
                 (Some(paragraph), run) => {
                     if index
@@ -959,6 +1157,7 @@ fn story_plan(
                             },
                             Scope::CellParagraph(row, column, paragraph),
                             unknown,
+                            original_text,
                         ),
                         Some(ordinal) => {
                             let Some(run) = index.text_run(row, column, paragraph, ordinal) else {
@@ -975,6 +1174,7 @@ fn story_plan(
                                 },
                                 Scope::CellRun(row, column, paragraph, run),
                                 unknown,
+                                original_text,
                             )
                         },
                     }
@@ -998,6 +1198,7 @@ fn story_plan(
         changed,
         reported: true,
         staged_bytes,
+        original_text,
         notes,
     }))
 }
@@ -1103,7 +1304,12 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
 }
 
 /// Read slide `slide`'s notes body placeholder (record 0346).
-fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
+fn read_notes(
+    file: &Pptx,
+    slide: usize,
+    capture_text: bool,
+    max_staged_bytes: usize,
+) -> Result<NotesBody> {
     // As the navigator resolves `/slide[N]/notes/paragraph[K]`: the notes
     // page must have notes text, and its first body placeholder holds the
     // paragraphs (record 0348).
@@ -1121,7 +1327,22 @@ fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
         // `Slide::notes` has read the body (its text): its structure is
         // indexed without reading it again (record 0348).
         Some(handle) => match handle.view().common().read_text_index() {
-            Ok(Some(index)) => Some((handle.position().get(), Arc::new(index))),
+            Ok(Some(index)) => {
+                let body = if capture_text {
+                    let body = handle.view().common().text_body()?;
+                    if let Some(body) = &body {
+                        bound(
+                            LimitKind::StagedBytes,
+                            body_capture_charge(body),
+                            max_staged_bytes,
+                        )?;
+                    }
+                    body.map(Arc::new)
+                } else {
+                    None
+                };
+                Some((handle.position().get(), Arc::new(index), body))
+            },
             _ => None,
         },
         None => None,
@@ -1129,7 +1350,12 @@ fn read_notes(file: &Pptx, slide: usize) -> Result<NotesBody> {
 }
 
 /// Read every cell of the table at scene position `position` once.
-fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>>> {
+fn read_cells(
+    cached: &CachedScene,
+    position: usize,
+    capture_text: bool,
+    max_staged_bytes: usize,
+) -> Result<Option<Arc<Cells>>> {
     let Some(handle) = cached
         .scene
         .shape(Position::new(position))
@@ -1138,7 +1364,89 @@ fn read_cells(cached: &CachedScene, position: usize) -> Result<Option<Arc<Cells>
         return Ok(None);
     };
     let index = handle.cell_text_index()?;
-    Ok(Some(Arc::new(Cells { index })))
+    let bodies = if capture_text {
+        let rows = handle.table()?.cell_contents()?;
+        // Account for the complete retained shape before allocating any
+        // `Arc<Body>`. The caller passes the remaining run budget, so this
+        // preflight keeps a large signed table from bypassing the limit while
+        // a partially filled cache is still private.
+        let mut retained = std::mem::size_of::<Vec<CapturedRow>>().saturating_add(
+            rows.len()
+                .saturating_mul(std::mem::size_of::<CapturedRow>()),
+        );
+        for row in &rows {
+            retained = retained.saturating_add(
+                row.len()
+                    .saturating_mul(std::mem::size_of::<Option<CapturedBody>>()),
+            );
+            for (_, body) in row {
+                if let Some(body) = body {
+                    retained = retained.saturating_add(body_capture_charge(body));
+                }
+            }
+        }
+        if retained > max_staged_bytes {
+            return Err(TransactionError::Limit {
+                kind: LimitKind::StagedBytes,
+                observed: retained,
+                maximum: max_staged_bytes,
+            }
+            .into());
+        }
+        let mut output = Vec::new();
+        output.try_reserve_exact(rows.len()).map_err(allocation)?;
+        for row in rows {
+            let mut cells = Vec::new();
+            cells.try_reserve_exact(row.len()).map_err(allocation)?;
+            for (_, body) in row {
+                let Some(body) = body else {
+                    cells.push(None);
+                    continue;
+                };
+                cells.push(Some(Arc::new(body)));
+            }
+            output.push(cells);
+        }
+        Some(output)
+    } else {
+        None
+    };
+    Ok(Some(Arc::new(Cells { index, bodies })))
+}
+
+fn body_capture_charge(body: &litchi_drawingml::text::body::Body) -> usize {
+    let mut bytes = std::mem::size_of_val(body);
+    for paragraph in &body.paragraphs {
+        bytes = bytes
+            .saturating_add(std::mem::size_of_val(paragraph))
+            .saturating_add(
+                paragraph
+                    .runs
+                    .iter()
+                    .map(|run| {
+                        std::mem::size_of_val(run)
+                            .saturating_add(run.text.len())
+                            .saturating_add(std::mem::size_of_val(&run.properties))
+                    })
+                    .sum::<usize>(),
+            );
+    }
+    bytes
+}
+
+fn story_text(
+    body: &litchi_drawingml::text::body::Body,
+    paragraph: Option<usize>,
+    run: Option<usize>,
+) -> Option<String> {
+    let Some(paragraph) = paragraph else {
+        return Some(body.text());
+    };
+    let paragraph = body.paragraphs.get(paragraph)?;
+    match run {
+        Some(run) => paragraph.runs.get(run).map(|run| run.text.clone()),
+        None => Some(paragraph.text()),
+    }
 }
 
 fn direct_handle(cached: &CachedScene, kind: DirectKind, ordinal: usize) -> Result<Option<Handle>> {
@@ -1189,6 +1497,19 @@ fn stage_all(
             && left.plan.format.is_some() == right.plan.format.is_some()
             && left.plan.notes == right.plan.notes
     }) {
+        let duplicate = if run.iter().any(|item| item.plan.original_text.is_some()) {
+            let mut targets = HashSet::new();
+            run.iter().any(|item| !targets.insert(item.plan.key()))
+        } else {
+            false
+        };
+        if duplicate {
+            for item in run {
+                stage_one(edit, &item.plan)?;
+                operations = operations.saturating_add(1);
+            }
+            continue;
+        }
         if run[0].plan.notes {
             operations = operations.saturating_add(stage_notes(
                 edit,
@@ -1534,6 +1855,8 @@ fn commit_native(
             Ok((
                 after,
                 Commit {
+                    snapshot_bytes: 0,
+                    retained_cache: std::sync::OnceLock::new(),
                     after: commit_after,
                     source,
                     target,
@@ -1558,6 +1881,8 @@ fn commit_native(
             Ok((
                 after,
                 Commit {
+                    snapshot_bytes: 0,
+                    retained_cache: std::sync::OnceLock::new(),
                     after: commit_after,
                     source,
                     target,
@@ -1590,7 +1915,11 @@ fn locate_failure(base: &Pptx, items: &[Item], error: Error) -> Error {
     ) {
         return error.with_item(first.index);
     }
-    let source = match base.editable_owner() {
+    let source = match if base.signature() == crate::format::signature::Signature::Signed {
+        base.editable_owner_for_write()
+    } else {
+        base.editable_owner()
+    } {
         Ok(source) => source,
         Err(error) => return error.with_item(first.index),
     };

@@ -5,6 +5,7 @@
 //! Source release keeps only the detached read projection and metadata.
 
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -132,6 +133,13 @@ impl Doc {
             package.source_version()?;
         }
         Ok(())
+    }
+
+    /// Check retained-source freshness for a mutation that may still prove an
+    /// exact signed no-op. A changed native result is rejected at publish,
+    /// after the editor establishes whether the request changed bytes.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        self.check_source()
     }
 
     /// Whether two handles point at the same retained source snapshot.  Byte
@@ -383,6 +391,53 @@ impl Doc {
         Ok(Some(package.clone()))
     }
 
+    /// Return the retained native owner for a setter that may prove an exact
+    /// signed no-op. Removal-authorized handles still explicitly remove the
+    /// signature before publishing; a signed handle keeps its original
+    /// compound source until a changed result is refused.
+    pub(crate) fn editable_package_for_write(&self) -> Result<Option<litchi_doc::Package>> {
+        self.check_source_for_write()?;
+        let DocSource::Retained(package) = &self.0.source else {
+            return Ok(None);
+        };
+        if matches!(
+            self.0.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
+            let bytes = signature::unsign_compound_file(
+                package.to_bytes()?,
+                litchi_sign::cfb::Format::Doc,
+            )?;
+            return Ok(Some(litchi_doc::Package::from_bytes_with_options(
+                &bytes,
+                litchi_doc::OpenOptions::default()
+                    .source_limits(package.source_limits())
+                    .leniency(package.leniency()),
+            )?));
+        }
+        Ok(Some(package.clone()))
+    }
+
+    /// Return the retained native package for a canonical signed no-op patch.
+    ///
+    /// The write editor above deliberately removes signature storages so a
+    /// changed publication can never carry them forward.  An exact logical
+    /// cancellation needs an empty native patch whose source is the original
+    /// signed compound artifact, however; keeping that source identity is
+    /// what lets native replay and the unified history agree.
+    pub(crate) fn original_package_for_noop(&self) -> Result<litchi_doc::Package> {
+        self.check_source_for_write()?;
+        match &self.0.source {
+            DocSource::Retained(package) => Ok(package.clone()),
+            DocSource::Released => Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the DOC source was released before signed no-op replay",
+            )
+            .with_format(FileFormat::Doc)
+            .with_suggestion("reopen the document with source retention enabled")),
+        }
+    }
+
     /// Apply properties to one target or every match of a scoped query in
     /// one native body transaction (see [`edit`]).
     pub(crate) fn set<'p, 'v>(
@@ -420,12 +475,38 @@ impl Doc {
     }
 
     /// The length of the retained input, or `None` when it was released.
-    #[cfg(test)]
-    fn retained_source_len(&self) -> Option<u64> {
+    /// This is an O(1) lower-bound probe used before a source-backed native
+    /// editor is allocated; the commit path still checks the exact retained
+    /// patch after staging.
+    pub(crate) fn retained_source_len(&self) -> Option<u64> {
         match &self.0.source {
             DocSource::Retained(package) => Some(package.shared_source().file_size()),
             DocSource::Released => None,
         }
+    }
+
+    /// Check the source, edit owner and caller-authored staging against the
+    /// remaining snapshot budget before a DOC body editor can copy the CFB or
+    /// build its immutable body snapshot.  The exact patch charge remains the
+    /// publication check; this bound covers the live native edit handoff too.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let source = self
+            .retained_source_len()
+            .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
+        let observed = source
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_doc::Patch>())
+            .saturating_add(size_of::<litchi_doc::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -446,9 +527,18 @@ fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOp
     litchi_doc::EditOptions::default().transaction_limits(transaction_limits)
 }
 
-fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
+/// Keep the native DOC render handoff inside the transaction's remaining
+/// snapshot budget. The body editor retains its source image while a rendered
+/// candidate is live, so giving it the complete remaining ceiling would allow
+/// the source and candidate to coexist above the facade limit before commit's
+/// exact patch check runs.
+pub(crate) fn body_transaction_limits_with_source(
+    limits: SemanticLimits,
+    source_bytes: usize,
+    snapshot_budget: usize,
+) -> BodyTransactionLimits {
     BodyTransactionLimits::new(limits.max_operations(), usize::MAX, usize::MAX)
-        .with_max_retained_render_bytes(limits.max_snapshot_bytes())
+        .with_max_retained_render_bytes(snapshot_budget.saturating_sub(source_bytes))
 }
 
 impl std::fmt::Debug for Doc {

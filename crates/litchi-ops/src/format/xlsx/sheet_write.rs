@@ -13,7 +13,7 @@ use litchi_xlsx::{self as xlsx, Name};
 
 use super::node::Node;
 use super::spec::{Kind, SHEET_WRITE_TABLE, SheetSetter};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::props::Props;
@@ -51,7 +51,7 @@ pub(crate) fn try_set_sheet(
     if direct_cell_or_range_path(target) {
         return Ok(None);
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     let result = (|| {
         let Some(positions) = resolve_sheet_targets(file, target, limits)? else {
             return Ok(None);
@@ -70,8 +70,9 @@ pub(crate) fn try_set_sheet(
 
         // The native edit validates signed/encrypted/retained-source policy
         // and keeps rename/visibility changes in one atomic workbook edit.
-        let source = file.editor()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let names = file.worksheet_names()?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         for position in positions {
             let Some(mut tab) = edit.tab(position).map_err(native_error)? else {
                 return Err(Error::new(
@@ -80,7 +81,11 @@ pub(crate) fn try_set_sheet(
                 )
                 .with_format(FileFormat::Xlsx));
             };
-            if let Some(name) = assignments.name.as_ref() {
+            if let Some(name) = assignments.name.as_ref()
+                && names
+                    .get(position)
+                    .is_none_or(|current| current.as_str() != name.as_str())
+            {
                 tab.rename(name.clone()).map_err(native_error)?;
             }
             if let Some(hidden) = assignments.hidden {
@@ -92,9 +97,9 @@ pub(crate) fn try_set_sheet(
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(file, source, native).map(Some)
+        Commit::from_native_with_limit(file, source, native, limits.max_snapshot_bytes()).map(Some)
     })();
-    file.check_source()?;
+    file.check_source_for_replay()?;
     result
 }
 
@@ -146,8 +151,8 @@ impl Xlsx {
                 None => return Ok(None),
             }
         };
-        let source = self.editor()?;
-        let base = middle.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let base = middle.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut edit = base.edit_auto_filter()?;
         for position in positions {
             let value = filter
@@ -162,12 +167,22 @@ impl Xlsx {
                 .map_err(|error| native_property_error(error, "autoFilter"))?;
         }
         let target = edit.commit()?.into_package();
-        let after = if source.same_content(&target).map_err(native_error)? {
-            self.clone()
-        } else {
+        let changed = !source.same_content(&target).map_err(native_error)?;
+        let after = if changed {
             middle.adopt_workbook(target.clone())
+        } else {
+            self.clone()
         };
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self,
+            after,
+            source,
+            target,
+            changed,
+            1,
+            0,
+            limits.max_snapshot_bytes(),
+        )?))
     }
 }
 
@@ -239,7 +254,7 @@ pub(super) fn resolve_sheet_targets(
             _ => return Err(unsupported_target(node)),
         }
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     if !matched {
         return Err(Error::new(
             Code::ZeroMatches,

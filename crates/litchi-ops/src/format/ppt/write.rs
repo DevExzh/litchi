@@ -12,6 +12,7 @@ mod elements;
 pub(crate) mod find;
 
 use std::collections::HashSet;
+use std::mem::size_of;
 
 use litchi_core::{FileFormat, Position};
 use litchi_ppt::Anchor;
@@ -170,7 +171,21 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    set_with_snapshot_budget(file, target, props, limits, limits.max_snapshot_bytes())
+}
+
+/// Set one PPT target with the snapshot budget left by an outer transaction.
+/// The budget is threaded to the native editor preflight so a previous leaf
+/// cannot consume the full per-transaction limit before this editor captures
+/// its before image.
+pub(crate) fn set_with_snapshot_budget<'p, 'v>(
+    file: &Ppt,
+    target: TargetArg<'p>,
+    props: impl IntoProps<'v>,
+    limits: &SemanticLimits,
+    snapshot_budget: usize,
+) -> Result<WriteCommit> {
+    file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
     if crate::format::ole_metadata::is_target(&target) {
         return file.set_metadata(&props, limits);
@@ -180,8 +195,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return commit;
     }
     let plans = build_plans(nodes, &props, limits)?;
-    let native = stage_plans(file, plans, limits)?;
-    file.check_source()?;
+    let native = stage_plans(file, plans, limits, snapshot_budget)?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -197,7 +212,7 @@ pub(crate) fn remove_with_limits(
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let nodes = resolve_remove_nodes(file, &target, limits)?;
     if nodes
         .first()
@@ -236,7 +251,7 @@ pub(crate) fn remove_with_limits(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -254,7 +269,7 @@ pub(crate) fn add_with_limits(
     node: crate::NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
     if node.kind().eq_ignore_ascii_case("comment") {
         return elements::add_comment(file, &parent, &node, limits);
@@ -338,7 +353,7 @@ pub(crate) fn add_with_limits(
     let native = stage_structural(file, 1, limits, move |edit| {
         edit.insert_slide(Position::new(position))
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     let commit = finish_commit(file, native, limits)?;
     Ok((
         commit,
@@ -358,7 +373,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     placement: Placement<'q>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let from = resolve_slide_path(file, &path)?;
     let count = file.slide_count()?;
     let destination = move_destination(file, from, count, &placement)?;
@@ -369,7 +384,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -385,7 +400,7 @@ pub(crate) fn swap_with_limits<'p, 'q>(
     right: PathArg<'q>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let left = resolve_slide_path(file, &left)?;
     let right = resolve_slide_path(file, &right)?;
     let operations = if left == right {
@@ -408,7 +423,7 @@ pub(crate) fn swap_with_limits<'p, 'q>(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -438,7 +453,7 @@ fn resolve_nodes<'f>(
     } else {
         return Err(empty_target());
     }
-    file.check_source()?;
+    file.check_source_for_write()?;
     if nodes.is_empty() {
         return Err(
             Error::new(Code::ZeroMatches, "mutation selector matched no element")
@@ -486,7 +501,7 @@ fn resolve_remove_nodes<'f>(
     } else {
         return Err(empty_target());
     }
-    file.check_source()?;
+    file.check_source_for_write()?;
     if nodes.is_empty() {
         return Err(
             Error::new(Code::ZeroMatches, "mutation selector matched no slide")
@@ -1261,14 +1276,17 @@ where
             maximum,
         }));
     }
-    let package = file.editable_package()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
-    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
-    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+    let before_bytes = file.retained_source_len().unwrap_or(0);
+    let minimum = before_bytes
+        .saturating_mul(2)
+        .saturating_add(size_of::<litchi_ppt::Patch>());
     if minimum > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
     }
+    let package =
+        file.editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     stage(&mut edit).map_err(native_edit_error)?;
     edit.commit().map_err(native_edit_error)
@@ -1278,6 +1296,7 @@ fn stage_plans(
     file: &Ppt,
     plans: Vec<Plan>,
     limits: &SemanticLimits,
+    snapshot_budget: usize,
 ) -> Result<litchi_ppt::Commit> {
     let operations = plans
         .iter()
@@ -1296,14 +1315,16 @@ fn stage_plans(
             maximum,
         }));
     }
-    let package = file.editable_package()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
-    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
-    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
-    if minimum > limits.max_snapshot_bytes() {
-        return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+    let before_bytes = file.retained_source_len().unwrap_or(0);
+    let minimum = before_bytes
+        .saturating_mul(2)
+        .saturating_add(size_of::<litchi_ppt::Patch>());
+    if minimum > snapshot_budget {
+        return Err(snapshot_limit(minimum, snapshot_budget));
     }
+    let package = file.editable_package_for_write_with_snapshot_limit(snapshot_budget)?;
     let mut edit = package.edit().map_err(native_edit_error)?;
     if plans.len() > 1
         && plans.iter().all(|plan| {
@@ -1368,18 +1389,49 @@ fn finish_commit(
     native: litchi_ppt::Commit,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.check_source()?;
+    file.check_source_for_write()?;
     let changed = !native.patch().is_noop();
     let operations = native.patch().operation_count().max(usize::from(changed));
+    let native_snapshot_bytes = native
+        .patch()
+        .before()
+        .len()
+        .saturating_add(native.patch().after().len())
+        .saturating_add(size_of::<litchi_ppt::Patch>());
+    if native_snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(
+            native_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        ));
+    }
     if 1 > limits.max_operations() {
         return Err(operation_limit(1, limits.max_operations()));
     }
-    let (package, patch) = native.into_parts();
-    let snapshot_bytes = patch
-        .before()
-        .len()
-        .saturating_add(patch.after().len())
-        .saturating_add(size_of::<litchi_ppt::Patch>());
+    let (package, patch) =
+        if !changed && file.signature() == crate::format::signature::Signature::Signed {
+            // The ordinary writer edits an unsigned private package so a changed
+            // publication can never carry signature streams forward.  A true
+            // no-op must retain a native patch whose before image is the original
+            // signed artifact; otherwise leaf replay would compare against the
+            // private unsigned image and the facade would lose content identity.
+            let original = file.original_package_for_noop()?;
+            file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+            original
+                .edit()
+                .map_err(native_edit_error)?
+                .commit()
+                .map_err(native_edit_error)?
+                .into_parts()
+        } else {
+            native.into_parts()
+        };
+    let snapshot_bytes = native_snapshot_bytes.max(
+        patch
+            .before()
+            .len()
+            .saturating_add(patch.after().len())
+            .saturating_add(size_of::<litchi_ppt::Patch>()),
+    );
     if snapshot_bytes > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
     }
@@ -1388,7 +1440,7 @@ fn finish_commit(
     } else {
         file.clone()
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     Ok(WriteCommit {
         before: file.clone(),
         after,

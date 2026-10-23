@@ -88,6 +88,24 @@ struct CellTarget {
     formula: bool,
 }
 
+/// Stable cell identity for coalescing.  Presence is a property of the
+/// authored state, not of the address: remove/reinsert must resolve to this
+/// same key so a signed cancellation can be recognized.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CellIdentity {
+    sheet: usize,
+    reference: Reference,
+}
+
+impl CellTarget {
+    fn identity(self) -> CellIdentity {
+        CellIdentity {
+            sheet: self.sheet,
+            reference: self.reference,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum SheetAssignment {
     Name(String),
@@ -103,7 +121,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
 
     // `/metadata` names the document properties unless the call carries a
@@ -119,7 +137,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     } else {
         set_cells_with_limits(file, target, &props, limits)
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     result
 }
 
@@ -131,7 +149,7 @@ pub(crate) fn remove_with_limits(
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     if let Some(commit) = file.try_remove_feature(&target, limits)? {
         return Ok(commit);
     }
@@ -166,7 +184,11 @@ pub(crate) fn remove_with_limits(
         .with_format(FileFormat::Xls));
     }
 
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
+    let mut edit = file
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     for target in targets {
         if target.present {
             edit.remove_cell(
@@ -218,7 +240,18 @@ fn set_sheet_with_limits(
 
     let SheetAssignment::Name(name) = assignment;
     super::structure::validate_sheet_name(file, Some(position), &name)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    if file
+        .worksheet_names()?
+        .get(position)
+        .is_some_and(|current| current == &name)
+    {
+        return no_op(file, limits);
+    }
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
+    let mut edit = file
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     edit.rename_sheet(Selector::Position(Position::new(position)), &name)
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
@@ -252,7 +285,11 @@ fn set_cells_with_limits(
     if let CellAssignment::Format(change) = &plan.assignment {
         // Formatting rewrites only the cell's XF reference, so formula cells
         // and absent coordinates are admitted alike.
-        let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+        file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
+        let mut edit = file
+            .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
+            .edit()
+            .map_err(native_edit_error)?;
         for target in targets {
             edit.set_cell_format(
                 Selector::Position(Position::new(target.sheet)),
@@ -281,7 +318,11 @@ fn set_cells_with_limits(
         .with_property(property));
     }
 
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), staged)?;
+    let mut edit = file
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     if let CellAssignment::Formula(expression) = &plan.assignment {
         // Each coordinate is written once: an absent cell gains a Formula,
         // and a scalar cell is replaced with one keeping its XF.
@@ -902,14 +943,73 @@ pub(super) fn finish_commit(
     fallback_operations: usize,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.check_source()?;
+    file.check_source_for_write()?;
     let changed = native.diagnostics().changed();
-    let operations =
-        native
-            .diagnostics()
-            .operation_count()
-            .max(if changed { fallback_operations } else { 0 });
+    // Native diagnostics count physical edits and therefore become zero for
+    // an exact signed identity patch. Keep the authored leaf count as the
+    // fallback even when the final package is unchanged.
+    let operations = native
+        .diagnostics()
+        .operation_count()
+        .max(fallback_operations);
+    let native_snapshot_bytes = native.patch().retained_bytes();
+    if native_snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(
+            native_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        ));
+    }
     let (package, patch) = native.into_parts();
+    if !changed && file.signature() == crate::format::signature::Signature::Signed {
+        // The write owner is an unsigned private copy. Rebuild the identity
+        // patch over the retained signed package so native replay and the
+        // facade compare the same physical base bytes.
+        let original = file.original_package_for_noop()?;
+        let minimum = file
+            .retained_source_len()
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_xls::Patch>())
+            .saturating_add(size_of::<litchi_xls::package::edit::Edit>());
+        if minimum > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+        }
+        let (package, patch) = original
+            .edit()
+            .map_err(native_edit_error)?
+            .commit()
+            .map_err(native_edit_error)?
+            .into_parts();
+        return finish_parts(
+            file,
+            package,
+            patch,
+            operations,
+            fallback_operations,
+            native_snapshot_bytes,
+            limits,
+        );
+    }
+    finish_parts(
+        file,
+        package,
+        patch,
+        operations,
+        fallback_operations,
+        native_snapshot_bytes,
+        limits,
+    )
+}
+
+fn finish_parts(
+    file: &Xls,
+    package: litchi_xls::Package,
+    patch: litchi_xls::Patch,
+    operations: usize,
+    fallback_operations: usize,
+    prior_snapshot_bytes: usize,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    let changed = !patch.is_noop();
     // The public operation bound counts mutation calls, not the native
     // resource/cell operations needed to implement each call.
     if fallback_operations > limits.max_operations() {
@@ -918,7 +1018,7 @@ pub(super) fn finish_commit(
             limits.max_operations(),
         ));
     }
-    let snapshot_bytes = patch.retained_bytes();
+    let snapshot_bytes = prior_snapshot_bytes.max(patch.retained_bytes());
     if snapshot_bytes > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
     }
@@ -927,7 +1027,7 @@ pub(super) fn finish_commit(
     } else {
         file.clone()
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     Ok(WriteCommit {
         before: file.clone(),
         after,
@@ -939,7 +1039,7 @@ pub(super) fn finish_commit(
 
 fn no_op(file: &Xls, limits: &SemanticLimits) -> Result<WriteCommit> {
     let native = file
-        .editable_package()?
+        .editable_package_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?
         .edit()
         .map_err(native_edit_error)?
         .commit()
@@ -1110,9 +1210,9 @@ pub(crate) mod refresh;
 
 pub(crate) mod coalesce {
     use super::{
-        CellAssignment, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
+        CellAssignment, CellIdentity, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
         WRITE_ENTRY_OVERHEAD, Xls, admit_cell_property, cell_state_facts, finish_commit,
-        native_edit_error, native_value_error, staged_limit,
+        native_edit_error, native_value_error, snapshot_limit, staged_limit,
     };
     use crate::error::{Code, Error};
     use crate::props::Props;
@@ -1122,6 +1222,7 @@ pub(crate) mod coalesce {
     use litchi_xls::Package;
     use litchi_xls::cell_values::{Reference, Selector};
     use std::collections::HashSet;
+    use std::mem::size_of;
 
     #[derive(Debug, Clone)]
     pub(crate) enum Action {
@@ -1137,11 +1238,23 @@ pub(crate) mod coalesce {
         action: Action,
         staged_bytes: usize,
         changed: bool,
+        /// The authored scalar before this run.  Retaining it lets a signed
+        /// run prove a cancellation without comparing reserialized BIFF.
+        original: Option<NativeValue>,
+        /// Whether the authored cell existed in the original package.  This
+        /// stays separate from the staged target's current presence so a
+        /// remove/reinsert pair cannot turn an absent coordinate into a
+        /// false cancellation.
+        original_present: bool,
+        /// Stored errors and formulas do not have a comparable scalar value.
+        /// They remain barriers for signed cancellation even when a later
+        /// operation happens to produce `None`.
+        original_known: bool,
     }
 
     impl Plan {
-        fn key(&self) -> CellTarget {
-            self.target
+        fn key(&self) -> CellIdentity {
+            self.target.identity()
         }
 
         fn charge(&self) -> usize {
@@ -1160,10 +1273,12 @@ pub(crate) mod coalesce {
         source: Package,
         edit: litchi_xls::package::edit::Edit,
         items: Vec<Item>,
-        seen: HashSet<CellTarget>,
+        seen: HashSet<CellIdentity>,
         staged_bytes: usize,
         max_staged_bytes: usize,
         limits: SemanticLimits,
+        max_snapshot_bytes: usize,
+        allow_repeated: bool,
     }
 
     impl Xls {
@@ -1213,8 +1328,26 @@ pub(crate) mod coalesce {
                 ) {
                     return Ok(None);
                 }
-                let Some((target, current)) = direct_target(self, target, limits, source)? else {
+                let spelling = target;
+                let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
+                };
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
+                // A coalesced signed run resolves each command through its
+                // staged native edit so later commands see earlier values.
+                // The cancellation proof must retain the value from the
+                // original package, however; otherwise a changed-then-restored
+                // cell would compare against the changed intermediate value
+                // and lose the exact signed no-op route.
+                let (original_target, original) = if signed && source.is_some() {
+                    let Some((original_target, original)) =
+                        direct_target(self, spelling, limits, None)?
+                    else {
+                        return Ok(None);
+                    };
+                    (original_target, original)
+                } else {
+                    (target, signed.then(|| current.clone()))
                 };
                 // Formula cells are deliberately left to the ordinary setter,
                 // which reports the dependency-aware unsupported capability.
@@ -1248,11 +1381,15 @@ pub(crate) mod coalesce {
                     | CellAssignment::Format(_)
                     | CellAssignment::Noop => return Ok(None),
                 };
+                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     target,
                     action,
                     staged_bytes: admitted.staged_bytes,
                     changed,
+                    original,
+                    original_present: signed && original_target.present,
+                    original_known,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1300,8 +1437,20 @@ pub(crate) mod coalesce {
                 if step.cell_ref().is_none() {
                     return Ok(None);
                 }
-                let Some((target, _)) = direct_target(self, target, limits, source)? else {
+                let spelling = target;
+                let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
+                };
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
+                let (original_target, original) = if signed && source.is_some() {
+                    let Some((original_target, original)) =
+                        direct_target(self, spelling, limits, None)?
+                    else {
+                        return Ok(None);
+                    };
+                    (original_target, original)
+                } else {
+                    (target, signed.then(|| current.clone()))
                 };
                 if target.formula {
                     return Ok(None);
@@ -1315,6 +1464,7 @@ pub(crate) mod coalesce {
                         limits.max_staged_bytes(),
                     ));
                 }
+                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     action: if target.present {
                         Action::Remove
@@ -1324,6 +1474,9 @@ pub(crate) mod coalesce {
                     target,
                     staged_bytes: WRITE_ENTRY_OVERHEAD,
                     changed: target.present,
+                    original,
+                    original_present: signed && original_target.present,
+                    original_known,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1331,11 +1484,23 @@ pub(crate) mod coalesce {
     }
 
     impl Run {
-        pub(crate) fn new(base: &Xls, limits: &SemanticLimits) -> Result<Self> {
-            base.check_source()?;
-            let source = base.editable_package()?;
+        pub(crate) fn new(
+            base: &Xls,
+            limits: &SemanticLimits,
+            remaining_snapshot: usize,
+        ) -> Result<Self> {
+            base.check_source_for_write()?;
+            let source_bytes = base.retained_source_len();
+            let minimum = source_bytes
+                .saturating_mul(2)
+                .saturating_add(size_of::<litchi_xls::Patch>())
+                .saturating_add(size_of::<litchi_xls::package::edit::Edit>());
+            if minimum > remaining_snapshot {
+                return Err(snapshot_limit(minimum, remaining_snapshot));
+            }
+            let source = base.editable_package_for_write_with_snapshot_limit(remaining_snapshot)?;
             let edit = source.edit().map_err(native_edit_error)?;
-            base.check_source()?;
+            base.check_source_for_write()?;
             Ok(Self {
                 base: base.clone(),
                 source,
@@ -1345,6 +1510,8 @@ pub(crate) mod coalesce {
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 limits: *limits,
+                max_snapshot_bytes: remaining_snapshot,
+                allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
             })
         }
 
@@ -1372,7 +1539,11 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
-            self.seen.contains(&plan.key())
+            // A signed cancellation may repeat an originally stored cell
+            // even after an intermediate remove made the staged target
+            // absent. Original absence stays a barrier so insertion is never
+            // mistaken for restoring a missing coordinate.
+            (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1380,7 +1551,7 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            if self.seen.contains(&plan.key())
+            if (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1391,6 +1562,21 @@ pub(crate) mod coalesce {
                     "XLS cell coalescing barrier was not flushed",
                 )
                 .with_format(FileFormat::Xls));
+            }
+            let staged = self
+                .staged_bytes
+                .saturating_add(plan.charge())
+                .saturating_add(size_of::<NativeValue>());
+            let observed = self
+                .base
+                .retained_source_len()
+                .saturating_mul(2)
+                .saturating_add(size_of::<litchi_xls::Patch>())
+                .saturating_add(size_of::<litchi_xls::package::edit::Edit>())
+                .saturating_add(staged)
+                .saturating_add(size_of::<Item>());
+            if observed > self.max_snapshot_bytes {
+                return Err(snapshot_limit(observed, self.max_snapshot_bytes));
             }
             // Staging reads no source: the run checks it when it opens and
             // around its commit (record 0337).
@@ -1448,19 +1634,82 @@ pub(crate) mod coalesce {
                 edit,
                 items,
                 limits,
+                max_snapshot_bytes,
+                allow_repeated,
                 ..
             } = self;
-            base.check_source()?;
+            let snapshot_limits = limits.with_snapshot_budget(max_snapshot_bytes);
+            let logical_noop = if allow_repeated {
+                logical_noop(&items)
+            } else {
+                false
+            };
+            let original = if logical_noop {
+                Some(base.original_package_for_noop()?)
+            } else {
+                None
+            };
+            base.check_source_for_write()?;
             let result = edit
                 .commit()
                 .map_err(native_edit_error)
-                .and_then(|native| finish_commit(&base, native, items.len(), &limits));
-            let freshness = base.check_source();
+                .and_then(|native| finish_commit(&base, native, items.len(), &snapshot_limits))
+                .and_then(|commit| {
+                    if logical_noop {
+                        let staged_snapshot_bytes = commit.snapshot_bytes;
+                        let original = original
+                            .as_ref()
+                            .ok_or_else(|| Error::signed(FileFormat::Xls))?;
+                        let empty = original
+                            .edit()
+                            .map_err(native_edit_error)?
+                            .commit()
+                            .map_err(native_edit_error)?;
+                        let mut commit =
+                            finish_commit(&base, empty, items.len(), &snapshot_limits)?;
+                        commit.operations = items.len();
+                        commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
+                        Ok(commit)
+                    } else {
+                        Ok(commit)
+                    }
+                });
+            let freshness = base.check_source_for_write();
             match freshness.and(result) {
                 Ok(commit) => Ok((base, commit)),
                 Err(error) => Err(locate_failure(&base, &source, &items, error)),
             }
         }
+    }
+
+    fn logical_noop(items: &[Item]) -> bool {
+        type State = (bool, bool, Option<NativeValue>);
+        let mut final_values = std::collections::HashMap::<CellIdentity, State>::new();
+        let mut originals = std::collections::HashMap::<CellIdentity, State>::new();
+        for item in items {
+            let plan = &item.plan;
+            let key = plan.key();
+            let original = originals.entry(key).or_insert_with(|| {
+                (
+                    plan.original_present,
+                    plan.original_known,
+                    plan.original.clone(),
+                )
+            });
+            let state = final_values.entry(key).or_insert_with(|| original.clone());
+            match &plan.action {
+                Action::Set(value) => *state = (true, true, Some(value.clone())),
+                Action::Clear if plan.target.present => {
+                    *state = (true, true, Some(NativeValue::Blank));
+                },
+                Action::Remove if plan.target.present => *state = (false, true, None),
+                Action::Clear | Action::Remove | Action::Noop => {},
+            }
+        }
+        !final_values.is_empty()
+            && final_values
+                .into_iter()
+                .all(|(key, value)| value.1 && originals.get(&key) == Some(&value))
     }
 
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
@@ -1494,13 +1743,13 @@ pub(crate) mod coalesce {
     }
 
     fn replay(base: &Xls, source: &Package, items: &[Item]) -> Result<Package> {
-        base.check_source()?;
+        base.check_source_for_write()?;
         let mut edit = source.edit().map_err(native_edit_error)?;
         for item in items {
             apply_item(&mut edit, item).map_err(|error| error.with_item(item.index))?;
         }
         let package = edit.commit().map_err(native_edit_error)?.into_package();
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(package)
     }
 

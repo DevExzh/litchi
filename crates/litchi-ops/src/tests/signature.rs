@@ -632,6 +632,932 @@ fn assert_exact_noop(input: &Input) {
     }
 }
 
+/// Return the readable leaf below the signed facade. The leaf keeps its
+/// format signature disposition, so direct setter tests exercise the same
+/// source owner and publication path exposed by the signed facade.
+fn signed_leaf(file: &File) -> File {
+    match file {
+        File::Signed(signed) => signed.file().clone(),
+        other => panic!("expected a signed facade, got {other:?}"),
+    }
+}
+
+fn signed_name(file: &File, path: &str) -> String {
+    file.get(path)
+        .unwrap_or_else(|error| panic!("resolve {path}: {error}"))
+        .view()
+        .format()
+        .unwrap_or_else(|error| panic!("read {path}: {error}"))
+        .find(|property| property.key() == "name")
+        .map(|property| property.value().to_string())
+        .unwrap_or_else(|| panic!("{path} has no name property"))
+}
+
+/// Find a small plain-text cell for legacy workbook cancellation coverage.
+/// The signed XLS fixture intentionally contains formulas and packed numeric
+/// records, so the test must choose an authored scalar rather than assuming
+/// that A1 is writable by the coalesced value family.
+fn signed_text_cell(file: &File) -> Option<(String, String)> {
+    for row in 0..12 {
+        for column in 0..8 {
+            let mut label = String::new();
+            let mut value = column + 1;
+            while value > 0 {
+                let digit = (value - 1) % 26;
+                label.push(char::from(b'A' + u8::try_from(digit).ok()?));
+                value = (value - 1) / 26;
+            }
+            let column = label.chars().rev().collect::<String>();
+            let path = format!("/sheet[1]/{column}{}", row + 1);
+            let Ok(node) = file.get(path.as_str()) else {
+                continue;
+            };
+            let mut type_name = None;
+            let mut formula = false;
+            let Ok(format) = node.view().format() else {
+                continue;
+            };
+            for property in format {
+                if property.key().eq_ignore_ascii_case("type") {
+                    type_name = Some(property.value().to_string());
+                }
+                formula |= property.key().eq_ignore_ascii_case("formula");
+            }
+            if formula
+                || !type_name.as_deref().is_some_and(|kind| {
+                    kind.eq_ignore_ascii_case("string")
+                        || kind.eq_ignore_ascii_case("sharedstring")
+                        || kind.eq_ignore_ascii_case("text")
+                })
+            {
+                continue;
+            }
+            let Ok(text) = node.view().text() else {
+                continue;
+            };
+            let text = text.unwrap_or_default().into_owned();
+            return Some((path, text));
+        }
+    }
+    None
+}
+
+/// Find a coordinate with no stored cell record.  The signed spreadsheet
+/// tests use it to distinguish an absent cell from an authored cell whose
+/// value happens to equal the native default.
+fn signed_missing_cell(file: &File) -> Option<String> {
+    for row in 0..32 {
+        for column in 0..16 {
+            let mut label = String::new();
+            let mut value = column + 1;
+            while value > 0 {
+                let digit = (value - 1) % 26;
+                label.push(char::from(b'A' + u8::try_from(digit).ok()?));
+                value = (value - 1) / 26;
+            }
+            let column = label.chars().rev().collect::<String>();
+            let path = format!("/sheet[1]/{column}{}", row + 1);
+            let Ok(node) = file.get(path.as_str()) else {
+                continue;
+            };
+            let Ok(text) = node.view().text() else {
+                continue;
+            };
+            let missing_text = text
+                .as_deref()
+                .is_none_or(|text| text.is_empty() || text == "(empty)");
+            let Ok(format) = node.view().format() else {
+                continue;
+            };
+            if missing_text && format.into_iter().next().is_none() {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+#[cfg(feature = "pptx")]
+#[test]
+fn signed_pptx_shape_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Pptx)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/slide[1]/shape[1]";
+        let text = file
+            .get(path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap()
+            .into_owned();
+        let props = crate::props! { "text" => text.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed leaf no-op setter: {error:?}", input.label));
+        assert!(leaf_set.is_signed(), "{}: leaf lost signature", input.label);
+        assert_eq!(
+            leaf_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: leaf bytes",
+            input.label
+        );
+
+        let facade_set = file.set(path, props.clone()).unwrap_or_else(|error| {
+            panic!("{}: signed facade no-op setter: {error:?}", input.label)
+        });
+        assert!(
+            matches!(facade_set, File::Signed(_)),
+            "{}: facade unwrapped",
+            input.label
+        );
+        assert_eq!(
+            facade_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: facade bytes",
+            input.label
+        );
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): signed setter edit: {error:?}", input.label)
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(
+                commit.file().is_signed(),
+                "{} ({route}): lost signature",
+                input.label
+            );
+            assert_eq!(
+                commit.file().to_bytes().unwrap(),
+                input.bytes,
+                "{} ({route})",
+                input.label
+            );
+        }
+
+        let changed = format!("{text} changed");
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+        // A cancellation followed by a real change must remain a signed
+        // refusal. The final plan, rather than the first changed operation,
+        // decides whether the original signed bytes may be retained.
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())?;
+                    edit.set(path, crate::props! { "text" => changed.as_str() })
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Pptx,
+                &format!("{} ({route}) mixed signed edit", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "text" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Pptx,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn signed_docx_paragraph_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Docx)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/body/p[1]";
+        let text = file
+            .get(path)
+            .unwrap_or_else(|error| panic!("{}: resolve DOCX paragraph: {error:?}", input.label))
+            .view()
+            .text()
+            .unwrap_or_else(|error| panic!("{}: read DOCX paragraph: {error:?}", input.label))
+            .unwrap_or_default()
+            .into_owned();
+        let props = crate::props! { "text" => text.as_str() };
+        let leaf = signed_leaf(&file);
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let updated = candidate.set(path, props.clone()).unwrap_or_else(|error| {
+                panic!(
+                    "{} ({route}): DOCX signed no-op setter: {error:?}",
+                    input.label
+                )
+            });
+            assert!(
+                updated.is_signed(),
+                "{} ({route}): lost signature",
+                input.label
+            );
+            assert_eq!(updated.to_bytes().unwrap(), input.bytes);
+
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): DOCX signed edit: {error:?}", input.label)
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(commit.file().is_signed(), "{} ({route})", input.label);
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let restored = commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed no-op inverse replay: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(restored.is_signed(), "{} ({route})", input.label);
+            assert_eq!(restored.to_bytes().unwrap(), input.bytes);
+        }
+
+        let changed = format!("{text} changed");
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed cancellation: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(commit.file().is_signed(), "{} ({route})", input.label);
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let restored = commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed cancellation inverse replay: {error:?}",
+                        input.label
+                    )
+                });
+            assert_eq!(restored.to_bytes().unwrap(), input.bytes);
+
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())?;
+                    edit.set(path, crate::props! { "text" => changed.as_str() })
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Docx,
+                &format!("{} ({route}) mixed signed DOCX edit", input.label),
+            );
+            assert_eq!(
+                candidate.to_bytes().unwrap(),
+                input.bytes,
+                "{} ({route}): changed signed DOCX edit published bytes",
+                input.label
+            );
+        }
+    }
+}
+
+#[cfg(feature = "xlsx")]
+#[test]
+fn signed_xlsx_sheet_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Xlsx)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/sheet[1]";
+        let name = signed_name(&file, path);
+        let props = crate::props! { "name" => name.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed leaf no-op setter: {error:?}", input.label));
+        assert!(leaf_set.is_signed(), "{}: leaf lost signature", input.label);
+        assert_eq!(
+            leaf_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: leaf bytes",
+            input.label
+        );
+
+        let facade_set = file.set(path, props.clone()).unwrap_or_else(|error| {
+            panic!("{}: signed facade no-op setter: {error:?}", input.label)
+        });
+        assert!(
+            matches!(facade_set, File::Signed(_)),
+            "{}: facade unwrapped",
+            input.label
+        );
+        assert_eq!(
+            facade_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: facade bytes",
+            input.label
+        );
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): signed setter edit: {error:?}", input.label)
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(
+                commit.file().is_signed(),
+                "{} ({route}): lost signature",
+                input.label
+            );
+            assert_eq!(
+                commit.file().to_bytes().unwrap(),
+                input.bytes,
+                "{} ({route})",
+                input.label
+            );
+        }
+
+        let changed = format!("{name} changed");
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_path = "/sheet[1]/A1";
+            let cell_text = candidate
+                .get(cell_path)
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): resolve cell: {error:?}", input.label)
+                })
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let cell_props = crate::props! { "value" => cell_text.as_str() };
+            let changed = format!("{cell_text} changed");
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(cell_path, crate::props! { "value" => changed.as_str() })?;
+                    edit.set(cell_path, cell_props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_path = "/sheet[1]/A1";
+            let cell_text = candidate
+                .get(cell_path)
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): resolve cell: {error:?}", input.label)
+                })
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let cell_props = crate::props! { "value" => cell_text.as_str() };
+            let cell_changed = format!("{cell_text} changed");
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(
+                        cell_path,
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )?;
+                    edit.set(cell_path, cell_props.clone())?;
+                    edit.set(
+                        cell_path,
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsx,
+                &format!("{} ({route}) mixed signed cell edit", input.label),
+            );
+        }
+        let missing_path = signed_missing_cell(&file)
+            .unwrap_or_else(|| panic!("{}: signed XLSX fixture has no absent cell", input.label));
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let error = candidate
+                .set(missing_path.as_str(), crate::props! { "value" => 0 })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsx,
+                &format!("{} ({route}) absent cell", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "name" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsx,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "xlsb")]
+#[test]
+fn signed_xlsb_sheet_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Xlsb)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/sheet[1]";
+        let name = signed_name(&file, path);
+        let props = crate::props! { "name" => name.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed leaf no-op setter: {error:?}", input.label));
+        assert!(leaf_set.is_signed(), "{}: leaf lost signature", input.label);
+        assert_eq!(
+            leaf_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: leaf bytes",
+            input.label
+        );
+
+        let facade_set = file.set(path, props.clone()).unwrap_or_else(|error| {
+            panic!("{}: signed facade no-op setter: {error:?}", input.label)
+        });
+        assert!(
+            matches!(facade_set, File::Signed(_)),
+            "{}: facade unwrapped",
+            input.label
+        );
+        assert_eq!(
+            facade_set.to_bytes().unwrap(),
+            input.bytes,
+            "{}: facade bytes",
+            input.label
+        );
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): signed setter edit: {error:?}", input.label)
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(
+                commit.file().is_signed(),
+                "{} ({route}): lost signature",
+                input.label
+            );
+            assert_eq!(
+                commit.file().to_bytes().unwrap(),
+                input.bytes,
+                "{} ({route})",
+                input.label
+            );
+        }
+
+        let changed = format!("{name} changed");
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_path = "/sheet[1]/A1";
+            let cell_text = candidate
+                .get(cell_path)
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): resolve cell: {error:?}", input.label)
+                })
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let cell_props = crate::props! { "value" => cell_text.as_str() };
+            let changed = format!("{cell_text} changed");
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(cell_path, crate::props! { "value" => changed.as_str() })?;
+                    edit.set(cell_path, cell_props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_path = "/sheet[1]/A1";
+            let cell_text = candidate
+                .get(cell_path)
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): resolve cell: {error:?}", input.label)
+                })
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let cell_props = crate::props! { "value" => cell_text.as_str() };
+            let cell_changed = format!("{cell_text} changed");
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(
+                        cell_path,
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )?;
+                    edit.set(cell_path, cell_props.clone())?;
+                    edit.set(
+                        cell_path,
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsb,
+                &format!("{} ({route}) mixed signed cell edit", input.label),
+            );
+        }
+        let missing_path = signed_missing_cell(&file)
+            .unwrap_or_else(|| panic!("{}: signed XLSB fixture has no absent cell", input.label));
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let error = candidate
+                .set(missing_path.as_str(), crate::props! { "value" => 0 })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsb,
+                &format!("{} ({route}) absent cell", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "name" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xlsb,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn signed_doc_paragraph_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Doc)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/body/p[1]";
+        let text = file
+            .get(path)
+            .unwrap_or_else(|error| panic!("{}: resolve DOC paragraph: {error:?}", input.label))
+            .view()
+            .text()
+            .unwrap_or_else(|error| panic!("{}: read DOC paragraph: {error:?}", input.label))
+            .unwrap_or_default()
+            .into_owned();
+        let props = crate::props! { "text" => text.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed DOC leaf no-op: {error:?}", input.label));
+        assert!(
+            leaf_set.is_signed(),
+            "{}: DOC leaf lost signature",
+            input.label
+        );
+        assert_eq!(leaf_set.to_bytes().unwrap(), input.bytes);
+
+        let facade_set = file
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed DOC facade no-op: {error:?}", input.label));
+        assert!(matches!(facade_set, File::Signed(_)));
+        assert_eq!(facade_set.to_bytes().unwrap(), input.bytes);
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| panic!("{} ({route}): DOC edit: {error:?}", input.label));
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+
+        let changed = same_width(&text).unwrap_or_else(|| format!("{text} changed"));
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())?;
+                    edit.set(path, crate::props! { "text" => changed.as_str() })
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Doc,
+                &format!("{} ({route}) mixed signed edit", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "text" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Doc,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "ppt")]
+#[test]
+fn signed_ppt_shape_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Ppt)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/slide[1]/shape[1]";
+        let text = file
+            .get(path)
+            .unwrap_or_else(|error| panic!("{}: resolve PPT shape: {error:?}", input.label))
+            .view()
+            .text()
+            .unwrap_or_else(|error| panic!("{}: read PPT shape: {error:?}", input.label))
+            .unwrap_or_default()
+            .into_owned();
+        let props = crate::props! { "text" => text.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed PPT leaf no-op: {error:?}", input.label));
+        assert!(
+            leaf_set.is_signed(),
+            "{}: PPT leaf lost signature",
+            input.label
+        );
+        assert_eq!(leaf_set.to_bytes().unwrap(), input.bytes);
+
+        let facade_set = file
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed PPT facade no-op: {error:?}", input.label));
+        assert!(matches!(facade_set, File::Signed(_)));
+        assert_eq!(facade_set.to_bytes().unwrap(), input.bytes);
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| panic!("{} ({route}): PPT edit: {error:?}", input.label));
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+
+        let changed = same_width(&text).unwrap_or_else(|| format!("{text} changed"));
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())?;
+                    edit.set(path, crate::props! { "text" => changed.as_str() })
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Ppt,
+                &format!("{} ({route}) mixed signed edit", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "text" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Ppt,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
+#[cfg(feature = "xls")]
+#[test]
+fn signed_xls_sheet_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Xls)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/sheet[1]";
+        let name = signed_name(&file, path);
+        let props = crate::props! { "name" => name.as_str() };
+        let leaf = signed_leaf(&file);
+
+        let leaf_set = leaf
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed XLS leaf no-op: {error:?}", input.label));
+        assert!(
+            leaf_set.is_signed(),
+            "{}: XLS leaf lost signature",
+            input.label
+        );
+        assert_eq!(leaf_set.to_bytes().unwrap(), input.bytes);
+
+        let facade_set = file
+            .set(path, props.clone())
+            .unwrap_or_else(|error| panic!("{}: signed XLS facade no-op: {error:?}", input.label));
+        assert!(matches!(facade_set, File::Signed(_)));
+        assert_eq!(facade_set.to_bytes().unwrap(), input.bytes);
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| panic!("{} ({route}): XLS edit: {error:?}", input.label));
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+        }
+
+        let changed = format!("{name} changed");
+        let (cell_path, _) = signed_text_cell(&file).unwrap_or_else(|| {
+            panic!("{}: signed XLS fixture has no plain text cell", input.label)
+        });
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let cell_text = candidate
+                .get(cell_path.as_str())
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): resolve cell: {error:?}", input.label)
+                })
+                .view()
+                .text()
+                .unwrap_or_else(|error| panic!("{} ({route}): read cell: {error:?}", input.label))
+                .unwrap_or_default()
+                .into_owned();
+            let cell_props = crate::props! { "value" => cell_text.as_str() };
+            let cell_changed = format!("{cell_text} changed");
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(
+                        cell_path.as_str(),
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )?;
+                    edit.set(cell_path.as_str(), cell_props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed cancelling edit: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.file().is_signed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let remove_reinsert = candidate
+                .edit(|edit| {
+                    edit.remove(cell_path.as_str())?;
+                    edit.set(cell_path.as_str(), cell_props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed remove/reinsert cancellation: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!remove_reinsert.diagnostics().changed());
+            assert!(remove_reinsert.file().is_signed());
+            assert_eq!(remove_reinsert.file().to_bytes().unwrap(), input.bytes);
+            let mixed_error = candidate
+                .edit(|edit| {
+                    edit.set(
+                        cell_path.as_str(),
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )?;
+                    edit.set(cell_path.as_str(), cell_props.clone())?;
+                    edit.set(
+                        cell_path.as_str(),
+                        crate::props! { "value" => cell_changed.as_str() },
+                    )
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &mixed_error,
+                FileFormat::Xls,
+                &format!("{} ({route}) mixed signed cell edit", input.label),
+            );
+        }
+        let missing_path = signed_missing_cell(&file)
+            .unwrap_or_else(|| panic!("{}: signed XLS fixture has no absent cell", input.label));
+        for (route, candidate) in [("leaf", signed_leaf(&file)), ("facade", file.clone())] {
+            let error = candidate
+                .set(missing_path.as_str(), crate::props! { "value" => 0 })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xls,
+                &format!("{} ({route}) absent cell", input.label),
+            );
+        }
+        for (route, candidate) in [("leaf", leaf), ("facade", file)] {
+            let error = candidate
+                .set(path, crate::props! { "name" => changed.as_str() })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Xls,
+                &format!("{} ({route})", input.label),
+            );
+        }
+    }
+}
+
 #[test]
 fn every_signed_input_follows_the_explicit_signature_policy() {
     let inputs = inputs();
@@ -746,6 +1672,48 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
 
         // 5. The per-format leaf transaction still keeps a signed exact no-op.
         assert_exact_noop(input);
+    }
+}
+
+#[test]
+fn invalid_intermediate_signed_edits_return_their_typed_error_without_publication() {
+    for input in inputs() {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        for (route, candidate) in [("leaf", signed_leaf(&file)), ("facade", file.clone())] {
+            let before = candidate.to_bytes().unwrap();
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(
+                        "/__signed_noop_missing__",
+                        crate::props! { "text" => "invalid" },
+                    )
+                })
+                .unwrap_err();
+            assert_ne!(
+                error.code(),
+                Code::DocumentProtected,
+                "{} ({route}): invalid admission was hidden by signature refusal: {error:?}",
+                input.label
+            );
+            assert!(
+                matches!(
+                    error.code(),
+                    Code::PathNotFound
+                        | Code::ZeroMatches
+                        | Code::NotFound
+                        | Code::InvalidPath
+                        | Code::UnsupportedPath
+                ),
+                "{} ({route}): unexpected invalid intermediate code: {error:?}",
+                input.label
+            );
+            assert_eq!(
+                candidate.to_bytes().unwrap(),
+                before,
+                "{} ({route}): failed intermediate edit published bytes",
+                input.label
+            );
+        }
     }
 }
 

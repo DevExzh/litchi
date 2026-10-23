@@ -3,6 +3,7 @@
 
 use litchi_core::{FileFormat, Metadata};
 use litchi_ppt::Package;
+use std::mem::size_of;
 
 use super::Ppt;
 use super::write::{StepPatch, WriteCommit};
@@ -41,14 +42,41 @@ impl Ppt {
             }
             .into());
         }
-        let package = self.editable_package()?;
+        self.preflight_snapshot_bytes(
+            limits.max_snapshot_bytes(),
+            size_of::<litchi_ppt::package::metadata::Edit>(),
+        )?;
+        let package = self.editable_package_for_write()?;
         let mut edit = package.edit_metadata()?;
         let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Ppt)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();
-        let snapshot_bytes =
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Ppt));
+        }
+        let staged_snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // Re-root a signed no-op on the original signed package; the
+                // writable probe above intentionally edits an unsigned copy.
+                let original = self.original_package_for_noop()?;
+                self.preflight_snapshot_bytes(
+                    limits.max_snapshot_bytes(),
+                    size_of::<litchi_ppt::package::metadata::Edit>(),
+                )?;
+                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
+                let canonical_snapshot_bytes =
+                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,
@@ -57,7 +85,7 @@ impl Ppt {
             }
             .into());
         }
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after: if changed {

@@ -326,6 +326,8 @@ impl Pptx {
             Path::from_steps([Step::new("slide").with(Predicate::Index(Position::new(index)))]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target,

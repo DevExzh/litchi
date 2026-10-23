@@ -9,8 +9,8 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeFormat, NativeScalar, NativeSelector, Reference,
-    TransferLimits, caller_value_error, cell_semantic_charge, check_snapshot_limits, native_error,
-    package_from_editor, snapshot_limit,
+    TransferLimits, caller_value_error, cell_semantic_charge, native_error, package_from_editor,
+    snapshot_limit,
 };
 use crate::error::{Code, Error, Result};
 use crate::import::{Origin, Summary, Table, Value, Written, serial};
@@ -78,7 +78,7 @@ pub(crate) fn import(
             })?;
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
-        let package = package_from_editor(file.editor()?);
+        let package = package_from_editor(file.editor_for_write()?);
         let mut edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
@@ -167,8 +167,14 @@ pub(crate) fn import(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
-        let commit = Commit::from_cell_parts(file, next, vec![patch])?;
-        check_snapshot_limits(commit.patch(), limits)?;
+        let commit = Commit::from_cell_parts(
+            file,
+            next,
+            vec![patch],
+            (sheet, native_limits),
+            limits.max_snapshot_bytes(),
+            table.fields().len(),
+        )?;
         Ok((commit, summary))
     })();
     let freshness = file.check_source();

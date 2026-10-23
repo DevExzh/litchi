@@ -14,10 +14,96 @@ use super::patch::{Commit, Patch};
 use super::target::Targets;
 use crate::Error;
 use crate::ole_streams::{self, native, presentation};
+use crate::protection::{Limits as ProtectionLimits, admit_readonly_container};
 use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
 use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
+
+/// A bounded, read-only CFB capture used when a format owner must inspect a
+/// signed source without opening a mutation-capable object editor.
+///
+/// `Probe` deliberately exposes stream reads and retained source bytes only.
+/// It has no edit, finish, replacement, or publication operation, so a
+/// signature-bearing source cannot accidentally enter the ordinary object
+/// mutation path. Encryption and DRM containers are rejected during the same
+/// bounded directory admission used by the object owner.
+#[derive(Debug, Clone)]
+pub struct Probe {
+    original: Arc<Vec<u8>>,
+    package: CapturedPackage,
+    limits: super::model::Limits,
+    cfb_limits: OleFileLimits,
+    signed: bool,
+}
+
+impl Probe {
+    /// Opens and captures a CFB source under explicit object and CFB limits.
+    ///
+    /// Signature streams are retained byte-for-byte for readback. The probe
+    /// refuses encrypted and DRM components before package capture.
+    /// The probe captures the complete CFB read-only. Host edit targets in
+    /// `options` do not select streams; object and CFB limits apply in full.
+    pub fn open_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self, Error> {
+        let limits = options.limits_value();
+        let cfb_limits = options.cfb_limits_value();
+        limits.validate()?;
+        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
+        let signed = admit_readonly_container(
+            &ole,
+            "read-only signed probe",
+            ProtectionLimits {
+                max_entries: limits.max_package_directory_entries(),
+            },
+        )?;
+        let package = CapturedPackage::capture(&mut ole, limits)?;
+        package.check(limits)?;
+        let original: Arc<Vec<u8>> = Arc::from(ole.into_inner().into_inner());
+        Ok(Self {
+            original,
+            package,
+            limits,
+            cfb_limits,
+            signed,
+        })
+    }
+
+    /// Returns whether the captured directory contains signature state.
+    #[must_use]
+    pub const fn is_signed(&self) -> bool {
+        self.signed
+    }
+
+    /// Borrows one captured stream without copying it.
+    #[must_use]
+    pub fn stream(&self, path: &[String]) -> Option<&[u8]> {
+        self.package.stream(path)
+    }
+
+    /// Returns shared ownership of one captured stream allocation.
+    #[must_use]
+    pub fn stream_shared(&self, path: &[String]) -> Option<Arc<[u8]>> {
+        self.package.stream_shared(path)
+    }
+
+    /// Returns the exact source bytes retained by the probe.
+    #[must_use]
+    pub fn source_shared(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.original)
+    }
+
+    /// Returns the object-capture profile retained by the probe.
+    #[must_use]
+    pub const fn limits_value(&self) -> super::model::Limits {
+        self.limits
+    }
+
+    /// Returns the low-level CFB profile retained by the probe.
+    #[must_use]
+    pub const fn cfb_limits_value(&self) -> OleFileLimits {
+        self.cfb_limits
+    }
+}
 
 /// A value with a static empty instance.
 pub(crate) trait EmptyValue: Sized + 'static {

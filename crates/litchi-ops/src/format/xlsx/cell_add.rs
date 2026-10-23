@@ -97,6 +97,7 @@ impl Xlsx {
         &self,
         parent: &Node<'_>,
         node: &NewNode<'_>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
         let index = match node.placement() {
             None | Some(Placement::End) => None,
@@ -126,7 +127,7 @@ impl Xlsx {
                 .with_format(FileFormat::Xlsx));
             },
         };
-        let (commit, placed) = self.add_run(parent, node.props(), index)?;
+        let (commit, placed) = self.add_run(parent, node.props(), index, limits)?;
         let Some((sheet, at)) = parent.write_cell_target() else {
             return Err(Error::new(Code::InternalError, "a run parent is a cell"));
         };

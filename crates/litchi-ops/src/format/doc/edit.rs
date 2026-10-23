@@ -498,7 +498,7 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
 impl Doc {
     /// The retained native owner, or the typed refusal for a released one.
     fn edit_source(&self) -> Result<litchi_doc::Package> {
-        self.editable_package()?.ok_or_else(|| {
+        self.editable_package_for_write()?.ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
@@ -509,9 +509,17 @@ impl Doc {
     }
 
     pub(super) fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit> {
-        Ok(self
-            .edit_source()?
-            .edit_with_options(super::edit_options(super::body_transaction_limits(*limits)))?)
+        self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+        let source_bytes = self
+            .retained_source_len()
+            .map_or(0, |bytes| usize::try_from(bytes).unwrap_or(usize::MAX));
+        Ok(self.edit_source()?.edit_with_options(super::edit_options(
+            super::body_transaction_limits_with_source(
+                *limits,
+                source_bytes,
+                limits.max_snapshot_bytes(),
+            ),
+        ))?)
     }
 
     /// Commit a staged native edit into a write step. An edit that changed
@@ -524,8 +532,26 @@ impl Doc {
     ) -> Result<WriteCommit> {
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let (package, patch) = commit.into_parts();
-        let snapshot_bytes = super::patch_snapshot_bytes(&patch);
+        let staged_snapshot_bytes = super::patch_snapshot_bytes(commit.patch());
+        limit(
+            LimitKind::SnapshotBytes,
+            staged_snapshot_bytes,
+            limits.max_snapshot_bytes(),
+        )?;
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Doc));
+        }
+        let (package, patch) = if !changed && self.signature() == super::Signature::Signed {
+            // The staged editor intentionally uses an unsigned private copy.
+            // Rebuild an identity patch over the retained signed package so
+            // native replay sees the same physical base as the facade.
+            let original = self.original_package_for_noop()?;
+            self.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 0)?;
+            original.edit()?.commit()?.into_parts()
+        } else {
+            commit.into_parts()
+        };
+        let snapshot_bytes = staged_snapshot_bytes.max(super::patch_snapshot_bytes(&patch));
         limit(
             LimitKind::SnapshotBytes,
             snapshot_bytes,
@@ -551,7 +577,7 @@ impl Doc {
         props: impl IntoProps<'v>,
         limits: &SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = (|| -> Result<WriteCommit> {
             let props = Props::from_props(props)?;
             if crate::format::ole_metadata::is_target(&target) {
@@ -631,7 +657,7 @@ impl Doc {
             }
             self.publish(edit, operations, limits)
         })();
-        self.check_source()?;
+        self.check_source_for_write()?;
         result
     }
 

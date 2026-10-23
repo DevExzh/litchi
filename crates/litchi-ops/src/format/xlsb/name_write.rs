@@ -18,9 +18,7 @@ use super::Nav;
 use super::Xlsb;
 use super::node::Item;
 use super::spec::{Kind, NAMED_RANGE_WRITE_TABLE, NamedRangeSetter};
-use super::write::{
-    Commit, NativeStructureOptions, check_snapshot_limits, native_error, package_from_editor,
-};
+use super::write::{Commit, NativeStructureOptions, native_error, package_from_editor};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
 use crate::props::Props;
@@ -120,7 +118,7 @@ fn sheet_position(file: &Xlsb, name: &str, property: &'static str) -> Result<usi
 }
 
 fn edit(file: &Xlsb, limits: &SemanticLimits) -> Result<litchi_xlsb::cell_values::structure::Edit> {
-    let package = package_from_editor(file.editor()?);
+    let package = package_from_editor(file.editor_for_write()?);
     let native_limits = litchi_xlsb::cell_values::TransferLimits::new(
         limits.max_snapshot_bytes(),
         limits.max_expanded_targets(),
@@ -156,8 +154,7 @@ fn commit(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let native = edit.commit().map_err(name_error)?;
-    let commit = Commit::from_native(file, native)?;
-    check_snapshot_limits(commit.patch(), limits)?;
+    let commit = Commit::from_native(file, native, limits.max_snapshot_bytes())?;
     Ok(commit)
 }
 

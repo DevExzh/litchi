@@ -13,8 +13,8 @@ use litchi_xlsb::sheet::Selector as NativeSelector;
 
 use super::super::Xlsb;
 use super::{
-    Commit, NativeCellOptions, Reference, TransferLimits, cell_semantic_charge,
-    check_snapshot_limits, native_error, package_from_editor, snapshot_limit,
+    Commit, NativeCellOptions, Reference, TransferLimits, cell_semantic_charge, native_error,
+    package_from_editor, snapshot_limit,
 };
 use crate::calc::{ErrorValue, Status as Calc, Value};
 use crate::refresh::{Field, Options, Status, Summary, formula_report, workbook_summary};
@@ -93,7 +93,8 @@ pub(crate) fn refresh(
             })?;
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
-        let mut package = package_from_editor(handle.editor()?);
+        let canonical_sheet = planned.keys().next().copied();
+        let mut package = package_from_editor(handle.editor_for_write()?);
         let mut patches = Vec::new();
         for (sheet, caches) in planned {
             let Some(mut edit) = package
@@ -133,8 +134,21 @@ pub(crate) fn refresh(
         if patches.is_empty() {
             return Ok((None, summary));
         }
-        let commit = Commit::from_cell_parts(handle, package, patches)?;
-        check_snapshot_limits(commit.patch(), limits)?;
+        let canonical_sheet = canonical_sheet.ok_or_else(|| {
+            crate::Error::new(
+                crate::Code::InternalError,
+                "XLSB refresh lost its worksheet owner",
+            )
+            .with_format(litchi_core::FileFormat::Xlsb)
+        })?;
+        let commit = Commit::from_cell_parts(
+            handle,
+            package,
+            patches,
+            (canonical_sheet, native_limits),
+            limits.max_snapshot_bytes(),
+            writes,
+        )?;
         Ok((Some(commit), summary))
     })();
     let freshness = handle.check_source();

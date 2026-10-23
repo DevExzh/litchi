@@ -254,6 +254,8 @@ impl Pptx {
             Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target,

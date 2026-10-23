@@ -223,6 +223,8 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -353,7 +355,7 @@ impl Pptx {
         };
         let slide = slide as usize;
         let shape = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut edit = base.edit()?;
         let mut operations = 0;
@@ -380,6 +382,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),

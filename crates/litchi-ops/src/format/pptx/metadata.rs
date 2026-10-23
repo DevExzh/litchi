@@ -88,11 +88,19 @@ impl Pptx {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Pptx)?;
-        self.set_metadata(&assignments).map(Some)
+        self.set_metadata(&assignments, props.len()).map(Some)
     }
 
-    fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
-        let source = self.editable_owner()?;
+    fn set_metadata(
+        &self,
+        assignments: &Assignments,
+        authored_operations: usize,
+    ) -> Result<Commit> {
+        // A signed metadata setter is staged through the unsigned private
+        // owner so the publication fence can distinguish a genuine no-op
+        // from a changed write.  Changed candidates are still refused by
+        // `set_with_limits`; exact no-ops are re-rooted on the signed owner.
+        let source = self.editable_owner_for_write()?;
         let package = self.metadata_owner(&source)?;
         let (after_package, patch, metadata) = commit(
             &package,
@@ -101,21 +109,24 @@ impl Pptx {
         )?;
         if patch.is_noop() {
             return Ok(Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after: self.clone(),
                 target: source.clone(),
                 source,
                 proof: Proof::Metadata(patch),
-                operations: 0,
+                operations: authored_operations,
             });
         }
         let after_package = Arc::new(after_package);
-        let operations = patch.changes().len();
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after: self.adopt_metadata(Arc::clone(&after_package), metadata),
             source: Editable::Eager(package),
             target: Editable::Eager(after_package),
             proof: Proof::Metadata(patch),
-            operations,
+            operations: authored_operations,
         })
     }
 

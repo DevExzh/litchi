@@ -30,5 +30,5 @@ pub use litchi_cfb::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutRepor
 pub use model::{Limits, Object, Objects, Storage, Stream};
 pub use options::{EditOptions, OpenOptions};
 pub use patch::{Commit, Diagnostics, Patch};
-pub use snapshot::Package;
+pub use snapshot::{Package, Probe};
 pub use target::{Target, Targets};

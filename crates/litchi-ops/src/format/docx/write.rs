@@ -48,6 +48,7 @@ pub(crate) struct Commit {
     file: Docx,
     patch: litchi_docx::document::Patch,
     diagnostics: litchi_docx::document::Diagnostics,
+    operations: usize,
 }
 
 impl Commit {
@@ -70,6 +71,10 @@ impl Commit {
         &self.file
     }
 
+    pub(crate) const fn operations(&self) -> usize {
+        self.operations
+    }
+
     /// A commit from its parts, for a route that publishes outside the
     /// main-document edit (record 0338: metadata).
     pub(super) const fn from_parts(
@@ -77,10 +82,12 @@ impl Commit {
         patch: litchi_docx::document::Patch,
         diagnostics: litchi_docx::document::Diagnostics,
     ) -> Self {
+        let operations = diagnostics.operations();
         Self {
             file,
             patch,
             diagnostics,
+            operations,
         }
     }
 }
@@ -1327,21 +1334,25 @@ impl WorkEdit {
             Self::Eager(edit) => {
                 let commit = edit.commit().map_err(Error::from)?;
                 let diagnostics = commit.diagnostics();
+                let operations = diagnostics.operations();
                 let (package, patch) = commit.into_parts();
                 Ok(Commit {
                     file: source.adopt_eager_package(package),
                     patch,
                     diagnostics,
+                    operations,
                 })
             },
             Self::Source(edit) => {
                 let commit = edit.commit().map_err(Error::from)?;
                 let diagnostics = commit.diagnostics();
+                let operations = diagnostics.operations();
                 let (package, patch) = commit.into_parts();
                 Ok(Commit {
                     file: source.adopt_source_package(package),
                     patch,
                     diagnostics,
+                    operations,
                 })
             },
         }

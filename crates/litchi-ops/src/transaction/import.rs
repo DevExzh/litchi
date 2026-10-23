@@ -81,6 +81,11 @@ impl Edit {
         self.check()?;
         self.flush_pending()?;
         let index = self.operations;
+        let operation_limits = self.limits.with_snapshot_budget(
+            self.limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes),
+        );
         let result = (|| {
             let path = target.into_path()?;
             let table = import::parse(source, options, &self.limits)?;
@@ -95,7 +100,7 @@ impl Edit {
             let summary = if table.is_empty() {
                 Summary::at(origin(&self.current, &path)?, &table)
             } else {
-                let (steps, summary) = run(&self.current, &path, &table, &self.limits)?;
+                let (steps, summary) = run(&self.current, &path, &table, &operation_limits)?;
                 self.record(steps)?;
                 summary
             };

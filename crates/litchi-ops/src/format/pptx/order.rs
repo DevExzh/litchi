@@ -102,6 +102,8 @@ impl Pptx {
             }
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target,
@@ -173,6 +175,8 @@ impl Pptx {
             }
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target,

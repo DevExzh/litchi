@@ -14,6 +14,7 @@
 //! so the first edit starts from it without reopening it.
 
 use std::io::{Cursor, Write};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -402,6 +403,39 @@ impl Ppt {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    /// The retained compound-file length, when an edit owner exists. This
+    /// O(1) lower bound is checked before private native-editor allocation;
+    /// the exact before/after patch remains the hard post-commit charge.
+    pub(crate) fn retained_source_len(&self) -> Option<usize> {
+        match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => {
+                Some(usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX))
+            },
+            PptOwner::Released => None,
+        }
+    }
+
+    /// Check the retained source and native edit handoff before a PPT edit
+    /// copies the CFB source or builds its immutable slide snapshot. The
+    /// exact patch charge remains authoritative after commit.
+    pub(crate) fn preflight_snapshot_bytes(&self, maximum: usize, additional: usize) -> Result<()> {
+        let source = self.retained_source_len().unwrap_or(0);
+        let observed = source
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_ppt::Patch>())
+            .saturating_add(size_of::<litchi_ppt::package::edit::Edit>())
+            .saturating_add(additional);
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
     /// Admit a primary native PPT edit under the signature, encryption and
     /// source-retention policy shared by the other native formats.
     pub(crate) fn admit_edit(&self) -> Result<()> {
@@ -411,6 +445,27 @@ impl Ppt {
         }
         if self.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Ppt));
+        }
+        if !self.retains_source() {
+            return Err(crate::Error::new(
+                Code::UnsupportedCapability,
+                "the PPT source was released before editing",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_suggestion(
+                "reopen the presentation without `OpenOptions::retain_source(false)`",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Admit a native edit that may still prove an exact signed no-op. A
+    /// changed package is rejected by the publication fence, while encrypted
+    /// and released owners remain protected before staging.
+    pub(crate) fn admit_edit_for_write(&self) -> Result<()> {
+        self.check_source_for_write()?;
+        if self.is_encrypted() {
+            return Err(litchi_ppt::Error::EncryptionPolicy.into());
         }
         if !self.retains_source() {
             return Err(crate::Error::new(
@@ -449,6 +504,68 @@ impl Ppt {
         Ok(package.clone())
     }
 
+    /// Return the retained package for a setter that may prove an exact
+    /// signed no-op. Removal-authorized handles use the explicit unsigned
+    /// copy; signed handles retain the original package until publication
+    /// proves that the native patch is unchanged.
+    pub(crate) fn editable_package_for_write(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        let package = match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => package,
+            PptOwner::Released => unreachable!("admit_edit_for_write checks source retention"),
+        };
+        if matches!(
+            self.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
+            let bytes = signature::unsign_compound_file(
+                package.to_encrypted_bytes()?,
+                litchi_sign::cfb::Format::Ppt,
+            )?;
+            return Ok(Package::from_bytes_with_options(
+                &bytes,
+                litchi_ppt::OpenOptions::new()
+                    .source_limits(self.0.source_limits)
+                    .leniency(package.leniency()),
+            )?);
+        }
+        Ok(package.clone())
+    }
+
+    /// Admit the writable package against the remaining snapshot budget
+    /// before signature removal or native edit capture can allocate.
+    pub(crate) fn editable_package_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package_for_write()
+    }
+
+    /// Admit an ordinary unsigned package against the remaining snapshot
+    /// budget before native edit capture can allocate.
+    pub(crate) fn editable_package_with_snapshot_limit(&self, maximum: usize) -> Result<Package> {
+        self.preflight_snapshot_bytes(maximum, 0)?;
+        self.editable_package()
+    }
+
+    /// Return the original native package for a canonical signed no-op edit.
+    /// Changed writes use [`Self::editable_package_for_write`] so signature
+    /// storages are removed before publication; the empty patch used for an
+    /// exact cancellation must remain bound to the signed CFB bytes.
+    pub(crate) fn original_package_for_noop(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => Ok(package.clone()),
+            PptOwner::Released => Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the PPT source was released before signed no-op replay",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_suggestion("reopen the presentation with source retention enabled")),
+        }
+    }
+
     /// Adopt a committed native package as an eager immutable handle while
     /// retaining the origin and the explicit signature transition.
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
@@ -481,10 +598,23 @@ impl Ppt {
         props: impl crate::props::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
-        let result = write::set_with_limits(self, target, props, limits);
-        self.check_source()?;
-        result
+        self.set_with_snapshot_budget(target, props, limits, limits.max_snapshot_bytes())
+    }
+
+    /// Set through the native writer with a caller-owned remaining snapshot
+    /// budget. Transactions use this after earlier leaf commits have already
+    /// consumed part of their aggregate limit.
+    pub(crate) fn set_with_snapshot_budget<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+        snapshot_budget: usize,
+    ) -> Result<WriteCommit> {
+        self.check_source_for_write()?;
+        let result = write::set_with_snapshot_budget(self, target, props, limits, snapshot_budget);
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
     }
 
     /// Admit one direct shape path for a transaction coalescer.
@@ -514,9 +644,9 @@ impl Ppt {
         limits: &crate::transaction::SemanticLimits,
         scene: &mut Option<write::coalesce::SceneCache>,
     ) -> Result<Option<write::coalesce::Plan>> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::coalesce::shape_plan(self, target, props, limits, scene);
-        self.check_source().and(result)
+        self.check_source_for_write().and(result)
     }
 
     /// Insert one blank slide under the presentation root.
@@ -535,10 +665,13 @@ impl Ppt {
         node: crate::NewNode<'n>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::add_with_limits(self, parent, node, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        result.and_then(|(commit, path)| {
+            self.enforce_signed_noop(Ok(commit))
+                .map(|commit| (commit, path))
+        })
     }
 
     /// Remove slides selected by a path or a scoped query through the native
@@ -553,10 +686,10 @@ impl Ppt {
         target: crate::target::TargetArg<'p>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::remove_with_limits(self, target, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
     }
 
     /// Move one slide to a final sibling position or relative placement.
@@ -579,10 +712,10 @@ impl Ppt {
         placement: crate::placement::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::move_to_with_limits(self, path, placement, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
     }
 
     /// Exchange two slides through one native primary PPT transaction.
@@ -601,10 +734,20 @@ impl Ppt {
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::swap_with_limits(self, left, right, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
+    }
+
+    fn enforce_signed_noop(&self, result: Result<WriteCommit>) -> Result<WriteCommit> {
+        result.and_then(|commit| {
+            if self.signature() != Signature::Signed || commit.after.same_snapshot(self) {
+                Ok(commit)
+            } else {
+                Err(signature::refusal(FileFormat::Ppt))
+            }
+        })
     }
 
     /// Opens the presentation over the positional package filesystem
@@ -720,6 +863,12 @@ impl Ppt {
             },
             PptOwner::Released => self.0.presentation.check_source().map_err(Into::into),
         }
+    }
+
+    /// Source freshness for a mutation that may still prove an exact signed
+    /// no-op. Changed native results are rejected at publication.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        self.check_source()
     }
 
     /// Stream the exact native package.  A signed handle preserves the

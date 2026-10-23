@@ -62,11 +62,38 @@ mod tests;
 
 pub use family::{Diagnostics, LimitKind};
 
+/// Bounds for one primary workbook edit.
+///
+/// The optional retained-byte ceiling is an admission budget for source
+/// promotion and staged worksheet captures. It is checked before a native
+/// worksheet action allocates its changed store or compaction buffer; the
+/// commit still performs exact patch accounting before publication.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    max_retained_bytes: Option<usize>,
+}
+
+impl EditOptions {
+    /// Set the maximum retained bytes admitted by this edit.
+    #[must_use]
+    pub const fn with_max_retained_bytes(mut self, value: usize) -> Self {
+        self.max_retained_bytes = Some(value);
+        self
+    }
+
+    /// Return the retained-byte ceiling, if one was supplied.
+    #[must_use]
+    pub const fn max_retained_bytes_value(self) -> Option<usize> {
+        self.max_retained_bytes
+    }
+}
+
 /// Insert a `drawing` element naming `relationship_id` into worksheet XML
 /// that has none, at its schema position.
 pub(crate) fn attach_worksheet_drawing(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
     drawing_transfer::attach_worksheet(xml, relationship_id)
 }
+pub(crate) use model::workbook_retained_bytes;
 pub use model::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,

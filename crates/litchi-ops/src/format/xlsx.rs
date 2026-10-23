@@ -39,6 +39,7 @@
 //! [`crate::view::sheet`] types, and its errors are typed [`crate::Error`]
 //! values.
 
+use std::mem::size_of;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -236,6 +237,13 @@ impl Xlsx {
     /// touch the owner. Write transactions use this at their outer fence so a
     /// stale source wins over target/property admission and native errors.
     pub(crate) fn check_source(&self) -> Result<()> {
+        self.0.owner.ensure_current()
+    }
+
+    /// Check only retained-source freshness for a setter that may establish
+    /// an exact signed no-op. Signature and encryption policy are applied by
+    /// the native editor and the final byte-identity fence.
+    pub(crate) fn check_source_for_replay(&self) -> Result<()> {
         self.0.owner.ensure_current()
     }
 
@@ -604,8 +612,86 @@ impl Xlsx {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsx));
         }
+        self.editor_after_source_check(false)
+    }
+
+    /// Build a native editor for a setter that may prove an exact signed
+    /// no-op. Changed commits are rejected by the setter/commit fence; the
+    /// signed package is kept intact while the native edit is staged.
+    pub(crate) fn editor_for_write(&self) -> Result<xlsx::Package> {
+        if self.0.signature() == Signature::Signed && !self.0.retain_source {
+            return Err(source_released());
+        }
+        self.editor_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    /// Admit the native promotion against the transaction's remaining
+    /// snapshot budget before it can copy the source archive or build the
+    /// owning workbook graph. Eager owners can use the native endpoint
+    /// census directly; deferred owners use the source archive plus the
+    /// fixed owning-package/workbook handoff that promotion must retain.
+    pub(crate) fn editor_with_snapshot_limit(&self, maximum: usize) -> Result<xlsx::Package> {
+        self.preflight_editor_snapshot(maximum)?;
+        self.editor()
+    }
+
+    /// Signed/removal-authorized variant of [`Self::editor_with_snapshot_limit`].
+    pub(crate) fn editor_for_write_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<xlsx::Package> {
+        self.preflight_editor_snapshot(maximum)?;
+        self.editor_for_write()
+    }
+
+    fn preflight_editor_snapshot(&self, maximum: usize) -> Result<()> {
+        let endpoint = match &self.0.owner {
+            XlsxOwner::Eager(package) => package.retained_bytes(),
+            XlsxOwner::Source(workbook) => workbook.retained_bytes_for_edit()?,
+        };
+        // This mirrors the native workbook editor's CaptureBudget::new:
+        // promotion must retain the source and target endpoints, the edit's
+        // action state, and both patch/commit owners before any family route
+        // can stage a changed worksheet or feature buffer.
+        let observed = endpoint
+            .saturating_mul(2)
+            .saturating_add(size_of::<xlsx::workbook::Edit>())
+            .saturating_add(size_of::<xlsx::workbook::Patch>())
+            .saturating_add(size_of::<xlsx::workbook::Commit>());
+        if observed > maximum {
+            return Err(crate::transaction::Error::Limit {
+                kind: crate::transaction::LimitKind::SnapshotBytes,
+                observed,
+                maximum,
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    /// Materialize the original native package for a canonical signed no-op
+    /// patch. `editor_for_write` intentionally calls `unsigned_workbook` so a
+    /// changed publication cannot preserve signature parts; the identity
+    /// patch itself must still be anchored to the signed package bytes.
+    pub(crate) fn original_package_for_noop(&self) -> Result<xlsx::Package> {
         if !self.0.retain_source {
             return Err(source_released());
+        }
+        self.check_source_for_replay()?;
+        match &self.0.owner {
+            XlsxOwner::Source(workbook) => self.promote_source(workbook),
+            XlsxOwner::Eager(package) => Ok(package.clone()),
+        }
+    }
+
+    fn editor_after_source_check(&self, allow_signed: bool) -> Result<xlsx::Package> {
+        if !self.0.retain_source {
+            return Err(source_released());
+        }
+        if allow_signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
         }
         match self.0.signature() {
             Signature::RemovalAuthorized => self.unsigned_workbook(),
@@ -613,6 +699,7 @@ impl Xlsx {
                 XlsxOwner::Source(workbook) => self.promote_source(workbook),
                 XlsxOwner::Eager(workbook) => Ok(workbook.clone()),
             },
+            Signature::Signed if allow_signed => self.unsigned_workbook(),
             Signature::Signed => unreachable!("signed handles return before source fencing"),
         }
     }

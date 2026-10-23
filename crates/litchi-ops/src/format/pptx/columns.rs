@@ -101,7 +101,11 @@ impl Pptx {
     fn change_columns(&self, table: &TreeItem, change: Change) -> Result<Commit> {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = if matches!(&change, Change::Width { .. }) {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         match change {
@@ -125,6 +129,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),

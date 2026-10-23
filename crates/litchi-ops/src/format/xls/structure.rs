@@ -101,7 +101,7 @@ pub(crate) fn add_sheet(
     node: &NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(WriteCommit, Path<'static>)> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     require_workbook(file, parent)?;
     let mut name = None;
     for (key, value) in node.props().iter() {
@@ -142,7 +142,11 @@ pub(crate) fn add_sheet(
     };
     validate_sheet_name(file, None, &name)?;
     admit(1, name.len().saturating_add(64), limits)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), name.len().saturating_add(64))?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     edit.insert_sheet(Position::new(position), &name)
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
@@ -233,7 +237,11 @@ pub(crate) fn remove_sheet(
         return Ok(None);
     };
     admit(1, 64, limits)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), 64)?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     edit.remove_sheet(Selector::Position(Position::new(position)))
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
@@ -288,7 +296,7 @@ pub(crate) fn move_sheet(
     placement: &Placement<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let source = resolve_sheet(file, path)?;
     let count = tab_count(file)?;
     let last = count
@@ -330,7 +338,7 @@ pub(crate) fn swap_sheets(
     right: &PathArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let left = resolve_sheet(file, left)?;
     let right = resolve_sheet(file, right)?;
     let count = tab_count(file)?;
@@ -351,7 +359,11 @@ fn reorder(
         .try_reserve_exact(order.len())
         .map_err(|_| refusal(Code::InternalError, "could not allocate the XLS tab order"))?;
     selectors.extend(order.iter().copied().map(Selector::from));
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    file.preflight_snapshot_bytes(limits.max_snapshot_bytes(), order_charge(order.len()))?;
+    let mut edit = file
+        .editable_package_with_snapshot_limit(limits.max_snapshot_bytes())?
+        .edit()
+        .map_err(native_edit_error)?;
     edit.reorder_sheets(&selectors).map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
     finish_commit(file, native, 1, limits)
@@ -369,7 +381,7 @@ impl Xls {
             if let Some((kind, implied)) =
                 super::feature_write::feature_kind(node.kind(), node.props())
             {
-                self.admit_edit()?;
+                self.admit_edit_for_write()?;
                 let parent_node = crate::path::resolve::get(&Nav::new(self), &parent)?;
                 if matches!(
                     parent_node.element(),

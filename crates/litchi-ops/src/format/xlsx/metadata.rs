@@ -15,6 +15,7 @@ use crate::format::metadata::{self, Assignments};
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 
 fn native(error: xlsx::metadata::Error) -> crate::Error {
     metadata::native_error(error, FileFormat::Xlsx)
@@ -25,7 +26,7 @@ pub(super) fn commit(
     workbook: &xlsx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
-) -> Result<(xlsx::Package, Metadata, bool)> {
+) -> Result<(xlsx::Package, Metadata, bool, usize)> {
     let mut edit = workbook.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
@@ -35,9 +36,10 @@ pub(super) fn commit(
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
     let commit = edit.commit().map_err(native)?;
+    let patch_bytes = commit.patch().retained_bytes();
     let changed = commit.diagnostics().changed();
     let after = commit.into_package();
-    Ok((after, metadata, changed))
+    Ok((after, metadata, changed, patch_bytes))
 }
 
 impl Xlsx {
@@ -49,26 +51,42 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let root = metadata::is_root(target) && !props.is_empty();
         if !(metadata::is_target(target) || root) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsx)?;
-        self.set_metadata(&assignments).map(Some)
+        self.set_metadata(&assignments, props.len(), limits)
+            .map(Some)
     }
 
-    fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
-        let source = self.editor()?;
-        let (target, metadata, changed) =
+    fn set_metadata(
+        &self,
+        assignments: &Assignments,
+        authored_operations: usize,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let (target, metadata, changed, native_patch_bytes) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)
         } else {
             self.clone()
         };
-        self.check_source()?;
-        Ok(Commit::from_metadata(after, source, target))
+        self.check_source_for_replay()?;
+        Commit::from_metadata(
+            self,
+            after,
+            source,
+            target,
+            changed,
+            authored_operations,
+            native_patch_bytes,
+            limits.max_snapshot_bytes(),
+        )
     }
 
     /// Adopt a metadata revision: [`Self::adopt_workbook`] with the new
@@ -93,7 +111,7 @@ impl Xlsx {
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
 pub(super) fn create(workbook: xlsx::Package, metadata: &Metadata) -> Result<Xlsx> {
-    let (workbook, metadata, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
+    let (workbook, metadata, _, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }
 

@@ -35,6 +35,7 @@ use crate::placement::Placement;
 use crate::props::Props;
 use crate::registry::{Access, Alias, Constraint, Entry, Operation, Table};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 use crate::value::{Scalar, ValueType};
 
 fn error(code: Code, message: &'static str) -> Error {
@@ -573,6 +574,7 @@ impl Xlsx {
         &self,
         parent: &Node<'_>,
         node: NewNode<'_>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
         let Item::Sheet(sheet) = parent.item() else {
             return Err(error(
@@ -734,7 +736,7 @@ impl Xlsx {
             );
         }
         let anchor = xlsx::chart::Anchor::new(origin[0], origin[1], to_col, to_row);
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let name = match name.or_else(|| spec.title().map(str::to_owned)) {
             Some(name) => name,
             // Counting reads the sheet's drawing: only for an unnamed chart.
@@ -745,7 +747,16 @@ impl Xlsx {
         let target = edit.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok((
-            Commit::from_metadata(after, source, target),
+            Commit::from_metadata(
+                self,
+                after,
+                source,
+                target,
+                true,
+                1,
+                0,
+                limits.max_snapshot_bytes(),
+            )?,
             Path::from_steps([
                 Step::new("sheet").with(Predicate::Index(Position::new(sheet))),
                 Step::new("chart").with(Predicate::Index(Position::new(index))),
@@ -796,7 +807,7 @@ impl Xlsx {
         if first_row != last_row && first_column != last_column {
             return Err(invalid("the series range is one row or one column"));
         }
-        let package = self.editor()?;
+        let package = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -853,7 +864,7 @@ impl Xlsx {
             .replace('$', "")
             .parse::<xlsx::Rect>()
             .map_err(|_| invalid("dataRange is not an A1 range"))?;
-        let package = self.editor()?;
+        let package = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -917,6 +928,7 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
@@ -1047,7 +1059,7 @@ impl Xlsx {
             }
         }
         let sheet = node.sheet_position();
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut native = source.edit_charts()?;
         if geometry.iter().any(Option::is_some) {
             let current = self
@@ -1086,11 +1098,24 @@ impl Xlsx {
         } else {
             self.clone()
         };
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self,
+            after,
+            source,
+            target,
+            changed,
+            1,
+            0,
+            limits.max_snapshot_bytes(),
+        )?))
     }
 
     /// Remove a chart selected by its path; `None` for other targets.
-    pub(super) fn try_remove_chart(&self, target: &TargetArg<'_>) -> Result<Option<Commit>> {
+    pub(super) fn try_remove_chart(
+        &self,
+        target: &TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
         };
@@ -1107,12 +1132,21 @@ impl Xlsx {
             return Ok(None);
         };
         let sheet = node.sheet_position();
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut native = source.edit_charts()?;
         native.remove(sheet, item.chart as usize)?;
         let target = native.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self,
+            after,
+            source,
+            target,
+            true,
+            1,
+            0,
+            limits.max_snapshot_bytes(),
+        )?))
     }
 }
 

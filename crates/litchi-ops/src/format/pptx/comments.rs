@@ -150,7 +150,7 @@ impl Pptx {
                 Some((x.unwrap_or(current.0), y.unwrap_or(current.1)))
             },
         };
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let mut changed = edit.set_comment_at(
@@ -181,11 +181,13 @@ impl Pptx {
             self.clone()
         };
         Ok(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
             proof: Proof::Eager(patch),
-            operations: usize::from(changed),
+            operations: 1,
         })
     }
 
@@ -248,6 +250,8 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -328,11 +332,13 @@ impl Pptx {
             self.clone()
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
             proof: Proof::Eager(patch),
-            operations: usize::from(changed),
+            operations: 1,
         }))
     }
 }
@@ -455,7 +461,7 @@ impl Pptx {
         }
         drop(node);
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = self.eager_base(&source)?;
         let mut edit = base.edit()?;
         let change = litchi_pptx::opened::ModernCommentChange {
@@ -479,11 +485,13 @@ impl Pptx {
             self.clone()
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
             proof: Proof::Eager(patch),
-            operations: usize::from(changed),
+            operations: 1,
         }))
     }
 
@@ -606,6 +614,8 @@ impl Pptx {
         let after = self.adopt_eager(Arc::clone(&target));
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),

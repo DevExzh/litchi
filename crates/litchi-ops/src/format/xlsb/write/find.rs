@@ -20,7 +20,7 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeScalar, Reference, TransferLimits, caller_value_error,
-    cell_semantic_charge, check_snapshot_limits, native_error, package_from_editor, snapshot_limit,
+    cell_semantic_charge, native_error, package_from_editor, snapshot_limit,
 };
 use crate::error::{Code, Error, Result};
 use crate::find::Spec;
@@ -75,11 +75,18 @@ pub(crate) fn find_replace(
             Ok(())
         })?;
         let cells = read(file, &scopes)?;
-        let editor = file.editor()?;
+        let editor = file.editor_for_write()?;
         let rich = rich_texts(super::super::projection(&editor)?);
         let runs = runs(&cells, &rich);
         let (changes, matches) = surface::find(&runs, spec, replacement, FileFormat::Xlsb, limits)?;
-        let commit = commit(file, package_from_editor(editor), &cells, changes, limits)?;
+        let commit = commit(
+            file,
+            package_from_editor(editor),
+            &cells,
+            changes,
+            matches,
+            limits,
+        )?;
         Ok((commit, matches))
     })()
     .map_err(|error: Error| error.with_format(FileFormat::Xlsb));
@@ -101,7 +108,7 @@ pub(crate) fn merge(
             .map(|sheet| (sheet, Rect::ALL))
             .collect();
         let cells = read(file, &scopes)?;
-        let editor = file.editor()?;
+        let editor = file.editor_for_write()?;
         let rich = rich_texts(super::super::projection(&editor)?);
         let runs = runs(&cells, &rich);
         let mut planner = Planner::new(record, options, limits);
@@ -110,7 +117,14 @@ pub(crate) fn merge(
         if changes.is_empty() {
             return Ok((None, summary));
         }
-        let commit = commit(file, package_from_editor(editor), &cells, changes, limits)?;
+        let commit = commit(
+            file,
+            package_from_editor(editor),
+            &cells,
+            changes,
+            summary.replacements().saturating_add(summary.fields()),
+            limits,
+        )?;
         Ok((Some(commit), summary))
     })()
     .map_err(|error: Error| error.with_format(FileFormat::Xlsb));
@@ -198,6 +212,7 @@ fn commit(
     package: litchi_xlsb::Package,
     cells: &[TextCell],
     changes: Vec<Change>,
+    authored_operations: usize,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let mut by_sheet: BTreeMap<usize, Vec<(Reference, String)>> = BTreeMap::new();
@@ -222,6 +237,10 @@ fn commit(
         })?;
     let native_limits =
         TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+    let canonical_sheet = match by_sheet.keys().next().copied() {
+        Some(sheet) => Some(sheet),
+        None => first_worksheet(file)?,
+    };
     let mut package = package;
     let mut patches = Vec::new();
     for (sheet, assignments) in by_sheet {
@@ -247,8 +266,17 @@ fn commit(
     }
     if patches.is_empty() {
         // Nothing changed: an exact no-op commit of the first worksheet.
+        let canonical_sheet = canonical_sheet.ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedCapability,
+                "the workbook has no worksheet to search",
+            )
+        })?;
         let edit = package
-            .edit_cell_values(NativeSelector::from(0))
+            .edit_cell_values_with_options(
+                NativeSelector::from(canonical_sheet),
+                NativeCellOptions::new().transfer_limits(native_limits),
+            )
             .map_err(native_error)?;
         let Some(edit) = edit else {
             return Err(Error::new(
@@ -260,9 +288,33 @@ fn commit(
         package = next;
         patches.push(patch);
     }
-    let commit = Commit::from_cell_parts(file, package, patches)?;
-    check_snapshot_limits(commit.patch(), limits)?;
+    let canonical_sheet = canonical_sheet
+        .ok_or_else(|| Error::new(Code::InternalError, "XLSB find lost its worksheet owner"))?;
+    let commit = Commit::from_cell_parts(
+        file,
+        package,
+        patches,
+        (canonical_sheet, native_limits),
+        limits.max_snapshot_bytes(),
+        authored_operations,
+    )?;
     Ok(commit)
+}
+
+/// Return the first complete-catalog position that is an actual worksheet.
+/// Native XLSB selectors are worksheet-aware, so a no-match proof must never
+/// silently fall back to selector zero or to a worksheet ordinal.
+fn first_worksheet(file: &Xlsb) -> Result<Option<usize>> {
+    let catalog = file.catalog()?;
+    for position in 0..catalog.len() {
+        let Some(handle) = SheetHandle::at(file, position)? else {
+            continue;
+        };
+        if handle.is_grid() {
+            return Ok(Some(position));
+        }
+    }
+    Ok(None)
 }
 
 fn rect(row: u32, column: u32, end_row: u32, end_column: u32) -> Result<Rect> {

@@ -36,11 +36,11 @@ impl Xlsx {
         spec: &Spec<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, usize)> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = self
             .find_inner(target, spec, limits)
             .map_err(|error| error.with_format(FileFormat::Xlsx));
-        self.check_source()?;
+        self.check_source_for_replay()?;
         result
     }
 
@@ -70,7 +70,7 @@ impl Xlsx {
             );
         };
         let scopes = scopes(self, target)?;
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let workbook = source.workbook();
         let matcher = spec.matcher();
         let mut matches = 0usize;
@@ -176,7 +176,7 @@ impl Xlsx {
                 }
             }
         }
-        let mut edit = source.edit().map_err(native_error)?;
+        let mut edit = super::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut index = 0;
         while index < changes.len() {
             let sheet = changes[index].0;
@@ -201,7 +201,10 @@ impl Xlsx {
             }
         }
         let native = edit.commit().map_err(native_error)?;
-        Ok((Commit::from_native(self, source, native)?, matches))
+        Ok((
+            Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())?,
+            matches,
+        ))
     }
 }
 

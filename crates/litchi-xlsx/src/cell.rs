@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem::{size_of, size_of_val};
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -231,6 +232,15 @@ impl Value {
         }
         Ok(())
     }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Number(number) => number.as_str().len(),
+            Self::Text(text) | Self::Date(Date(text)) => text.as_str().len(),
+            Self::Error(error) => error.as_str().len(),
+            Self::Bool(_) => 0,
+        })
+    }
 }
 
 /// A checked ISO 8601 lexical value for a `SpreadsheetML` date cell.
@@ -368,6 +378,17 @@ impl Content {
             Self::Formula(formula) => Cell::Formula(formula.clone()),
         }
     }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Value(value) => value.retained_bytes(),
+            Self::Formula(formula) => formula.text().len().saturating_add(
+                formula
+                    .cached()
+                    .map_or(0, |cache| cache.value().retained_bytes()),
+            ),
+        })
+    }
 }
 
 impl From<Formula> for Content {
@@ -443,6 +464,32 @@ impl Number {
             )));
         }
         Ok(())
+    }
+
+    /// Conservative logical bytes retained by this authored rich string.
+    ///
+    /// The transaction capture budget accounts for the run text and the
+    /// lexical run properties that are copied into the pending cell action;
+    /// allocator capacity is deliberately not folded into the package/cache
+    /// census.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.runs.iter().fold(size_of::<Self>(), |bytes, run| {
+            let properties = run.properties.as_deref().map_or(0, |items| {
+                items
+                    .iter()
+                    .fold(size_of_val(items), |bytes, (name, value)| {
+                        bytes
+                            .saturating_add(size_of_val(name.as_ref()))
+                            .saturating_add(name.len())
+                            .saturating_add(size_of_val(value.as_ref()))
+                            .saturating_add(value.len())
+                    })
+            });
+            bytes
+                .saturating_add(size_of::<RichRun>())
+                .saturating_add(run.text.len())
+                .saturating_add(properties)
+        })
     }
 }
 

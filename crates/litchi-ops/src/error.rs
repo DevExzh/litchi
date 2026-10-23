@@ -1911,6 +1911,7 @@ impl Classify for litchi_xls::package::Error {
             Self::Source(error) => error.classify(),
             Self::CachedSource(error) => error.as_ref().classify(),
             Self::Cfb(error) => error.classify(),
+            Self::Object(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Allocation { .. } => Class::of(Code::InternalError),
             Self::EncryptionPolicy => Class::suggest(

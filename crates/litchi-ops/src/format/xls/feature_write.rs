@@ -87,10 +87,49 @@ impl Xls {
         commit: sf::edit::Commit,
         limits: &SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        // A signed setter may still prove an exact native identity patch.
+        // Changed feature output is rejected below, but the strict guard here
+        // would prevent same-value set/remove requests from reaching that
+        // proof.
+        self.check_source_for_write()?;
         let changed = commit.diagnostics().changed();
+        let staged_snapshot_bytes = commit.patch().retained_bytes();
         let (package, patch) = commit.into_parts();
-        let snapshot_bytes = patch.retained_bytes();
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Xls));
+        }
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // The feature probe is staged on an unsigned private copy.
+                // Rebuild the exact identity patch over the retained signed
+                // package before publishing the no-op.
+                let original = self.original_package_for_noop()?;
+                let minimum = self
+                    .retained_source_len()
+                    .saturating_mul(2)
+                    .saturating_add(std::mem::size_of::<litchi_xls::Patch>())
+                    .saturating_add(std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>());
+                if minimum > limits.max_snapshot_bytes() {
+                    return Err(error(
+                        Code::LimitExceeded,
+                        "the worksheet-feature identity patch exceeds the snapshot budget",
+                    ));
+                }
+                let empty = original
+                    .edit_sheet_features()
+                    .map_err(native)?
+                    .commit()
+                    .map_err(native)?;
+                let canonical_snapshot_bytes = empty.patch().retained_bytes();
+                let (package, patch) = empty.into_parts();
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(error(
                 Code::LimitExceeded,
@@ -108,18 +147,24 @@ impl Xls {
         } else {
             self.clone()
         };
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after,
             patch: StepPatch::Features(patch),
-            operations: usize::from(changed),
+            // One feature command remains one authored operation even when
+            // its native patch is the canonical empty identity.
+            operations: 1,
             snapshot_bytes,
         })
     }
 
-    fn feature_edit(&self) -> Result<sf::edit::Edit> {
-        self.editable_package()?
+    fn feature_edit(&self, maximum: usize) -> Result<sf::edit::Edit> {
+        self.preflight_snapshot_bytes(
+            maximum,
+            std::mem::size_of::<litchi_xls::sheet_features::edit::Edit>(),
+        )?;
+        self.editable_package_for_write_with_snapshot_limit(maximum)?
             .edit_sheet_features()
             .map_err(native)
     }
@@ -128,7 +173,7 @@ impl Xls {
 /// Run one leaf edit and publish it.
 macro_rules! publish {
     ($file:expr, $limits:expr, |$edit:ident| $body:expr) => {{
-        let mut $edit = $file.feature_edit()?;
+        let mut $edit = $file.feature_edit($limits.max_snapshot_bytes())?;
         let value = { $body };
         let commit = $edit.commit().map_err(native)?;
         ($file.publish_features(commit, $limits)?, value)

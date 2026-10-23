@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::io::Read;
+use std::mem::size_of;
 use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
@@ -885,6 +886,89 @@ impl SourceBackedWorkbook {
         Ok(&self.view()?.inner.package)
     }
 
+    /// Conservative retained-data census for promotion to the owning
+    /// workbook used by the edit kernel.
+    ///
+    /// Promotion keeps the source archive and eagerly materializes the
+    /// workbook catalog plus every worksheet part used by the page-break
+    /// projection.  The census accounts for those declared payloads and the
+    /// native endpoint/catalog owners without decoding any deferred part.
+    /// Callers can therefore reject a native edit before promotion allocates;
+    /// the owning package's exact retained census remains authoritative after
+    /// promotion and commit.
+    pub fn retained_bytes_for_edit(&self) -> Result<usize> {
+        let inner = self.current();
+        let package = &inner.package;
+        let mut endpoint = usize::try_from(package.source_artifact().len()).unwrap_or(usize::MAX);
+        endpoint = endpoint
+            .saturating_add(size_of::<super::Workbook>())
+            .saturating_add(size_of::<super::Inner>())
+            .saturating_add(size_of::<litchi_opc::OpcPackage>());
+
+        let main = package.main_document_part()?;
+        let main_payload =
+            usize::try_from(main.declared_uncompressed_size()?).unwrap_or(usize::MAX);
+        endpoint = endpoint
+            // The owning catalog parses the workbook XML into independent
+            // names, relationship targets and sheet records in addition to
+            // retaining its source payload.  Reserve one more payload-sized
+            // envelope for those derived strings and records.
+            .saturating_add(main_payload)
+            .saturating_add(main_payload);
+        endpoint = endpoint
+            .saturating_add(main.partname().as_str().len())
+            .saturating_add(main.content_type().len());
+
+        // Workbook::from_package builds a page-break projection for every
+        // catalog sheet, which materializes each corresponding part.  Count
+        // only those payloads here; unrelated media and extension parts stay
+        // deferred and are charged by their family editor if touched.
+        for sheet in &inner.sheets {
+            let part = package.part(&sheet.part_uri)?;
+            endpoint = endpoint.saturating_add(
+                usize::try_from(part.declared_uncompressed_size()?).unwrap_or(usize::MAX),
+            );
+            endpoint = endpoint
+                .saturating_add(size_of::<super::model::SheetData>())
+                .saturating_add(sheet.name.capacity())
+                .saturating_add(sheet.name_key.len())
+                .saturating_add(sheet.part_uri.as_str().len())
+                .saturating_add(sheet.relationship_id.len());
+        }
+
+        endpoint = endpoint
+            .saturating_add(
+                inner
+                    .shared_strings_uri
+                    .as_ref()
+                    .map_or(0, |uri| uri.as_str().len()),
+            )
+            .saturating_add(
+                inner
+                    .styles_uri
+                    .as_ref()
+                    .map_or(0, |uri| uri.as_str().len()),
+            )
+            .saturating_add(
+                inner
+                    .defined_names
+                    .len()
+                    .saturating_mul(size_of::<crate::raw::DefinedName>()),
+            );
+
+        // The native retained census includes package metadata and
+        // relationship strings even when their payloads remain deferred.
+        for part in package.iter_parts() {
+            endpoint = endpoint
+                .saturating_add(size_of::<litchi_opc::PartMetadata>())
+                .saturating_add(part.partname().as_str().len())
+                .saturating_add(part.content_type().len())
+                .saturating_add(relationship_bytes(part.rels()));
+        }
+        endpoint = endpoint.saturating_add(relationship_bytes(package.rels()));
+        Ok(endpoint)
+    }
+
     /// Recover the validated deferred OPC package without re-indexing it.
     ///
     /// The returned package is the one this catalog was opened from, so
@@ -1031,6 +1115,21 @@ impl SourceBackedWorkbook {
             None => &self.inner,
         }
     }
+}
+
+fn relationship_bytes(relationships: &litchi_opc::Relationships) -> usize {
+    relationships.iter().fold(
+        size_of::<litchi_opc::Relationships>(),
+        |bytes, relationship| {
+            bytes
+                .saturating_add(size_of::<litchi_opc::Relationship>())
+                .saturating_add(relationship.r_id().len())
+                .saturating_add(relationship.reltype().len())
+                .saturating_add(relationship.target_ref().len())
+                .saturating_add(relationship.base_uri().len())
+                .saturating_add(relationship.source_uri().map_or(0, str::len))
+        },
+    )
 }
 
 #[cfg(any(unix, windows))]

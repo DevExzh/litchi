@@ -42,7 +42,7 @@ use crate::OpenOptions;
 use crate::Workbook;
 use crate::custom::Props;
 use crate::error::{Result, invalid};
-use crate::workbook::{Commit, Edit, Patch};
+use crate::workbook::{Commit, Edit, EditOptions, Patch};
 use crate::writer;
 
 #[cfg(feature = "encryption")]
@@ -233,6 +233,15 @@ impl Package {
         self.workbook.opc_package()
     }
 
+    /// Conservative retained-data charge for one immutable package endpoint.
+    /// This is used by format adapters when a private signed no-op probe is
+    /// discarded after its native identity patch is rebuilt. It does not
+    /// force lazy cell or feature projections.
+    pub fn retained_bytes(&self) -> usize {
+        let archive_hint = self.opc().exact_source_len().unwrap_or(0);
+        crate::workbook::edit::workbook_retained_bytes(self.workbook_ref(), archive_hint)
+    }
+
     /// Whether the package carries OPC digital-signature parts or
     /// relationships. Nothing is verified.
     #[must_use]
@@ -355,8 +364,15 @@ impl Package {
     /// Dropping the returned [`Edit`] is the rollback; its
     /// [`Edit::commit`] publishes a new package and leaves this one intact.
     pub fn edit(&self) -> Result<Edit> {
+        self.edit_with_options(EditOptions::default())
+    }
+
+    /// Start an isolated semantic transaction with an optional retained-byte
+    /// admission budget. The budget is checked before a worksheet action can
+    /// allocate a changed store or compaction buffer.
+    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
         self.workbook.ensure_mutation_allowed("edit")?;
-        Edit::new(self.workbook.clone())
+        Edit::new_with_options(self.workbook.clone(), options)
     }
 
     /// Apply a reversible patch after checking every expected source part.

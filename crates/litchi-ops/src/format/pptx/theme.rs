@@ -237,7 +237,7 @@ impl Pptx {
                 Ok(())
             })?;
         }
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         if !colors.is_empty() || name.is_some() {
@@ -276,6 +276,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),

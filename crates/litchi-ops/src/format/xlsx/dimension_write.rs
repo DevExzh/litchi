@@ -17,7 +17,7 @@ use litchi_xlsx::{self as xlsx, HeightAt, RowAt, WidthAt};
 
 use super::node::Node;
 use super::spec::{COLUMN_WRITE_TABLE, ColumnSetter, Kind, ROW_WRITE_TABLE, RowSetter};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::props::{Key, Props};
@@ -84,7 +84,7 @@ pub(crate) fn try_set_dimensions(
         return Ok(None);
     }
 
-    file.check_source()?;
+    file.check_source_for_replay()?;
     let result = (|| {
         let Some(resolved) = resolve_targets(file, target, limits)? else {
             return Ok(None);
@@ -107,8 +107,8 @@ pub(crate) fn try_set_dimensions(
         };
         check_target_count(resolved.targets.len(), charge, limits)?;
 
-        let source = file.editor()?;
-        let mut edit = source.edit().map_err(native_error)?;
+        let source = file.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         match assignments {
             DimensionAssignments::Row(assignments) => {
                 apply_rows(&mut edit, &resolved.targets, &assignments)?;
@@ -118,9 +118,9 @@ pub(crate) fn try_set_dimensions(
             },
         }
         let native = edit.commit().map_err(native_error)?;
-        Commit::from_native(file, source, native).map(Some)
+        Commit::from_native_with_limit(file, source, native, limits.max_snapshot_bytes()).map(Some)
     })();
-    file.check_source()?;
+    file.check_source_for_replay()?;
     result
 }
 
@@ -197,7 +197,7 @@ fn resolve_targets(
         }
         append_target(&mut targets, &mut seen, target, limits)?;
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     if !matched {
         return Err(Error::new(
             Code::ZeroMatches,

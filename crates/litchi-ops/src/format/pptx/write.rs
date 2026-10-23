@@ -17,7 +17,7 @@ use crate::value::Scalar;
 use crate::{Code, Error, IntoProps, Props, Result};
 use litchi_core::FileFormat;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub(crate) enum Proof {
     Source(litchi_pptx::source::Patch),
@@ -37,6 +37,14 @@ impl Proof {
             }),
         }
     }
+
+    pub(crate) fn is_noop(&self) -> bool {
+        match self {
+            Self::Source(patch) => patch.is_noop(),
+            Self::Eager(patch) => patch.is_noop(),
+            Self::Metadata(patch) => patch.is_noop(),
+        }
+    }
 }
 pub(crate) struct Commit {
     pub(crate) after: Pptx,
@@ -44,10 +52,30 @@ pub(crate) struct Commit {
     pub(crate) target: Editable,
     pub(crate) proof: Proof,
     pub(crate) operations: usize,
+    pub(crate) snapshot_bytes: usize,
+    /// Retained native patch size is lazy but must not be recomputed by each
+    /// facade limit check.  In particular, direct unsigned writes should not
+    /// repeatedly walk the complete patch just to read the same charge.
+    pub(crate) retained_cache: OnceLock<usize>,
 }
 impl Commit {
     pub(crate) fn into_file(self) -> Pptx {
         self.after
+    }
+
+    /// Return the already-accounted snapshot charge. The native proof walk is
+    /// cached per commit so signed and unsigned writes pay it at most once.
+    pub(crate) const fn snapshot_bytes(&self) -> usize {
+        self.snapshot_bytes
+    }
+
+    /// Measure the native proof for a hard snapshot check, caching the result
+    /// for the transaction wrapper and any later canonical no-op accounting.
+    pub(crate) fn measure_snapshot_bytes(&mut self) -> usize {
+        let proof = &self.proof;
+        let measured = *self.retained_cache.get_or_init(|| proof.retained_bytes());
+        self.snapshot_bytes = self.snapshot_bytes.max(measured);
+        self.snapshot_bytes
     }
 }
 impl Editable {
@@ -190,11 +218,53 @@ impl Pptx {
         props: impl IntoProps<'v>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        self.check_source()?;
+        if self.signature() == crate::format::signature::Signature::Signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
+        }
         let result = (|| self.set_inner(target, Props::from_props(props)?, limits))()
             .map_err(|error| error.with_format(FileFormat::Pptx));
-        self.check_source()?;
-        result
+        result.and_then(|commit| {
+            // Every native proof retains source/target endpoints, including
+            // unsigned writes.  Charge it once here so the facade's snapshot
+            // limit cannot be bypassed merely by omitting a signature.
+            let mut commit = commit;
+            let snapshot_bytes = commit.measure_snapshot_bytes();
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+            }
+            if self.signature() == crate::format::signature::Signature::Signed {
+                self.check_source_for_replay()?;
+                if commit.after.same_snapshot(self) {
+                    if commit.proof.is_noop() {
+                        // The staged private edit may have retained more of
+                        // the source than the canonical identity probe.  A
+                        // direct signed no-op still owes the caller the
+                        // peak charge of both phases, just like a coalesced
+                        // run does.
+                        let staged_snapshot_bytes = commit.snapshot_bytes();
+                        let mut commit = canonical_signed_noop(self, commit.operations)?;
+                        commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
+                        let snapshot_bytes = commit.snapshot_bytes();
+                        if snapshot_bytes > limits.max_snapshot_bytes() {
+                            return Err(snapshot_limit(
+                                snapshot_bytes,
+                                limits.max_snapshot_bytes(),
+                            ));
+                        }
+                        Ok(commit)
+                    } else {
+                        Ok(commit)
+                    }
+                } else {
+                    Err(Error::signed(FileFormat::Pptx))
+                }
+            } else {
+                self.check_source()?;
+                Ok(commit)
+            }
+        })
     }
     fn set_inner(
         &self,
@@ -388,7 +458,11 @@ impl Pptx {
         }
         targets.sort_unstable_by_key(|target| (target.slide, target.position));
         let body_edits = body_edits(&targets, text, &values.format)?;
-        let source = self.editable_owner()?;
+        let source = if self.signature() == crate::format::signature::Signature::Signed {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let mut operations = 0;
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
@@ -460,6 +534,13 @@ impl Pptx {
                 )
             },
         };
+        // One facade setter remains one authored operation even when the
+        // native property writer proves that its final value is unchanged.
+        operations = operations.max(1);
+        // Defer the retained-patch walk to the cached accessor.  This keeps
+        // construction of an unsigned direct commit from doing an eager
+        // second scan when the transaction only needs the charge once.
+        let snapshot_bytes = 0;
         let after = if !changed {
             self.clone()
         } else {
@@ -474,7 +555,51 @@ impl Pptx {
             target,
             proof,
             operations,
+            snapshot_bytes,
+            retained_cache: OnceLock::new(),
         })
+    }
+}
+
+fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
+    let source = base.original_owner_for_noop()?;
+    match &source {
+        Editable::Source(package) => {
+            let (target, patch) = package
+                .edit()
+                .map_err(native_error)?
+                .commit()
+                .map_err(native_error)?
+                .into_parts();
+            let snapshot_bytes = patch.retained_bytes();
+            Ok(Commit {
+                after: base.clone(),
+                source,
+                target: Editable::Source(target),
+                proof: Proof::Source(patch),
+                operations,
+                snapshot_bytes,
+                retained_cache: OnceLock::from(snapshot_bytes),
+            })
+        },
+        Editable::Eager(package) => {
+            let (target, patch) = package
+                .edit()
+                .map_err(native_error)?
+                .commit()
+                .map_err(native_error)?
+                .into_parts();
+            let snapshot_bytes = patch.retained_bytes();
+            Ok(Commit {
+                after: base.clone(),
+                source,
+                target: Editable::Eager(Arc::new(target)),
+                proof: Proof::Eager(patch),
+                operations,
+                snapshot_bytes,
+                retained_cache: OnceLock::from(snapshot_bytes),
+            })
+        },
     }
 }
 
@@ -631,11 +756,25 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     }
     Ok(())
 }
+
+fn snapshot_limit(observed: usize, maximum: usize) -> Error {
+    TxError::Limit {
+        kind: LimitKind::SnapshotBytes,
+        observed,
+        maximum,
+    }
+    .into()
+}
+
 fn allocation(source: std::collections::TryReserveError) -> Error {
     TxError::Allocation { source }.into()
 }
 fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Pptx)
+}
+
+fn native_error(error: litchi_pptx::Error) -> Error {
+    Error::from(error).with_format(FileFormat::Pptx)
 }
 
 pub(super) fn validate_text(value: &str) -> Result<()> {

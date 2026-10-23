@@ -26,7 +26,7 @@ use litchi_core::FileFormat;
 use litchi_xlsx::{self as xlsx, Address};
 
 use super::node::{Item, Node, RunItem, SheetHandle};
-use super::write::Commit;
+use super::write::{Commit, edit_with_snapshot_limit};
 use super::{Nav, Xlsx};
 use crate::error::{Code, Error, Result};
 use crate::node::Value;
@@ -35,6 +35,7 @@ use crate::path::navigate::{Lookup, Select};
 use crate::props::{PropValue, Props};
 use crate::registry::{Access, Alias, Constraint, Entry, Operation, Table};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 use crate::value::{ColorContext, Length, LengthSpec, Scalar, ValueType};
 
 /// The run keys a write admits.
@@ -509,6 +510,7 @@ impl Xlsx {
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
+        limits: &SemanticLimits,
     ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
@@ -525,7 +527,7 @@ impl Xlsx {
         let assignments = admit(props, Operation::Set)?;
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
         let read = xlsx::RichText::clone(&run.rich);
-        self.edit_runs_with(sheet, at, false, Some(read), |rich| {
+        self.edit_runs_with(sheet, at, false, Some(read), limits, |rich| {
             let run = rich.run_mut(index).ok_or_else(|| {
                 Error::new(Code::PathNotFound, "the run is no longer in the cell")
             })?;
@@ -541,6 +543,7 @@ impl Xlsx {
         parent: &Node<'_>,
         props: &Props<'_>,
         index: Option<usize>,
+        limits: &SemanticLimits,
     ) -> Result<(Commit, usize)> {
         let Some((sheet, at)) = parent.write_cell_target() else {
             return Err(
@@ -551,7 +554,7 @@ impl Xlsx {
         let assignments = admit(props, Operation::Add)?;
         let run = assignments.run()?;
         let mut placed = 0;
-        let commit = self.edit_runs(sheet, at, |rich| {
+        let commit = self.edit_runs(sheet, at, limits, |rich| {
             let position = index.unwrap_or(rich.runs().len());
             rich.insert_run(position, run)
                 .map_err(|error| super::write::native_property_error(error, "index"))?;
@@ -562,7 +565,11 @@ impl Xlsx {
     }
 
     /// `remove` of a run path; `None` for other targets.
-    pub(super) fn try_remove_run(&self, target: &TargetArg<'_>) -> Result<Option<Commit>> {
+    pub(super) fn try_remove_run(
+        &self,
+        target: &TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<Commit>> {
         let Some(path) = target.path() else {
             return Ok(None);
         };
@@ -577,7 +584,7 @@ impl Xlsx {
         };
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
         let read = xlsx::RichText::clone(&run.rich);
-        self.edit_runs_with(sheet, at, true, Some(read), |rich| {
+        self.edit_runs_with(sheet, at, true, Some(read), limits, |rich| {
             rich.remove_run(index)
                 .map(drop)
                 .map_err(super::write::native_error)
@@ -591,9 +598,10 @@ impl Xlsx {
         &self,
         sheet: usize,
         at: Address,
+        limits: &SemanticLimits,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
-        self.edit_runs_with(sheet, at, false, None, change)
+        self.edit_runs_with(sheet, at, false, None, limits, change)
     }
 
     /// [`Self::edit_runs`]; after a removal (`plain`), the runs left
@@ -607,16 +615,17 @@ impl Xlsx {
         at: Address,
         plain: bool,
         read: Option<xlsx::RichText>,
+        limits: &SemanticLimits,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let mut rich = match read {
             Some(rich) => rich,
             None => editable_runs(&source, sheet, at)?,
         };
         change(&mut rich)?;
-        self.check_source()?;
-        let mut edit = source.edit().map_err(super::write::native_error)?;
+        self.check_source_for_replay()?;
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut worksheet = edit
             .sheet(sheet)
             .map_err(super::write::native_error)?
@@ -639,7 +648,7 @@ impl Xlsx {
             },
         }
         let native = edit.commit().map_err(super::write::native_error)?;
-        Commit::from_native(self, source, native)
+        Commit::from_native_with_limit(self, source, native, limits.max_snapshot_bytes())
     }
 }
 

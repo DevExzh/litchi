@@ -207,6 +207,8 @@ impl Pptx {
         ]);
         Ok((
             Commit {
+                snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -274,7 +276,7 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let (edit, geometry) = admit_set(self, &which, &tree, props, limits)?;
         let position = tree.handle.position().get();
-        let source = self.editable_owner()?;
+        let source = self.editable_owner_for_write()?;
         let base = eager(&source, self.0.ooxml_limits)?;
         let mut native = base.edit()?;
         if geometry.iter().any(Option::is_some) {
@@ -345,6 +347,8 @@ impl Pptx {
             self.adopt_eager(Arc::clone(&target))
         };
         Ok(Some(Commit {
+            snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),

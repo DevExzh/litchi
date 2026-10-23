@@ -10,6 +10,8 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
+    /// Retained native snapshot bytes needed by one workbook edit.
+    SnapshotBytes,
     /// Cells in one copy or move of a cell range.
     TransferCells,
     /// Stored cells scanned for formula dependencies of one range transfer.
@@ -23,6 +25,7 @@ impl LimitKind {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::SnapshotBytes => "retained snapshot bytes",
             Self::TransferCells => "cells in one range transfer",
             Self::TransferDependencyScan => "stored cells scanned for one range transfer",
             Self::SvgInputBytes => "SVG attachment input bytes",

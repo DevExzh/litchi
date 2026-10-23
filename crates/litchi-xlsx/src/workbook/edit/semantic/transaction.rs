@@ -50,7 +50,7 @@ use super::super::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,
 };
-use super::super::{codec, package};
+use super::super::{codec, package, workbook_retained_bytes};
 
 use self::snapshot::Snapshot;
 use super::super::svg::{PictureSelector, SvgInput};
@@ -340,10 +340,76 @@ pub struct Edit {
     /// payload (ADR 0030), so an edit that stages no SVG lifecycle intent never
     /// takes it.
     pub(in crate::workbook::edit) svg_base_part_bytes: Option<usize>,
+    #[allow(dead_code, reason = "the facade consumes the native capture budget")]
+    capture_budget: Option<CaptureBudget>,
+    capture_sheets: HashSet<usize>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct CaptureBudget {
+    maximum: usize,
+    reserved: usize,
+}
+
+impl CaptureBudget {
+    fn new(base: &Workbook, maximum: usize) -> Self {
+        let archive_hint = base.inner.package.exact_source_len().unwrap_or(0);
+        let endpoint = workbook_retained_bytes(base, archive_hint);
+        let reserved = endpoint
+            .saturating_mul(2)
+            .saturating_add(size_of::<Edit>())
+            .saturating_add(size_of::<Patch>())
+            .saturating_add(size_of::<Commit>());
+        Self { maximum, reserved }
+    }
+
+    #[allow(dead_code, reason = "called by the facade's worksheet preflight")]
+    fn charge(&mut self, additional: usize) -> Result<()> {
+        let observed = self.reserved.saturating_add(additional);
+        if observed > self.maximum {
+            return Err(Error::Limit {
+                kind: super::super::LimitKind::SnapshotBytes.into(),
+                observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
+            });
+        }
+        self.reserved = observed;
+        Ok(())
+    }
+
+    pub(super) fn charge_new_sheet(&mut self, authored_bytes: usize) -> Result<()> {
+        self.charge(
+            authored_bytes
+                .saturating_add(size_of::<super::super::validation::Added>())
+                .saturating_add(size_of::<super::super::validation::SheetActions>())
+                .saturating_add(size_of::<Action>())
+                .saturating_add(size_of::<Change>())
+                .saturating_add(size_of::<PartChange>()),
+        )
+    }
 }
 
 impl Edit {
     pub(crate) fn new(base: Workbook) -> Result<Self> {
+        Self::new_with_options(base, super::super::EditOptions::default())
+    }
+
+    pub(crate) fn new_with_options(
+        base: Workbook,
+        options: super::super::EditOptions,
+    ) -> Result<Self> {
+        let capture_budget = options
+            .max_retained_bytes_value()
+            .map(|maximum| CaptureBudget::new(&base, maximum));
+        if let Some(budget) = capture_budget {
+            if budget.reserved > budget.maximum {
+                return Err(Error::Limit {
+                    kind: super::super::LimitKind::SnapshotBytes.into(),
+                    observed: u64::try_from(budget.reserved).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(budget.maximum).unwrap_or(u64::MAX),
+                });
+            }
+        }
         Ok(Self {
             base,
             panes: None,
@@ -360,7 +426,60 @@ impl Edit {
             svg_projected_owners: HashMap::new(),
             svg_staged_payload_bytes: 0,
             svg_base_part_bytes: None,
+            capture_budget,
+            capture_sheets: HashSet::new(),
         })
+    }
+
+    /// Reserve the native capture needed by one worksheet operation before
+    /// its action map, changed store, or compaction output can allocate.
+    #[allow(dead_code, reason = "called by the XLSX facade coalescer")]
+    pub(crate) fn preflight_cell_capture(
+        &mut self,
+        position: usize,
+        authored_bytes: usize,
+    ) -> Result<()> {
+        if self.capture_budget.is_none() {
+            return Ok(());
+        }
+        let sheet = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
+        let first_sheet_capture = !self.capture_sheets.contains(&position);
+        let worksheet_bytes = if first_sheet_capture {
+            match self.base.inner.package.part_metadata(&sheet.part_uri) {
+                Some(metadata) if metadata.payload_is_decoded() => self
+                    .base
+                    .inner
+                    .package
+                    .get_part(&sheet.part_uri)?
+                    .blob()
+                    .len(),
+                // A deferred source payload must not be decoded merely to
+                // decide whether the capture budget admits the edit. The
+                // owned archive is a bounded estimate; the exact native
+                // patch check remains authoritative.
+                Some(_) | None => self.base.inner.package.exact_source_len().unwrap_or(0),
+            }
+        } else {
+            0
+        };
+        let additional = worksheet_bytes
+            .saturating_add(authored_bytes)
+            .saturating_add(size_of::<Action>())
+            .saturating_add(size_of::<SheetActions>())
+            .saturating_add(size_of::<Change>())
+            .saturating_add(size_of::<PartChange>());
+        if let Some(budget) = &mut self.capture_budget {
+            budget.charge(additional)?;
+        }
+        if first_sheet_capture {
+            self.capture_sheets.insert(position);
+        }
+        Ok(())
     }
 
     /// Take, once, the base census the SVG lifecycle planner checks at commit.
@@ -1838,6 +1957,7 @@ impl Edit {
             svg_projected_owners: _,
             svg_staged_payload_bytes: _,
             svg_base_part_bytes,
+            ..
         } = self;
         let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
@@ -3707,6 +3827,9 @@ impl Edit {
                 reason: TabEditBlock::SheetLimit,
             });
         }
+        if let Some(budget) = &mut self.capture_budget {
+            budget.charge_new_sheet(name.as_str().len())?;
+        }
         self.added
             .try_reserve(1)
             .map_err(|source| allocation("worksheet creation", source))?;
@@ -3741,10 +3864,12 @@ impl Edit {
             .added
             .get_mut(index)
             .ok_or_else(|| invalid("worksheet creation plan disappeared after validation"))?;
+        let capture_budget = &mut self.capture_budget;
         Ok(NewSheet {
             added,
             active: &mut self.active,
             style_lineage: &self.base.inner.style_lineage,
+            capture_budget,
             index,
             position,
         })
@@ -3847,16 +3972,38 @@ impl Edit {
     ) -> Result<()> {
         let key = crate::hyperlinks::model::reference_key(hyperlink.reference().range());
         let source = self.source_hyperlink(position, key)?;
-        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
         if source.as_ref() == Some(&hyperlink) {
-            actions.remove(&key);
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
         } else {
-            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+            let already_staged = self
+                .sheets
+                .get(&position)
+                .is_some_and(|actions| actions.hyperlinks.contains_key(&key));
+            let staged_count = self
+                .sheets
+                .get(&position)
+                .map_or(0, |actions| actions.hyperlinks.len());
+            if !already_staged && staged_count >= MAX_HYPERLINK_EDITS {
                 return Err(invalid(format!(
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            actions.insert(key, HyperlinkAction::Put(hyperlink));
+            let authored_bytes = hyperlink.reference().as_str().len()
+                + hyperlink.location().map_or(0, str::len)
+                + hyperlink.external_target().map_or(0, str::len)
+                + hyperlink.display().map_or(0, str::len)
+                + hyperlink.tooltip().map_or(0, str::len)
+                + size_of::<crate::hyperlinks::Hyperlink>();
+            self.preflight_cell_capture(position, authored_bytes)?;
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .insert(key, HyperlinkAction::Put(hyperlink));
         }
         Ok(())
     }
@@ -3872,16 +4019,35 @@ impl Edit {
             return Ok(None);
         };
         let source = self.source_hyperlink(position, key)?;
-        let actions = &mut self.sheets.entry(position).or_default().hyperlinks;
         if source.is_none() {
-            actions.remove(&key);
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
         } else {
-            if !actions.contains_key(&key) && actions.len() >= MAX_HYPERLINK_EDITS {
+            let already_staged = self
+                .sheets
+                .get(&position)
+                .is_some_and(|actions| actions.hyperlinks.contains_key(&key));
+            let staged_count = self
+                .sheets
+                .get(&position)
+                .map_or(0, |actions| actions.hyperlinks.len());
+            if !already_staged && staged_count >= MAX_HYPERLINK_EDITS {
                 return Err(invalid(format!(
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            actions.insert(key, HyperlinkAction::Remove(reference));
+            self.preflight_cell_capture(
+                position,
+                reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
+            )?;
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .insert(key, HyperlinkAction::Remove(reference));
         }
         Ok(Some(current))
     }
