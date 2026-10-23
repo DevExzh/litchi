@@ -212,7 +212,8 @@ fn invalid_data(error: impl ToString) -> std::io::Error {
 mod tests {
     use super::*;
     use crate::shape::{Anchor, Bounds, Flags, Kind, PropertyTable, ShapeId};
-    use litchi_odraw::write::{self, Atom, Container as OutContainer, ShapeBuilder};
+    use litchi_odraw::builder::ShapeBuilder;
+    use litchi_odraw::write::{self, Atom, Container as OutContainer};
 
     fn create_shape(
         shape_type: Kind,

@@ -4,7 +4,8 @@ use super::super::core::WriteError;
 use super::model::{FloatingShapeContent, FloatingShapeInfo, Picture};
 use super::validation::metafile_bounds;
 use crate::parts::spa::SPA_LEN;
-use litchi_odraw::image::write::{BlipBuilder, digest};
+use litchi_odraw::image::builder::BlipBuilder;
+use litchi_odraw::image::write::digest;
 use litchi_odraw::image::{Limits as ImageLimits, Point};
 
 /// Size of the PICF picture descriptor header ([MS-DOC] 2.9.161).

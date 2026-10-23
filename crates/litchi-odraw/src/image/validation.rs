@@ -120,7 +120,7 @@ impl<'data> Store<'data> {
     /// Returns `Error::MalformedImage` when the record is not an `OfficeArt`
     /// `BStore` container, contains an invalid child, or its file-block count
     /// does not match `recInstance`, and `Error::ImageLimitExceeded` when the
-    /// entry count exceeds `limits.max_store_entries`.
+    /// raw record or entry count exceeds its configured image limit.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         let effective_records = record.limits().constrained_by(limits.records);
         if record.len() > effective_records.max_record_bytes {
@@ -146,9 +146,29 @@ impl<'data> Store<'data> {
                 maximum: u64::from(limits.max_store_entries),
             });
         }
+        // Keep the image validator in charge of classifying its raw record
+        // budget. The generic iterator still enforces that budget for direct
+        // callers, but this admission path reports the image-specific kind.
+        let parser_limits = crate::Limits {
+            max_records: u32::MAX,
+            ..effective_records
+        };
+        let mut visited = 0_u32;
         let mut actual = 0u16;
-        for child in crate::Children::new(record.data(), effective_records) {
+        for child in crate::Children::new(record.data(), parser_limits) {
             child?;
+            visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
+                limit: LimitKind::Records,
+                observed: u64::from(visited) + 1,
+                maximum: u64::from(effective_records.max_records),
+            })?;
+            if visited > effective_records.max_records {
+                return Err(Error::ImageLimitExceeded {
+                    limit: LimitKind::Records,
+                    observed: u64::from(visited),
+                    maximum: u64::from(effective_records.max_records),
+                });
+            }
             actual = actual.checked_add(1).ok_or(Error::MalformedImage {
                 reason: "BStore file-block count exceeds 4095",
             })?;

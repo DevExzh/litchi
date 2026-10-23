@@ -7,7 +7,8 @@
 
 use std::io::{self, Write};
 
-use litchi_odraw::image::write::{BlipBuilder, StoreBuilder, digest};
+use litchi_odraw::image::builder::{BlipBuilder, StoreBuilder};
+use litchi_odraw::image::write::digest;
 pub use litchi_odraw::image::{Id, Kind, Uid};
 use litchi_odraw::image::{Point, Rect};
 

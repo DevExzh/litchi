@@ -54,6 +54,7 @@ pub struct Children<'data> {
     data: &'data [u8],
     limits: Limits,
     offset: usize,
+    seen: u32,
     done: bool,
 }
 
@@ -65,6 +66,7 @@ impl<'data> Children<'data> {
             data,
             limits,
             offset: 0,
+            seen: 0,
             done: false,
         }
     }
@@ -78,6 +80,15 @@ impl<'data> Iterator for Children<'data> {
             return None;
         }
 
+        if self.seen >= self.limits.max_records {
+            self.done = true;
+            return Some(Err(Error::LimitExceeded {
+                limit: LimitKind::Records,
+                observed: u64::from(self.seen) + 1,
+                maximum: self.limits.max_records,
+            }));
+        }
+
         if self.data.len().saturating_sub(self.offset) < 8 {
             self.done = true;
             return Some(Err(Error::TruncatedHeader {
@@ -88,6 +99,7 @@ impl<'data> Iterator for Children<'data> {
 
         match Record::parse(self.data, self.offset, self.limits) {
             Ok((record, consumed)) => {
+                self.seen += 1;
                 if let Some(next) = self.offset.checked_add(consumed) {
                     self.offset = next;
                     Some(Ok(record))
@@ -110,7 +122,8 @@ impl<'data> Iterator for Children<'data> {
             return (0, Some(0));
         }
         let remaining = self.data.len().saturating_sub(self.offset);
-        (0, Some(remaining / 8))
+        let admitted = usize::try_from(self.limits.max_records - self.seen).unwrap_or(usize::MAX);
+        (0, Some((remaining / 8).min(admitted)))
     }
 }
 
@@ -377,6 +390,46 @@ mod tests {
         ));
         assert!(children.next().is_none());
         assert!(children.next().is_none());
+    }
+
+    #[test]
+    fn child_iteration_enforces_the_record_admission_limit() {
+        let mut bytes = atom(RecordKind::Sp.raw(), &[]);
+        bytes.extend_from_slice(&atom(RecordKind::Opt.raw(), &[]));
+        let mut children = Children::new(
+            &bytes,
+            Limits {
+                max_records: 1,
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(children.next(), Some(Ok(_))));
+        assert!(matches!(
+            children.next(),
+            Some(Err(Error::LimitExceeded {
+                limit: LimitKind::Records,
+                observed: 2,
+                maximum: 1,
+            }))
+        ));
+        assert!(children.next().is_none());
+
+        let mut none = Children::new(
+            &bytes,
+            Limits {
+                max_records: 0,
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(
+            none.next(),
+            Some(Err(Error::LimitExceeded {
+                limit: LimitKind::Records,
+                observed: 1,
+                maximum: 0,
+            }))
+        ));
+        assert!(none.next().is_none());
     }
 
     #[test]

@@ -9,13 +9,13 @@
 use crate::Result;
 use crate::writer::{ShapeGroupChild, ShapeGroupWrite, ShapeKind};
 use litchi_odraw::{
+    builder::{PropertyBuilder, ShapeBuilder},
     prop::Id,
     shape::{Flags, Native},
     write::{
-        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
-        atom as write_escher_atom, child_anchor as write_child_anchor,
-        container as write_container, container_header as write_container_header,
-        spgr as write_spgr,
+        Atom as WriteAtom, Container as WriteContainer, atom as write_escher_atom,
+        child_anchor as write_child_anchor, container as write_container,
+        container_header as write_container_header, spgr as write_spgr,
     },
 };
 

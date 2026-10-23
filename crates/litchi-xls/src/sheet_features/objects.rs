@@ -6,9 +6,8 @@
 //! record it owns. The container lengths, the drawing's shape count and the
 //! drawing group's cluster table follow; every other record keeps its bytes.
 
-use litchi_odraw::write::{
-    Atom, Container, PropertyBuilder, ShapeBuilder, atom, atom_header, container_header,
-};
+use litchi_odraw::builder::{PropertyBuilder, ShapeBuilder};
+use litchi_odraw::write::{Atom, Container, atom, atom_header, container_header};
 
 use super::super::Area;
 use super::super::drawing::{self, Block, Bse, Cluster, Group, Object};
@@ -1161,8 +1160,8 @@ impl Edit {
     /// Add (or share) a blip in the drawing group's store; returns its
     /// one-based index.
     fn add_blip(&mut self, kind: litchi_odraw::image::Kind, data: &[u8]) -> Result<u32> {
-        let mut store = litchi_odraw::image::write::StoreBuilder::new();
-        let blip = litchi_odraw::image::write::BlipBuilder::bitmap(kind, data)
+        let mut store = litchi_odraw::image::builder::StoreBuilder::new();
+        let blip = litchi_odraw::image::builder::BlipBuilder::bitmap(kind, data)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the image cannot be stored"))?;
         store
             .add_embedded(blip)

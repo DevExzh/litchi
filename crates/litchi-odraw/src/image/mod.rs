@@ -14,6 +14,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub mod builder;
 pub mod write;
 
 pub use file::{File, all, container, delay, get, record, record_with_delay, scan, store};

@@ -202,7 +202,14 @@ impl<'data> File<'data> {
 pub fn store(data: &[u8], limits: Limits) -> Result<Option<Store<'_>>> {
     let mut found = None;
     let mut visited = 0_u32;
-    for result in Parser::new(data, limits.record_limits()).records() {
+    // Keep this scanner's image-specific record count classification. The
+    // generic Children iterator enforces the same raw budget for callers that
+    // consume it directly, but this route reports its own typed image limit.
+    let parser_limits = crate::Limits {
+        max_records: u32::MAX,
+        ..limits.record_limits()
+    };
+    for result in Parser::new(data, parser_limits).records() {
         let record = result?;
         visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
             limit: ImageLimitKind::Records,
@@ -265,7 +272,8 @@ pub fn all<'data>(
     store: &Store<'data>,
     delay_store: Option<&'data [u8]>,
 ) -> Result<Vec<File<'data>>> {
-    let mut files = Vec::with_capacity(usize::from(store.len()));
+    let file_cap = usize::try_from(store.limits().max_files).unwrap_or(usize::MAX);
+    let mut files = Vec::with_capacity(usize::from(store.len()).min(file_cap));
     for raw in 1..=u32::from(store.len()) {
         let id = Id::new(raw)?;
         if let Some(file) = get(store, id, delay_store)? {
@@ -499,9 +507,13 @@ fn collect<'data>(
             }
         } else if record.kind() == RecordKind::BStoreContainer {
             let store = Store::from_record(record, limits)?;
-            let store_files = all(&store, delay_store)?;
-            check_count(files.len(), store_files.len(), limits)?;
-            files.extend(store_files);
+            for raw in 1..=u32::from(store.len()) {
+                let id = Id::new(raw)?;
+                if let Some(file) = get(&store, id, delay_store)? {
+                    check_count(files.len(), 1, limits)?;
+                    files.push(file);
+                }
+            }
         } else if record.is_container() {
             let depth = stack.len().saturating_add(1);
             if depth > usize::from(limits.records.max_depth) {
@@ -676,6 +688,28 @@ mod tests {
     }
 
     #[test]
+    fn detaching_a_view_rechecks_the_retained_blip_budget() {
+        let bytes = png_blip(b"png");
+        let blip = Blip::parse(&bytes, Limits::default()).expect("valid PNG");
+        let body_len = u32::try_from(bytes.len() - 8).expect("body length fits");
+        let file = File::new(
+            blip,
+            None,
+            0,
+            Limits {
+                max_blip_bytes: body_len - 1,
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(
+            file.into_owned(),
+            Err(Error::MalformedImage {
+                reason: "owned BLIP framing could not be encoded"
+            })
+        ));
+    }
+
+    #[test]
     fn producer_names_cannot_escape_the_output_directory() {
         let bytes = png_blip(b"png");
         let blip = Blip::parse(&bytes, Default::default()).expect("valid PNG");
@@ -746,6 +780,35 @@ mod tests {
             .expect("resolve")
             .expect("image");
         assert_eq!(file.data().expect("image data"), b"png");
+    }
+
+    #[test]
+    fn all_enforces_the_retained_file_budget() {
+        let blip = png_blip(b"png");
+        let fbse = delayed_fbse(&blip, 0, &[]);
+        let mut bytes = vec![0x1f, 0, 0x01, 0xf0];
+        bytes.extend_from_slice(
+            &u32::try_from(fbse.len())
+                .expect("FBSE length fits in u32")
+                .to_le_bytes(),
+        );
+        bytes.extend_from_slice(&fbse);
+        let store = Store::parse(
+            &bytes,
+            Limits {
+                max_files: 0,
+                ..Limits::default()
+            },
+        )
+        .expect("valid store");
+        assert!(matches!(
+            all(&store, Some(&blip)),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Files,
+                observed: 1,
+                maximum: 0,
+            })
+        ));
     }
 
     #[test]
