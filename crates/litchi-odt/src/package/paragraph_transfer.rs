@@ -111,7 +111,7 @@ impl ParagraphTransferPlan {
 
     /// Applies this plan to an edit whose source is the exact planned target.
     pub fn apply(&self, edit: &mut Edit) -> std::result::Result<(), OdfError> {
-        Ok(edit.stage_plain_paragraph_transfer(self).map(|_| ())?)
+        edit.stage_plain_paragraph_transfer(self).map(|_| ())
     }
 
     pub(crate) fn validate_integrity(

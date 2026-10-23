@@ -329,8 +329,7 @@ mod tests {
                 owner.max_namespace_prefix_bytes(),
                 owner.max_namespace_uri_bytes(),
             )
-        })
-        .map_err(Error::from)?;
+        })?;
         litchi_odf_common::calculation::parse(xml, limits).map_err(Error::from)
     }
 

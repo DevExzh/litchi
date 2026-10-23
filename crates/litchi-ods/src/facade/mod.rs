@@ -936,9 +936,7 @@ impl Workbook {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn source_features(&self) -> FamilyResult<crate::source_features::Snapshot> {
-        Ok(crate::source_features::Snapshot::parse(
-            self.inner.package.content_xml(),
-        )?)
+        crate::source_features::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Inspect the source-backed content-validation catalog and compact cell bindings.

@@ -1954,17 +1954,11 @@ fn apply_flat_operation(edit: &mut crate::flat::Edit, operation: &SemanticOperat
                 return Err(invalid("ODI metadata operation has the wrong value type"));
             };
             match property {
-                MetadataProperty::Title => edit.set_title(value.clone()).map_err(CoreError::from),
-                MetadataProperty::Author => edit.set_author(value.clone()).map_err(CoreError::from),
-                MetadataProperty::Subject => {
-                    edit.set_subject(value.clone()).map_err(CoreError::from)
-                },
-                MetadataProperty::Description => {
-                    edit.set_description(value.clone()).map_err(CoreError::from)
-                },
-                MetadataProperty::Keywords => edit
-                    .set_keywords(keyword_list(value.as_ref()))
-                    .map_err(CoreError::from),
+                MetadataProperty::Title => edit.set_title(value.clone()),
+                MetadataProperty::Author => edit.set_author(value.clone()),
+                MetadataProperty::Subject => edit.set_subject(value.clone()),
+                MetadataProperty::Description => edit.set_description(value.clone()),
+                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
             }
         },
         OperationKey::Styles => Err(invalid("ODI flat plan contains a package style operation")),

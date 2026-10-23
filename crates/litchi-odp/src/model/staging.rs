@@ -377,7 +377,7 @@ mod tests {
         ] {
             let path = root.join(name);
             let presentation = crate::Package::open(&path)
-                .and_then(|package| Ok(package.presentation()?))
+                .and_then(|package| package.presentation())
                 .unwrap_or_else(|error| panic!("{name}: opening native fixture: {error}"));
             let staged = presentation
                 .staging()
