@@ -472,3 +472,62 @@ crates/litchi-iwa-core/Cargo.toml --lib`; all 83 tests passed, including the
 retained-header and public-version mutation regressions. This is correctness
 evidence only. The existing v22 Callgrind/allocation binaries predate
 `e1da0c08f2`, and no native timing claim is made for the follow-up source.
+
+## Follow-up exact matched qualification (`ceb87be1d3`)
+
+The follow-up rebuilt both endpoints from the identical probe source
+(`e2e16d88f9fa70c621599b9d6ac85fef85d2a1997810be311bcaaeae447366ad`) and
+lockfile (`21e7fece767541aa3d8a189f49368dcb5a1d27a7b3ca6d137f93d4452c7d6c65`):
+the original `ddf2ac8a...` core as base and the public-version guard at
+`ceb87be1d3` as candidate. The reduced receipt is
+[`constructor-ceb87-followup.json`](results/0361fd/constructor-ceb87-followup.json).
+The complete allocation summary and Callgrind captures remain outside the
+repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+
+The allocation run used the same allocator-enabled probe on both endpoints,
+100 iterations per route and ABBA ordering. All 15 routes had stable counters
+across their repeated endpoint legs, and every equal-iteration pair had the
+same checksum, encoded byte length and output SHA-256. Candidate counters were
+identical for `field_path`, `field_info`, `message_info`, `archive_info`, and
+`retained_encoded_len`; they were lower for the archive-object, rejection,
+parse, validation and encoding routes, except for the unchanged retained
+encoding peak. The exact binary hashes and all counter tuples are in the
+receipt.
+
+The matching Callgrind run used 2,000 and 12,000 iterations per endpoint and
+computed `Ir/op = (Ir at 12,000 - Ir at 2,000) / 10,000`:
+
+| Route | Base Ir/op | Candidate Ir/op | Candidate/base |
+|---|---:|---:|---:|
+| `field_path` | 36.0024 | 83.0036 | 2.3055 |
+| `field_info` | 65.0034 | 195.0026 | 2.9999 |
+| `message_info` | 168.0042 | 274.0053 | 1.6309 |
+| `archive_info` | 51.0050 | 294.0051 | 5.7642 |
+| `archive_object` | 13,723.9943 | 3,333.0040 | 0.2429 |
+| `archive_object_reject` | 3,440.0046 | 371.0051 | 0.1079 |
+| `parse` | 53,467.0360 | 48,204.4730 | 0.9016 |
+| `validate` | 9,061.0046 | 3,188.0057 | 0.3518 |
+| `encode` | 37,737.7921 | 31,832.9945 | 0.8435 |
+| `retained_parse` | 89,533.6377 | 90,051.1457 | 1.0058 |
+| `retained_validate` | 9,067.0046 | 7,194.0046 | 0.7934 |
+| `retained_encoded_len` | 15,585.0046 | 7,363.0101 | 0.4724 |
+| `retained_encode` | 46,978.0197 | 35,921.6190 | 0.7646 |
+| `retained_validate_tight` | 9,134.0046 | 7,266.0035 | 0.7955 |
+| `retained_encode_tight` | 46,157.3053 | 35,749.6491 | 0.7745 |
+
+The higher metadata-constructor counts are the cost of checking the current
+public record; the lower archive-object and wire routes show the optimized
+authoring and retained-header paths. These are instruction-count results,
+not native latency qualification. Native timing remains pending a verified
+quiet host.
+
+The versions-equality gap was confined to the ordinary public `Vec<MessageInfo>`
+route in `ArchiveInfo::new`: its default-profile fast predicate previously
+checked only `versions.len()`, so a caller-mutated version value could enter
+the fixed-shape branch. `MessageInfoCollection::push` already used the exact
+`is_minimal_message_info` comparison before updating its private admission
+ledger, and `push_new` creates the fixed vector itself. Thus the private
+certificate path did not accept a mutated version; the guard repairs the
+public raw-Vec validation path and preserves mutated values by sending them
+through complete admission.
