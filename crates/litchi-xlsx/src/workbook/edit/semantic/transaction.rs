@@ -1532,10 +1532,10 @@ impl Edit {
             actions
                 .hyperlinks
                 .iter()
-                .filter_map(|((row, column, _, _), action)| {
-                    (Address::at(*row, *column).ok() == Some(address))
-                        .then(|| hyperlink_action_retained_bytes(action))
+                .filter(|((row, column, _, _), _)| {
+                    Address::at(*row, *column).ok() == Some(address)
                 })
+                .map(|(_, action)| hyperlink_action_retained_bytes(action))
                 .fold(0usize, usize::saturating_add)
         });
         let key = (position, address);
@@ -6017,14 +6017,13 @@ impl Edit {
             self.recompute_relationship_capture(position, address);
             return Ok(());
         }
-        let capture =
+        let _capture =
             self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
         self.sheets
             .entry(position)
             .or_default()
             .hyperlinks
             .insert(key, HyperlinkAction::Put(hyperlink));
-        drop(capture);
         Ok(())
     }
 
@@ -6060,14 +6059,13 @@ impl Edit {
             .and_then(|actions| actions.hyperlinks.get(&key))
             .map_or(0, hyperlink_action_retained_bytes);
         if source.is_none() {
-            let capture = self.preflight_hyperlink_capture(position, address, previous_bytes, 0)?;
+            let _capture = self.preflight_hyperlink_capture(position, address, previous_bytes, 0)?;
             self.sheets
                 .entry(position)
                 .or_default()
                 .hyperlinks
                 .remove(&key);
             self.recompute_relationship_capture(position, address);
-            drop(capture);
         } else {
             let already_staged = self
                 .sheets
@@ -6082,7 +6080,7 @@ impl Edit {
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            let capture = self.preflight_hyperlink_capture(
+            let _capture = self.preflight_hyperlink_capture(
                 position,
                 address,
                 previous_bytes,
@@ -6093,7 +6091,6 @@ impl Edit {
                 .or_default()
                 .hyperlinks
                 .insert(key, HyperlinkAction::Remove(reference));
-            drop(capture);
         }
         Ok(Some(current))
     }
