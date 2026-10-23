@@ -212,7 +212,10 @@ class EndpointManifest(unittest.TestCase):
         package_dir = root / "crates/litchi-ops"
         package_dir.mkdir(parents=True)
         workspace_manifest = root / "Cargo.toml"
-        workspace_manifest.write_text("[workspace]\n", encoding="utf-8")
+        workspace_manifest.write_text(
+            "[workspace]\n[workspace.package]\nversion = \"0.0.1\"\n",
+            encoding="utf-8",
+        )
         toolchain = root / "rust-toolchain.toml"
         toolchain.write_text(
             "[toolchain]\nchannel = \"1.95.0\"\ncomponents = [\"clippy\"]\n",
@@ -220,7 +223,7 @@ class EndpointManifest(unittest.TestCase):
         )
         package_manifest = package_dir / "Cargo.toml"
         package_manifest.write_text(
-            "[package]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n"
+            "[package]\nname = \"litchi-ops\"\nversion.workspace = true\n"
             "[features]\ndocx = []\nxlsx = []\n",
             encoding="utf-8",
         )
@@ -411,6 +414,24 @@ class EndpointManifest(unittest.TestCase):
             endpoint_path.write_bytes(provenance.canonical(endpoint))
             with self.assertRaises(RuntimeError):
                 runner.endpoint_manifest(endpoint_path, args.binary, "partial")
+
+    def test_runtime_rejects_stale_workspace_package_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args, paths, _ = self.inputs(Path(tmp))
+            endpoint = provenance.endpoint_manifest(args)
+            endpoint_path = Path(tmp) / "endpoint.json"
+            endpoint_path.write_bytes(provenance.canonical(endpoint))
+            runner = self.runner_module()
+
+            projection = json.loads(paths["projection"].read_text(encoding="utf-8"))
+            projection["workspace"]["package_version"] = "9.9.9"
+            projection["lock"]["packages"][0]["version"] = "9.9.9"
+            paths["projection"].write_bytes(provenance.canonical(projection))
+            endpoint["dependency_projection"] = provenance.artifact(paths["projection"])
+            endpoint["dependency_projection_sha256"] = provenance.digest(paths["projection"])
+            endpoint_path.write_bytes(provenance.canonical(endpoint))
+            with self.assertRaises(RuntimeError):
+                runner.endpoint_manifest(endpoint_path, args.binary, "stale-version")
 
 
 if __name__ == "__main__":

@@ -527,11 +527,24 @@ def verify_endpoint_details(value: dict[str, Any], fields: dict[str, Any], label
     if fields["probe"]["path"] != str(expected_probe):
         raise RuntimeError(f"{label} probe is not crates/litchi-ops/examples/file_w8_qualified_probe.rs")
     try:
+        workspace_data = tomllib.loads(workspace_path.read_text(encoding="utf-8"))
         package_data = tomllib.loads(Path(package["path"]).read_text(encoding="utf-8"))
     except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
-        raise RuntimeError(f"{label} package manifest is invalid: {error}") from error
-    if package_data.get("package", {}).get("name") != PACKAGE_NAME:
+        raise RuntimeError(f"{label} workspace/package manifest is invalid: {error}") from error
+    package_table = package_data.get("package")
+    if not isinstance(package_table, dict) or package_table.get("name") != PACKAGE_NAME:
         raise RuntimeError(f"{label} package manifest does not declare {PACKAGE_NAME}")
+    package_version = package_table.get("version")
+    if package_version is True or (
+        isinstance(package_version, dict) and package_version.get("workspace") is True
+    ):
+        workspace_table = workspace_data.get("workspace")
+        workspace_package = workspace_table.get("package") if isinstance(workspace_table, dict) else None
+        package_version = workspace_package.get("version") if isinstance(workspace_package, dict) else None
+    if not isinstance(package_version, str) or not package_version:
+        raise RuntimeError(f"{label} package version is not resolved")
+    if projection_value.get("workspace", {}).get("package_version") != package_version:
+        raise RuntimeError(f"{label} projection package version differs from the manifests")
     features = value.get("features")
     if not isinstance(features, dict) or projection_value.get("features") != features:
         raise RuntimeError(f"{label} feature projection is missing or stale")

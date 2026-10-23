@@ -388,8 +388,12 @@ def dependency_projection(args: argparse.Namespace) -> dict[str, Any]:
     if missing:
         raise fail(f"requested features are not declared by {package['name']}: {missing}")
     package_version = package.get("version")
-    if package_version is True:
-        package_version = workspace_data.get("workspace", {}).get("package", {}).get("version")
+    if package_version is True or (
+        isinstance(package_version, dict) and package_version.get("workspace") is True
+    ):
+        workspace_table = workspace_data.get("workspace")
+        workspace_package = workspace_table.get("package") if isinstance(workspace_table, dict) else None
+        package_version = workspace_package.get("version") if isinstance(workspace_package, dict) else None
     if not isinstance(package_version, str) or not package_version:
         raise fail(f"could not resolve {package['name']} package version")
     if not any(

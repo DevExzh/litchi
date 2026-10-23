@@ -37,7 +37,8 @@ The package declaration must be `litchi-ops` at the canonical
 `crates/litchi-ops/Cargo.toml` path, and the probe must be at
 `crates/litchi-ops/examples/file_w8_qualified_probe.rs` in that same
 workspace.  The runner rechecks both path and package-name identities before
-calibration.
+calibration, resolves `version.workspace = true` from the workspace package,
+and compares that version with the projected `litchi-ops` lock entry.
 
 Keep all generated descriptors, lockfiles, source archives, manifests and
 binaries in `.coord` or another external scratch directory.  The tool rejects
