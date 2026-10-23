@@ -946,6 +946,7 @@ enum IndexedLayoutName {
 struct IndexedLayoutEntry {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     name: IndexedLayoutName,
+    central_metadata_bytes: u64,
 }
 
 /// The bytes of one fixed ZIP local file header.
@@ -1750,6 +1751,62 @@ impl<'a, R> Iterator for IndexedArchiveNames<'a, R> {
 }
 
 impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
+
+/// Central-directory facts for one preservation entry.
+///
+/// This is a borrowed, metadata-only projection. It includes directory
+/// records, which the ordinary file index intentionally omits, and does not
+/// read or allocate member payloads. The values are the declarations already
+/// retained while the indexed archive's central-directory pass runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreservationEntryMetadata {
+    raw_name_len: u64,
+    central_metadata_bytes: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+    directory: bool,
+}
+
+impl PreservationEntryMetadata {
+    /// Returns the raw central-directory member-name length in bytes.
+    #[must_use]
+    pub const fn raw_name_len(self) -> u64 {
+        self.raw_name_len
+    }
+
+    /// Returns the variable central-directory metadata length in bytes.
+    ///
+    /// This includes the raw name, extra fields and file comment, but not the
+    /// fixed 46-byte central-directory record.
+    #[must_use]
+    pub const fn central_metadata_bytes(self) -> u64 {
+        self.central_metadata_bytes
+    }
+
+    /// Returns the complete central-directory record length in bytes.
+    #[must_use]
+    pub const fn central_record_bytes(self) -> u64 {
+        CENTRAL_FIXED_RECORD_BYTES + self.central_metadata_bytes
+    }
+
+    /// Returns the declared compressed payload size.
+    #[must_use]
+    pub const fn compressed_size(self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Returns the declared uncompressed payload size.
+    #[must_use]
+    pub const fn uncompressed_size(self) -> u64 {
+        self.uncompressed_size
+    }
+
+    /// Returns whether this central record represents a directory.
+    #[must_use]
+    pub const fn is_directory(self) -> bool {
+        self.directory
+    }
+}
 
 /// Reusable decoder state for one sequential operation over an indexed ZIP
 /// archive.
@@ -4207,6 +4264,7 @@ where
                     layout.push(IndexedLayoutEntry {
                         wayfinder: entry.wayfinder(),
                         name: IndexedLayoutName::Directory(central_name),
+                        central_metadata_bytes: metadata_bytes - CENTRAL_FIXED_RECORD_BYTES,
                     });
                     directories.insert(
                         name,
@@ -4310,6 +4368,7 @@ where
                 layout.push(IndexedLayoutEntry {
                     wayfinder: entry.wayfinder(),
                     name: IndexedLayoutName::Entry(entry_id),
+                    central_metadata_bytes: metadata_bytes - CENTRAL_FIXED_RECORD_BYTES,
                 });
                 index.insert(index_name, entry_id);
                 ordered_entries.push((local_header_offset, entry_id));
@@ -4625,6 +4684,33 @@ where
         self.order.iter().map(|&entry_id| {
             let name = self.entries[entry_id.0].name.as_str();
             (entry_id, name)
+        })
+    }
+
+    /// Iterate all central-directory entries in physical local-header order.
+    ///
+    /// Unlike [`Self::file_entries`], this includes directory records. The
+    /// returned values borrow only metadata retained during indexing; the
+    /// iterator performs no source reads, payload decompression or allocation.
+    #[must_use]
+    pub fn preservation_entries(
+        &self,
+    ) -> impl ExactSizeIterator<Item = PreservationEntryMetadata> + '_ {
+        self.layout.iter().map(|entry| {
+            let (raw_name_len, directory) = match &entry.name {
+                IndexedLayoutName::Entry(entry_id) => (
+                    self.entries[entry_id.0].info.central_name.len() as u64,
+                    false,
+                ),
+                IndexedLayoutName::Directory(name) => (name.len() as u64, true),
+            };
+            PreservationEntryMetadata {
+                raw_name_len,
+                central_metadata_bytes: entry.central_metadata_bytes,
+                compressed_size: entry.wayfinder.compressed_size_hint(),
+                uncompressed_size: entry.wayfinder.uncompressed_size_hint(),
+                directory,
+            }
         })
     }
 
@@ -12931,6 +13017,37 @@ mod tests {
     }
 
     #[test]
+    fn indexed_archive_preservation_entries_include_directories_without_payload_work() {
+        let indexed = indexed_archive(fixture(&[
+            FixtureEntry::stored(b"first.bin", b"first"),
+            FixtureEntry::stored(b"folder/", b""),
+            FixtureEntry::stored(b"second.bin", b"second"),
+        ]));
+
+        let entries: Vec<_> = indexed.preservation_entries().collect();
+        assert_eq!(entries.len(), indexed.preservation_entry_count());
+        assert_eq!(entries.len(), 3);
+        assert!(!entries[0].is_directory());
+        assert_eq!(entries[0].raw_name_len(), b"first.bin".len() as u64);
+        assert_eq!(entries[0].compressed_size(), 5);
+        assert_eq!(entries[0].uncompressed_size(), 5);
+        assert_eq!(entries[0].central_metadata_bytes(), 9);
+        assert_eq!(entries[0].central_record_bytes(), 46 + 9);
+        assert!(entries[1].is_directory());
+        assert_eq!(entries[1].raw_name_len(), b"folder/".len() as u64);
+        assert_eq!(entries[1].compressed_size(), 0);
+        assert_eq!(entries[1].uncompressed_size(), 0);
+        assert_eq!(entries[1].central_metadata_bytes(), 7);
+        assert_eq!(entries[1].central_record_bytes(), 46 + 7);
+        assert!(!entries[2].is_directory());
+        assert_eq!(entries[2].raw_name_len(), b"second.bin".len() as u64);
+        assert_eq!(entries[2].compressed_size(), 6);
+        assert_eq!(entries[2].uncompressed_size(), 6);
+        assert_eq!(entries[2].central_metadata_bytes(), 10);
+        assert_eq!(entries[2].central_record_bytes(), 46 + 10);
+    }
+
+    #[test]
     fn equal_local_header_offsets_keep_existing_reader_ordering() {
         let mut bytes = fixture(&[
             FixtureEntry::stored(b"first.bin", b"first"),
@@ -13602,6 +13719,15 @@ mod tests {
         let indexed = indexed_archive_result(one.clone(), one_limits).unwrap();
         assert_eq!(indexed.len(), 0);
         assert!(indexed.metadata("folder/").unwrap().is_directory());
+
+        let mut one_name_over = one_limits;
+        one_name_over.max_member_name_bytes = 6;
+        assert_limit(
+            indexed_archive_result(one.clone(), one_name_over).unwrap_err(),
+            LimitResource::MemberNameBytes,
+            7,
+            6,
+        );
 
         let mut one_over = one_limits;
         one_over.max_metadata_bytes -= 1;
