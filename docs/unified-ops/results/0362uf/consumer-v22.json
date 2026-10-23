@@ -1,0 +1,34 @@
+{
+  "source": "c2329a970df5a407452ae2f43e7ed3658df3d467",
+  "pid": 1807055,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v7.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v22"
+  ],
+  "started_unix_seconds": 1792766601.940684,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 180.8435288109995,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v22/check-0.log",
+      "bytes": 2515,
+      "sha256": "0ec89765c6440c43f6538eb457ca9e65196889edfa99feb6597be012f970f532",
+      "target_bytes_before": 18620128880,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Workspace check found one unused self import after glossary qualifier migration; removed without lint allowance. Harness groups not reached."
+}

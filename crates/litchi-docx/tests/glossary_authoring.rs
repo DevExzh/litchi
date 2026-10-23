@@ -4,8 +4,7 @@
 )]
 use litchi_docx::Package;
 use litchi_docx::glossary::{
-    self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Limits, Name, Props,
-    raw,
+    Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Limits, Name, Props, raw,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, part::BlobPart};

@@ -299,3 +299,8 @@ The whole diagnosed batch is assigned for consumer repair; no lint allowance
 or default-policy fallback is accepted. Both harness groups remain unreached.
 [consumer-v21.json](results/0362uf/consumer-v21.json) retains exact commands,
 source, logs and hashes.
+
+The twenty-second pass on `c2329a970d` reports one unused `self` import
+left by the glossary test qualification migration. It is removed directly,
+without a lint allowance. [consumer-v22.json](results/0362uf/consumer-v22.json)
+records the 180.84-second workspace failure; the harness groups were not reached.
