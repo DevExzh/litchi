@@ -1,10 +1,16 @@
 {
-  "schema": "litchi.odf.shared-triad-qualification.manifest.v1",
+  "schema": "litchi.odf.shared-triad-qualification.manifest.v2",
   "lane": "odf-shared-triad",
   "baseline_commit": "173dd5330476713714871007316794b9a3a1bdaa",
-  "candidate_commit": "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee",
+  "candidate_commit": null,
+  "source": {
+    "package_manifest": "crates/litchi-ops/Cargo.toml",
+    "lock_path": "Cargo.lock",
+    "lock_sha256": null
+  },
   "probe": {
     "path": "crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
+    "sha256": "f274ae4692bf2debc4d77fd8c812da2b7bf78321ae5f475223ccd81a6c680af5",
     "features": ["odc", "odi", "oth", "odm"],
     "modes": ["validate", "timed"],
     "max_iterations": 128
@@ -51,7 +57,7 @@
     "setup_outside_clock": [
       "deterministic builder or tracked fixture read",
       "Package::from_bytes and File::open_bytes",
-      "edit target and property construction"
+      "typed edit inputs, props and edit target construction"
     ],
     "inside_clock": ["commit_only", "commit_plus_diagnostics", "publication"],
     "allocation_observation": {
@@ -59,6 +65,14 @@
       "leaf": "not exposed by litchi_core::edit::Diagnostics",
       "process_allocator": "external runner only"
     }
+  },
+  "output": {
+    "schema": "litchi.odf.shared-triad-qualification.v1",
+    "families": ["odc", "odi", "oth", "odm"],
+    "odm_changed_output_decisions": [
+      "byte_exact",
+      "archive_member_order_and_manifest_listing"
+    ]
   },
   "claim_scope": "validation and reproducible phase protocol only; no native acceptance claim"
 }

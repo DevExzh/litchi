@@ -9,9 +9,13 @@ claim is included here.
 ## Source and routes
 
 The intended comparison is the exact shared-triad change from
-`173dd5330476713714871007316794b9a3a1bdaa` to its implementing source tip
-`15ab9324ef4f8c927acd6ecfc19d9707c3f886ee`. The route/probe manifest is
-`tools/native_qualification/manifests/odf-shared-triad.json`.
+`173dd5330476713714871007316794b9a3a1bdaa`; the candidate is deliberately
+unresolved until the final integrated freeze. The historical implementation
+tip `15ab9324ef4f8c927acd6ecfc19d9707c3f886ee` is provenance only and is not a
+candidate or an acceptance endpoint. The route/probe manifest is
+`tools/native_qualification/manifests/odf-shared-triad.json`; its runner
+requires a supplied full candidate SHA and fails closed on an unresolved or
+stale selection.
 
 All four routes use deterministic in-repository builders. ODC creates a chart,
 ODI creates an image, and OTH creates one paragraph. ODM uses its existing
@@ -32,10 +36,21 @@ untimed proof reads every triad accessor, checks the source owner is unchanged,
 checks patch base admission, forward replay, inverse restoration, exact no-op
 replay, and repeated publication bytes. The leaf and facade outputs are also
 reopened for the semantic marker. ODC, ODI and OTH currently produce byte-
-identical changed outputs; ODM deliberately records separate archive digests
-and requires semantic title equality, while retaining the stronger per-side
-source/replay/publication proofs. This distinction is evidence, not an
-acceptance waiver.
+identical changed outputs; ODM records separate archive digests and performs
+an ordered ZIP-member audit. The audit compares decompressed member hashes,
+`meta.xml` presence/content, untouched members, compression, timestamps,
+extra fields, comments, permissions and archive comments. The deterministic
+ODM output currently has one explicit `archive_member_order_and_manifest_listing`
+decision: payload bytes and stored metadata are identical by member name, but
+the two physical orders and the corresponding manifest entry orders differ.
+The audit proves each manifest lists its own physical order and rejects any
+other content or archive-metadata difference. In the observed pair the native
+order is `mimetype,content.xml,meta.xml,META-INF/manifest.xml` and the facade
+order is `mimetype,meta.xml,content.xml,META-INF/manifest.xml`. The member
+audit also compares raw names, decompressed bytes and hashes, CRC/compressed
+size, compression, timestamps, extra fields, comments, permissions, version
+and encryption flags, plus the archive comment. This is an explicit fidelity
+classification, not byte identity, semantic-only acceptance, or a waiver.
 
 ## Probe and timing contract
 
@@ -60,8 +75,12 @@ counter, so process allocator capture remains an external runner concern.
 
 The generic W4b/W5 native runner is not reused for this lane: it intentionally
 rejects unknown historical lanes and hard-codes their workload argv. The
-manifest freezes this lane's source refs, features, route operations and phase
-boundaries; a later safe runner may consume it without changing the probe.
+dedicated `tools/native_qualification/odf_shared_triad_runner.py` binds the
+source HEAD/tree, package manifest, lock hash, probe hash, exact features,
+route order, phase boundary, and validated output receipt. Its unit tests
+mutate each of those contracts and verify rejection. It runs Cargo only with
+`--offline --locked`, one build job, an external target/TMPDIR, and fixed
+19.2-GB preflight/20-GB hard limits.
 
 ## Baseline compatibility and validation
 
@@ -73,19 +92,43 @@ post-baseline accessor in the probe. The baseline endpoint has not been built
 in this source-only phase; no compatibility result is claimed until the
 coordinator authorizes the external baseline build.
 
-Current-candidate checks completed with one cargo job and the existing memory
-shim (target and temporary directory outside the checkout):
+An earlier source-only development check was run with one cargo job and the
+memory shim, but without `--locked`; it is historical debug evidence only and
+is not a qualification receipt. The successful external untimed output was
+`/tmp/uo2-w8-readiness-odf-shared-final.json` (15,786 bytes,
+SHA-256 `37637dee1eeff82e37803a7a2579d91510af6e4f8aaed58c5436e3b21b7c89df`).
+It predates the fail-closed assertions and archive audit below and must not be
+reused as current evidence.
+
+The underlying Cargo command (which the runner invokes) is:
 
 ```text
-rustfmt --edition 2024 --check crates/litchi-ops/examples/odf_shared_triad_qualification.rs
-cargo check --offline -p litchi-ops \
-  --example odf_shared_triad_qualification --features odc,odi,oth,odm
-cargo run --offline -p litchi-ops \
+source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+export CARGO_TARGET_DIR=/external/native-final/targets/odf-shared-run
+export CARGO_BUILD_JOBS=1
+export TMPDIR=/external/native-final/tmp/odf-shared-run
+cargo run --offline --locked -p litchi-ops \
   --example odf_shared_triad_qualification --features odc,odi,oth,odm \
-  -- --mode validate
+  -- --mode validate --family all
 ```
 
-The validation emitted all four rows; each side's changed/no-op replay and
-publication checks passed, and each semantic marker matched. The run was
-untimed and is not a native acceptance result. No Cargo release build, quiet
-host timing, baseline build, or PROGRESS edit was performed.
+The executable orchestration is:
+
+```text
+python3 tools/native_qualification/odf_shared_triad_runner.py \
+  --manifest tools/native_qualification/manifests/odf-shared-triad.json \
+  --phase run --role candidate \
+  --source-root "$SOURCE_ROOT" --source-commit "$FINAL_CANDIDATE_SHA" \
+  --lock-sha256 "$CARGO_LOCK_SHA256" \
+  --output "$OUT/probe.json" --receipt "$OUT/receipt.json" \
+  --target-dir "$TARGET" --tmpdir "$TMPDIR" --stderr "$OUT/probe.stderr" \
+  --mode validate
+```
+
+The runner supplies the final selected source SHA and lock SHA, rejects the
+historical `15ab` tip, verifies the clean source tree and package/probe/lock
+identities, rejects overlapping artifacts, captures stdout/stderr outside the
+checkout, and validates all four rows before writing the receipt. The current
+source correction has no baseline build, release build, quiet-host timing, or
+final native comparison; a locked debug validation is still required after the
+successor commit is selected. No PROGRESS edit is part of this lane.

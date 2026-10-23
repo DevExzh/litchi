@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Fail-closed unit tests for the ODF shared-triad protocol."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from native_qualification import odf_shared_triad_runner as runner  # noqa: E402
+
+
+def _side(changed: bool) -> dict[str, object]:
+    return {
+        "changed": changed,
+        "patch_noop": not changed,
+        "patch_base_match": True,
+        "diagnostics_changed": changed,
+        "source_unchanged": True,
+        "output_differs_from_source": changed,
+        "publication_repeat_exact": True,
+        "forward_replay_exact": True,
+        "inverse_replay_restores_source": True,
+        "source_bytes": 1,
+        "output_bytes": 2 if changed else 1,
+        "output_sha256": "0" * 64,
+    }
+
+
+def _output(manifest: dict[str, object]) -> dict[str, object]:
+    rows = []
+    for route in manifest["routes"]:  # type: ignore[index]
+        family = route["family"]
+        odm = family == "odm"
+        audit = None
+        if odm:
+            audit = {
+                "status": "audited",
+                "decision": "byte_exact",
+                "allowed": True,
+                "archive_comment_equal": True,
+                "member_order_exact": True,
+                "non_meta_content_exact": True,
+                "non_manifest_content_exact": True,
+                "non_meta_stored_metadata_exact": True,
+                "meta_stored_metadata_exact": True,
+                "non_manifest_archive_record_exact": True,
+                "meta_archive_record_exact": True,
+                "leaf_order": ["meta.xml"],
+                "facade_order": ["meta.xml"],
+                "content_differences": [],
+                "leaf_member_count": 1,
+                "facade_member_count": 1,
+                "members": [
+                    {
+                        "name": "meta.xml",
+                        "facade_name": "meta.xml",
+                        "content_equal": True,
+                        "stored_metadata_equal": True,
+                        "archive_record_equal": True,
+                    }
+                ],
+            }
+        rows.append(
+            {
+                "family": family,
+                "route": route["id"],
+                "source": route["source"],
+                "source_bytes": 1,
+                "source_sha256": "1" * 64,
+                "source_pair_exact": True,
+                "leaf": {"changed": _side(True), "no_op": _side(False)},
+                "facade": {"changed": _side(True), "no_op": _side(False)},
+                "paired": {
+                    "changed_output_exact": not odm,
+                    "changed_output_sha256": "2" * 64,
+                    "facade_changed_output_sha256": "3" * 64,
+                    "semantic_equality": True,
+                    "archive_audit": audit,
+                },
+                "timing": {
+                    "status": "not_run",
+                    "setup_outside_clock": list(runner.SETUP_PHASES),
+                    "clock_phases": list(runner.PHASES),
+                    "max_iterations": 128,
+                },
+            }
+        )
+    return {
+        "schema": runner.OUTPUT_SCHEMA,
+        "mode": "validate",
+        "families": rows,
+        "claim_scope": runner.CLAIM_SCOPE,
+    }
+
+
+class OdfSharedTriadRunnerTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.manifest, _ = runner.load_manifest(
+            ROOT / "tools/native_qualification/manifests/odf-shared-triad.json"
+        )
+
+    def test_manifest_is_unresolved_until_final_candidate(self) -> None:
+        self.assertIsNone(self.manifest["candidate_commit"])
+        stale = copy.deepcopy(self.manifest)
+        stale["candidate_commit"] = "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee"
+        with self.assertRaisesRegex(runner.RunnerError, "historical"):
+            runner.validate_manifest(stale)
+
+    def test_manifest_mutations_fail_closed(self) -> None:
+        for field, value, message in (
+            ("probe", {"features": ["odc"]}, "features"),
+            ("routes", [], "routes"),
+            ("phases", {"inside_clock": ["publication"]}, "inside_clock"),
+        ):
+            mutated = copy.deepcopy(self.manifest)
+            if field == "probe":
+                mutated["probe"].update(value)
+            else:
+                mutated[field].update(value) if isinstance(mutated[field], dict) else mutated.__setitem__(field, value)
+            with self.assertRaisesRegex(runner.RunnerError, message):
+                runner.validate_manifest(mutated)
+
+    def test_probe_output_booleans_and_bindings_are_required(self) -> None:
+        payload = _output(self.manifest)
+        runner.validate_probe_output(self.manifest, payload)
+        broken = copy.deepcopy(payload)
+        broken["families"][0]["leaf"]["changed"]["forward_replay_exact"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "forward_replay_exact"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][1]["source_pair_exact"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "source bytes"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][2]["paired"]["semantic_equality"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "semantic_equality"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["content_differences"] = ["content.xml"]
+        with self.assertRaisesRegex(runner.RunnerError, "content difference"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["members"][0]["archive_record_equal"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "archive_record_equal"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["facade_order"] = ["other.xml"]
+        with self.assertRaisesRegex(runner.RunnerError, "member names differ"):
+            runner.validate_probe_output(self.manifest, broken)
+
+    def test_source_tree_probe_and_lock_are_bound(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-shared-runner-") as directory:
+            root = Path(directory)
+            (root / "crates/litchi-ops/examples").mkdir(parents=True)
+            shutil.copy2(ROOT / "crates/litchi-ops/Cargo.toml", root / "crates/litchi-ops/Cargo.toml")
+            probe = root / "crates/litchi-ops/examples/odf_shared_triad_qualification.rs"
+            shutil.copy2(ROOT / "crates/litchi-ops/examples/odf_shared_triad_qualification.rs", probe)
+            lock = root / "Cargo.lock"
+            lock.write_bytes(b"synthetic lock identity\n")
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.name", "runner-test"], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-qm", "fixture"], check=True)
+            commit = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+            lock_sha = hashlib.sha256(lock.read_bytes()).hexdigest()
+            probe_sha = hashlib.sha256(probe.read_bytes()).hexdigest()
+            manifest = copy.deepcopy(self.manifest)
+            manifest["baseline_commit"] = commit
+            manifest["probe"]["sha256"] = probe_sha
+            manifest["source"]["lock_sha256"] = lock_sha
+            identity = runner.source_identity(
+                manifest,
+                role="baseline",
+                source_root=root,
+                source_commit=None,
+                lock_sha256=lock_sha,
+            )
+            self.assertEqual(identity["commit"], commit)
+            with self.assertRaisesRegex(runner.RunnerError, "lock"):
+                runner.source_identity(
+                    manifest,
+                    role="baseline",
+                    source_root=root,
+                    source_commit=None,
+                    lock_sha256="f" * 64,
+                )
+
+    def test_receipt_tree_identity_is_a_git_tree_sha(self) -> None:
+        receipt = runner.make_receipt(
+            b"manifest",
+            {
+                "clean": True,
+                "commit": "a" * 40,
+                "tree": "b" * 40,
+                "package_manifest": {
+                    "path": "/source/crates/litchi-ops/Cargo.toml",
+                    "sha256": "d" * 64,
+                    "name": "litchi-ops",
+                },
+                "source_tree_sha256": "e" * 64,
+                "root": "/source",
+                "probe": {
+                    "path": "/source/crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
+                    "sha256": self.manifest["probe"]["sha256"],
+                },
+                "lock": {"path": "/source/Cargo.lock", "sha256": "c" * 64},
+            },
+            None,
+        )
+        runner.validate_receipt_bindings(self.manifest, receipt)
+        receipt["source"]["tree"] = "d" * 64
+        with self.assertRaisesRegex(runner.RunnerError, "commit/tree"):
+            runner.validate_receipt_bindings(self.manifest, receipt)
+
+
+if __name__ == "__main__":
+    unittest.main()
