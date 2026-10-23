@@ -8,17 +8,21 @@ Rust, a benchmark binary, or a timing workload.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_qualification_runner as runner  # noqa: E402
+from native_qualification import prepare_w4b_w5_inputs as source_prep  # noqa: E402
 from native_qualification import w5_analyzer_adapter as w5_adapter  # noqa: E402
 
 
@@ -83,6 +87,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 "W5_AFTER_SOURCE": str(Path(directory) / "w5-after-source"),
                 "W5_TARGET_ROOT": str(target_root),
                 "LITCHI_COORD_BIN": directory,
+                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
                 "W4B_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
                 "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
             }
@@ -108,7 +113,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             data["target_limit_bytes"] = 1
             path = Path(directory) / "manifest.json"
             path.write_text(json.dumps(data), encoding="utf-8")
-            old = {key: os.environ.get(key) for key in ("NATIVE_QUAL_OUTPUT", "W5_BEFORE_SOURCE", "W5_AFTER_SOURCE", "W5_TARGET_ROOT", "LITCHI_COORD_BIN", "W5_ANALYZER")}
+            old = {key: os.environ.get(key) for key in ("NATIVE_QUAL_OUTPUT", "W5_BEFORE_SOURCE", "W5_AFTER_SOURCE", "W5_TARGET_ROOT", "LITCHI_COORD_BIN", "LITCHI_NATIVE_QUAL_ROOT", "W5_ANALYZER")}
             try:
                 os.environ.update(
                     {
@@ -117,6 +122,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                         "W5_AFTER_SOURCE": str(Path(directory) / "after"),
                         "W5_TARGET_ROOT": str(Path(directory) / "targets"),
                         "LITCHI_COORD_BIN": directory,
+                        "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
                         "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
                     }
                 )
@@ -269,6 +275,102 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(qualified["schema"], w5_adapter.SUMMARY_SCHEMA)
             self.assertEqual(qualified["lane"], "w5-legacy")
             self.assertEqual(qualified["analysis"], analysis)
+
+    def test_w5_source_overlay_replaces_only_the_recorded_routes_module(self) -> None:
+        candidate = (ROOT / "crates/litchi-ops/examples/legacy_w5_source_probe.rs").read_text(encoding="utf-8")
+        routes = (ROOT / "docs/unified-ops/results/0359a/routes_before.rs").read_text(encoding="utf-8")
+        adapted = source_prep._adapt_w5_probe(candidate, routes)
+        self.assertIn("SourceSnapshot::from_bytes", adapted)
+        self.assertIn("source_backed::Package::from_bytes", candidate)
+        self.assertEqual(adapted.count("mod routes {"), 1)
+        self.assertIn("PLAN_ONLY_ROUTE: bool = true", adapted)
+
+    def test_w4b_crud_overlay_is_only_the_recorded_trait_import(self) -> None:
+        baseline = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
+        adapted = source_prep._adapt_w4b_crud(baseline)
+        self.assertEqual(
+            adapted,
+            "use litchi::sheet::{WorkbookTrait, Worksheet};\n"
+            "use litchi_core::sheet::Cell as _;\nfn main() {}\n",
+        )
+        with self.assertRaisesRegex(source_prep.PreparationError, "already contains"):
+            source_prep._adapt_w4b_crud(
+                baseline.replace(
+                    "fn main", "use litchi_core::sheet::Cell as _;\nfn main"
+                )
+            )
+
+    def test_source_preparation_requires_external_disjoint_provenance(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-prep-paths-") as directory:
+            root = Path(directory)
+            before = root / "before"
+            after = root / "after"
+            before.mkdir()
+            after.mkdir()
+            with self.assertRaisesRegex(source_prep.PreparationError, "pairwise disjoint"):
+                source_prep._require_disjoint_sources(before, after, before / "provenance.json")
+
+    def test_w4b_preparation_transforms_existing_baseline_crud(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-prep-crud-") as directory:
+            root = Path(directory)
+            before = root / "before"
+            after = root / "after"
+            baseline_crud = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
+            candidate_crud = baseline_crud + "// candidate API body\n"
+
+            def git(repo: Path, *args: str) -> str:
+                result = subprocess.run(
+                    ["git", "-C", str(repo), *args],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                return result.stdout.strip()
+
+            for repo, crud in ((before, baseline_crud), (after, candidate_crud)):
+                repo.mkdir()
+                git(repo, "init", "--quiet")
+                git(repo, "config", "user.email", "native-qualification@test.invalid")
+                git(repo, "config", "user.name", "native qualification test")
+                crud_path = repo / source_prep.W4B_CRUD
+                crud_path.parent.mkdir(parents=True)
+                crud_path.write_text(crud, encoding="utf-8")
+                probe_path = repo / source_prep.W4B_PROBE
+                probe_path.parent.mkdir(parents=True, exist_ok=True)
+                probe_path.write_text("fn main() {}\n", encoding="utf-8")
+                git(repo, "add", ".")
+                git(repo, "commit", "--quiet", "-m", "source pair")
+
+            baseline_tree = git(before, "rev-parse", "HEAD^{tree}")
+            with mock.patch.object(source_prep, "W4B_BASE_TREE", baseline_tree):
+                prepared = source_prep._prepare_w4b(before, after)
+
+            adapted = (before / source_prep.W4B_CRUD).read_text(encoding="utf-8")
+            self.assertEqual(adapted, source_prep._adapt_w4b_crud(baseline_crud))
+            crud_overlay = prepared["overlays"][1]
+            self.assertEqual(
+                crud_overlay["before_sha256"],
+                hashlib.sha256(baseline_crud.encode()).hexdigest(),
+            )
+            self.assertEqual(
+                crud_overlay["after_sha256"],
+                source_prep._sha256(before / source_prep.W4B_CRUD)[0],
+            )
+            self.assertEqual(
+                crud_overlay["adaptation"],
+                "recorded one-line litchi_core::sheet::Cell import",
+            )
+
+            unrelated = root / "unrelated.rs"
+            unrelated.write_text("changed\n", encoding="utf-8")
+            with self.assertRaisesRegex(source_prep.PreparationError, "changed unexpectedly"):
+                source_prep._transform_text_exact(
+                    unrelated,
+                    baseline_crud,
+                    source_prep._adapt_w4b_crud(baseline_crud),
+                    after / source_prep.W4B_CRUD,
+                )
 
     def test_symlink_artifact_is_never_hashed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-link-") as directory:

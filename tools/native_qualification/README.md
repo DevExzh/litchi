@@ -15,6 +15,58 @@ The two manifests preserve the recorded workloads and order:
   `legacy_w5_probe` for each leg, 31 rounds, `LITCHI_PROBE_BATCH_ROUNDS=7`,
   and the same ABBA order.
 
+Before a final build, prepare the historical source consumers in external
+worktrees.  The accepted W5 baseline is `7afba5f146aa1a16eba73ebed2144dd041b33fb5`;
+the accepted W4b baseline is the synthetic merge tree
+`684a028b2ae30a3a110b87bf6743fc598c6691a2`, reproduced by merging the
+recorded W4-XLSX ref `635b884c7c5372a4aa05ea3f13c77eccc0469598` with the
+recorded trunk ref `f2bbbc8d07ab5da26c180f1ff74813d39f632d54`.  The historical
+measured heads are W5 `e3e805f2dd26db78b8e951fa920275760e87a22b` and W4b
+`1af8b42cb6c4a12c3a048cc36b6342ef07498d1d`.  The current clean source refs
+from the individual wave closures (`83bfc60b42ad7b6830c81bbc30e1238efadef907`
+for W5 and `b2e21c0ab481ed7ff8e3ce07e50fcb3c9572fc90` for W4b) are historical
+provenance only, not final candidates.  The coordinator must select repaired,
+assembled candidate commits after the final merge; the preparer requires each
+selected candidate's full commit SHA and records it in its provenance.
+
+The baseline trees intentionally predate their wave probe consumers.  Create
+the W4b synthetic worktree, create a detached W5 worktree at the accepted
+tip, then run this source-only preparer.  It copies the W4b probe, applies the
+recorded one-line `Cell` import to `xlsb_crud`, and generates the W5 probe with
+the recorded `routes_before.rs`; it writes hashes and source identities to an
+external provenance JSON and runs no build command:
+
+```sh
+W4B_TREE=$(git merge-tree --write-tree \
+  635b884c7c5372a4aa05ea3f13c77eccc0469598 \
+  f2bbbc8d07ab5da26c180f1ff74813d39f632d54)
+test "$W4B_TREE" = 684a028b2ae30a3a110b87bf6743fc598c6691a2
+W4B_COMMIT=$(printf '%s\n' 'record-0360b synthetic baseline' | \
+  git commit-tree "$W4B_TREE" -p 635b884c7c5372a4aa05ea3f13c77eccc0469598 \
+  -p f2bbbc8d07ab5da26c180f1ff74813d39f632d54)
+git worktree add --detach /external/sources/w4b-before "$W4B_COMMIT"
+: "${W4B_AFTER_REF:?set to the coordinator-selected full repaired assembled W4b candidate SHA}"
+: "${W5_AFTER_REF:?set to the coordinator-selected full repaired assembled W5 candidate SHA}"
+git worktree add --detach /external/sources/w4b-after "$W4B_AFTER_REF"
+git worktree add --detach /external/sources/w5-before \
+  7afba5f146aa1a16eba73ebed2144dd041b33fb5
+git worktree add --detach /external/sources/w5-after "$W5_AFTER_REF"
+
+python3 tools/native_qualification/prepare_w4b_w5_inputs.py \
+  --w4b-before /external/sources/w4b-before \
+  --w4b-after /external/sources/w4b-after \
+  --w4b-after-ref "$W4B_AFTER_REF" \
+  --w5-before /external/sources/w5-before \
+  --w5-after /external/sources/w5-after \
+  --w5-after-ref "$W5_AFTER_REF" \
+  --output /external/native-final/source-preparation.json
+```
+
+Use the analyzer scripts already tracked by the selected candidate sources:
+`$W4B_AFTER_SOURCE/docs/unified-ops/results/0360b/analyze.py` and
+`$W5_AFTER_SOURCE/docs/unified-ops/results/0359a/analyze.py`.  The fixture is
+the tracked `$W4B_AFTER_SOURCE/test-data/poi/test-data/spreadsheet/testVarious.xlsb`.
+
 Use a new external output directory for each attempt.  The target directories
 must also be external to both source worktrees.  The runner refuses an output
 directory containing an existing phase journal/receipt and never deletes an
@@ -29,7 +81,8 @@ export W4B_AFTER_SOURCE=/external/sources/w4b-after
 export W4B_TARGET_ROOT=/external/native-final/targets/w4b-run1
 export W4B_XLSB_FIXTURE=/external/fixtures/testVarious.xlsb
 export LITCHI_COORD_BIN=/home/zhuhe/code/litchi-worktrees/.coord/bin
-export W4B_ANALYZER=/external/harnesses/w4b-xlsb/perf/analyze.py
+export LITCHI_NATIVE_QUAL_ROOT="$(git rev-parse --show-toplevel)"
+export W4B_ANALYZER="$W4B_AFTER_SOURCE/docs/unified-ops/results/0360b/analyze.py"
 
 python3 tools/native_qualification_runner.py \
   --manifest tools/native_qualification/manifests/w4b-xlsb.json \
@@ -40,10 +93,12 @@ python3 tools/native_qualification_runner.py \
 ```
 
 Use the analogous `W5_BEFORE_SOURCE`, `W5_AFTER_SOURCE`, and
-`W5_TARGET_ROOT` variables for `legacy-w5.json`, and set `W5_ANALYZER` to the
-record-0359a `analyze.py`.  The manifest runs the tracked adapter from the
-candidate source: it executes that analyzer, parses its JSON stdout against
-the W5 analysis schema, and writes the unchanged analysis under the qualified
+`W5_TARGET_ROOT` variables for `legacy-w5.json`, and set
+`W5_ANALYZER="$W5_AFTER_SOURCE/docs/unified-ops/results/0359a/analyze.py"`.
+The manifest runs the tracked adapter from the
+final runner checkout (`LITCHI_NATIVE_QUAL_ROOT`), not from either historical
+source tree: it executes that analyzer, parses its JSON stdout against the W5
+analysis schema, and writes the unchanged analysis under the qualified
 `summary.json` envelope.  The W5 probes synthesize their inputs, so that
 manifest has no fixture path.
 

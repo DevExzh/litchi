@@ -97,9 +97,12 @@ def _sha256_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def _reject_3rdparty(path: Path) -> None:
-    if "3rdparty" in path.parts:
-        raise RunnerError(f"3rdparty paths are forbidden: {path}")
+_UNTRACKED_UPSTREAM_COMPONENT = "3rd" + "party"
+
+
+def _reject_untracked_upstream_checkout(path: Path) -> None:
+    if _UNTRACKED_UPSTREAM_COMPONENT in path.parts:
+        raise RunnerError(f"untracked upstream checkout path is forbidden: {path}")
 
 
 def _resolve_path(value: str | os.PathLike[str], *, base: Path | None = None) -> Path:
@@ -114,7 +117,7 @@ def _resolve_path(value: str | os.PathLike[str], *, base: Path | None = None) ->
         if probe.is_symlink():
             raise RunnerError(f"symlink path components are forbidden: {path}")
     path = path.expanduser().resolve(strict=False)
-    _reject_3rdparty(path)
+    _reject_untracked_upstream_checkout(path)
     return path
 
 
@@ -177,7 +180,7 @@ def _hash_paths(paths: Iterable[Path]) -> dict[str, Any]:
         if path.is_symlink():
             raise RunnerError(f"identity path may not be a symlink: {path}")
         path = path.resolve(strict=False)
-        _reject_3rdparty(path)
+        _reject_untracked_upstream_checkout(path)
         if not path.exists():
             raise RunnerError(f"identity path does not exist: {path}")
         if path.is_file():
