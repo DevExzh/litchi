@@ -35,13 +35,14 @@ The fair implementation comparison is the exact source snapshot at
 `9b1f96d6dce1506dc9d0080f0696b42ba592c397` (the concrete eager-cell iterator
 is already present, but the deferred source-backed cell reopen is not) against
 an explicitly pinned candidate source ref. The default candidate ref is
-`ef6e6ea25355e56571f870a4cefd1675fdb60366`, which contains both production
-freshness fixes `8d491b1e8f` and `ef6e6ea253`. The candidate ref may be replaced
-on the command line with the final assembled commit, but the receipt must
-retain that exact ref and the required production commit ancestry. The
-historical baseline remains exactly `9b1f...`; production files are never
-cherry-picked into it. No result may be attributed solely to F3 without the
-full candidate source identity and production control. The harness source
+`c7ed9d3abdc3f9e3ee152c12129f194d82b66042`, which contains the two production
+freshness fixes `8d491b1e8f` and `ef6e6ea253` plus the typed deferred-cell
+refusal and protected-source fixes `157eb7c8d2` and `c7ed9d3abd`. The candidate
+ref may be replaced on the command line with the final assembled commit, but
+the receipt must retain that exact ref and the required production commit
+ancestry. The historical baseline remains exactly `9b1f...`; production files
+are never cherry-picked into it. No result may be attributed solely to F3
+without the full candidate source identity and production control. The harness source
 `tools/perf-baseline/src/xls_numeric.rs` is taken from the frozen common
 harness ref for both binaries.
 
@@ -68,7 +69,7 @@ module and the existing probe source, so it does not compile unrelated DOCX or
 PPTX baseline modules or duplicate workload construction.
 
 The common harness is frozen at
-`4f6783815bb9a7b02723ed08242f14ef808e2d23`. Prepare both source snapshots at
+`c7ed9d3abdc3f9e3ee152c12129f194d82b66042`. Prepare both source snapshots at
 their exact production refs, then overlay only the allowlisted probe files
 from that frozen commit. This is a content overlay, not a cherry-pick: it
 keeps the baseline production tree at `9b1f...` and keeps the candidate
@@ -77,9 +78,9 @@ one identical harness. The overlay is deterministic and auditable:
 
 ```sh
 REPO=/home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification
-HARNESS_REF=4f6783815bb9a7b02723ed08242f14ef808e2d23
+HARNESS_REF=c7ed9d3abdc3f9e3ee152c12129f194d82b66042
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
-CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253
+CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-c7ed9d3abd
 PROBE_PATHS=(
   tools/perf-baseline/src/xls_f3_qualification.rs
   tools/perf-baseline/src/xls_f3_corpus.rs
@@ -103,9 +104,12 @@ The runner checks the exact frozen blob hashes for every overlay path, allows
 only those paths to be dirty or newly added, compares the production manifest
 with the selected source ref, and compares the resulting production-plus-
 overlay source manifest with its expected identity before launching a child.
-The candidate must descend from both `8d491b1e8f084effde712651e07d460ba044cb1f`
-and `ef6e6ea25355e56571f870a4cefd1675fdb60366`; the control source ref is
-fixed to `9b1f96d6dce1506dc9d0080f0696b42ba592c397`. Before and after every
+The candidate must descend from all four pinned production commits:
+`8d491b1e8f084effde712651e07d460ba044cb1f`,
+`ef6e6ea25355e56571f870a4cefd1675fdb60366`,
+`157eb7c8d250568acb9dbc83bbeb0f9e675d1ea5`, and
+`c7ed9d3abdc3f9e3ee152c12129f194d82b66042`; the control source ref is fixed
+to `9b1f96d6dce1506dc9d0080f0696b42ba592c397`. Before and after every
 child it records the selected CPU's `/proc/stat` counters, load average,
 runnable count, and selected-CPU runnable processes. A scan is quiet only when
 no heavy process is present, one-minute load is at most 1.0, runnable count is
@@ -189,7 +193,7 @@ the checkout, for example:
 ```text
 /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/
   source-base-9b1f96d6dc/
-  source-candidate-ef6e6ea253/
+  source-candidate-c7ed9d3abd/
   target-base-release/
   target-candidate-release/
   binaries/
@@ -211,7 +215,7 @@ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253/tools/perf-baseline-f3/Cargo.toml \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-c7ed9d3abd/tools/perf-baseline-f3/Cargo.toml \
   --example xls_f3_qualification
 mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
   /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
@@ -255,15 +259,15 @@ python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_
   --control-binary "$BASE" \
   --candidate-binary "$CAND" \
   --control-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc \
-  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253 \
+  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-c7ed9d3abd \
   --output-dir "$OUT" \
   --cpu "${CPU}" \
   --memory-limit-bytes 2147483648 \
   --warmup 20 --samples 40 \
-  --harness-ref 4f6783815bb9a7b02723ed08242f14ef808e2d23 \
+  --harness-ref c7ed9d3abdc3f9e3ee152c12129f194d82b66042 \
   --control-source-ref 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
-  --candidate-source-ref ef6e6ea25355e56571f870a4cefd1675fdb60366 \
-  --candidate-production-commits 8d491b1e8f084effde712651e07d460ba044cb1f,ef6e6ea25355e56571f870a4cefd1675fdb60366
+  --candidate-source-ref c7ed9d3abdc3f9e3ee152c12129f194d82b66042 \
+  --candidate-production-commits 8d491b1e8f084effde712651e07d460ba044cb1f,ef6e6ea25355e56571f870a4cefd1675fdb60366,157eb7c8d250568acb9dbc83bbeb0f9e675d1ea5,c7ed9d3abdc3f9e3ee152c12129f194d82b66042
 ```
 
 The runner emits A1/B1/B2/A2 for each route/corpus pair, and stores its script

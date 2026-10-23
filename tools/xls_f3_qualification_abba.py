@@ -48,11 +48,13 @@ BASELINE_SOURCE_REF = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
 # The harness is copied as a deterministic file overlay from this frozen
 # source commit.  The runner itself is deliberately not an overlay path, so a
 # runner change does not require a self-referential commit list.
-COMMON_HARNESS_REF = "4f6783815bb9a7b02723ed08242f14ef808e2d23"
-CANDIDATE_SOURCE_REF = "ef6e6ea25355e56571f870a4cefd1675fdb60366"
+COMMON_HARNESS_REF = "c7ed9d3abdc3f9e3ee152c12129f194d82b66042"
+CANDIDATE_SOURCE_REF = "c7ed9d3abdc3f9e3ee152c12129f194d82b66042"
 CANDIDATE_PRODUCTION_COMMITS = (
     "8d491b1e8f084effde712651e07d460ba044cb1f",
     "ef6e6ea25355e56571f870a4cefd1675fdb60366",
+    "157eb7c8d250568acb9dbc83bbeb0f9e675d1ea5",
+    "c7ed9d3abdc3f9e3ee152c12129f194d82b66042",
 )
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",
@@ -707,7 +709,7 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
         )
     if not options.diagnostic and options.candidate_production_commits != CANDIDATE_PRODUCTION_COMMITS:
         raise RunnerError(
-            "qualified candidates must contain the pinned 8d and ef6 production commits"
+            "qualified candidates must contain all pinned XLS production commits"
         )
     return routes, corpora
 
