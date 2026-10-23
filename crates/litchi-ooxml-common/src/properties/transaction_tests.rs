@@ -9,7 +9,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::{CommitOptions, Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
+use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
 use crate::leniency::ToleranceReport;
 
@@ -78,19 +78,25 @@ fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
     .unwrap();
     let expected = edit.clone().commit().unwrap().patch().retained_bytes();
 
-    let committed = edit
-        .commit_with_options(CommitOptions::new().max_retained_bytes(expected))
+    let committed = Edit::new_with_retained_limit(&package, Host::Word, Some(expected))
+        .and_then(|mut edit| {
+            edit.update_metadata(|metadata| {
+                metadata.title = Some("A & <property> \r\n B".to_owned());
+            })?;
+            edit.commit()
+        })
         .unwrap();
     assert_eq!(committed.patch().retained_bytes(), expected);
 
-    let mut under = Edit::new(&package, Host::Word).unwrap();
+    let mut under =
+        Edit::new_with_retained_limit(&package, Host::Word, Some(expected - 1)).unwrap();
     under
         .update_metadata(|metadata| {
             metadata.title = Some("A & <property> \r\n B".to_owned());
         })
         .unwrap();
     assert!(matches!(
-        under.commit_with_options(CommitOptions::new().max_retained_bytes(expected - 1)),
+        under.commit(),
         Err(Error::Limit {
             kind: super::LimitKind::RetainedBytes,
             ..

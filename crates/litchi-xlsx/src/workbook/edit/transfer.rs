@@ -180,6 +180,21 @@ pub(super) fn copy_scalar_cells_from<'edit, 'source, 'range, 'target, 'anchor>(
             "cross-workbook scalar target action count exceeds {MAX_SCALAR_TRANSFER}"
         )));
     }
+    let mut capture_reservations = Vec::new();
+    let admission = (|| -> Result<()> {
+        for (address, content) in &staged {
+            capture_reservations.push(edit.preflight_transfer_payload(
+                target_sheet.position(),
+                *address,
+                content.retained_bytes(),
+            )?);
+        }
+        Ok(())
+    })();
+    if let Err(error) = admission {
+        edit.rollback_capture_reservations(&mut capture_reservations);
+        return Err(error);
+    }
     let target_actions = edit.sheets.entry(target_sheet.position()).or_default();
     for (address, content) in staged {
         target_actions.cells.insert(address, Action::set(content));

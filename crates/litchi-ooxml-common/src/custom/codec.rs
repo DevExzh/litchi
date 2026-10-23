@@ -621,7 +621,8 @@ pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
         writer.write_event(Event::End(BytesEnd::new("property")))?;
     }
     writer.write_event(Event::End(BytesEnd::new("Properties")))?;
-    let xml = writer.into_inner();
+    let mut xml = writer.into_inner();
+    xml.shrink_to_fit();
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
             crate::LimitKind::CustomPropertiesXmlBytes,

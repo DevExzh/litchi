@@ -28,7 +28,14 @@ pub(super) fn commit(
     custom: Option<&Assignments>,
     max_patch_bytes: Option<usize>,
 ) -> Result<(xlsx::Package, Metadata, bool, usize)> {
-    let mut edit = workbook.edit_metadata().map_err(native)?;
+    let mut edit = match max_patch_bytes {
+        Some(maximum) => workbook
+            .edit_metadata_with_options(
+                xlsx::metadata::EditOptions::new().max_retained_bytes(maximum),
+            )
+            .map_err(native)?,
+        None => workbook.edit_metadata().map_err(native)?,
+    };
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
         let props = assignments.apply_custom(edit.custom_props(), FileFormat::Xlsx)?;
@@ -36,12 +43,7 @@ pub(super) fn commit(
     }
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
-    let commit = match max_patch_bytes {
-        Some(maximum) => edit
-            .commit_with_options(xlsx::metadata::CommitOptions::new().max_retained_bytes(maximum))
-            .map_err(native)?,
-        None => edit.commit().map_err(native)?,
-    };
+    let commit = edit.commit().map_err(native)?;
     let patch_bytes = commit.patch().retained_bytes();
     let changed = commit.diagnostics().changed();
     let after = commit.into_package();

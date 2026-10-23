@@ -435,7 +435,9 @@ impl BoundedXml {
     }
 
     fn finish(self) -> Result<String> {
-        String::from_utf8(self.bytes).map_err(|error| {
+        let mut bytes = self.bytes;
+        bytes.shrink_to_fit();
+        String::from_utf8(bytes).map_err(|error| {
             Error::Invalid(format!("core-properties XML output was not UTF-8: {error}"))
         })
     }

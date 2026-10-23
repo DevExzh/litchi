@@ -277,6 +277,7 @@ pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
             observed: xml.len(),
         });
     }
+    xml.shrink_to_fit();
     Ok(xml)
 }
 
