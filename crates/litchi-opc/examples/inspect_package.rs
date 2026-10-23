@@ -11,6 +11,7 @@
 //! ```
 
 use litchi_opc::OpcPackage;
+use litchi_opc::SourceLimits;
 use std::io::Write as _;
 use std::path::PathBuf;
 

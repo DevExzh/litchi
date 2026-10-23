@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::{PackURI, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const CT: &str = "http://schemas.openxmlformats.org/package/2006/content-types";

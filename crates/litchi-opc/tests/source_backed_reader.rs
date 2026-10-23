@@ -14,6 +14,7 @@ use std::sync::{
 
 use litchi_core::{OwnedSource, ReadAt};
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";

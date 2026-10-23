@@ -26,6 +26,7 @@ use litchi_opc::{
     AuthoredXmlFragment, BlobPart, OpcError, OpcPackage, PackURI, PackageWriter,
     SourceBackedPackage, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use quick_xml::{events::Event, reader::NsReader};
 use soapberry_zip::office::StreamingArchiveWriter;
 

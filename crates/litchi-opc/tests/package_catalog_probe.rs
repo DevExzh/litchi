@@ -9,6 +9,7 @@
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{
     OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits,
     probe_package_catalog_from_reader,

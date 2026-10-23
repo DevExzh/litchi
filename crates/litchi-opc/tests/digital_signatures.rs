@@ -5,6 +5,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, sign::Report};
 use litchi_sign::{Policy, Status};
 

@@ -9,6 +9,7 @@
 
 use std::fs;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;

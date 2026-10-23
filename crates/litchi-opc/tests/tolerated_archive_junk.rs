@@ -10,6 +10,7 @@
 //! actually inside it is reachable afterwards. Tolerating junk is only correct
 //! if nothing real is lost, and only acceptable if the junk is still reported.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{NonPartReason, OpcPackage, Part};
 use std::path::PathBuf;
 

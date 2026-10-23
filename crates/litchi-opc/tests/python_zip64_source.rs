@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, SourceBackedPackage};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, RECOMMENDED_BUFFER_SIZE, ZipArchive};
 

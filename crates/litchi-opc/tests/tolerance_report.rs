@@ -11,6 +11,7 @@
 
 use litchi_opc::leniency::{ContentTypeDefect, Defect, RelationshipDefect, ToleranceReport};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;

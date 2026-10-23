@@ -21,6 +21,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const DROP_REL: &str = "urn:test:drop";

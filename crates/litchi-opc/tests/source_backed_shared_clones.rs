@@ -22,6 +22,7 @@ use std::sync::{Arc, RwLock};
 
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::{OpcError, PackURI, Relationships, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 /// Unsigned real-producer fixtures in four formats.

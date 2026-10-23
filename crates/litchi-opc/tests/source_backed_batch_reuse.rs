@@ -31,6 +31,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 

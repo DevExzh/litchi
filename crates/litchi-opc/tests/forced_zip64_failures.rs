@@ -26,6 +26,7 @@ use litchi_core::{
     Resource, SourceVersion,
 };
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const TARGET_URI: &str = "/word/document.xml";
 const SOURCE_FIXTURE: &[u8] = include_bytes!(

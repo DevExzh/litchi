@@ -739,7 +739,7 @@ fn publication_disables_read_ahead_before_output_and_keeps_future_reads_exact() 
     let reopened = SourceBackedPackage::from_vec(
         saved,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("saved package must reopen");
@@ -776,7 +776,7 @@ fn assert_external_relationship_was_removed(output: &[u8]) {
     let reopened = SourceBackedPackage::from_vec(
         output.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published relationship-removal archive must reopen");
@@ -911,7 +911,7 @@ fn non_empty_topology_publication_disables_opt_in_reads_and_adds_a_typed_part() 
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("topology output must reopen");
@@ -969,7 +969,7 @@ fn precompressed_topology_addition_disables_opt_in_reads_before_physical_transfe
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("topology output must reopen");
@@ -1061,7 +1061,7 @@ fn expected_artifact_splice_preview_releases_opt_in_reads_and_runs_exact_twice()
         SourceBackedPackage::from_vec(
             output.clone(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None
         )
         .expect("published splice archive must reopen")

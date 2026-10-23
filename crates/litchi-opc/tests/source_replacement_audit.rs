@@ -10,6 +10,7 @@
 //! `verify_source` audits it replaces, through every public door.
 
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use xml_minifier::audit::{Limits, verify_source};
 

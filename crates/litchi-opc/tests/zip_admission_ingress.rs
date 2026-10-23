@@ -30,6 +30,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 

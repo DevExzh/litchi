@@ -20,6 +20,7 @@ use litchi_opc::{
     AuthoredXmlFragment, OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits,
     SourceTopologyPlan, authored_xml_requires_source_proof,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";

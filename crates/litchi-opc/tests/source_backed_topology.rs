@@ -15,6 +15,7 @@ use litchi_core::{
 use litchi_opc::{
     OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";

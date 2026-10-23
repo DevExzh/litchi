@@ -9,6 +9,7 @@
 
 use std::io::{self, Read};
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::phys_pkg::OwnedPhysPkgReader;
 use litchi_opc::{
     OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits,

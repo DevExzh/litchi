@@ -28,6 +28,7 @@ use litchi_opc::{
     OpcError, SourceArtifact, SourceArtifactFingerprint, SourceArtifactRestoreProof,
     SourceBackedPackage, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";

@@ -17,6 +17,7 @@
 use std::sync::Arc;
 
 use litchi_core::{Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits};
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, PreparedTopology, SourceBackedPackage,
     SourceCacheLimits, SourceLimits, SourceTopologyPlan,
@@ -83,7 +84,7 @@ fn open(bytes: &[u8]) -> SourceBackedPackage {
     SourceBackedPackage::from_vec(
         bytes.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()

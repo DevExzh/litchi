@@ -28,6 +28,7 @@ use litchi_opc::{
     AuthorizedPrecompressedPart, OpcError, PackURI, SourceBackedPackage, SourceLimitKind,
     SourceLimits, SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
 const RELATIONSHIPS_NS: &str = "http://schemas.openxmlformats.org/package/2006/relationships";

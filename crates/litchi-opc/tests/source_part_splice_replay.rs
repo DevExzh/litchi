@@ -28,6 +28,7 @@ use litchi_opc::{
     SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
     SourcePartSpliceReplayError, SourcePartSpliceReplayProof, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use sha2::{Digest as _, Sha256};
 use soapberry_zip::office::StreamingArchiveWriter;
 

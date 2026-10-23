@@ -35,6 +35,7 @@
 //! repeating a build in one process varies the visit order exactly as separate
 //! processes do.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{OpcPackage, PackURI, Relationships, TargetMode};
 use std::collections::BTreeSet;
