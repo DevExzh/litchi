@@ -4807,7 +4807,16 @@ mod tests {
     #[test]
     fn batch_source_tokens_re_admit_broad_metadata_under_recipient_limits() {
         let archive = create_minimal_docx();
-        let producer = OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap();
+        // The producer fixture deliberately adds a relationship target larger
+        // than the default 4 KiB target ceiling. Open it under an actually
+        // broader owner policy so the source token can be created; the
+        // recipient below remains tight and must reject it atomically.
+        let producer_limits = SourceLimits::builder()
+            .max_relationship_target_bytes(8192)
+            .unwrap()
+            .build()
+            .unwrap();
+        let producer = OpcPackage::from_bytes(&archive, producer_limits).unwrap();
         let root = PackURI::new(PACKAGE_URI).unwrap();
         let broad_content_types = producer
             .source_content_types(producer.read_limits())
@@ -4832,6 +4841,10 @@ mod tests {
             .unwrap();
         let recipient_limits = SourceLimits::builder()
             .max_relationship_xml_bytes(largest_existing_relationship)
+            .unwrap()
+            // Keep the target ceiling above the deliberately broad token so
+            // this regression isolates the recipient XML-byte refusal.
+            .max_relationship_target_bytes(8192)
             .unwrap()
             .build()
             .unwrap();
