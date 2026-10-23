@@ -22,6 +22,7 @@ use crate::style::stylesheet::{FontColor, FontColorKind, Scheme, Script};
 use crate::{FontChange, StyleState};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, SourceLimits, TargetMode};
+use std::mem::size_of;
 
 fn table_workbook(with_existing_merge: bool) -> crate::Package {
     let baseline = crate::Package::new().expect("baseline");
@@ -662,6 +663,24 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         .unmerge("H8")
         .expect("missing range is a no-op");
     assert!(missing.commit().expect("no-op commit").patch().is_noop());
+
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut bounded_missing = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    bounded_missing
+        .sheet(0usize)
+        .expect("lookup")
+        .expect("sheet")
+        .unmerge("H8")
+        .expect("bounded missing range is a no-op");
+    assert!(
+        bounded_missing
+            .commit()
+            .expect("bounded no-op commit")
+            .patch()
+            .is_noop()
+    );
 }
 
 #[test]
@@ -1378,6 +1397,64 @@ fn plain_set_over_same_visible_rich_text_erases_runs() {
 }
 
 #[test]
+fn unbounded_plain_set_preserves_shared_string_identity() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut install = baseline.edit().expect("install edit");
+    install
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "plain shared text")
+        .expect("plain shared value");
+    let source = install.commit().expect("install commit").into_package();
+    let source_bytes = source.to_bytes().expect("source bytes");
+
+    let mut edit = source.edit().expect("unbounded edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "plain shared text")
+        .expect("same plain value");
+    let committed = edit.commit().expect("source-equivalent commit");
+    assert!(committed.patch().is_noop());
+    assert_eq!(
+        committed.package().to_bytes().expect("target bytes"),
+        source_bytes
+    );
+}
+
+#[test]
+fn remove_then_differing_typed_style_recreates_the_cell() {
+    let source = styled_workbook();
+    let mut edit = source.edit().expect("edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .remove("A1")
+        .and_then(|sheet| sheet.font("A1", &FontChange::new().bold(Some(true))))
+        .expect("remove then typed style");
+    let committed = edit.commit().expect("commit");
+    let sheet = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    assert!(sheet.cell("A1").expect("recreated cell").stored().is_some());
+    assert_eq!(
+        sheet
+            .style("A1")
+            .expect("style lookup")
+            .expect("recreated style")
+            .format()
+            .expect("format")
+            .font()
+            .expect("font")
+            .bold(),
+        Some(true)
+    );
+}
+
+#[test]
 fn rich_transfer_keeps_the_source_shared_style() {
     let source = styled_workbook();
     let mut package = source.inner.package.clone();
@@ -1541,6 +1618,297 @@ fn moved_rich_source_does_not_reappear_in_later_copy() {
         .expect("inverse move and copy");
     assert_eq!(
         restored.package().to_bytes().expect("restored bytes"),
+        source_bytes
+    );
+}
+
+#[test]
+fn typed_facet_equal_to_source_overrides_pending_complete_style() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut configure = source.edit().expect("configure edit");
+    configure
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "styled")
+        .and_then(|sheet| {
+            sheet.font(
+                "A1",
+                &FontChange::new()
+                    .bold(Some(true))
+                    .name(Some("Accent"))
+                    .expect("font name"),
+            )
+        })
+        .expect("complete source style");
+    let configured = configure.commit().expect("configure commit").into_package();
+    let accent = configured
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("accent style");
+
+    let mut edit = configured
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1", &accent)
+        .and_then(|sheet| {
+            sheet.font(
+                "B1",
+                &FontChange::new().name(None).expect("clear font name"),
+            )
+        })
+        .expect("typed override");
+    let committed = edit.commit().expect("override commit");
+    let format = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1")
+        .expect("style lookup")
+        .expect("styled B1")
+        .format()
+        .expect("cell format");
+    let font = format.font().expect("font");
+    assert_eq!(font.bold(), Some(true));
+    assert_eq!(font.name(), None);
+}
+
+#[test]
+fn typed_facet_equal_to_pending_complete_style_releases_capture() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut configure = source.edit().expect("configure edit");
+    configure
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "styled")
+        .and_then(|sheet| {
+            sheet.font(
+                "A1",
+                &FontChange::new()
+                    .bold(Some(true))
+                    .name(Some("Accent"))
+                    .expect("font name"),
+            )
+        })
+        .expect("complete source style");
+    let configured = configure.commit().expect("configure commit").into_package();
+    let accent = configured
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("accent style");
+    let sheet = &configured.inner.sheets[0];
+    let worksheet_bytes = configured
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let maximum = configured
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(size_of::<StyleEffect>());
+    let mut edit = configured
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.style("B1", &accent).expect("pending complete style");
+    sheet
+        .font("B1", &FontChange::new().bold(Some(true)))
+        .expect("typed request equals pending style");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
+}
+
+#[test]
+fn source_style_and_reset_release_superseded_typed_capture() {
+    let source = styled_workbook();
+    let source_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("source style");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let font = FontChange::new().bold(Some(true));
+    let payload = Content::from("after style supersession");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>().saturating_mul(2))
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(font.retained_bytes())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.font("A1", &font).expect("typed style");
+    sheet
+        .style("A1", &source_style)
+        .expect("source style supersession");
+    sheet
+        .set("B1", payload)
+        .expect("released typed capture leaves room for payload");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
+
+    let source = crate::Package::new().expect("source workbook");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let payload = Content::from("after reset supersession");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>().saturating_mul(2))
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(font.retained_bytes())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.font("B1", &font).expect("typed style");
+    sheet.reset_style("B1").expect("missing reset supersession");
+    sheet
+        .set("C1", payload)
+        .expect("released reset capture leaves room for payload");
+    drop(sheet);
+    assert!(
+        edit.sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fonts.is_empty())
+    );
+}
+
+#[test]
+fn complete_style_source_equivalent_releases_capture_before_next_payload() {
+    let source = styled_workbook();
+    let styles = source.styles().expect("styles");
+    let base = styles.base().expect("base style");
+    let source_style = styles.get(1).expect("source style");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let payload = Content::from("payload after complete-style cancellation");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(payload.retained_bytes());
+
+    let mut style_edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded style edit");
+    style_edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1", &base)
+        .and_then(|sheet| sheet.style("A1", &source_style))
+        .and_then(|sheet| sheet.set("C1", payload.clone()))
+        .expect("source-equivalent style releases stale capture");
+
+    let mut reset_edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded reset edit");
+    reset_edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1", &source_style)
+        .and_then(|sheet| sheet.reset_style("B1"))
+        .and_then(|sheet| sheet.set("C1", payload))
+        .expect("source-equivalent reset releases stale capture");
+}
+
+#[test]
+fn unbounded_source_equivalent_complete_style_and_reset_are_noops() {
+    let source = styled_workbook();
+    let source_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("source style");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let mut style_edit = source.edit().expect("style edit");
+    style_edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1", &source_style)
+        .expect("source-equivalent style");
+    let styled = style_edit.commit().expect("style no-op commit");
+    assert!(styled.patch().is_noop());
+    assert_eq!(
+        styled.package().to_bytes().expect("style bytes"),
+        source_bytes
+    );
+
+    let mut reset_edit = source.edit().expect("reset edit");
+    reset_edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .reset_style("B1")
+        .expect("missing reset");
+    let reset = reset_edit.commit().expect("reset no-op commit");
+    assert!(reset.patch().is_noop());
+    assert_eq!(
+        reset.package().to_bytes().expect("reset bytes"),
         source_bytes
     );
 }
@@ -1945,6 +2313,44 @@ fn signed_packages_refuse_changed_edits_and_keep_exact_noops() {
         .expect("stage");
     let patch = unsigned_edit.commit().expect("commit").patch().clone();
     assert!(matches!(signed.apply(&patch), Err(Error::Signed)));
+}
+
+#[test]
+fn signed_unbounded_source_equivalent_set_is_an_exact_noop() {
+    let baseline = crate::Package::new().expect("baseline");
+    let mut install = baseline.edit().expect("install edit");
+    install
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "signed plain value")
+        .expect("install value");
+    let unsigned = install.commit().expect("install commit").into_package();
+    let mut package = unsigned.inner.package.clone();
+    package
+        .rels_mut()
+        .try_add_relationship(
+            litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+            "_xmlsignatures/origin.sigs".to_owned(),
+            "rIdSignature".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("signature relationship");
+    let signed = crate::Package::from_opc(package).expect("signed package");
+    let source_bytes = signed.to_bytes().expect("source bytes");
+
+    let mut edit = signed.edit().expect("unbounded signed edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "signed plain value")
+        .expect("source-equivalent set");
+    let committed = edit.commit().expect("signed exact no-op");
+    assert!(committed.patch().is_noop());
+    assert_eq!(
+        committed.package().to_bytes().expect("target bytes"),
+        source_bytes
+    );
 }
 
 #[test]

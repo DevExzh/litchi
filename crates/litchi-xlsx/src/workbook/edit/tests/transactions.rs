@@ -1,10 +1,248 @@
 //! Transaction joins, conflicts, and cross-facet edit tests.
 
 use super::super::*;
-use super::support::part_text;
+use super::support::{part_text, styled_workbook};
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
 use std::mem::size_of;
+
+#[test]
+fn bounded_endpoint_accepts_exact_payload_and_typed_noops() {
+    let source = styled_workbook();
+    let existing_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("existing style");
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("endpoint-only budget");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.set("A1", 1_i32).expect("same scalar payload");
+    sheet
+        .style("A1", &existing_style)
+        .expect("same shared style");
+    sheet
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty authored font name"),
+        )
+        .expect("same default font");
+    sheet
+        .fill(
+            "A1",
+            &crate::style::FillChange::new()
+                .pattern(Some(crate::style::cell_format::Pattern::Solid)),
+        )
+        .expect("same source fill pattern");
+    let commit = edit.commit().expect("endpoint no-op commit");
+    assert!(commit.patch().is_noop());
+}
+
+#[test]
+fn mixed_join_normalizes_unbounded_typed_noop_before_bounded_admission() {
+    let source = styled_workbook();
+    let maximum = source.retained_bytes().saturating_mul(2);
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut unbounded = source.edit().expect("unbounded edit");
+    unbounded
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty authored font name"),
+        )
+        .expect("stage unbounded typed no-op");
+    bounded
+        .join(unbounded)
+        .expect("typed no-op does not consume bounded endpoint budget");
+    let commit = bounded.commit().expect("mixed no-op commit");
+    assert!(commit.patch().is_noop());
+}
+
+#[test]
+fn mixed_join_normalizes_typed_noop_against_pending_complete_style() {
+    let source = styled_workbook();
+    let pending_style = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("A1")
+        .expect("style lookup")
+        .expect("pending style");
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(size_of::<StyleEffect>());
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut unbounded = source.edit().expect("unbounded edit");
+    unbounded
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .style("B1", &pending_style)
+        .and_then(|sheet| {
+            sheet.fill(
+                "B1",
+                &crate::style::FillChange::new()
+                    .pattern(Some(crate::style::cell_format::Pattern::Solid)),
+            )
+        })
+        .expect("stage pending style and matching typed facet");
+    bounded
+        .join(unbounded)
+        .expect("pending-style typed no-op joins within its final capture");
+    assert!(
+        bounded
+            .sheets
+            .get(&0)
+            .is_none_or(|actions| actions.fills.is_empty())
+    );
+}
+
+#[test]
+fn unbounded_join_normalizes_source_equivalent_effects_before_conflicts() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut install = baseline.edit().expect("install edit");
+    install
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .expect("install value");
+    let source = install.commit().expect("install commit").into_package();
+
+    let mut left = source.edit().expect("left edit");
+    left.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .expect("left source-equivalent set");
+    let mut right = source.edit().expect("right edit");
+    right
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .and_then(|sheet| sheet.clear("B2"))
+        .and_then(|sheet| sheet.remove("C3"))
+        .and_then(|sheet| sheet.reset_style("D4"))
+        .expect("right source-equivalent effects");
+
+    left.join(right)
+        .expect("source-equivalent effects do not overlap");
+    let committed = left.commit().expect("source-equivalent join commit");
+    assert!(committed.patch().is_noop());
+}
+
+#[test]
+fn failed_join_preserves_original_self_and_rejected_effects() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut left = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    left.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "left")
+        .expect("left value");
+    let left_len = left.len();
+
+    let mut right = source.edit().expect("unbounded edit");
+    right
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty font name"),
+        )
+        .and_then(|sheet| sheet.set("A1", "right"))
+        .and_then(|sheet| sheet.remove("B2"))
+        .and_then(|sheet| sheet.clear("C3"))
+        .expect("right effects");
+    let right_len = right.len();
+
+    let error = left
+        .join(right)
+        .expect_err("overlapping payloads must refuse");
+    assert!(matches!(error.failure(), JoinFailure::Overlap(_)));
+    assert_eq!(left.len(), left_len);
+    assert_eq!(error.rejected().len(), right_len);
+    assert!(matches!(
+        left.sheets
+            .get(&0)
+            .and_then(|actions| {
+                actions
+                    .cells
+                    .get(&Address::from_a1("A1").expect("A1"))
+            }),
+        Some(Action::Update {
+            payload: Some(Payload::Set(content)),
+            ..
+        }) if matches!(
+            content.as_cell(),
+            Cell::Value(Value::Text(value)) if value.as_str() == "left"
+        )
+    ));
+    let mut rejected = error.into_rejected();
+    assert_eq!(rejected.len(), right_len);
+    assert!(rejected.sheets.get(&0).is_some_and(|actions| {
+        actions
+            .fonts
+            .contains_key(&Address::from_a1("B1").expect("B1"))
+    }));
+    assert!(matches!(
+        rejected
+            .sheets
+            .get(&0)
+            .and_then(|actions| {
+                actions
+                    .cells
+                    .get(&Address::from_a1("A1").expect("A1"))
+            }),
+        Some(Action::Update {
+            payload: Some(Payload::Set(content)),
+            ..
+        }) if matches!(
+            content.as_cell(),
+            Cell::Value(Value::Text(value)) if value.as_str() == "right"
+        )
+    ));
+    let _ = rejected
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .state("B2")
+        .expect("rejected state remains readable");
+}
 
 #[test]
 fn primary_edit_capture_budget_rejects_before_cell_staging() {
@@ -123,6 +361,7 @@ fn mixed_bounded_and_unbounded_join_admits_staged_capture() {
         .retained_bytes()
         .saturating_mul(2)
         .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<Change>())
         .saturating_add(size_of::<Change>())
         .saturating_add(size_of::<PartChange>())
         .saturating_add(content.retained_bytes().saturating_mul(2));

@@ -1869,6 +1869,8 @@ pub enum JoinFailure {
     DefinedNames,
     /// Both edits stage worksheet drawing graph transfers that cannot be joined.
     DrawingTransfer,
+    /// Planning the deferred source-equivalence effect projection failed.
+    Normalization(Box<str>),
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.
@@ -1903,7 +1905,8 @@ impl JoinError {
             | JoinFailure::ResourceLimit(_)
             | JoinFailure::TaskPanes
             | JoinFailure::DefinedNames
-            | JoinFailure::DrawingTransfer => None,
+            | JoinFailure::DrawingTransfer
+            | JoinFailure::Normalization(_) => None,
         }
     }
 
@@ -1946,6 +1949,9 @@ impl fmt::Display for JoinError {
             },
             JoinFailure::DrawingTransfer => {
                 formatter.write_str("worksheet drawing graph transfers overlap")
+            },
+            JoinFailure::Normalization(reason) => {
+                write!(formatter, "edit effect normalization failed: {reason}")
             },
         }
     }

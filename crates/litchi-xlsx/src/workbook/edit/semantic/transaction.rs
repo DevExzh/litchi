@@ -33,6 +33,7 @@ use crate::raw::worksheet::edit::{
 use crate::row::{HeightAt, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
+use crate::style::cell_format::Format;
 use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
@@ -54,7 +55,11 @@ use super::super::{codec, package, workbook_retained_bytes};
 
 use self::snapshot::Snapshot;
 use super::super::svg::{PictureSelector, SvgInput};
-use super::worksheet::{NewSheet, Sheet, Tab};
+use super::worksheet::{
+    NewSheet, Sheet, Tab, alignment_change_matches_source, border_change_matches_source,
+    fill_change_matches_source, font_change_matches_source, number_format_matches_source,
+    protection_change_matches_source, quote_prefix_matches_source,
+};
 
 const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
 
@@ -365,7 +370,7 @@ fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
 }
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Edit {
     pub(in crate::workbook::edit) base: Workbook,
     pub(in crate::workbook::edit) panes: Option<PanesAction>,
@@ -427,6 +432,22 @@ struct CellCapture {
     relationship: usize,
     remove: usize,
     active: bool,
+}
+
+/// The typed style facets that still change the immutable source after all
+/// pending requests for one address have been composed.  This is deliberately
+/// a boolean projection: the capture ledger charges the final retained
+/// endpoint, not every intermediate request that an unbounded edit happened
+/// to author before a mixed-budget join.
+#[derive(Debug, Clone, Copy, Default)]
+struct EffectiveTypedFacets {
+    font: bool,
+    alignment: bool,
+    fill: bool,
+    border: bool,
+    protection: bool,
+    quote_prefix: bool,
+    number_format: bool,
 }
 
 impl CellCapture {
@@ -656,13 +677,83 @@ impl CaptureBudget {
                 } else {
                     false
                 };
-                let has_other_facet = actions.fonts.contains_key(&address)
+                let has_typed = actions.fonts.contains_key(&address)
                     || actions.alignments.contains_key(&address)
                     || actions.fills.contains_key(&address)
                     || actions.borders.contains_key(&address)
                     || actions.protections.contains_key(&address)
                     || actions.quote_prefixes.contains_key(&address)
-                    || actions.number_formats.contains_key(&address)
+                    || actions.number_formats.contains_key(&address);
+                let effective_format = if !has_typed {
+                    None
+                } else if let Some(Action::Update {
+                    style: Some(style), ..
+                }) = actions.cells.get(&address)
+                {
+                    let raw = match style {
+                        StyleEffect::Set(raw) => *raw,
+                        StyleEffect::Reset => 0,
+                    };
+                    Some(base.inner.format(raw)?)
+                } else {
+                    source
+                        .style(address)?
+                        .map(|style| style.format())
+                        .transpose()?
+                };
+                let typed = EffectiveTypedFacets {
+                    font: actions.fonts.get(&address).is_some_and(|change| {
+                        !font_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::font),
+                        )
+                    }),
+                    alignment: actions.alignments.get(&address).is_some_and(|change| {
+                        !alignment_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::alignment),
+                        )
+                    }),
+                    fill: actions.fills.get(&address).is_some_and(|change| {
+                        !fill_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::fill),
+                        )
+                    }),
+                    border: actions.borders.get(&address).is_some_and(|change| {
+                        !border_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::border),
+                        )
+                    }),
+                    protection: actions.protections.get(&address).is_some_and(|change| {
+                        !protection_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::protection),
+                        )
+                    }),
+                    quote_prefix: actions.quote_prefixes.get(&address).is_some_and(|value| {
+                        !quote_prefix_matches_source(
+                            *value,
+                            effective_format.as_ref().map(Format::quote_prefix),
+                        )
+                    }),
+                    number_format: actions.number_formats.get(&address).is_some_and(|value| {
+                        !number_format_matches_source(
+                            value.as_deref(),
+                            effective_format
+                                .as_ref()
+                                .and_then(|format| format.number_format().code()),
+                        )
+                    }),
+                };
+                let has_other_facet = typed.font
+                    || typed.alignment
+                    || typed.fill
+                    || typed.border
+                    || typed.protection
+                    || typed.quote_prefix
+                    || typed.number_format
                     || effective_merge_starts.contains(&address)
                     || actions
                         .hyperlinks
@@ -674,6 +765,7 @@ impl CaptureBudget {
                         address,
                         action_effective,
                         effective_merge_starts.contains(&address),
+                        typed,
                     ) {
                         budget.cells.insert((*position, address), capture);
                     }
@@ -714,7 +806,21 @@ impl CaptureBudget {
                     .saturating_add(added.name.as_str().len()),
             );
             for address in addresses {
-                if let Some(capture) = staged_cell_capture(&added.actions, address, true, true) {
+                if let Some(capture) = staged_cell_capture(
+                    &added.actions,
+                    address,
+                    true,
+                    true,
+                    EffectiveTypedFacets {
+                        font: true,
+                        alignment: true,
+                        fill: true,
+                        border: true,
+                        protection: true,
+                        quote_prefix: true,
+                        number_format: true,
+                    },
+                ) {
                     budget.added_cells.insert((index, address), capture);
                 }
             }
@@ -2981,6 +3087,206 @@ impl Edit {
             && self.removed.is_empty()
     }
 
+    /// Normalize deferred worksheet effects against the immutable source.
+    ///
+    /// Ordinary unbounded setters deliberately do not perform this census.
+    /// A join and commit are the deferred boundaries: they build one effect
+    /// plan, then apply it atomically so source-equivalent actions do not
+    /// create conflicts, consume snapshot budget, or invalidate a signed
+    /// no-op. Rich-text identity remains part of the comparison: a plain set
+    /// over rich text is an authored representation change.
+    fn normalize_effects(&mut self) -> Result<()> {
+        #[derive(Debug)]
+        struct Plan {
+            position: usize,
+            address: Address,
+            action: Option<Action>,
+            font: bool,
+            alignment: bool,
+            fill: bool,
+            border: bool,
+            protection: bool,
+            quote_prefix: bool,
+            number_format: bool,
+        }
+
+        let mut plans = Vec::new();
+        for (&position, actions) in &self.sheets {
+            let mut addresses = BTreeSet::new();
+            addresses.extend(actions.cells.keys().copied());
+            addresses.extend(actions.fonts.keys().copied());
+            addresses.extend(actions.alignments.keys().copied());
+            addresses.extend(actions.fills.keys().copied());
+            addresses.extend(actions.borders.keys().copied());
+            addresses.extend(actions.protections.keys().copied());
+            addresses.extend(actions.quote_prefixes.keys().copied());
+            addresses.extend(actions.number_formats.keys().copied());
+            if addresses.is_empty() {
+                continue;
+            }
+            let source = self
+                .base
+                .sheet(position)?
+                .ok_or_else(|| invalid("worksheet effect target disappeared"))?;
+            let store = source.store()?;
+            for address in addresses {
+                let stored = store.entry(address);
+                let source_cell = stored.map(|value| value.cell.clone());
+                let source_style = stored.and_then(|value| value.style);
+                let source_rich = source.rich_text(address)?;
+                let source_format = source_style
+                    .map(|style| self.base.inner.format(style))
+                    .transpose()?;
+                let original_action = actions.cells.get(&address);
+                let format = match original_action {
+                    Some(Action::Update {
+                        style: Some(StyleEffect::Set(style)),
+                        ..
+                    }) => Some(self.base.inner.format(*style)?),
+                    Some(Action::Update {
+                        style: Some(StyleEffect::Reset),
+                        ..
+                    }) => Some(self.base.inner.format(0)?),
+                    _ => source_format.clone(),
+                };
+                let font_matches = actions.fonts.get(&address).is_none_or(|change| {
+                    font_change_matches_source(change, format.as_ref().and_then(Format::font))
+                });
+                let alignment_matches = actions.alignments.get(&address).is_none_or(|change| {
+                    alignment_change_matches_source(
+                        change,
+                        format.as_ref().and_then(Format::alignment),
+                    )
+                });
+                let fill_matches = actions.fills.get(&address).is_none_or(|change| {
+                    fill_change_matches_source(change, format.as_ref().and_then(Format::fill))
+                });
+                let border_matches = actions.borders.get(&address).is_none_or(|change| {
+                    border_change_matches_source(change, format.as_ref().and_then(Format::border))
+                });
+                let protection_matches = actions.protections.get(&address).is_none_or(|change| {
+                    protection_change_matches_source(
+                        change,
+                        format.as_ref().and_then(Format::protection),
+                    )
+                });
+                let quote_prefix_matches =
+                    actions.quote_prefixes.get(&address).is_none_or(|value| {
+                        quote_prefix_matches_source(
+                            *value,
+                            format.as_ref().map(Format::quote_prefix),
+                        )
+                    });
+                let number_format_matches =
+                    actions.number_formats.get(&address).is_none_or(|value| {
+                        number_format_matches_source(
+                            value.as_deref(),
+                            format
+                                .as_ref()
+                                .and_then(|value| value.number_format().code()),
+                        )
+                    });
+                let typed_effective = !(font_matches
+                    && alignment_matches
+                    && fill_matches
+                    && border_matches
+                    && protection_matches
+                    && quote_prefix_matches
+                    && number_format_matches);
+                let mut action = original_action.cloned();
+                if let Some(Action::Update { payload, style }) = action.as_mut() {
+                    if payload.as_ref().is_some_and(|payload| {
+                        payload_matches_source(payload, &source_cell, &source_rich)
+                    }) {
+                        *payload = None;
+                    }
+                    if style
+                        .as_ref()
+                        .is_some_and(|style| style_matches_source(*style, source_style))
+                    {
+                        *style = None;
+                    }
+                    if payload.is_none() && style.is_none() && !typed_effective {
+                        action = None;
+                    }
+                } else if matches!(action, Some(Action::Remove)) {
+                    if typed_effective {
+                        action = Some(Action::Update {
+                            payload: None,
+                            style: None,
+                        });
+                    } else if source_cell.is_none() {
+                        action = None;
+                    }
+                }
+                plans.push(Plan {
+                    position,
+                    address,
+                    action,
+                    font: !font_matches,
+                    alignment: !alignment_matches,
+                    fill: !fill_matches,
+                    border: !border_matches,
+                    protection: !protection_matches,
+                    quote_prefix: !quote_prefix_matches,
+                    number_format: !number_format_matches,
+                });
+            }
+        }
+
+        for plan in plans {
+            if !plan.fill {
+                self.discard_fill(plan.position, plan.address)?;
+            }
+            if !plan.border {
+                self.discard_border(plan.position, plan.address)?;
+            }
+            let Some(actions) = self.sheets.get_mut(&plan.position) else {
+                continue;
+            };
+            if plan.font {
+                // The map already owns the final request.
+            } else {
+                actions.fonts.remove(&plan.address);
+            }
+            if plan.alignment {
+                // The map already owns the final request.
+            } else {
+                actions.alignments.remove(&plan.address);
+            }
+            if plan.protection {
+                // The map already owns the final request.
+            } else {
+                actions.protections.remove(&plan.address);
+            }
+            if plan.quote_prefix {
+                // The map already owns the final request.
+            } else {
+                actions.quote_prefixes.remove(&plan.address);
+            }
+            if plan.number_format {
+                // The map already owns the final request.
+            } else {
+                actions.number_formats.remove(&plan.address);
+            }
+            if let Some(action) = plan.action {
+                actions.cells.insert(plan.address, action);
+            } else {
+                actions.cells.remove(&plan.address);
+            }
+        }
+
+        if let Some(previous) = self.capture_budget.take() {
+            self.capture_budget = Some(CaptureBudget::from_staged(
+                &self.base,
+                previous.maximum,
+                &self.sheets,
+                &self.added,
+            )?);
+        }
+        Ok(())
+    }
+
     /// Join an independently prepared edit when every effect is disjoint.
     ///
     /// Both edits must originate from the same immutable snapshot. On failure
@@ -2990,6 +3296,44 @@ impl Edit {
         if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
             return Err(JoinError {
                 failure: JoinFailure::DifferentSnapshot,
+                rejected: Box::new(other),
+            });
+        }
+        let mut candidate = self.clone();
+        match candidate.join_in_place(other.clone()) {
+            Ok(()) => {
+                *self = candidate;
+                Ok(self)
+            },
+            Err(JoinError { failure, .. }) => Err(JoinError {
+                failure,
+                rejected: Box::new(other),
+            }),
+        }
+    }
+
+    fn join_in_place(&mut self, other: Self) -> std::result::Result<(), JoinError> {
+        let mut other = other;
+        if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
+            return Err(JoinError {
+                failure: JoinFailure::DifferentSnapshot,
+                rejected: Box::new(other),
+            });
+        }
+        // Normalize both sides at the deferred join boundary.  Setters on an
+        // unbounded edit intentionally avoid source reads, but joining two
+        // edits must compare their final effects rather than their authored
+        // no-op requests.  `join` invokes this on a candidate clone, so a
+        // source/format error cannot partially publish either edit.
+        if let Err(error) = self.normalize_effects() {
+            return Err(JoinError {
+                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
+                rejected: Box::new(other),
+            });
+        }
+        if let Err(error) = other.normalize_effects() {
+            return Err(JoinError {
+                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
                 rejected: Box::new(other),
             });
         }
@@ -3430,7 +3774,7 @@ impl Edit {
         self.removed.extend(other.removed);
         self.cross_workbook_scalar |= other_cross_workbook_scalar;
         self.capture_budget = joined_capture_budget;
-        Ok(self)
+        Ok(())
     }
 
     /// Validate and atomically publish a new immutable snapshot.
@@ -3438,7 +3782,8 @@ impl Edit {
     /// An edit that staged nothing returns its source snapshot, a signed one
     /// included (ADR 0006); a changed edit of a signed workbook is refused
     /// with [`Error::Signed`].
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.normalize_effects()?;
         if self.is_empty() {
             let budget = self.capture_budget.clone();
             let source = self.base.clone();
@@ -5544,15 +5889,7 @@ impl Edit {
             .get(&position)
             .and_then(|actions| actions.hyperlinks.get(&key))
             .map_or(0, hyperlink_action_retained_bytes);
-        let capture =
-            self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
-        let source = match self.source_hyperlink(position, key) {
-            Ok(source) => source,
-            Err(error) => {
-                self.rollback_cell_capture(capture);
-                return Err(error);
-            },
-        };
+        let source = self.source_hyperlink(position, key)?;
         if source.as_ref() == Some(&hyperlink) {
             self.sheets
                 .entry(position)
@@ -5560,13 +5897,16 @@ impl Edit {
                 .hyperlinks
                 .remove(&key);
             self.recompute_relationship_capture(position, address);
-        } else {
-            self.sheets
-                .entry(position)
-                .or_default()
-                .hyperlinks
-                .insert(key, HyperlinkAction::Put(hyperlink));
+            return Ok(());
         }
+        let capture =
+            self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
+        self.sheets
+            .entry(position)
+            .or_default()
+            .hyperlinks
+            .insert(key, HyperlinkAction::Put(hyperlink));
+        drop(capture);
         Ok(())
     }
 
@@ -5582,6 +5922,20 @@ impl Edit {
             return Ok(None);
         };
         let source = self.source_hyperlink(position, key)?;
+        let staged_put = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.hyperlinks.get(&key))
+            .is_some_and(|action| matches!(action, HyperlinkAction::Put(_)));
+        if staged_put {
+            self.sheets
+                .entry(position)
+                .or_default()
+                .hyperlinks
+                .remove(&key);
+            self.recompute_relationship_capture(position, address);
+            return Ok(Some(current));
+        }
         let previous_bytes = self
             .sheets
             .get(&position)
@@ -6220,6 +6574,48 @@ fn payload_capture_bytes(payload: &Payload) -> usize {
     }
 }
 
+fn payload_matches_source(
+    payload: &Payload,
+    source: &Option<Cell>,
+    source_rich: &Option<crate::RichText>,
+) -> bool {
+    match payload {
+        Payload::Set(content) => {
+            source_rich.is_none()
+                && source
+                    .as_ref()
+                    .is_some_and(|value| value == &content.as_cell())
+        },
+        Payload::SharedString { text, .. } => {
+            source_rich.is_none()
+                && source.as_ref().is_some_and(|value| {
+                    matches!(value, Cell::Value(crate::Value::Text(current)) if current == text)
+                })
+        },
+        Payload::Rich(text) => source_rich.as_ref() == Some(text.as_ref()),
+        Payload::Cache(value) => source.as_ref().is_some_and(|current| {
+            matches!(
+                current,
+                Cell::Formula(formula)
+                    if formula
+                        .cached()
+                        .is_some_and(|cache| cache.value() == value)
+            )
+        }),
+        Payload::Clear | Payload::ClearIfPresent => {
+            source.as_ref().is_none_or(|value| matches!(value, Cell::Empty))
+        },
+        Payload::SharedFormula { .. } => false,
+    }
+}
+
+fn style_matches_source(style: StyleEffect, source: Option<u32>) -> bool {
+    match style {
+        StyleEffect::Set(style) => source == Some(style),
+        StyleEffect::Reset => source.is_none(),
+    }
+}
+
 fn worksheet_capture_bytes(base: &Workbook, position: usize) -> Result<usize> {
     let sheet = base
         .inner
@@ -6237,6 +6633,7 @@ fn staged_cell_capture(
     address: Address,
     include_action: bool,
     include_structural: bool,
+    typed: EffectiveTypedFacets,
 ) -> Option<CellCapture> {
     let mut capture = CellCapture::default();
     if include_action {
@@ -6244,30 +6641,42 @@ fn staged_cell_capture(
             apply_action_capture(&mut capture, action);
         }
     }
-    if let Some(change) = actions.fonts.get(&address) {
-        capture.apply(CaptureFacet::Font, change.retained_bytes());
+    if typed.font {
+        if let Some(change) = actions.fonts.get(&address) {
+            capture.apply(CaptureFacet::Font, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.alignments.get(&address) {
-        capture.apply(CaptureFacet::Alignment, change.retained_bytes());
+    if typed.alignment {
+        if let Some(change) = actions.alignments.get(&address) {
+            capture.apply(CaptureFacet::Alignment, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.fills.get(&address) {
-        capture.apply(CaptureFacet::Fill, change.retained_bytes());
+    if typed.fill {
+        if let Some(change) = actions.fills.get(&address) {
+            capture.apply(CaptureFacet::Fill, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.borders.get(&address) {
-        capture.apply(CaptureFacet::Border, change.retained_bytes());
+    if typed.border {
+        if let Some(change) = actions.borders.get(&address) {
+            capture.apply(CaptureFacet::Border, change.retained_bytes());
+        }
     }
-    if let Some(change) = actions.protections.get(&address) {
-        capture.apply(CaptureFacet::Protection, change.retained_bytes());
+    if typed.protection {
+        if let Some(change) = actions.protections.get(&address) {
+            capture.apply(CaptureFacet::Protection, change.retained_bytes());
+        }
     }
-    if actions.quote_prefixes.contains_key(&address) {
+    if typed.quote_prefix {
         capture.apply(CaptureFacet::QuotePrefix, size_of::<Option<bool>>());
     }
-    if let Some(value) = actions.number_formats.get(&address) {
-        capture.apply(
-            CaptureFacet::NumberFormat,
-            size_of::<Option<Arc<str>>>()
-                .saturating_add(value.as_ref().map_or(0, |value| value.len())),
-        );
+    if typed.number_format {
+        if let Some(value) = actions.number_formats.get(&address) {
+            capture.apply(
+                CaptureFacet::NumberFormat,
+                size_of::<Option<Arc<str>>>()
+                    .saturating_add(value.as_ref().map_or(0, |value| value.len())),
+            );
+        }
     }
     if include_structural {
         capture.apply(CaptureFacet::Structural, 0);
