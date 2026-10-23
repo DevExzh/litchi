@@ -35,11 +35,13 @@ The fair implementation comparison is the source snapshot at `9b1f96d6dc`
 (the concrete eager-cell iterator is already present, but the deferred
 source-backed cell reopen is not) against the source-backed-cell candidate.
 For an implementation-only comparison the candidate is `f05a395359`; the
-assembled candidate currently under qualification is `8acd229235` plus the
-deferred-source freshness fix `8d491b1e8f`. If the
-assembled candidate is used, the receipt must retain its full source hash and
-list the post-`f05a395359` XLS changes; no result may be attributed solely to
-F3 without that control. The harness source
+assembled candidate currently under qualification is the common candidate
+lineage `8acd229235` plus the separate production freshness fix
+`8d491b1e8f`. The runner requires that production commit in the candidate and
+rejects it in the historical baseline. If the assembled candidate is used, the
+receipt must retain its full source manifest hash and list the
+post-`f05a395359` XLS changes; no result may be attributed solely to F3 without
+that control. The harness source
 `tools/perf-baseline/src/xls_numeric.rs` is byte-for-byte unchanged between
 `9b1f96d6dc` and `8acd229235`.
 
@@ -59,11 +61,14 @@ The executable three-route probe was introduced by `d8fe3bcacb`; its
 freshness/refusal/replay gates plus the first ABBA runner are committed as
 `b03aaf1aac` in
 `tools/perf-baseline/examples/xls_f3_qualification.rs`, with its library
-implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. It calls
-the existing Number and RK/MulRK corpus builders through narrow helpers, so it
-does not duplicate workload construction. To regenerate the same probe in the
-already-created baseline and candidate source snapshots, use the same commit
-in both snapshots; this does not create a second baseline worktree:
+implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. The
+shared `tools/perf-baseline/src/xls_f3_corpus.rs` module owns both canonical
+fixture builders. The isolated `tools/perf-baseline-f3` manifest reuses that
+module and the existing probe source, so it does not compile unrelated DOCX or
+PPTX baseline modules or duplicate workload construction. To regenerate the
+same probe in the already-created baseline and candidate source snapshots, use
+the same common-harness commits in both snapshots; this does not create a
+second baseline worktree:
 
 ```sh
 PROBE_COMMITS=(
@@ -73,23 +78,32 @@ PROBE_COMMITS=(
   a9acffd972c827b5c9ad4c4084cf1bc2022470c4
   b3f2a5ad324af29bccb33e77457e13363b84005f
   6ff38d7c12b75353f324385cf19a358f8ece4c25
+  c704276fee70773a3faa08c67c258941291bbee3
+  7f742c3558ce8d75c2478f9beea0691d228ca9da
 )
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235
 git -C "$BASE" cherry-pick "${PROBE_COMMITS[@]}"
 git -C "$CAND" cherry-pick "${PROBE_COMMITS[@]}"
+git -C "$CAND" cherry-pick 8d491b1e8f084effde712651e07d460ba044cb1f
 ```
 
-The two hardening commits (`28d4a7c49f` for the probe/record and
-`a9acffd972` for the quiet-host enforcement) are copied to both snapshots as
-well. The runner checks the exact hashes of the probe, corpus, library and
-runner files against this checkout, and rejects a missing cherry-pick or any
-source edit before launching a child.
+The hardening commits (`28d4a7c49f` for the probe/record,
+`a9acffd972` for the quiet-host enforcement, and `c704276fee` for the complete
+common probe list) are copied to both snapshots as well. The runner checks the
+exact hashes of the probe, corpus, library and runner files against this
+checkout, hashes the complete tracked source manifest (paths and blob IDs),
+and rejects a missing cherry-pick or any source edit before launching a child.
+Only the candidate additionally requires production lineage
+`8d491b1e8f084effde712651e07d460ba044cb1f`; the baseline must not contain
+that commit. A source identity records `common_lineage`,
+`production_lineage`, the candidate production commit list,
+`forbidden_production_lineage`, and `source_manifest_sha256` separately.
 
 The current probe additionally allocates its bounded publication sink before
 the route timer, and its replay oracle reopens independent equal-content
-source and target owners. The runner accepts the pinned baseline and candidate
-lineages for qualification; lineage overrides are allowed only with
+source and target owners. The runner accepts the pinned common and candidate
+production lineages for qualification; lineage overrides are allowed only with
 `--diagnostic`, which marks the receipt unqualified. Before and after every
 child it records the selected CPU's `/proc/stat` counters, load average,
 runnable count, and selected-CPU runnable processes. A scan is quiet only when
@@ -187,12 +201,12 @@ source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/env.sh
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-base-release \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc/tools/perf-baseline/Cargo.toml \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc/tools/perf-baseline-f3/Cargo.toml \
   --example xls_f3_qualification
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235/tools/perf-baseline/Cargo.toml \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235/tools/perf-baseline-f3/Cargo.toml \
   --example xls_f3_qualification
 mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
   /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
@@ -240,7 +254,9 @@ python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_
   --memory-limit-bytes 2147483648 \
   --warmup 20 --samples 40 \
   --control-lineage 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
-  --candidate-lineage 8acd229235e3c01c6e529f6d1f055d84b8e03de4
+  --candidate-lineage 8acd229235e3c01c6e529f6d1f055d84b8e03de4 \
+  --candidate-production-lineage 8d491b1e8f084effde712651e07d460ba044cb1f \
+  --control-forbidden-production-lineage 8d491b1e8f084effde712651e07d460ba044cb1f
 ```
 
 The runner emits A1/B1/B2/A2 for each route/corpus pair, and stores its script

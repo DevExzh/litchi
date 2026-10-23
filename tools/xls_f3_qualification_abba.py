@@ -46,6 +46,8 @@ MAX_QUIET_LOADAVG = 1.0
 MAX_QUIET_RUNNABLE = 1
 BASELINE_LINEAGE = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
 CANDIDATE_LINEAGE = "8acd229235e3c01c6e529f6d1f055d84b8e03de4"
+CANDIDATE_PRODUCTION_LINEAGE = "8d491b1e8f084effde712651e07d460ba044cb1f"
+CANDIDATE_PRODUCTION_COMMITS = (CANDIDATE_PRODUCTION_LINEAGE,)
 PROBE_COMMITS = (
     "d8fe3bcacb0c51cf354314393f93cef0a393e157",
     "b03aaf1aace43fab45666dc3a1507f3da5922d5a",
@@ -53,12 +55,18 @@ PROBE_COMMITS = (
     "a9acffd972c827b5c9ad4c4084cf1bc2022470c4",
     "b3f2a5ad324af29bccb33e77457e13363b84005f",
     "6ff38d7c12b75353f324385cf19a358f8ece4c25",
+    "c704276fee70773a3faa08c67c258941291bbee3",
+    "7f742c3558ce8d75c2478f9beea0691d228ca9da",
 )
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",
+    "tools/perf-baseline/src/xls_f3_corpus.rs",
     "tools/perf-baseline/examples/xls_f3_qualification.rs",
     "tools/perf-baseline/src/xls_numeric.rs",
     "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline-f3/Cargo.toml",
+    "tools/perf-baseline-f3/src/lib.rs",
+    "tools/perf-baseline-f3/examples/xls_f3_qualification.rs",
     "tools/xls_f3_qualification_abba.py",
 )
 REQUIRED_COLUMNS = (
@@ -166,6 +174,20 @@ def hash_git_diff(source: Path) -> str:
     return sha256_bytes(completed.stdout)
 
 
+def hash_git_manifest(source: Path) -> str:
+    """Hash tracked source paths and blob identities, including their names."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(source), "ls-tree", "-r", "--full-tree", "--long", "HEAD"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise RunnerError(f"cannot hash tracked source manifest for {source}: {error}") from error
+    return sha256_bytes(completed.stdout)
+
+
 def require_ancestor(source: Path, ancestor: str) -> None:
     try:
         completed = subprocess.run(
@@ -184,6 +206,42 @@ def require_ancestor(source: Path, ancestor: str) -> None:
         )
 
 
+def require_not_ancestor(source: Path, ancestor: str) -> None:
+    """Reject a source containing a production change that belongs to the candidate."""
+    try:
+        present = subprocess.run(
+            ["git", "-C", str(source), "cat-file", "-e", f"{ancestor}^{{commit}}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except OSError as error:
+        raise RunnerError(f"cannot inspect source production lineage for {source}: {error}") from error
+    # A historical source may not retain the candidate commit object.  That is
+    # the expected state; only an existing ancestor is contamination.
+    if present.returncode != 0:
+        return
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(source), "merge-base", "--is-ancestor", ancestor, "HEAD"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError as error:
+        raise RunnerError(f"cannot check forbidden source lineage for {source}: {error}") from error
+    if completed.returncode == 0:
+        raise RunnerError(
+            f"{source} contains forbidden candidate production lineage {ancestor}"
+        )
+    if completed.returncode != 1:
+        detail = completed.stderr.decode("utf-8", "replace").strip()
+        raise RunnerError(
+            f"cannot determine forbidden source lineage for {source}"
+            + (f": {detail}" if detail else "")
+        )
+
+
 def probe_identities(repo: Path) -> dict[str, str]:
     identities: dict[str, str] = {}
     for relative in PROBE_PATHS:
@@ -196,6 +254,8 @@ def source_identity(
     *,
     lineage: str,
     expected_probe: dict[str, str],
+    required_production_lineage: str | None = None,
+    forbidden_production_lineage: str | None = None,
 ) -> dict[str, Any]:
     source = path.expanduser().resolve(strict=True)
     if not source.is_dir():
@@ -208,6 +268,10 @@ def source_identity(
     if status:
         raise RunnerError(f"source snapshot is dirty: {source}: {status}")
     require_ancestor(source, lineage)
+    if required_production_lineage is not None:
+        require_ancestor(source, required_production_lineage)
+    if forbidden_production_lineage is not None:
+        require_not_ancestor(source, forbidden_production_lineage)
     actual_probe = probe_identities(source)
     if actual_probe != expected_probe:
         mismatches = [
@@ -222,10 +286,14 @@ def source_identity(
         "path": str(source),
         "revision": revision,
         "tree": tree,
-        "lineage": lineage,
+        "common_lineage": lineage,
+        "production_lineage": required_production_lineage,
+        "candidate_production_commits": list(CANDIDATE_PRODUCTION_COMMITS),
+        "forbidden_production_lineage": forbidden_production_lineage,
         "worktree_clean": True,
         "status_sha256": sha256_bytes(status.encode("utf-8")),
         "diff_sha256": hash_git_diff(source),
+        "source_manifest_sha256": hash_git_manifest(source),
         "probe_commits": list(PROBE_COMMITS),
         "probe_sha256": actual_probe,
     }
@@ -486,6 +554,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate-source", type=Path, required=True)
     parser.add_argument("--control-lineage", default=BASELINE_LINEAGE)
     parser.add_argument("--candidate-lineage", default=CANDIDATE_LINEAGE)
+    parser.add_argument(
+        "--candidate-production-lineage", default=CANDIDATE_PRODUCTION_LINEAGE
+    )
+    parser.add_argument(
+        "--control-forbidden-production-lineage",
+        default=CANDIDATE_PRODUCTION_LINEAGE,
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cpu", type=int, required=True)
     parser.add_argument("--memory-limit-bytes", type=int, default=DEFAULT_MEMORY_LIMIT_BYTES)
@@ -541,6 +616,9 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
     if not options.diagnostic and (
         options.control_lineage != BASELINE_LINEAGE
         or options.candidate_lineage != CANDIDATE_LINEAGE
+        or options.candidate_production_lineage != CANDIDATE_PRODUCTION_LINEAGE
+        or options.control_forbidden_production_lineage
+        != CANDIDATE_PRODUCTION_LINEAGE
     ):
         raise RunnerError(
             "lineage overrides require --diagnostic and are explicitly unqualified"
@@ -783,11 +861,13 @@ def main() -> int:
             options.control_source,
             lineage=options.control_lineage,
             expected_probe=expected_probe,
+            forbidden_production_lineage=options.control_forbidden_production_lineage,
         )
         candidate_source = source_identity(
             options.candidate_source,
             lineage=options.candidate_lineage,
             expected_probe=expected_probe,
+            required_production_lineage=options.candidate_production_lineage,
         )
         if control_source["path"] == candidate_source["path"]:
             raise RunnerError("control and candidate sources must have distinct paths")
