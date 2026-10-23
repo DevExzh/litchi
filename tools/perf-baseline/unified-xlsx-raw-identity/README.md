@@ -11,10 +11,10 @@ the report; Cargo features select the source-compatible constructor.
 
 The current v2 harness is based on `a3b649ca857673c9c0ce62e04c7d44e7ba78c502`.
 After the adapter change its source-file SHA-256 is
-`df7f749961c2d0f27abff803298a8a2f697d2789cdf25dd890cf3dc26000b6f5`; the
-adapter block (the `open_opc` documentation, both cfg branches, and the
-unselected-policy guard) is
-`6709476271f311aee6d35a1c4c788b4f4bee2aedec34d5517b1b4b8abd39b65e`.
+`3c9d07e449865ddeee86ec273cf2ec31eaccb9897f5631bc6db45416b56f14fa`; the
+adapter block (the `open_opc` documentation, fallback, and explicit
+legacy-only branch) is
+`294827709997633b1c0c8568e07f7a3eae4f13103a0a9757efee236c641412d5`.
 The native v1 source files at both historical revisions have SHA-256
 `6f5e5606afa342f87a7c1e93538b7302878a6b45113cef7b6514f62a7f1cdb34`.
 Do not reuse a 5726-only result as a performance qualification for the later
@@ -49,10 +49,10 @@ default build and `--all-features` both select the required-limit constructor;
 when both current and legacy markers are present, the current cfg wins. A
 pinned historical checkout is built with `--no-default-features` and the
 explicit `legacy-xlsx-raw-opc` marker, so it selects the one-argument
-constructor. The adapter rejects an unqualified `--no-default-features`
-build, preventing an accidental API choice. The historical manifest must
-contain that marker before the command (the source revision predates the
-marker):
+constructor. A `--no-default-features` build without either marker also uses
+the current required-limit constructor, so existing no-default builds remain
+valid. The historical manifest must contain the legacy marker before the
+historical command (the source revision predates the marker):
 
 ```sh
 HIST_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63

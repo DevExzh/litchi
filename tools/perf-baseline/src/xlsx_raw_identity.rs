@@ -215,7 +215,10 @@ fn build_package(spec: CaseSpec) -> ProbeResult<Package> {
 /// current assembly keeps the same policy explicit at the required-limit
 /// constructor.  This is the only versioned ingress adapter; the lifecycle
 /// and ownership path around it stays identical.
-#[cfg(feature = "current-xlsx-raw-opc")]
+// The current required-limit ingress is also the safe fallback for a
+// no-default-features build.  The historical constructor is selected only
+// when its explicit marker is present without the current marker.
+#[cfg(any(feature = "current-xlsx-raw-opc", not(feature = "legacy-xlsx-raw-opc")))]
 fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
     Ok(OpcPackage::from_vec(bytes, SourceLimits::default())?)
 }
@@ -224,14 +227,6 @@ fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
 fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
     Ok(OpcPackage::from_vec(bytes)?)
 }
-
-#[cfg(all(
-    not(feature = "current-xlsx-raw-opc"),
-    not(feature = "legacy-xlsx-raw-opc")
-))]
-compile_error!(
-    "select current-xlsx-raw-opc (the default) or legacy-xlsx-raw-opc for the raw OPC adapter"
-);
 
 fn open_package(bytes: &[u8]) -> ProbeResult<Package> {
     Ok(Package::from_opc(open_opc(bytes.to_vec())?)?)
