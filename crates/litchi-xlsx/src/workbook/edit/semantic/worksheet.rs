@@ -237,6 +237,35 @@ impl Sheet<'_> {
             })
     }
 
+    /// A typed request after removal recreates the cell's style-bearing
+    /// record. Keep the supported remove-then-style sequence instead of
+    /// leaving an impossible `Remove` action beside deferred style maps.
+    fn promote_remove_for_typed(&mut self, address: Address) {
+        let removed = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.cells.get(&address))
+            .is_some_and(|action| matches!(action, Action::Remove));
+        if !removed {
+            return;
+        }
+        self.edit
+            .release_cell_capture_facet(self.position, address, CaptureFacet::Remove);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .cells
+            .insert(
+                address,
+                Action::Update {
+                    payload: None,
+                    style: None,
+                },
+            );
+    }
+
     /// Discard typed style requests when a complete style operation resolves
     /// to the immutable source.  This path runs before capture admission, so
     /// it must release every facet explicitly rather than relying on a later
@@ -299,6 +328,55 @@ impl Sheet<'_> {
             );
         }
         Ok(())
+    }
+
+    /// Cancel a pending complete style when the later complete request is the
+    /// immutable source style.  This is deliberately a bounded-edit boundary:
+    /// ordinary edits keep the setter fast and defer the source comparison to
+    /// the join/commit effect planner.  A bounded edit, however, must release
+    /// the superseded complete-style capture before admitting the next
+    /// operation, or a stale reservation can reject an otherwise fitting
+    /// payload.
+    fn discard_source_equivalent_complete_style(
+        &mut self,
+        address: Address,
+        requested: Option<u32>,
+    ) -> Result<bool> {
+        if !self.edit.capture_budgeted()
+            || !self
+                .edit
+                .sheets
+                .get(&self.position)
+                .and_then(|actions| actions.cells.get(&address))
+                .is_some_and(|action| matches!(action, Action::Update { style: Some(_), .. }))
+        {
+            return Ok(false);
+        }
+        if self.source_style(address)? != requested {
+            return Ok(false);
+        }
+        self.discard_typed_style_noop(address)?;
+        let remove_action = self
+            .edit
+            .sheets
+            .get_mut(&self.position)
+            .and_then(|actions| actions.cells.get_mut(&address))
+            .is_some_and(|action| match action {
+                Action::Update { payload, style } => {
+                    *style = None;
+                    payload.is_none()
+                },
+                Action::Remove => false,
+            });
+        if remove_action {
+            self.edit
+                .sheets
+                .get_mut(&self.position)
+                .and_then(|actions| actions.cells.remove(&address));
+        }
+        self.edit
+            .release_cell_capture_facet(self.position, address, CaptureFacet::Style);
+        Ok(true)
     }
 
     fn has_pending_cell_effect(&self, address: Address) -> bool {
@@ -1132,6 +1210,9 @@ impl Sheet<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
+        if self.discard_source_equivalent_complete_style(address, Some(style.raw()))? {
+            return Ok(self);
+        }
         let had_pending_style = self.has_pending_style(address);
         let has_pending_complete_style = self.has_pending_complete_style(address);
         if had_pending_style
@@ -1221,6 +1302,9 @@ impl Sheet<'_> {
     /// A missing cell remains missing and resolves as a no-op at commit.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        if self.discard_source_equivalent_complete_style(address, None)? {
+            return Ok(self);
+        }
         let had_pending_style = self.has_pending_style(address);
         let has_pending_complete_style = self.has_pending_complete_style(address);
         if had_pending_style
@@ -1364,6 +1448,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Font);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1424,6 +1509,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Alignment);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1495,6 +1581,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Border);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1584,6 +1671,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Fill);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1641,6 +1729,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Protection);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1695,6 +1784,7 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::QuotePrefix);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1764,6 +1854,7 @@ impl Sheet<'_> {
             );
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,

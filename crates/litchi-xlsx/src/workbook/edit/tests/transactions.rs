@@ -126,6 +126,125 @@ fn mixed_join_normalizes_typed_noop_against_pending_complete_style() {
 }
 
 #[test]
+fn unbounded_join_normalizes_source_equivalent_effects_before_conflicts() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut install = baseline.edit().expect("install edit");
+    install
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .expect("install value");
+    let source = install.commit().expect("install commit").into_package();
+
+    let mut left = source.edit().expect("left edit");
+    left.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .expect("left source-equivalent set");
+    let mut right = source.edit().expect("right edit");
+    right
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "shared value")
+        .and_then(|sheet| sheet.clear("B2"))
+        .and_then(|sheet| sheet.remove("C3"))
+        .and_then(|sheet| sheet.reset_style("D4"))
+        .expect("right source-equivalent effects");
+
+    left.join(right)
+        .expect("source-equivalent effects do not overlap");
+    let committed = left.commit().expect("source-equivalent join commit");
+    assert!(committed.patch().is_noop());
+}
+
+#[test]
+fn failed_join_preserves_original_self_and_rejected_effects() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut left = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    left.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "left")
+        .expect("left value");
+    let left_len = left.len();
+
+    let mut right = source.edit().expect("unbounded edit");
+    right
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .font(
+            "B1",
+            &crate::FontChange::new()
+                .name(None)
+                .expect("empty font name"),
+        )
+        .and_then(|sheet| sheet.set("A1", "right"))
+        .and_then(|sheet| sheet.remove("B2"))
+        .and_then(|sheet| sheet.clear("C3"))
+        .expect("right effects");
+    let right_len = right.len();
+
+    let error = left
+        .join(right)
+        .expect_err("overlapping payloads must refuse");
+    assert!(matches!(error.failure(), JoinFailure::Overlap(_)));
+    assert_eq!(left.len(), left_len);
+    assert_eq!(error.rejected().len(), right_len);
+    assert!(matches!(
+        left.sheets
+            .get(&0)
+            .and_then(|actions| {
+                actions
+                    .cells
+                    .get(&Address::from_a1("A1").expect("A1"))
+            }),
+        Some(Action::Update {
+            payload: Some(Payload::Set(content)),
+            ..
+        }) if matches!(
+            content.as_cell(),
+            Cell::Value(Value::Text(value)) if value.as_str() == "left"
+        )
+    ));
+    let mut rejected = error.into_rejected();
+    assert_eq!(rejected.len(), right_len);
+    assert!(rejected.sheets.get(&0).is_some_and(|actions| {
+        actions
+            .fonts
+            .contains_key(&Address::from_a1("B1").expect("B1"))
+    }));
+    assert!(matches!(
+        rejected
+            .sheets
+            .get(&0)
+            .and_then(|actions| {
+                actions
+                    .cells
+                    .get(&Address::from_a1("A1").expect("A1"))
+            }),
+        Some(Action::Update {
+            payload: Some(Payload::Set(content)),
+            ..
+        }) if matches!(
+            content.as_cell(),
+            Cell::Value(Value::Text(value)) if value.as_str() == "right"
+        )
+    ));
+    let _ = rejected
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .state("B2")
+        .expect("rejected state remains readable");
+}
+
+#[test]
 fn primary_edit_capture_budget_rejects_before_cell_staging() {
     let source = crate::Package::new().expect("source workbook");
     // The native ledger admits only the two final endpoints at this

@@ -370,7 +370,7 @@ fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
 }
 
 /// Isolated workbook transaction. Dropping it rolls back every pending change.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Edit {
     pub(in crate::workbook::edit) base: Workbook,
     pub(in crate::workbook::edit) panes: Option<PanesAction>,
@@ -684,8 +684,7 @@ impl CaptureBudget {
                     || actions.protections.contains_key(&address)
                     || actions.quote_prefixes.contains_key(&address)
                     || actions.number_formats.contains_key(&address);
-                let removed = matches!(actions.cells.get(&address), Some(Action::Remove));
-                let effective_format = if !has_typed || removed {
+                let effective_format = if !has_typed {
                     None
                 } else if let Some(Action::Update {
                     style: Some(style), ..
@@ -702,55 +701,51 @@ impl CaptureBudget {
                         .map(|style| style.format())
                         .transpose()?
                 };
-                let typed = if removed {
-                    EffectiveTypedFacets::default()
-                } else {
-                    EffectiveTypedFacets {
-                        font: actions.fonts.get(&address).is_some_and(|change| {
-                            !font_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::font),
-                            )
-                        }),
-                        alignment: actions.alignments.get(&address).is_some_and(|change| {
-                            !alignment_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::alignment),
-                            )
-                        }),
-                        fill: actions.fills.get(&address).is_some_and(|change| {
-                            !fill_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::fill),
-                            )
-                        }),
-                        border: actions.borders.get(&address).is_some_and(|change| {
-                            !border_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::border),
-                            )
-                        }),
-                        protection: actions.protections.get(&address).is_some_and(|change| {
-                            !protection_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::protection),
-                            )
-                        }),
-                        quote_prefix: actions.quote_prefixes.get(&address).is_some_and(|value| {
-                            !quote_prefix_matches_source(
-                                *value,
-                                effective_format.as_ref().map(Format::quote_prefix),
-                            )
-                        }),
-                        number_format: actions.number_formats.get(&address).is_some_and(|value| {
-                            !number_format_matches_source(
-                                value.as_deref(),
-                                effective_format
-                                    .as_ref()
-                                    .and_then(|format| format.number_format().code()),
-                            )
-                        }),
-                    }
+                let typed = EffectiveTypedFacets {
+                    font: actions.fonts.get(&address).is_some_and(|change| {
+                        !font_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::font),
+                        )
+                    }),
+                    alignment: actions.alignments.get(&address).is_some_and(|change| {
+                        !alignment_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::alignment),
+                        )
+                    }),
+                    fill: actions.fills.get(&address).is_some_and(|change| {
+                        !fill_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::fill),
+                        )
+                    }),
+                    border: actions.borders.get(&address).is_some_and(|change| {
+                        !border_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::border),
+                        )
+                    }),
+                    protection: actions.protections.get(&address).is_some_and(|change| {
+                        !protection_change_matches_source(
+                            change,
+                            effective_format.as_ref().and_then(Format::protection),
+                        )
+                    }),
+                    quote_prefix: actions.quote_prefixes.get(&address).is_some_and(|value| {
+                        !quote_prefix_matches_source(
+                            *value,
+                            effective_format.as_ref().map(Format::quote_prefix),
+                        )
+                    }),
+                    number_format: actions.number_formats.get(&address).is_some_and(|value| {
+                        !number_format_matches_source(
+                            value.as_deref(),
+                            effective_format
+                                .as_ref()
+                                .and_then(|format| format.number_format().code()),
+                        )
+                    }),
                 };
                 let has_other_facet = typed.font
                     || typed.alignment
@@ -3011,18 +3006,20 @@ impl Edit {
             && self.removed.is_empty()
     }
 
-    /// Remove source-equivalent typed requests from an unbounded edit when it
-    /// is about to join a bounded edit. Unbounded setters intentionally avoid
-    /// source reads on their fast path; the join is the first point at which
-    /// the bounded ledger needs the effective final request. Keeping this
-    /// normalization here avoids charging a typed no-op (and avoids letting it
-    /// produce a patch at commit) without adding work to ordinary unbounded
-    /// edits.
-    fn normalize_unbounded_typed_noops(&mut self) -> Result<()> {
-        #[derive(Debug, Clone, Copy)]
-        struct Removal {
+    /// Normalize deferred worksheet effects against the immutable source.
+    ///
+    /// Ordinary unbounded setters deliberately do not perform this census.
+    /// A join and commit are the deferred boundaries: they build one effect
+    /// plan, then apply it atomically so source-equivalent actions do not
+    /// create conflicts, consume snapshot budget, or invalidate a signed
+    /// no-op. Rich-text identity remains part of the comparison: a plain set
+    /// over rich text is an authored representation change.
+    fn normalize_effects(&mut self) -> Result<()> {
+        #[derive(Debug)]
+        struct Plan {
             position: usize,
             address: Address,
+            action: Option<Action>,
             font: bool,
             alignment: bool,
             fill: bool,
@@ -3032,9 +3029,10 @@ impl Edit {
             number_format: bool,
         }
 
-        let mut removals = Vec::new();
+        let mut plans = Vec::new();
         for (&position, actions) in &self.sheets {
             let mut addresses = BTreeSet::new();
+            addresses.extend(actions.cells.keys().copied());
             addresses.extend(actions.fonts.keys().copied());
             addresses.extend(actions.alignments.keys().copied());
             addresses.extend(actions.fills.keys().copied());
@@ -3048,118 +3046,162 @@ impl Edit {
             let source = self
                 .base
                 .sheet(position)?
-                .ok_or_else(|| invalid("worksheet typed request target disappeared"))?;
+                .ok_or_else(|| invalid("worksheet effect target disappeared"))?;
+            let store = source.store()?;
             for address in addresses {
-                let removed = matches!(actions.cells.get(&address), Some(Action::Remove));
-                let effective_format = if removed {
-                    None
-                } else if let Some(Action::Update {
-                    style: Some(style), ..
-                }) = actions.cells.get(&address)
-                {
-                    let raw = match style {
-                        StyleEffect::Set(raw) => *raw,
-                        StyleEffect::Reset => 0,
-                    };
-                    Some(self.base.inner.format(raw)?)
-                } else {
-                    source
-                        .style(address)?
-                        .map(|style| style.format())
-                        .transpose()?
+                let stored = store.entry(address);
+                let source_cell = stored.map(|value| value.cell.clone());
+                let source_style = stored.and_then(|value| value.style);
+                let source_rich = source.rich_text(address)?;
+                let source_format = source_style
+                    .map(|style| self.base.inner.format(style))
+                    .transpose()?;
+                let original_action = actions.cells.get(&address);
+                let format = match original_action {
+                    Some(Action::Update {
+                        style: Some(StyleEffect::Set(style)),
+                        ..
+                    }) => Some(self.base.inner.format(*style)?),
+                    Some(Action::Update {
+                        style: Some(StyleEffect::Reset),
+                        ..
+                    }) => Some(self.base.inner.format(0)?),
+                    _ => source_format.clone(),
                 };
-                let removal = Removal {
+                let font_matches = actions.fonts.get(&address).is_none_or(|change| {
+                    font_change_matches_source(change, format.as_ref().and_then(Format::font))
+                });
+                let alignment_matches = actions.alignments.get(&address).is_none_or(|change| {
+                    alignment_change_matches_source(
+                        change,
+                        format.as_ref().and_then(Format::alignment),
+                    )
+                });
+                let fill_matches = actions.fills.get(&address).is_none_or(|change| {
+                    fill_change_matches_source(change, format.as_ref().and_then(Format::fill))
+                });
+                let border_matches = actions.borders.get(&address).is_none_or(|change| {
+                    border_change_matches_source(change, format.as_ref().and_then(Format::border))
+                });
+                let protection_matches = actions.protections.get(&address).is_none_or(|change| {
+                    protection_change_matches_source(
+                        change,
+                        format.as_ref().and_then(Format::protection),
+                    )
+                });
+                let quote_prefix_matches =
+                    actions.quote_prefixes.get(&address).is_none_or(|value| {
+                        quote_prefix_matches_source(
+                            *value,
+                            format.as_ref().map(Format::quote_prefix),
+                        )
+                    });
+                let number_format_matches =
+                    actions.number_formats.get(&address).is_none_or(|value| {
+                        number_format_matches_source(
+                            value.as_deref(),
+                            format
+                                .as_ref()
+                                .and_then(|value| value.number_format().code()),
+                        )
+                    });
+                let typed_effective = !(font_matches
+                    && alignment_matches
+                    && fill_matches
+                    && border_matches
+                    && protection_matches
+                    && quote_prefix_matches
+                    && number_format_matches);
+                let mut action = original_action.cloned();
+                if let Some(Action::Update { payload, style }) = action.as_mut() {
+                    if payload.as_ref().is_some_and(|payload| {
+                        payload_matches_source(payload, &source_cell, &source_rich)
+                    }) {
+                        *payload = None;
+                    }
+                    if style
+                        .as_ref()
+                        .is_some_and(|style| style_matches_source(*style, source_style))
+                    {
+                        *style = None;
+                    }
+                    if payload.is_none() && style.is_none() && !typed_effective {
+                        action = None;
+                    }
+                } else if matches!(action, Some(Action::Remove)) {
+                    if typed_effective {
+                        action = Some(Action::Update {
+                            payload: None,
+                            style: None,
+                        });
+                    } else if source_cell.is_none() {
+                        action = None;
+                    }
+                }
+                plans.push(Plan {
                     position,
                     address,
-                    font: removed
-                        || actions.fonts.get(&address).is_some_and(|change| {
-                            font_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::font),
-                            )
-                        }),
-                    alignment: removed
-                        || actions.alignments.get(&address).is_some_and(|change| {
-                            alignment_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::alignment),
-                            )
-                        }),
-                    fill: removed
-                        || actions.fills.get(&address).is_some_and(|change| {
-                            fill_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::fill),
-                            )
-                        }),
-                    border: removed
-                        || actions.borders.get(&address).is_some_and(|change| {
-                            border_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::border),
-                            )
-                        }),
-                    protection: removed
-                        || actions.protections.get(&address).is_some_and(|change| {
-                            protection_change_matches_source(
-                                change,
-                                effective_format.as_ref().and_then(Format::protection),
-                            )
-                        }),
-                    quote_prefix: removed
-                        || actions.quote_prefixes.get(&address).is_some_and(|value| {
-                            quote_prefix_matches_source(
-                                *value,
-                                effective_format.as_ref().map(Format::quote_prefix),
-                            )
-                        }),
-                    number_format: removed
-                        || actions.number_formats.get(&address).is_some_and(|value| {
-                            number_format_matches_source(
-                                value.as_deref(),
-                                effective_format
-                                    .as_ref()
-                                    .and_then(|format| format.number_format().code()),
-                            )
-                        }),
-                };
-                if removal.font
-                    || removal.alignment
-                    || removal.fill
-                    || removal.border
-                    || removal.protection
-                    || removal.quote_prefix
-                    || removal.number_format
-                {
-                    removals.push(removal);
-                }
+                    action,
+                    font: !font_matches,
+                    alignment: !alignment_matches,
+                    fill: !fill_matches,
+                    border: !border_matches,
+                    protection: !protection_matches,
+                    quote_prefix: !quote_prefix_matches,
+                    number_format: !number_format_matches,
+                });
             }
         }
 
-        for removal in removals {
-            if removal.fill {
-                self.discard_fill(removal.position, removal.address)?;
+        for plan in plans {
+            if !plan.fill {
+                self.discard_fill(plan.position, plan.address)?;
             }
-            if removal.border {
-                self.discard_border(removal.position, removal.address)?;
+            if !plan.border {
+                self.discard_border(plan.position, plan.address)?;
             }
-            if let Some(actions) = self.sheets.get_mut(&removal.position) {
-                if removal.font {
-                    actions.fonts.remove(&removal.address);
-                }
-                if removal.alignment {
-                    actions.alignments.remove(&removal.address);
-                }
-                if removal.protection {
-                    actions.protections.remove(&removal.address);
-                }
-                if removal.quote_prefix {
-                    actions.quote_prefixes.remove(&removal.address);
-                }
-                if removal.number_format {
-                    actions.number_formats.remove(&removal.address);
-                }
+            let Some(actions) = self.sheets.get_mut(&plan.position) else {
+                continue;
+            };
+            if plan.font {
+                // The map already owns the final request.
+            } else {
+                actions.fonts.remove(&plan.address);
             }
+            if plan.alignment {
+                // The map already owns the final request.
+            } else {
+                actions.alignments.remove(&plan.address);
+            }
+            if plan.protection {
+                // The map already owns the final request.
+            } else {
+                actions.protections.remove(&plan.address);
+            }
+            if plan.quote_prefix {
+                // The map already owns the final request.
+            } else {
+                actions.quote_prefixes.remove(&plan.address);
+            }
+            if plan.number_format {
+                // The map already owns the final request.
+            } else {
+                actions.number_formats.remove(&plan.address);
+            }
+            if let Some(action) = plan.action {
+                actions.cells.insert(plan.address, action);
+            } else {
+                actions.cells.remove(&plan.address);
+            }
+        }
+
+        if let Some(previous) = self.capture_budget.take() {
+            self.capture_budget = Some(CaptureBudget::from_staged(
+                &self.base,
+                previous.maximum,
+                &self.sheets,
+                &self.added,
+            )?);
         }
         Ok(())
     }
@@ -3170,6 +3212,26 @@ impl Edit {
     /// `self` is unchanged and [`JoinError`] returns ownership of `other`, so
     /// callers never lose prepared work while resolving a conflict.
     pub fn join(&mut self, other: Self) -> std::result::Result<&mut Self, JoinError> {
+        if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
+            return Err(JoinError {
+                failure: JoinFailure::DifferentSnapshot,
+                rejected: Box::new(other),
+            });
+        }
+        let mut candidate = self.clone();
+        match candidate.join_in_place(other.clone()) {
+            Ok(()) => {
+                *self = candidate;
+                Ok(self)
+            },
+            Err(JoinError { failure, .. }) => Err(JoinError {
+                failure,
+                rejected: Box::new(other),
+            }),
+        }
+    }
+
+    fn join_in_place(&mut self, other: Self) -> std::result::Result<(), JoinError> {
         let mut other = other;
         if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
             return Err(JoinError {
@@ -3177,34 +3239,22 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
-        if self.capture_budget.is_some() && other.capture_budget.is_none() {
-            if other.normalize_unbounded_typed_noops().is_err() {
-                let maximum = self
-                    .capture_budget
-                    .as_ref()
-                    .map_or(usize::MAX, |budget| budget.maximum);
-                return Err(JoinError {
-                    failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                        usize::MAX,
-                        maximum,
-                    )),
-                    rejected: Box::new(other),
-                });
-            }
-        } else if self.capture_budget.is_none() && other.capture_budget.is_some() {
-            if self.normalize_unbounded_typed_noops().is_err() {
-                let maximum = other
-                    .capture_budget
-                    .as_ref()
-                    .map_or(usize::MAX, |budget| budget.maximum);
-                return Err(JoinError {
-                    failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
-                        usize::MAX,
-                        maximum,
-                    )),
-                    rejected: Box::new(other),
-                });
-            }
+        // Normalize both sides at the deferred join boundary.  Setters on an
+        // unbounded edit intentionally avoid source reads, but joining two
+        // edits must compare their final effects rather than their authored
+        // no-op requests.  `join` invokes this on a candidate clone, so a
+        // source/format error cannot partially publish either edit.
+        if let Err(error) = self.normalize_effects() {
+            return Err(JoinError {
+                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
+                rejected: Box::new(other),
+            });
+        }
+        if let Err(error) = other.normalize_effects() {
+            return Err(JoinError {
+                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
+                rejected: Box::new(other),
+            });
         }
         if self.panes.is_some() && other.panes.is_some() {
             return Err(JoinError {
@@ -3643,7 +3693,7 @@ impl Edit {
         self.removed.extend(other.removed);
         self.cross_workbook_scalar |= other_cross_workbook_scalar;
         self.capture_budget = joined_capture_budget;
-        Ok(self)
+        Ok(())
     }
 
     /// Validate and atomically publish a new immutable snapshot.
@@ -3651,7 +3701,8 @@ impl Edit {
     /// An edit that staged nothing returns its source snapshot, a signed one
     /// included (ADR 0006); a changed edit of a signed workbook is refused
     /// with [`Error::Signed`].
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.normalize_effects()?;
         if self.is_empty() {
             let budget = self.capture_budget.clone();
             let source = self.base.clone();
@@ -6439,6 +6490,48 @@ fn payload_capture_bytes(payload: &Payload) -> usize {
         Payload::Cache(value) => size_of::<Payload>().saturating_add(value.retained_bytes()),
         Payload::Rich(text) => text.retained_bytes(),
         Payload::Clear | Payload::ClearIfPresent => size_of::<Content>(),
+    }
+}
+
+fn payload_matches_source(
+    payload: &Payload,
+    source: &Option<Cell>,
+    source_rich: &Option<crate::RichText>,
+) -> bool {
+    match payload {
+        Payload::Set(content) => {
+            source_rich.is_none()
+                && source
+                    .as_ref()
+                    .is_some_and(|value| value == &content.as_cell())
+        },
+        Payload::SharedString { text, .. } => {
+            source_rich.is_none()
+                && source.as_ref().is_some_and(|value| {
+                    matches!(value, Cell::Value(crate::Value::Text(current)) if current == text)
+                })
+        },
+        Payload::Rich(text) => source_rich.as_ref() == Some(text.as_ref()),
+        Payload::Cache(value) => source.as_ref().is_some_and(|current| {
+            matches!(
+                current,
+                Cell::Formula(formula)
+                    if formula
+                        .cached()
+                        .is_some_and(|cache| cache.value() == value)
+            )
+        }),
+        Payload::Clear | Payload::ClearIfPresent => {
+            source.as_ref().is_none_or(|value| matches!(value, Cell::Empty))
+        },
+        Payload::SharedFormula { .. } => false,
+    }
+}
+
+fn style_matches_source(style: StyleEffect, source: Option<u32>) -> bool {
+    match style {
+        StyleEffect::Set(style) => source == Some(style),
+        StyleEffect::Reset => source.is_none(),
     }
 }
 
