@@ -9,9 +9,13 @@ cell data is collected or copied.
 
 This closes the memo 29 residual without changing the source-backed cursor,
 grid fallback, path behavior, or error classification. The source-backed XLS
-commit reopen optimization (0359a-F3) remains a separate follow-up because it
-needs matched write-only, first-read, and read-after-write evidence while
-retaining commit-time source validation.
+commit path now retains its validated overlay plan and defers opening the
+composed workbook until the first semantic read. Write-only publication still
+streams the checked plan directly, while the first read opens the target once
+and caches it for subsequent projections. Commit-time source, span,
+fingerprint, and numeric readback validation remains unchanged. The
+coordinator should qualify write-only, first-read, and read-after-write costs
+against the former forward-only plan before claiming the F3 saving.
 
 Validation was limited to formatting and static diff/artifact guards in this
 leaf. The coordinator should run the XLS and unified-ops checks on the merged
