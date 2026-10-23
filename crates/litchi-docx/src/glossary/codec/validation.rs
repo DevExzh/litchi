@@ -112,7 +112,7 @@ pub(in crate::glossary) fn validate_entry_limits(entry: &Entry, limits: &Limits)
         return Ok(());
     };
     if let Some(name) = &props.name {
-        selected_name(name.as_str(), name.key(), limits)?;
+        selected_name(name.as_str(), name.key.as_ref(), limits)?;
     }
     for value in [
         props.style.as_deref(),

@@ -477,9 +477,8 @@ pub mod raw {
             }
             super::add_selected_metadata(&mut metadata, value, limits)?;
         }
-        let mut relationship_count = 0usize;
         admit_relationships(&graph.rels, limits)?;
-        relationship_count = graph.rels.len();
+        let mut relationship_count = graph.rels.len();
         for relationship in &graph.rels {
             for value in [&relationship.id, &relationship.kind, &relationship.target] {
                 super::add_selected_metadata(&mut metadata, value, limits)?;
@@ -758,7 +757,7 @@ pub(in crate::glossary) fn load_graph_with_limits(
             source,
         })?;
     for uri in owned {
-        if uri != &owner.root {
+        if uri != owner.root {
             names.push(uri);
         }
     }
@@ -1215,7 +1214,7 @@ pub(in crate::glossary) fn locate(
                     maximum: limits.string_bytes(),
                 });
             }
-            if part.partname() != &main {
+            if part.partname() != main {
                 return Err(invalid(format!(
                     "glossary-document relationship has invalid source '{}'",
                     part.partname()
@@ -2206,13 +2205,14 @@ pub(in crate::glossary) fn glossary_owned_parts(
             queue.push_back((target, target_role));
         }
     }
+    let part_count = owned.len().saturating_sub(1);
     Ok((
         owned,
         ClosureLedger {
             total_bytes,
             metadata_bytes,
             relationship_count,
-            part_count: owned.len().saturating_sub(1),
+            part_count,
         },
     ))
 }
