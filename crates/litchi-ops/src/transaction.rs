@@ -652,6 +652,10 @@ impl Edit {
             {
                 return Ok(());
             }
+            // The direct path below is normally flushed by `execute`, but the
+            // PPT planner needs the post-flush snapshot remainder before it
+            // captures its native before image.
+            self.flush_pending()?;
             #[cfg(any(
                 feature = "doc",
                 feature = "ppt",
@@ -667,6 +671,10 @@ impl Edit {
                 feature = "iwork-adapter"
             ))]
             let limits = self.limits;
+            #[cfg(feature = "ppt")]
+            let remaining_snapshot = limits
+                .max_snapshot_bytes()
+                .saturating_sub(self.snapshot_bytes);
             self.execute(|file| match file {
                 #[cfg(feature = "doc")]
                 File::Doc(handle) => {
@@ -698,9 +706,11 @@ impl Edit {
                     wrap_xls(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[cfg(feature = "ppt")]
-                File::Ppt(handle) => {
-                    wrap_ppt(handle, handle.set_with_limits(target, props, &limits)?, ())
-                },
+                File::Ppt(handle) => wrap_ppt(
+                    handle,
+                    handle.set_with_snapshot_budget(target, props, &limits, remaining_snapshot)?,
+                    (),
+                ),
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => {
                     wrap_pptx(handle, handle.set_with_limits(target, props, &limits)?, ())
@@ -1203,6 +1213,9 @@ impl Edit {
                 self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
                     handle,
                     &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
                 )?);
             }
             let (had_prior, staged) = {
@@ -1563,7 +1576,13 @@ impl Edit {
                 .into());
             }
             if self.doc.is_none() {
-                self.doc = Some(crate::format::doc::write::Run::new(&handle, &self.limits)?);
+                self.doc = Some(crate::format::doc::write::Run::new(
+                    &handle,
+                    &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
+                )?);
             }
             let run = self
                 .doc
@@ -2140,6 +2159,9 @@ impl Edit {
                 self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
                     handle,
                     &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
                 )?);
             }
             let (had_prior, staged) = {
@@ -2312,6 +2334,9 @@ impl Edit {
                 self.cells = Some(crate::format::xlsx::write::coalesce::Run::new(
                     handle,
                     &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
                 )?);
             }
             let run = self
@@ -2366,6 +2391,9 @@ impl Edit {
                 self.shapes = Some(crate::format::pptx::write::coalesce::Run::new(
                     handle,
                     &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
                 )?);
             }
             let run = self
@@ -2420,6 +2448,9 @@ impl Edit {
                 self.ppt_shapes = Some(crate::format::ppt::write::coalesce::Run::new(
                     handle,
                     &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
                 )?);
             }
             let run = self

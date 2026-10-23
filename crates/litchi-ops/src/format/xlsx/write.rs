@@ -55,7 +55,7 @@ impl Commit {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
             let changed = !source.same_content(&target).map_err(native_error)?;
-            let (source, target, native_patch) =
+            let (source, target, native_patch, canonical_snapshot_bytes) =
                 if !changed && base.signature() == super::Signature::Signed {
                     // Writes stage through an unsigned private workbook. A
                     // no-op patch must instead be rooted in the retained
@@ -68,11 +68,12 @@ impl Commit {
                         .commit()
                         .map_err(native_error)?
                         .into_parts();
-                    (original, target, native_patch)
+                    let canonical_snapshot_bytes = native_patch.retained_bytes();
+                    (original, target, native_patch, canonical_snapshot_bytes)
                 } else {
-                    (source, target, native_patch)
+                    (source, target, native_patch, native_snapshot_bytes)
                 };
-            let snapshot_bytes = native_snapshot_bytes.max(native_patch.retained_bytes());
+            let snapshot_bytes = native_snapshot_bytes.max(canonical_snapshot_bytes);
             if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
@@ -98,18 +99,46 @@ impl Commit {
     /// the leaf metadata patch changes only the `docProps` parts, which the
     /// retained endpoints' content comparison observes.
     pub(super) fn from_metadata(
+        base: &Xlsx,
         after_xlsx: Xlsx,
         source: xlsx::Package,
         target: xlsx::Package,
-    ) -> Self {
-        Self {
+        changed: bool,
+        authored_operations: usize,
+    ) -> Result<Self> {
+        if changed && base.signature() == super::Signature::Signed {
+            return Err(Error::signed(FileFormat::Xlsx));
+        }
+        if !changed && base.signature() == super::Signature::Signed {
+            // Metadata/features use the leaf metadata adapter rather than the
+            // primary workbook editor. Rebuild a genuine identity workbook
+            // patch over the retained signed owner instead of publishing the
+            // unsigned private probe as the replay base.
+            let original = base.original_package_for_noop()?;
+            let (target, native_patch) = original
+                .edit()
+                .map_err(native_error)?
+                .commit()
+                .map_err(native_error)?
+                .into_parts();
+            let snapshot_bytes = native_patch.retained_bytes();
+            return Ok(Self {
+                after_xlsx: base.clone(),
+                source: original,
+                target,
+                native_patch,
+                operations: authored_operations,
+                snapshot_bytes,
+            });
+        }
+        Ok(Self {
             after_xlsx,
             source,
             target,
             native_patch: xlsx::workbook::Patch::default(),
-            operations: 0,
+            operations: authored_operations,
             snapshot_bytes: 0,
-        }
+        })
     }
 
     /// Consume the adapter result for explicit transaction history.
@@ -3026,6 +3055,7 @@ pub(crate) mod coalesce {
     use litchi_core::FileFormat;
     use litchi_xlsx as xlsx;
     use std::collections::{HashMap, HashSet};
+    use std::mem::size_of;
 
     /// One admitted direct cell payload assignment.
     pub(crate) struct Plan {
@@ -3187,13 +3217,22 @@ pub(crate) mod coalesce {
 
     impl Run {
         /// Promote/admit the native source once for this run.
-        pub(crate) fn new(base: &Xlsx, limits: &SemanticLimits) -> Result<Self> {
+        pub(crate) fn new(
+            base: &Xlsx,
+            limits: &SemanticLimits,
+            remaining_snapshot: usize,
+        ) -> Result<Self> {
             base.check_source_for_replay()?;
             let source = if base.signature() == super::Signature::Signed {
                 base.editor_for_write()?
             } else {
                 base.editor()?
             };
+            let source_bytes = base.retained_source_len()?.unwrap_or(0);
+            let minimum = source_bytes.saturating_add(size_of::<xlsx::workbook::Patch>());
+            if minimum > remaining_snapshot {
+                return Err(snapshot_limit(minimum, remaining_snapshot));
+            }
             let edit = source.edit().map_err(native_error)?;
             base.check_source_for_replay()?;
             Ok(Self {

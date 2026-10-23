@@ -50,8 +50,24 @@ impl Xls {
         if changed && self.signature() == super::Signature::Signed {
             return Err(super::signature::refusal(FileFormat::Xls));
         }
-        let snapshot_bytes =
+        let staged_snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // Re-root the identity patch on the retained signed package;
+                // the writable probe used an unsigned private package.
+                let original = self.original_package_for_noop()?;
+                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
+                let canonical_snapshot_bytes =
+                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,

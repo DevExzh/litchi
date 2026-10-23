@@ -167,12 +167,15 @@ impl Xlsx {
                 .map_err(|error| native_property_error(error, "autoFilter"))?;
         }
         let target = edit.commit()?.into_package();
-        let after = if source.same_content(&target).map_err(native_error)? {
-            self.clone()
-        } else {
+        let changed = !source.same_content(&target).map_err(native_error)?;
+        let after = if changed {
             middle.adopt_workbook(target.clone())
+        } else {
+            self.clone()
         };
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self, after, source, target, changed, 1,
+        )?))
     }
 }
 

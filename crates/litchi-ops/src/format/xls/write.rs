@@ -1198,7 +1198,7 @@ pub(crate) mod coalesce {
     use super::{
         CellAssignment, CellIdentity, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
         WRITE_ENTRY_OVERHEAD, Xls, admit_cell_property, cell_state_facts, finish_commit,
-        native_edit_error, native_value_error, staged_limit,
+        native_edit_error, native_value_error, snapshot_limit, staged_limit,
     };
     use crate::error::{Code, Error};
     use crate::props::Props;
@@ -1208,6 +1208,7 @@ pub(crate) mod coalesce {
     use litchi_xls::Package;
     use litchi_xls::cell_values::{Reference, Selector};
     use std::collections::HashSet;
+    use std::mem::size_of;
 
     #[derive(Debug, Clone)]
     pub(crate) enum Action {
@@ -1468,9 +1469,21 @@ pub(crate) mod coalesce {
     }
 
     impl Run {
-        pub(crate) fn new(base: &Xls, limits: &SemanticLimits) -> Result<Self> {
+        pub(crate) fn new(
+            base: &Xls,
+            limits: &SemanticLimits,
+            remaining_snapshot: usize,
+        ) -> Result<Self> {
             base.check_source_for_write()?;
             let source = base.editable_package_for_write()?;
+            let source_bytes = source
+                .source()
+                .map(|source| usize::try_from(source.file_size()).unwrap_or(usize::MAX))
+                .unwrap_or(0);
+            let minimum = source_bytes.saturating_add(size_of::<litchi_xls::Patch>());
+            if minimum > remaining_snapshot {
+                return Err(snapshot_limit(minimum, remaining_snapshot));
+            }
             let edit = source.edit().map_err(native_edit_error)?;
             base.check_source_for_write()?;
             Ok(Self {

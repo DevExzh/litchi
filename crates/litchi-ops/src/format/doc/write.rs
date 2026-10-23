@@ -12,10 +12,11 @@
 use litchi_core::{FileFormat, Position};
 use litchi_doc::Edit;
 use litchi_doc::body_text::{CharacterProperty, TextTarget};
+use std::mem::size_of;
 
 use super::{Doc, WriteCommit};
 use crate::error::{Code, Error, Result};
-use crate::transaction::SemanticLimits;
+use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::{Props, TargetArg};
 
 /// A direct paragraph assignment admitted to a native run.
@@ -56,6 +57,7 @@ pub(crate) struct Run {
     items: Vec<Item>,
     last_target: Option<(Box<str>, Position)>,
     signed: bool,
+    max_snapshot_bytes: usize,
 }
 
 impl Doc {
@@ -106,7 +108,18 @@ impl Doc {
 }
 
 impl Run {
-    pub(crate) fn new(base: &Doc, limits: &SemanticLimits) -> Result<Self> {
+    pub(crate) fn new(
+        base: &Doc,
+        limits: &SemanticLimits,
+        remaining_snapshot: usize,
+    ) -> Result<Self> {
+        if remaining_snapshot == 0 {
+            return Err(Error::from(TransactionError::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed: 1,
+                maximum: 0,
+            }));
+        }
         base.check_source_for_write()?;
         let package = (if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_package_for_write()?
@@ -121,14 +134,31 @@ impl Run {
             .with_format(FileFormat::Doc)
             .with_suggestion("reopen the document with source retention enabled")
         })?;
-        let edit = package
-            .edit_with_options(super::edit_options(super::body_transaction_limits(*limits)))?;
+        // The body editor retains the source and a patch-sized handoff before
+        // it can publish a run. Reject a too-small remainder before creating
+        // that editor, just as the OLE and OPC adapters do.
+        let source_bytes =
+            usize::try_from(package.shared_source().file_size()).unwrap_or(usize::MAX);
+        let minimum = source_bytes
+            .saturating_mul(2)
+            .saturating_add(size_of::<litchi_doc::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(Error::from(TransactionError::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed: minimum,
+                maximum: remaining_snapshot,
+            }));
+        }
+        let edit = package.edit_with_options(super::edit_options(
+            super::body_transaction_limits_with_snapshot(*limits, remaining_snapshot),
+        ))?;
         Ok(Self {
             base: base.clone(),
             edit,
             items: Vec::new(),
             last_target: None,
             signed: base.signature() == crate::format::signature::Signature::Signed,
+            max_snapshot_bytes: remaining_snapshot,
         })
     }
 
@@ -277,7 +307,7 @@ impl Run {
             edit,
             items,
             signed,
-            limits,
+            max_snapshot_bytes,
             ..
         } = self;
         base.check_source_for_write()?;
@@ -313,11 +343,7 @@ impl Run {
             };
             (after, patch, snapshot_bytes)
         };
-        limit(
-            LimitKind::SnapshotBytes,
-            snapshot_bytes,
-            limits.max_snapshot_bytes(),
-        )?;
+        limit(LimitKind::SnapshotBytes, snapshot_bytes, max_snapshot_bytes)?;
         base.check_source_for_write()?;
         Ok(WriteCommit {
             before,

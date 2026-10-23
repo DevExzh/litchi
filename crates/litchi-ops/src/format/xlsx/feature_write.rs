@@ -218,13 +218,21 @@ fn unsupported_parent() -> Error {
 
 impl Xlsx {
     /// Publish a leaf commit of one feature family.
-    fn publish(&self, source: xlsx::Package, target: xlsx::Package, changed: bool) -> Commit {
+    fn publish(
+        &self,
+        source: xlsx::Package,
+        target: xlsx::Package,
+        changed: bool,
+    ) -> Result<Commit> {
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(Error::signed(FileFormat::Xlsx));
+        }
         let after = if changed {
             self.adopt_workbook(target.clone())
         } else {
             self.clone()
         };
-        Commit::from_metadata(after, source, target)
+        Commit::from_metadata(self, after, source, target, changed, 1)
     }
 
     /// The features of `kind` on the worksheet at `sheet`, read again.
@@ -400,7 +408,7 @@ impl Xlsx {
                     .map(Some);
             },
         };
-        Ok(Some(self.publish(source, target, changed)))
+        Ok(Some(self.publish(source, target, changed)?))
     }
 }
 
@@ -630,7 +638,7 @@ impl Xlsx {
                 .with_suggestion("set the existing comment instead"));
         };
         let (target, changed) = split(edit.commit()?);
-        let commit = self.publish(source, target, changed);
+        let commit = self.publish(source, target, changed)?;
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
@@ -686,7 +694,7 @@ impl Xlsx {
         }
         .map_err(authored)?;
         let (target, changed) = split(edit.commit()?);
-        Ok(self.publish(source, target, changed))
+        self.publish(source, target, changed)
     }
 }
 
@@ -1326,7 +1334,7 @@ impl Xlsx {
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let commit = self.publish(source, commit.into_package(), changed);
+        let commit = self.publish(source, commit.into_package(), changed)?;
         Ok((commit, feature_path(parent.sheet, "picture", Some(index))))
     }
 
@@ -1480,7 +1488,7 @@ impl Xlsx {
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let commit = self.publish(source, commit.into_package(), changed);
+        let commit = self.publish(source, commit.into_package(), changed)?;
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
     }
 
@@ -1597,7 +1605,7 @@ impl Xlsx {
         }
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        Ok(self.publish(source, commit.into_package(), changed))
+        self.publish(source, commit.into_package(), changed)
     }
 }
 
@@ -2273,7 +2281,7 @@ impl Xlsx {
         edit.set_formats(parent.sheet, formats).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let commit = self.publish(source, commit.into_package(), changed);
+        let commit = self.publish(source, commit.into_package(), changed)?;
         Ok((commit, feature_path(parent.sheet, "cf", Some(index))))
     }
 
@@ -2314,7 +2322,7 @@ impl Xlsx {
         edit.set_formats(sheet, formats).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        Ok(self.publish(source, commit.into_package(), changed))
+        self.publish(source, commit.into_package(), changed)
     }
 }
 
@@ -2586,7 +2594,7 @@ impl Xlsx {
             .map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let commit = self.publish(source, commit.into_package(), changed);
+        let commit = self.publish(source, commit.into_package(), changed)?;
         Ok((
             commit,
             feature_path(parent.sheet, "dataValidation", Some(index)),
@@ -2620,7 +2628,7 @@ impl Xlsx {
         edit.set_validations(sheet, collections).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        Ok(self.publish(source, commit.into_package(), changed))
+        self.publish(source, commit.into_package(), changed)
     }
 }
 
@@ -2902,7 +2910,7 @@ impl Xlsx {
             .map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        let commit = self.publish(source, commit.into_package(), changed);
+        let commit = self.publish(source, commit.into_package(), changed)?;
         Ok((commit, feature_path(parent.sheet, "autofilter", None)))
     }
 
@@ -2921,7 +2929,7 @@ impl Xlsx {
         edit.set_auto_filter(sheet, Some(definition))?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
-        Ok(self.publish(source, commit.into_package(), changed))
+        self.publish(source, commit.into_package(), changed)
     }
 }
 
@@ -2987,7 +2995,7 @@ impl Xlsx {
         };
         let committed = edit.commit()?;
         let changed = changed && committed.diagnostics().changed();
-        Ok(self.publish(source, committed.into_package(), changed))
+        self.publish(source, committed.into_package(), changed)
     }
 
     fn break_spec(

@@ -53,8 +53,25 @@ impl Doc {
         if changed && self.signature() == super::Signature::Signed {
             return Err(super::signature::refusal(FileFormat::Doc));
         }
-        let snapshot_bytes =
+        let staged_snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // The writable probe is an unsigned private package. Rebuild
+                // an identity metadata patch over the retained signed owner
+                // so replay and the facade have the same physical base.
+                let original = self.original_package_for_noop()?;
+                let (package, patch) = original.edit_metadata()?.commit()?.into_parts();
+                let canonical_snapshot_bytes =
+                    ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,

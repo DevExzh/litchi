@@ -89,8 +89,32 @@ impl Xls {
     ) -> Result<WriteCommit> {
         self.check_source()?;
         let changed = commit.diagnostics().changed();
+        let staged_snapshot_bytes = commit.patch().retained_bytes();
         let (package, patch) = commit.into_parts();
-        let snapshot_bytes = patch.retained_bytes();
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Xls));
+        }
+        let (package, patch, snapshot_bytes) =
+            if !changed && self.signature() == super::Signature::Signed {
+                // The feature probe is staged on an unsigned private copy.
+                // Rebuild the exact identity patch over the retained signed
+                // package before publishing the no-op.
+                let original = self.original_package_for_noop()?;
+                let empty = original
+                    .edit_sheet_features()
+                    .map_err(native)?
+                    .commit()
+                    .map_err(native)?;
+                let canonical_snapshot_bytes = empty.patch().retained_bytes();
+                let (package, patch) = empty.into_parts();
+                (
+                    package,
+                    patch,
+                    staged_snapshot_bytes.max(canonical_snapshot_bytes),
+                )
+            } else {
+                (package, patch, staged_snapshot_bytes)
+            };
         if snapshot_bytes > limits.max_snapshot_bytes() {
             return Err(error(
                 Code::LimitExceeded,
@@ -113,13 +137,15 @@ impl Xls {
             before: self.clone(),
             after,
             patch: StepPatch::Features(patch),
-            operations: usize::from(changed),
+            // One feature command remains one authored operation even when
+            // its native patch is the canonical empty identity.
+            operations: 1,
             snapshot_bytes,
         })
     }
 
     fn feature_edit(&self) -> Result<sf::edit::Edit> {
-        self.editable_package()?
+        self.editable_package_for_write()?
             .edit_sheet_features()
             .map_err(native)
     }

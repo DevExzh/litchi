@@ -9,6 +9,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashSet;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::FileFormat;
@@ -100,7 +101,11 @@ const NATIVE_MAX_OPERATIONS: usize = litchi_ppt::package::edit::MAX_OPERATIONS;
 impl Run {
     /// Start a source-checked native edit and preflight the retained snapshot
     /// lower bound before the native editor captures its before image.
-    pub(crate) fn new(base: &Ppt, limits: &SemanticLimits) -> Result<Self> {
+    pub(crate) fn new(
+        base: &Ppt,
+        limits: &SemanticLimits,
+        remaining_snapshot: usize,
+    ) -> Result<Self> {
         base.check_source_for_write()?;
         let package = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_package_for_write()?
@@ -110,8 +115,8 @@ impl Run {
         let before_bytes =
             usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
         let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
-        if minimum > limits.max_snapshot_bytes() {
-            return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+        if minimum > remaining_snapshot {
+            return Err(snapshot_limit(minimum, remaining_snapshot));
         }
         let edit = package.edit().map_err(native_edit_error)?;
         base.check_source_for_write()?;
@@ -209,11 +214,14 @@ impl Run {
             items,
             limits,
             allow_repeated,
-            native_operations,
             ..
         } = self;
         let logical_noop = allow_repeated && logical_noop(&items);
-        let authored_operations = native_operations;
+        // Native text/anchor setters may expand one authored command into
+        // several physical operations.  The unified leaf diagnostic is the
+        // authored command count, just like the XLS/XLSX/XLSB adapters; the
+        // native count remains enforced by `requires_barrier` above.
+        let authored_operations = items.len();
         let original = matches!(
             base.signature(),
             crate::format::signature::Signature::Signed
@@ -225,6 +233,7 @@ impl Run {
             stage_all(&mut edit, &items)?;
             let native = edit.commit().map_err(native_edit_error)?;
             let mut commit = super::finish_commit(&base, native, &limits)?;
+            commit.operations = authored_operations;
             let staged_snapshot_bytes = commit.snapshot_bytes;
             if logical_noop {
                 // Keep the staged native commit for validation, then replace

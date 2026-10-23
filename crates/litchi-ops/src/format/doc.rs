@@ -505,6 +505,17 @@ fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
         .with_max_retained_render_bytes(limits.max_snapshot_bytes())
 }
 
+/// The retained-render ceiling for a coalesced run after earlier transaction
+/// steps have charged their snapshots.  The native editor must see this
+/// remaining budget before it captures its body image.
+fn body_transaction_limits_with_snapshot(
+    limits: SemanticLimits,
+    remaining_snapshot: usize,
+) -> BodyTransactionLimits {
+    BodyTransactionLimits::new(limits.max_operations(), usize::MAX, usize::MAX)
+        .with_max_retained_render_bytes(remaining_snapshot)
+}
+
 impl std::fmt::Debug for Doc {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter

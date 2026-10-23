@@ -17,7 +17,7 @@ use crate::value::Scalar;
 use crate::{Code, Error, IntoProps, Props, Result};
 use litchi_core::FileFormat;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub(crate) enum Proof {
     Source(litchi_pptx::source::Patch),
@@ -42,7 +42,7 @@ impl Proof {
         match self {
             Self::Source(patch) => patch.is_noop(),
             Self::Eager(patch) => patch.is_noop(),
-            Self::Metadata(_) => false,
+            Self::Metadata(patch) => patch.is_noop(),
         }
     }
 }
@@ -53,6 +53,10 @@ pub(crate) struct Commit {
     pub(crate) proof: Proof,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
+    /// Retained native patch size is lazy but must not be recomputed by each
+    /// facade limit check.  In particular, direct unsigned writes should not
+    /// repeatedly walk the complete patch just to read the same charge.
+    pub(crate) retained_cache: OnceLock<usize>,
 }
 impl Commit {
     pub(crate) fn into_file(self) -> Pptx {
@@ -60,7 +64,11 @@ impl Commit {
     }
 
     pub(crate) fn snapshot_bytes(&self) -> usize {
-        self.snapshot_bytes.max(self.proof.retained_bytes())
+        self.snapshot_bytes.max(
+            *self
+                .retained_cache
+                .get_or_init(|| self.proof.retained_bytes()),
+        )
     }
 }
 impl Editable {
@@ -219,7 +227,14 @@ impl Pptx {
                 self.check_source_for_replay()?;
                 if commit.after.same_snapshot(self) {
                     if commit.proof.is_noop() {
-                        let commit = canonical_signed_noop(self, commit.operations)?;
+                        // The staged private edit may have retained more of
+                        // the source than the canonical identity probe.  A
+                        // direct signed no-op still owes the caller the
+                        // peak charge of both phases, just like a coalesced
+                        // run does.
+                        let staged_snapshot_bytes = commit.snapshot_bytes();
+                        let mut commit = canonical_signed_noop(self, commit.operations)?;
+                        commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
                         let snapshot_bytes = commit.snapshot_bytes();
                         if snapshot_bytes > limits.max_snapshot_bytes() {
                             return Err(snapshot_limit(
@@ -508,7 +523,10 @@ impl Pptx {
                 )
             },
         };
-        let snapshot_bytes = proof.retained_bytes();
+        // Defer the retained-patch walk to the cached accessor.  This keeps
+        // construction of an unsigned direct commit from doing an eager
+        // second scan when the transaction only needs the charge once.
+        let snapshot_bytes = 0;
         let after = if !changed {
             self.clone()
         } else {
@@ -524,6 +542,7 @@ impl Pptx {
             proof,
             operations,
             snapshot_bytes,
+            retained_cache: OnceLock::new(),
         })
     }
 }
@@ -546,6 +565,7 @@ fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
                 proof: Proof::Source(patch),
                 operations,
                 snapshot_bytes,
+                retained_cache: OnceLock::from(snapshot_bytes),
             })
         },
         Editable::Eager(package) => {
@@ -563,6 +583,7 @@ fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
                 proof: Proof::Eager(patch),
                 operations,
                 snapshot_bytes,
+                retained_cache: OnceLock::from(snapshot_bytes),
             })
         },
     }

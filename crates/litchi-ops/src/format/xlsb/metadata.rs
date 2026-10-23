@@ -33,6 +33,8 @@ pub(crate) struct Images {
     after_file: Option<Xlsb>,
     before: OnceLock<Vec<u8>>,
     after: OnceLock<Vec<u8>>,
+    retained: usize,
+    pub(super) authored_operations: usize,
     pub(super) patch: xlsb::metadata::Patch,
 }
 
@@ -57,8 +59,23 @@ impl Images {
     }
 
     pub(super) fn retained_bytes(&self) -> usize {
-        self.before().len().saturating_add(self.after().len())
+        self.retained
     }
+}
+
+/// Retain the expensive full-package charge only for a signed probe, whose
+/// private candidate is about to be replaced by a canonical identity patch.
+/// Unsigned metadata history keeps its endpoint images lazy and uncharged.
+fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize, usize)> {
+    if file.signature() != super::Signature::Signed {
+        return Ok((0, 0));
+    }
+    let before = Images::image(file).len();
+    let candidate = file.adopt_package(package.clone())?;
+    Ok((
+        before.saturating_add(Images::image(&candidate).len()),
+        before,
+    ))
 }
 
 fn native(error: xlsb::metadata::Error) -> crate::Error {
@@ -94,15 +111,19 @@ impl Xlsb {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsb)?;
-        self.set_metadata(&assignments).map(Some)
+        self.set_metadata(&assignments, props.len()).map(Some)
     }
 
-    fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
+    fn set_metadata(
+        &self,
+        assignments: &Assignments,
+        authored_operations: usize,
+    ) -> Result<Commit> {
         if let (XlsbOwner::Source(source), super::Signature::Unsigned) =
             (&self.0.owner, self.signature())
         {
             if self.0.retain_source {
-                return self.set_source_metadata(source, assignments);
+                return self.set_source_metadata(source, assignments, authored_operations);
             }
         }
         // Stage on the workbook itself: no copy into a package first
@@ -113,7 +134,29 @@ impl Xlsb {
             |value| assignments.apply(value),
             Some(assignments),
         )?;
+        if !patch.is_noop() && self.signature() == super::Signature::Signed {
+            return Err(crate::Error::signed(FileFormat::Xlsb));
+        }
+        let (staged_retained, signed_before) = staged_retained_bytes(self, &target)?;
         drop(editor);
+        let (target, patch, retained) =
+            if patch.is_noop() && self.signature() == super::Signature::Signed {
+                // The writable probe strips signature parts. Rebuild the genuine
+                // native metadata identity patch over the retained signed package
+                // before publishing the leaf; the staged charge remains part of
+                // the peak even though that probe is discarded.
+                let original = self.original_package_for_noop()?;
+                let (target, patch) = original
+                    .edit_metadata()
+                    .map_err(native)?
+                    .commit()
+                    .map_err(native)?
+                    .into_parts();
+                let canonical_retained = patch.retained_bytes();
+                (target, patch, staged_retained.max(canonical_retained))
+            } else {
+                (target, patch, staged_retained)
+            };
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -128,6 +171,8 @@ impl Xlsb {
                 after_file,
                 before: OnceLock::new(),
                 after: OnceLock::new(),
+                retained: retained.max(signed_before.saturating_mul(2)),
+                authored_operations,
                 patch,
             },
         ))
@@ -140,6 +185,7 @@ impl Xlsb {
         &self,
         source: &super::source::SourceWorkbook,
         assignments: &Assignments,
+        authored_operations: usize,
     ) -> Result<Commit> {
         self.check_source_for_replay()?;
         let mut edit = source.workbook().edit_metadata().map_err(native)?;
@@ -152,6 +198,9 @@ impl Xlsb {
         // The staged value is the committed one; no second read of the parts.
         let metadata = edit.metadata().map_err(native)?;
         let (workbook, patch) = edit.commit().map_err(native)?.into_parts();
+        // Source-backed metadata is used only for unsigned owners above, so
+        // its endpoint images remain lazy and uncharged here.
+        let (staged_retained, signed_before) = (0usize, 0usize);
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -176,6 +225,8 @@ impl Xlsb {
                 after_file,
                 before: OnceLock::new(),
                 after: OnceLock::new(),
+                retained: staged_retained.max(signed_before.saturating_mul(2)),
+                authored_operations,
                 patch,
             },
         ))

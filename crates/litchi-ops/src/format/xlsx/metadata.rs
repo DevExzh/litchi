@@ -55,10 +55,14 @@ impl Xlsx {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsx)?;
-        self.set_metadata(&assignments).map(Some)
+        self.set_metadata(&assignments, props.len()).map(Some)
     }
 
-    fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
+    fn set_metadata(
+        &self,
+        assignments: &Assignments,
+        authored_operations: usize,
+    ) -> Result<Commit> {
         let source = self.editor_for_write()?;
         let (target, metadata, changed) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
@@ -68,7 +72,7 @@ impl Xlsx {
             self.clone()
         };
         self.check_source_for_replay()?;
-        Ok(Commit::from_metadata(after, source, target))
+        Commit::from_metadata(self, after, source, target, changed, authored_operations)
     }
 
     /// Adopt a metadata revision: [`Self::adopt_workbook`] with the new

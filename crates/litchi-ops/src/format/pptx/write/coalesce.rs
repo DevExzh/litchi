@@ -34,6 +34,7 @@ use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
 use std::collections::{HashMap, HashSet};
+use std::mem::size_of;
 use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
@@ -300,13 +301,29 @@ impl Pptx {
 
 impl Run {
     /// Start one native edit and its bounded direct-path resolution cache.
-    pub(crate) fn new(base: &Pptx, limits: &SemanticLimits) -> Result<Self> {
+    pub(crate) fn new(
+        base: &Pptx,
+        limits: &SemanticLimits,
+        remaining_snapshot: usize,
+    ) -> Result<Self> {
         base.check_source_for_write()?;
         let source = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_owner_for_write()?
         } else {
             base.editable_owner()?
         };
+        let source_bytes = match &source {
+            Editable::Source(package) => package
+                .opc()
+                .map_err(native_error)?
+                .exact_source_len()
+                .unwrap_or(0),
+            Editable::Eager(_) => 0,
+        };
+        let minimum = source_bytes.saturating_add(size_of::<litchi_pptx::opened::Patch>());
+        if minimum > remaining_snapshot {
+            return Err(super::snapshot_limit(minimum, remaining_snapshot));
+        }
         let edit = match &source {
             Editable::Eager(package) => match base.take_spare_edit(package) {
                 Some(edit) => NativeEdit::Eager(edit),
@@ -433,11 +450,13 @@ impl Run {
             ..
         } = self;
         let logical_noop = allow_repeated && logical_noop(&items);
+        let authored_operations = items.len();
         base.check_source_for_write()?;
         let result = (|| {
             let mut changes = Vec::new();
             let operations = stage_all(&mut edit, &items, &mut changes)?;
             let (mut after, mut commit) = commit_native(&base, source, edit, operations)?;
+            commit.operations = authored_operations;
             let staged_snapshot_bytes = commit.snapshot_bytes();
             bound(
                 LimitKind::SnapshotBytes,
@@ -457,6 +476,7 @@ impl Run {
                     new_native_edit(&original)?,
                     operations,
                 )?;
+                commit.operations = authored_operations;
                 commit.snapshot_bytes = commit.snapshot_bytes().max(staged_snapshot_bytes);
                 bound(
                     LimitKind::SnapshotBytes,
@@ -1839,6 +1859,7 @@ fn commit_native(
                 after,
                 Commit {
                     snapshot_bytes: 0,
+                    retained_cache: std::sync::OnceLock::new(),
                     after: commit_after,
                     source,
                     target,
@@ -1864,6 +1885,7 @@ fn commit_native(
                 after,
                 Commit {
                     snapshot_bytes: 0,
+                    retained_cache: std::sync::OnceLock::new(),
                     after: commit_after,
                     source,
                     target,

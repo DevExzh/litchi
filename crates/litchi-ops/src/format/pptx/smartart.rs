@@ -368,6 +368,7 @@ impl Pptx {
         };
         Ok(Commit {
             snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
@@ -488,6 +489,7 @@ impl Pptx {
         Ok((
             Commit {
                 snapshot_bytes: 0,
+                retained_cache: std::sync::OnceLock::new(),
                 after,
                 source,
                 target: Editable::Eager(target),
@@ -710,6 +712,7 @@ impl Pptx {
         let (target, patch) = base.edit()?.commit()?.into_parts();
         Ok(Commit {
             snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after: self.clone(),
             source,
             target: Editable::Eager(Arc::new(target)),

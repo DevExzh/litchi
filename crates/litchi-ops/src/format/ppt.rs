@@ -547,8 +547,21 @@ impl Ppt {
         props: impl crate::props::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
+        self.set_with_snapshot_budget(target, props, limits, limits.max_snapshot_bytes())
+    }
+
+    /// Set through the native writer with a caller-owned remaining snapshot
+    /// budget. Transactions use this after earlier leaf commits have already
+    /// consumed part of their aggregate limit.
+    pub(crate) fn set_with_snapshot_budget<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+        snapshot_budget: usize,
+    ) -> Result<WriteCommit> {
         self.check_source_for_write()?;
-        let result = write::set_with_limits(self, target, props, limits);
+        let result = write::set_with_snapshot_budget(self, target, props, limits, snapshot_budget);
         self.check_source_for_write()?;
         self.enforce_signed_noop(result)
     }

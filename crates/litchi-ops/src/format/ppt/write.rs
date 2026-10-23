@@ -12,6 +12,7 @@ mod elements;
 pub(crate) mod find;
 
 use std::collections::HashSet;
+use std::mem::size_of;
 
 use litchi_core::{FileFormat, Position};
 use litchi_ppt::Anchor;
@@ -170,6 +171,20 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
+    set_with_snapshot_budget(file, target, props, limits, limits.max_snapshot_bytes())
+}
+
+/// Set one PPT target with the snapshot budget left by an outer transaction.
+/// The budget is threaded to the native editor preflight so a previous leaf
+/// cannot consume the full per-transaction limit before this editor captures
+/// its before image.
+pub(crate) fn set_with_snapshot_budget<'p, 'v>(
+    file: &Ppt,
+    target: TargetArg<'p>,
+    props: impl IntoProps<'v>,
+    limits: &SemanticLimits,
+    snapshot_budget: usize,
+) -> Result<WriteCommit> {
     file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
     if crate::format::ole_metadata::is_target(&target) {
@@ -180,7 +195,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return commit;
     }
     let plans = build_plans(nodes, &props, limits)?;
-    let native = stage_plans(file, plans, limits)?;
+    let native = stage_plans(file, plans, limits, snapshot_budget)?;
     file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
@@ -1278,6 +1293,7 @@ fn stage_plans(
     file: &Ppt,
     plans: Vec<Plan>,
     limits: &SemanticLimits,
+    snapshot_budget: usize,
 ) -> Result<litchi_ppt::Commit> {
     let operations = plans
         .iter()
@@ -1301,8 +1317,8 @@ fn stage_plans(
     // captures it. The complete before/after charge is checked after commit.
     let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
     let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
-    if minimum > limits.max_snapshot_bytes() {
-        return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+    if minimum > snapshot_budget {
+        return Err(snapshot_limit(minimum, snapshot_budget));
     }
     let mut edit = package.edit().map_err(native_edit_error)?;
     if plans.len() > 1

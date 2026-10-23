@@ -745,7 +745,7 @@ impl Xlsx {
         let target = edit.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
         Ok((
-            Commit::from_metadata(after, source, target),
+            Commit::from_metadata(self, after, source, target, true, 1)?,
             Path::from_steps([
                 Step::new("sheet").with(Predicate::Index(Position::new(sheet))),
                 Step::new("chart").with(Predicate::Index(Position::new(index))),
@@ -1086,7 +1086,9 @@ impl Xlsx {
         } else {
             self.clone()
         };
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self, after, source, target, changed, 1,
+        )?))
     }
 
     /// Remove a chart selected by its path; `None` for other targets.
@@ -1112,7 +1114,9 @@ impl Xlsx {
         native.remove(sheet, item.chart as usize)?;
         let target = native.commit()?.into_package();
         let after = self.adopt_workbook(target.clone());
-        Ok(Some(Commit::from_metadata(after, source, target)))
+        Ok(Some(Commit::from_metadata(
+            self, after, source, target, true, 1,
+        )?))
     }
 }
 

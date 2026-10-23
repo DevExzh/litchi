@@ -71,6 +71,33 @@ allowlist: encryption and DRM components remain refused. The probe compares
 the original Workbook stream before opening a mutation-capable editor, and
 stale-source/patch-conflict admission still wins over signed refusal.
 
+## Independent review follow-up
+
+The follow-up closes the remaining review gaps without widening the public
+commit or signature contracts. DOC, XLS, XLSX, PPTX and PPT coalesced editors
+receive the transaction's remaining snapshot budget before they capture a
+native before image; the PPT direct planner receives the same budget. PPTX
+retained-patch sizing is lazy and cached for unsigned commits, and its
+two-phase hyperlink setter carries both native staged charges before dropping
+the first proof. Signed PPTX no-op canonicalization keeps the larger staged or
+identity charge, and XLSB find no-match proofs select the first actual
+worksheet with the same bounded `TransferLimits` as a matched proof.
+
+Signed metadata and feature probes retain their authored no-op semantics and
+snapshot charges across XLSX, XLSB and the legacy adapters. XLSB unsigned
+metadata and feature history remains lazy (it does not serialize full endpoint
+images or walk retained payloads just to account an unsigned no-op). Signed
+XLSB metadata and each heterogeneous feature family are re-rooted in their
+actual native empty patch, while the authored command count survives the
+zero-parts native diagnostic. XLSX metadata/feature wrappers likewise carry
+the authored scalar count instead of deriving it from the empty workbook
+patch. PPTX metadata no-ops join the same native-empty signed path, and its
+direct comment/notes/text adapters preserve one authored command even when
+the native patch is empty. Direct PPT/PPTX coalescers report authored command
+counts after native expansion and after signed identity replacement.
+No synthetic no-op marker, signature re-marking, shared-core commit change, or
+unsigned tracking scan was introduced.
+
 The tests cover:
 
 - exact no-op replay through both a signed leaf and `File::Signed`, preserving

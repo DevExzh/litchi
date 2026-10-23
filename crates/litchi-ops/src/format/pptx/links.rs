@@ -363,6 +363,7 @@ impl Pptx {
         };
         Ok(Commit {
             snapshot_bytes: 0,
+            retained_cache: std::sync::OnceLock::new(),
             after,
             source,
             target: Editable::Eager(target),
@@ -626,13 +627,23 @@ impl Pptx {
         let second = file.write_link(&owner, link.as_ref())?;
         Ok(Some(match first {
             None => second,
-            Some(first) => Commit {
-                snapshot_bytes: 0,
-                after: second.after,
-                source: first.source,
-                target: second.target,
-                proof: second.proof,
-                operations: first.operations.saturating_add(second.operations),
+            Some(first) => {
+                // Both native edits have already captured a proof.  The
+                // combined facade step retains the first source and the
+                // second target, but its peak staged charge still includes
+                // both edits before the first proof is discarded.
+                let first_snapshot_bytes = first.snapshot_bytes();
+                let second_snapshot_bytes = second.snapshot_bytes();
+                let snapshot_bytes = first_snapshot_bytes.saturating_add(second_snapshot_bytes);
+                Commit {
+                    snapshot_bytes,
+                    after: second.after,
+                    source: first.source,
+                    target: second.target,
+                    proof: second.proof,
+                    operations: first.operations.saturating_add(second.operations),
+                    retained_cache: std::sync::OnceLock::from(second_snapshot_bytes),
+                }
             },
         }))
     }

@@ -95,6 +95,13 @@ pub(crate) struct Images {
     retained: usize,
     /// The parts the leaf patch changed.
     parts: usize,
+    /// The authored feature command count. Native part counts are zero for an
+    /// exact no-op, but the unified leaf still records the admitted command.
+    authored_operations: usize,
+    /// The real native identity proof used when a signed private feature
+    /// probe is discarded.  Unsigned feature commits intentionally keep this
+    /// absent so publishing a normal no-op does not walk retained payloads.
+    native: Option<NativeFeatureProof>,
 }
 
 impl Images {
@@ -121,23 +128,127 @@ impl Images {
         self.retained
     }
 
-    pub(super) const fn is_noop(&self) -> bool {
-        self.parts == 0
+    pub(super) fn is_noop(&self) -> bool {
+        self.parts == 0 && self.native.as_ref().is_none_or(NativeFeatureProof::is_noop)
     }
 
     pub(super) const fn operation_count(&self) -> usize {
-        if self.parts == 0 { 0 } else { 1 }
+        self.authored_operations
     }
 }
+
+/// One of the native family patches behind the unified feature vocabulary.
+/// The facade history still keeps package images for the heterogeneous leaf,
+/// but a signed cancellation carries the actual native identity patch instead
+/// of an inferred empty marker.
+#[derive(Debug, Clone)]
+enum NativeFeatureProof {
+    Comments(xlsb::comments::edit::Patch),
+    Hyperlinks(xlsb::hyperlinks::edit::Patch),
+    Drawings(xlsb::drawing::edit::Patch),
+    ConditionalFormatting(xlsb::conditional_formatting::edit::Patch),
+    DataValidation(xlsb::data_validation::edit::Patch),
+    AutoFilter(xlsb::auto_filter::edit::Patch),
+    PageBreaks(xlsb::page_breaks::edit::Patch),
+}
+
+impl NativeFeatureProof {
+    fn is_noop(&self) -> bool {
+        match self {
+            Self::Comments(patch) => patch.is_noop(),
+            Self::Hyperlinks(patch) => patch.is_noop(),
+            Self::Drawings(patch) => patch.is_noop(),
+            Self::ConditionalFormatting(patch) => patch.is_noop(),
+            Self::DataValidation(patch) => patch.is_noop(),
+            Self::AutoFilter(patch) => patch.is_noop(),
+            Self::PageBreaks(patch) => patch.is_noop(),
+        }
+    }
+}
+
+/// The common part of the seven native feature commits.  Keeping this
+/// adapter typed means signed cancellation can rebuild the correct family
+/// patch without serializing or fabricating a sentinel patch.
+trait FeatureCommit: Sized {
+    fn parts(&self) -> usize;
+    fn retained_bytes(&self) -> usize;
+    fn into_package(self) -> xlsb::Package;
+    fn canonical_identity(base: &Xlsb) -> Result<(xlsb::Package, NativeFeatureProof, usize)>;
+}
+
+macro_rules! feature_commit {
+    ($commit:path, $edit:ident, $proof:ident) => {
+        impl FeatureCommit for $commit {
+            fn parts(&self) -> usize {
+                self.diagnostics().parts()
+            }
+
+            fn retained_bytes(&self) -> usize {
+                self.patch().retained_bytes()
+            }
+
+            fn into_package(self) -> xlsb::Package {
+                <$commit>::into_package(self)
+            }
+
+            fn canonical_identity(
+                base: &Xlsb,
+            ) -> Result<(xlsb::Package, NativeFeatureProof, usize)> {
+                let original = base.original_package_for_noop()?;
+                let commit = original.$edit().map_err(native)?.commit().map_err(native)?;
+                let (package, patch) = commit.into_parts();
+                let retained = patch.retained_bytes();
+                Ok((package, NativeFeatureProof::$proof(patch), retained))
+            }
+        }
+    };
+}
+
+feature_commit!(xlsb::comments::edit::Commit, edit_comments, Comments);
+feature_commit!(xlsb::hyperlinks::edit::Commit, edit_hyperlinks, Hyperlinks);
+feature_commit!(xlsb::drawing::edit::Commit, edit_drawings, Drawings);
+feature_commit!(
+    xlsb::conditional_formatting::edit::Commit,
+    edit_conditional_formats,
+    ConditionalFormatting
+);
+feature_commit!(
+    xlsb::data_validation::edit::Commit,
+    edit_data_validations,
+    DataValidation
+);
+feature_commit!(
+    xlsb::auto_filter::edit::Commit,
+    edit_auto_filter,
+    AutoFilter
+);
+feature_commit!(
+    xlsb::page_breaks::edit::Commit,
+    edit_page_breaks,
+    PageBreaks
+);
 
 impl Xlsb {
     /// Publish one leaf feature commit: the new package (or this handle for
     /// an exact no-op) and the history images.
-    fn publish(&self, package: xlsb::Package, retained: usize, parts: usize) -> Result<Commit> {
+    fn publish<C: FeatureCommit>(&self, commit: C, authored_operations: usize) -> Result<Commit> {
         self.check_source_for_replay()?;
-        if parts != 0 && self.signature() == super::Signature::Signed {
+        let parts = commit.parts();
+        let signed = self.signature() == super::Signature::Signed;
+        if parts != 0 && signed {
             return Err(Error::signed(FileFormat::Xlsb));
         }
+        let (package, native, retained) = if signed {
+            let staged_retained = commit.retained_bytes();
+            let (package, native, canonical_retained) = C::canonical_identity(self)?;
+            (
+                package,
+                Some(native),
+                staged_retained.max(canonical_retained),
+            )
+        } else {
+            (commit.into_package(), None, 0)
+        };
         let after_file = if parts == 0 {
             None
         } else {
@@ -154,6 +265,8 @@ impl Xlsb {
                 after: OnceLock::new(),
                 retained,
                 parts,
+                authored_operations,
+                native,
             },
         ))
     }
@@ -163,9 +276,7 @@ impl Xlsb {
 macro_rules! publish {
     ($file:expr, $commit:expr) => {{
         let commit = $commit;
-        let parts = commit.diagnostics().parts();
-        let (package, patch) = commit.into_parts();
-        $file.publish(package, patch.retained_bytes(), parts)
+        $file.publish(commit, 1)
     }};
 }
 

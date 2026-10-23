@@ -286,6 +286,6 @@ fn commit(
             }),
         });
     }
-    let native = stage_plans(file, plans, limits)?;
+    let native = stage_plans(file, plans, limits, limits.max_snapshot_bytes())?;
     finish_commit(file, native, limits)
 }

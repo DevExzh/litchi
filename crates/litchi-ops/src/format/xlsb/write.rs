@@ -158,7 +158,7 @@ impl Commit {
 
     /// Adapt a metadata commit (record 0253).
     pub(super) fn from_metadata(after: Xlsb, images: super::metadata::Images) -> Self {
-        let operations = images.patch.changes().len();
+        let operations = images.authored_operations;
         let snapshot_bytes = images.retained_bytes();
         Self {
             after,
@@ -215,22 +215,23 @@ impl Commit {
             if native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
-            let (package, patch) =
+            let (package, patch, retained_bytes) =
                 if patch.is_noop() && base.signature() == super::Signature::Signed {
                     // Structural writes are staged through an unsigned private
                     // package. Rebuild the identity patch over the retained
                     // signed package so the leaf and facade share one base.
                     let original = base.original_package_for_noop()?;
-                    original
+                    let (package, patch) = original
                         .edit()
                         .map_err(native_error)?
                         .commit()
                         .map_err(native_error)?
-                        .into_parts()
+                        .into_parts();
+                    let retained_bytes = patch.retained_bytes().map_err(native_error)?;
+                    (package, patch, retained_bytes)
                 } else {
-                    (package, patch)
+                    (package, patch, native_snapshot_bytes)
                 };
-            let retained_bytes = patch.retained_bytes().map_err(native_error)?;
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
             if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
@@ -272,17 +273,20 @@ impl Commit {
             if native_snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(native_snapshot_bytes, limits.bytes()));
             }
-            let patch = if patch.is_noop() && base.signature() == super::Signature::Signed {
-                canonical_cell_patch(base, sheet, limits)?
-            } else {
-                Patch::Cells(vec![patch])
-            };
+            let (patch, retained_bytes) =
+                if patch.is_noop() && base.signature() == super::Signature::Signed {
+                    let patch = canonical_cell_patch(base, sheet, limits)?;
+                    let retained_bytes = patch.retained_bytes();
+                    (patch, retained_bytes)
+                } else {
+                    (Patch::Cells(vec![patch]), native_snapshot_bytes)
+                };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
-            let snapshot_bytes = native_snapshot_bytes.max(patch.retained_bytes());
+            let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
             if snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(snapshot_bytes, limits.bytes()));
             }
@@ -328,17 +332,20 @@ impl Commit {
                 Patch::Cells(patches) => patches.iter().all(NativeCellPatch::is_noop),
                 _ => false,
             };
-            let patch = if base.signature() == super::Signature::Signed && all_noop {
-                canonical_cell_patch(base, canonical.0, canonical.1)?
-            } else {
-                native_patch
-            };
+            let (patch, retained_bytes) =
+                if base.signature() == super::Signature::Signed && all_noop {
+                    let patch = canonical_cell_patch(base, canonical.0, canonical.1)?;
+                    let retained_bytes = patch.retained_bytes();
+                    (patch, retained_bytes)
+                } else {
+                    (native_patch, native_snapshot_bytes)
+                };
             let after = if patch.is_noop() {
                 base.clone()
             } else {
                 base.adopt_package(package)?
             };
-            let snapshot_bytes = native_snapshot_bytes.max(patch.retained_bytes());
+            let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
             if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
