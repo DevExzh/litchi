@@ -67,20 +67,11 @@ impl EditOptions {
     }
 }
 
-fn retained_patch_bytes(patch: &Patch) -> usize {
-    patch.changes().iter().fold(0usize, |bytes, change| {
-        bytes
-            .saturating_add(change.part_name().as_str().len())
-            .saturating_add(change.before().map_or(0, <[u8]>::len))
-            .saturating_add(change.after().map_or(0, <[u8]>::len))
-    })
-}
-
 fn enforce_snapshot_limit(patch: &Patch, options: EditOptions) -> Result<()> {
     let Some(maximum) = options.max_snapshot_bytes_value() else {
         return Ok(());
     };
-    let retained = retained_patch_bytes(patch);
+    let retained = patch.retained_bytes();
     if retained > maximum {
         return Err(Error::Limit {
             kind: LimitKind::XmlBytes,

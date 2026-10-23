@@ -80,19 +80,6 @@ fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize,
     ))
 }
 
-/// The properties patch already owns the complete before/after payload for
-/// each changed family.  Charge those bytes for unsigned publication instead
-/// of treating the operation as a zero-sized snapshot.  This mirrors the
-/// native metadata history proof without serializing the whole workbook.
-fn patch_retained_bytes(patch: &xlsb::metadata::Patch) -> usize {
-    patch.changes().iter().fold(0usize, |bytes, change| {
-        bytes
-            .saturating_add(change.part_name().as_str().len())
-            .saturating_add(change.before().map_or(0, |value| value.len()))
-            .saturating_add(change.after().map_or(0, |value| value.len()))
-    })
-}
-
 fn native_options(maximum: usize) -> xlsb::metadata::EditOptions {
     xlsb::metadata::EditOptions::default().max_snapshot_bytes(maximum)
 }
@@ -162,7 +149,7 @@ impl Xlsb {
         let (staged_retained, signed_before) = if self.signature() == super::Signature::Signed {
             staged_retained_bytes(self, &target)?
         } else {
-            (patch_retained_bytes(&patch), 0)
+            (patch.retained_bytes(), 0)
         };
         let staged_noop = patch.is_noop();
         drop(editor);
@@ -241,7 +228,7 @@ impl Xlsb {
         // Source-backed metadata is used only for unsigned owners above. The
         // native patch already owns the changed property payloads, so charge
         // that proof without materializing or serializing the whole source.
-        let retained = patch_retained_bytes(&patch);
+        let retained = patch.retained_bytes();
         if retained > limits.max_snapshot_bytes() {
             return Err(snapshot_limit(retained, limits.max_snapshot_bytes()));
         }
