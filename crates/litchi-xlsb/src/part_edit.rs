@@ -591,7 +591,13 @@ impl RetainedAccounting {
                 }
             }
         }
-        if image.exact_canonical.is_some() {
+        if image.exact_canonical.is_some()
+            || (image.explicit && matches!(&image.publication, ContentTypesXml::Authored))
+        {
+            // An explicit authored replacement binds this digest during
+            // manifest capture.  Admission has not materialized it yet, so
+            // account for the same 32-byte endpoint that final capture will
+            // retain without serializing canonical XML here.
             self.add_bytes(32);
         }
     }
@@ -709,8 +715,8 @@ impl PartPatch {
         before: &OpcPackage,
         after: &OpcPackage,
         names: &[PackURI],
+        changed_parts: &[PackURI],
     ) -> Result<(usize, usize)> {
-        let changed_parts = after.changed_parts(before);
         let mut accounting = RetainedAccounting::default();
         let mut changed = 0usize;
         for name in names {
@@ -1021,7 +1027,8 @@ impl PartPatch {
             .map(|name| PackURI::new(name.as_str()))
             .collect::<std::result::Result<_, _>>()
             .map_err(Error::from)?;
-        let (retained, _) = Self::retained_bytes_for_names(before, after, &names)?;
+        let changed_parts = after.changed_parts(before);
+        let (retained, _) = Self::retained_bytes_for_names(before, after, &names, &changed_parts)?;
         Self::enforce_retained_limit(retained, max_snapshot_bytes)?;
         let mut deltas = Vec::new();
         for name in names {
@@ -1089,7 +1096,8 @@ impl PartPatch {
         changed_names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         changed_names.dedup();
 
-        let (retained, changed) = Self::retained_bytes_for_names(before, after, &changed_names)?;
+        let (retained, changed) =
+            Self::retained_bytes_for_names(before, after, &changed_names, &changed_names)?;
         if changed > maximum {
             return Err(Error::limit(crate::opc::LimitKind::Parts, changed, maximum));
         }
