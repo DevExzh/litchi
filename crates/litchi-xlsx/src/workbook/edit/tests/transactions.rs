@@ -635,9 +635,12 @@ fn failed_join_keeps_typed_normalization_source_and_both_edits() {
         .expect_err("malformed source refuses normalization");
     assert!(matches!(
         error.failure(),
-        JoinFailure::Normalization(JoinNormalization::Xml)
+        JoinFailure::Normalization(JoinNormalization::Invalid)
     ));
-    assert!(matches!(error.normalization_source(), Some(Error::Xml(_))));
+    assert!(matches!(
+        error.normalization_source(),
+        Some(Error::Invalid(_))
+    ));
     assert_eq!(left.len(), 1);
     assert_eq!(error.rejected().len(), 1);
 }

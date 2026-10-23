@@ -821,15 +821,22 @@ impl Sheet<'_> {
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         text.validate_for_write()?;
-        let source_same = match self.source_storage(address)? {
-            Some((_, true, _)) => match self.source_rich_text(address)? {
-                Some(source) => source == text,
-                None => false,
-            },
-            // Shared strings, including shared rich strings, must be rewritten
-            // as an inline rich payload.  Only an identical inline-rich
-            // representation is a genuine no-op.
-            Some((_, false, _)) | None => false,
+        let source_same = if self.edit.capture_budgeted() {
+            match self.source_storage(address)? {
+                Some((_, true, _)) => match self.source_rich_text(address)? {
+                    Some(source) => source == text,
+                    None => false,
+                },
+                // Shared strings, including shared rich strings, must be
+                // rewritten as an inline rich payload. Only an identical
+                // inline-rich representation is a bounded setter no-op.
+                Some((_, false, _)) | None => false,
+            }
+        } else {
+            // The commit normalizer performs the exact representation-aware
+            // comparison for unbounded edits. Keep the authoring fast path
+            // free of source storage and rich-run scans.
+            false
         };
         if source_same {
             let mut remove_action = false;

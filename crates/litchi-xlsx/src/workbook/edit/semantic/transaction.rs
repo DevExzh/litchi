@@ -3612,11 +3612,15 @@ impl Edit {
         }
 
         let added_offset = self.added.len();
+        enum CaptureJoinError {
+            Resource(usize, usize),
+            Normalization(Error),
+        }
         let joined_capture_budget_result = match (&self.capture_budget, &other.capture_budget) {
             (Some(left), Some(right)) => left
                 .joined(right, added_offset)
                 .map(Some)
-                .map_err(|error| error),
+                .map_err(|(observed, maximum)| CaptureJoinError::Resource(observed, maximum)),
             (Some(left), None) => {
                 let derived = CaptureBudget::from_staged(
                     &other.base,
@@ -3624,9 +3628,11 @@ impl Edit {
                     &other.sheets,
                     &other.added,
                 )
-                .map_err(|_error| (usize::MAX, left.maximum));
+                .map_err(CaptureJoinError::Normalization);
                 match derived {
-                    Ok(derived) => left.joined(&derived, added_offset).map(Some),
+                    Ok(derived) => left.joined(&derived, added_offset).map(Some).map_err(
+                        |(observed, maximum)| CaptureJoinError::Resource(observed, maximum),
+                    ),
                     Err(error) => Err(error),
                 }
             },
@@ -3637,9 +3643,11 @@ impl Edit {
                     &self.sheets,
                     &self.added,
                 )
-                .map_err(|_error| (usize::MAX, right.maximum));
+                .map_err(CaptureJoinError::Normalization);
                 match derived {
-                    Ok(derived) => derived.joined(right, added_offset).map(Some),
+                    Ok(derived) => derived.joined(right, added_offset).map(Some).map_err(
+                        |(observed, maximum)| CaptureJoinError::Resource(observed, maximum),
+                    ),
                     Err(error) => Err(error),
                 }
             },
@@ -3647,11 +3655,12 @@ impl Edit {
         };
         let joined_capture_budget = match joined_capture_budget_result {
             Ok(joined) => joined,
-            Err((observed, maximum)) => {
+            Err(CaptureJoinError::Resource(observed, maximum)) => {
                 reject!(JoinFailure::ResourceLimit(snapshot_join_resource_limit(
                     observed, maximum,
                 )));
             },
+            Err(CaptureJoinError::Normalization(error)) => reject_normalization!(error),
         };
 
         let other_cross_workbook_scalar = other.cross_workbook_scalar;
