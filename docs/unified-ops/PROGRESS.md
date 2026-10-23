@@ -2467,3 +2467,43 @@ See [0063](0063-source-pptx-modern-comments.md).
   corpus dispositions, final inventory/glossary, and the complete assembled
   gate remain open. Only the comprehensive redaction audit is deferred.
   Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, runtime admission and fourth cleanup):
+  The integration assembly reaches `ff86f4a1c0`, incorporating the complete
+  required-policy consumer migration, ODraw retained-policy/raw-limit closure,
+  XLS concrete iteration/deferred reopen, reproducible ODP probe routing, and
+  the XLSX historical raw qualification harness. Record 0362uf preserves the
+  fourteenth and fifteenth workspace compiler failures and their repairs.
+  The sixteenth all-target/all-feature workspace and harness pass is running;
+  no unfinished result counts as a pass.
+
+  OPC runtime validation on `8acd229235` passes all 714 library tests. It
+  follows repairs for two policy-confounded fixtures and a real final-output
+  admission bypass: appended replacement relationships must be counted even
+  when the original relationship entry is omitted. ZIP runtime validation
+  reaches 505 passing tests and one failing ZIP64/comment geometry regression;
+  that failure remains assigned for diagnosis and repair.
+
+  DOCX whole-owner replay now checks source freshness, complete base identity,
+  recipient policy and the redaction inverse capability before publication.
+  Same-owner and equal-content ordinary restores retain their supported paths;
+  unrelated content changes cannot fall back to scoped replay. The raw-helper
+  branch remains unmerged pending generated-root shape admission before capture
+  and elimination of duplicate catalog planning, despite its passing leaf
+  library receipt. Signed native no-op accounting also remains under repair.
+
+  The tooling pass records 1,334 tests with one matrix coverage failure, plus
+  archive-header boundary coverage and dependency-classification failures.
+  The matrix repair now preserves allocator/instruction diagnostics and
+  explicitly unqualified native results, without inventing comparison ratios
+  for unpaired values. Crate-boundary fixes and the assembled rerun remain open.
+
+  A fourth cleanup wave removed six clean, inactive merged leaves without
+  forcing, totaling 37,259,489,031 bytes of checkout contents. Seven generated
+  files (457,223 bytes) were quarantined with hashes. Branch references,
+  recreation commands, measurement evidence and active worktrees are retained.
+
+  Native qualification, full corpus replay/dispositions, final inventory and
+  glossary, and the complete assembled gate remain required. The integration
+  branch is staging these changes; they are not yet accepted into trunk. Only
+  the comprehensive redaction audit is deferred. Nothing has been pushed.
