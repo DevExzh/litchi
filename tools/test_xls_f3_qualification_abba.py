@@ -44,6 +44,12 @@ def initialize_repository(directory: Path, files: dict[str, bytes]) -> str:
 
 
 class ProvenanceTests(unittest.TestCase):
+    def test_status_paths_preserves_porcelain_prefixes(self) -> None:
+        self.assertEqual(
+            RUNNER.status_paths(" M tools/perf-baseline/src/lib.rs\n?? tools/new.rs\n"),
+            ["tools/perf-baseline/src/lib.rs", "tools/new.rs"],
+        )
+
     def test_only_frozen_overlay_is_admitted_and_production_mutation_is_rejected(self) -> None:
         # The checkout is read-only input: all writes below target the temporary
         # source fixture, while frozen probe bytes come from `git show`.

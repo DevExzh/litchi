@@ -179,7 +179,11 @@ def run_capture(command: list[str]) -> str:
         )
     except (OSError, subprocess.CalledProcessError, UnicodeError) as error:
         raise RunnerError(f"command failed: {' '.join(command)}: {error}") from error
-    return completed.stdout.strip()
+    # Preserve porcelain status' leading index/worktree marker.  Stripping
+    # leading whitespace turns a tracked worktree-only edit (` M path`) into
+    # `path` with its first character lost, which could make the overlay gate
+    # misclassify an allowlisted file as an unexpected path.
+    return completed.stdout.rstrip("\r\n")
 
 
 def run_capture_bytes(command: list[str]) -> bytes:
