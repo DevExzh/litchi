@@ -89,3 +89,15 @@ and flattens normalization errors into strings. A current-source repair leaf
 `b2a1e6e735` composes the proposal with the reviewed rich-transfer and metadata
 work solely to repair this full batch without temporary compiler overlays.
 It is not accepted into this diagnostic branch or the main integration.
+
+## XLSB runtime return
+
+On `d4d1820dbe`, the full all-feature XLSB library passes 769 tests and
+fails three (54.10 seconds including compilation, 8.65 seconds in tests).
+The retained-metadata test compares serialized producer defaults against an
+empty metadata value; two OPC eager/deferred projection tests disagree on
+content-types source presence. These are returned for diagnosis and repair
+without weakening exact retention limits, source fidelity or projection
+validation. The runner stopped before the queued PPTX/ODF group.
+[xlsb-pptx-odf-runtime-v13.json](results/0362up/xlsb-pptx-odf-runtime-v13.json)
+retains source, command, complete log and completed executable identities.

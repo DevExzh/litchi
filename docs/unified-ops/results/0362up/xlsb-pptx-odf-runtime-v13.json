@@ -1,0 +1,45 @@
+{
+  "source": "d4d1820dbe97f60dce0dfa19e2462b2140600a8a",
+  "pid": 2056882,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-pptx-odf-runtime-v13-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-pptx-odf-runtime-v13"
+  ],
+  "started_unix_seconds": 1792783104.8313394,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 101,
+      "seconds": 54.09726506299921,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-pptx-odf-runtime-v13/check-0.log",
+      "bytes": 229486,
+      "sha256": "ebabf7a7971bc41a4074f32070c88c87331cb037a1cc656ae8d13047add384b6",
+      "target_bytes_before": 3259690234,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsb-a78e52581af29829",
+          "bytes": 47842544,
+          "sha256": "14041b1b22da2a8b38a4337c86b3078f2d085ad46563337e235e6d35b5b254d0"
+        }
+      ]
+    }
+  ],
+  "note": "Full all-feature XLSB library: 769 passed, 3 failed. Returned metadata baseline expectation and two OPC eager/deferred projection source-presence assertions for diagnosis without weakening fidelity or limit checks. Runner stopped after XLSB failure; PPTX/ODF focused runtime group was not reached."
+}
