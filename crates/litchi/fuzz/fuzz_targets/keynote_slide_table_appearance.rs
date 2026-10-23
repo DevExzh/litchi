@@ -196,10 +196,32 @@ fn exercise_package(package: &Package, data: &[u8]) {
             return;
         },
     };
-    black_box(edit.path());
-    assert_eq!(edit.appearance(), before);
+    let path = match edit.path() {
+        Ok(path) => path,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    black_box(path);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, before),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    }
     let edit = edit.set(after);
-    assert_eq!(edit.appearance(), after);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, after),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    }
 
     let commit = match edit.commit() {
         Ok(commit) => commit,

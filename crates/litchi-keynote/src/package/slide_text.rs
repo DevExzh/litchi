@@ -10,7 +10,7 @@
 
 use std::fmt;
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
@@ -23,6 +23,7 @@ use litchi_iwa_text::{TextPosition, TextSpan};
 use litchi_iwa_text_wire::{RewriteBehavior, RewriteLimits};
 use thiserror::Error as ThisError;
 
+use super::edit::OwnedSlideSelector;
 use super::{
     NOTE_MESSAGE_TYPE, PLACEHOLDER_MESSAGE_TYPE, Package, PhysicalSource, ReadError,
     SHAPE_INFO_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, SemanticBudget,
@@ -224,7 +225,7 @@ struct Operation {
     replacement: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TextSnapshot {
     placeholder_identifier: u64,
     storage_identifier: u64,
@@ -292,11 +293,10 @@ impl ReferenceSemantics {
 /// One mutable storage-relative text operation staged against an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
-    position: Position,
+    slide: OwnedSlideSelector,
     role: Kind,
-    placeholder_identifier: u64,
-    storage_identifier: u64,
-    before: String,
+    position: OnceLock<Position>,
+    snapshot: OnceLock<TextSnapshot>,
     operation: Option<Operation>,
 }
 
@@ -304,7 +304,7 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("position", &self.position)
+            .field("has_snapshot", &self.snapshot.get().is_some())
             .field("role", &self.role)
             .field("has_operation", &self.operation.is_some())
             .finish_non_exhaustive()
@@ -316,25 +316,35 @@ impl<'a> Edit<'a> {
         source: &'a Package,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
-    ) -> Result<Self, Error> {
-        let position = resolve_position(source, selector.into())?;
-        let snapshot = text_snapshot_at(source, position, role)?
-            .ok_or(Error::Refused(Refusal::TextStorageNotFound { role }))?;
-        Ok(Self {
+    ) -> Self {
+        Self {
             source,
-            position,
+            slide: OwnedSlideSelector::from_selector(selector.into()),
             role,
-            placeholder_identifier: snapshot.placeholder_identifier,
-            storage_identifier: snapshot.storage_identifier,
-            before: snapshot.text,
+            position: OnceLock::new(),
+            snapshot: OnceLock::new(),
             operation: None,
-        })
+        }
     }
 
-    /// Return the semantic slide position resolved when this edit began.
+    fn resolve(&self) -> Result<&TextSnapshot, Error> {
+        if let Some(snapshot) = self.snapshot.get() {
+            return Ok(snapshot);
+        }
+        let position = resolve_position(self.source, self.slide.as_selector())?;
+        let snapshot = text_snapshot_at(self.source, position, self.role)?.ok_or(
+            Error::Refused(Refusal::TextStorageNotFound { role: self.role }),
+        )?;
+        let _ = self.position.set(position);
+        let _ = self.snapshot.set(snapshot);
+        self.snapshot.get().ok_or(Error::InvalidSource)
+    }
+
+    /// Resolve and return the selected semantic slide position.
     #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
+    pub fn position(&self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.position.get().copied().ok_or(Error::InvalidSource)
     }
 
     /// Return the semantic placeholder role selected when this edit began.
@@ -343,10 +353,10 @@ impl<'a> Edit<'a> {
         self.role
     }
 
-    /// Borrow the selected placeholder text from the immutable source snapshot.
+    /// Resolve and borrow the selected placeholder text from the source snapshot.
     #[must_use]
-    pub fn text(&self) -> &str {
-        &self.before
+    pub fn text(&self) -> Result<&str, Error> {
+        Ok(self.resolve()?.text.as_str())
     }
 
     /// Whether a sequence of edits of this text, each a splice within
@@ -361,7 +371,7 @@ impl<'a> Edit<'a> {
     ///
     /// A typed read or wire error for the selected storage.
     pub fn admits_combined_splice(&self, hull: Range<usize>) -> Result<bool, Error> {
-        owned_storage_admits_combined_splice(self.source, self.storage_identifier, hull)
+        owned_storage_admits_combined_splice(self.source, self.resolve()?.storage_identifier, hull)
     }
 
     /// Return the staged storage-relative span, when present.
@@ -389,12 +399,13 @@ impl<'a> Edit<'a> {
         if self.operation.is_some() {
             return Err(Error::Refused(Refusal::OperationAlreadyStaged));
         }
+        let snapshot = self.resolve()?;
         validate_replacement(replacement)?;
-        let range = validate_span(&self.before, span)?;
-        let selected = self.before.get(range).ok_or(Error::InvalidSource)?;
+        let range = validate_span(&snapshot.text, span)?;
+        let selected = snapshot.text.get(range).ok_or(Error::InvalidSource)?;
         validate_consumed_text(selected)?;
         let is_semantic_noop = selected == replacement;
-        validate_candidate_text_memory(self.source, &self.before, span, replacement)?;
+        validate_candidate_text_memory(self.source, &snapshot.text, span, replacement)?;
         self.operation = Some(Operation {
             span,
             replacement: if is_semantic_noop {
@@ -444,7 +455,7 @@ impl<'a> Edit<'a> {
     ///
     /// Returns the same failures as [`Self::replace`].
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
-        let end = TextPosition::from_utf16_index(self.before.encode_utf16().count())
+        let end = TextPosition::from_utf16_index(self.resolve()?.text.encode_utf16().count())
             .map_err(|_error| Error::InvalidSource)?;
         let span = TextSpan::new(TextPosition::ZERO, end).map_err(|_error| Error::InvalidSource)?;
         self.replace(span, text)
@@ -478,16 +489,21 @@ impl<'a> Edit<'a> {
     /// Returns a typed source, dependency, limit, allocation, or verification
     /// error before publishing any candidate.
     pub fn commit(self) -> Result<Commit, Error> {
+        let position = self.position()?;
+        let snapshot = self.resolve()?.clone();
+        let before_text = snapshot.text;
+        let placeholder_identifier = snapshot.placeholder_identifier;
+        let storage_identifier = snapshot.storage_identifier;
         let operation = self.operation.unwrap_or(Operation {
             span: TextSpan::default(),
             replacement: None,
         });
-        let range = validate_span(&self.before, operation.span)?;
-        let selected = self.before.get(range.clone()).ok_or(Error::InvalidSource)?;
+        let range = validate_span(&before_text, operation.span)?;
+        let selected = before_text.get(range.clone()).ok_or(Error::InvalidSource)?;
         let replacement = operation.replacement.as_deref().unwrap_or(selected);
         validate_replacement(replacement)?;
         validate_consumed_text(selected)?;
-        validate_candidate_text_memory(self.source, &self.before, operation.span, replacement)?;
+        validate_candidate_text_memory(self.source, &before_text, operation.span, replacement)?;
         let replacement_units = utf16_len(replacement)?;
         let inverse_end = operation
             .span
@@ -506,7 +522,7 @@ impl<'a> Edit<'a> {
         let source_fingerprint = fingerprint(&source_bytes);
 
         if operation.replacement.is_none() {
-            let before = Arc::new(self.before);
+            let before = Arc::new(before_text);
             let after = Arc::clone(&before);
             return Ok(Commit {
                 package: self.source.snapshot(),
@@ -515,10 +531,10 @@ impl<'a> Edit<'a> {
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    position: self.position,
+                    position,
                     role: self.role,
-                    placeholder_identifier: self.placeholder_identifier,
-                    storage_identifier: self.storage_identifier,
+                    placeholder_identifier,
+                    storage_identifier,
                     span: operation.span,
                     inverse_span,
                     before,
@@ -531,10 +547,10 @@ impl<'a> Edit<'a> {
         }
         self.source.validate().map_err(map_read_error)?;
         let current =
-            text_snapshot_at(self.source, self.position, self.role)?.ok_or(Error::InvalidSource)?;
-        if current.placeholder_identifier != self.placeholder_identifier
-            || current.storage_identifier != self.storage_identifier
-            || current.text != self.before
+            text_snapshot_at(self.source, position, self.role)?.ok_or(Error::InvalidSource)?;
+        if current.placeholder_identifier != placeholder_identifier
+            || current.storage_identifier != storage_identifier
+            || current.text != before_text
         {
             return Err(Error::InvalidSource);
         }
@@ -546,15 +562,15 @@ impl<'a> Edit<'a> {
             .replacement
             .as_deref()
             .ok_or(Error::InvalidSource)?;
-        let after_text = replace_utf8_range(&self.before, range, changed_replacement)?;
-        let before = Arc::new(self.before);
+        let after_text = replace_utf8_range(&before_text, range, changed_replacement)?;
+        let before = Arc::new(before_text);
         let after = Arc::new(after_text);
         let (package, touched_components) = rewrite_text(
             self.source,
-            self.position,
+            position,
             self.role,
-            self.placeholder_identifier,
-            self.storage_identifier,
+            placeholder_identifier,
+            storage_identifier,
             operation.span,
             changed_replacement,
             after.as_str(),
@@ -567,10 +583,10 @@ impl<'a> Edit<'a> {
                 target,
                 source_fingerprint,
                 target_fingerprint,
-                position: self.position,
+                position,
                 role: self.role,
-                placeholder_identifier: self.placeholder_identifier,
-                storage_identifier: self.storage_identifier,
+                placeholder_identifier,
+                storage_identifier,
                 span: operation.span,
                 inverse_span,
                 before,
@@ -845,19 +861,25 @@ impl Package {
     ///
     /// # Costs
     ///
-    /// The edit owns one bounded copy of the selected placeholder text.
+    /// The edit retains only the source and selector at entry. It resolves the
+    /// selected placeholder and owns one bounded text copy on the first value
+    /// read, staged operation, or commit.
     ///
     /// # Errors
     ///
     /// Returns [`Refusal::UnsupportedKind`] for
-    /// [`Kind::SlideNumber`], or a typed selector, missing-placeholder, source,
-    /// limit, allocation, or dependency error.
+    /// [`Kind::SlideNumber`] at entry. Selector, missing-placeholder, source,
+    /// limit, allocation, and dependency errors are deferred until the first
+    /// value read, staged operation, or commit.
     pub fn edit_slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
     ) -> Result<Edit<'_>, Error> {
-        Edit::new(self, selector, role)
+        if role == Kind::SlideNumber {
+            return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
+        }
+        Ok(Edit::new(self, selector, role))
     }
 
     /// Start one selector-first slide-title edit.

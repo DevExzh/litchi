@@ -11,7 +11,11 @@
     reason = "The package boundary maps native failures to content-redacted semantic errors."
 )]
 
-use std::{fmt, mem::size_of, sync::Arc};
+use std::{
+    fmt,
+    mem::size_of,
+    sync::{Arc, OnceLock},
+};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{
@@ -25,6 +29,7 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector};
 use super::slide_chart_title::{
     self, ChartGraphScanBudget, ChartSelection, Error as ChartTitleError,
     LimitKind as ChartTitleLimitKind, select_chart_with_budget,
@@ -218,11 +223,9 @@ impl From<Refusal> for Error {
 /// package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    slide_position: Position,
-    chart_position: Position,
-    chart_identifier: u64,
-    slide_identifier: u64,
-    before: Arc<ChartData>,
+    slide: OwnedSlideSelector,
+    chart: OwnedChartSelector,
+    selection: OnceLock<(ChartSelection, Arc<ChartData>)>,
     after: Option<ChartData>,
 }
 
@@ -230,37 +233,63 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("slide_position", &self.slide_position)
-            .field("chart_position", &self.chart_position)
-            .field("before", self.before.as_ref())
-            .field("after", &self.after)
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&self) -> Result<&(ChartSelection, Arc<ChartData>), Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let mut budget = ChartGraphScanBudget::new(self.source).map_err(map_chart_title_error)?;
+        budget
+            .charge_selection_scans(self.source, true)
+            .map_err(map_axis_support_error)?;
+        let selection = select_chart_with_budget(
+            self.source,
+            self.slide.as_selector(),
+            self.chart.as_selector(),
+            true,
+            &mut budget,
+        )
+        .map_err(map_axis_support_error)?;
+        let before = read_selected_data(self.source, selection.clone(), &mut budget)?;
+        preflight_data_budget(&budget, LimitKind::Allocations, 1)?;
+        budget
+            .charge_work(size_of::<ChartData>())
+            .map_err(map_axis_support_error)?;
+        let _ = self.selection.set((selection, Arc::new(before)));
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
     /// Return the selected semantic slide position.
     #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.slide_position
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.slide_position)
     }
 
     /// Return the selected semantic chart position.
     #[must_use]
-    pub const fn chart_position(&self) -> Position {
-        self.chart_position
+    pub fn chart_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.chart_position)
     }
 
-    /// Return the chart data observed when this edit began.
+    /// Return the chart data observed when this edit first resolves.
     #[must_use]
-    pub fn before(&self) -> &ChartData {
-        self.before.as_ref()
+    pub fn before(&self) -> Result<&ChartData, Error> {
+        Ok(self.resolve()?.1.as_ref())
     }
 
     /// Return the chart data currently staged for publication.
     #[must_use]
-    pub fn after(&self) -> &ChartData {
-        self.after.as_ref().unwrap_or(self.before.as_ref())
+    pub fn after(&self) -> Result<&ChartData, Error> {
+        match self.after.as_ref() {
+            Some(after) => Ok(after),
+            None => Ok(self.resolve()?.1.as_ref()),
+        }
     }
 
     /// Replace the staged chart data.
@@ -490,35 +519,20 @@ impl Package {
     }
 
     /// Begin a selector-first immutable chart-data edit.
+    ///
+    /// Entry retains only the source and the archive-free selectors. Chart
+    /// graph selection and data decoding are deferred until a value is read
+    /// or the edit is committed.
     pub fn edit_slide_chart_data<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = ChartGraphScanBudget::new(self).map_err(map_chart_title_error)?;
-        budget
-            .charge_selection_scans(self, true)
-            .map_err(map_axis_support_error)?;
-        let selection = select_chart_with_budget(
-            self,
-            slide_selector.into(),
-            chart_selector.into(),
-            true,
-            &mut budget,
-        )
-        .map_err(map_axis_support_error)?;
-        let before = read_selected_data(self, selection.clone(), &mut budget)?;
-        preflight_data_budget(&budget, LimitKind::Allocations, 1)?;
-        budget
-            .charge_work(size_of::<ChartData>())
-            .map_err(map_axis_support_error)?;
         Ok(Edit {
             source: self,
-            slide_position: selection.slide_position,
-            chart_position: selection.chart_position,
-            chart_identifier: selection.chart_identifier,
-            slide_identifier: selection.slide_identifier,
-            before: Arc::new(before),
+            slide: OwnedSlideSelector::from_selector(slide_selector.into()),
+            chart: OwnedChartSelector::from_selector(chart_selector.into()),
+            selection: OnceLock::new(),
             after: None,
         })
     }
@@ -624,15 +638,13 @@ impl Package {
 }
 
 fn commit_data_edit(edit: Edit<'_>) -> Result<Commit, Error> {
-    let Edit {
-        source,
-        slide_position,
-        chart_position,
-        chart_identifier,
-        slide_identifier,
-        before,
-        after: after_value,
-    } = edit;
+    let (selection_base, before) = edit.resolve()?.clone();
+    let source = edit.source;
+    let after_value = edit.after;
+    let slide_position = selection_base.slide_position;
+    let chart_position = selection_base.chart_position;
+    let chart_identifier = selection_base.chart_identifier;
+    let slide_identifier = selection_base.slide_identifier;
     let catalog = physical_catalog(source)?;
     let source_bytes = catalog.shared_source();
     let mut budget = ChartGraphScanBudget::new(source).map_err(map_chart_title_error)?;

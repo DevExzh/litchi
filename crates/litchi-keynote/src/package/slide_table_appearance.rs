@@ -6,7 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit};
@@ -30,6 +30,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 use litchi_iwa_protos::{table_appearance_codec as appearance_codec, table_info_codec};
 use thiserror::Error as ThisError;
 
+use super::edit::OwnedSlideSelector;
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::selector::SlideSelector;
 use crate::slide::table::{
@@ -806,48 +807,62 @@ impl AppearanceBudget {
 /// Immutable appearance settings staged against one exact package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    path: Path,
-    before: Appearance,
-    after: Appearance,
-    #[allow(dead_code)]
-    selection: AppearanceSelection,
+    slide: OwnedSlideSelector,
+    table: TableSelector,
+    selection: OnceLock<AppearanceSelection>,
+    after: Option<Appearance>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("path", &self.path)
-            .field("before", &self.before)
-            .field("after", &self.after)
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        self.path
+    fn resolve(&self) -> Result<&AppearanceSelection, Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let mut budget = AppearanceBudget::new(self.source)?;
+        let catalog = physical_source(self.source)?;
+        budget.source_catalog(self.source, catalog)?;
+        let selection = select_table_with_budget(
+            self.source,
+            self.slide.as_selector(),
+            self.table,
+            &mut budget,
+        )?;
+        let _ = self.selection.set(selection);
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
+    pub fn path(&self) -> Result<Path, Error> {
+        Ok(self.resolve()?.path())
+    }
+
+    pub fn before(&self) -> Result<Appearance, Error> {
+        Ok(self.resolve()?.before)
+    }
+
+    pub fn after(&self) -> Result<Appearance, Error> {
+        if let Some(after) = self.after {
+            return Ok(after);
+        }
+        Ok(self.resolve()?.before)
+    }
+
+    pub fn appearance(&self) -> Result<Appearance, Error> {
+        self.after()
     }
 
     #[must_use]
-    pub const fn before(&self) -> Appearance {
-        self.before
-    }
-
-    #[must_use]
-    pub const fn after(&self) -> Appearance {
-        self.after
-    }
-
-    #[must_use]
-    pub const fn appearance(&self) -> Appearance {
-        self.after
-    }
-
-    #[must_use]
-    pub const fn set(mut self, appearance: Appearance) -> Self {
-        self.after = appearance;
+    pub fn set(mut self, appearance: Appearance) -> Self {
+        self.after = Some(appearance);
         self
     }
 
@@ -916,6 +931,15 @@ struct AppearanceSelection {
     stylesheet_identifier: Option<u64>,
     before: Appearance,
     locked: bool,
+}
+
+impl AppearanceSelection {
+    const fn path(&self) -> Path {
+        Path::Table {
+            slide: self.slide_position,
+            table: self.table_position,
+        }
+    }
 }
 
 /// A reversible process-local exact-source appearance patch.
@@ -1100,24 +1124,21 @@ impl Package {
     }
 
     /// Start a selector-first immutable appearance edit.
+    ///
+    /// Entry retains only the source and archive-free selectors. Table graph
+    /// selection and appearance decoding are deferred until a value is read
+    /// or the edit is committed.
     pub fn edit_slide_table_appearance<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = AppearanceBudget::new(self)?;
-        let catalog = physical_source(self)?;
-        budget.source_catalog(self, catalog)?;
-        let selection = select_table_with_budget(self, slide.into(), table.into(), &mut budget)?;
         Ok(Edit {
             source: self,
-            path: Path::Table {
-                slide: selection.slide_position,
-                table: selection.table_position,
-            },
-            before: selection.before,
-            after: selection.before,
-            selection,
+            slide: OwnedSlideSelector::from_selector(slide.into()),
+            table: table.into(),
+            selection: OnceLock::new(),
+            after: None,
         })
     }
 
@@ -1128,17 +1149,21 @@ impl Package {
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let selection = edit.resolve()?.clone();
+    let before = selection.before;
+    let after = edit.after.unwrap_or(before);
+    let path = selection.path();
     let source_catalog = physical_source(edit.source)?;
     let source_bytes = source_catalog.shared_source();
-    if edit.before == edit.after {
+    if before == after {
         return Ok(Commit {
             package: edit.source.snapshot(),
             patch: Patch {
                 source: Arc::clone(&source_bytes),
                 target: source_bytes,
-                path: edit.path,
-                before: edit.before,
-                after: edit.after,
+                path,
+                before,
+                after,
                 touched_components: 0,
                 deleted_previews: 0,
                 changed_members: empty_changed_members(),
@@ -1155,18 +1180,13 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !source_catalog.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    if edit.selection.locked {
+    if selection.locked {
         return Err(Error::Refused(Refusal::Locked));
     }
     let mut budget = AppearanceBudget::new(edit.source)?;
     budget.source_catalog(edit.source, source_catalog)?;
-    let (mut edits, new_style, new_uuid) = rewrite_native_appearance(
-        edit.source,
-        &edit.selection,
-        edit.after,
-        edit.path,
-        &mut budget,
-    )?;
+    let (mut edits, new_style, new_uuid) =
+        rewrite_native_appearance(edit.source, &selection, after, path, &mut budget)?;
     budget.allocations(1)?;
     budget.scratch(size_of::<NativeAppearanceEdit>())?;
     edits
@@ -1174,10 +1194,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .map_err(|_| Error::Allocation { amount: 1 })?;
     let metadata_edit = rewrite_metadata_for_style(
         edit.source,
-        &edit.selection,
+        &selection,
         new_style,
         new_uuid,
-        edit.path,
+        path,
         &mut budget,
     )?;
     edits.push(metadata_edit);
@@ -1234,11 +1254,11 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     budget.source_catalog(&candidate, candidate_catalog)?;
     let selected = select_table_with_budget(
         &candidate,
-        SlideSelector::Position(edit.selection.slide_position),
-        TableSelector::index(edit.selection.table_position.get()),
+        SlideSelector::Position(selection.slide_position),
+        TableSelector::index(selection.table_position.get()),
         &mut budget,
     )?;
-    if selected.before != edit.after {
+    if selected.before != after {
         return Err(Error::Verification);
     }
     verify_candidate_locality(
@@ -1253,9 +1273,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         patch: Patch {
             source: source_bytes,
             target: target_bytes,
-            path: edit.path,
-            before: edit.before,
-            after: edit.after,
+            path,
+            before,
+            after,
             touched_components,
             deleted_previews,
             changed_members,

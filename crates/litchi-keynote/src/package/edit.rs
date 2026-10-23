@@ -10,7 +10,57 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use thiserror::Error as ThisError;
 
 use super::{Package, ReadError, strict_slide_node_skipped};
-use crate::{SlideSelector, SlideSelectorError};
+use crate::{ChartSelector, SlideSelector, SlideSelectorError};
+
+/// An owned slide selector retained by a deferred edit.
+///
+/// Selector names are small caller input, not package payload.  Owning the
+/// name lets an edit keep only its source and selector while deferring the
+/// package-wide show lookup until the first value read or commit.
+#[derive(Clone, Debug)]
+pub(crate) enum OwnedSlideSelector {
+    Name(Arc<str>),
+    Position(Position),
+}
+
+impl OwnedSlideSelector {
+    pub(crate) fn from_selector(selector: SlideSelector<'_>) -> Self {
+        match selector {
+            SlideSelector::Name(name) => Self::Name(Arc::<str>::from(name)),
+            SlideSelector::Position(position) => Self::Position(position),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> SlideSelector<'_> {
+        match self {
+            Self::Name(name) => SlideSelector::Name(name.as_ref()),
+            Self::Position(position) => SlideSelector::Position(*position),
+        }
+    }
+}
+
+/// An owned chart selector retained by a deferred chart edit.
+#[derive(Clone, Debug)]
+pub(crate) enum OwnedChartSelector {
+    Name(Arc<str>),
+    Index(usize),
+}
+
+impl OwnedChartSelector {
+    pub(crate) fn from_selector(selector: ChartSelector<'_>) -> Self {
+        match selector {
+            ChartSelector::Name(name) => Self::Name(Arc::<str>::from(name)),
+            ChartSelector::Index(index) => Self::Index(index),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> ChartSelector<'_> {
+        match self {
+            Self::Name(name) => ChartSelector::Name(name.as_ref()),
+            Self::Index(index) => ChartSelector::Index(*index),
+        }
+    }
+}
 
 /// An error raised while staging or committing a Keynote slide-state edit.
 #[derive(Debug, ThisError)]

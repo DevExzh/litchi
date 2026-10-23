@@ -205,7 +205,15 @@ fn exercise_arrangement(
             return;
         },
     };
-    assert_eq!(edit.before(), before);
+    let observed_before = match edit.before() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_before, before);
 
     // Cover both independent setter methods, complete replacements, and an
     // exact no-op.  `ChartArrangement` is Copy, so no input-derived heap
@@ -217,8 +225,15 @@ fn exercise_arrangement(
         3 => edit.set(ChartArrangement::new(true, false)),
         _ => edit.set(ChartArrangement::new(true, true)),
     };
-    let requested = edit.after();
-    assert_eq!(edit.after(), requested);
+    let requested = match edit.after() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(edit.after(), Ok(requested));
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -342,10 +357,12 @@ fn exercise_malformed_packages() {
         if let Err(error) = batch {
             observe_error(error);
         }
-        let edit = package.edit_slide_chart_arrangement(
-            SlideSelector::name("Charts"),
-            ChartSelector::name(PRIVATE_SELECTOR),
-        );
+        let edit = package
+            .edit_slide_chart_arrangement(
+                SlideSelector::name("Charts"),
+                ChartSelector::name(PRIVATE_SELECTOR),
+            )
+            .and_then(|edit| edit.commit());
         assert!(edit.is_err(), "malformed chart arrangement edit was staged");
         if let Err(error) = edit {
             observe_redacted(error, PRIVATE_SELECTOR);
