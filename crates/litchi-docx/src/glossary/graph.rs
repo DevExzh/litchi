@@ -610,12 +610,6 @@ pub mod raw {
         }
         Ok(())
     }
-
-    fn is_xml_content_type(content_type: &str) -> bool {
-        content_type.ends_with("+xml")
-            || content_type.eq_ignore_ascii_case("application/xml")
-            || content_type.eq_ignore_ascii_case("text/xml")
-    }
 }
 
 /// Admit the exact graph closure that a raw graph publication will own.
