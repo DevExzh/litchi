@@ -1,0 +1,47 @@
+{
+  "source": "aa7ee42eda50b5b671a9a0e476861c10fa594b64",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "-p",
+        "litchi-opc",
+        "-p",
+        "soapberry-zip"
+      ],
+      "exit": 0,
+      "seconds": 10.028222507000464,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v14/check-0.log",
+      "bytes": 182,
+      "sha256": "4b63de0a793108f9bb61533733f3df38c4f01c0d8e403605fcb770c90988907a",
+      "target_bytes_before": 18858209078,
+      "completed_test_executables_pruned": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going"
+      ],
+      "exit": 101,
+      "seconds": 387.17156433700075,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v14/check-1.log",
+      "bytes": 14203,
+      "sha256": "2af31dc3076ad05391f169363a674e31e260ef67ddeee49eef400f59c41e0fd7",
+      "target_bytes_before": 18858254526,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Focused OPC/ZIP alltargets/allfeatures passed. Workspace failed on OOXML relationship policy lookup and test qualifications, XLS non-exhaustive overlay error mapping and ODP qualification. Both harness checks not reached."
+}

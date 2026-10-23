@@ -341,7 +341,7 @@ impl Patch {
                 let Some(after) = &relationships.after else {
                     continue;
                 };
-                let current = package.source_relationships(after.owner(), after.read_limits())?;
+                let current = package.source_relationships(after.owner(), package.read_limits())?;
                 package.try_replace_relationships(&current, after, package.read_limits())?;
             }
             let current = package.source_content_types(package.read_limits())?;

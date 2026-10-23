@@ -598,7 +598,7 @@ impl SourceBackedPresentation {
                 Some(
                     Meta::from_bytes(
                         &package.get_file("meta.xml")?,
-                        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+                        XmlStreamLimits::owner_default_value(),
                     )?
                     .try_extract_metadata()?,
                 )
@@ -1247,18 +1247,15 @@ impl SourceBackedPresentation {
             })?;
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
-        if let Some(content_xml) = self
-            .small_content_xml_snapshot()
-            .map_err(|source| TextOutputError::Document {
-                source,
-                progress: writer.progress(),
-            })?
+        if let Some(content_xml) =
+            self.small_content_xml_snapshot()
+                .map_err(|source| TextOutputError::Document {
+                    source,
+                    progress: writer.progress(),
+                })?
         {
-            let result = Parser::write_slides_text_to(
-                content_xml,
-                &mut writer,
-                paragraph_separator,
-            );
+            let result =
+                Parser::write_slides_text_to(content_xml, &mut writer, paragraph_separator);
             let progress = writer.progress();
             if let Err(source) = self.check_source() {
                 return Err(TextOutputError::Document { source, progress });

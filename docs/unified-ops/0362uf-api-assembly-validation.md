@@ -168,3 +168,18 @@ all reviewed recipient admission, cancellation, proof and typed-error paths.
 
 [consumer-v13.json](results/0362uf/consumer-v13.json) preserves the source and
 log hash. Workspace/harness checks and semantic acceptance remain pending.
+
+The fourteenth attempt on `aa7ee42eda` passed the focused OPC/ZIP all-target,
+all-feature check in 9.95 seconds. The workspace check then ended with exit
+101 after 387.17 seconds. OOXML relationship replay attempted to read policy
+from a token instead of the recipient package; it now captures the current
+relationships under `package.read_limits()`, while replacement still
+intersects token and recipient policy. An ODP redundant qualification is
+removed. The XLS exhaustive-match repair and OOXML test import cleanup remain
+separate consumer commits.
+
+[consumer-v14.json](results/0362uf/consumer-v14.json) retains both command
+receipts. Neither harness group was reached. The inactive incremental cache
+(498,384,649 bytes) was moved intact outside the capped target, with 564 file
+hashes in `.coord/replay-integration/cache-archive-20261023/manifest.json`;
+current builds disable incremental compilation. No measured binary was removed.
