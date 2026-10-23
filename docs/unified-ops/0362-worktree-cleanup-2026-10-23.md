@@ -7,7 +7,8 @@ Two inactive merged leaves were removed with `git worktree remove` without
 - `uo2-iwa-detection-api`: HEAD `7f3aef217eb9090199b8389a8d70bca9633e4ee3`, ancestor of integration `a814baa1de`; 341,906,569 bytes reclaimed. Eleven generated ignored files (461,243 bytes) were moved first to quarantine, with relative paths and SHA-256 records.
 
 Both trees were clean, had no targets, protected measurement binaries, or active
-process/file-descriptor users. Their branch refs were checked after removal.
+process/file-descriptor users. Their branch refs were checked after removal;
+the full receipt records exact `git worktree add` commands for recreation.
 
 The DOCX section/redaction leaves and the old W8 DOCX/RTF leaves contain ignored
 performance captures, native bundles, and portable `.zst` evidence. The replay
