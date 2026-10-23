@@ -59,6 +59,144 @@ struct SourceCatalogView<'source> {
     replacement: Option<(usize, u64)>,
 }
 
+/// One bounded folded-name index for structural ZIP members used during a
+/// recipient census. Relationship owners are numerous on real OPC packages;
+/// retaining this index once avoids rescanning every physical entry for each
+/// `.rels` member while still refusing ASCII-folded ambiguities.
+struct AdmissionPhysicalMemberLookup {
+    by_folded_name: HashMap<String, (soapberry_zip::office::EntryId, usize)>,
+    _memory: Option<Reservation>,
+}
+
+struct AdmissionPartLookup {
+    by_folded_name: HashMap<String, usize>,
+    _memory: Option<Reservation>,
+}
+
+fn build_admission_part_lookup(
+    source: &SourceSnapshot,
+    catalog: &super::AdmittedCatalog,
+) -> Result<AdmissionPartLookup> {
+    let mut name_bytes = 0_u64;
+    for part in &catalog.parts {
+        name_bytes = name_bytes
+            .checked_add(part.partname.as_str().len() as u64)
+            .ok_or_else(|| overlay_unavailable("catalog Part name bytes overflow"))?;
+    }
+    let part_count = catalog.parts.len() as u64;
+    let memory_bound = name_bytes
+        .checked_mul(2)
+        .and_then(|bytes| bytes.checked_add(part_count.checked_mul(64)?))
+        .ok_or_else(|| overlay_unavailable("catalog Part lookup memory overflows"))?;
+    let memory = source
+        .context
+        .as_ref()
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, memory_bound)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    let mut by_folded_name = HashMap::new();
+    by_folded_name
+        .try_reserve(catalog.parts.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC folded catalog Part lookup",
+            source,
+        })?;
+    for (index, part) in catalog.parts.iter().enumerate() {
+        let folded = super::folded_part_name(&part.partname)?;
+        if by_folded_name.insert(folded, index).is_some() {
+            return Err(overlay_unavailable(
+                "catalog Part name is ambiguous under ASCII case folding",
+            ));
+        }
+    }
+    Ok(AdmissionPartLookup {
+        by_folded_name,
+        _memory: memory,
+    })
+}
+
+fn build_admission_physical_lookup(
+    source: &SourceSnapshot,
+    archive: &soapberry_zip::office::IndexedArchive<super::SourceReader>,
+) -> Result<AdmissionPhysicalMemberLookup> {
+    let mut name_bytes = 0_u64;
+    for (index, (_, name)) in archive.file_entries().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
+        }
+        name_bytes = name_bytes
+            .checked_add(name.len() as u64)
+            .ok_or_else(|| overlay_unavailable("structural member name bytes overflow"))?;
+    }
+    let member_count = archive.len() as u64;
+    let memory_bound = name_bytes
+        .checked_mul(2)
+        .and_then(|bytes| bytes.checked_add(member_count.checked_mul(128)?))
+        .ok_or_else(|| overlay_unavailable("structural member lookup memory overflows"))?;
+    let memory = source
+        .context
+        .as_ref()
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, memory_bound)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    let mut by_folded_name = HashMap::new();
+    by_folded_name
+        .try_reserve(archive.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC structural member lookup",
+            source,
+        })?;
+    for (index, (entry_id, name)) in archive.file_entries().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+        }
+        let folded = super::folded_ascii_name(
+            name,
+            "source-backed OPC folded structural member name",
+        )?;
+        if let Some((_, count)) = by_folded_name.get_mut(&folded) {
+            *count = count
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("structural member count overflows"))?;
+        } else {
+            by_folded_name.insert(folded, (entry_id, 1));
+        }
+    }
+    Ok(AdmissionPhysicalMemberLookup {
+        by_folded_name,
+        _memory: memory,
+    })
+}
+
+fn structural_member_entry_id(
+    archive: &soapberry_zip::office::IndexedArchive<super::SourceReader>,
+    physical_members: &AdmissionPhysicalMemberLookup,
+    member_name: &str,
+) -> Result<Option<soapberry_zip::office::EntryId>> {
+    let folded = super::folded_ascii_name(
+        member_name,
+        "source-backed OPC folded structural member name",
+    )?;
+    match physical_members.by_folded_name.get(&folded) {
+        Some((entry_id, 1)) => Ok(archive.entry_id(member_name).or(Some(*entry_id))),
+        Some(_) => Err(overlay_unavailable(
+            "structural OPC member name is ambiguous under ASCII case folding",
+        )),
+        None => Ok(archive.entry_id(member_name)),
+    }
+}
+
 struct StructuralMember {
     bytes: Vec<u8>,
     _memory: Option<Reservation>,
@@ -74,27 +212,13 @@ struct StructuralMember {
 fn read_structural_member(
     source: &SourceSnapshot,
     archive: &soapberry_zip::office::IndexedArchive<super::SourceReader>,
+    physical_members: &AdmissionPhysicalMemberLookup,
     member_name: &str,
     kind: SourceLimitKind,
     maximum: u64,
     limits: SourceLimits,
 ) -> Result<Option<StructuralMember>> {
-    let entry_id = if let Some(entry_id) = archive.entry_id(member_name) {
-        Some(entry_id)
-    } else {
-        let mut casefolded = None;
-        for (candidate_id, candidate_name) in archive.file_entries() {
-            if !candidate_name.eq_ignore_ascii_case(member_name) {
-                continue;
-            }
-            if casefolded.replace(candidate_id).is_some() {
-                return Err(overlay_unavailable(
-                    "structural OPC member name is ambiguous under ASCII case folding",
-                ));
-            }
-        }
-        casefolded
-    };
+    let entry_id = structural_member_entry_id(archive, physical_members, member_name)?;
     let Some(entry_id) = entry_id else {
         return Ok(None);
     };
@@ -206,31 +330,36 @@ fn relationship_owner_from_member(member_name: &str) -> Result<Option<PackURI>> 
         .map_err(OpcError::InvalidPackUri)
 }
 
-fn catalog_part_index(catalog: &super::AdmittedCatalog, owner: &PackURI) -> Option<usize> {
+fn catalog_part_index(
+    catalog: &super::AdmittedCatalog,
+    folded_parts: &AdmissionPartLookup,
+    owner: &PackURI,
+) -> Result<Option<usize>> {
     // The catalog's admission already rejects ambiguous OPC-equivalent Part
     // names. Reuse its exact/case-folded lookup index instead of scanning all
     // Parts for every relationship owner.
-    catalog.parts_by_name.get(owner).copied().or_else(|| {
+    if let Some(index) = catalog.parts_by_name.get(owner).copied() {
+        return Ok(Some(index));
+    }
+    if let Some(order) = catalog.casefold_order.as_ref() {
         let wanted = owner.as_str();
-        catalog.casefold_order.as_ref().and_then(|order| {
-            order
-                .binary_search_by(|index| {
-                    super::cmp_ascii_case_insensitive(
-                        catalog.parts[*index].partname.as_str(),
-                        wanted,
-                    )
-                })
-                .ok()
-                .map(|position| order[position])
-        })
-    })
+        return Ok(order
+            .binary_search_by(|index| {
+                super::cmp_ascii_case_insensitive(catalog.parts[*index].partname.as_str(), wanted)
+            })
+            .ok()
+            .map(|position| order[position]));
+    }
+    let folded = super::folded_part_name(owner)?;
+    Ok(folded_parts.by_folded_name.get(&folded).copied())
 }
 
 fn canonical_relationship_owner(
     catalog: &super::AdmittedCatalog,
+    folded_parts: &AdmissionPartLookup,
     owner: &PackURI,
 ) -> Result<PackURI> {
-    let index = catalog_part_index(catalog, owner);
+    let index = catalog_part_index(catalog, folded_parts, owner)?;
     Ok(index
         .and_then(|index| catalog.parts.get(index))
         .map_or_else(|| owner.clone(), |part| part.partname.clone()))
@@ -247,6 +376,30 @@ fn parse_relationship_xml(
     limits: SourceLimits,
 ) -> Result<super::Relationships> {
     PackageReader::parse_owned_relationships(xml, owner, limits)
+}
+
+fn folded_relationship_lookup<'a>(
+    relationships: &'a HashMap<PackURI, super::Relationships>,
+) -> Result<HashMap<String, &'a super::Relationships>> {
+    let mut lookup = HashMap::new();
+    lookup
+        .try_reserve(relationships.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC folded relationship owner lookup",
+            source,
+        })?;
+    for (owner, value) in relationships {
+        let folded = super::folded_ascii_name(
+            owner.as_str(),
+            "source-backed OPC folded relationship owner",
+        )?;
+        if lookup.insert(folded, value).is_some() {
+            return Err(overlay_unavailable(
+                "relationship owner is ambiguous under ASCII case folding",
+            ));
+        }
+    }
+    Ok(lookup)
 }
 
 fn admit_preservation_member_names(
@@ -377,6 +530,18 @@ impl<E> fmt::Display for ArtifactStreamError<E> {
 
 impl<E> std::error::Error for ArtifactStreamError<E> {}
 
+/// A format-owned execution/cancellation fence for one native publication.
+///
+/// The OPC target invokes this guard before publication and before every write
+/// and flush performed by the native writer.  The guard error remains typed in
+/// [`ArtifactStreamError::Producer`]; it is never flattened into an
+/// `io::Error` visible to the format caller.
+pub trait ArtifactStreamGuard {
+    type Error;
+
+    fn check(&self) -> std::result::Result<(), Self::Error>;
+}
+
 /// The exact result of one mediated artifact publication.
 ///
 /// The producer cannot construct this value or write to the target directly.
@@ -410,9 +575,9 @@ static NEXT_ARTIFACT_STREAM_TARGET: AtomicU64 = AtomicU64::new(1);
 ///
 /// `ArtifactStreamTarget` intentionally does not implement [`Write`]. A
 /// format producer can publish only through the native source, topology,
-/// overlay, and splice methods below; arbitrary bytes cannot bypass the OPC
-/// census or the ZIP preservation profile. The target is created by the OPC
-/// facade and is valid for exactly one publication attempt.
+/// overlay, restore, and splice methods below; arbitrary bytes cannot bypass
+/// the OPC census or the ZIP preservation profile. The target is created by
+/// the OPC facade and is valid for exactly one publication attempt.
 pub struct ArtifactStreamTarget<'a> {
     writer: &'a mut dyn Write,
     policy: &'a ArtifactStreamPolicy<'a>,
@@ -463,12 +628,104 @@ impl<'a> ArtifactStreamTarget<'a> {
         Ok(publication)
     }
 
+    fn publish_with_guard<G, F>(
+        &mut self,
+        guard: &G,
+        operation: F,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>>
+    where
+        G: ArtifactStreamGuard,
+        F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
+    {
+        if self.claimed {
+            self.invalidated = true;
+            return Err(ArtifactStreamError::opc(overlay_unavailable(
+                "artifact stream target already has a publication attempt",
+            )));
+        }
+        self.claimed = true;
+        if let Err(error) = guard.check() {
+            return Err(ArtifactStreamError::producer(error));
+        }
+        let policy = self.policy;
+        let mut sink = ArtifactTargetSink { target: self };
+        let mut guarded = GuardedArtifactSink {
+            inner: &mut sink,
+            guard,
+            failure: None,
+        };
+        let operation_result = operation(&mut guarded, policy);
+        let guard_error = guarded.failure.take();
+        drop(guarded);
+        drop(sink);
+        let policy_error = policy
+            .take_failure()
+            .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
+        let operation_result = operation_result.map_err(ArtifactStreamError::opc);
+
+        match (operation_result, guard_error, policy_error) {
+            (Ok(()), None, None) => Ok(self.mint_publication()),
+            (Err(operation), None, None) => Err(operation),
+            (Ok(()), Some(guard), None) => Err(ArtifactStreamError::producer(guard)),
+            (Err(operation), Some(guard), None) => Err(ArtifactStreamError::incomplete(
+                self.written,
+                ArtifactStreamError::producer(guard),
+                Some(operation),
+            )),
+            (Ok(()), None, Some(policy)) => Err(policy),
+            (Err(operation), None, Some(policy)) => Err(ArtifactStreamError::incomplete(
+                self.written,
+                operation,
+                Some(policy),
+            )),
+            (Ok(()), Some(guard), Some(policy)) => Err(ArtifactStreamError::incomplete(
+                self.written,
+                ArtifactStreamError::producer(guard),
+                Some(policy),
+            )),
+            (Err(operation), Some(guard), Some(policy)) => {
+                let secondary = ArtifactStreamError::incomplete(
+                    self.written,
+                    operation,
+                    Some(policy),
+                );
+                Err(ArtifactStreamError::incomplete(
+                    self.written,
+                    ArtifactStreamError::producer(guard),
+                    Some(secondary),
+                ))
+            },
+        }
+    }
+
+    fn mint_publication(&mut self) -> ArtifactStreamPublication {
+        let publication = ArtifactStreamPublication {
+            written: self.written,
+            fingerprint: self.fingerprint(),
+            target_token: self.token,
+        };
+        self.publication = Some(publication);
+        publication
+    }
+
     /// Publish an exact retained source artifact.
     pub fn publish_source_artifact(
         &mut self,
         artifact: &SourceArtifact,
     ) -> Result<ArtifactStreamPublication> {
         self.publish(|writer, policy| artifact.write_to_with_policy(writer, policy))
+    }
+
+    /// Publish an exact retained source artifact with a typed guard checked
+    /// around every native write and flush.
+    pub fn publish_source_artifact_with_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        artifact: &SourceArtifact,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
+            artifact.write_to_with_policy(writer, policy)
+        })
     }
 
     /// Publish an exact source-backed package through the recipient policy.
@@ -479,6 +736,17 @@ impl<'a> ArtifactStreamTarget<'a> {
         self.publish(|writer, policy| package.write_exact_source_with_policy(writer, policy))
     }
 
+    /// Publish an exact source-backed package with a typed native-write guard.
+    pub fn publish_source_package_with_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        package: SourceBackedPackage,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
+            package.write_exact_source_with_policy(writer, policy)
+        })
+    }
+
     /// Publish a prepared effective topology.
     pub fn publish_topology(
         &mut self,
@@ -487,13 +755,46 @@ impl<'a> ArtifactStreamTarget<'a> {
         self.publish(|writer, policy| topology.publish_to_stream_with_policy(writer, policy))
     }
 
-    /// Prepare and publish one bounded source-backed overlay plan.
+    /// Publish a prepared topology with a typed native-write guard.
+    pub fn publish_topology_with_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        topology: &super::PreparedTopology,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
+            topology.publish_to_stream_with_policy(writer, policy)
+        })
+    }
+
+    /// Prepare and publish one bounded source-backed topology plan.
+    ///
+    /// Relationship removals must be represented in `plan`, not as a
+    /// separately generated `.rels` payload. The topology publisher applies
+    /// those removals to the source XML ranges and therefore retains the
+    /// source declaration, whitespace, comments, and unrelated lexical bytes.
     pub fn publish_overlay(
         &mut self,
         package: SourceBackedPackage,
         plan: super::SourceTopologyPlan,
     ) -> Result<ArtifactStreamPublication> {
         self.publish(|writer, policy| {
+            package.write_topology_to_stream_with_policy(writer, plan, policy)
+        })
+    }
+
+    /// Publish a source topology plan with a typed native-write guard.
+    ///
+    /// Relationship removals must be represented by this topology plan.  The
+    /// OPC publisher then retains the source relationship XML ranges and
+    /// applies the removal in place, preserving declarations, whitespace,
+    /// comments, and every unrelated lexical byte.
+    pub fn publish_overlay_with_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        package: SourceBackedPackage,
+        plan: super::SourceTopologyPlan,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
             package.write_topology_to_stream_with_policy(writer, plan, policy)
         })
     }
@@ -506,6 +807,62 @@ impl<'a> ArtifactStreamTarget<'a> {
         self.publish(|writer, policy| {
             plan.duplicate()
                 .write_to_with_policy(writer, policy)
+                .map(|_| ())
+        })
+    }
+
+    /// Authenticate the complete candidate artifact and publish the splice.
+    ///
+    /// The preview is bounded and performed by the existing splice planner;
+    /// the caller's sink is touched only after both the length and SHA-256
+    /// fingerprint match.
+    pub fn publish_splice_with_expected_artifact(
+        &mut self,
+        plan: &super::SourcePartSplicePlan<'_>,
+        expected_len: u64,
+        expected_sha256: SourceArtifactFingerprint,
+    ) -> Result<ArtifactStreamPublication> {
+        self.publish(|writer, policy| {
+            plan.duplicate()
+                .write_to_with_expected_artifact_with_policy(
+                    writer,
+                    expected_len,
+                    expected_sha256,
+                    policy,
+                )
+                .map(|_| ())
+        })
+    }
+
+    /// Publish the splice with a format-owned execution/cancellation guard.
+    pub fn publish_splice_with_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        plan: &super::SourcePartSplicePlan<'_>,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
+            plan.duplicate()
+                .write_to_with_policy(writer, policy)
+                .map(|_| ())
+        })
+    }
+
+    /// Authenticate and publish a splice while retaining typed guard errors.
+    pub fn publish_splice_with_expected_artifact_and_guard<G: ArtifactStreamGuard>(
+        &mut self,
+        plan: &super::SourcePartSplicePlan<'_>,
+        expected_len: u64,
+        expected_sha256: SourceArtifactFingerprint,
+        guard: &G,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+        self.publish_with_guard(guard, |writer, policy| {
+            plan.duplicate()
+                .write_to_with_expected_artifact_with_policy(
+                    writer,
+                    expected_len,
+                    expected_sha256,
+                    policy,
+                )
                 .map(|_| ())
         })
     }
@@ -534,6 +891,49 @@ impl<'a> ArtifactStreamTarget<'a> {
             ));
         }
         Ok(())
+    }
+
+    /// Mediate an exact inverse through this one-shot target.
+    ///
+    /// The current and original streams are probed and freshness-checked by
+    /// the authenticated restore implementation.  The private target sink is
+    /// the only writer passed to that implementation, so the format producer
+    /// cannot bypass the recipient policy or publish a second artifact.
+    pub fn publish_restore<C, O>(
+        &mut self,
+        package: &SourceBackedPackage,
+        current: &C,
+        original: &O,
+        proof: SourceArtifactRestoreProof,
+        max_output_bytes: u64,
+    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<O::Error>>
+    where
+        C: ArtifactStream + ?Sized,
+        O: ArtifactStream + ?Sized,
+        C: ArtifactStream<Error = O::Error>,
+    {
+        if self.claimed {
+            self.invalidated = true;
+            return Err(ArtifactStreamError::opc(overlay_unavailable(
+                "artifact stream target already has a publication attempt",
+            )));
+        }
+        self.claimed = true;
+        let policy = self.policy;
+        let mut sink = ArtifactTargetSink { target: self };
+        let result = package.restore_streamed_artifact_to_stream(
+            current,
+            original,
+            proof,
+            max_output_bytes,
+            &mut sink,
+            Some(policy),
+        );
+        drop(sink);
+        match result {
+            Ok(()) => Ok(self.mint_publication()),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -568,6 +968,44 @@ impl Write for ArtifactTargetSink<'_, '_> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.target.writer.flush()
+    }
+}
+
+struct GuardedArtifactSink<'guard, 'sink, G> {
+    inner: &'sink mut dyn Write,
+    guard: &'guard G,
+    failure: Option<G::Error>,
+}
+
+impl<G: ArtifactStreamGuard> Write for GuardedArtifactSink<'_, '_, G> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.failure.is_none() {
+            if let Err(error) = self.guard.check() {
+                self.failure = Some(error);
+            }
+        }
+        if self.failure.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "artifact stream publication guard refused output",
+            ));
+        }
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.failure.is_none() {
+            if let Err(error) = self.guard.check() {
+                self.failure = Some(error);
+            }
+        }
+        if self.failure.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "artifact stream publication guard refused output",
+            ));
+        }
+        self.inner.flush()
     }
 }
 
@@ -729,6 +1167,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             .map(|context| context.check().map_err(map_execution_error))
             .transpose()?;
         let limits = self.recipient_limits;
+        let physical_members = build_admission_physical_lookup(view.source, view.archive)?;
+        let folded_parts = build_admission_part_lookup(view.source, view.catalog)?;
         if view.replacement.is_none() {
             admit_preservation_member_names(view.source, view.archive, limits)?;
         }
@@ -873,6 +1313,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         if let Some(xml) = read_structural_member(
             view.source,
             view.archive,
+            &physical_members,
             &view.catalog.content_types_member,
             SourceLimitKind::ContentTypesBytes,
             limits.max_content_types_bytes() as u64,
@@ -891,7 +1332,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for (_, member_name) in view.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(canonical_relationship_owner(view.catalog, &owner)?);
+                relationship_owners.insert(canonical_relationship_owner(
+                    view.catalog,
+                    &folded_parts,
+                    &owner,
+                )?);
             }
         }
 
@@ -942,6 +1387,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             let Some(xml) = read_structural_member(
                 view.source,
                 view.archive,
+                &physical_members,
                 &member_name,
                 SourceLimitKind::RelationshipXmlBytes,
                 limits.max_relationship_xml_bytes() as u64,
@@ -991,6 +1437,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             total_relationships,
             limits.max_total_relationships() as u64,
         )?;
+        let admitted_relationships_by_owner =
+            folded_relationship_lookup(&admitted_relationships)?;
 
         // Count the reachable relationship graph from the bounded, recipient-
         // admitted XML map. Keeping orphan owners in this map is important:
@@ -1015,10 +1463,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             }
         }
         while let Some(owner) = work.pop() {
-            if let Some((_, relationships)) = admitted_relationships
-                .iter()
-                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
-            {
+            let folded = super::folded_ascii_name(
+                owner.as_str(),
+                "source-backed OPC folded relationship graph owner",
+            )?;
+            if let Some(relationships) = admitted_relationships_by_owner.get(&folded) {
                 for relationship in relationships.iter() {
                     if !relationship.is_external() {
                         let target = relationship.target_partname()?;
@@ -1163,6 +1612,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             return self.admit_source_catalog(package);
         }
         let limits = self.recipient_limits;
+        let physical_members =
+            build_admission_physical_lookup(&package.source, &package.archive)?;
+        let folded_parts = build_admission_part_lookup(&package.source, &package.catalog)?;
         let effective = state.effective_data();
         let retained = state.retained();
         let totals = state
@@ -1375,6 +1827,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             if let Some(xml) = read_structural_member(
                 &package.source,
                 &package.archive,
+                &physical_members,
                 content_types_name,
                 SourceLimitKind::ContentTypesBytes,
                 limits.max_content_types_bytes() as u64,
@@ -1409,7 +1862,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for (_, member_name) in package.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
+                relationship_owners.insert(canonical_relationship_owner(
+                    &package.catalog,
+                    &folded_parts,
+                    &owner,
+                )?);
             }
         }
         relationship_owners.insert(
@@ -1443,6 +1900,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 let Some(xml) = read_structural_member(
                     &package.source,
                     &package.archive,
+                    &physical_members,
                     &member,
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
@@ -1461,6 +1919,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 let Some(xml) = read_structural_member(
                     &package.source,
                     &package.archive,
+                    &physical_members,
                     &member,
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
@@ -1503,6 +1962,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             relationship_events,
             limits.max_total_relationship_xml_events() as u64,
         )?;
+        let admitted_relationships_by_owner =
+            folded_relationship_lookup(&admitted_relationships)?;
 
         // Traverse the effective graph, checking before each new target is
         // retained so the admission itself cannot grow beyond the recipient
@@ -1516,10 +1977,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits,
         )?;
         while let Some(owner) = work.pop() {
-            if let Some((_, relationships)) = admitted_relationships
-                .iter()
-                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
-            {
+            let folded = super::folded_ascii_name(
+                owner.as_str(),
+                "source-backed OPC folded relationship graph owner",
+            )?;
+            if let Some(relationships) = admitted_relationships_by_owner.get(&folded) {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
@@ -1541,6 +2003,9 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         package.source.ensure_current()?;
         package.cache.check_context().map_err(map_execution_error)?;
         let limits = self.recipient_limits;
+        let physical_members =
+            build_admission_physical_lookup(&package.source, &package.archive)?;
+        let folded_parts = build_admission_part_lookup(&package.source, &package.catalog)?;
         let content_types_name = package.catalog.content_types_member.as_str();
         let is_omitted = |name: &str| {
             omitted_members
@@ -1741,6 +2206,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             if let Some(xml) = read_structural_member(
                 &package.source,
                 &package.archive,
+                &physical_members,
                 content_types_name,
                 SourceLimitKind::ContentTypesBytes,
                 limits.max_content_types_bytes() as u64,
@@ -1773,12 +2239,20 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         }
         for (_, member_name) in package.archive.file_entries() {
             if let Some(owner) = relationship_owner_from_member(member_name)? {
-                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
+                relationship_owners.insert(canonical_relationship_owner(
+                    &package.catalog,
+                    &folded_parts,
+                    &owner,
+                )?);
             }
         }
         for member in appended {
             if let Some(owner) = relationship_owner_from_member(&member.name)? {
-                relationship_owners.insert(canonical_relationship_owner(&package.catalog, &owner)?);
+                relationship_owners.insert(canonical_relationship_owner(
+                    &package.catalog,
+                    &folded_parts,
+                    &owner,
+                )?);
             }
         }
         for owner in relationship_owners {
@@ -1802,6 +2276,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 let Some(xml) = read_structural_member(
                     &package.source,
                     &package.archive,
+                    &physical_members,
                     &member,
                     SourceLimitKind::RelationshipXmlBytes,
                     limits.max_relationship_xml_bytes() as u64,
@@ -1839,20 +2314,26 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             relationship_total,
             limits.max_total_relationships() as u64,
         )?;
+        let relationship_map_by_owner = folded_relationship_lookup(&relationship_map)?;
 
         let root_owner =
             PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
-        let Some(root) = relationship_map.get(&root_owner) else {
+        let root_key = super::folded_ascii_name(
+            root_owner.as_str(),
+            "source-backed OPC folded relationship graph owner",
+        )?;
+        let Some(root) = relationship_map_by_owner.get(&root_key) else {
             return Ok(());
         };
         let mut graph = HashSet::new();
         let mut work = Vec::new();
         enqueue_graph_targets(root, &mut graph, &mut work, limits)?;
         while let Some(owner) = work.pop() {
-            if let Some((_, relationships)) = relationship_map
-                .iter()
-                .find(|(candidate, _)| candidate.is_equivalent_to(&owner))
-            {
+            let folded = super::folded_ascii_name(
+                owner.as_str(),
+                "source-backed OPC folded relationship graph owner",
+            )?;
+            if let Some(relationships) = relationship_map_by_owner.get(&folded) {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
@@ -2455,6 +2936,25 @@ impl SourceBackedPackage {
                     target
                         .validate_publication(publication)
                         .map_err(ArtifactStreamError::opc)
+                        .and_then(|()| {
+                            if publication.written() != proof.original_len {
+                                return Err(ArtifactStreamError::opc(
+                                    OpcError::SourceArtifactMismatch {
+                                        artifact: "original",
+                                        field: "length",
+                                    },
+                                ));
+                            }
+                            if publication.fingerprint() != proof.original_sha256 {
+                                return Err(ArtifactStreamError::opc(
+                                    OpcError::SourceArtifactMismatch {
+                                        artifact: "original",
+                                        field: "fingerprint",
+                                    },
+                                ));
+                            }
+                            Ok(())
+                        })
                 })
                 .and_then(|()| {
                     target
@@ -2710,6 +3210,7 @@ mod tests {
     use super::*;
     use super::super::SourceCacheLimits;
     use soapberry_zip::office::StreamingArchiveWriter;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
     fn fingerprint(bytes: &[u8]) -> SourceArtifactFingerprint {
         SourceArtifactFingerprint::from_sha256(Sha256::digest(bytes).into())
@@ -2760,6 +3261,50 @@ mod tests {
             Arc::new(payload.to_vec()),
             soapberry_zip::CompressionMethod::Store,
         )
+    }
+
+    fn swapping_artifact(document: &[u8]) -> SourceArtifact {
+        const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
+            .unwrap();
+        writer.write_stored("word/document.xml", document).unwrap();
+        SourceBackedPackage::from_vec(
+            writer.finish_to_bytes().unwrap(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+        .source_artifact()
+    }
+
+    struct SwappingArtifact {
+        first: SourceArtifact,
+        second: SourceArtifact,
+        calls: AtomicUsize,
+    }
+
+    impl ArtifactStream for SwappingArtifact {
+        type Error = OpcError;
+
+        fn check_fresh(&self) -> Result<()> {
+            Ok(())
+        }
+
+        fn stream_to(
+            &self,
+            target: &mut ArtifactStreamTarget<'_>,
+        ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+            if self.calls.fetch_add(1, AtomicOrdering::SeqCst) == 0 {
+                target.publish_source_artifact(&self.first)
+            } else {
+                target.publish_source_artifact(&self.second)
+            }
+        }
     }
 
     #[test]
@@ -2824,6 +3369,46 @@ mod tests {
                 field: "fingerprint"
             })
         ));
+    }
+
+    #[test]
+    fn restore_rejects_a_valid_but_swapped_final_original() {
+        let first = swapping_artifact(b"<a/>");
+        let second = swapping_artifact(b"<b/>");
+        assert_eq!(first.len(), second.len());
+        let fingerprint = first.fingerprint().unwrap();
+        let proof = SourceArtifactRestoreProof {
+            current_len: first.len(),
+            current_sha256: fingerprint,
+            original_len: first.len(),
+            original_sha256: fingerprint,
+        };
+        let swapping = SwappingArtifact {
+            first: first.clone(),
+            second,
+            calls: AtomicUsize::new(0),
+        };
+        let recipient = append_fixture(false);
+        let mut output = Vec::new();
+        let error = recipient
+            .restore_streamed_artifact_to_stream(
+                &first,
+                &swapping,
+                proof,
+                first.len(),
+                &mut output,
+                None,
+            )
+            .expect_err("the final valid-but-different artifact must be rejected");
+        assert_eq!(swapping.calls.load(AtomicOrdering::SeqCst), 2);
+        assert!(matches!(
+            error.opc_error(),
+            Some(OpcError::SourceArtifactMismatch {
+                artifact: "original",
+                field: "fingerprint"
+            })
+        ));
+        assert!(!output.is_empty());
     }
 
     #[test]
