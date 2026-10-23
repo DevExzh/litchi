@@ -187,6 +187,14 @@ pub mod durable {
         pub fn apply_foreign<Mode>(&self) -> Result<litchi_core::unrelated::Commit<Self, litchi_core::patch::Patch<Mode>>, Error> { todo!() }
     }
 }
+pub mod shared_core {
+    pub type Commit = litchi_core::edit::Commit<crate::strict::Package, crate::strict::Patch, crate::strict::Diagnostics>;
+    pub use litchi_core::edit::Diagnostics;
+    pub use litchi_core::edit::Commit as ReexportCommit;
+    pub type RichCommit = litchi_core::edit::Commit<crate::strict::Package, crate::strict::Patch, crate::strict::Diagnostics>;
+    pub use litchi_core::unrelated::Commit as UnrelatedCommit;
+    pub use std::time::Instant as FakeDiagnostics;
+}
 '''
 
 DEPENDENCY_SOURCE = r'''
@@ -268,6 +276,26 @@ class PolicyTests(unittest.TestCase):
                     {"path": "fixture::Patch", "type_args": "Mode"},
                     {"path": "fixture::Patch", "type_args": [None]},
                     {"path": "fixture::Patch", "typo": []}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                gate.checked_policy(policy(bad))
+
+    def test_shared_type_policy_is_explicit_and_fail_closed(self):
+        def policy(rows):
+            return {"version": 1, "profiles": [profile(shared_types=rows)]}
+
+        valid = [{
+            "path": "fixture::shared_core::Commit",
+            "target": "litchi_core::edit::Commit",
+        }]
+        self.assertTrue(gate.checked_policy(policy(valid)))
+        for bad in (
+            "not-an-array",
+            [{"path": "fixture::shared_core::Commit"}],
+            [{"path": "other::Commit", "target": "litchi_core::edit::Commit"}],
+            [{"path": "fixture::shared_core::Commit", "target": "other::Commit"}],
+            [{"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"},
+             {"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Diagnostics"}],
+        ):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 gate.checked_policy(policy(bad))
 
@@ -571,6 +599,48 @@ class RustdocTests(unittest.TestCase):
                          if value["path"] == ["litchi_core", "edit", "Commit"])
         ambiguous["paths"]["ambiguous-core-commit"] = copy.deepcopy(canonical)
         self.assertEqual(len(gate.violations(ambiguous, profile(result_methods=[rule]))), 1)
+
+    def test_shared_type_rows_use_nominal_ids_for_aliases_and_reexports(self):
+        rows = [
+            {"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"},
+            {"path": "fixture::shared_core::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+            {"path": "fixture::shared_core::ReexportCommit", "target": "litchi_core::edit::Commit"},
+            {"path": "fixture::shared_core::RichCommit", "target": "litchi_core::edit::Commit"},
+        ]
+        self.assertEqual(gate.violations(self.document, profile(shared_types=rows)), [])
+
+        fake = dict(rows[0], path="fixture::shared_core::UnrelatedCommit")
+        failures = gate.violations(self.document, profile(shared_types=[fake]))
+        self.assertEqual(failures, [
+            "fixture::shared_core::UnrelatedCommit must resolve nominally to "
+            "litchi_core::edit::Commit (record 0351)",
+        ])
+
+        fake_diagnostics = dict(rows[1], path="fixture::shared_core::FakeDiagnostics")
+        failures = gate.violations(self.document, profile(shared_types=[fake_diagnostics]))
+        self.assertEqual(failures, [
+            "fixture::shared_core::FakeDiagnostics must resolve nominally to "
+            "litchi_core::edit::Diagnostics (record 0351)",
+        ])
+
+        # A format-owned diagnostics type remains valid when it is not
+        # nominated as the shared core Diagnostics type.
+        self.assertEqual(gate.violations(self.document, profile(
+            families=["fixture::strict"], family_methods=True)), [])
+
+    def test_shared_type_rows_reject_ambiguous_canonical_ids(self):
+        document = copy.deepcopy(self.document)
+        canonical = next(
+            value for value in document["paths"].values()
+            if value["path"] == ["litchi_core", "edit", "Commit"]
+        )
+        document["paths"]["ambiguous-shared-core-commit"] = copy.deepcopy(canonical)
+        rows = [{"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"}]
+        failures = gate.violations(document, profile(shared_types=rows))
+        self.assertEqual(failures, [
+            "fixture::shared_core::Commit must resolve nominally to "
+            "litchi_core::edit::Commit (record 0351)",
+        ])
 
     def test_unresolved_and_recursive_result_aliases_fail_closed(self):
         for mutation in ("missing", "cycle"):

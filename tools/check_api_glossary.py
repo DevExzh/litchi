@@ -10,7 +10,10 @@ every registered family expose the commit-triad accessors and return its
 Commit from Edit::commit. "result_methods" pins a method's Result payload to a
 specific Commit (including nested types and method type parameters); owner
 replay must publish that owner. Local aliases are resolved by identity, not
-spelling. Direct shared core Commit types use their canonical dependency path.
+spelling. "shared_types" explicitly pins nominated public aliases/re-exports to
+the nominal litchi_core::edit::Commit or Diagnostics item; generic arguments
+and richer format-owned diagnostics remain outside that rule. Direct shared
+core Commit types use their canonical dependency path.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
@@ -63,6 +66,10 @@ EDIT_OUTPUT_NAMES = frozenset({
     "save_reencrypted", "save_with_durability",
 })
 TYPE_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
+SHARED_TYPE_TARGETS = frozenset({
+    "litchi_core::edit::Commit",
+    "litchi_core::edit::Diagnostics",
+})
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
 
 
@@ -86,7 +93,10 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
     seen = set()
     for profile in value["profiles"]:
         fields = {"id", "package", "default_features", "features", "banned_names", "families"}
-        optional = {"delegated_globs", "immutable_owners", "family_methods", "result_methods"}
+        optional = {
+            "delegated_globs", "immutable_owners", "family_methods", "result_methods",
+            "shared_types",
+        }
         if (not isinstance(profile, dict) or not fields <= set(profile)
                 or set(profile) - (fields | optional)):
             raise ValueError("profile requires exactly " + ", ".join(sorted(fields))
@@ -172,6 +182,19 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             check_path(owner)
         if len(set(owners)) != len(owners):
             raise ValueError("duplicate immutable owner")
+        shared_types = profile.get("shared_types", [])
+        if not isinstance(shared_types, list):
+            raise ValueError("shared_types must be an array")
+        seen_shared_paths = set()
+        for shared in shared_types:
+            if (not isinstance(shared, dict) or set(shared) != {"path", "target"}):
+                raise ValueError("shared type requires exactly path and target")
+            check_path(shared["path"])
+            if shared["target"] not in SHARED_TYPE_TARGETS:
+                raise ValueError("shared type target must be a canonical litchi_core::edit type")
+            if shared["path"] in seen_shared_paths:
+                raise ValueError("duplicate shared type path")
+            seen_shared_paths.add(shared["path"])
         results = profile.get("result_methods", [])
         if not isinstance(results, list):
             raise ValueError("result_methods must be an array")
@@ -461,6 +484,13 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         # Associated functions have no receiver but still count as methods.
         if kind == "function" and len(path) > 1:
             methods.setdefault(path[:-1], set()).add(path[-1])
+    for rule in profile.get("shared_types", []):
+        public = tuple(rule["path"].split("::"))
+        target = tuple(rule["target"].split("::"))
+        if not return_types.matches_shared(public, target):
+            failures.add(
+                f"{rule['path']} must resolve nominally to {rule['target']} (record 0351)"
+            )
     for family in profile["families"]:
         path = tuple(family.split("::"))
         if surface.exports.get(path) != "module":
