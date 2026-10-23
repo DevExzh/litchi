@@ -3212,6 +3212,10 @@ mod tests {
         assert!(canonical.final_len() > 32 * 1024 * 1024);
 
         let root = PackURI::new("/").unwrap();
+        // The package's retained owner policy must admit the deliberately
+        // oversized target before this test reaches the fixed OwnedXmlPart
+        // ceiling. The caller profile alone cannot widen a package's policy.
+        package.read_limits = limits;
         assert!(matches!(
             package.plan_source_relationships(&root, limits),
             Err(OpcError::SourceBackedOverlayUnavailable { .. })

@@ -53,3 +53,14 @@ tokens retain their actual admission policy through every edit and replay path.
 
 Validation is intentionally recorded after the bounded focused test/check run;
 no native performance result is claimed by this source repair.
+
+The first combined runtime check exposed a fixture issue rather than a
+recipient-policy bypass: the broad-token test built a target of 4,117 bytes
+from a producer opened under the default 4,096-byte target ceiling. Its
+producer now opens under an explicitly broader 8,192-byte target policy, while
+the recipient remains at its tighter admitted XML budget and the atomic
+refusal assertion is unchanged. The fixed-owned-XML regression likewise now
+raises the authored package's retained owner policy before checking the
+independent 32 MiB `OwnedXmlPart` ceiling; the caller argument alone cannot
+widen that owner policy. These corrections preserve both production
+intersection rules and the intended refusal classifications.
