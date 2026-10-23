@@ -14462,14 +14462,20 @@
         },
         {
           "name": "apply_joined",
-          "scope": "litchi_odg::Drawing",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 \u00a72)",
+          "scope": "litchi_odg::Package",
+          "replacement": "stage JoinedEdits with Edit::join and publish Edit::commit (0362ut)",
           "recursive": false
         },
         {
           "name": "apply_joined_with_policies",
-          "scope": "litchi_odg::Drawing",
-          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 \u00a72)",
+          "scope": "litchi_odg::Package",
+          "replacement": "stage JoinedEdits with Edit::join and publish Edit::commit (0362ut)",
+          "recursive": false
+        },
+        {
+          "name": "apply_joined_with_security_policy",
+          "scope": "litchi_odg::Package",
+          "replacement": "stage JoinedEdits with Edit::join and publish Edit::commit (0362ut)",
           "recursive": false
         },
         {

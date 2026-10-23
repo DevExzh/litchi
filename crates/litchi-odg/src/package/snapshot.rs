@@ -1158,6 +1158,8 @@ impl Package {
             changes: Vec::new(),
             resource_edits: Vec::new(),
             requires_package_projection: false,
+            pending_joined: None,
+            package_replacement: None,
             security_policy,
             active_content_policy,
         }
@@ -1167,64 +1169,6 @@ impl Package {
     #[must_use]
     pub fn joined_edits(&self, limits: CompositionLimits) -> JoinedEdits {
         JoinedEdits::new(Lineage::new(self), limits)
-    }
-
-    /// Applies joined disjoint work atomically against this exact base.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
-    /// whole-package readback. No intermediate snapshot is published on failure.
-    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Package> {
-        self.apply_joined_with_policies(
-            joined,
-            SecurityWritePolicy::Refuse,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under an explicit signature-write policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus policy refusal.
-    pub fn apply_joined_with_security_policy(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-    ) -> Result<Package> {
-        self.apply_joined_with_policies(
-            joined,
-            security_policy,
-            ActiveContentWritePolicy::PreserveInert,
-        )
-    }
-
-    /// Applies joined work under explicit security and inert active-content dispositions.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::apply_joined`] plus either policy refusal.
-    pub fn apply_joined_with_policies(
-        &self,
-        joined: JoinedEdits,
-        security_policy: SecurityWritePolicy,
-        active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Package> {
-        if !joined.lineage().matches(self) {
-            return Err(Error::PatchConflict);
-        }
-        let mut current = self.clone();
-        for edit in joined.into_sub_edits() {
-            current = apply_durable_patch(
-                &current,
-                edit.payload(),
-                false,
-                security_policy,
-                active_content_policy,
-            )?;
-        }
-        Ok(current)
     }
 
     /// Starts explicit bounded undo/redo history at this snapshot.
@@ -1572,6 +1516,8 @@ pub struct Edit {
     changes: Vec<Change>,
     resource_edits: Vec<ResourceEdit>,
     requires_package_projection: bool,
+    pending_joined: Option<JoinedEdits>,
+    package_replacement: Option<Package>,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
 }
@@ -1585,6 +1531,88 @@ struct ContentSplice {
 }
 
 impl Edit {
+    /// Appends one admitted disjoint composition after the ordinary staged
+    /// operations in this edit.
+    ///
+    /// The composition is retained without publishing or rebuilding. Lineage,
+    /// durable-payload validity, and conflicts with already staged work are
+    /// checked before the composition is moved into the edit, so a refusal
+    /// leaves this edit unchanged. A second composition is refused with the
+    /// rejected plan intact: one plan preserves its original composition
+    /// limits, stable identifiers, and deterministic order.
+    pub fn join(&mut self, joined: JoinedEdits) -> std::result::Result<&mut Self, JoinError> {
+        if self.pending_joined.is_some() {
+            return Err(JoinError::new(
+                joined_refusal("ODG edit accepts one bounded joined plan"),
+                joined,
+            ));
+        }
+        if !joined.lineage().matches(&self.source) {
+            return Err(JoinError::new(Error::PatchConflict, joined));
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        let validation_error = joined.sub_edits().find_map(|sub_edit| {
+            validate_durable_patch(&sub_edit.payload().inner)
+                .err()
+                .or_else(|| {
+                    validate_joined_preconditions(sub_edit.payload(), &source_fingerprint).err()
+                })
+        });
+        if let Some(error) = validation_error {
+            return Err(JoinError::new(error, joined));
+        }
+        if joined_contains_mixed_package_effects(&joined) {
+            return Err(JoinError::new(
+                joined_refusal("ODG joined package replacement cannot mix with staged effects"),
+                joined,
+            ));
+        }
+        if self.joined_conflicts_with_staged(&joined) {
+            return Err(JoinError::new(
+                joined_refusal("ODG joined edit overlaps staged work"),
+                joined,
+            ));
+        }
+        if joined_has_dependent_conflict(&self.source, &joined) {
+            return Err(JoinError::new(
+                joined_refusal("ODG joined edit has dependent presentation effects"),
+                joined,
+            ));
+        }
+        self.pending_joined = Some(joined);
+        Ok(self)
+    }
+
+    fn joined_conflicts_with_staged(&self, joined: &JoinedEdits) -> bool {
+        let staged_package_effect = self.requires_package_projection
+            || !self.resource_edits.is_empty()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Structure(_)))
+            || self.package_replacement.is_some();
+        joined.sub_edits().any(|sub_edit| {
+            sub_edit.effects().writes().any(|effect| {
+                if effect == "package" {
+                    return staged_package_effect || !self.changes.is_empty();
+                }
+                if staged_package_effect {
+                    return true;
+                }
+                self.changes
+                    .iter()
+                    .flat_map(|change| change_effect_keys(&self.source, change))
+                    .any(|staged| staged == effect)
+            })
+        }) || self.changes.iter().any(|change| {
+            joined.sub_edits().any(|sub_edit| {
+                sub_edit.payload().operations().iter().any(|operation| {
+                    change_conflicts_with_operation(&self.source, change, operation)
+                })
+            })
+        })
+    }
+
     fn replace_or_insert_shape_attribute(
         &mut self,
         page: usize,
@@ -4122,6 +4150,126 @@ impl Edit {
         Ok(())
     }
 
+    fn stage_durable_operation(
+        &mut self,
+        operation: &PatchOperation,
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+        {
+            return Err(Error::PatchConflict);
+        }
+        match operation.op.as_str() {
+            "page.name.set" => {
+                self.set_page_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
+            "page.style.set" => {
+                self.set_page_style_name(
+                    parse_page_target(&operation.target)?,
+                    string_value(operation)?,
+                )?;
+            },
+            "page.transition.set" => {
+                self.set_page_transition(
+                    parse_page_target(&operation.target)?,
+                    transition_from_value(&operation.value)?,
+                )?;
+            },
+            "shape.geometry.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                let values = geometry_value(&operation.value)?;
+                self.set_shape_geometry(
+                    page, shape, &values[0], &values[1], &values[2], &values[3],
+                )?;
+            },
+            "shape.control.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_control_reference(page, shape, string_value(operation)?)?;
+            },
+            "shape.layer.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_layer(page, shape, string_value(operation)?)?;
+            },
+            "shape.name.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.path.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_path_data(page, shape, string_value(operation)?)?;
+            },
+            "shape.style.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_style_name(page, shape, string_value(operation)?)?;
+            },
+            "shape.text.set" => {
+                let (page, shape) = parse_shape_target(&operation.target)?;
+                self.set_shape_text(page, shape, string_value(operation)?)?;
+            },
+            _ => return invalid("ODG durable patch operation is unsupported"),
+        }
+        Ok(())
+    }
+
+    fn has_staged_edits(&self) -> bool {
+        self.content != self.source.content_xml()
+            || self.styles != self.source.styles_xml().map(str::to_owned)
+            || !self.changes.is_empty()
+            || !self.resource_edits.is_empty()
+            || self.requires_package_projection
+    }
+
+    fn apply_pending_joined(&mut self) -> Result<()> {
+        let Some(joined) = self.pending_joined.as_ref() else {
+            return Ok(());
+        };
+        if self.joined_conflicts_with_staged(joined) {
+            return invalid("ODG joined edit overlaps staged work");
+        }
+        let source_fingerprint = fingerprint(self.source.as_bytes());
+        for sub_edit in joined.sub_edits() {
+            validate_durable_patch(&sub_edit.payload().inner)?;
+            validate_joined_preconditions(sub_edit.payload(), &source_fingerprint)?;
+        }
+        let joined = self
+            .pending_joined
+            .take()
+            .expect("pending joined plan was borrowed above");
+        for sub_edit in joined.into_sub_edits() {
+            let durable = sub_edit.into_payload();
+            for operation in durable.operations() {
+                if operation.op == "package.replace" {
+                    if self.has_staged_edits() || self.package_replacement.is_some() {
+                        return invalid(
+                            "ODG joined package replacement cannot mix with staged edits",
+                        );
+                    }
+                    enforce_security_policy(&self.source, self.security_policy)?;
+                    enforce_active_content_policy(&self.source, self.active_content_policy)?;
+                    let blob = durable_blob(&durable, &operation.value)?;
+                    let replacement = self.source.reopen_same_flavor(blob.to_vec())?;
+                    enforce_active_content_policy(&replacement, self.active_content_policy)?;
+                    self.package_replacement = Some(replacement);
+                } else {
+                    if self.package_replacement.is_some() {
+                        return invalid(
+                            "ODG joined package replacement cannot mix with staged edits",
+                        );
+                    }
+                    self.stage_durable_operation(operation, &source_fingerprint)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Atomically validates, rebuilds, and publishes the edited package.
     ///
     /// An edit that leaves every part unchanged publishes the exact source
@@ -4134,7 +4282,23 @@ impl Edit {
         Ok(self.commit_core()?)
     }
 
-    pub(crate) fn commit_core(self) -> Result<Commit> {
+    pub(crate) fn commit_core(mut self) -> Result<Commit> {
+        self.apply_pending_joined()?;
+        if let Some(snapshot) = self.package_replacement.take() {
+            let changed = self.source.as_bytes() != snapshot.as_bytes();
+            let patch = Patch {
+                source: self.source,
+                target: snapshot.clone(),
+                changes: Vec::new(),
+                resource_changes: Vec::new(),
+                requires_package_projection: true,
+            };
+            return Ok(Commit {
+                snapshot,
+                patch,
+                changed,
+            });
+        }
         if self.content == self.source.content_xml()
             && self.styles == self.source.styles_xml().map(str::to_owned)
             && self.resource_edits.is_empty()
@@ -4253,6 +4417,44 @@ pub enum Change {
     PageStyle(PageStyleChange),
     PageTransition(Box<PageTransitionChange>),
     Structure(StructureChange),
+}
+
+fn change_effect_keys(_source: &Package, change: &Change) -> Vec<String> {
+    let (target, operation) = match change {
+        Change::ControlReference(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.control.set",
+        ),
+        Change::Text(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.text.set",
+        ),
+        Change::Name(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.name.set",
+        ),
+        Change::Layer(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.layer.set",
+        ),
+        Change::Geometry(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.geometry.set",
+        ),
+        Change::Style(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.style.set",
+        ),
+        Change::Path(value) => (
+            format!("page/{}/shape/{}", value.page, value.shape),
+            "shape.path.set",
+        ),
+        Change::PageName(_) => return vec!["pages#page.name.unique".to_owned()],
+        Change::PageStyle(value) => (format!("page/{}", value.page), "page.style.set"),
+        Change::PageTransition(value) => (format!("page/{}", value.page), "page.transition.set"),
+        Change::Structure(_) => return vec!["package".to_owned()],
+    };
+    vec![format!("{target}#{operation}")]
 }
 
 /// One reversible page-name change.
@@ -5007,19 +5209,11 @@ impl Patch {
         limits: CompositionLimits,
     ) -> Result<SubEdit> {
         let durable = self.durable()?;
-        let writes = if durable
+        let writes = durable
             .operations()
             .iter()
-            .any(|operation| operation.op == "package.replace")
-        {
-            vec!["package".to_string()]
-        } else {
-            durable
-                .operations()
-                .iter()
-                .map(|operation| format!("{}#{}", operation.target, operation.op))
-                .collect::<Vec<_>>()
-        };
+            .flat_map(durable_effect_keys)
+            .collect::<Vec<_>>();
         SubEdit::new(
             Lineage::new(&self.source),
             limits,
@@ -5051,6 +5245,45 @@ pub type SubEdit = litchi_core::SubEdit<Lineage, DurablePatch>;
 
 /// Deterministically ordered, provably disjoint ODG sub-edits.
 pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
+
+/// Recoverable refusal while staging a bounded joined plan on an edit.
+///
+/// The rejected plan is retained so callers can correct or route it to a
+/// different edit without reconstructing its payloads. The error itself is
+/// content-free; the plan is available only through the explicit recovery
+/// accessor.
+#[derive(Debug)]
+pub struct JoinError {
+    error: Error,
+    rejected: Box<JoinedEdits>,
+}
+
+impl JoinError {
+    fn new(error: Error, rejected: JoinedEdits) -> Self {
+        Self {
+            error,
+            rejected: Box::new(rejected),
+        }
+    }
+
+    /// The fixed classified reason for refusing the plan.
+    #[must_use]
+    pub const fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Recover the rejected plan for retry or alternate routing.
+    #[must_use]
+    pub fn into_rejected(self) -> JoinedEdits {
+        *self.rejected
+    }
+
+    /// Recover both the refusal and the rejected plan.
+    #[must_use]
+    pub fn into_parts(self) -> (Error, JoinedEdits) {
+        (self.error, *self.rejected)
+    }
+}
 
 /// Non-mutating three-way ODG merge plan.
 pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
@@ -5706,58 +5939,7 @@ fn apply_durable_patch(
             continue;
         }
         let mut edit = current.edit_with_policies(security_policy, active_content_policy);
-        match operation.op.as_str() {
-            "page.name.set" => {
-                edit.set_page_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.style.set" => {
-                edit.set_page_style_name(
-                    parse_page_target(&operation.target)?,
-                    string_value(operation)?,
-                )?;
-            },
-            "page.transition.set" => {
-                edit.set_page_transition(
-                    parse_page_target(&operation.target)?,
-                    transition_from_value(&operation.value)?,
-                )?;
-            },
-            "shape.geometry.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                let values = geometry_value(&operation.value)?;
-                edit.set_shape_geometry(
-                    page, shape, &values[0], &values[1], &values[2], &values[3],
-                )?;
-            },
-            "shape.control.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_control_reference(page, shape, string_value(operation)?)?;
-            },
-            "shape.layer.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_layer(page, shape, string_value(operation)?)?;
-            },
-            "shape.name.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.path.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_path_data(page, shape, string_value(operation)?)?;
-            },
-            "shape.style.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_style_name(page, shape, string_value(operation)?)?;
-            },
-            "shape.text.set" => {
-                let (page, shape) = parse_shape_target(&operation.target)?;
-                edit.set_shape_text(page, shape, string_value(operation)?)?;
-            },
-            _ => return invalid("ODG durable patch operation is unsupported"),
-        }
+        edit.stage_durable_operation(operation, &source_fingerprint)?;
         current = edit.commit_core()?.into_package();
     }
     Ok(current)
@@ -5908,6 +6090,127 @@ fn validate_durable_patch(patch: &CorePatch<Reversible>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str) -> Result<()> {
+    if patch.operations().iter().any(|operation| {
+        operation
+            .preconditions
+            .get("source")
+            .and_then(serde_json::Value::as_str)
+            != Some(source_fingerprint)
+    }) {
+        return Err(Error::PatchConflict);
+    }
+    Ok(())
+}
+
+fn durable_effect_keys(operation: &PatchOperation) -> Vec<String> {
+    match operation.op.as_str() {
+        "package.replace" => vec!["package".to_owned()],
+        "page.name.set" => vec!["pages#page.name.unique".to_owned()],
+        _ => vec![format!("{}#{}", operation.target, operation.op)],
+    }
+}
+
+fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> bool {
+    let operations = joined
+        .sub_edits()
+        .flat_map(|sub_edit| sub_edit.payload().operations().iter())
+        .collect::<Vec<_>>();
+    operations.iter().enumerate().any(|(index, left)| {
+        operations[index.saturating_add(1)..]
+            .iter()
+            .any(|right| operations_conflict(source, left, right))
+    })
+}
+
+fn operations_conflict(source: &Package, left: &PatchOperation, right: &PatchOperation) -> bool {
+    let left_style = left.op == "page.style.set";
+    let right_style = right.op == "page.style.set";
+    let left_transition = left.op == "page.transition.set";
+    let right_transition = right.op == "page.transition.set";
+    if (left_style && right_transition) || (left_transition && right_style) {
+        return parse_page_target(&left.target).ok() == parse_page_target(&right.target).ok();
+    }
+    if left_transition && right_transition {
+        let left_page = parse_page_target(&left.target).ok();
+        let right_page = parse_page_target(&right.target).ok();
+        return left_page
+            .zip(right_page)
+            .and_then(|(left_page, right_page)| {
+                source
+                    .pages()
+                    .get(left_page)
+                    .and_then(|page| page.style_name())
+                    .zip(
+                        source
+                            .pages()
+                            .get(right_page)
+                            .and_then(|page| page.style_name()),
+                    )
+            })
+            .is_some_and(|(left_style, right_style)| left_style == right_style);
+    }
+    false
+}
+
+fn change_conflicts_with_operation(
+    source: &Package,
+    change: &Change,
+    operation: &PatchOperation,
+) -> bool {
+    let operation_page = match operation.op.as_str() {
+        "page.style.set" | "page.transition.set" => parse_page_target(&operation.target).ok(),
+        _ => None,
+    };
+    match change {
+        Change::PageStyle(value) => {
+            operation.op == "page.transition.set" && operation_page == Some(value.page)
+        },
+        Change::PageTransition(value) => {
+            if operation.op == "page.style.set" {
+                return operation_page == Some(value.page);
+            }
+            if operation.op != "page.transition.set" {
+                return false;
+            }
+            operation_page
+                .and_then(|page| source.pages().get(page).and_then(|page| page.style_name()))
+                .zip(
+                    source
+                        .pages()
+                        .get(value.page)
+                        .and_then(|page| page.style_name()),
+                )
+                .is_some_and(|(left_style, right_style)| left_style == right_style)
+        },
+        Change::ControlReference(_)
+        | Change::Text(_)
+        | Change::Name(_)
+        | Change::Layer(_)
+        | Change::Geometry(_)
+        | Change::Style(_)
+        | Change::Path(_)
+        | Change::PageName(_)
+        | Change::Structure(_) => false,
+    }
+}
+
+fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> bool {
+    let has_package = joined.sub_edits().any(|sub_edit| {
+        sub_edit
+            .effects()
+            .writes()
+            .any(|effect| effect == "package")
+    });
+    let has_other = joined.sub_edits().any(|sub_edit| {
+        sub_edit
+            .effects()
+            .writes()
+            .any(|effect| effect != "package")
+    });
+    has_package && has_other
 }
 
 struct Parsed {
@@ -13408,6 +13711,14 @@ fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(Error::InvalidFormat(message.into()))
+}
+
+fn joined_refusal(reason: &'static str) -> Error {
+    Error::Refused(litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedOperation,
+        "odg.edit.join",
+        reason,
+    ))
 }
 
 #[cfg(test)]

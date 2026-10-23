@@ -1,6 +1,8 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::{CompositionError, CompositionLimitKind, CompositionLimits, SubEditJoinFailure};
+use litchi_core::{
+    CompositionError, CompositionLimitKind, CompositionLimits, Error, SubEditJoinFailure,
+};
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::{Package, Transition};
 
@@ -228,7 +230,9 @@ fn disjoint_transition_sub_edits_join_and_same_page_edits_conflict() {
     joined
         .join(second.patch().prepare("second", limits).unwrap())
         .unwrap();
-    let output = source.apply_joined(joined).unwrap();
+    let mut joined_edit = source.edit();
+    joined_edit.join(joined).unwrap();
+    let output = joined_edit.commit().unwrap().into_package();
     assert_eq!(
         output.pages()[0].transition().unwrap().style(),
         Some("dissolve")
@@ -254,6 +258,62 @@ fn disjoint_transition_sub_edits_join_and_same_page_edits_conflict() {
 }
 
 #[test]
+fn joined_transition_rejects_a_preceding_page_style_retarget() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+
+    let mut transition_edit = source.edit();
+    transition_edit
+        .set_page_transition(0, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let transition_commit = transition_edit.commit().unwrap();
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(
+            transition_commit
+                .patch()
+                .prepare("transition", limits)
+                .unwrap(),
+        )
+        .unwrap();
+
+    let mut style_edit = source.edit();
+    style_edit.set_page_style_name(0, "dp2").unwrap();
+    let error = match style_edit.join(joined) {
+        Ok(_) => panic!("style and transition effects were treated as disjoint"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    let committed = style_edit.commit().unwrap();
+    assert_eq!(committed.package().pages()[0].style_name(), Some("dp2"));
+}
+
+#[test]
+fn joined_page_name_effects_share_the_document_uniqueness_key() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut first_edit = source.edit();
+    first_edit.set_page_name(0, "First renamed").unwrap();
+    let first = first_edit.commit().unwrap();
+    let mut second_edit = source.edit();
+    second_edit.set_page_name(1, "Second renamed").unwrap();
+    let second = second_edit.commit().unwrap();
+
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(first.patch().prepare("first", limits).unwrap())
+        .unwrap();
+    let error = joined
+        .join(second.patch().prepare("second", limits).unwrap())
+        .unwrap_err();
+    assert!(matches!(error.failure(), SubEditJoinFailure::Overlap(_)));
+}
+
+#[test]
 fn transition_sub_edit_admission_honors_each_composition_bound() {
     let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let mut edit = source.edit();
@@ -264,7 +324,7 @@ fn transition_sub_edit_admission_honors_each_composition_bound() {
     let per_edit = CompositionLimits::new(2, 0, 4, 2);
     assert!(matches!(
         commit.patch().prepare("too-many-effects", per_edit),
-        Err(litchi_core::Error::InvalidFormat(message)) if message.contains("EffectsPerSubEdit")
+        Err(Error::InvalidFormat(message)) if message.contains("EffectsPerSubEdit")
     ));
 
     let one_sub_edit = CompositionLimits::new(1, 2, 4, 2);
