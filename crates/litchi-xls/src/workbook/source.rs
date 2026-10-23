@@ -1916,7 +1916,7 @@ impl SourceInner {
             leniency: self.leniency,
             query_cache: Arc::clone(&self.query_cache),
             tolerance: Mutex::new(tolerance),
-            cursor_checks: Box::new([]),
+            cursor_checks: Vec::new().into_boxed_slice(),
             pending: Some(pending),
             materialized: std::sync::OnceLock::new(),
             deferred: true,
