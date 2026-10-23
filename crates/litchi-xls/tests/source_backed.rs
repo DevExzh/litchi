@@ -2147,7 +2147,17 @@ fn deferred_numeric_fixture() -> (
     Reference,
     String,
 ) {
-    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    // `Simple.xls` is intentionally a string-only corpus fixture.  Generate a
+    // small valid BIFF workbook here so the deferred edit and freshness tests
+    // always exercise a real numeric cell instead of depending on a corpus
+    // accident.  The writer emits the same CFB/Workbook source shape consumed
+    // by the source-backed reader, so all cold, cached, and handoff paths stay
+    // under test.
+    let mut builder = litchi_xls::Builder::new();
+    let sheet = builder.add_worksheet("Deferred").unwrap();
+    builder.write_number(sheet, 0, 0, 42.0).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source = Arc::new(CountingSource::new(bytes));
     let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let mut numeric = None;
     for worksheet in workbook.worksheets().unwrap() {
@@ -2186,7 +2196,7 @@ fn deferred_numeric_fixture() -> (
             return (source, committed, index, reference, sheet_name);
         }
     }
-    panic!("Simple.xls has no numeric cell for deferred projection test");
+    panic!("generated deferred fixture has no numeric cell");
 }
 
 fn assert_inflight_projection_source_change(
