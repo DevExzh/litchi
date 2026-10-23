@@ -2205,6 +2205,28 @@ fn assert_inflight_projection_source_change(
     );
 }
 
+fn assert_inflight_workbook_source_change(
+    operation: impl FnOnce(
+        &SourceBackedWorkbook,
+        usize,
+        Reference,
+        &str,
+    ) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
+    // Open the deferred target once so the operation below takes the cached
+    // target path. Its leading original-source fence then mutates immediately
+    // after observation, forcing the operation's trailing promotion path.
+    package.worksheet_by_index(sheet_index).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference, &sheet_name).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight workbook mutation, got {error:?}"
+    );
+}
+
 #[test]
 fn deferred_projection_handles_keep_the_original_source_fence() {
     let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
@@ -2259,6 +2281,62 @@ fn deferred_projection_promotes_inflight_source_changes_for_all_reads() {
             .map(|_| ())
     });
     assert_inflight_projection_source_change(|worksheet| worksheet.name().map(|_| ()));
+}
+
+#[test]
+fn deferred_workbook_facade_promotes_inflight_source_changes() {
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_value_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        let (_cancellation, execution) = execution_pair();
+        workbook
+            .cell_by_index_with_execution(sheet, reference.row(), reference.column(), &execution)
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook.worksheet_by_index(sheet).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, name| {
+        workbook.worksheet_by_name(name).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheets().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_names().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_descriptors().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.sheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.date_system().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.formatting().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.source_version().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.materialize_eager().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.text().map(|_| ())
+    });
 }
 
 #[test]

@@ -1011,6 +1011,11 @@ impl SourceBackedWorkbook {
     }
 
     fn text_impl(&self, execution: Option<&ExecutionContext>) -> Result<String> {
+        let result = self.text_impl_inner(execution);
+        self.finish_deferred(result)
+    }
+
+    fn text_impl_inner(&self, execution: Option<&ExecutionContext>) -> Result<String> {
         let mut collector = FallibleTextCollector::default();
         let report = match self.write_text_to_impl(
             &mut collector,
@@ -1101,7 +1106,13 @@ impl SourceBackedWorkbook {
         })();
 
         let progress = writer.progress();
-        let source = take_source_text_failure(&failure)
+        let original_freshness = if self.inner.deferred {
+            self.inner.ensure_current().err()
+        } else {
+            None
+        };
+        let source = original_freshness
+            .or_else(|| take_source_text_failure(&failure))
             .or_else(|| execution.and_then(|context| context.check().err().map(Into::into)))
             .or_else(|| owner.ensure_current().err());
         if let Some(source) = source {
@@ -1136,6 +1147,14 @@ impl SourceBackedWorkbook {
     }
 
     fn materialize_eager_impl(
+        &self,
+        execution: Option<&ExecutionContext>,
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
+        let result = self.materialize_eager_inner(execution);
+        self.finish_deferred(result)
+    }
+
+    fn materialize_eager_inner(
         &self,
         execution: Option<&ExecutionContext>,
     ) -> Result<Reader<Cursor<Vec<u8>>>> {
@@ -1369,10 +1388,39 @@ impl SourceBackedWorkbook {
         effective_inner(&self.inner)
     }
 
+    /// Finish an operation that read a deferred target with a fence on the
+    /// original dynamic source. The composed target maps its source-change
+    /// error to I/O, so this trailing fence promotes an in-flight mutation to
+    /// the typed source-change error. Nondeferred owners keep their existing
+    /// operation fences and pay no extra version observation.
+    fn finish_deferred<T>(&self, result: Result<T>) -> Result<T> {
+        if self.inner.deferred {
+            self.inner.ensure_current()?;
+        }
+        result
+    }
+
+    /// Finish a retained workbook projection. Metadata and worksheet catalog
+    /// lookups need a target fence on ordinary owners; cell queries already
+    /// fence their target internally, so callers mark those as complete. A
+    /// deferred owner always fences the original source instead.
+    fn finish_projection<T>(
+        &self,
+        owner: &SourceInner,
+        result: Result<T>,
+        target_already_fenced: bool,
+    ) -> Result<T> {
+        if self.inner.deferred {
+            self.inner.ensure_current()?;
+        } else if !target_already_fenced {
+            owner.ensure_current()?;
+        }
+        result
+    }
+
     pub(crate) fn materialized(&self) -> Result<Self> {
-        Ok(Self {
-            inner: self.effective_inner()?,
-        })
+        let inner = self.effective_inner()?;
+        self.finish_deferred(Ok(Self { inner }))
     }
 
     /// Whether two handles are shares of one opened (or committed) workbook.
@@ -1388,37 +1436,39 @@ impl SourceBackedWorkbook {
     pub(crate) fn replay_identity(&self) -> crate::Result<(u64, ArtifactFingerprint)> {
         self.ensure_current()
             .map_err(crate::source_backed::workbook_error)?;
-        let identity = match &self.inner.pending {
-            Some(plan) => {
-                let mut sink = io::sink();
-                let fingerprint = plan
-                    .write_to(&mut sink)
-                    .map_err(crate::source_backed::overlay_error)?
-                    .target_fingerprint();
-                (plan.operation_shape().source_bytes, fingerprint)
-            },
-            None => {
-                let first = self
-                    .inner
-                    .cfb
-                    .caller_bracketed_identity_fingerprint()
-                    .map_err(crate::source_backed::overlay_error)?;
-                let second = self
-                    .inner
-                    .cfb
-                    .caller_bracketed_identity_fingerprint()
-                    .map_err(crate::source_backed::overlay_error)?;
-                if first != second {
-                    return Err(Error::Io(io::Error::other(
-                        "source changed during source-backed replay",
-                    )));
-                }
-                (self.inner.cfb.file_size(), first)
-            },
-        };
+        let identity = (|| {
+            Ok::<_, crate::Error>(match &self.inner.pending {
+                Some(plan) => {
+                    let mut sink = io::sink();
+                    let fingerprint = plan
+                        .write_to(&mut sink)
+                        .map_err(crate::source_backed::overlay_error)?
+                        .target_fingerprint();
+                    (plan.operation_shape().source_bytes, fingerprint)
+                },
+                None => {
+                    let first = self
+                        .inner
+                        .cfb
+                        .caller_bracketed_identity_fingerprint()
+                        .map_err(crate::source_backed::overlay_error)?;
+                    let second = self
+                        .inner
+                        .cfb
+                        .caller_bracketed_identity_fingerprint()
+                        .map_err(crate::source_backed::overlay_error)?;
+                    if first != second {
+                        return Err(Error::Io(io::Error::other(
+                            "source changed during source-backed replay",
+                        )));
+                    }
+                    (self.inner.cfb.file_size(), first)
+                },
+            })
+        })();
         self.ensure_current()
             .map_err(crate::source_backed::workbook_error)?;
-        Ok(identity)
+        identity
     }
 
     pub(crate) fn pending_plan(&self) -> Option<&ValidatedOverlayPlan> {
@@ -1644,14 +1694,14 @@ impl SourceBackedWorkbook {
             .sheets
             .iter()
             .position(|sheet| sheet.worksheet_index == Some(index));
-        owner.ensure_current()?;
-        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+        let result = Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
             // Keep the deferred publication owner on the projection. Its
             // effective target is a cache, while the original owner carries
             // the dynamic-source freshness fence.
             owner: Arc::clone(&self.inner),
             sheet_index,
-        }))
+        }));
+        self.finish_projection(&owner, result, false)
     }
 
     /// Alias for [`Self::worksheet_by_index`].
@@ -1665,11 +1715,11 @@ impl SourceBackedWorkbook {
         let sheet_index = owner.sheets.iter().position(|sheet| {
             sheet.worksheet_index.is_some() && crate::sheet_name::equivalent(&sheet.name, name)
         });
-        owner.ensure_current()?;
-        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+        let result = Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
             owner: Arc::clone(&self.inner),
             sheet_index,
-        }))
+        }));
+        self.finish_projection(&owner, result, false)
     }
 
     /// Iterates ordinary worksheet handles without reading worksheet payloads.
@@ -1686,8 +1736,7 @@ impl SourceBackedWorkbook {
                 })
             })
             .collect();
-        owner.ensure_current()?;
-        Ok(worksheets)
+        self.finish_projection(&owner, Ok(worksheets), false)
     }
 
     /// Looks up one cell by worksheet index and zero-based coordinates.
@@ -1697,22 +1746,23 @@ impl SourceBackedWorkbook {
         row: u32,
         column: u32,
     ) -> Result<Option<SourceBackedCell>> {
-        // The lookup reads only retained metadata, and every path of the cell
-        // read observes the source after it, so the lookup's own trailing
-        // check would only repeat that observation (record 0287). A missing
-        // worksheet still checks before it reports.
+        // The cell query owns the target's trailing fence (record 0287); a
+        // deferred owner adds the original-source fence below so an
+        // in-flight mutation is not reported as composed-source I/O. A
+        // missing worksheet still checks before it reports.
         let owner = self.effective_inner()?;
         let Some(sheet_index) = owner
             .sheets
             .iter()
             .position(|sheet| sheet.worksheet_index == Some(worksheet_index))
         else {
-            owner.ensure_current()?;
-            return Err(SourceBackedError::WorksheetNotFound(
+            let result = Err(SourceBackedError::WorksheetNotFound(
                 worksheet_index.to_string(),
             ));
+            return self.finish_projection(&owner, result, false);
         };
-        query_cell(&owner, sheet_index, row, column, None)
+        let result = query_cell(&owner, sheet_index, row, column, None);
+        self.finish_projection(&owner, result, true)
     }
 
     /// The workbook's number formats and XF table.
@@ -1867,9 +1917,9 @@ impl SourceBackedWorkbook {
             // asking the composed view for its version.
             self.ensure_current()?;
             let composed = plan.composed_source().map_err(deferred_overlay_error)?;
-            let version = composed.version().map_err(SourceBackedError::Io)?;
+            let version = composed.version().map_err(SourceBackedError::Io);
             self.ensure_current()?;
-            return Ok(version);
+            return version;
         }
         self.ensure_current()?;
         Ok(self.inner.expected_version)
@@ -1897,8 +1947,7 @@ impl SourceBackedWorkbook {
     fn metadata<T>(&self, operation: impl FnOnce(&SourceInner) -> T) -> Result<T> {
         let owner = self.effective_inner()?;
         let value = operation(&owner);
-        owner.ensure_current()?;
-        Ok(value)
+        self.finish_projection(&owner, Ok(value), false)
     }
 }
 
