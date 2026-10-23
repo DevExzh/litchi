@@ -356,3 +356,12 @@ the exact source and empty diagnostic log. The subsequent reviewed Clippy
 repair is in [0362ur](0362ur-clippy-v3-consumers.md); it keeps glossary
 limits unchanged and scopes smaller enum representations to relationship
 tokens. The full Clippy rerun is still required.
+
+The isolated workspace documentation rerun on `eb718eece7` uses a fresh
+20 GB capped target and one Cargo job, with other Litchi builds held. It
+terminates after 583.21 seconds on an unresolved ODB `Error::Unsupported`
+link, with no memory kill. The API now returns the ODF family's typed
+`Refused` variant; the link and two neighboring stale ODG/ODT descriptions
+are corrected. [wsdoc-assembly-v1.json](results/0362uf/wsdoc-assembly-v1.json)
+records source, command, unchanged locks and log hash. This failed run does
+not establish a documentation or complete gate pass.

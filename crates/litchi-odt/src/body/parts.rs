@@ -1875,7 +1875,7 @@ impl Region<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] when the region holds content a text
+    /// Returns [`Error::Refused`] when the region holds content a text
     /// set cannot keep (a field, a frame, a table, a bookmark, ...), so a
     /// set never drops it silently.
     pub(crate) fn text_replacement(self, text: &str) -> Result<Option<(Range<usize>, String)>> {
