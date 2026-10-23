@@ -31,3 +31,21 @@ It is not replaced by a broader claim based on the older shared leaf. DOCX
 source admission and XLSB digest/census fixes also retain their scoped clear
 reviews. Final combined compilation, meaningful boundary/fidelity tests and
 performance qualification remain required for the complete composition.
+
+## Second cell review and combined runtime
+
+Pinned shared proposal `1929682421` repairs common metadata preparation but
+still needs cell corrections: same-visible plain assignment must erase rich
+runs; rich transfers must carry source cell styles; transfer failure must
+restore every staged map; existing merges and equivalent typed styles must
+normalize before finite admission; shrinking style payloads must release the
+old charge; independent hyperlink ranges sharing a start must accumulate.
+Inline-rich range transfers must avoid repeated whole-part scans per address.
+These are required repairs, not accepted fidelity or performance exceptions.
+
+The combined metadata library suite passes 482 tests on `af09b4fcf9`.
+XLS source-backed tests reach 72 passes and seven fixture failures: the new
+freshness helper assumed a numeric cell in `Simple.xls`, which has none.
+The helper must create or select a valid numeric source before exercising
+cold, cached, inflight and handoff fences; no freshness assertion is waived.
+The complete XLS run and all subsequent qualification remain required.
