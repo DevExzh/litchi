@@ -2593,3 +2593,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   inventory/glossary and the complete assembled gate remain open. Source
   integration has not yet been accepted into trunk. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, workspace and harness compilation):
+  The source integration reaches `3107f05f23`. Workspace checking with all
+  targets/features passes on `7de3789ede`; the complete performance harness
+  and isolated XLSX raw harness both compile with all targets/features on
+  `808f9883a0`. Their consumer migrations preserve existing workload and
+  publication timing boundaries. Record 0362uf retains exact source and log
+  hashes for both successes and the preceding failures.
+
+  The third broad Clippy pass reaches XLSX, DOCX and XLSB production/test
+  lints after the complete OPC/ODF cleanup. Its terminal failure is recorded
+  and the whole diagnosed batch is assigned for repair. These compilation
+  results do not constitute the complete 53-check gate or native qualification.
+
+  A separate diagnostic branch, `uo2/budget-validation`, composes signed
+  native budget proposals with the current immutable owner and required-policy
+  APIs. Its first compilation exposed a stale OPC retained-field reference;
+  that failure and repair are recorded in 0362up. A new combined native/facade
+  check is running on `3ae4cb2420`. Review still requires exact XLSX capture
+  accounting without extra endpoint scans, PPTX sizing without a second graph
+  proof, and final verification of DOCX admission before snapshot capture.
+  This diagnostic branch is not accepted into the source integration or trunk.
+
+  A seventh cleanup wave removed two clean, inactive merged leaf worktrees
+  without force, reclaiming 12,522,187,690 checkout bytes. Branch references
+  and recreation commands remain recorded; dirty leaves, build targets and
+  measurement evidence were preserved. Receipt `e16821b336` is merged.
+
+  XLS deferred-reopen fidelity/provenance repair, native qualification, full
+  corpus replay/dispositions, final inventory/glossary and the complete
+  assembled gate remain required. Source integration is not yet accepted into
+  trunk. Only the comprehensive redaction audit is deferred. Nothing is pushed.
