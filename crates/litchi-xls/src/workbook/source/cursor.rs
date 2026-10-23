@@ -63,8 +63,8 @@ const BATCH: usize = 64;
 pub struct CellCursor {
     owner: Arc<SourceInner>,
     /// The projection owner, retained separately from the effective scan
-    /// owner so a deferred publication keeps checking its dynamic source
-    /// while batches are read from the materialized target.
+    /// owner so a deferred publication or package handoff keeps checking its
+    /// dynamic source while batches are read from the materialized target.
     source_owner: Arc<SourceInner>,
     sheet_index: usize,
     /// Whether a formula of the worksheet renders no text without the
@@ -112,7 +112,7 @@ impl SourceBackedWorksheet {
                     needs_formula_context: false,
                 };
                 let scan = scan_worksheet(&owner, self.sheet_index, None, &mut order);
-                if self.owner.deferred {
+                if self.owner.needs_source_fence() {
                     self.owner.ensure_current()?;
                 }
                 scan?;
@@ -150,7 +150,7 @@ impl CellCursor {
 
     /// Scan the next batch.
     fn refill(&mut self) -> Result<()> {
-        if self.source_owner.deferred {
+        if self.source_owner.needs_source_fence() {
             self.source_owner.ensure_current()?;
         }
         let count = std::cell::Cell::new(0_usize);
@@ -166,7 +166,7 @@ impl CellCursor {
             count: &count,
         };
         let scan = scan_worksheet_from(&self.owner, self.sheet_index, None, &mut sink, self.resume);
-        if self.source_owner.deferred {
+        if self.source_owner.needs_source_fence() {
             self.source_owner.ensure_current()?;
         }
         let resume = scan?;

@@ -7,7 +7,7 @@ use litchi_core::{
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
     SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
-    cell_values::Reference, raw::Reader,
+    cell_values::Reference, package::Package, raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -2227,6 +2227,23 @@ fn assert_inflight_workbook_source_change(
     );
 }
 
+fn assert_cold_inflight_workbook_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook, usize, Reference) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    // Do not materialize the deferred target first: the mutation lands after
+    // effective_inner's leading fence while from_read_at opens the composed
+    // source. That open may report I/O, so effective_inner must fence again
+    // before propagating its error.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after cold in-flight mutation, got {error:?}"
+    );
+}
+
 #[test]
 fn deferred_projection_handles_keep_the_original_source_fence() {
     let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
@@ -2336,6 +2353,35 @@ fn deferred_workbook_facade_promotes_inflight_source_changes() {
     });
     assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
         workbook.text().map(|_| ())
+    });
+}
+
+#[test]
+fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(package).unwrap();
+    let workbook = package.workbook();
+    let source_backed = workbook.source_backed_ref().unwrap();
+
+    assert!(
+        source_backed
+            .cell_value_by_index(sheet_index, reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    source.bump();
+    assert!(matches!(
+        source_backed.cell_value_by_index(sheet_index, reference.row(), reference.column()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn deferred_cold_materialization_promotes_inflight_source_changes() {
+    assert_cold_inflight_workbook_source_change(|workbook, sheet, reference| {
+        workbook
+            .cell_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
     });
 }
 

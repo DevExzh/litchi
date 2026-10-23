@@ -475,10 +475,21 @@ struct SheetEntry {
     end: u64,
 }
 
+/// The dynamic source identity retained when a deferred target is handed to
+/// another owner (for example `Package::from_source`). The target's composed
+/// source reports a source mutation as I/O, so the handoff keeps the original
+/// positional source and CFB view for typed freshness checks.
+struct SourceFence {
+    source: Arc<dyn ReadAt>,
+    cfb: Arc<SharedOleFile>,
+    expected_version: SourceVersion,
+}
+
 struct SourceInner {
     source: Arc<dyn ReadAt>,
     cfb: Arc<SharedOleFile>,
     expected_version: SourceVersion,
+    source_fence: Option<Arc<SourceFence>>,
     workbook_path: Arc<[String]>,
     workbook_stream_len: u64,
     sheets: Box<[SheetEntry]>,
@@ -1106,7 +1117,7 @@ impl SourceBackedWorkbook {
         })();
 
         let progress = writer.progress();
-        let original_freshness = if self.inner.deferred {
+        let original_freshness = if self.inner.needs_source_fence() {
             self.inner.ensure_current().err()
         } else {
             None
@@ -1314,6 +1325,7 @@ impl SourceBackedWorkbook {
             source,
             cfb,
             expected_version,
+            source_fence: None,
             workbook_path: workbook_path.into_boxed_slice().into(),
             workbook_stream_len,
             sheets: parsed.sheets.into_boxed_slice(),
@@ -1362,6 +1374,7 @@ impl SourceBackedWorkbook {
             Error::Internal("a freshly opened source-backed workbook is already shared"),
         ))?;
         inner.pending = Some(Arc::new(plan));
+        inner.source_fence = self.inner.handoff_source_fence();
         inner.deferred = false;
         Ok(workbook)
     }
@@ -1388,13 +1401,13 @@ impl SourceBackedWorkbook {
         effective_inner(&self.inner)
     }
 
-    /// Finish an operation that read a deferred target with a fence on the
-    /// original dynamic source. The composed target maps its source-change
-    /// error to I/O, so this trailing fence promotes an in-flight mutation to
-    /// the typed source-change error. Nondeferred owners keep their existing
-    /// operation fences and pay no extra version observation.
+    /// Finish an operation that read a deferred or handed-off target with a
+    /// fence on the original dynamic source. The composed target maps its
+    /// source-change error to I/O, so this trailing fence promotes an
+    /// in-flight mutation to the typed source-change error. Ordinary owners
+    /// keep their existing operation fences and pay no extra observation.
     fn finish_deferred<T>(&self, result: Result<T>) -> Result<T> {
-        if self.inner.deferred {
+        if self.inner.needs_source_fence() {
             self.inner.ensure_current()?;
         }
         result
@@ -1403,14 +1416,15 @@ impl SourceBackedWorkbook {
     /// Finish a retained workbook projection. Metadata and worksheet catalog
     /// lookups need a target fence on ordinary owners; cell queries already
     /// fence their target internally, so callers mark those as complete. A
-    /// deferred owner always fences the original source instead.
+    /// deferred or handed-off owner always fences the retained original
+    /// source instead.
     fn finish_projection<T>(
         &self,
         owner: &SourceInner,
         result: Result<T>,
         target_already_fenced: bool,
     ) -> Result<T> {
-        if self.inner.deferred {
+        if self.inner.needs_source_fence() {
             self.inner.ensure_current()?;
         } else if !target_already_fenced {
             owner.ensure_current()?;
@@ -1420,6 +1434,15 @@ impl SourceBackedWorkbook {
 
     pub(crate) fn materialized(&self) -> Result<Self> {
         let inner = self.effective_inner()?;
+        let inner = if self.inner.deferred {
+            let source_fence = self
+                .inner
+                .handoff_source_fence()
+                .expect("a deferred source-backed owner always has an original-source fence");
+            Arc::new(inner.clone_with_source_fence(source_fence))
+        } else {
+            inner
+        };
         self.finish_deferred(Ok(Self { inner }))
     }
 
@@ -1466,8 +1489,10 @@ impl SourceBackedWorkbook {
                 },
             })
         })();
-        self.ensure_current()
-            .map_err(crate::source_backed::workbook_error)?;
+        if self.inner.needs_source_fence() || identity.is_ok() {
+            self.ensure_current()
+                .map_err(crate::source_backed::workbook_error)?;
+        }
         identity
     }
 
@@ -1991,6 +2016,7 @@ impl SourceInner {
             source: Arc::clone(&self.source),
             cfb: Arc::clone(&self.cfb),
             expected_version: self.expected_version,
+            source_fence: self.source_fence.clone(),
             workbook_path: Arc::clone(&self.workbook_path),
             workbook_stream_len: self.workbook_stream_len,
             sheets: self.sheets.clone(),
@@ -2010,7 +2036,56 @@ impl SourceInner {
         }
     }
 
+    fn clone_with_source_fence(&self, source_fence: Arc<SourceFence>) -> Self {
+        let tolerance = self
+            .tolerance
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        Self {
+            source: Arc::clone(&self.source),
+            cfb: Arc::clone(&self.cfb),
+            expected_version: self.expected_version,
+            source_fence: Some(source_fence),
+            workbook_path: Arc::clone(&self.workbook_path),
+            workbook_stream_len: self.workbook_stream_len,
+            sheets: self.sheets.clone(),
+            worksheet_names: self.worksheet_names.clone(),
+            sst: Arc::clone(&self.sst),
+            formatting: Arc::clone(&self.formatting),
+            styles: self.styles.clone(),
+            encoding: self.encoding.clone(),
+            limits: self.limits,
+            leniency: self.leniency,
+            query_cache: Arc::clone(&self.query_cache),
+            tolerance: Mutex::new(tolerance),
+            cursor_checks: Vec::new().into_boxed_slice(),
+            pending: self.pending.clone(),
+            materialized: std::sync::OnceLock::new(),
+            deferred: self.deferred,
+        }
+    }
+
+    fn needs_source_fence(&self) -> bool {
+        self.deferred || self.source_fence.is_some()
+    }
+
+    fn handoff_source_fence(&self) -> Option<Arc<SourceFence>> {
+        self.source_fence.clone().or_else(|| {
+            self.deferred.then(|| {
+                Arc::new(SourceFence {
+                    source: Arc::clone(&self.source),
+                    cfb: Arc::clone(&self.cfb),
+                    expected_version: self.expected_version,
+                })
+            })
+        })
+    }
+
     fn ensure_current(&self) -> Result<()> {
+        if let Some(fence) = &self.source_fence {
+            ensure_current_parts(&fence.source, &fence.cfb, fence.expected_version)?;
+        }
         ensure_current_parts(&self.source, &self.cfb, self.expected_version)
     }
 }
@@ -2030,15 +2105,22 @@ fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
     let Some(plan) = owner.pending.as_ref().cloned() else {
         return Ok(Arc::clone(owner));
     };
-    let composed = plan.composed_source().map_err(deferred_overlay_error)?;
-    let target = SourceBackedWorkbook::from_read_at_with_options(
-        Arc::new(composed),
-        SourceBackedOptions::new()
-            .limits(owner.limits)
-            .leniency(owner.leniency),
-    )?;
-    let target = target.inner;
+    let target = (|| -> Result<Arc<SourceInner>> {
+        let composed = plan.composed_source().map_err(deferred_overlay_error)?;
+        let target = SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(composed),
+            SourceBackedOptions::new()
+                .limits(owner.limits)
+                .leniency(owner.leniency),
+        )?;
+        Ok(target.inner)
+    })();
+    // The composed reader reports an original-source mutation as I/O while
+    // opening its target. Always run the original fence before propagating
+    // that result so cold materialization has the same typed error promotion
+    // as the cached projection path.
     owner.ensure_current()?;
+    let target = target?;
     let _ = owner.materialized.set(Arc::clone(&target));
     Ok(owner.materialized.get().cloned().unwrap_or(target))
 }
@@ -2107,14 +2189,15 @@ impl SourceBackedWorksheet {
     }
 
     /// Finish one projection operation with the owner that still observes the
-    /// caller's dynamic source. A deferred target is backed by a composed
-    /// source whose version error is only an I/O-shaped projection of the
-    /// original change; fence the original owner after the target operation so
-    /// that a mutation in that window is promoted to typed `SourceChanged`.
+    /// caller's dynamic source. A deferred or handed-off target is backed by
+    /// a composed source whose version error is only an I/O-shaped projection
+    /// of the original change; fence the original owner after the target
+    /// operation so that a mutation in that window is promoted to typed
+    /// `SourceChanged`.
     /// The fence runs before the operation result is returned, so freshness
     /// keeps the same precedence as the workbook-level projection fences.
     fn finish_projection<T>(&self, result: Result<T>) -> Result<T> {
-        if self.owner.deferred {
+        if self.owner.needs_source_fence() {
             self.owner.ensure_current()?;
         }
         result
@@ -2260,13 +2343,13 @@ impl SourceBackedWorksheet {
             let result = Err(SourceBackedError::WorksheetNotFound(
                 self.sheet_index.to_string(),
             ));
-            if !self.owner.deferred {
+            if !self.owner.needs_source_fence() {
                 owner.ensure_current()?;
             }
             return self.finish_projection(result);
         };
         let value = operation(sheet);
-        if !self.owner.deferred {
+        if !self.owner.needs_source_fence() {
             owner.ensure_current()?;
         }
         self.finish_projection(Ok(value))
