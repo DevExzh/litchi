@@ -21,7 +21,7 @@ Validation was limited to formatting and static diff/artifact guards in this
 leaf. The coordinator should run the XLS and unified-ops checks on the merged
 assembly.
 
-## F3 qualification lane (prepared, not measured)
+## F3 qualification lane (executable, not measured)
 
 The fair implementation comparison is the source snapshot at `9b1f96d6dc`
 (the concrete eager-cell iterator is already present, but the deferred
@@ -46,6 +46,26 @@ xls_numeric_plan_only_number_edit_save
 xls_numeric_plan_only_rk_mulrk_edit_save
 ```
 
+The executable three-route probe is committed as `d8fe3bcacb` in
+`tools/perf-baseline/examples/xls_f3_qualification.rs`, with its library
+implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. It calls
+the existing Number and RK/MulRK corpus builders through narrow helpers, so it
+does not duplicate workload construction. To regenerate the same probe in the
+already-created baseline and candidate source snapshots, use the same commit
+in both snapshots; this does not create a second baseline worktree:
+
+```sh
+PROBE_COMMIT=d8fe3bcacb0c51cf354314393f93cef0a393e157
+BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
+CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235
+git -C "$BASE" cherry-pick "$PROBE_COMMIT"
+git -C "$CAND" cherry-pick "$PROBE_COMMIT"
+```
+
+If the candidate snapshot already contains that commit, the second cherry-pick
+is a no-op in the regeneration log and must be recorded as such. The copied
+source must remain byte-identical between the two builds.
+
 The Number corpus edits `Untouched!E21`, `Number 42` to `43`; the native
 RK/MulRK corpus edits one RK and two MulRK values with fixed-width integer
 replacements. Every fresh sample opens a new owner and stages the same edit.
@@ -55,12 +75,17 @@ read of the committed owner. It already records separate edit, set, commit,
 publication and total vectors. The plan-only selector is not a first-read
 control; it is another write-only publication contract.
 
-The F3 probe must add three explicit route labels over this same preparation:
+The executable F3 probe accepts one required route and an optional corpus:
+`--route write-only|first-read|read-after-write` and
+`--corpus number|rk-mulrk|all` (default `all`). It emits one CSV header followed
+by rows with `route,corpus,sample,nanoseconds,edit_ns,set_ns,commit_ns,write_ns,read_ns,output_bytes,output_sha256,batch`.
+The probe has already added three explicit route labels over this same
+preparation:
 
 | route | timed sequence | route-specific oracle |
 | --- | --- | --- |
 | `write-only` | edit, stage, commit, `write_to` | no semantic call on the committed owner before publication |
-| `first-read` | edit, stage, commit, one `cell_value_by_name`/`cell_value_by_index` on the committed owner | the first read returns the replacement and a second untimed read returns the same value, proving the materialized owner is cached |
+| `first-read` | edit, stage, commit, one `cell_value_by_index` on the committed owner | the first read returns the replacement and a second untimed read returns the same value, proving the materialized owner is cached |
 | `read-after-write` | edit, stage, commit, `write_to`, then one semantic read on that same committed owner | the output is complete before the first read, and the read still returns the replacement |
 
 The first-read route must write and verify its output outside the timed
@@ -95,8 +120,6 @@ the checkout, for example:
   source-candidate-8acd229235/
   target-base-release/
   target-candidate-release/
-  target-base-alloc/
-  target-candidate-alloc/
   binaries/
   abba/
   heap/
@@ -118,12 +141,20 @@ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   cargo build --offline --locked --release \
   --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235/tools/perf-baseline/Cargo.toml \
   --example xls_f3_qualification
+mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
+  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
+cp /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-base-release/examples/xls_f3_qualification \
+  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
+cp /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release/examples/xls_f3_qualification \
+  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
+sha256sum \
+  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification \
+  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
 ```
 
-The F3 probe binary name above is the reserved qualification entry point; it
-must implement the three route labels before these commands are run. The
-existing numeric selectors remain the retained corpus/oracle control and are
-run separately with the README command. No evidence belongs under
+The F3 probe binary name above is the implemented qualification entry point.
+The existing numeric selectors remain the retained corpus/oracle control and
+are run separately with the README command. No evidence belongs under
 `docs/performance/results/` until a reduced receipt is ready.
 
 The native run is four process legs per route in strict A-B-B-A order, with
@@ -137,9 +168,12 @@ quiet CPU is represented below as `${CPU}` and must be fixed in the manifest:
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
 OUT=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/abba
+mkdir -p "$OUT"
 for route in write-only first-read read-after-write; do
-  taskset -c "${CPU}" "$BASE" --route "$route" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/base-${route}.csv"
-  taskset -c "${CPU}" "$CAND" --route "$route" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/candidate-${route}.csv"
+  for corpus in number rk-mulrk; do
+    taskset -c "${CPU}" "$BASE" --route "$route" --corpus "$corpus" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/base-${route}-${corpus}.csv"
+    taskset -c "${CPU}" "$CAND" --route "$route" --corpus "$corpus" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/candidate-${route}-${corpus}.csv"
+  done
 done
 ```
 
@@ -148,25 +182,28 @@ calibrate `BATCH` per route, and store its script hash, binary hashes, source
 hashes, CPU, memory scope, raw stdout/stderr and discarded attempts in
 `$OUT`. It must not report a speedup from the old eager `ole_w5_probe`.
 
-For resource evidence, build the same probe separately with the counting
-allocator feature into `target-base-alloc` and `target-candidate-alloc`, then
-run direct heaptrack children (not a wrapper hidden behind `taskset`) in fresh
-directories:
+For resource evidence, use the same release probe binaries and run direct
+heaptrack children (not a wrapper hidden behind `taskset`) in fresh
+directories. The probe intentionally has no counting-allocator mode in this
+source-only preparation; heaptrack is whole-process evidence with its own
+instrumentation overhead, not a native route-timing result:
 
 ```sh
 HEAPTRACK=$(command -v heaptrack)
 HEAPTRACK_PRINT=$(command -v heaptrack_print)
 for side in base candidate; do
-  binary=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/$side-alloc/xls_f3_qualification
+  binary=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/$side/xls_f3_qualification
   for route in write-only first-read read-after-write; do
-    dir=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/heap/$side/$route
-    mkdir -p "$dir"
-    "$HEAPTRACK" --record-only --output "$dir/heaptrack" "$binary" \
-      --route "$route" --warmup 0 --samples 1 --batch 1 \
-      > "$dir/probe.stdout" 2> "$dir/heaptrack.stderr"
-    capture=$(find "$dir" -maxdepth 1 -type f \( -name 'heaptrack.*.zst' -o -name 'heaptrack.*.gz' \) -print)
-    "$HEAPTRACK_PRINT" -f "$capture" -l -H "$dir/histogram.tsv" \
-      > "$dir/heaptrack-print.txt" 2> "$dir/heaptrack-print.stderr"
+    for corpus in number rk-mulrk; do
+      dir=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/heap/$side/$route/$corpus
+      mkdir -p "$dir"
+      "$HEAPTRACK" --record-only --output "$dir/heaptrack" "$binary" \
+        --route "$route" --corpus "$corpus" --warmup 0 --samples 1 --batch 1 \
+        > "$dir/probe.stdout" 2> "$dir/heaptrack.stderr"
+      capture=$(find "$dir" -maxdepth 1 -type f \( -name 'heaptrack.*.zst' -o -name 'heaptrack.*.gz' \) -print)
+      "$HEAPTRACK_PRINT" -f "$capture" -l -H "$dir/histogram.tsv" \
+        > "$dir/heaptrack-print.txt" 2> "$dir/heaptrack-print.stderr"
+    done
   done
 done
 ```
