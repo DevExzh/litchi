@@ -15,7 +15,7 @@ pub(in crate::glossary) use validation::*;
 pub(in crate::glossary) use xml::*;
 
 use super::model::{Catalog, Conformance};
-use super::{Error, MAX, MAX_DEPTH, MAX_VALUES, Result};
+use super::{Error, Result};
 
 ///
 /// # Errors

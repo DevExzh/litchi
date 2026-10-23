@@ -52,8 +52,7 @@ pub mod raw {
     pub use super::super::limit::Limits;
     use super::super::model::Catalog as TypedCatalog;
     use super::super::{
-        CT, Error, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES, OpcPackage, PackURI,
-        Result,
+        Error, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES, OpcPackage, PackURI, Result,
     };
     use super::{Catalog, Conformance};
     use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -88,7 +87,7 @@ pub mod raw {
             content_type: impl AsRef<str>,
             data: Vec<u8>,
             limits: &Limits,
-        ) -> super::Result<Self> {
+        ) -> Result<Self> {
             admit_part(name.as_ref(), content_type.as_ref(), data.len(), limits)?;
             Ok(Self {
                 name: name.as_ref().to_owned(),
@@ -126,7 +125,7 @@ pub mod raw {
         /// # Errors
         ///
         /// Returns an error if the operation cannot be completed.
-        pub fn replace_data(&mut self, data: Vec<u8>, limits: &Limits) -> super::Result<()> {
+        pub fn replace_data(&mut self, data: Vec<u8>, limits: &Limits) -> Result<()> {
             admit_part(&self.name, &self.content_type, data.len(), limits)?;
             self.data = Arc::new(data);
             Ok(())
@@ -141,7 +140,7 @@ pub mod raw {
             &mut self,
             relationships: Vec<Rel>,
             limits: &Limits,
-        ) -> super::Result<()> {
+        ) -> Result<()> {
             admit_relationships(&relationships, limits)?;
             let mut ids = std::collections::HashSet::new();
             for relationship in &relationships {
@@ -253,7 +252,7 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn load(package: &litchi_opc::OpcPackage, limits: &Limits) -> super::Result<Option<Graph>> {
+    pub fn load(package: &OpcPackage, limits: &Limits) -> Result<Option<Graph>> {
         super::load_graph_with_limits(package, limits)
     }
 
@@ -267,11 +266,7 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put(
-        package: &mut litchi_opc::OpcPackage,
-        graph: &Graph,
-        limits: &Limits,
-    ) -> super::Result<bool> {
+    pub fn put(package: &mut OpcPackage, graph: &Graph, limits: &Limits) -> Result<bool> {
         super::put_graph_checked(package, graph, limits)
     }
 
@@ -285,15 +280,12 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove(
-        package: &mut litchi_opc::OpcPackage,
-        limits: &Limits,
-    ) -> super::Result<Option<Graph>> {
+    pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<Option<Graph>> {
         super::remove_graph_with_limits(package, limits)
     }
 
     /// Parse one detached glossary XML payload under `limits`.
-    pub fn read(xml: &[u8], limits: &Limits) -> super::Result<(TypedCatalog, Conformance)> {
+    pub fn read(xml: &[u8], limits: &Limits) -> Result<(TypedCatalog, Conformance)> {
         super::super::codec::read_with_limits(xml, limits)
     }
 
@@ -302,7 +294,7 @@ pub mod raw {
         catalog: &TypedCatalog,
         conformance: Conformance,
         limits: &Limits,
-    ) -> super::Result<Vec<u8>> {
+    ) -> Result<Vec<u8>> {
         admit_catalog(catalog, limits)?;
         super::super::codec::write_with_limits(catalog, conformance, limits)
     }

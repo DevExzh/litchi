@@ -159,7 +159,8 @@ fn check_shape(depth: usize, nodes: usize, attributes: usize, limits: &Limits) -
 }
 
 fn admit_package(package: &OpcPackage, limits: &Limits) -> Result<()> {
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part?;
         if part.content_type() == super::CONTENT_TYPE {
             admit_xml(part.blob(), limits)?;
         }

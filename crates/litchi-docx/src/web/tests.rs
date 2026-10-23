@@ -123,22 +123,46 @@ fn numeric_div_selectors_reject_missing_positions_without_mutation() {
 fn package_graph_crud_round_trips_and_is_idempotent() {
     let mut package = package(Conformance::Transitional);
     assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(!raw::remove(&mut package, &Limits::DEFAULT).unwrap());
 
     let mut settings = Settings::default();
     settings.set_encoding("utf-8").unwrap().set_allow_png(true);
-    assert!(put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     assert_eq!(
         load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings.clone(), Conformance::Transitional))
     );
-    assert!(!put(&mut package, settings.clone(), Conformance::Transitional).unwrap());
+    assert!(
+        !raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
 
     settings.set_allow_png(false);
-    assert!(put(&mut package, settings, Conformance::Transitional).unwrap());
-    assert!(remove(&mut package).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings,
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
+    assert!(raw::remove(&mut package, &Limits::DEFAULT).unwrap());
     assert!(load(&package, &Limits::DEFAULT).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(!raw::remove(&mut package, &Limits::DEFAULT).unwrap());
 }
 
 #[test]
@@ -161,10 +185,18 @@ fn semantic_noop_preserves_noncanonical_bytes_and_signatures() {
     let (settings, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
     assert!(package.is_signed());
 
-    assert!(put(&mut package, settings.clone(), Conformance::Strict).is_err());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Strict,
+            &Limits::DEFAULT,
+        )
+        .is_err()
+    );
     assert_eq!(package.get_part(&name).unwrap().blob(), source);
     assert!(package.is_signed());
-    assert!(!put(&mut package, settings, conformance).unwrap());
+    assert!(!raw::put(&mut package, settings, conformance, &Limits::DEFAULT,).unwrap());
     assert_eq!(package.get_part(&name).unwrap().blob(), source);
     assert!(package.is_signed());
 }
@@ -174,7 +206,15 @@ fn strict_graph_and_mce_round_trip() {
     let mut package = package(Conformance::Strict);
     let mut settings = Settings::default();
     settings.set_target_screen_size(Screen::Pixels1920x1200);
-    assert!(put(&mut package, settings.clone(), Conformance::Strict).unwrap());
+    assert!(
+        raw::put(
+            &mut package,
+            settings.clone(),
+            Conformance::Strict,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     assert_eq!(
         load(&package, &Limits::DEFAULT).unwrap(),
         Some((settings, Conformance::Strict))
@@ -212,10 +252,11 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
     let parts = duplicate.part_count();
     let relationships = duplicate.get_part(&document).unwrap().rels().iter().count();
     assert!(
-        put(
+        raw::put(
             &mut duplicate,
             Settings::default(),
-            Conformance::Transitional
+            Conformance::Transitional,
+            &Limits::DEFAULT,
         )
         .is_err()
     );
@@ -226,7 +267,15 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
     );
 
     let mut shared = package(Conformance::Transitional);
-    assert!(put(&mut shared, Settings::default(), Conformance::Transitional).unwrap());
+    assert!(
+        raw::put(
+            &mut shared,
+            Settings::default(),
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
     let name = PackURI::new("/word/webSettings.xml").unwrap();
     let bytes = shared.get_part(&name).unwrap().blob().to_vec();
     let mut other = BlobPart::new(
@@ -241,7 +290,7 @@ fn graph_failures_are_atomic_and_shared_parts_are_rejected() {
         false,
     );
     shared.add_part(Box::new(other));
-    assert!(remove(&mut shared).is_err());
+    assert!(raw::remove(&mut shared, &Limits::DEFAULT).is_err());
     assert_eq!(shared.get_part(&name).unwrap().blob(), bytes);
     assert!(load(&shared, &Limits::DEFAULT).unwrap().is_some());
 }

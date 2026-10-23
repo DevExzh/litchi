@@ -672,7 +672,7 @@ impl Catalog {
         // `Limits::DEFAULT` argument widen or replace that policy.
         let selected = self.enforced_limits.unwrap_or(*limits);
         let limits = &selected;
-        super::graph::raw::admit_xml(&xml, limits)?;
+        raw::admit_xml(&xml, limits)?;
         if self.background.as_ref() == Some(&xml) {
             // Re-selecting a policy is still an admission operation.  The
             // unchanged-byte fast path must not install a narrower policy
@@ -1261,7 +1261,7 @@ impl Entry {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn new(name: impl Into<String>, body_xml: Vec<u8>, limits: &super::Limits) -> Result<Self> {
-        super::graph::raw::admit_xml(&body_xml, limits)?;
+        raw::admit_xml(&body_xml, limits)?;
         let name = name.into();
         validate_name(&name)?;
         let name = Name {
@@ -1321,7 +1321,7 @@ impl Entry {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn with_body(mut self, body: Vec<u8>, limits: &super::Limits) -> Result<Self> {
-        super::graph::raw::admit_xml(&body, limits)?;
+        raw::admit_xml(&body, limits)?;
         if self.body.as_ref() != Some(&body) {
             self.producer = None;
             self.lineage = None;

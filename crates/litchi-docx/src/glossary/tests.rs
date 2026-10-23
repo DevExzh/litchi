@@ -592,7 +592,7 @@ fn exact_noop_preserves_custom_root_bytes_and_signature() {
     );
     assert!(package.is_signed());
     let (loaded, conformance) = load(&package, &Limits::DEFAULT).unwrap().unwrap();
-    assert!(!put(&mut package, loaded, conformance).unwrap());
+    assert!(!put(&mut package, loaded, conformance, &Limits::DEFAULT).unwrap());
     assert_eq!(package.get_part(&custom).unwrap().blob(), source.as_slice());
     assert!(package.is_signed());
     assert_eq!(
@@ -626,7 +626,15 @@ fn semantic_create_allocates_around_unrelated_canonical_parts() {
 
     let mut catalog = Catalog::new();
     catalog.add(entry("Allocated")).unwrap();
-    assert!(put(&mut package, catalog, Conformance::Transitional).unwrap());
+    assert!(
+        put(
+            &mut package,
+            catalog,
+            Conformance::Transitional,
+            &Limits::DEFAULT,
+        )
+        .unwrap()
+    );
 
     let graph = raw::load(&package, &Limits::default()).unwrap().unwrap();
     assert_eq!(graph.root_name(), "/word/glossary/document1.xml");
@@ -941,7 +949,13 @@ fn shared_inbound_owned_parts_block_changed_store_and_remove() {
     let mut package = package();
     let mut catalog = Catalog::new();
     catalog.add(entry("Keep")).unwrap();
-    put(&mut package, catalog.clone(), Conformance::Transitional).unwrap();
+    put(
+        &mut package,
+        catalog.clone(),
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .unwrap();
     let root = PackURI::new("/word/glossary/document.xml").unwrap();
     let mut referrer = BlobPart::new(
         PackURI::new("/word/header1.xml").unwrap(),
@@ -955,8 +969,16 @@ fn shared_inbound_owned_parts_block_changed_store_and_remove() {
 
     let mut changed = catalog;
     changed.add(entry("Changed")).unwrap();
-    assert!(put(&mut package, changed, Conformance::Transitional).is_err());
-    assert!(remove(&mut package).is_err());
+    assert!(
+        put(
+            &mut package,
+            changed,
+            Conformance::Transitional,
+            &Limits::DEFAULT
+        )
+        .is_err()
+    );
+    assert!(remove(&mut package, &Limits::DEFAULT).is_err());
     assert!(package.get_part(&root).is_ok());
 }
 
@@ -1580,9 +1602,9 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
     raw::put(&mut source, &source_graph, &Limits::default()).unwrap();
     raw::put(&mut destination, &destination_graph, &Limits::default()).unwrap();
 
-    let (mut source_catalog, _) = load(&source).unwrap().unwrap();
+    let (mut source_catalog, _) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
     let source_entry = source_catalog.remove("picture").unwrap().unwrap();
-    let (mut destination_catalog, _) = load(&destination).unwrap().unwrap();
+    let (mut destination_catalog, _) = load(&destination, &Limits::DEFAULT).unwrap().unwrap();
     let before = destination_catalog.clone();
     assert!(
         destination_catalog
@@ -1607,8 +1629,8 @@ fn semantic_catalogs_cannot_rebind_colliding_relationship_ids() {
     );
     assert!(destination_catalog.background().is_none());
 
-    let (foreign, conformance) = load(&source).unwrap().unwrap();
-    assert!(put(&mut destination, foreign, conformance).is_err());
+    let (foreign, conformance) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
+    assert!(put(&mut destination, foreign, conformance, &Limits::DEFAULT).is_err());
     let retained = raw::load(&destination, &Limits::default())
         .unwrap()
         .unwrap();
@@ -1643,14 +1665,22 @@ fn inactive_mce_relationship_ids_remain_bound_to_their_physical_graph() {
 
     let mut source = package();
     raw::put(&mut source, &graph, &Limits::default()).unwrap();
-    let (mut loaded, conformance) = load(&source).unwrap().unwrap();
+    let (mut loaded, conformance) = load(&source, &Limits::DEFAULT).unwrap().unwrap();
     assert!(
         !std::str::from_utf8(loaded.at(0).unwrap().body().unwrap())
             .unwrap()
             .contains("rIdInactiveImage")
     );
     let mut destination = package();
-    assert!(put(&mut destination, loaded.clone(), conformance).is_err());
+    assert!(
+        put(
+            &mut destination,
+            loaded.clone(),
+            conformance,
+            &Limits::DEFAULT,
+        )
+        .is_err()
+    );
     assert!(
         raw::load(&destination, &Limits::default())
             .unwrap()
@@ -1658,7 +1688,7 @@ fn inactive_mce_relationship_ids_remain_bound_to_their_physical_graph() {
     );
 
     loaded.add(entry("Unrelated")).unwrap();
-    assert!(put(&mut source, loaded, conformance).unwrap());
+    assert!(put(&mut source, loaded, conformance, &Limits::DEFAULT).unwrap());
     let preserved = raw::load(&source, &Limits::default()).unwrap().unwrap();
     assert!(
         String::from_utf8(write(&preserved.catalog, conformance).unwrap())

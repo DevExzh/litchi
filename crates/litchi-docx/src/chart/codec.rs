@@ -575,7 +575,7 @@ fn process_markup(xml: &[u8], policy: &super::Limits, output_maximum: usize) -> 
         ..MceLimits::default()
     };
     process_markup_compatibility(xml, &Capabilities::default(), &limits)
-        .map(|output| output.xml)
+        .map(|output| output.xml.into_owned())
         .map_err(Error::from)
 }
 

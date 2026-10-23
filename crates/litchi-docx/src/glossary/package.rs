@@ -31,7 +31,7 @@ pub fn load(
     package: &OpcPackage,
     limits: &super::Limits,
 ) -> Result<Option<(Catalog, Conformance)>> {
-    let Some(graph) = super::graph::raw::load(package, limits)? else {
+    let Some(graph) = raw::load(package, limits)? else {
         return Ok(None);
     };
     let binding = Binding::from_graph(&graph);

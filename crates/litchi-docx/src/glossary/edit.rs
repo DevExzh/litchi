@@ -247,7 +247,7 @@ impl crate::Package {
         Edit {
             staged: Staged::new(self),
             draft: None,
-            limits: *self.semantic_limits().glossary_value(),
+            limits: self.semantic_limits().glossary_value(),
         }
     }
 
@@ -259,7 +259,7 @@ impl crate::Package {
     /// Returns [`crate::Error::PatchConflict`] for a package that does not
     /// hold the before state.
     pub fn apply_glossary(&self, patch: &Patch) -> Result<Commit> {
-        let limits = *self.semantic_limits().glossary_value();
+        let limits = self.semantic_limits().glossary_value();
         patch.0.check(self.opc_package(), "apply_glossary")?;
         let source_owner = graph::locate(self.opc_package(), &limits)?;
         let main_name = self.opc_package().main_document_part()?.partname().clone();
@@ -386,7 +386,7 @@ fn admit_patch_relationships(
         });
     }
     for relationship in relationships.iter() {
-        super::graph::validate_relationship_metadata(
+        graph::validate_relationship_metadata(
             relationship.r_id(),
             relationship.reltype(),
             relationship.target_ref(),
@@ -444,7 +444,7 @@ fn owner_state_from_relationships(
         if relationship.is_external() {
             return Err(invalid("glossary relationship cannot be external"));
         }
-        super::graph::validate_relationship_metadata(
+        graph::validate_relationship_metadata(
             relationship.r_id(),
             relationship.reltype(),
             relationship.target_ref(),
@@ -496,7 +496,7 @@ fn owner_metadata_seed_for(
                 maximum: limits.name_bytes(),
             });
         }
-        super::graph::add_selected_metadata(&mut metadata, value, limits)?;
+        graph::add_selected_metadata(&mut metadata, value, limits)?;
     }
     for value in [owner.id.as_str(), owner.target.as_str()] {
         if value.len() > limits.string_bytes() {
@@ -506,7 +506,7 @@ fn owner_metadata_seed_for(
                 maximum: limits.string_bytes(),
             });
         }
-        super::graph::add_selected_metadata(&mut metadata, value, limits)?;
+        graph::add_selected_metadata(&mut metadata, value, limits)?;
     }
     Ok(metadata)
 }
@@ -542,8 +542,8 @@ fn patch_part_ledger(
         });
     }
     let mut metadata_bytes = 0usize;
-    super::graph::add_selected_metadata(&mut metadata_bytes, name.as_str(), limits)?;
-    super::graph::add_selected_metadata(&mut metadata_bytes, content_type, limits)?;
+    graph::add_selected_metadata(&mut metadata_bytes, name.as_str(), limits)?;
+    graph::add_selected_metadata(&mut metadata_bytes, content_type, limits)?;
     let mut relationship_count = 0usize;
     admit_patch_relationships(
         relationships,

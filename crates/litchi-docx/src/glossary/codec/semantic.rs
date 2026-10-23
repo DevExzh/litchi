@@ -14,7 +14,7 @@ use super::super::{Arc, Error, HashMap, HashSet, Result};
 use super::super::{MAX, MAX_PARTS, MC, VML};
 use super::validation::{
     INSERT_VALUES, KIND_VALUES, bounded_with_limits, expect, expect_w, invalid, kids, leaf,
-    name_key_with_limits, noattrs, onoff_with_limits, parse_behavior, parse_type,
+    name_key_with_limits, noattrs, only_w, onoff_with_limits, parse_behavior, parse_type,
     validate_catalog_fields, validate_entry_limits, validate_name, wattr_get_with_limits,
     wval_with_limits, xml_error,
 };
@@ -45,7 +45,7 @@ pub(in crate::glossary) fn project(
         let xml = node_xml_with_limits(background, false, limits, semantic_bytes)?;
         add_semantic_xml_bytes(&mut semantic_bytes, xml.len(), limits)?;
         out.background = Some(xml);
-        out.background_refs = super::super::graph::relationship_references(background)?;
+        out.background_refs = relationship_references(background)?;
         for conformance in [Conformance::Transitional, Conformance::Strict] {
             let mut size = XmlSize::default();
             node_write(&mut size, background, conformance == Conformance::Strict)?;
@@ -341,7 +341,7 @@ pub(in crate::glossary) fn parse_entry(
         producer: producer.map(Box::new),
         sizes: [0; 2],
         refs: body_node
-            .map(super::super::graph::relationship_references)
+            .map(relationship_references)
             .transpose()?
             .unwrap_or_else(|| Arc::from([])),
         lineage: None,

@@ -66,7 +66,8 @@ pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
 fn admit_package(package: &OpcPackage, limits: &Limits) -> Result<()> {
     let mut font_parts = 0usize;
     let mut total_font_bytes = 0usize;
-    for part in package.iter_parts() {
+    for part in package.try_iter_parts() {
+        let part = part?;
         if part.content_type() == FT_CT {
             admit_xml(part.blob(), limits)?;
         } else if part.content_type() == FONT_CT {
@@ -312,7 +313,7 @@ pub(crate) fn admit_table(table: &Table, conformance: Conformance, limits: &Limi
 }
 
 fn admit_attribute(
-    attribute: &super::model::raw::Attr,
+    attribute: &Attr,
     count: &mut usize,
     bytes: &mut usize,
     limits: &Limits,
@@ -574,7 +575,8 @@ pub(crate) fn admit_xml(xml: &[u8], limits: &Limits) -> Result<()> {
 }
 
 fn check_font_count(element: &BytesStart<'_>, count: &mut usize, limits: &Limits) -> Result<()> {
-    let qualified = std::str::from_utf8(element.name().as_ref())
+    let element_name = element.name();
+    let qualified = std::str::from_utf8(element_name.as_ref())
         .map_err(|error| Error::Xml(error.to_string()))?;
     let local = qualified
         .rsplit_once(':')
@@ -631,7 +633,7 @@ fn check_shape(depth: usize, nodes: usize, limits: &Limits) -> Result<()> {
 }
 
 fn check_attributes(
-    element: &quick_xml::events::BytesStart<'_>,
+    element: &BytesStart<'_>,
     attributes: &mut usize,
     attribute_bytes: &mut usize,
     limits: &Limits,

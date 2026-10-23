@@ -252,10 +252,10 @@ pub fn parse(xml: &[u8], limits: &super::super::Limits) -> Result<(Settings, Con
     Settings::parse_xml(processed.as_ref())
 }
 
-pub(super) fn process_web_xml(
-    xml: &[u8],
+pub(super) fn process_web_xml<'a>(
+    xml: &'a [u8],
     limits: &super::super::Limits,
-) -> Result<std::borrow::Cow<'_, [u8]>> {
+) -> Result<std::borrow::Cow<'a, [u8]>> {
     let limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: limits.xml_bytes(),
         max_output_bytes: limits.xml_bytes(),

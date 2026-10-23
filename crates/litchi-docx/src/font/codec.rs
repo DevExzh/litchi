@@ -93,9 +93,9 @@ pub fn parse(xml: &[u8], limits: &super::Limits) -> Result<Table> {
     }
     super::raw::admit_xml(xml.as_ref(), limits)?;
     let root = parse_tree(xml.as_ref())?;
-    let conformance = if root.ns == super::model::WT {
+    let conformance = if root.ns == WT {
         Conformance::Transitional
-    } else if root.ns == super::model::WS {
+    } else if root.ns == WS {
         Conformance::Strict
     } else {
         return Err(invalid("font-table root has an invalid Word namespace"));

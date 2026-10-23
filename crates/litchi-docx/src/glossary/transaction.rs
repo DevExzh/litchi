@@ -46,7 +46,7 @@ impl Snapshot {
     /// Returns an error if the operation cannot be completed.
     pub fn load(package: &OpcPackage, limits: &super::Limits) -> Result<Self> {
         let package_conformance = package_conformance(package)?;
-        let graph = super::raw::load(package, limits)?;
+        let graph = raw::load(package, limits)?;
         let main_part = package.main_document_part()?.partname().as_str().to_owned();
         let conformance = graph
             .as_ref()

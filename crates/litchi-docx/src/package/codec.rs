@@ -149,9 +149,10 @@ impl Package {
         // Create webSettings.xml part
         let web_settings_partname = PackURI::new("/word/webSettings.xml")
             .map_err(|e| Error::InvalidUri(format!("webSettings partname: {e}")))?;
-        let web_settings_xml = docx_web::write(
+        let web_settings_xml = docx_web::raw::write(
             &docx_web::Settings::default(),
             docx_web::Conformance::Transitional,
+            &docx_web::Limits::DEFAULT,
         )?;
         let web_settings_part = BlobPart::new(
             web_settings_partname,
