@@ -2,7 +2,7 @@
 
 use super::Xls;
 use super::node::{CellSource, Item, Node, Sheet};
-use super::owner::{CellData, EagerCells, Grid, SheetHandle};
+use super::owner::{CellData, Grid, SheetHandle};
 use super::spec::Kind;
 use crate::error::{Code, Error, Result};
 use crate::node::ViewOptions;
@@ -22,7 +22,7 @@ pub(crate) struct Children<'f> {
 enum State<'f> {
     EagerCells {
         sheet: usize,
-        cells: EagerCells<'f>,
+        cells: litchi_xls::worksheet::StoredCells<'f>,
     },
     /// A positional worksheet's cells through the leaf's cell cursor
     /// (record 0267).

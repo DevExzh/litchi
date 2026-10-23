@@ -80,8 +80,24 @@ impl Edit {
     /// macro-bearing, stale or length-changing edit, or a failed readback.
     pub fn commit(self) -> Result<Commit> {
         let (plan, diagnostics) = self.inner.commit_source_backed_plan()?.into_plan();
-        published(&self.source, plan, diagnostics)
+        published_deferred(&self.source, plan, diagnostics)
     }
+}
+
+fn published_deferred(
+    before: &SourceBackedWorkbook,
+    plan: litchi_cfb::ValidatedOverlayPlan,
+    diagnostics: Diagnostics,
+) -> Result<Commit> {
+    let after = before
+        .committed_deferred(plan)
+        .map_err(crate::source_backed::workbook_error)?;
+    let patch = Patch {
+        before: before.clone(),
+        after: after.clone(),
+        diagnostics,
+    };
+    Ok(Commit::new(after, patch, diagnostics))
 }
 
 impl SourceBackedWorkbook {

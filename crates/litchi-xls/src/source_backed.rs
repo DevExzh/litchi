@@ -17,8 +17,9 @@
 //! complete reader's readback of the composed candidate) and returns a new
 //! [`crate::SourceBackedWorkbook`] that reads through the plan's composed
 //! source and writes the plan: `write_to`/`save` stream exactly the bytes the
-//! former publishers streamed, and nothing is materialized. Chained edits
-//! work on the committed workbook.
+//! former publishers streamed. The composed source is opened lazily on the
+//! first semantic read, so write-only callers do not pay a second workbook
+//! open. Chained edits work on the committed workbook.
 //!
 //! A family [`cells::Patch`] (likewise `comments::Patch`,
 //! `sheet_visibility::Patch`) is an exact pair: it replays onto the recorded
@@ -108,6 +109,7 @@ macro_rules! source_family {
             }
         }
 
+        #[allow(dead_code, reason = "cell-family publication defers its composed reopen")]
         fn published(
             before: &crate::SourceBackedWorkbook,
             plan: litchi_cfb::ValidatedOverlayPlan,
@@ -223,6 +225,9 @@ impl SourceBackedWorkbook {
     /// The source-backed package view of this workbook, the staging base of
     /// a source-backed family edit.
     fn staging_package(&self) -> crate::Result<crate::Package> {
-        crate::Package::from_source(self.clone()).map_err(crate::scoped::package_error)
+        let owner = self
+            .materialized()
+            .map_err(|error| crate::scoped::package_error(error.into()))?;
+        crate::Package::from_source(owner).map_err(crate::scoped::package_error)
     }
 }

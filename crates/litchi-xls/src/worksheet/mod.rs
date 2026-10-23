@@ -318,8 +318,10 @@ impl Worksheet {
     /// Borrow stored cells in row-major order without collecting their references.
     ///
     /// Missing coordinates are omitted; formatting-only stored cells remain.
-    pub fn stored_cells(&self) -> impl Iterator<Item = &Cell> + Send + Sync {
-        self.cells.values()
+    pub fn stored_cells(&self) -> StoredCells<'_> {
+        StoredCells {
+            cells: self.cells.values(),
+        }
     }
 
     pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut Cell> {
@@ -922,6 +924,24 @@ impl WorksheetTrait for Worksheet {
             Some(cell) => Ok(Cow::Borrowed(cell.value())),
             None => Ok(Cow::Borrowed(CellValue::EMPTY)),
         }
+    }
+}
+
+/// The stored cells of an XLS worksheet in row-major order.
+///
+/// This named iterator keeps the worksheet's zero-copy cell walk concrete for
+/// callers that need to retain it across an adapter state transition. The
+/// cell map remains owned by the worksheet; no cell data is copied.
+pub struct StoredCells<'a> {
+    cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
+}
+
+impl<'a> Iterator for StoredCells<'a> {
+    type Item = &'a Cell;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.cells.next()
     }
 }
 
