@@ -48,7 +48,10 @@ structural/content-free implementations are recorded by `1a5f56f45d`, and
 the error enum is non-exhaustive in `02c9f44c78`. The redaction audit remains
 the only deferral.
 
-W4 and W4b integration, the DOCX helper/raw work, signed-native replay, W8
-qualification and final replay-scope review, performance repairs, remaining
-shared/raw API work, and the final full gate remain open. W5's OLE correction
-is not an open exception. Nothing is pushed.
+W4 and W4b source integration is assembled (the W4/W4b assembly commits are
+in the current ancestry); their native/performance qualification and the final
+full gate remain open. DOCX raw/model/helper work,
+signed-native replay, W8 native qualification, remaining shared/raw API work,
+and the final full gate remain open. W8 content-matching replay is integrated
+across the format consumers; it is not yet a performance acceptance claim.
+W5's OLE correction is not an open exception. Nothing is pushed.

@@ -59,7 +59,7 @@ The resulting classification is:
 | Surface | Textual basis | Status |
 |---|---|---|
 | Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and the W6 writer’s public ZIP limit/error types. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”; the concrete ODF repair must still distinguish a canonical re-export from a migration alias. |
-| Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | Required canonicalization for the Office package substrate, but it should be one atomic OPC lane with DOCX/PPTX/XLSX/XLSB consumers. Its absence from the 0351 wave table is a scheduling qualification, not a permanent exception. |
+| Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | The required source/consumer canonicalization is integrated by 0362rl across DOCX/PPTX/XLSX/XLSB and raw consumers. Its absence from the 0351 wave table remains a qualification boundary: rerun the profile and native checks before calling the substrate lane fully gated. |
 | Standalone CFB or soapberry-ZIP methods with no public format operation or free foreign-result signature | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. A typed foreign causal source nested in a crate-owned error is a separate, permitted boundary shape. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
 
 This distinction is narrower than a blanket exemption. For example,
@@ -340,26 +340,34 @@ do not by themselves expand the current ODF owner scope.
 
 1. **W6 ODF raw/alias lane:** 0362rda removes the six source-member aliases,
    canonicalizes the writer limit re-export and migrates every named ODF
-   consumer. The remaining lane work is to make archive/manifest limits
-   caller-selected where the public raw/codec contract requires it, decide the
-   writer error boundary and default policy, then run ODF
-   round-trip/parser-hardening, streaming and facade tests and measure memory
-   and output performance.
+   consumer. The remaining archive/manifest/raw-writer work is assigned to
+   `odf_raw_contract`: make limits caller-selected where the public raw/codec
+   contract requires it, decide the writer error boundary and default policy,
+   then run ODF round-trip/parser-hardening, streaming and facade tests and
+   measure memory and output performance.
 2. **W5 domain alias lane:** closed by `953f9720bc` and `c905a7d63d`; the
    current source has no `Revision::fingerprint` or `ole1::Snapshot` alias.
 3. **W4 format boundary:** keep the W4 change limited to public XLSX/XLSB
    routes and the shared OOXML staging rule. Any public `&mut OpcPackage`
    helper outside the raw `edit_opc`/codec boundary is W4 debt and needs a
    Package route in the same commit.
-4. **OPC substrate lane:** canonicalize limits and aliases across DOCX/PPTX/
-   XLSX/XLSB, ops and all raw/perf/test consumers; preserve source-backed
-   cache, splice and publication performance.
-5. **CFB substrate lane:** canonicalize CFB ingress and writer limits, remove
-   `update_stream`, and migrate the legacy, encrypted-OOXML and raw Reader
-   consumers together.
-6. **soapberry ZIP lane:** canonicalize generic reader/writer limits and
-   aliases, including `ErrorKind::Io`, and migrate every direct consumer with
-   streaming/deflate ABBA evidence.
+4. **OPC substrate lane:** source/consumer canonicalization is closed by
+   `0362rl` in the assembled tree: limits and aliases were migrated across
+   DOCX/PPTX/XLSX/XLSB, ops and raw/perf/test consumers. A fresh rustdoc
+   profile and native qualification are still required before calling the
+   substrate lane fully gated; preserve source-backed cache, splice and
+   publication performance while doing so.
+5. **CFB substrate follow-up (separate scope):** the current source still has
+   public default/`*_with_limits` ingress, validation and writer methods plus
+   `OleWriter::update_stream` (`file.rs:1055`, `shared.rs:650,680,780`,
+   `validation.rs:91`, `writer/core.rs:1297`, `writer/sequential.rs:197`).
+   This is not current format-wave debt merely because DOC/PPT/XLS depend on
+   CFB; a future owner must decide its scope and migrate consumers together.
+6. **soapberry ZIP follow-up (separate scope):** the current source still has
+   public office transport `*_with_limits` methods in `office.rs` and
+   `preserve.rs:786`, plus its documented aliases. This is not a blanket
+   current format requirement; a public format re-export or foreign surface
+   remains required in that owning format lane.
 
 Before each lane is merged, rerun `tools/api_debt_inventory.py` and the API
 glossary gate over the full workspace, then show that all listed consumers
