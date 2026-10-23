@@ -651,7 +651,7 @@ impl Sheet<'_> {
     /// Unmerge the range containing one checked cell, if any.
     pub fn unmerge<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        let range = match (|| -> Result<Option<Rect>> {
+        let range = (|| -> Result<Option<Rect>> {
             let data = self
                 .edit
                 .base
@@ -675,10 +675,7 @@ impl Sheet<'_> {
                 intents,
                 address,
             ))
-        })() {
-            Ok(range) => range,
-            Err(error) => return Err(error),
-        };
+        })()?;
         let Some(range) = range else {
             return Ok(self);
         };
@@ -793,7 +790,7 @@ impl Sheet<'_> {
             }
             return Ok(self);
         }
-        let capture =
+        let _capture =
             self.edit
                 .preflight_cell_capture(self.position, address, content.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
@@ -802,7 +799,6 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
         }
-        drop(capture);
         Ok(self)
     }
 
@@ -872,7 +868,7 @@ impl Sheet<'_> {
             }
             return Ok(self);
         }
-        let capture =
+        let _capture =
             self.edit
                 .preflight_cell_capture(self.position, address, text.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
@@ -883,7 +879,6 @@ impl Sheet<'_> {
                 entry.get_mut().set_payload(Payload::Rich(Box::new(text)))
             },
         }
-        drop(capture);
         Ok(self)
     }
 
@@ -1006,7 +1001,7 @@ impl Sheet<'_> {
                 "a formula cache cannot join another payload change of the same cell",
             ));
         }
-        let capture =
+        let _capture =
             self.edit
                 .preflight_cell_capture(self.position, address, value.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
@@ -1015,7 +1010,6 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Cache(value)),
         }
-        drop(capture);
         Ok(self)
     }
 
@@ -1913,14 +1907,11 @@ impl Sheet<'_> {
             return Ok(self);
         }
         if !source_exists {
-            let cleanup = (|| -> Result<()> {
+            (|| -> Result<()> {
                 self.edit.discard_fill(self.position, address)?;
                 self.edit.discard_border(self.position, address)?;
                 Ok(())
-            })();
-            if let Err(error) = cleanup {
-                return Err(error);
-            }
+            })()?;
             self.edit
                 .sheets
                 .entry(self.position)
@@ -2152,10 +2143,10 @@ fn authored_alignment_bool_matches(
     }
 }
 
-fn source_border_side<'a>(
-    source: Option<&'a cell_format::Border>,
+fn source_border_side(
+    source: Option<&cell_format::Border>,
     edge: BorderEdge,
-) -> Option<&'a cell_format::Side> {
+) -> Option<&cell_format::Side> {
     let source = source?;
     match edge {
         BorderEdge::Start => source.start.as_ref(),

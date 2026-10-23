@@ -1823,15 +1823,16 @@ fn typed_facet_equal_to_pending_complete_style_releases_capture() {
     let mut edit = configured
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
         .expect("bounded edit");
-    let mut sheet = edit
-        .sheet("Sheet1")
-        .expect("sheet lookup")
-        .expect("worksheet");
-    sheet.style("B1", &accent).expect("pending complete style");
-    sheet
-        .font("B1", &FontChange::new().bold(Some(true)))
-        .expect("typed request equals pending style");
-    drop(sheet);
+    {
+        let mut sheet = edit
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet");
+        sheet.style("B1", &accent).expect("pending complete style");
+        sheet
+            .font("B1", &FontChange::new().bold(Some(true)))
+            .expect("typed request equals pending style");
+    }
     assert!(
         edit.sheets
             .get(&0)
@@ -1869,18 +1870,19 @@ fn source_style_and_reset_release_superseded_typed_capture() {
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
         .expect("bounded edit");
-    let mut sheet = edit
-        .sheet("Sheet1")
-        .expect("sheet lookup")
-        .expect("worksheet");
-    sheet.font("A1", &font).expect("typed style");
-    sheet
-        .style("A1", &source_style)
-        .expect("source style supersession");
-    sheet
-        .set("B1", payload)
-        .expect("released typed capture leaves room for payload");
-    drop(sheet);
+    {
+        let mut sheet = edit
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet");
+        sheet.font("A1", &font).expect("typed style");
+        sheet
+            .style("A1", &source_style)
+            .expect("source style supersession");
+        sheet
+            .set("B1", payload)
+            .expect("released typed capture leaves room for payload");
+    }
     assert!(
         edit.sheets
             .get(&0)
@@ -1907,16 +1909,17 @@ fn source_style_and_reset_release_superseded_typed_capture() {
     let mut edit = source
         .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
         .expect("bounded edit");
-    let mut sheet = edit
-        .sheet("Sheet1")
-        .expect("sheet lookup")
-        .expect("worksheet");
-    sheet.font("B1", &font).expect("typed style");
-    sheet.reset_style("B1").expect("missing reset supersession");
-    sheet
-        .set("C1", payload)
-        .expect("released reset capture leaves room for payload");
-    drop(sheet);
+    {
+        let mut sheet = edit
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet");
+        sheet.font("B1", &font).expect("typed style");
+        sheet.reset_style("B1").expect("missing reset supersession");
+        sheet
+            .set("C1", payload)
+            .expect("released reset capture leaves room for payload");
+    }
     assert!(
         edit.sheets
             .get(&0)

@@ -386,11 +386,10 @@ impl PartPatch {
         self.deltas
             .iter()
             .fold(0usize, |total, delta| {
-                let total = total
+                total
                     .saturating_add(delta.name.as_str().len())
                     .saturating_add(delta.before.as_ref().map_or(0, state_bytes))
-                    .saturating_add(delta.after.as_ref().map_or(0, state_bytes));
-                total
+                    .saturating_add(delta.after.as_ref().map_or(0, state_bytes))
             })
             .saturating_add(self.root.as_ref().map_or(0, |(before, after)| {
                 root_bytes(before).saturating_add(root_bytes(after))
@@ -453,73 +452,74 @@ impl PartPatch {
         let mut observed = 0usize;
         let mut changed_names = BTreeSet::new();
         let mut changes_types = false;
-        let mut add_delta = |name: &PackURI,
-                             before_part: Option<&dyn Part>,
-                             after_part: Option<&dyn Part>|
-         -> Result<()> {
-            let changed = match (before_part, after_part) {
-                (Some(before_part), Some(after_part)) => {
-                    !same_part(before, before_part, after, after_part)?
-                },
-                (None, None) => false,
-                _ => true,
-            };
-            if changed {
-                changed_names.insert(name.as_str().to_owned());
-                if match (before_part, after_part) {
+        {
+            let mut add_delta = |name: &PackURI,
+                                 before_part: Option<&dyn Part>,
+                                 after_part: Option<&dyn Part>|
+             -> Result<()> {
+                let changed = match (before_part, after_part) {
                     (Some(before_part), Some(after_part)) => {
-                        before_part.content_type() != after_part.content_type()
+                        !same_part(before, before_part, after, after_part)?
                     },
                     (None, None) => false,
                     _ => true,
-                } {
-                    changes_types = true;
+                };
+                if changed {
+                    changed_names.insert(name.as_str().to_owned());
+                    if match (before_part, after_part) {
+                        (Some(before_part), Some(after_part)) => {
+                            before_part.content_type() != after_part.content_type()
+                        },
+                        (None, None) => false,
+                        _ => true,
+                    } {
+                        changes_types = true;
+                    }
+                    observed = observed
+                        .saturating_add(name.as_str().len())
+                        .saturating_add(
+                            before_part
+                                .map(|part| state_bytes(before, part))
+                                .transpose()?
+                                .unwrap_or(0),
+                        )
+                        .saturating_add(
+                            after_part
+                                .map(|part| state_bytes(after, part))
+                                .transpose()?
+                                .unwrap_or(0),
+                        );
                 }
-                observed = observed
-                    .saturating_add(name.as_str().len())
-                    .saturating_add(
-                        before_part
-                            .map(|part| state_bytes(before, part))
-                            .transpose()?
-                            .unwrap_or(0),
-                    )
-                    .saturating_add(
-                        after_part
-                            .map(|part| state_bytes(after, part))
-                            .transpose()?
-                            .unwrap_or(0),
-                    );
-            }
-            Ok(())
-        };
+                Ok(())
+            };
 
-        if all {
-            for part in before.try_iter_parts() {
-                let part = part?;
-                add_delta(
-                    part.partname(),
-                    Some(part),
-                    optional_part(after, part.partname())?,
-                )?;
-            }
-            for part in after.try_iter_parts() {
-                let part = part?;
-                if optional_part(before, part.partname())?.is_none() {
-                    add_delta(part.partname(), None, Some(part))?;
+            if all {
+                for part in before.try_iter_parts() {
+                    let part = part?;
+                    add_delta(
+                        part.partname(),
+                        Some(part),
+                        optional_part(after, part.partname())?,
+                    )?;
                 }
-            }
-        } else {
-            for name in names {
-                let name =
-                    PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;
-                add_delta(
-                    &name,
-                    optional_part(before, &name)?,
-                    optional_part(after, &name)?,
-                )?;
+                for part in after.try_iter_parts() {
+                    let part = part?;
+                    if optional_part(before, part.partname())?.is_none() {
+                        add_delta(part.partname(), None, Some(part))?;
+                    }
+                }
+            } else {
+                for name in names {
+                    let name =
+                        PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;
+                    add_delta(
+                        &name,
+                        optional_part(before, &name)?,
+                        optional_part(after, &name)?,
+                    )?;
+                }
             }
         }
-        drop(add_delta);
 
         let root = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
         if !before.same_retained_relationships(after, &root)?
