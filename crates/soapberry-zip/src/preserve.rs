@@ -16,6 +16,7 @@ use crate::{
     accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
     extra_fields::{ExtraFieldId, ExtraFields},
 };
+use std::fmt;
 use std::io::Write;
 use std::mem::size_of;
 use std::num::NonZeroUsize;
@@ -45,6 +46,205 @@ const ZIP64_LOCATOR_SIGNATURE: u32 = 0x0706_4b50;
 /// callers. They remain valid for the lifetime of their index.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PreservationEntryId(u32);
+
+/// A policy failure while preparing a preservation output.
+///
+/// The archive and caller failures remain typed and are available through the
+/// accessors below.  Formatting is deliberately content-free: a caller's
+/// diagnostic cannot become part of a stable ZIP error message or debug log.
+pub enum PreservationAdmissionError<E> {
+    /// The source archive or the prepared output layout was rejected.
+    Archive(Error),
+    /// The caller's recipient policy rejected the prepared output.
+    Admission(E),
+}
+
+impl<E> PreservationAdmissionError<E> {
+    /// Return the archive failure, when the archive could not be prepared.
+    #[must_use]
+    pub fn archive(&self) -> Option<&Error> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(_) => None,
+        }
+    }
+
+    /// Return the caller's policy failure, when admission was rejected.
+    #[must_use]
+    pub fn admission(&self) -> Option<&E> {
+        match self {
+            Self::Archive(_) => None,
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+impl<E> fmt::Debug for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "PreservationAdmissionError::Archive",
+            Self::Admission(_) => "PreservationAdmissionError::Admission",
+        })
+    }
+}
+
+impl<E> fmt::Display for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "preservation archive preparation failed",
+            Self::Admission(_) => "preservation output admission failed",
+        })
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for PreservationAdmissionError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+/// Final per-member facts available to a preservation recipient policy.
+///
+/// All lengths and sizes describe the bytes that the writer will publish,
+/// including any ZIP64 central-record promotion.  The value contains no
+/// member payload or archive bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreservationOutputEntry {
+    raw_name_len: u64,
+    extra_len: u64,
+    comment_len: u64,
+    metadata_len: u64,
+    central_record_len: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+}
+
+impl PreservationOutputEntry {
+    /// Length of the raw central-directory member name.
+    #[must_use]
+    pub const fn raw_name_len(self) -> u64 {
+        self.raw_name_len
+    }
+
+    /// Length of the final central-directory extra-field region.
+    #[must_use]
+    pub const fn extra_len(self) -> u64 {
+        self.extra_len
+    }
+
+    /// Length of the final central-directory file-comment region.
+    #[must_use]
+    pub const fn comment_len(self) -> u64 {
+        self.comment_len
+    }
+
+    /// Length of all variable central-directory metadata, including the raw
+    /// name, extra fields and file comment.
+    #[must_use]
+    pub const fn metadata_len(self) -> u64 {
+        self.metadata_len
+    }
+
+    /// Length of the final central-directory record, including its fixed
+    /// header and variable metadata.
+    #[must_use]
+    pub const fn central_record_len(self) -> u64 {
+        self.central_record_len
+    }
+
+    /// Final compressed payload size declared by the central record.
+    #[must_use]
+    pub const fn compressed_size(self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Final decoded payload size declared by the central record.
+    #[must_use]
+    pub const fn uncompressed_size(self) -> u64 {
+        self.uncompressed_size
+    }
+}
+
+/// Borrowed final layout facts for a preservation recipient policy.
+///
+/// The profile is created only by an admission-enabled write.  It borrows the
+/// small metrics retained by the prepared layout and never owns compressed,
+/// local-record or complete-archive bytes.
+#[derive(Debug)]
+pub struct PreservationOutputProfile<'a> {
+    entries: &'a [PreservationOutputEntry],
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl<'a> PreservationOutputProfile<'a> {
+    /// Bytes before the first local member in the published archive.
+    ///
+    /// Preservation indexes reject source prelude bytes, so this is currently
+    /// always zero. It is exposed explicitly so recipient policies account for
+    /// the complete archive geometry rather than silently assuming a prefix.
+    #[must_use]
+    pub const fn prefix_bytes(&self) -> u64 {
+        self.prefix_bytes
+    }
+
+    /// Number of retained entries in the final archive.
+    #[must_use]
+    pub const fn entry_count(&self) -> u64 {
+        self.entry_count
+    }
+
+    /// Final local-member bytes, including local framing and payload bytes.
+    #[must_use]
+    pub const fn local_bytes(&self) -> u64 {
+        self.local_bytes
+    }
+
+    /// Final central-directory bytes, including promoted records.
+    #[must_use]
+    pub const fn central_directory_bytes(&self) -> u64 {
+        self.central_directory_bytes
+    }
+
+    /// Total variable central-directory metadata bytes.
+    #[must_use]
+    pub const fn central_metadata_bytes(&self) -> u64 {
+        self.central_metadata_bytes
+    }
+
+    /// Final ZIP tail bytes, including ZIP64 EOCD and locator when present.
+    #[must_use]
+    pub const fn tail_bytes(&self) -> u64 {
+        self.tail_bytes
+    }
+
+    /// Final archive-comment bytes.
+    #[must_use]
+    pub const fn archive_comment_bytes(&self) -> u64 {
+        self.archive_comment_bytes
+    }
+
+    /// Exact final archive length, including all framing and the comment.
+    #[must_use]
+    pub const fn archive_bytes(&self) -> u64 {
+        self.archive_bytes
+    }
+
+    /// Final per-entry metrics in central-directory order.
+    #[must_use]
+    pub fn entries(&self) -> &'a [PreservationOutputEntry] {
+        self.entries
+    }
+}
 
 /// A validated source member available to a preservation plan.
 #[derive(Debug, Clone)]
@@ -939,6 +1139,97 @@ where
         self.write_prepared(plan, sink, accounting, None)
     }
 
+    /// Validate a preservation plan, admit its exact final layout, then write
+    /// it to a non-seekable sink. The admission callback runs after all
+    /// compression, ZIP64 promotion and tail preparation, and before the
+    /// first sink byte is accepted.
+    pub fn write_to_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting(plan, sink, &mut accounting, admission)
+    }
+
+    /// [`write_to_with_admission`](Self::write_to_with_admission) while
+    /// recording accepted source bytes in the supplied accounting value.
+    pub fn write_to_with_admission_and_accounting<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(plan, sink, accounting, None, admission)
+    }
+
+    /// Admit the exact final layout of a scheduled preservation write before
+    /// publication. Compression scheduling and the bounded worker session are
+    /// retained; admission is the only additional pre-publication phase.
+    pub fn write_to_with_admission_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting_and_session(
+            plan,
+            sink,
+            &mut accounting,
+            session,
+            wave,
+            cancellation,
+            admission,
+        )
+    }
+
+    /// [`write_to_with_admission_and_session`](Self::write_to_with_admission_and_session)
+    /// while recording accepted source bytes.
+    pub fn write_to_with_admission_and_accounting_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(
+            plan,
+            sink,
+            accounting,
+            Some(ScheduledWave {
+                session,
+                wave,
+                cancellation,
+            }),
+            admission,
+        )
+    }
+
     /// Validates `plan` completely, then writes it to a non-seekable sink,
     /// compressing its regenerated members on an explicit write session.
     ///
@@ -1019,7 +1310,7 @@ where
     fn write_prepared<W>(
         &self,
         plan: &PreservationPlan,
-        mut sink: W,
+        sink: W,
         accounting: &mut ZipOperationAccounting,
         scheduled: Option<ScheduledWave<'_>>,
     ) -> Result<W, Error>
@@ -1029,6 +1320,44 @@ where
         let mut prepared = self.prepare_with(plan, scheduled)?;
         let layout = self.validate_output_layout(&mut prepared)?;
 
+        self.emit_prepared(prepared, layout, sink, accounting)
+    }
+
+    fn write_prepared_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        scheduled: Option<ScheduledWave<'_>>,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut prepared = self
+            .prepare_with(plan, scheduled)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let layout = self
+            .validate_output_layout(&mut prepared)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let profile = build_output_profile(&prepared, &layout, &self.entries)
+            .map_err(PreservationAdmissionError::Archive)?;
+        admission(&profile.view()).map_err(PreservationAdmissionError::Admission)?;
+        self.emit_prepared(prepared, layout, sink, accounting)
+            .map_err(PreservationAdmissionError::Archive)
+    }
+
+    fn emit_prepared<W>(
+        &self,
+        prepared: Vec<PreparedEntry>,
+        layout: OutputLayout,
+        mut sink: W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
         let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
         for &index in &self.local_order {
             if prepared[index].omitted {
@@ -1438,6 +1767,12 @@ where
             central_patches,
             tail,
             output_size,
+            entry_count,
+            local_bytes: local_size,
+            central_directory_bytes: central_size,
+            central_metadata_bytes: central_metadata_bytes(prepared, &self.entries)?,
+            tail_bytes: tail_size,
+            archive_comment_bytes: archive_comment_len,
         })
     }
 }
@@ -1469,6 +1804,178 @@ struct OutputLayout {
     central_patches: Vec<CentralOffsetPatch>,
     tail: PreparedTail,
     output_size: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+}
+
+struct PreparedOutputProfile {
+    entries: Vec<PreservationOutputEntry>,
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl PreparedOutputProfile {
+    fn view(&self) -> PreservationOutputProfile<'_> {
+        PreservationOutputProfile {
+            entries: &self.entries,
+            prefix_bytes: self.prefix_bytes,
+            entry_count: self.entry_count,
+            local_bytes: self.local_bytes,
+            central_directory_bytes: self.central_directory_bytes,
+            central_metadata_bytes: self.central_metadata_bytes,
+            tail_bytes: self.tail_bytes,
+            archive_comment_bytes: self.archive_comment_bytes,
+            archive_bytes: self.archive_bytes,
+        }
+    }
+}
+
+fn central_metadata_bytes(
+    prepared: &[PreparedEntry],
+    source_entries: &[PreservedEntry],
+) -> Result<u64, Error> {
+    prepared.iter().try_fold(0_u64, |total, entry| {
+        if entry.omitted {
+            return Ok(total);
+        }
+        let central = entry.central.checked_bytes(source_entries)?;
+        let fixed = ZipFileHeaderFixed::parse(central)?;
+        let metadata = u64::from(fixed.file_name_len)
+            .checked_add(u64::from(fixed.extra_field_len))
+            .and_then(|size| size.checked_add(u64::from(fixed.file_comment_len)))
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        total
+            .checked_add(metadata)
+            .ok_or_else(|| unsupported("central-directory metadata length"))
+    })
+}
+
+fn central_entry_sizes(central: &[u8]) -> Result<(u64, u64), Error> {
+    let fixed = ZipFileHeaderFixed::parse(central)?;
+    let name_end = ZipFileHeaderFixed::SIZE
+        .checked_add(usize::from(fixed.file_name_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let extra_end = name_end
+        .checked_add(usize::from(fixed.extra_field_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let record_end = extra_end
+        .checked_add(usize::from(fixed.file_comment_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    if record_end != central.len() {
+        return Err(unsupported("central-directory record length"));
+    }
+    let extra = &central[name_end..extra_end];
+    let mut compressed = (
+        u64::from(fixed.compressed_size),
+        fixed.compressed_size == u32::MAX,
+    );
+    let mut uncompressed = (
+        u64::from(fixed.uncompressed_size),
+        fixed.uncompressed_size == u32::MAX,
+    );
+    if !compressed.1 && !uncompressed.1 {
+        return Ok((compressed.0, uncompressed.0));
+    }
+
+    let mut fields = ExtraFields::new(extra);
+    while !fields.remaining_bytes().is_empty() {
+        let Some((field_id, field_data)) = fields.next() else {
+            return Err(unsupported("malformed central extra fields"));
+        };
+        if field_id != ExtraFieldId::ZIP64 {
+            continue;
+        }
+        let mut cursor = 0usize;
+        let read_u64 = |cursor: &mut usize| -> Result<u64, Error> {
+            let end = cursor
+                .checked_add(8)
+                .ok_or_else(|| unsupported("ZIP64 size field"))?;
+            let bytes = field_data
+                .get(*cursor..end)
+                .ok_or_else(|| unsupported("truncated ZIP64 size field"))?;
+            *cursor = end;
+            Ok(u64::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| unsupported("ZIP64 size field"))?,
+            ))
+        };
+        if uncompressed.1 {
+            uncompressed.0 = read_u64(&mut cursor)?;
+            uncompressed.1 = false;
+        }
+        if compressed.1 {
+            compressed.0 = read_u64(&mut cursor)?;
+            compressed.1 = false;
+        }
+        break;
+    }
+    if compressed.1 || uncompressed.1 {
+        return Err(unsupported("missing ZIP64 size fields"));
+    }
+    Ok((compressed.0, uncompressed.0))
+}
+
+fn build_output_profile(
+    prepared: &[PreparedEntry],
+    layout: &OutputLayout,
+    source_entries: &[PreservedEntry],
+) -> Result<PreparedOutputProfile, Error> {
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(
+            usize::try_from(layout.entry_count)
+                .map_err(|_| unsupported("preservation output entry count"))?,
+        )
+        .map_err(|source| allocation("preservation output profile", source))?;
+    let mut metadata_total = 0_u64;
+    for entry in prepared.iter().filter(|entry| !entry.omitted) {
+        let central = entry.central.checked_bytes(source_entries)?;
+        let fixed = ZipFileHeaderFixed::parse(central)?;
+        let metadata_len = u64::from(fixed.file_name_len)
+            .checked_add(u64::from(fixed.extra_field_len))
+            .and_then(|size| size.checked_add(u64::from(fixed.file_comment_len)))
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        metadata_total = metadata_total
+            .checked_add(metadata_len)
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        let (compressed_size, uncompressed_size) = central_entry_sizes(central)?;
+        entries.push(PreservationOutputEntry {
+            raw_name_len: u64::from(fixed.file_name_len),
+            extra_len: u64::from(fixed.extra_field_len),
+            comment_len: u64::from(fixed.file_comment_len),
+            metadata_len,
+            central_record_len: usize_to_u64(central.len(), "central-directory record length")?,
+            compressed_size,
+            uncompressed_size,
+        });
+    }
+    if usize_to_u64(entries.len(), "preservation output entry count")? != layout.entry_count
+        || metadata_total != layout.central_metadata_bytes
+    {
+        return Err(unsupported("preservation output profile mismatch"));
+    }
+    Ok(PreparedOutputProfile {
+        entries,
+        prefix_bytes: 0,
+        entry_count: layout.entry_count,
+        local_bytes: layout.local_bytes,
+        central_directory_bytes: layout.central_directory_bytes,
+        central_metadata_bytes: layout.central_metadata_bytes,
+        tail_bytes: layout.tail_bytes,
+        archive_comment_bytes: layout.archive_comment_bytes,
+        archive_bytes: layout.output_size,
+    })
 }
 
 fn write_prepared_central<W: Write>(
@@ -4031,6 +4538,77 @@ mod tests {
             .unwrap();
 
         assert_eq!(output, data);
+    }
+
+    #[test]
+    fn admission_profile_is_exact_and_rejection_writes_zero_bytes() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let plan = PreservationPlan::copy_all(&index);
+        let mut observed = None;
+        let output = index
+            .write_to_with_admission(&plan, Vec::new(), |profile| {
+                observed = Some((
+                    profile.prefix_bytes(),
+                    profile.entry_count(),
+                    profile.local_bytes(),
+                    profile.central_directory_bytes(),
+                    profile.central_metadata_bytes(),
+                    profile.tail_bytes(),
+                    profile.archive_comment_bytes(),
+                    profile.archive_bytes(),
+                    profile.entries().to_vec(),
+                ));
+                Ok::<(), io::Error>(())
+            })
+            .unwrap();
+        let (
+            prefix,
+            entry_count,
+            local_bytes,
+            central_bytes,
+            metadata_bytes,
+            tail_bytes,
+            comment_bytes,
+            archive_bytes,
+            entries,
+        ) = observed.expect("admission callback must run");
+        assert_eq!(prefix, 0);
+        assert_eq!(entry_count, entries.len() as u64);
+        assert_eq!(archive_bytes, output.len() as u64);
+        assert_eq!(
+            archive_bytes,
+            local_bytes + central_bytes + tail_bytes + comment_bytes
+        );
+        assert_eq!(
+            metadata_bytes,
+            entries.iter().map(|entry| entry.metadata_len()).sum()
+        );
+        assert!(entries.iter().all(|entry| {
+            entry.metadata_len() == entry.raw_name_len() + entry.extra_len() + entry.comment_len()
+        }));
+
+        let mut sink = Vec::new();
+        let one_under = archive_bytes
+            .checked_sub(1)
+            .expect("ordinary archive is non-empty");
+        let error = index
+            .write_to_with_admission(&plan, &mut sink, |profile| {
+                assert!(profile.archive_bytes() > one_under);
+                Err::<(), _>(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "secret policy",
+                ))
+            })
+            .expect_err("one-under admission must refuse");
+        assert!(sink.is_empty(), "admission runs before the first sink byte");
+        assert!(matches!(error, PreservationAdmissionError::Admission(_)));
+        assert_eq!(error.to_string(), "preservation output admission failed");
+        assert_eq!(
+            format!("{error:?}"),
+            "PreservationAdmissionError::Admission"
+        );
     }
 
     #[test]

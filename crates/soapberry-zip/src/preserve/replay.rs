@@ -15,7 +15,7 @@
 
 use super::{
     PreparedCentral, PreparedEntry, PreparedLocal, PreservationEntryId, PreservationIndex,
-    write_prepared_central, write_prepared_local, write_prepared_tail,
+    PreservationOutputProfile, write_prepared_central, write_prepared_local, write_prepared_tail,
 };
 use crate::accounting::{AccountingWriteKind, ZipOperationAccounting};
 use crate::crc::crc32_chunk;
@@ -260,6 +260,11 @@ pub enum ReplayPublicationError<E> {
         actual: Box<ReplayMeasurement>,
         progress: ReplayProgress,
     },
+    Admission {
+        pass: ReplayPass,
+        source: E,
+        progress: ReplayProgress,
+    },
 }
 
 impl<E> ReplayPublicationError<E> {
@@ -270,7 +275,8 @@ impl<E> ReplayPublicationError<E> {
             | Self::Callback { progress, .. }
             | Self::Limit { progress, .. }
             | Self::Sink { progress, .. }
-            | Self::NonDeterministic { progress, .. } => *progress,
+            | Self::NonDeterministic { progress, .. }
+            | Self::Admission { progress, .. } => *progress,
         }
     }
 
@@ -280,7 +286,8 @@ impl<E> ReplayPublicationError<E> {
             Self::Archive { pass, .. }
             | Self::Callback { pass, .. }
             | Self::Limit { pass, .. }
-            | Self::Sink { pass, .. } => *pass,
+            | Self::Sink { pass, .. }
+            | Self::Admission { pass, .. } => *pass,
             Self::NonDeterministic { .. } => ReplayPass::Emit,
         }
     }
@@ -292,7 +299,7 @@ impl<E> ReplayPublicationError<E> {
             | Self::Limit { callback_error, .. }
             | Self::Sink { callback_error, .. } => callback_error.as_ref(),
             Self::Callback { source, .. } => Some(source),
-            Self::NonDeterministic { .. } => None,
+            Self::NonDeterministic { .. } | Self::Admission { .. } => None,
         }
     }
 }
@@ -353,6 +360,9 @@ impl<E: fmt::Display> fmt::Display for ReplayPublicationError<E> {
             Self::NonDeterministic { .. } => {
                 formatter.write_str("replay callback produced different output on emission")
             },
+            Self::Admission { pass, .. } => {
+                write!(formatter, "replay output admission failed during {pass:?}")
+            },
         }
     }
 }
@@ -401,11 +411,93 @@ where
         limits: ReplayLimits,
         sink: W,
         accounting: &mut ZipOperationAccounting,
-        mut callback: F,
+        callback: F,
     ) -> Result<W, ReplayPublicationError<E>>
     where
         W: Write,
         F: FnMut(&mut dyn Write) -> Result<(), E>,
+    {
+        self.write_replacing_with_replay_core(
+            target,
+            compression,
+            limits,
+            sink,
+            accounting,
+            callback,
+            None::<fn(&PreservationOutputProfile<'_>) -> Result<(), E>>,
+        )
+    }
+
+    /// Replace one member with a measured replay and admit the exact final
+    /// archive layout before the first publication byte.
+    pub fn write_replacing_with_replay_with_admission<W, F, A, E>(
+        &self,
+        target: PreservationEntryId,
+        compression: CompressionMethod,
+        limits: ReplayLimits,
+        sink: W,
+        callback: F,
+        admission: A,
+    ) -> Result<W, ReplayPublicationError<E>>
+    where
+        W: Write,
+        F: FnMut(&mut dyn Write) -> Result<(), E>,
+        A: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_replacing_with_replay_with_admission_and_accounting(
+            target,
+            compression,
+            limits,
+            sink,
+            &mut accounting,
+            callback,
+            admission,
+        )
+    }
+
+    /// [`write_replacing_with_replay_with_admission`](Self::write_replacing_with_replay_with_admission)
+    /// while recording accepted generated payload bytes.
+    pub fn write_replacing_with_replay_with_admission_and_accounting<W, F, A, E>(
+        &self,
+        target: PreservationEntryId,
+        compression: CompressionMethod,
+        limits: ReplayLimits,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        callback: F,
+        admission: A,
+    ) -> Result<W, ReplayPublicationError<E>>
+    where
+        W: Write,
+        F: FnMut(&mut dyn Write) -> Result<(), E>,
+        A: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_replacing_with_replay_core(
+            target,
+            compression,
+            limits,
+            sink,
+            accounting,
+            callback,
+            Some(admission),
+        )
+    }
+
+    fn write_replacing_with_replay_core<W, F, A, E>(
+        &self,
+        target: PreservationEntryId,
+        compression: CompressionMethod,
+        limits: ReplayLimits,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        mut callback: F,
+        admission: Option<A>,
+    ) -> Result<W, ReplayPublicationError<E>>
+    where
+        W: Write,
+        F: FnMut(&mut dyn Write) -> Result<(), E>,
+        A: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
     {
         if let Err(source) = limits.validate() {
             return Err(ReplayPublicationError::Archive {
@@ -508,6 +600,21 @@ where
                 callback_error: None,
                 progress: ReplayProgress::Untouched,
             });
+        }
+        if let Some(admission) = admission {
+            let profile = super::build_output_profile(&prepared, &layout, &self.entries).map_err(
+                |source| ReplayPublicationError::Archive {
+                    pass: ReplayPass::Preflight,
+                    source,
+                    callback_error: None,
+                    progress: ReplayProgress::Untouched,
+                },
+            )?;
+            admission(&profile.view()).map_err(|source| ReplayPublicationError::Admission {
+                pass: ReplayPass::Preflight,
+                source,
+                progress: ReplayProgress::Untouched,
+            })?;
         }
 
         let mut sink = ReplaySink::new(sink);

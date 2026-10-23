@@ -518,6 +518,70 @@ fn replay_measure_and_emit_allow_different_callback_chunk_boundaries() {
 }
 
 #[test]
+fn replay_admission_runs_after_measurement_and_before_publication() {
+    let source = source_archive();
+    let payload = b"admitted replay payload";
+    let archive = ZipArchive::from_slice(&source).unwrap().into_zip_archive();
+    let mut buffer = vec![0; RECOMMENDED_BUFFER_SIZE];
+    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let target = target_id(&index);
+    let mut callback_calls = 0;
+    let mut admitted = None;
+    let output = index
+        .write_replacing_with_replay_with_admission(
+            target,
+            CompressionMethod::Deflate,
+            ReplayLimits::default(),
+            Vec::new(),
+            |writer| {
+                callback_calls += 1;
+                writer.write_all(payload)
+            },
+            |profile| {
+                admitted = Some((profile.archive_bytes(), profile.entry_count()));
+                Ok::<(), io::Error>(())
+            },
+        )
+        .unwrap();
+    assert_eq!(callback_calls, 2, "measurement and emission each run once");
+    assert_eq!(
+        admitted,
+        Some((output.len() as u64, index.entries().len() as u64))
+    );
+
+    let mut sink = Vec::new();
+    let mut rejected_calls = 0;
+    let error = index
+        .write_replacing_with_replay_with_admission(
+            target,
+            CompressionMethod::Deflate,
+            ReplayLimits::default(),
+            &mut sink,
+            |writer| {
+                rejected_calls += 1;
+                writer.write_all(payload)
+            },
+            |_profile| {
+                Err::<(), _>(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "secret policy",
+                ))
+            },
+        )
+        .expect_err("admission must reject before publication");
+    assert_eq!(
+        rejected_calls, 1,
+        "rejection occurs before emission callback"
+    );
+    assert!(sink.is_empty());
+    assert!(matches!(error, ReplayPublicationError::Admission { .. }));
+    assert_eq!(
+        error.to_string(),
+        "replay output admission failed during Preflight"
+    );
+}
+
+#[test]
 fn replay_sink_short_writes_produce_exact_output() {
     let source = source_archive();
     let payload = b"short sink replacement payload repeated repeated";
