@@ -1331,6 +1331,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         for (index, part) in view.catalog.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 view.source.ensure_current()?;
+                view.source
+                    .context
+                    .as_ref()
+                    .map(|context| context.check().map_err(map_execution_error))
+                    .transpose()?;
             }
             let metadata = view.archive.metadata_for(part.entry_id)?;
             let bytes = if view.replacement.is_some_and(|(target, _)| target == index) {
@@ -1806,6 +1811,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         for (index, part) in effective.parts.iter().enumerate() {
             if index & 0xff == 0 {
                 package.source.ensure_current()?;
+                package.cache.check_context().map_err(map_execution_error)?;
             }
             let name_bytes = u64::try_from(part.partname(package).membername().len())
                 .map_err(|_| overlay_unavailable("recipient Part name exceeds u64"))?;
@@ -1840,20 +1846,6 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             .package_relationships
             .as_deref()
             .unwrap_or(&package.catalog.package_relationships);
-        let mut total_relationships = 0_u64;
-        check_relationships(limits, package_relationships, &mut total_relationships)?;
-        for part in &effective.parts {
-            check_relationships(
-                limits,
-                part.relationships(package),
-                &mut total_relationships,
-            )?;
-        }
-        limits.check(
-            SourceLimitKind::TotalRelationships,
-            total_relationships,
-            limits.max_total_relationships() as u64,
-        )?;
 
         let content_types_name = package.catalog.content_types_member.as_str();
         let changed_content_types = changed_payload(content_types_name);
@@ -1898,6 +1890,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
 
         let mut relationship_xml_bytes = 0_u64;
         let mut relationship_events = 0_u64;
+        let mut total_relationships = 0_u64;
         let mut relationship_owners = HashSet::new();
         for owner in package.catalog.relationship_xml_metrics.keys() {
             relationship_owners.insert(owner.clone());
@@ -1917,8 +1910,21 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         for part in &effective.parts {
             relationship_owners.insert(part.partname(package).clone());
         }
+        for name in generated_names.iter() {
+            if let Some(owner) = relationship_owner_from_member(name)? {
+                relationship_owners.insert(canonical_relationship_owner(
+                    &package.catalog,
+                    &folded_parts,
+                    &owner,
+                )?);
+            }
+        }
         let mut admitted_relationships = HashMap::new();
-        for owner in relationship_owners {
+        for (index, owner) in relationship_owners.into_iter().enumerate() {
+            if index & 0xff == 0 {
+                package.source.ensure_current()?;
+                package.cache.check_context().map_err(map_execution_error)?;
+            }
             let member = relationship_member_name(&owner)?;
             if is_omitted(&member) {
                 continue;
@@ -1975,6 +1981,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
                 (bytes, events, relationships)
             };
+            // Count and validate the parsed final XML before retaining the map.
+            // This includes physical relationship parts that are not represented
+            // in the source catalog (orphan .rels members).
+            check_relationships(limits, &relationships, &mut total_relationships)?;
             limits.check(
                 SourceLimitKind::RelationshipXmlBytes,
                 bytes,
@@ -1989,11 +1999,29 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
                 .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
             admitted_relationships.insert(owner, relationships);
         }
-        for part in &effective.parts {
-            admitted_relationships
-                .entry(part.partname(package).clone())
-                .or_insert_with(|| part.relationships(package).clone());
+        let package_owner = PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        if let std::collections::hash_map::Entry::Vacant(entry) =
+            admitted_relationships.entry(package_owner)
+        {
+            let relationships = package_relationships.clone();
+            check_relationships(limits, &relationships, &mut total_relationships)?;
+            entry.insert(relationships);
         }
+        for part in &effective.parts {
+            let owner = part.partname(package).clone();
+            if let std::collections::hash_map::Entry::Vacant(entry) =
+                admitted_relationships.entry(owner)
+            {
+                let relationships = part.relationships(package).clone();
+                check_relationships(limits, &relationships, &mut total_relationships)?;
+                entry.insert(relationships);
+            }
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationships,
+            total_relationships,
+            limits.max_total_relationships() as u64,
+        )?;
         limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
             relationship_xml_bytes,
@@ -2108,6 +2136,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         for (index, (entry_id, name)) in package.archive.file_entries().enumerate() {
             if index & 0xff == 0 {
                 package.source.ensure_current()?;
+                package.cache.check_context().map_err(map_execution_error)?;
             }
             if is_omitted(name) {
                 continue;
@@ -2179,7 +2208,11 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         )?;
 
         let mut total_part_bytes = 0_u64;
-        for part in &package.catalog.parts {
+        for (index, part) in package.catalog.parts.iter().enumerate() {
+            if index & 0xff == 0 {
+                package.source.ensure_current()?;
+                package.cache.check_context().map_err(map_execution_error)?;
+            }
             let member = part.partname.membername();
             if is_omitted(member) {
                 continue;
@@ -3284,6 +3317,37 @@ mod tests {
         .unwrap()
     }
 
+    fn physical_orphan_relationship_fixture() -> SourceBackedPackage {
+        const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        const DOCUMENT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
+        const ORPHAN_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="../custom/orphan.xml"/></Relationships>"#;
+        let mut writer = StreamingArchiveWriter::new();
+        writer.write_stored("[Content_Types].xml", CONTENT_TYPES).unwrap();
+        writer
+            .write_stored("_rels/.rels", ROOT_RELATIONSHIPS)
+            .unwrap();
+        writer
+            .write_stored("word/document.xml", b"<document/>")
+            .unwrap();
+        writer
+            .write_stored("word/_rels/document.xml.rels", DOCUMENT_RELATIONSHIPS)
+            .unwrap();
+        writer
+            .write_stored("custom/orphan.xml", b"<orphan/>")
+            .unwrap();
+        writer
+            .write_stored("custom/_rels/missing.xml.rels", ORPHAN_RELATIONSHIPS)
+            .unwrap();
+        SourceBackedPackage::from_vec(
+            writer.finish_to_bytes().unwrap(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+    }
+
     fn test_policy(limits: SourceLimits) -> ArtifactStreamPolicy<'static> {
         ArtifactStreamPolicy {
             phase: ArtifactStreamPhase::Publish,
@@ -3617,5 +3681,35 @@ mod tests {
                 &[appended_member("_rels/.rels", ROOT_RELATIONSHIPS)],
             )
             .is_err());
+    }
+
+    #[test]
+    fn prepared_topology_counts_physical_orphan_relationships() {
+        let package = physical_orphan_relationship_fixture();
+        let mut plan = super::super::SourceTopologyPlan::new();
+        plan.try_replace_part(
+            PackURI::new("/word/document.xml").unwrap(),
+            b"<changed/>".to_vec(),
+        )
+        .unwrap();
+        let prepared = package.prepare_topology(plan).unwrap();
+        let limits = SourceLimits::builder()
+            .max_total_relationships(2)
+            .unwrap()
+            .build()
+            .unwrap();
+        let policy = test_policy(limits);
+        let mut output = Vec::new();
+        let error = prepared
+            .publish_to_stream_with_policy(&mut output, &policy)
+            .expect_err("the orphan relationship must count toward the final total");
+        assert!(matches!(
+            error,
+            OpcError::Limit {
+                kind: SourceLimitKind::TotalRelationships,
+                ..
+            }
+        ));
+        assert!(output.is_empty());
     }
 }
