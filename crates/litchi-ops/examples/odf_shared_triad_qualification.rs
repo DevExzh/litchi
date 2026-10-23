@@ -18,6 +18,8 @@ mod probe {
     use litchi_core::Position;
     use litchi_odf_common::core::{PackageWriter, StreamingArchiveLimits, Structure};
     use litchi_ops::{File, TargetArg, open_bytes};
+    use quick_xml::Reader;
+    use quick_xml::events::Event;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
     use zip::ZipArchive;
@@ -127,18 +129,126 @@ mod probe {
         })
     }
 
-    fn manifest_paths(member: &ArchiveMember) -> Vec<String> {
-        member
+    type ManifestAttributes = Vec<(String, String)>;
+
+    #[derive(Debug, PartialEq, Eq, Clone)]
+    struct ManifestSemantics {
+        root_attributes: ManifestAttributes,
+        ordered_entries: Vec<ManifestAttributes>,
+        normalized_entries: Vec<ManifestAttributes>,
+        other_events: Vec<String>,
+    }
+
+    fn manifest_attributes(
+        element: &quick_xml::events::BytesStart<'_>,
+        reader: &Reader<&[u8]>,
+    ) -> ManifestAttributes {
+        let mut attributes = element
+            .attributes()
+            .map(|attribute| {
+                let attribute = attribute.expect("ODF manifest attribute");
+                let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
+                let value = attribute
+                    .decode_and_unescape_value(reader.decoder())
+                    .expect("ODF manifest attribute value")
+                    .into_owned();
+                (key, value)
+            })
+            .collect::<Vec<_>>();
+        attributes.sort();
+        attributes
+    }
+
+    fn manifest_semantics(member: &ArchiveMember) -> ManifestSemantics {
+        let xml = member
             .content_text
             .as_deref()
-            .unwrap_or_default()
-            .split("<manifest:file-entry ")
-            .skip(1)
-            .filter_map(|entry| {
-                entry
-                    .split_once("manifest:full-path=\"")
-                    .and_then(|(_, value)| value.split_once('"'))
-                    .map(|(path, _)| path.to_owned())
+            .expect("ODF manifest XML is UTF-8");
+        let mut reader = Reader::from_str(xml);
+        let mut root_attributes = Vec::new();
+        let mut ordered_entries = Vec::new();
+        let mut other_events = Vec::new();
+        let mut saw_root = false;
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(element)) | Ok(Event::Empty(element)) => {
+                    let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+                    let attributes = manifest_attributes(&element, &reader);
+                    if !saw_root {
+                        root_attributes = attributes;
+                        saw_root = true;
+                    } else if name.ends_with("file-entry") {
+                        ordered_entries.push(attributes);
+                    } else {
+                        other_events.push(format!("start:{name}:{attributes:?}"));
+                    }
+                },
+                Ok(Event::End(element)) => {
+                    let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+                    if name != "manifest" && !name.ends_with(":manifest") {
+                        other_events.push(format!("end:{name}"));
+                    }
+                },
+                Ok(Event::Text(text)) => {
+                    other_events.push(format!(
+                        "text:{}",
+                        text.decode().expect("ODF manifest text").into_owned()
+                    ));
+                },
+                Ok(Event::CData(text)) => {
+                    other_events.push(format!(
+                        "cdata:{}",
+                        text.decode().expect("ODF manifest CDATA").into_owned()
+                    ));
+                },
+                Ok(Event::Comment(comment)) => {
+                    other_events.push(format!(
+                        "comment:{}",
+                        comment.decode().expect("ODF manifest comment").into_owned()
+                    ));
+                },
+                Ok(Event::Decl(declaration)) => {
+                    other_events.push(format!("decl:{declaration:?}"));
+                },
+                Ok(Event::PI(instruction)) => {
+                    other_events.push(format!("pi:{instruction:?}"));
+                },
+                Ok(Event::DocType(declaration)) => {
+                    other_events.push(format!("doctype:{declaration:?}"));
+                },
+                Ok(Event::Eof) => break,
+                Err(error) => panic!("ODF manifest XML: {error}"),
+            }
+        }
+        assert!(saw_root, "ODF manifest has no root element");
+        let mut normalized_entries = ordered_entries.clone();
+        normalized_entries.sort();
+        ManifestSemantics {
+            root_attributes,
+            ordered_entries,
+            normalized_entries,
+            other_events,
+        }
+    }
+
+    fn manifest_semantics_json(semantics: &ManifestSemantics) -> Value {
+        json!({
+            "root_attributes": semantics.root_attributes,
+            "ordered_entries": semantics.ordered_entries,
+            "normalized_entries": semantics.normalized_entries,
+            "other_events": semantics.other_events,
+        })
+    }
+
+    fn manifest_paths(semantics: &ManifestSemantics) -> Vec<String> {
+        semantics
+            .ordered_entries
+            .iter()
+            .filter_map(|attributes| {
+                attributes
+                    .iter()
+                    .find(|(key, _)| key == "manifest:full-path")
+                    .map(|(_, value)| value.clone())
             })
             .collect()
     }
@@ -151,8 +261,8 @@ mod probe {
             .collect()
     }
 
-    fn manifest_tracks_order(member: &ArchiveMember, members: &[ArchiveMember]) -> bool {
-        let manifest_payloads = manifest_paths(member)
+    fn manifest_tracks_order(semantics: &ManifestSemantics, members: &[ArchiveMember]) -> bool {
+        let manifest_payloads = manifest_paths(semantics)
             .into_iter()
             .filter(|path| path != "/")
             .collect::<Vec<_>>();
@@ -167,6 +277,7 @@ mod probe {
             facade_members.len(),
             "ODM archive member count differs"
         );
+        assert_eq!(leaf_comment, facade_comment, "ODM archive comments differ");
 
         let mut member_rows = Vec::with_capacity(leaf_members.len());
         let mut member_order_exact = true;
@@ -251,8 +362,6 @@ mod probe {
             meta_member_count, 1,
             "ODM archive must contain one meta.xml"
         );
-        let only_meta_content_difference =
-            content_differences.iter().all(|name| name == "meta.xml");
         let manifest_content_difference =
             content_differences == [String::from("META-INF/manifest.xml")];
         let leaf_manifest = leaf_members
@@ -263,12 +372,22 @@ mod probe {
             .iter()
             .find(|member| member.name == "META-INF/manifest.xml")
             .expect("ODM facade manifest");
+        let leaf_manifest_semantics = manifest_semantics(leaf_manifest);
+        let facade_manifest_semantics = manifest_semantics(facade_manifest);
+        let manifest_semantics_equal = leaf_manifest_semantics.root_attributes
+            == facade_manifest_semantics.root_attributes
+            && leaf_manifest_semantics.normalized_entries
+                == facade_manifest_semantics.normalized_entries
+            && leaf_manifest_semantics.other_events == facade_manifest_semantics.other_events;
         let manifest_listing_tracks_order =
-            manifest_paths(leaf_manifest) == manifest_paths(facade_manifest);
-        let leaf_manifest_tracks_order = manifest_tracks_order(leaf_manifest, &leaf_members);
-        let facade_manifest_tracks_order = manifest_tracks_order(facade_manifest, &facade_members);
+            manifest_paths(&leaf_manifest_semantics) == manifest_paths(&facade_manifest_semantics);
+        let leaf_manifest_tracks_order =
+            manifest_tracks_order(&leaf_manifest_semantics, &leaf_members);
+        let facade_manifest_tracks_order =
+            manifest_tracks_order(&facade_manifest_semantics, &facade_members);
         let archive_member_order_and_manifest_listing = !member_order_exact
             && manifest_content_difference
+            && manifest_semantics_equal
             && non_manifest_content_exact
             && non_manifest_metadata_exact
             && non_manifest_record_exact
@@ -277,26 +396,28 @@ mod probe {
             && facade_manifest_tracks_order
             && !manifest_listing_tracks_order;
         let allowed = (member_order_exact
-            && leaf_comment == facade_comment
             && non_meta_content_exact
             && non_meta_metadata_exact
             && meta_metadata_exact
             && non_manifest_record_exact
             && meta_record_exact
-            && only_meta_content_difference)
+            && content_differences.is_empty())
             || archive_member_order_and_manifest_listing;
         let decision = if archive_member_order_and_manifest_listing {
             "archive_member_order_and_manifest_listing"
         } else if content_differences.is_empty() {
             "byte_exact"
         } else {
-            "metadata_member_only"
+            "unadmitted_content_or_metadata_delta"
         };
         let audit = json!({
             "status": "audited",
             "decision": decision,
             "allowed": allowed,
             "archive_comment_equal": leaf_comment == facade_comment,
+            "manifest_semantics_equal": manifest_semantics_equal,
+            "leaf_manifest_semantics": manifest_semantics_json(&leaf_manifest_semantics),
+            "facade_manifest_semantics": manifest_semantics_json(&facade_manifest_semantics),
             "member_order_exact": member_order_exact,
             "leaf_order": leaf_members.iter().map(|member| &member.name).collect::<Vec<_>>(),
             "facade_order": facade_members.iter().map(|member| &member.name).collect::<Vec<_>>(),
@@ -707,17 +828,11 @@ mod probe {
 
     fn odi_changed(
         package: &litchi_odi::Package,
-        geometry: &[Option<String>; 4],
+        geometry: [Option<String>; 4],
     ) -> litchi_odi::Commit {
         let mut edit = package.edit();
-        edit.set_geometry(
-            0,
-            geometry[0].clone(),
-            geometry[1].clone(),
-            geometry[2].clone(),
-            geometry[3].clone(),
-        )
-        .expect("ODI set_geometry");
+        edit.set_geometry(0, geometry[0], geometry[1], geometry[2], geometry[3])
+            .expect("ODI set_geometry");
         edit.commit().expect("ODI changed commit")
     }
 
@@ -753,7 +868,7 @@ mod probe {
         ];
         let target = TargetArg::parse("/frame[1]").expect("ODI target");
 
-        let changed = odi_changed(&package, &geometry);
+        let changed = odi_changed(&package, geometry.clone());
         let noop = odi_noop(&package);
         let changed_output = changed.package().as_bytes().to_vec();
         let changed_repeat = changed.package().to_bytes().expect("ODI publish");
@@ -830,18 +945,28 @@ mod probe {
             "changed": side(&file_source, file.to_bytes().expect("ODI facade source repeat") == file_source, &file_changed_output, &file_changed_repeat, &file_changed_forward, &file_changed_inverse, true, file_changed.diagnostics().changed(), file_changed.patch().is_noop(), file_changed.patch().apply(&file).is_ok(), file_changed.diagnostics().changed(), Some(file_changed.diagnostics().snapshot_bytes()), Some(file_changed.diagnostics().operations()), Some(file_changed.diagnostics().commits())),
             "no_op": side(&file_source, file.to_bytes().expect("ODI facade no-op source") == file_source, &file_noop_output, &file_noop_repeat, &file_noop_forward, &file_noop_inverse, false, file_noop.diagnostics().changed(), file_noop.patch().is_noop(), file_noop.patch().apply(&file).is_ok(), file_noop.diagnostics().changed(), Some(file_noop.diagnostics().snapshot_bytes()), Some(file_noop.diagnostics().operations()), Some(file_noop.diagnostics().commits())),
         });
+        let mut leaf_commit_geometry = vec![geometry.clone(); iterations];
+        let mut leaf_diagnostics_geometry = vec![geometry.clone(); iterations];
+        let mut leaf_publication_geometry = vec![geometry.clone(); iterations];
         let timing = timing(
             mode,
             iterations,
             || {
-                let _ = black_box(odi_changed(&package, &geometry));
+                let geometry = leaf_commit_geometry.pop().expect("ODI timed commit input");
+                let _ = black_box(odi_changed(&package, geometry));
             },
             || {
-                let commit = odi_changed(&package, &geometry);
+                let geometry = leaf_diagnostics_geometry
+                    .pop()
+                    .expect("ODI timed diagnostics input");
+                let commit = odi_changed(&package, geometry);
                 black_box(commit.diagnostics().changed());
             },
             || {
-                let commit = odi_changed(&package, &geometry);
+                let geometry = leaf_publication_geometry
+                    .pop()
+                    .expect("ODI timed publication input");
+                let commit = odi_changed(&package, geometry);
                 black_box(commit.package().to_bytes().expect("ODI timed publish"));
             },
             || {
@@ -892,10 +1017,10 @@ mod probe {
     fn oth_changed(
         package: &litchi_oth::Package,
         position: Position,
-        text: &str,
+        text: String,
     ) -> litchi_oth::Commit {
         let mut edit = package.edit();
-        edit.set_paragraph_text(position, text.to_owned())
+        edit.set_paragraph_text(position, text)
             .expect("OTH set_paragraph_text");
         edit.commit().expect("OTH changed commit")
     }
@@ -931,7 +1056,7 @@ mod probe {
         let position = Position::new(0);
         let target = TargetArg::parse("/body/p[1]").expect("OTH target");
 
-        let changed = oth_changed(&package, position, &changed_text);
+        let changed = oth_changed(&package, position, changed_text.clone());
         let noop = oth_noop(&package);
         let changed_output = changed.package().as_bytes().to_vec();
         let changed_repeat = changed.package().to_bytes().expect("OTH publish");
@@ -1008,18 +1133,28 @@ mod probe {
             "changed": side(&file_source, file.to_bytes().expect("OTH facade source repeat") == file_source, &file_changed_output, &file_changed_repeat, &file_changed_forward, &file_changed_inverse, true, file_changed.diagnostics().changed(), file_changed.patch().is_noop(), file_changed.patch().apply(&file).is_ok(), file_changed.diagnostics().changed(), Some(file_changed.diagnostics().snapshot_bytes()), Some(file_changed.diagnostics().operations()), Some(file_changed.diagnostics().commits())),
             "no_op": side(&file_source, file.to_bytes().expect("OTH facade no-op source") == file_source, &file_noop_output, &file_noop_repeat, &file_noop_forward, &file_noop_inverse, false, file_noop.diagnostics().changed(), file_noop.patch().is_noop(), file_noop.patch().apply(&file).is_ok(), file_noop.diagnostics().changed(), Some(file_noop.diagnostics().snapshot_bytes()), Some(file_noop.diagnostics().operations()), Some(file_noop.diagnostics().commits())),
         });
+        let mut leaf_commit_text = vec![changed_text.clone(); iterations];
+        let mut leaf_diagnostics_text = vec![changed_text.clone(); iterations];
+        let mut leaf_publication_text = vec![changed_text.clone(); iterations];
         let timing = timing(
             mode,
             iterations,
             || {
-                let _ = black_box(oth_changed(&package, position, &changed_text));
+                let text = leaf_commit_text.pop().expect("OTH timed commit input");
+                let _ = black_box(oth_changed(&package, position, text));
             },
             || {
-                let commit = oth_changed(&package, position, &changed_text);
+                let text = leaf_diagnostics_text
+                    .pop()
+                    .expect("OTH timed diagnostics input");
+                let commit = oth_changed(&package, position, text);
                 black_box(commit.diagnostics().changed());
             },
             || {
-                let commit = oth_changed(&package, position, &changed_text);
+                let text = leaf_publication_text
+                    .pop()
+                    .expect("OTH timed publication input");
+                let commit = oth_changed(&package, position, text);
                 black_box(commit.package().to_bytes().expect("OTH timed publish"));
             },
             || {
@@ -1090,9 +1225,12 @@ mod probe {
             .expect("ODM deterministic package")
     }
 
-    fn odm_changed(package: &litchi_odm::Package, title: &str) -> litchi_odm::transaction::Commit {
+    fn odm_changed(
+        package: &litchi_odm::Package,
+        title: String,
+    ) -> litchi_odm::transaction::Commit {
         let mut edit = package.edit();
-        edit.set_title(title.to_owned()).expect("ODM set_title");
+        edit.set_title(title).expect("ODM set_title");
         edit.commit().expect("ODM changed commit")
     }
 
@@ -1123,7 +1261,7 @@ mod probe {
         let changed_title = CHANGED_TEXT.to_owned();
         let target = TargetArg::parse("/metadata").expect("ODM target");
 
-        let changed = odm_changed(&package, &changed_title);
+        let changed = odm_changed(&package, changed_title.clone());
         let noop = odm_noop(&package);
         let changed_output = changed.package().as_bytes().to_vec();
         let changed_repeat = changed.package().to_bytes().expect("ODM publish");
@@ -1200,18 +1338,28 @@ mod probe {
             "changed": side(&file_source, file.to_bytes().expect("ODM facade source repeat") == file_source, &file_changed_output, &file_changed_repeat, &file_changed_forward, &file_changed_inverse, true, file_changed.diagnostics().changed(), file_changed.patch().is_noop(), file_changed.patch().apply(&file).is_ok(), file_changed.diagnostics().changed(), Some(file_changed.diagnostics().snapshot_bytes()), Some(file_changed.diagnostics().operations()), Some(file_changed.diagnostics().commits())),
             "no_op": side(&file_source, file.to_bytes().expect("ODM facade no-op source") == file_source, &file_noop_output, &file_noop_repeat, &file_noop_forward, &file_noop_inverse, false, file_noop.diagnostics().changed(), file_noop.patch().is_noop(), file_noop.patch().apply(&file).is_ok(), file_noop.diagnostics().changed(), Some(file_noop.diagnostics().snapshot_bytes()), Some(file_noop.diagnostics().operations()), Some(file_noop.diagnostics().commits())),
         });
+        let mut leaf_commit_title = vec![changed_title.clone(); iterations];
+        let mut leaf_diagnostics_title = vec![changed_title.clone(); iterations];
+        let mut leaf_publication_title = vec![changed_title.clone(); iterations];
         let timing = timing(
             mode,
             iterations,
             || {
-                let _ = black_box(odm_changed(&package, &changed_title));
+                let title = leaf_commit_title.pop().expect("ODM timed commit input");
+                let _ = black_box(odm_changed(&package, title));
             },
             || {
-                let commit = odm_changed(&package, &changed_title);
+                let title = leaf_diagnostics_title
+                    .pop()
+                    .expect("ODM timed diagnostics input");
+                let commit = odm_changed(&package, title);
                 black_box(commit.diagnostics().changed());
             },
             || {
-                let commit = odm_changed(&package, &changed_title);
+                let title = leaf_publication_title
+                    .pop()
+                    .expect("ODM timed publication input");
+                let commit = odm_changed(&package, title);
                 black_box(commit.package().to_bytes().expect("ODM timed publish"));
             },
             || {
@@ -1283,9 +1431,45 @@ mod probe {
                 "{family} changed native/facade output bytes differ"
             );
         }
+        let (leaf_route, facade_route, changed_marker, no_op) = match family {
+            "odc" => (
+                "Package::edit -> replace_chart(title) -> commit",
+                "File::edit -> set(/, title) -> commit",
+                CHANGED_TEXT,
+                "Package::edit/File::edit with an empty closure",
+            ),
+            "odi" => (
+                "Package::edit -> set_geometry(frame 0) -> commit",
+                "File::edit -> set(/frame[1], geometry) -> commit",
+                "1cm,2cm,3cm,4cm frame geometry",
+                "Package::edit/File::edit with an empty closure",
+            ),
+            "oth" => (
+                "Package::edit -> set_paragraph_text(position 0) -> commit",
+                "File::edit -> set(/body/p[1], text) -> commit",
+                CHANGED_TEXT,
+                "Package::edit/File::edit with an empty closure",
+            ),
+            "odm" => (
+                "Package::edit -> set_title -> commit",
+                "File::edit -> set(/metadata, title) -> commit",
+                CHANGED_TEXT,
+                "Package::edit/File::edit with an empty closure",
+            ),
+            _ => panic!("unknown shared-triad family {family}"),
+        };
         json!({
             "family": family,
             "route": route,
+            "descriptor": {
+                "id": route,
+                "family": family,
+                "source": source,
+                "leaf": leaf_route,
+                "facade": facade_route,
+                "changed_marker": changed_marker,
+                "no_op": no_op,
+            },
             "source_kind": source_kind,
             "source": source,
             "source_bytes": source_bytes.len(),

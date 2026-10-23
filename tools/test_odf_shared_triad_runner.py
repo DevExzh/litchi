@@ -48,6 +48,19 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                 "decision": "byte_exact",
                 "allowed": True,
                 "archive_comment_equal": True,
+                "manifest_semantics_equal": True,
+                "leaf_manifest_semantics": {
+                    "root_attributes": [],
+                    "ordered_entries": [],
+                    "normalized_entries": [],
+                    "other_events": [],
+                },
+                "facade_manifest_semantics": {
+                    "root_attributes": [],
+                    "ordered_entries": [],
+                    "normalized_entries": [],
+                    "other_events": [],
+                },
                 "member_order_exact": True,
                 "non_meta_content_exact": True,
                 "non_manifest_content_exact": True,
@@ -76,6 +89,7 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                 "family": family,
                 "route": route["id"],
                 "source": route["source"],
+                "descriptor": route,
                 "source_bytes": 1,
                 "source_sha256": "1" * 64,
                 "source_pair_exact": True,
@@ -163,6 +177,18 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
         broken = copy.deepcopy(payload)
         broken["families"][3]["paired"]["archive_audit"]["facade_order"] = ["other.xml"]
         with self.assertRaisesRegex(runner.RunnerError, "member names differ"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["decision"] = "metadata_member_only"
+        with self.assertRaisesRegex(runner.RunnerError, "decision is unknown"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["facade_manifest_semantics"]["root_attributes"] = [
+            ["manifest:version", "9.9"]
+        ]
+        with self.assertRaisesRegex(runner.RunnerError, "normalized manifest semantics differ"):
             runner.validate_probe_output(self.manifest, broken)
 
     def test_source_tree_probe_and_lock_are_bound(self) -> None:

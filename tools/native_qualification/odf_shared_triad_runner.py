@@ -41,6 +41,44 @@ ROUTE_IDS = (
     "oth_paragraph_text",
     "odm_title",
 )
+ROUTE_DESCRIPTORS = (
+    {
+        "id": "odc_chart_title",
+        "family": "odc",
+        "source": "litchi_odc::Package::new",
+        "leaf": "Package::edit -> replace_chart(title) -> commit",
+        "facade": "File::edit -> set(/, title) -> commit",
+        "changed_marker": "shared-triad qualification",
+        "no_op": "Package::edit/File::edit with an empty closure",
+    },
+    {
+        "id": "odi_frame_geometry",
+        "family": "odi",
+        "source": "litchi_odi::Package::new",
+        "leaf": "Package::edit -> set_geometry(frame 0) -> commit",
+        "facade": "File::edit -> set(/frame[1], geometry) -> commit",
+        "changed_marker": "1cm,2cm,3cm,4cm frame geometry",
+        "no_op": "Package::edit/File::edit with an empty closure",
+    },
+    {
+        "id": "oth_paragraph_text",
+        "family": "oth",
+        "source": "litchi_oth::Builder::paragraph(before)",
+        "leaf": "Package::edit -> set_paragraph_text(position 0) -> commit",
+        "facade": "File::edit -> set(/body/p[1], text) -> commit",
+        "changed_marker": "shared-triad qualification",
+        "no_op": "Package::edit/File::edit with an empty closure",
+    },
+    {
+        "id": "odm_title",
+        "family": "odm",
+        "source": "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
+        "leaf": "Package::edit -> set_title -> commit",
+        "facade": "File::edit -> set(/metadata, title) -> commit",
+        "changed_marker": "shared-triad qualification",
+        "no_op": "Package::edit/File::edit with an empty closure",
+    },
+)
 PHASES = ("commit_only", "commit_plus_diagnostics", "publication")
 SETUP_PHASES = (
     "deterministic builder or tracked fixture read",
@@ -192,13 +230,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     routes = data.get("routes")
     if not isinstance(routes, list) or any(not isinstance(item, Mapping) for item in routes):
         raise RunnerError("routes must be an ordered list of objects")
-    if tuple(item.get("id") for item in routes) != ROUTE_IDS:
-        raise RunnerError(f"routes must be the reviewed ordered routes {list(ROUTE_IDS)!r}")
-    if tuple(item.get("family") for item in routes) != FAMILIES:
-        raise RunnerError("route families must match the reviewed order")
-    for item in routes:
-        if not isinstance(item, Mapping) or not isinstance(item.get("leaf"), str) or not isinstance(item.get("facade"), str):
-            raise RunnerError("each route must declare leaf and facade lifecycles")
+    if routes != list(ROUTE_DESCRIPTORS):
+        raise RunnerError("routes do not match the exact reviewed descriptors")
 
     phases = data.get("phases")
     if not isinstance(phases, Mapping):
@@ -372,7 +405,6 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
     decision = audit.get("decision")
     if decision not in {
         "byte_exact",
-        "metadata_member_only",
         "archive_member_order_and_manifest_listing",
     }:
         raise RunnerError(f"{label}.archive_audit decision is unknown")
@@ -393,15 +425,21 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
     _require_bool(
         audit,
         "meta_archive_record_exact",
-        decision != "metadata_member_only",
+        True,
         f"{label}.archive_audit",
     )
+    _require_bool(audit, "manifest_semantics_equal", True, f"{label}.archive_audit")
+    leaf_semantics = audit.get("leaf_manifest_semantics")
+    facade_semantics = audit.get("facade_manifest_semantics")
+    if not isinstance(leaf_semantics, Mapping) or not isinstance(facade_semantics, Mapping):
+        raise RunnerError(f"{label}.archive_audit normalized manifest semantics are missing")
+    if leaf_semantics != facade_semantics:
+        raise RunnerError(f"{label}.archive_audit normalized manifest semantics differ")
     _require_bool(audit, "member_order_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
     _require_bool(audit, "non_meta_content_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
     differences = audit.get("content_differences")
     expected_differences = {
         "byte_exact": [],
-        "metadata_member_only": ["meta.xml"],
         "archive_member_order_and_manifest_listing": ["META-INF/manifest.xml"],
     }[decision]
     if differences != expected_differences:
@@ -447,12 +485,12 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
             raise RunnerError(f"{label}.archive_audit member order/name differs")
         expected_content = {
             "byte_exact": True,
-            "metadata_member_only": item["name"] != "meta.xml",
             "archive_member_order_and_manifest_listing": item["name"] != "META-INF/manifest.xml",
         }[audit["decision"]]
-        expected_record = item["name"] != "meta.xml" or audit["decision"] != "metadata_member_only"
-        if audit["decision"] == "archive_member_order_and_manifest_listing" and item["name"] == "META-INF/manifest.xml":
-            expected_record = False
+        expected_record = not (
+            audit["decision"] == "archive_member_order_and_manifest_listing"
+            and item["name"] == "META-INF/manifest.xml"
+        )
         _require_bool(item, "content_equal", expected_content, f"{label}.archive_audit.member")
         expected_metadata = not (
             audit["decision"] == "archive_member_order_and_manifest_listing"
@@ -460,16 +498,20 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         )
         _require_bool(item, "stored_metadata_equal", expected_metadata, f"{label}.archive_audit.member")
         _require_bool(item, "archive_record_equal", expected_record, f"{label}.archive_audit.member")
-    if audit["decision"] == "metadata_member_only" and differences != ["meta.xml"]:
-        raise RunnerError(f"{label}.archive_audit metadata-member decision is not exact")
 
 
-def validate_probe_output(manifest: Mapping[str, Any], payload: Mapping[str, Any]) -> None:
+def validate_probe_output(
+    manifest: Mapping[str, Any],
+    payload: Mapping[str, Any],
+    expected_mode: str | None = None,
+) -> None:
     if payload.get("schema") != OUTPUT_SCHEMA:
         raise RunnerError("probe output schema differs from the manifest")
     mode = payload.get("mode")
     if mode not in ("validate", "timed"):
         raise RunnerError("probe output mode is invalid")
+    if expected_mode is not None and mode != expected_mode:
+        raise RunnerError(f"probe output mode {mode!r} differs from requested mode {expected_mode!r}")
     if payload.get("claim_scope") != CLAIM_SCOPE:
         raise RunnerError("probe output claim scope is not non-acceptance")
     rows = payload.get("families")
@@ -483,6 +525,8 @@ def validate_probe_output(manifest: Mapping[str, Any], payload: Mapping[str, Any
         route = route_map[family]
         if row.get("route") != route["id"] or row.get("source") != route["source"]:
             raise RunnerError(f"{family} route/source identity differs")
+        if row.get("descriptor") != route:
+            raise RunnerError(f"{family} route descriptor differs")
         if row.get("source_pair_exact") is not True:
             raise RunnerError(f"{family} native/facade source bytes were not proven equal")
         _require_hash(row.get("source_sha256"), f"{family}.source_sha256")
@@ -611,7 +655,7 @@ def run_probe(
         raise RunnerError(f"probe stdout is not one JSON object: {error}") from error
     if not isinstance(payload, Mapping):
         raise RunnerError("probe stdout root must be an object")
-    validate_probe_output(manifest, payload)
+    validate_probe_output(manifest, payload, mode)
     target_bytes = _directory_size(target_dir)
     if target_bytes > TARGET_PREFLIGHT_BYTES:
         raise RunnerError("target directory exceeded the fixed 19.2 GB preflight limit")
@@ -620,9 +664,14 @@ def run_probe(
     output_hash, output_bytes = _sha256_file(output_path)
     return {
         "command": command,
+        "phase": "run",
         "mode": mode,
         "output": {"path": str(output_path), "sha256": output_hash, "bytes": output_bytes},
-        "stderr": {"path": str(stderr_path), "bytes": len(completed.stderr)},
+        "stderr": {
+            "path": str(stderr_path),
+            "sha256": _sha256_bytes(completed.stderr),
+            "bytes": len(completed.stderr),
+        },
         "target": {"path": str(target_dir), "bytes": _directory_size(target_dir)},
     }
 
@@ -682,6 +731,16 @@ def validate_receipt_bindings(
         observed_hash, observed_bytes = _sha256_file(output_path)
         if observed_hash != output["sha256"] or observed_bytes != output.get("bytes"):
             raise RunnerError("receipt output identity does not match the output file")
+        if run.get("phase") == "run":
+            stderr = run.get("stderr")
+            if not isinstance(stderr, Mapping) or not HASH.fullmatch(str(stderr.get("sha256", ""))):
+                raise RunnerError("receipt stderr identity is missing")
+            stderr_path = _resolve(str(stderr.get("path")))
+            observed_stderr_hash, observed_stderr_bytes = _sha256_file(stderr_path)
+            if observed_stderr_hash != stderr["sha256"] or observed_stderr_bytes != stderr.get("bytes"):
+                raise RunnerError("receipt stderr identity does not match the stderr file")
+        elif run.get("phase") != "validate":
+            raise RunnerError("receipt run phase identity is missing")
 
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -754,8 +813,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             payload = json.loads(output_bytes)
             if not isinstance(payload, Mapping):
                 raise RunnerError("probe output root must be an object")
-            validate_probe_output(manifest, payload)
+            validate_probe_output(manifest, payload, args.mode)
             run = {
+                "phase": "validate",
                 "mode": payload["mode"],
                 "output": {
                     "path": str(output_path),
