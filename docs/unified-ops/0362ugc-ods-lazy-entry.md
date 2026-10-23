@@ -32,11 +32,14 @@ dropped edit and a pristine no-op entry do not pay the protection scan. The
 changed and signed publication paths still use the same owner checks and
 deferred source-backed write path.
 
-The package archive caches its non-reserved resource count when the archive is
-opened, so unified `Package::edit` validates the count without enumerating
-archive members on every entry. Flat ODS edits stage only touched sheets in a
-sparse `BTreeMap`; the full aligned staging vector is materialized only for a
-changed commit. No eager output buffer is created by any of these entries.
+The package archive retains its validated index at open. Resource admission is
+deferred to the first caller-selected operation that needs the count and is
+then cached, so opening does not allocate a file-name census while unified
+`Package::edit` still validates the count before retaining a staged edit. Flat
+ODS edits stage only touched sheets in a sparse `BTreeMap`; the full aligned
+staging vector is materialized only for a changed commit. No eager output
+buffer is created by any of these entries. The follow-up correction is recorded
+in `0362ugca`.
 
 The focused regressions cover both DDE and sheet metadata construction/drop,
 invalid finite limits and canceled contexts before parsing, exact no-op

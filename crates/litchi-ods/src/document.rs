@@ -4345,7 +4345,7 @@ fn validate_package_size(length: usize, limits: Limits) -> CoreResult<()> {
 }
 
 fn validate_resource_count(package: &Archive, limits: Limits) -> CoreResult<()> {
-    let count = package.resource_count();
+    let count = package.resource_count()?;
     if count > limits.resources {
         invalid(format!(
             "ODS resource count limit exceeded: observed {count}, limit {}",

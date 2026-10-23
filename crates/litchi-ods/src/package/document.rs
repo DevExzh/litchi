@@ -59,7 +59,7 @@ const BODY_MARKER: &str = "<office:spreadsheet";
 pub(crate) struct Archive {
     inner: Arc<family::Package>,
     xml_limits: XmlStreamLimits,
-    resource_count: usize,
+    resource_count: std::sync::OnceLock<usize>,
 }
 
 impl fmt::Debug for Archive {
@@ -71,7 +71,7 @@ impl fmt::Debug for Archive {
                 "prepared_index",
                 &self.inner.package().prepared_index_identity(),
             )
-            .field("resources", &self.resource_count)
+            .field("resources", &self.resource_count.get())
             .finish()
     }
 }
@@ -167,15 +167,10 @@ impl Archive {
 
     fn from_family_package(package: family::Package, xml_limits: XmlStreamLimits) -> Result<Self> {
         crate::authoring::validate_content_xml(package.content_xml())?;
-        let resource_count = package
-            .files()?
-            .into_iter()
-            .filter(|path| !crate::document::is_reserved_path(path) && !path.ends_with('/'))
-            .count();
         Ok(Self {
             inner: Arc::new(package),
             xml_limits,
-            resource_count,
+            resource_count: std::sync::OnceLock::new(),
         })
     }
 
@@ -200,8 +195,24 @@ impl Archive {
     }
 
     #[must_use]
-    pub(crate) const fn resource_count(&self) -> usize {
-        self.resource_count
+    pub(crate) fn resource_count(&self) -> Result<usize> {
+        if let Some(count) = self.resource_count.get() {
+            return Ok(*count);
+        }
+        // Resource admission is deliberately deferred until the first
+        // operation that has a caller-selected resource limit. The family
+        // package has already retained its validated indexed archive at this
+        // point; opening a package must not allocate a file-name Vec merely
+        // to prepare a later edit. Once admitted, later validations reuse the
+        // same count.
+        let count = self
+            .inner
+            .files()?
+            .into_iter()
+            .filter(|path| !crate::document::is_reserved_path(path) && !path.ends_with('/'))
+            .count();
+        let _ = self.resource_count.set(count);
+        Ok(self.resource_count.get().copied().unwrap_or(count))
     }
 
     /// Everything a tolerant read repaired while this package was opened.
