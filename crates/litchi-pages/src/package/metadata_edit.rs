@@ -18,6 +18,8 @@ use std::sync::Arc;
 
 use thiserror::Error as ThisError;
 
+pub use litchi_core::edit::Diagnostics;
+
 use super::{Package, PackageError, sidecars};
 
 /// The largest encoded properties sidecar a commit publishes.
@@ -273,14 +275,14 @@ impl<'a> Edit<'a> {
         let changed = expected != current;
         let source_bytes = self.source.state.source.shared_source();
         if !changed {
-            return Ok(Commit {
-                package: self.source.clone(),
-                patch: Patch {
+            return Ok(Commit::new(
+                self.source.clone(),
+                Patch {
                     source: Arc::clone(&source_bytes),
                     target: source_bytes,
                 },
-                diagnostics: Diagnostics { changed: false },
-            });
+                Diagnostics::UNCHANGED,
+            ));
         }
         let mut dictionary = sidecars::properties(self.source)
             .map_err(|_error| Error::InvalidSource)?
@@ -318,14 +320,14 @@ impl<'a> Edit<'a> {
             return Err(Error::Verification);
         }
         let target = package.state.source.shared_source();
-        Ok(Commit {
+        Ok(Commit::new(
             package,
-            patch: Patch {
+            Patch {
                 source: source_bytes,
                 target,
             },
-            diagnostics: Diagnostics { changed: true },
-        })
+            Diagnostics::CHANGED,
+        ))
     }
 }
 
@@ -362,60 +364,8 @@ impl Patch {
     }
 }
 
-/// Compact evidence describing one document-properties commit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the package differs from its source.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
-
 /// The verified result of one document-properties transaction.
-#[must_use = "a document-properties commit contains the validated package snapshot"]
-#[derive(Debug)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Borrow the reopened immutable package snapshot.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Consume the commit and return its package snapshot.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit and return its package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-
-    /// Borrow the reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Borrow compact publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 impl Package {
     /// Stage a document-properties transaction.
@@ -428,22 +378,29 @@ impl Package {
     }
 
     /// Apply a document-properties patch to the exact package it was made
-    /// from.
+    /// from and return the replay commit triad.
     ///
     /// # Errors
     ///
     /// [`Error::PatchConflict`] unless this package's bytes equal the
     /// patch's source; [`Error::Verification`] when the target fails to
     /// reopen.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self, Error> {
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit, Error> {
         if self.state.source.source_bytes() != patch.source.as_ref() {
             return Err(Error::PatchConflict);
         }
-        if patch.is_noop() {
-            return Ok(self.clone());
-        }
-        let limits = self.state.source.limits();
-        Self::from_bytes_with_archive_limits(&patch.target, limits)
-            .map_err(|_error: PackageError| Error::Verification)
+        let changed = !patch.is_noop();
+        let package = if changed {
+            let limits = self.state.source.limits();
+            Self::from_bytes_with_archive_limits(&patch.target, limits)
+                .map_err(|_error: PackageError| Error::Verification)?
+        } else {
+            self.clone()
+        };
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(changed),
+        ))
     }
 }

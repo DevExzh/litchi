@@ -77,8 +77,12 @@ fn metadata_edits_round_trip_and_invert() -> TestResult {
         ))
     ));
 
-    let restored = commit.package().apply_metadata(&commit.patch().inverse())?;
-    assert_eq!(restored.to_bytes()?, original);
+    let inverse = commit.patch().inverse();
+    let restored = commit.package().apply_metadata(&inverse)?;
+    assert!(!restored.patch().is_noop());
+    assert!(restored.diagnostics().changed());
+    assert_eq!(restored.patch(), &inverse);
+    assert_eq!(restored.package().to_bytes()?, original);
     assert!(matches!(
         package.apply_metadata(&commit.patch().inverse()),
         Err(MetadataError::PatchConflict)
@@ -97,7 +101,13 @@ fn metadata_edits_round_trip_and_invert() -> TestResult {
     noop.set_title(package.metadata().title.as_deref())?;
     let unchanged = noop.commit()?;
     assert!(!unchanged.diagnostics().changed());
+    assert!(unchanged.patch().is_noop());
     assert_eq!(unchanged.package().to_bytes()?, original);
+
+    let replayed_noop = package.apply_metadata(unchanged.patch())?;
+    assert!(!replayed_noop.diagnostics().changed());
+    assert!(replayed_noop.patch().is_noop());
+    assert_eq!(replayed_noop.package().to_bytes()?, original);
 
     let mut invalid = package.edit_metadata();
     assert!(matches!(
