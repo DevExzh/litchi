@@ -4,9 +4,17 @@
   "output_dir": "$NATIVE_QUAL_OUTPUT",
   "path_prepend": ["$LITCHI_COORD_BIN"],
   "rounds": 31,
-  "target_limit_bytes": 21474836480,
-  "memory_limit_bytes": 21474836480,
   "abba_order": ["before", "after", "after", "before"],
+  "validators": [
+    {
+      "id": "historical-analyze",
+      "script": "$W4B_ANALYZER",
+      "argv": ["python3", "$W4B_ANALYZER", "{output_dir}"],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
   "shared": {
     "probe_paths": [
       "crates/litchi-ops/examples/xlsb_w4b_probe.rs",
@@ -43,12 +51,16 @@
           "id": "probe",
           "binary": "{target_dir}/release/examples/xlsb_w4b_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/probe-{leg}-{index}.json",
+          "stderr": "{output_dir}/probe-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
           "id": "sheet",
           "binary": "{target_dir}/release/examples/sheet_dispatch_bench",
           "argv": [],
+          "stdout": "{output_dir}/sheet-{leg}-{index}.txt",
+          "stderr": "{output_dir}/sheet-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
@@ -56,6 +68,8 @@
           "binary": "{target_dir}/release/xlsb_crud",
           "argv": ["--case", "all", "--backend", "owned", "--fixture", "{fixture}", "--warmup", "3", "--samples", "{rounds}", "--json", "{output}"],
           "outputs": ["{output_dir}/crud-{leg}-{index}.json"],
+          "stdout": "{output_dir}/crud-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/crud-{leg}-{index}.stderr",
           "require_stdout": false
         }
       ]
@@ -87,12 +101,16 @@
           "id": "probe",
           "binary": "{target_dir}/release/examples/xlsb_w4b_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/probe-{leg}-{index}.json",
+          "stderr": "{output_dir}/probe-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
           "id": "sheet",
           "binary": "{target_dir}/release/examples/sheet_dispatch_bench",
           "argv": [],
+          "stdout": "{output_dir}/sheet-{leg}-{index}.txt",
+          "stderr": "{output_dir}/sheet-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
@@ -100,6 +118,8 @@
           "binary": "{target_dir}/release/xlsb_crud",
           "argv": ["--case", "all", "--backend", "owned", "--fixture", "{fixture}", "--warmup", "3", "--samples", "{rounds}", "--json", "{output}"],
           "outputs": ["{output_dir}/crud-{leg}-{index}.json"],
+          "stdout": "{output_dir}/crud-{leg}-{index}.stdout",
+          "stderr": "{output_dir}/crud-{leg}-{index}.stderr",
           "require_stdout": false
         }
       ]

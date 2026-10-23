@@ -4,9 +4,17 @@
   "output_dir": "$NATIVE_QUAL_OUTPUT",
   "path_prepend": ["$LITCHI_COORD_BIN"],
   "rounds": 31,
-  "target_limit_bytes": 21474836480,
-  "memory_limit_bytes": 21474836480,
   "abba_order": ["before", "after", "after", "before"],
+  "validators": [
+    {
+      "id": "historical-analyze",
+      "script": "$W5_ANALYZER",
+      "argv": ["python3", "$W5_ANALYZER", "{output_dir}"],
+      "cwd": "{output_dir}",
+      "outputs": ["{output_dir}/summary.json"],
+      "require_stdout": true
+    }
+  ],
   "environment": {
     "LITCHI_PROBE_BATCH_ROUNDS": "7"
   },
@@ -37,12 +45,16 @@
           "id": "source",
           "binary": "{target_dir}/release/examples/legacy_w5_source_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/source-{leg}-{index}.json",
+          "stderr": "{output_dir}/source-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
           "id": "ops",
           "binary": "{target_dir}/release/examples/legacy_w5_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/ops-{leg}-{index}.json",
+          "stderr": "{output_dir}/ops-{leg}-{index}.stderr",
           "require_stdout": true
         }
       ]
@@ -66,12 +78,16 @@
           "id": "source",
           "binary": "{target_dir}/release/examples/legacy_w5_source_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/source-{leg}-{index}.json",
+          "stderr": "{output_dir}/source-{leg}-{index}.stderr",
           "require_stdout": true
         },
         {
           "id": "ops",
           "binary": "{target_dir}/release/examples/legacy_w5_probe",
           "argv": ["{rounds}"],
+          "stdout": "{output_dir}/ops-{leg}-{index}.json",
+          "stderr": "{output_dir}/ops-{leg}-{index}.stderr",
           "require_stdout": true
         }
       ]

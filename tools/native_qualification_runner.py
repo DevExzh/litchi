@@ -38,13 +38,16 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 from typing import Any, Iterable, Mapping, Sequence
 
 
 SCHEMA = "litchi.native-qualification.v1"
 ABBA_ORDER = ("before", "after", "after", "before")
-MAX_TARGET_BYTES = 20 * 1024**3
-DEFAULT_MEMORY_BYTES = 20 * 1024**3
+ROUNDS = 31
+TARGET_PREFLIGHT_BYTES = 19_200_000_000
+TARGET_HARD_LIMIT_BYTES = 20_000_000_000
+MEMORY_HARD_LIMIT_BYTES = 20_000_000_000
 HEAVY_NAMES = frozenset(
     {
         "cargo",
@@ -78,6 +81,10 @@ def _sha256_bytes(data: bytes) -> str:
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
+    if path.is_symlink():
+        raise RunnerError(f"refusing to follow symlinked file: {path}")
+    if not path.is_file():
+        raise RunnerError(f"expected a regular file: {path}")
     digest = hashlib.sha256()
     size = 0
     with path.open("rb") as stream:
@@ -119,10 +126,22 @@ def _under(path: Path, parent: Path) -> bool:
     return True
 
 
+def _overlap(left: Path, right: Path) -> bool:
+    return left == right or _under(left, right) or _under(right, left)
+
+
 def _ensure_external(path: Path, source_roots: Iterable[Path], label: str) -> None:
     for root in source_roots:
         if _under(path, root):
             raise RunnerError(f"{label} must be outside source worktrees: {path}")
+
+
+def _ensure_disjoint(paths: Mapping[str, Path]) -> None:
+    items = list(paths.items())
+    for index, (left_name, left) in enumerate(items):
+        for right_name, right in items[index + 1 :]:
+            if _overlap(left, right):
+                raise RunnerError(f"paths must be pairwise disjoint: {left_name}={left}, {right_name}={right}")
 
 
 def _directory_size(path: Path) -> int:
@@ -155,12 +174,12 @@ def _hash_paths(paths: Iterable[Path]) -> dict[str, Any]:
 
     entries: list[tuple[str, Path]] = []
     for path in paths:
+        if path.is_symlink():
+            raise RunnerError(f"identity path may not be a symlink: {path}")
         path = path.resolve(strict=False)
         _reject_3rdparty(path)
         if not path.exists():
             raise RunnerError(f"identity path does not exist: {path}")
-        if path.is_symlink():
-            raise RunnerError(f"identity path may not be a symlink: {path}")
         if path.is_file():
             entries.append((path.name, path))
             continue
@@ -262,21 +281,18 @@ def load_manifest(path: Path) -> dict[str, Any]:
     data = _expand_environment(data)
     if data.get("schema") != SCHEMA:
         raise RunnerError(f"manifest schema must be {SCHEMA!r}")
+    if data.get("lane") not in {"w4b-xlsb", "w5-legacy"}:
+        raise RunnerError("lane must be w4b-xlsb or w5-legacy")
     if data.get("abba_order") != list(ABBA_ORDER):
         raise RunnerError(f"abba_order must be {list(ABBA_ORDER)!r}")
+    if data.get("rounds") != ROUNDS:
+        raise RunnerError(f"rounds is fixed at {ROUNDS}")
+    if "target_limit_bytes" in data or "memory_limit_bytes" in data:
+        raise RunnerError("target and memory limits are fixed by the runner, not manifest-configurable")
     if set(data.get("legs", {})) != {"before", "after"}:
         raise RunnerError("manifest legs must contain exactly before and after")
     if not isinstance(data.get("shared", {}), dict):
         raise RunnerError("shared must be an object")
-    try:
-        target_limit = int(data.get("target_limit_bytes", MAX_TARGET_BYTES))
-        memory_limit = int(data.get("memory_limit_bytes", DEFAULT_MEMORY_BYTES))
-    except (TypeError, ValueError) as error:
-        raise RunnerError("target_limit_bytes and memory_limit_bytes must be integers") from error
-    if target_limit <= 0 or target_limit > MAX_TARGET_BYTES:
-        raise RunnerError(f"target_limit_bytes must be in (0, {MAX_TARGET_BYTES}]")
-    if memory_limit < 1024**3 or memory_limit > DEFAULT_MEMORY_BYTES:
-        raise RunnerError(f"memory_limit_bytes must be in [{1024**3}, {DEFAULT_MEMORY_BYTES}]")
     output = _resolve_path(str(data.get("output_dir", "")))
     source_roots: list[Path] = []
     for leg, spec in data["legs"].items():
@@ -307,22 +323,39 @@ def load_manifest(path: Path) -> dict[str, Any]:
                 raise RunnerError(f"program {leg}/{program['id']} needs argv")
             if "binary" not in program:
                 raise RunnerError(f"program {leg}/{program['id']} needs binary")
+            if not isinstance(program.get("outputs", []), list):
+                raise RunnerError(f"program {leg}/{program['id']}.outputs must be a list")
+            for stream in ("stdout", "stderr"):
+                if stream in program and not isinstance(program[stream], str):
+                    raise RunnerError(f"program {leg}/{program['id']}.{stream} must be a path template")
+    validators = data.get("validators", [])
+    if not isinstance(validators, list) or not validators:
+        raise RunnerError("validators must contain at least one lane correctness/analyzer command")
+    validator_ids: set[str] = set()
+    for validator in validators:
+        _validate_validator(validator, "validators")
+        if validator["id"] in validator_ids:
+            raise RunnerError(f"duplicate validator id {validator['id']!r}")
+        validator_ids.add(validator["id"])
     before_ids = [program["id"] for program in data["legs"]["before"]["programs"]]
     after_ids = [program["id"] for program in data["legs"]["after"]["programs"]]
     if before_ids != after_ids:
         raise RunnerError("before and after program order must match")
-    if source_roots[0] == source_roots[1]:
-        raise RunnerError("before and after source_root must be distinct worktrees")
     targets = [_resolve_path(str(data["legs"][leg]["target_dir"])) for leg in ("before", "after")]
-    if targets[0] == targets[1]:
-        raise RunnerError("before and after target_dir must be distinct")
-    _ensure_external(output, source_roots, "output_dir")
-    for leg, spec in data["legs"].items():
-        _ensure_external(_resolve_path(str(spec["target_dir"])), source_roots, f"legs.{leg}.target_dir")
+    _ensure_disjoint(
+        {
+            "source_before": source_roots[0],
+            "source_after": source_roots[1],
+            "target_before": targets[0],
+            "target_after": targets[1],
+            "output": output,
+        }
+    )
     shared = data["shared"]
     for key in ("probe_paths", "fixture_paths"):
         if not isinstance(shared.get(key, []), list):
             raise RunnerError(f"shared.{key} must be a list")
+    _validate_lane_workload(data)
     return data
 
 
@@ -339,6 +372,86 @@ def _validate_command(command: Any, location: str) -> None:
         raise RunnerError(f"{location} command must execute Cargo directly, not {argv[0]!r}")
     if "shell" in command or command.get("shell"):
         raise RunnerError(f"{location} may not use a shell")
+    artifacts = command.get("artifacts", [])
+    if (
+        not isinstance(artifacts, list)
+        or not artifacts
+        or not all(isinstance(item, str) and item for item in artifacts)
+    ):
+        raise RunnerError(f"{location}.artifacts must be a non-empty string list")
+
+
+def _validate_validator(command: Any, location: str) -> None:
+    if not isinstance(command, dict) or not isinstance(command.get("id"), str) or not command["id"]:
+        raise RunnerError(f"{location} entries need a non-empty id")
+    argv = command.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(item, str) for item in argv):
+        raise RunnerError(f"{location}.{command['id']} argv must be a non-empty string list")
+    if command.get("shell"):
+        raise RunnerError(f"{location}.{command['id']} may not use a shell")
+    if not isinstance(command.get("script"), str) or not command["script"]:
+        raise RunnerError(f"{location}.{command['id']} needs a real validator script")
+    outputs = command.get("outputs", [])
+    if not isinstance(outputs, list) or not all(isinstance(item, str) for item in outputs):
+        raise RunnerError(f"{location}.{command['id']}.outputs must be a string list")
+
+
+def _validate_lane_workload(data: Mapping[str, Any]) -> None:
+    expected: dict[str, list[tuple[str, list[str]]]] = {
+        "w4b-xlsb": [
+            ("probe", ["{rounds}"]),
+            ("sheet", []),
+            (
+                "crud",
+                [
+                    "--case",
+                    "all",
+                    "--backend",
+                    "owned",
+                    "--fixture",
+                    "{fixture}",
+                    "--warmup",
+                    "3",
+                    "--samples",
+                    "{rounds}",
+                    "--json",
+                    "{output}",
+                ],
+            ),
+        ],
+        "w5-legacy": [("source", ["{rounds}"]), ("ops", ["{rounds}"])],
+    }
+    expected_programs = expected[str(data["lane"])]
+    for leg, spec in data["legs"].items():
+        actual = [(program["id"], program["argv"]) for program in spec["programs"]]
+        if actual != expected_programs:
+            raise RunnerError(f"{leg} does not preserve the exact {data['lane']} workload")
+        expected_stdout = {
+            "w4b-xlsb": {
+                "probe": "{output_dir}/probe-{leg}-{index}.json",
+                "sheet": "{output_dir}/sheet-{leg}-{index}.txt",
+                "crud": "{output_dir}/crud-{leg}-{index}.stdout",
+            },
+            "w5-legacy": {
+                "source": "{output_dir}/source-{leg}-{index}.json",
+                "ops": "{output_dir}/ops-{leg}-{index}.json",
+            },
+        }[str(data["lane"])]
+        for program in spec["programs"]:
+            if program.get("stdout") != expected_stdout[program["id"]]:
+                raise RunnerError(f"{leg}/{program['id']} does not use the historical analyzer filename")
+    if data["lane"] == "w5-legacy":
+        environment = data.get("environment", {})
+        if environment.get("LITCHI_PROBE_BATCH_ROUNDS") != "7":
+            raise RunnerError("W5 must set LITCHI_PROBE_BATCH_ROUNDS=7")
+        for spec in data["legs"].values():
+            if "environment" in spec and spec["environment"].get("LITCHI_PROBE_BATCH_ROUNDS") != "7":
+                raise RunnerError("W5 leg environment must preserve LITCHI_PROBE_BATCH_ROUNDS=7")
+    validators = data.get("validators", [])
+    if len(validators) != 1 or validators[0].get("id") != "historical-analyze":
+        raise RunnerError("each lane needs exactly one historical-analyze validator")
+    if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
+        raise RunnerError("historical analyzer must write summary.json in the output directory")
 
 
 def _render(value: str, context: Mapping[str, Any]) -> str:
@@ -369,6 +482,62 @@ def normalize_cargo_argv(argv: Sequence[str]) -> list[str]:
     return [*before, *values[separator:]]
 
 
+def _cargo_config_files(cwd: Path) -> list[Path]:
+    files: list[Path] = []
+    current = cwd
+    while True:
+        config_dir = current / ".cargo"
+        for name in ("config.toml", "config"):
+            candidate = config_dir / name
+            if candidate.is_symlink():
+                raise RunnerError(f"Cargo config may not be a symlink: {candidate}")
+            if candidate.exists():
+                files.append(candidate)
+        if current.parent == current:
+            break
+        current = current.parent
+    return files
+
+
+def _validate_cargo_paths(argv: Sequence[str], *, cwd: Path, source: Path, target: Path) -> None:
+    separator = argv.index("--") if "--" in argv else len(argv)
+    before = list(argv[:separator])
+    index = 1
+    while index < len(before):
+        token = before[index]
+        if token == "--config" or token.startswith("--config="):
+            raise RunnerError("Cargo --config is forbidden; it can redirect the target or manifest")
+        if token in {"--target-dir", "--artifact-dir", "--out-dir"} or token.startswith(
+            ("--target-dir=", "--artifact-dir=", "--out-dir=")
+        ):
+            raise RunnerError("Cargo output-directory overrides are forbidden; CARGO_TARGET_DIR is runner-owned")
+        if token == "--manifest-path":
+            if index + 1 >= len(before):
+                raise RunnerError("Cargo --manifest-path has no value")
+            value = before[index + 1]
+            manifest = _resolve_path(value, base=cwd)
+            if not _under(manifest, source) or not manifest.is_file():
+                raise RunnerError(f"Cargo manifest escapes the intended source root: {manifest}")
+            index += 2
+            continue
+        if token.startswith("--manifest-path="):
+            manifest = _resolve_path(token.split("=", 1)[1], base=cwd)
+            if not _under(manifest, source) or not manifest.is_file():
+                raise RunnerError(f"Cargo manifest escapes the intended source root: {manifest}")
+        index += 1
+    for config in _cargo_config_files(cwd):
+        try:
+            data = tomllib.loads(config.read_text(encoding="utf-8"))
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            raise RunnerError(f"cannot parse Cargo config {config}: {error}") from error
+        build = data.get("build", {})
+        if not isinstance(build, dict) or "target-dir" not in build:
+            continue
+        configured = _resolve_path(str(build["target-dir"]), base=config.parent)
+        if configured != target:
+            raise RunnerError(f"Cargo config redirects target outside the runner target: {config} -> {configured}")
+
+
 def _read_proc(pid: int) -> dict[str, Any] | None:
     proc = Path("/proc") / str(pid)
     try:
@@ -386,9 +555,18 @@ def _read_proc(pid: int) -> dict[str, Any] | None:
     fields = right[1].split()
     try:
         parent = int(fields[1])
+        process_group = int(fields[2])
     except (IndexError, ValueError):
         return None
-    return {"pid": pid, "ppid": parent, "comm": comm, "exe": exe, "cwd": cwd, "cmdline": cmdline}
+    return {
+        "pid": pid,
+        "ppid": parent,
+        "pgrp": process_group,
+        "comm": comm,
+        "exe": exe,
+        "cwd": cwd,
+        "cmdline": cmdline,
+    }
 
 
 def _proc_snapshot() -> dict[int, dict[str, Any]]:
@@ -455,6 +633,10 @@ class ProcessGuard:
 
 
 def _json_hash(path: Path) -> tuple[str, int]:
+    # ``Path.exists()`` is false for a dangling symlink.  Check the link first
+    # so a replaced log cannot be silently recorded as an empty stream.
+    if path.is_symlink():
+        raise RunnerError(f"refusing to follow symlinked log: {path}")
     return _sha256_file(path) if path.exists() else (_sha256_bytes(b""), 0)
 
 
@@ -465,15 +647,20 @@ class SafeRunner:
         self.phase = phase
         self.cpu = cpu
         self.guard = ProcessGuard()
-        self.target_limit = int(manifest.get("target_limit_bytes", MAX_TARGET_BYTES))
-        self.memory_limit = int(manifest.get("memory_limit_bytes", DEFAULT_MEMORY_BYTES))
+        self.target_preflight_limit = TARGET_PREFLIGHT_BYTES
+        self.target_limit = TARGET_HARD_LIMIT_BYTES
+        self.memory_limit = MEMORY_HARD_LIMIT_BYTES
         self.output = _resolve_path(str(manifest["output_dir"]))
+        if self.output.is_symlink():
+            raise RunnerError(f"output_dir may not be a symlink: {self.output}")
         self.output.mkdir(parents=True, exist_ok=True)
         self.command_dir = self.output / "commands"
+        if self.command_dir.is_symlink():
+            raise RunnerError(f"command log directory may not be a symlink: {self.command_dir}")
         self.command_dir.mkdir(parents=True, exist_ok=True)
         self.events_path = self.output / f"events-{phase}.jsonl"
         self.receipt_path = self.output / f"{phase}-receipt.json"
-        if self.events_path.exists() or self.receipt_path.exists():
+        if self.events_path.is_symlink() or self.receipt_path.is_symlink() or self.events_path.exists() or self.receipt_path.exists():
             raise RunnerError(
                 f"output already contains {phase} receipt/journal; choose a fresh output_dir: {self.output}"
             )
@@ -503,6 +690,11 @@ class SafeRunner:
 
     def _environment(self, spec: Mapping[str, Any], context: Mapping[str, Any]) -> dict[str, str]:
         env = os.environ.copy()
+        # Do not inherit Cargo's external configuration channels.  The runner
+        # owns CARGO_TARGET_DIR and validates the workspace-local config before
+        # starting a build.
+        env.pop("CARGO_HOME", None)
+        env.pop("CARGO_CONFIG", None)
         path_prepend = [_render(str(value), context) for value in self.manifest.get("path_prepend", [])]
         if path_prepend:
             for path in path_prepend:
@@ -514,6 +706,8 @@ class SafeRunner:
         if not isinstance(custom, dict):
             raise RunnerError("environment must be an object")
         for key, value in custom.items():
+            if key in {"CARGO_HOME", "CARGO_CONFIG"}:
+                raise RunnerError(f"{key} is forbidden because it can inject Cargo path configuration")
             env[str(key)] = _render(str(value), context)
         target = str(context["target_dir"])
         if env.get("CARGO_TARGET_DIR", target) != target:
@@ -521,7 +715,11 @@ class SafeRunner:
         env["CARGO_TARGET_DIR"] = target
         env["CARGO_BUILD_JOBS"] = "1"
         env["CARGO_INCREMENTAL"] = "0"
-        env["LITCHI_MEM_MAX"] = f"{(self.memory_limit + 1024**3 - 1) // 1024**3}G"
+        # The shim's documented value is an explicit 20G cap.  Do not derive
+        # a binary-GiB suffix from the decimal byte ceiling (20e9 would round
+        # down to a misleading 19G).
+        env["LITCHI_MEM_MAX"] = "20G"
+        env.pop("LITCHI_PROBE_ONLY", None)
         return env
 
     @staticmethod
@@ -538,7 +736,24 @@ class SafeRunner:
         return {key: env[key] for key in keys if key in env}
 
     def _identity(self, leg: str) -> dict[str, Any]:
-        return _source_identity(self.manifest["legs"][leg], self.shared)
+        identity = _source_identity(self.manifest["legs"][leg], self.shared)
+        identity["target_dir"] = str(_resolve_path(str(self.manifest["legs"][leg]["target_dir"])))
+        identity["output_dir"] = str(self.output)
+        return identity
+
+    def _build_artifact_paths(
+        self, leg: str, command: Mapping[str, Any], context: Mapping[str, Any]
+    ) -> list[Path]:
+        target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
+        paths: list[Path] = []
+        for value in command.get("artifacts", []):
+            path = _resolve_path(_render(str(value), context))
+            if not _under(path, target) or path == target:
+                raise RunnerError(f"build artifact escapes its leg target: {path}")
+            if path in paths:
+                raise RunnerError(f"build command declares an artifact more than once: {path}")
+            paths.append(path)
+        return paths
 
     def _check_identity(self, leg: str, expected: Mapping[str, Any]) -> dict[str, Any]:
         actual = self._identity(leg)
@@ -547,16 +762,36 @@ class SafeRunner:
                 raise RunnerError(f"source identity changed for {leg}: {key}")
         return actual
 
-    def _check_target(self, target: Path) -> int:
+    def _check_target(self, target: Path, *, preflight: bool = False) -> int:
         if target.is_symlink():
             raise RunnerError(f"target_dir may not be a symlink: {target}")
+        if target.exists() and not target.is_dir():
+            raise RunnerError(f"target_dir is not a directory: {target}")
         size = _directory_size(target)
-        if size > self.target_limit:
-            raise RunnerError(f"target exceeds byte limit: {target} ({size} > {self.target_limit})")
+        limit = self.target_preflight_limit if preflight else self.target_limit
+        if size > limit:
+            label = "preflight" if preflight else "hard"
+            raise RunnerError(f"target exceeds {label} byte limit: {target} ({size} > {limit})")
         return size
 
+    def _require_fresh_target(self, target: Path) -> None:
+        if target.is_symlink():
+            raise RunnerError(f"fresh target may not be a symlink: {target}")
+        if not target.exists():
+            return
+        if not target.is_dir():
+            raise RunnerError(f"fresh target is not a directory: {target}")
+        try:
+            next(target.iterdir())
+        except StopIteration:
+            return
+        raise RunnerError(f"fresh target is not empty; refusing stale artifacts: {target}")
+
     def _append_event(self, event: Mapping[str, Any]) -> None:
-        with self.events_path.open("a", encoding="utf-8") as stream:
+        if self.events_path.is_symlink():
+            raise RunnerError(f"event journal may not be a symlink: {self.events_path}")
+        mode = "x" if not self.events_path.exists() else "a"
+        with self.events_path.open(mode, encoding="utf-8") as stream:
             stream.write(json.dumps(event, sort_keys=True) + "\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -576,6 +811,47 @@ class SafeRunner:
                 process.kill()
             process.wait()
 
+    def _wait_descendants_gone(self, pid: int) -> list[int]:
+        deadline = time.monotonic() + 5.0
+        remaining: set[int] = set()
+        while time.monotonic() < deadline:
+            snapshot = _proc_snapshot()
+            remaining = {
+                child_pid
+                for child_pid, entry in snapshot.items()
+                if child_pid != pid and (child_pid in _descendants(snapshot, pid) or entry.get("pgrp") == pid)
+            }
+            if not remaining:
+                return []
+            time.sleep(0.1)
+        return sorted(remaining)
+
+    def _stabilize_target(self, target: Path) -> int:
+        previous: int | None = None
+        stable = 0
+        for _ in range(10):
+            size = self._check_target(target)
+            if size == previous:
+                stable += 1
+                if stable >= 2:
+                    return size
+            else:
+                stable = 0
+            previous = size
+            time.sleep(0.2)
+        raise RunnerError(f"target size did not stabilize after child exit: {target}")
+
+    def _prepare_log_path(self, path: Path) -> Path:
+        path = _resolve_path(path)
+        if not _under(path, self.output):
+            raise RunnerError(f"log path escapes output_dir: {path}")
+        if path.is_symlink() or path.exists():
+            raise RunnerError(f"refusing to overwrite or follow log path: {path}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.parent.is_symlink():
+            raise RunnerError(f"log parent may not be a symlink: {path.parent}")
+        return path
+
     def _run_command(
         self,
         *,
@@ -587,14 +863,15 @@ class SafeRunner:
         identity: Mapping[str, Any],
         expected_outputs: Sequence[Path] = (),
         require_stdout: bool = False,
+        stdout_path: Path | None = None,
+        stderr_path: Path | None = None,
+        preflight_target: bool = True,
     ) -> dict[str, Any]:
         self.guard.require_quiet()
         target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
-        target_before = self._check_target(target)
-        stdout_path = self.command_dir / f"{event_id}.stdout"
-        stderr_path = self.command_dir / f"{event_id}.stderr"
-        if stdout_path.exists() or stderr_path.exists():
-            raise RunnerError(f"refusing to overwrite existing command logs for {event_id}")
+        target_before = self._check_target(target, preflight=preflight_target)
+        stdout_path = self._prepare_log_path(stdout_path or (self.command_dir / f"{event_id}.stdout"))
+        stderr_path = self._prepare_log_path(stderr_path or (self.command_dir / f"{event_id}.stderr"))
         start = time.monotonic_ns()
         started_at = _now()
         violation: list[dict[str, Any]] = []
@@ -642,8 +919,14 @@ class SafeRunner:
                 runner_error = str(error)
                 returncode = process.returncode if process is not None else None
         ended_at = _now()
+        post_descendants = self._wait_descendants_gone(process.pid) if process is not None else []
+        post_offenders = self.guard.offenders()
+        if post_descendants:
+            runner_error = runner_error or f"child descendants survived exit: {post_descendants}"
+        if post_offenders:
+            runner_error = runner_error or "unrelated Litchi process remained after child exit"
         try:
-            target_after = _directory_size(target)
+            target_after = self._stabilize_target(target)
         except RunnerError as error:
             target_after = -1
             runner_error = runner_error or str(error)
@@ -651,17 +934,28 @@ class SafeRunner:
             runner_error = runner_error or (
                 f"target exceeds byte limit: {target} ({target_after} > {self.target_limit})"
             )
-        stdout_hash, stdout_bytes = _json_hash(stdout_path)
-        stderr_hash, stderr_bytes = _json_hash(stderr_path)
+        try:
+            stdout_hash, stdout_bytes = _json_hash(stdout_path)
+            stderr_hash, stderr_bytes = _json_hash(stderr_path)
+        except RunnerError as error:
+            runner_error = runner_error or str(error)
+            stdout_hash, stdout_bytes = _sha256_bytes(b""), 0
+            stderr_hash, stderr_bytes = _sha256_bytes(b""), 0
         output_records: list[dict[str, Any]] = []
         for output in expected_outputs:
-            if not output.exists() or not output.is_file():
-                output_records.append({"path": str(output), "exists": False})
-                continue
-            output_hash, output_bytes = _sha256_file(output)
-            output_records.append(
-                {"path": str(output), "exists": True, "bytes": output_bytes, "sha256": output_hash}
-            )
+            try:
+                if output.is_symlink():
+                    raise RunnerError(f"child output is a symlink: {output}")
+                if not output.exists() or not output.is_file():
+                    output_records.append({"path": str(output), "exists": False})
+                    continue
+                output_hash, output_bytes = _sha256_file(output)
+                output_records.append(
+                    {"path": str(output), "exists": True, "bytes": output_bytes, "sha256": output_hash}
+                )
+            except RunnerError as error:
+                output_records.append({"path": str(output), "exists": False, "error": str(error)})
+                runner_error = runner_error or str(error)
         try:
             identity_after = self._identity(leg)
         except RunnerError as error:
@@ -678,6 +972,9 @@ class SafeRunner:
             "argv": list(argv),
             "cwd": str(cwd),
             "environment": self._recorded_environment(env),
+            "source_root": identity["source_root"],
+            "target_dir": str(target),
+            "output_dir": str(self.output),
             "start_utc": started_at,
             "end_utc": ended_at,
             "duration_ns": time.monotonic_ns() - start,
@@ -691,6 +988,8 @@ class SafeRunner:
             "source_head": identity["head"],
             "source_identity_after": identity_after,
             "process_guard_violations": violation,
+            "post_exit_descendants": post_descendants,
+            "post_exit_offenders": post_offenders,
             "runner_error": runner_error,
         }
         self._append_event(event)
@@ -721,34 +1020,59 @@ class SafeRunner:
         return configure
 
     def _write_receipt(self, status: str, *, identities: Mapping[str, Any], events: Sequence[Mapping[str, Any]], error: str | None = None) -> None:
+        manifest_hash, _ = _sha256_file(self.manifest_path)
+        runner_path = Path(__file__).resolve()
+        runner_hash, _ = _sha256_file(runner_path)
+        journal_hash, journal_bytes = (
+            _sha256_file(self.events_path) if self.events_path.exists() else (_sha256_bytes(b""), 0)
+        )
         receipt = {
             "schema": SCHEMA,
             "status": status,
             "phase": self.phase,
-            "manifest": str(self.manifest_path),
-            "manifest_sha256": _sha256_file(self.manifest_path)[0],
+            "lane": self.manifest["lane"],
+            "manifest": {"path": str(self.manifest_path), "sha256": manifest_hash},
             "runner": {
-                "path": str(Path(__file__).resolve()),
-                "sha256": _sha256_file(Path(__file__).resolve())[0],
+                "path": str(runner_path),
+                "sha256": runner_hash,
             },
             "created_utc": _now(),
-            "target_limit_bytes": self.target_limit,
-            "memory_limit_bytes": self.memory_limit,
+            "limits": {
+                "target_preflight_bytes": self.target_preflight_limit,
+                "target_hard_bytes": self.target_limit,
+                "memory_bytes": self.memory_limit,
+            },
             "cpu": self.cpu,
             "abba_order": list(ABBA_ORDER),
             "identities": identities,
             "event_count": len(self.recorded_events),
-            "events_sha256": _sha256_file(self.events_path)[0] if self.events_path.exists() else _sha256_bytes(b""),
+            "event_journal": {
+                "path": str(self.events_path),
+                "bytes": journal_bytes,
+                "sha256": journal_hash,
+                "count": len(self.recorded_events),
+            },
         }
         if error is not None:
             receipt["error"] = error
-        self.receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        if self.receipt_path.is_symlink() or self.receipt_path.exists():
+            raise RunnerError(f"refusing to overwrite or follow receipt: {self.receipt_path}")
+        with self.receipt_path.open("x", encoding="utf-8") as stream:
+            stream.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
     def build(self) -> None:
         identities: dict[str, Any] = {}
         try:
             for leg in ("before", "after"):
+                target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
+                self._require_fresh_target(target)
+                self._check_target(target, preflight=True)
+            for leg in ("before", "after"):
                 identity = self._identity(leg)
+                target = _resolve_path(str(identity["target_dir"]))
+                identity["target_initial_bytes"] = self._check_target(target, preflight=True)
                 identities[leg] = identity
                 source = Path(identity["source_root"])
                 context = self._context(leg, 0)
@@ -758,10 +1082,11 @@ class SafeRunner:
                     cwd = _resolve_path(_render(str(command.get("cwd", ".")), context), base=source)
                     if not _under(cwd, source):
                         raise RunnerError(f"build cwd escapes source root: {cwd}")
-                    outputs = [
-                        _resolve_path(_render(str(value), context))
-                        for value in command.get("artifacts", [])
-                    ]
+                    _validate_cargo_paths(argv, cwd=cwd, source=source, target=Path(identity["target_dir"]))
+                    outputs = self._build_artifact_paths(leg, command, context)
+                    for output in outputs:
+                        if output.is_symlink() or output.exists():
+                            raise RunnerError(f"refusing to overwrite or follow build artifact: {output}")
                     self._run_command(
                         event_id=f"build-{leg}-{command['id']}",
                         leg=leg,
@@ -773,13 +1098,13 @@ class SafeRunner:
                     )
                 artifacts = []
                 for command in self.manifest["legs"][leg]["build"]:
-                    for value in command.get("artifacts", []):
-                        path = _resolve_path(_render(str(value), context))
-                        if not path.is_file() or not os.access(path, os.X_OK):
+                    for path in self._build_artifact_paths(leg, command, context):
+                        if path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK):
                             raise RunnerError(f"declared binary is missing or not executable: {path}")
                         digest, size = _sha256_file(path)
                         artifacts.append({"path": str(path), "bytes": size, "sha256": digest})
                 identities[leg]["artifacts"] = artifacts
+                identities[leg]["target_final_bytes"] = self._check_target(target)
             self._write_receipt("passed", identities=identities, events=self.recorded_events)
         except (BaseException,) as error:
             self._write_receipt("failed", identities=identities, events=self.recorded_events, error=str(error))
@@ -787,17 +1112,200 @@ class SafeRunner:
 
     def _load_build_receipt(self) -> dict[str, Any]:
         path = self.output / "build-receipt.json"
-        if not path.is_file():
+        if path.is_symlink() or not path.is_file():
             raise RunnerError(f"ABBA requires a successful build receipt: {path}")
         try:
             receipt = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise RunnerError(f"cannot read build receipt: {error}") from error
-        if receipt.get("status") != "passed" or receipt.get("schema") != SCHEMA:
-            raise RunnerError("build receipt is not a passed native-qualification receipt")
-        if receipt.get("manifest_sha256") != _sha256_file(self.manifest_path)[0]:
-            raise RunnerError("build receipt belongs to a different manifest")
+        self._validate_build_receipt(receipt)
         return receipt
+
+    def _validate_build_receipt(self, receipt: Mapping[str, Any]) -> None:
+        if (
+            receipt.get("status") != "passed"
+            or receipt.get("schema") != SCHEMA
+            or receipt.get("phase") != "build"
+            or receipt.get("lane") != self.manifest["lane"]
+        ):
+            raise RunnerError("build receipt is not a passed build-phase receipt")
+        manifest = receipt.get("manifest")
+        runner = receipt.get("runner")
+        if not isinstance(manifest, dict) or manifest.get("path") != str(self.manifest_path):
+            raise RunnerError("build receipt manifest path does not match the current manifest")
+        manifest_hash, _ = _sha256_file(self.manifest_path)
+        if manifest.get("sha256") != manifest_hash:
+            raise RunnerError("build receipt manifest hash differs from the current manifest")
+        runner_path = str(Path(__file__).resolve())
+        runner_hash, _ = _sha256_file(Path(__file__).resolve())
+        if not isinstance(runner, dict) or runner.get("path") != runner_path or runner.get("sha256") != runner_hash:
+            raise RunnerError("build receipt was produced by a different runner")
+        limits = receipt.get("limits")
+        expected_limits = {
+            "target_preflight_bytes": TARGET_PREFLIGHT_BYTES,
+            "target_hard_bytes": TARGET_HARD_LIMIT_BYTES,
+            "memory_bytes": MEMORY_HARD_LIMIT_BYTES,
+        }
+        if limits != expected_limits:
+            raise RunnerError("build receipt limits are not the runner's fixed limits")
+        if receipt.get("abba_order") != list(ABBA_ORDER):
+            raise RunnerError("build receipt ABBA order differs from the fixed order")
+        journal = receipt.get("event_journal")
+        if not isinstance(journal, dict) or journal.get("path") != str(self.output / "events-build.jsonl"):
+            raise RunnerError("build receipt event journal path does not match")
+        if self.events_path != self.output / "events-abba.jsonl":
+            raise RunnerError("ABBA runner has an unexpected current event journal")
+        build_events_path = self.output / "events-build.jsonl"
+        if build_events_path.is_symlink() or not build_events_path.is_file():
+            raise RunnerError("build event journal is missing or symlinked")
+        journal_hash, journal_bytes = _sha256_file(build_events_path)
+        if journal.get("sha256") != journal_hash or journal.get("bytes") != journal_bytes:
+            raise RunnerError("build event journal hash or size differs from the receipt")
+        lines = build_events_path.read_text(encoding="utf-8").splitlines()
+        if journal.get("count") != len(lines) or receipt.get("event_count") != len(lines):
+            raise RunnerError("build event journal count differs from the receipt")
+        try:
+            events = [json.loads(line) for line in lines]
+        except json.JSONDecodeError as error:
+            raise RunnerError(f"build event journal contains invalid JSON: {error}") from error
+        expected_events: list[tuple[str, str, dict[str, Any]]] = []
+        for leg in ("before", "after"):
+            source = Path(_resolve_path(str(self.manifest["legs"][leg]["source_root"])))
+            context = self._context(leg, 0)
+            for command in self.manifest["legs"][leg]["build"]:
+                argv = normalize_cargo_argv(_render_argv(command["argv"], context))
+                cwd = _resolve_path(_render(str(command.get("cwd", ".")), context), base=source)
+                if not _under(cwd, source):
+                    raise RunnerError(f"build cwd escapes source root: {cwd}")
+                target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
+                _validate_cargo_paths(argv, cwd=cwd, source=source, target=target)
+                expected_events.append(
+                    (
+                        f"build-{leg}-{command['id']}",
+                        leg,
+                        {
+                            "argv": argv,
+                            "cwd": str(cwd),
+                            "source": source,
+                            "target": str(target),
+                            "artifacts": [str(path) for path in self._build_artifact_paths(leg, command, context)],
+                        },
+                    )
+                )
+        if len(events) != len(expected_events):
+            raise RunnerError("build event journal does not contain the complete build order")
+        identities = receipt.get("identities")
+        if not isinstance(identities, dict):
+            raise RunnerError("build receipt identities are missing")
+        seen_log_paths: set[str] = set()
+        for event, (event_id, leg, expectation) in zip(events, expected_events):
+            if not isinstance(event, dict) or event.get("schema") != SCHEMA:
+                raise RunnerError(f"invalid build event for {event_id}")
+            if event.get("event_id") != event_id or event.get("leg") != leg or event.get("argv") != expectation["argv"]:
+                raise RunnerError(f"build event order/argv mismatch for {event_id}")
+            recorded = identities.get(leg)
+            if not isinstance(recorded, dict):
+                raise RunnerError(f"missing source identity for {leg}")
+            if (
+                event.get("source_root") != recorded.get("source_root")
+                or event.get("target_dir") != recorded.get("target_dir")
+                or event.get("cwd") != expectation["cwd"]
+            ):
+                raise RunnerError(f"resolved path identity mismatch for {event_id}")
+            target_record = event.get("target")
+            if (
+                event.get("output_dir") != str(self.output)
+                or not isinstance(target_record, dict)
+                or target_record.get("path") != recorded.get("target_dir")
+            ):
+                raise RunnerError(f"output/target identity mismatch for {event_id}")
+            if event.get("source_identity_sha256") != recorded.get("identity_sha256"):
+                raise RunnerError(f"source identity hash mismatch for {event_id}")
+            identity_after = event.get("source_identity_after")
+            if not isinstance(identity_after, dict) or identity_after.get("identity_sha256") != recorded.get("identity_sha256"):
+                raise RunnerError(f"source identity-after mismatch for {event_id}")
+            if event.get("returncode") != 0 or event.get("runner_error") is not None:
+                raise RunnerError(f"build event is not successful for {event_id}")
+            if event.get("process_guard_violations") or event.get("post_exit_descendants") or event.get("post_exit_offenders"):
+                raise RunnerError(f"build event was not quiet for {event_id}")
+            if (
+                not isinstance(target_record, dict)
+                or target_record.get("path") != expectation["target"]
+                or not isinstance(target_record.get("bytes_before"), int)
+                or not isinstance(target_record.get("bytes_after"), int)
+                or not 0 <= target_record["bytes_before"] <= TARGET_HARD_LIMIT_BYTES
+                or not 0 <= target_record["bytes_after"] <= TARGET_HARD_LIMIT_BYTES
+            ):
+                raise RunnerError(f"build target limits/path are invalid for {event_id}")
+            output_records = event.get("outputs")
+            if (
+                not isinstance(output_records, list)
+                or not all(isinstance(item, dict) for item in output_records)
+                or [item.get("path") for item in output_records] != expectation["artifacts"]
+            ):
+                raise RunnerError(f"build artifact path order differs for {event_id}")
+            for output_record in output_records:
+                output_path = _resolve_path(str(output_record.get("path", "")))
+                if output_path in seen_log_paths:
+                    raise RunnerError(f"build output path is reused for {event_id}: {output_path}")
+                if output_path.is_symlink() or not output_path.is_file():
+                    raise RunnerError(f"build output path is missing or symlinked for {event_id}: {output_path}")
+                output_hash, output_bytes = _sha256_file(output_path)
+                if output_hash != output_record.get("sha256") or output_bytes != output_record.get("bytes"):
+                    raise RunnerError(f"build output hash mismatch for {event_id}: {output_path}")
+                seen_log_paths.add(str(output_path))
+            event_environment = event.get("environment")
+            if not isinstance(event_environment, dict) or {
+                "CARGO_TARGET_DIR": event_environment.get("CARGO_TARGET_DIR"),
+                "CARGO_BUILD_JOBS": event_environment.get("CARGO_BUILD_JOBS"),
+                "CARGO_INCREMENTAL": event_environment.get("CARGO_INCREMENTAL"),
+                "LITCHI_MEM_MAX": event_environment.get("LITCHI_MEM_MAX"),
+            } != {
+                "CARGO_TARGET_DIR": expectation["target"],
+                "CARGO_BUILD_JOBS": "1",
+                "CARGO_INCREMENTAL": "0",
+                "LITCHI_MEM_MAX": "20G",
+            }:
+                raise RunnerError(f"build environment limits/path differ for {event_id}")
+            for stream_name in ("stdout", "stderr"):
+                stream = event.get(stream_name)
+                if not isinstance(stream, dict):
+                    raise RunnerError(f"missing {stream_name} receipt for {event_id}")
+                stream_path = _resolve_path(str(stream.get("path", "")))
+                if not _under(stream_path, self.output) or stream_path.is_symlink() or not stream_path.is_file():
+                    raise RunnerError(f"invalid {stream_name} path for {event_id}")
+                if str(stream_path) in seen_log_paths:
+                    raise RunnerError(f"build log path is reused for {event_id}: {stream_path}")
+                stream_hash, stream_bytes = _sha256_file(stream_path)
+                if stream_hash != stream.get("sha256") or stream_bytes != stream.get("bytes"):
+                    raise RunnerError(f"{stream_name} hash mismatch for {event_id}")
+                seen_log_paths.add(str(stream_path))
+        for leg in ("before", "after"):
+            current = self._identity(leg)
+            recorded = identities.get(leg)
+            if not isinstance(recorded, dict):
+                raise RunnerError(f"missing identity for {leg}")
+            for key in ("source_root", "target_dir", "output_dir", "head", "tree", "source_tree_sha256", "identity_sha256", "lock_paths", "probe_paths", "fixture_paths"):
+                if current.get(key) != recorded.get(key):
+                    raise RunnerError(f"build receipt identity changed for {leg}: {key}")
+            if recorded.get("target_initial_bytes") != 0:
+                raise RunnerError(f"build target was not fresh for {leg}")
+            target = Path(recorded["target_dir"])
+            target_now = self._check_target(target)
+            if target_now != recorded.get("target_final_bytes"):
+                raise RunnerError(f"build target changed before timing for {leg}")
+            artifacts = recorded.get("artifacts")
+            if not isinstance(artifacts, list) or not artifacts:
+                raise RunnerError(f"build artifacts are missing for {leg}")
+            for artifact in artifacts:
+                if not isinstance(artifact, dict):
+                    raise RunnerError(f"build artifact record is malformed for {leg}")
+                artifact_path = _resolve_path(str(artifact.get("path", "")))
+                if not _under(artifact_path, Path(recorded["target_dir"])) or artifact_path.is_symlink() or not artifact_path.is_file():
+                    raise RunnerError(f"build artifact path is not a fresh target artifact: {artifact_path}")
+                artifact_hash, artifact_bytes = _sha256_file(artifact_path)
+                if artifact_hash != artifact.get("sha256") or artifact_bytes != artifact.get("bytes"):
+                    raise RunnerError(f"build artifact hash changed before timing: {artifact_path}")
 
     def abba(self) -> None:
         identities: dict[str, Any] = {}
@@ -847,14 +1355,26 @@ class SafeRunner:
                     for output in output_values:
                         if not _under(output, self.output):
                             raise RunnerError(f"declared child output escapes output_dir: {output}")
-                        if output.exists():
-                            raise RunnerError(f"refusing to overwrite existing child output: {output}")
+                        if output.is_symlink() or output.exists():
+                            raise RunnerError(f"refusing to overwrite or follow child output: {output}")
                         output.parent.mkdir(parents=True, exist_ok=True)
+                        if output.parent.is_symlink():
+                            raise RunnerError(f"child output parent may not be a symlink: {output.parent}")
                     program_context = dict(context)
                     if len(output_values) == 1:
                         program_context["output"] = output_values[0]
                     args = _render_argv([str(value) for value in program["argv"]], program_context)
                     argv = [str(binary), *args]
+                    stdout_path = (
+                        _resolve_path(_render(str(program["stdout"]), program_context))
+                        if "stdout" in program
+                        else None
+                    )
+                    stderr_path = (
+                        _resolve_path(_render(str(program["stderr"]), program_context))
+                        if "stderr" in program
+                        else None
+                    )
                     run_cwd = _resolve_path(str(spec.get("run_cwd", ".")), base=Path(identity["source_root"]))
                     if not _under(run_cwd, Path(identity["source_root"])):
                         raise RunnerError(f"run_cwd escapes source root: {run_cwd}")
@@ -867,7 +1387,44 @@ class SafeRunner:
                         identity=identities[leg],
                         expected_outputs=output_values,
                         require_stdout=bool(program.get("require_stdout", True)),
+                        stdout_path=stdout_path,
+                        stderr_path=stderr_path,
                     )
+            validator_context = self._context("after", len(ABBA_ORDER) + 1)
+            validator_spec = self.manifest["legs"]["after"]
+            validator_env = self._environment(validator_spec, validator_context)
+            for validator in self.manifest["validators"]:
+                validator_id = validator["id"]
+                argv = _render_argv([str(value) for value in validator["argv"]], validator_context)
+                validator_script = _resolve_path(_render(str(validator["script"]), validator_context))
+                if validator_script.is_symlink() or not validator_script.is_file():
+                    raise RunnerError(f"validator script is missing or symlinked: {validator_script}")
+                if len(argv) < 2 or _resolve_path(argv[1]) != validator_script:
+                    raise RunnerError(f"validator argv does not invoke its declared script: {validator_id}")
+                outputs = [
+                    _resolve_path(_render(str(value), validator_context))
+                    for value in validator.get("outputs", [])
+                ]
+                for output in outputs:
+                    if not _under(output, self.output) or output.is_symlink() or output.exists():
+                        raise RunnerError(f"validator output is invalid or already exists: {output}")
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    if output.parent.is_symlink():
+                        raise RunnerError(f"validator output parent may not be a symlink: {output.parent}")
+                validator_cwd = _resolve_path(
+                    _render(str(validator.get("cwd", self.output)), validator_context)
+                )
+                self._run_command(
+                    event_id=f"validator-{validator_id}",
+                    leg="after",
+                    argv=argv,
+                    cwd=validator_cwd,
+                    env=validator_env,
+                    identity=identities["after"],
+                    expected_outputs=outputs,
+                    require_stdout=bool(validator.get("require_stdout", True)),
+                    preflight_target=False,
+                )
             self._write_receipt("passed", identities=identities, events=self.recorded_events)
         except (BaseException,) as error:
             self._write_receipt("failed", identities=identities, events=self.recorded_events, error=str(error))

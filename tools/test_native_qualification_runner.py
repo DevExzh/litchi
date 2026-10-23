@@ -82,6 +82,8 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 "W5_AFTER_SOURCE": str(Path(directory) / "w5-after-source"),
                 "W5_TARGET_ROOT": str(target_root),
                 "LITCHI_COORD_BIN": directory,
+                "W4B_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
+                "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
             }
             old = {key: os.environ.get(key) for key in environment}
             try:
@@ -97,6 +99,148 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     else:
                         os.environ[key] = value
 
+    def test_manifest_cannot_weaken_fixed_limits(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-limits-") as directory:
+            data = json.loads(
+                (ROOT / "tools/native_qualification/manifests/legacy-w5.json").read_text(encoding="utf-8")
+            )
+            data["target_limit_bytes"] = 1
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            old = {key: os.environ.get(key) for key in ("NATIVE_QUAL_OUTPUT", "W5_BEFORE_SOURCE", "W5_AFTER_SOURCE", "W5_TARGET_ROOT", "LITCHI_COORD_BIN", "W5_ANALYZER")}
+            try:
+                os.environ.update(
+                    {
+                        "NATIVE_QUAL_OUTPUT": str(Path(directory) / "output"),
+                        "W5_BEFORE_SOURCE": str(ROOT),
+                        "W5_AFTER_SOURCE": str(Path(directory) / "after"),
+                        "W5_TARGET_ROOT": str(Path(directory) / "targets"),
+                        "LITCHI_COORD_BIN": directory,
+                        "W5_ANALYZER": str(ROOT / "tools/native_qualification_runner.py"),
+                    }
+                )
+                with self.assertRaisesRegex(runner.RunnerError, "fixed"):
+                    runner.load_manifest(path)
+            finally:
+                for key, value in old.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+    def test_pairwise_source_target_output_overlap_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-overlap-") as directory:
+            data = json.loads(
+                (ROOT / "tools/native_qualification/manifests/legacy-w5.json").read_text(encoding="utf-8")
+            )
+            data["output_dir"] = str(Path(directory) / "out")
+            data["legs"]["before"]["source_root"] = str(Path(directory) / "source")
+            data["legs"]["after"]["source_root"] = str(Path(directory) / "source" / "nested")
+            data["legs"]["before"]["target_dir"] = str(Path(directory) / "target-before")
+            data["legs"]["after"]["target_dir"] = str(Path(directory) / "target-after")
+            data["shared"]["probe_paths"] = []
+            data["path_prepend"] = [directory]
+            data["legs"]["before"]["lock_paths"] = ["Cargo.lock"]
+            data["legs"]["after"]["lock_paths"] = ["Cargo.lock"]
+            data["validators"][0]["script"] = str(ROOT / "tools/native_qualification_runner.py")
+            data["validators"][0]["argv"] = ["python3", str(ROOT / "tools/native_qualification_runner.py"), "{output_dir}"]
+            path = Path(directory) / "manifest.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "pairwise"):
+                runner.load_manifest(path)
+
+    def test_cargo_output_override_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-cargo-") as directory:
+            target = Path(directory) / "target"
+            with self.assertRaisesRegex(runner.RunnerError, "output-directory"):
+                runner._validate_cargo_paths(
+                    ["cargo", "build", "--target-dir", str(Path(directory) / "other")],
+                    cwd=ROOT,
+                    source=ROOT,
+                    target=target,
+                )
+            config_dir = Path(directory) / ".cargo"
+            config_dir.mkdir()
+            (config_dir / "config.toml").write_text(
+                '[build]\ntarget-dir = "/tmp/escape-target"\n', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(runner.RunnerError, "redirects target"):
+                runner._validate_cargo_paths(["cargo", "build"], cwd=Path(directory), source=ROOT, target=target)
+
+    def test_build_artifact_must_stay_in_its_leg_target(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-artifact-") as directory:
+            root = Path(directory)
+            target = root / "target"
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(target)}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            with self.assertRaisesRegex(runner.RunnerError, "escapes its leg target"):
+                safe._build_artifact_paths(
+                    "before",
+                    {"artifacts": [str(root / "outside")], "id": "escape"},
+                    {},
+                )
+
+    def test_environment_uses_fixed_decimal_memory_cap(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-env-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(root / "target")}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            env = safe._environment({}, {"target_dir": root / "target"})
+            self.assertEqual(env["LITCHI_MEM_MAX"], "20G")
+            self.assertNotIn("CARGO_HOME", env)
+            self.assertNotIn("CARGO_CONFIG", env)
+
+    def test_symlink_artifact_is_never_hashed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-link-") as directory:
+            root = Path(directory)
+            real = root / "real"
+            real.write_text("artifact", encoding="utf-8")
+            link = root / "link"
+            link.symlink_to(real)
+            with self.assertRaisesRegex(runner.RunnerError, "symlinked"):
+                runner._sha256_file(link)
+
+    def test_dangling_log_link_is_not_recorded_as_empty(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-dangling-") as directory:
+            root = Path(directory)
+            link = root / "log"
+            link.symlink_to(root / "missing")
+            with self.assertRaisesRegex(runner.RunnerError, "symlinked log"):
+                runner._json_hash(link)
+
+    def test_receipt_phase_is_checked_before_any_timing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-receipt-") as directory:
+            root = Path(directory)
+            manifest = {
+                "schema": runner.SCHEMA,
+                "lane": "w5-legacy",
+                "output_dir": str(root / "output"),
+                "abba_order": list(runner.ABBA_ORDER),
+                "legs": {
+                    "before": {"source_root": str(ROOT), "target_dir": str(root / "before")},
+                    "after": {"source_root": str(ROOT), "target_dir": str(root / "after")},
+                },
+            }
+            safe = runner.SafeRunner(manifest, ROOT / "tools/native_qualification_runner.py", "abba", None)
+            with self.assertRaisesRegex(runner.RunnerError, "build-phase"):
+                safe._validate_build_receipt({"schema": runner.SCHEMA, "status": "passed", "phase": "abba", "lane": "w5-legacy"})
+
     def test_failed_child_is_journaled_before_error(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-child-") as directory:
             root = Path(directory)
@@ -107,8 +251,6 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             manifest = {
                 "schema": runner.SCHEMA,
                 "output_dir": str(output),
-                "target_limit_bytes": 20 * 1024**3,
-                "memory_limit_bytes": 1024**3,
                 "abba_order": list(runner.ABBA_ORDER),
                 "shared": {"probe_paths": [str(ROOT / "tools/native_qualification_runner.py")]},
                 "legs": {
@@ -120,7 +262,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     },
                     "after": {
                         "source_root": str(ROOT),
-                        "target_dir": str(target),
+                        "target_dir": str(root / "after-target"),
                         "lock_paths": ["tools/native_qualification_runner.py"],
                         "allow_dirty": True,
                     },
