@@ -671,6 +671,37 @@ fn semantic_create_allocates_around_unrelated_canonical_parts() {
 }
 
 #[test]
+fn semantic_put_admits_catalog_before_loading_existing_graph() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        1,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        1,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Incoming")).unwrap();
+    let error = put(&mut package, catalog, Conformance::Transitional, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary string bytes limit exceeded"),
+        "{error}"
+    );
+}
+
+#[test]
 fn repeated_changed_raw_graph_is_a_signature_preserving_noop() {
     let mut package = package();
     let mut initial = Catalog::new();

@@ -18,8 +18,9 @@ use super::codec::{
     validate_entry_limits, validate_physical_part, write_with_limits,
 };
 use super::graph::{
-    graph_matches_catalog, package_conformance, put_graph_checked, raw, relationship_kind,
-    remove_graph_with_limits, validate_raw_graph_metadata, validate_relationship_metadata,
+    graph_matches_catalog, package_conformance, prepare_graph_for_put, put_prepared_graph, raw,
+    relationship_kind, remove_graph_with_limits, validate_raw_graph_metadata,
+    validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
 use super::{CT, MAX_VALUES, OpcPackage, PackURI, Result};
@@ -531,18 +532,24 @@ impl Transaction {
             return Ok(Commit::new(self.before, patch, false));
         }
         crate::signature_policy::ensure_unsigned(target)?;
+        let prepared = self
+            .draft
+            .as_ref()
+            .map(|graph| prepare_graph_for_put(target, graph, &self.limits))
+            .transpose()?;
         let current = Snapshot::load(target, &self.limits)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary transaction source is stale"));
         }
         let mut candidate = target.clone();
-        match self.draft.as_ref() {
-            Some(graph) => {
-                put_graph_checked(&mut candidate, graph, &self.limits)?;
+        match (self.draft.as_ref(), prepared) {
+            (Some(graph), Some(prepared)) => {
+                put_prepared_graph(&mut candidate, graph, &self.limits, prepared)?;
             },
-            None => {
+            (None, None) => {
                 remove_graph_with_limits(&mut candidate, &self.limits)?;
             },
+            _ => return Err(invalid("glossary transaction draft preparation changed")),
         }
         let snapshot = Snapshot::load(&candidate, &self.limits)?;
         match (self.draft.as_ref(), snapshot.graph.as_ref()) {
@@ -700,6 +707,15 @@ impl Patch {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, target: &mut OpcPackage, limits: &super::Limits) -> Result<Snapshot> {
+        let prepared = if self.is_empty() {
+            None
+        } else {
+            self.after
+                .graph
+                .as_ref()
+                .map(|graph| prepare_graph_for_put(target, graph, limits))
+                .transpose()?
+        };
         let current = Snapshot::load(target, limits)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary patch source is stale"));
@@ -709,13 +725,14 @@ impl Patch {
         }
         crate::signature_policy::ensure_unsigned(target)?;
         let mut candidate = target.clone();
-        match self.after.graph.as_ref() {
-            Some(graph) => {
-                put_graph_checked(&mut candidate, graph, limits)?;
+        match (self.after.graph.as_ref(), prepared) {
+            (Some(graph), Some(prepared)) => {
+                put_prepared_graph(&mut candidate, graph, limits, prepared)?;
             },
-            None => {
+            (None, None) => {
                 remove_graph_with_limits(&mut candidate, limits)?;
             },
+            _ => return Err(invalid("glossary patch preparation changed")),
         }
         let resulting = Snapshot::load(&candidate, limits)?;
         if !resulting.same_source(&self.after) {
@@ -1322,7 +1339,7 @@ fn published_catalog(graph: &raw::Graph, limits: &super::Limits) -> Result<Catal
         }
     }
     let encoded = write_with_limits(&graph.catalog, graph.conformance, limits)?;
-    let (catalog, conformance) = read_with_limits(&encoded, limits)?;
+    let (catalog, conformance) = super::codec::read_admitted_with_limits(&encoded, limits)?;
     if conformance != graph.conformance {
         return Err(invalid("canonical glossary changed conformance"));
     }

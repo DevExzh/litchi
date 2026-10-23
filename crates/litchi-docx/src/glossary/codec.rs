@@ -33,6 +33,16 @@ pub(in crate::glossary) fn read_with_limits(
     // package owner, proves the selected policy before either DOM projection
     // retains strings or the MCE projection is parsed.
     super::graph::raw::admit_xml(xml, limits)?;
+    read_admitted_with_limits(xml, limits)
+}
+
+/// Read XML whose exact bytes have already passed the raw XML admission under
+/// the same policy. This preserves all DOM, MCE, semantic, and catalog checks
+/// without scanning the identical bytes a second time.
+pub(in crate::glossary) fn read_admitted_with_limits(
+    xml: &[u8],
+    limits: &super::Limits,
+) -> Result<(Catalog, Conformance)> {
     let original = parse_dom_with_limits(xml, limits)?;
     let original_conformance = Conformance::from_word(original.ns.as_ref())?;
     let producer_entries = extract_producer_entries(original, original_conformance, limits)?;

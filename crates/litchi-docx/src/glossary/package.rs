@@ -8,7 +8,7 @@
 )]
 //! Package-facing glossary load/store/remove orchestration.
 
-use super::codec::invalid;
+use super::codec::{invalid, validate_catalog_limits};
 use super::graph::{
     catalog_relationship_references, raw, relationship_kind, validate_package_conformance,
 };
@@ -69,6 +69,8 @@ pub(crate) fn put(
 ) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     catalog.validate_bound_lineages()?;
+    validate_catalog_limits(&catalog, limits)?;
+    raw::admit_catalog(&catalog, limits)?;
     let existing = super::graph::load_graph_with_limits(package, limits)?;
     let binding = catalog.binding.take();
     let bound_to_destination = binding

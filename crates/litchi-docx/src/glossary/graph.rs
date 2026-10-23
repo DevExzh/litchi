@@ -424,20 +424,12 @@ pub mod raw {
     pub(in crate::glossary) fn admit_graph(graph: &Graph, limits: &Limits) -> Result<()> {
         super::validate_catalog_limits(&graph.catalog, limits)?;
         admit_catalog(&graph.catalog, limits)?;
-        let generated_root = if graph.root_xml().is_none() {
-            let plan = super::super::codec::plan_write_with_limits(
+        let generated_plan = if graph.root_xml().is_none() {
+            Some(super::super::codec::plan_write_with_limits(
                 &graph.catalog,
                 graph.conformance,
                 limits,
-            )?;
-            let xml = super::super::codec::write_plan_with_limits(
-                &graph.catalog,
-                graph.conformance,
-                &plan,
-                limits,
-            )?;
-            admit_xml(&xml, limits)?;
-            Some(xml)
+            )?)
         } else {
             None
         };
@@ -451,10 +443,20 @@ pub mod raw {
             graph,
             limits,
             graph.root_xml(),
-            generated_root.as_deref(),
-            generated_root.is_some(),
+            None,
+            generated_plan.as_ref().map(|plan| plan.bytes),
+            false,
             owner,
         )?;
+        if let Some(plan) = generated_plan {
+            let xml = super::super::codec::write_plan_with_limits(
+                &graph.catalog,
+                graph.conformance,
+                &plan,
+                limits,
+            )?;
+            admit_xml(&xml, limits)?;
+        }
         Ok(())
     }
 
@@ -462,7 +464,8 @@ pub mod raw {
         graph: &Graph,
         limits: &Limits,
         root_xml: Option<&[u8]>,
-        generated_root: Option<&[u8]>,
+        generated_root_xml: Option<&[u8]>,
+        generated_root_bytes: Option<usize>,
         root_xml_admitted: bool,
         owner_main: &str,
         owner_id: &str,
@@ -472,7 +475,8 @@ pub mod raw {
             graph,
             limits,
             root_xml,
-            generated_root,
+            generated_root_xml,
+            generated_root_bytes,
             root_xml_admitted,
             Some((owner_main, owner_id, owner_target)),
         )?;
@@ -641,7 +645,8 @@ fn admit_graph_ledger(
     graph: &raw::Graph,
     limits: &raw::Limits,
     root_xml: Option<&[u8]>,
-    generated_root: Option<&[u8]>,
+    generated_root_xml: Option<&[u8]>,
+    generated_root_bytes: Option<usize>,
     root_xml_admitted: bool,
     owner: Option<(&str, &str, &str)>,
 ) -> Result<ClosureLedger> {
@@ -653,21 +658,38 @@ fn admit_graph_ledger(
             maximum: part_limit,
         });
     }
-    let root_xml_bytes = match (root_xml, generated_root) {
-        (Some(xml), None) => {
+    let root_xml_bytes = match (root_xml, generated_root_xml, generated_root_bytes) {
+        (Some(xml), None, None) => {
             if !root_xml_admitted {
                 raw::admit_xml(xml, limits)?;
             }
             xml.len()
         },
-        (None, Some(xml)) => {
+        (None, Some(xml), None) => {
             if !root_xml_admitted {
                 raw::admit_xml(xml, limits)?;
             }
             xml.len()
         },
-        (None, None) => 0,
-        (Some(_), Some(_)) => {
+        (None, None, Some(bytes)) => {
+            if bytes > limits.xml_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlBytes,
+                    actual: bytes,
+                    maximum: limits.xml_bytes(),
+                });
+            }
+            if bytes > limits.dom_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::DomBytes,
+                    actual: bytes,
+                    maximum: limits.dom_bytes(),
+                });
+            }
+            bytes
+        },
+        (None, None, None) => 0,
+        _ => {
             return Err(invalid(
                 "glossary graph supplied both source and generated XML",
             ));
@@ -1024,6 +1046,16 @@ struct OwnerPlan {
     insert: bool,
 }
 
+pub(in crate::glossary) struct PreparedGraph {
+    root_uri: PackURI,
+    main: PackURI,
+    owner_target: String,
+    owner_plan: OwnerPlan,
+    preserve_root: bool,
+    generated_xml: Option<Vec<u8>>,
+    effective_catalog: Catalog,
+}
+
 fn plan_owner_relationship(
     main: &dyn Part,
     current_owner_id: Option<&str>,
@@ -1079,6 +1111,15 @@ pub(in crate::glossary) fn put_graph_checked(
     value: &raw::Graph,
     limits: &raw::Limits,
 ) -> Result<bool> {
+    let prepared = prepare_graph_for_put(package, value, limits)?;
+    put_prepared_graph(package, value, limits, prepared)
+}
+
+pub(in crate::glossary) fn prepare_graph_for_put(
+    package: &OpcPackage,
+    value: &raw::Graph,
+    limits: &raw::Limits,
+) -> Result<PreparedGraph> {
     validate_package_conformance(package, value.conformance)?;
     admit_graph_name(&value.root_name, limits)?;
     if let Some(owner_main) = value.owner_main.as_deref() {
@@ -1093,29 +1134,6 @@ pub(in crate::glossary) fn put_graph_checked(
     validate_raw_graph_metadata(value)?;
     validate_catalog_limits(&value.catalog, limits)?;
     raw::admit_catalog(&value.catalog, limits)?;
-    let preserved_catalog = if let Some(xml) = &value.root_xml {
-        let (source, source_conformance) = read_with_limits(xml.as_slice(), limits)?;
-        (source_conformance == value.conformance && source == value.catalog).then_some(source)
-    } else {
-        None
-    };
-    let preserve_root = preserved_catalog.is_some();
-    let generated_plan = if preserve_root {
-        None
-    } else {
-        Some(plan_write_with_limits(
-            &value.catalog,
-            value.conformance,
-            limits,
-        )?)
-    };
-    let generated_xml = if let Some(plan) = generated_plan.as_ref() {
-        let xml = write_plan_with_limits(&value.catalog, value.conformance, plan, limits)?;
-        raw::admit_xml(&xml, limits)?;
-        Some(xml)
-    } else {
-        None
-    };
     let root_uri = PackURI::new(&value.root_name).map_err(Error::Uri)?;
     if is_signature_part(&root_uri) || is_reserved_physical_part(&root_uri) {
         return Err(invalid(
@@ -1166,6 +1184,22 @@ pub(in crate::glossary) fn put_graph_checked(
             &owner_target,
         )?
     };
+    let preserved_catalog = if let Some(xml) = &value.root_xml {
+        let (source, source_conformance) = read_with_limits(xml.as_slice(), limits)?;
+        (source_conformance == value.conformance && source == value.catalog).then_some(source)
+    } else {
+        None
+    };
+    let preserve_root = preserved_catalog.is_some();
+    let generated_plan = if preserve_root {
+        None
+    } else {
+        Some(plan_write_with_limits(
+            &value.catalog,
+            value.conformance,
+            limits,
+        )?)
+    };
     raw::admit_graph_with_owner(
         value,
         limits,
@@ -1176,12 +1210,59 @@ pub(in crate::glossary) fn put_graph_checked(
                 .expect("preserved glossary XML is present")
                 .as_slice()
         }),
-        generated_xml.as_deref(),
+        None,
+        generated_plan.as_ref().map(|plan| plan.bytes),
         true,
         main.as_str(),
         &owner_plan.id,
         &owner_target,
     )?;
+    let generated_xml = if let Some(plan) = generated_plan {
+        let xml = write_plan_with_limits(&value.catalog, value.conformance, &plan, limits)?;
+        raw::admit_xml(&xml, limits)?;
+        Some(xml)
+    } else {
+        None
+    };
+    let effective_catalog = if preserve_root {
+        preserved_catalog.ok_or_else(|| invalid("preserved glossary catalog is missing"))?
+    } else {
+        let xml = generated_xml
+            .as_deref()
+            .ok_or_else(|| invalid("generated glossary XML is missing"))?;
+        let (canonical, canonical_conformance) =
+            super::codec::read_admitted_with_limits(xml, limits)?;
+        if canonical_conformance != value.conformance {
+            return Err(invalid("canonical glossary changed conformance"));
+        }
+        canonical
+    };
+    Ok(PreparedGraph {
+        root_uri,
+        main,
+        owner_target,
+        owner_plan,
+        preserve_root,
+        generated_xml,
+        effective_catalog,
+    })
+}
+
+pub(in crate::glossary) fn put_prepared_graph(
+    package: &mut OpcPackage,
+    value: &raw::Graph,
+    limits: &raw::Limits,
+    prepared: PreparedGraph,
+) -> Result<bool> {
+    let PreparedGraph {
+        root_uri,
+        main,
+        owner_target,
+        owner_plan,
+        preserve_root,
+        generated_xml,
+        effective_catalog,
+    } = prepared;
     let current_owner = locate(package, limits)?;
     let current = load_graph_for_owner(package, limits, current_owner)?;
     let mut root = if preserve_root {
@@ -1198,21 +1279,8 @@ pub(in crate::glossary) fn put_graph_checked(
         let xml = generated_xml.ok_or_else(|| invalid("generated glossary XML is missing"))?;
         BlobPart::new(root_uri.clone(), CT.to_owned(), xml)
     };
-    let canonical_catalog;
-    let effective_catalog = if preserve_root {
-        preserved_catalog
-            .as_ref()
-            .ok_or_else(|| invalid("preserved glossary catalog is missing"))?
-    } else {
-        let (canonical, canonical_conformance) = read_with_limits(root.blob(), limits)?;
-        if canonical_conformance != value.conformance {
-            return Err(invalid("canonical glossary changed conformance"));
-        }
-        canonical_catalog = canonical;
-        &canonical_catalog
-    };
     add_relationships(&mut root, &value.rels, value.conformance)?;
-    validate_relationship_integrity(effective_catalog, &root, value.conformance)?;
+    validate_relationship_integrity(&effective_catalog, &root, value.conformance)?;
     let staged_root_xml = root.blob_arc();
     if value.parts.len() > MAX_VALUES {
         return Err(crate::Error::GlossaryLimit {
@@ -1263,7 +1331,7 @@ pub(in crate::glossary) fn put_graph_checked(
     }
 
     if let Some(current) = current.as_ref()
-        && graph_matches_catalog(current, value, effective_catalog, Some(&staged_root_xml))?
+        && graph_matches_catalog(current, value, &effective_catalog, Some(&staged_root_xml))?
     {
         return Ok(false);
     }
@@ -1316,7 +1384,7 @@ pub(in crate::glossary) fn put_graph_checked(
     if !graph_matches_catalog_with_owner(
         &round_trip,
         value,
-        effective_catalog,
+        &effective_catalog,
         Some(&staged_root_xml),
         main.as_str(),
         &owner_plan.id,
