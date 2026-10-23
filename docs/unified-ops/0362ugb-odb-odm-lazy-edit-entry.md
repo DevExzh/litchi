@@ -9,11 +9,15 @@ route changes.
 
 `litchi_odb::Package::edit` and `edit_with_policy` now construct
 `authoring::Edit` with `Cow::Borrowed(source.database.content_xml())`.  All
-existing mutating splices call `Cow::to_mut()` at their first write, so the
-source XML remains borrowed for read-only staging, failed/no-op staging and
-discard.  The commit path still compares the staged XML with the source,
-rebuilds and validates only a changed candidate, and preserves the existing
-policy refusal, patch, inverse and exact-source behavior.
+existing mutating splices use `Cow::to_mut()` at the write boundary.  The
+constructor, read-only staging and discard remain borrowed.  Some helper
+call sites take the mutable buffer before proving a move is needed or before
+returning a validation failure (for example, a self-move through
+`relocate_sibling`), so those paths may materialize; this does not change
+their semantic no-op result.  The commit path still compares the staged XML
+with the source, rebuilds and validates only a changed candidate, and
+preserves the existing policy refusal, patch, inverse and exact-source
+behavior.
 
 `litchi_odm::Package::edit_title` no longer reads `meta.xml` at entry.  Its
 bounded title state borrows the title already retained by the immutable
