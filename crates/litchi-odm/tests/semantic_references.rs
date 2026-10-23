@@ -96,6 +96,21 @@ fn title_noop_reuses_the_exact_source_artifact() {
 }
 
 #[test]
+fn title_edit_borrows_the_projected_title_until_first_mutation() {
+    let meta = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:meta><dc:title>Borrowed</dc:title></office:meta></office:document-meta>"#;
+    let source = Package::from_bytes(&package(CONTENT, Some(meta))).unwrap();
+    let document = source.document();
+    let source_title = document.title().unwrap();
+    let mut edit = source.edit_title().unwrap();
+
+    // The projected title is already retained by the immutable package.  A
+    // title edit borrows that bounded value and only allocates after set().
+    assert_eq!(edit.title().unwrap().as_ptr(), source_title.as_ptr());
+    edit.set("Changed").unwrap();
+    assert_ne!(edit.title().unwrap().as_ptr(), source_title.as_ptr());
+}
+
+#[test]
 fn named_entities_are_rejected_before_semantic_projection() {
     let content = CONTENT.replacen("Master introduction", "&untrusted;", 1);
     assert!(Package::from_bytes(&package(&content, None)).is_err());
