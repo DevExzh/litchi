@@ -307,6 +307,15 @@ pub(crate) struct PartPatch {
     exact_content_types: bool,
 }
 
+/// Metadata-only admission for one part patch.  Whole-graph callers retain
+/// the changed names so capture can materialize only those deltas after the
+/// census, rather than walking every part a second time.
+#[derive(Debug, Default)]
+struct RetainedEstimate {
+    bytes: usize,
+    changed_names: BTreeSet<String>,
+}
+
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
         self.deltas.is_empty() && self.root.is_none() && self.content_types.is_none()
@@ -399,7 +408,7 @@ impl PartPatch {
         after: &OpcPackage,
         names: &BTreeSet<String>,
         all: bool,
-    ) -> Result<usize> {
+    ) -> Result<RetainedEstimate> {
         fn relationship_bytes(relationship: &litchi_opc::Relationship) -> usize {
             relationship
                 .r_id()
@@ -442,6 +451,7 @@ impl PartPatch {
         }
 
         let mut observed = 0usize;
+        let mut changed_names = BTreeSet::new();
         let mut add_delta = |name: &PackURI,
                              before_part: Option<&dyn Part>,
                              after_part: Option<&dyn Part>|
@@ -454,6 +464,7 @@ impl PartPatch {
                 _ => true,
             };
             if changed {
+                changed_names.insert(name.as_str().to_owned());
                 observed = observed
                     .saturating_add(name.as_str().len())
                     .saturating_add(
@@ -524,16 +535,19 @@ impl PartPatch {
 
         if !before.same_retained_content_types(after)? {
             let before_bytes = before
-                .content_types_source_bytes()
+                .retained_content_types_xml()?
                 .map_or(0, |bytes| bytes.capacity());
             let after_bytes = after
-                .content_types_source_bytes()
+                .retained_content_types_xml()?
                 .map_or(0, |bytes| bytes.capacity());
             observed = observed
                 .saturating_add(before_bytes)
                 .saturating_add(after_bytes);
         }
-        Ok(observed)
+        Ok(RetainedEstimate {
+            bytes: observed,
+            changed_names,
+        })
     }
 
     pub(crate) fn inverse(&self) -> Self {
@@ -977,17 +991,20 @@ impl Staged {
             return Ok((self.source, PartPatch::default()));
         };
         let source = self.source;
+        let mut endpoint_charge = None;
+        let mut estimated_names = None;
         let target = if let Some(maximum) = self.max_retained_bytes {
-            let estimated_patch =
+            let estimate =
                 PartPatch::estimate_retained_bytes(source.opc(), &staged, &self.touched, self.all)?;
             // Build the exact target owner once, before patch capture, so the
             // admission charge covers the real source and target endpoints
             // rather than assuming the edit preserves package size.
             let target = source.derive(staged.clone())?;
-            let observed = source
-                .retained_bytes()
-                .saturating_add(target.retained_bytes())
-                .saturating_add(estimated_patch);
+            let source_bytes = source.retained_bytes();
+            let target_bytes = target.retained_bytes();
+            let observed = source_bytes
+                .saturating_add(target_bytes)
+                .saturating_add(estimate.bytes);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
                     resource: litchi_core::Resource::Memory,
@@ -996,11 +1013,17 @@ impl Staged {
                     scope: "XLSX part edit retained package".into(),
                 }));
             }
+            endpoint_charge = Some((source_bytes, target_bytes));
+            if self.all {
+                estimated_names = Some(estimate.changed_names);
+            }
             Some(target)
         } else {
             None
         };
-        let patch = if self.all {
+        let patch = if let Some(names) = estimated_names {
+            PartPatch::capture(source.opc(), &staged, &names)?
+        } else if self.all {
             PartPatch::capture_all(source.opc(), &staged)?
         } else {
             PartPatch::capture(source.opc(), &staged, &self.touched)?
@@ -1014,9 +1037,10 @@ impl Staged {
             None => source.derive(staged)?,
         };
         if let Some(maximum) = self.max_retained_bytes {
-            let observed = source
-                .retained_bytes()
-                .saturating_add(package.retained_bytes())
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
                 .saturating_add(patch.retained_bytes());
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {

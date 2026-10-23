@@ -1311,6 +1311,7 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
+        let mut endpoint_charge = None;
         let target = if let Some(maximum) = self.max_retained_bytes {
             let estimated_patch =
                 Patch::estimate_retained_bytes(self.package.opc(), &self.staged, &self.touched)?;
@@ -1322,10 +1323,10 @@ impl Edit {
                     .adopt_published_package(self.staged.clone())
                     .map(Package::from_workbook)?
             };
-            let observed = self
-                .package
-                .retained_bytes()
-                .saturating_add(target.retained_bytes())
+            let source_bytes = self.package.retained_bytes();
+            let target_bytes = target.retained_bytes();
+            let observed = source_bytes
+                .saturating_add(target_bytes)
                 .saturating_add(estimated_patch);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
@@ -1335,6 +1336,7 @@ impl Edit {
                     scope: "XLSX chart retained package".into(),
                 }));
             }
+            endpoint_charge = Some((source_bytes, target_bytes));
             Some(target)
         } else {
             None
@@ -1359,10 +1361,10 @@ impl Edit {
                 .map(Package::from_workbook)?,
         };
         if let Some(maximum) = self.max_retained_bytes {
-            let observed = self
-                .package
-                .retained_bytes()
-                .saturating_add(package.retained_bytes())
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
                 .saturating_add(patch.retained_bytes());
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {

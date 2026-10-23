@@ -235,10 +235,9 @@ impl Edit {
         if !self.changed() {
             let patch = Patch(super::Patch::new(self.before.clone(), self.before));
             if let Some(maximum) = self.max_retained_bytes {
-                let observed = self
-                    .target
-                    .retained_bytes()
-                    .saturating_add(self.target.retained_bytes())
+                let endpoint_bytes = self.target.retained_bytes();
+                let observed = endpoint_bytes
+                    .saturating_add(endpoint_bytes)
                     .saturating_add(patch.retained_bytes());
                 if observed > maximum {
                     return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
@@ -281,11 +280,14 @@ impl Edit {
             ));
         }
         let package = self.target.publish(candidate)?;
+        let endpoint_charge = self
+            .max_retained_bytes
+            .map(|_| (self.target.retained_bytes(), package.retained_bytes()));
         if let Some(maximum) = self.max_retained_bytes {
-            let observed = self
-                .target
-                .retained_bytes()
-                .saturating_add(package.retained_bytes())
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
                 .saturating_add(estimated_patch_bytes);
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
@@ -298,10 +300,10 @@ impl Edit {
         }
         let patch = Patch(super::Patch::new(self.before, snapshot));
         if let Some(maximum) = self.max_retained_bytes {
-            let observed = self
-                .target
-                .retained_bytes()
-                .saturating_add(package.retained_bytes())
+            let (source_bytes, target_bytes) =
+                endpoint_charge.expect("retained endpoint charge established with the budget");
+            let observed = source_bytes
+                .saturating_add(target_bytes)
                 .saturating_add(patch.retained_bytes());
             if observed > maximum {
                 return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
