@@ -112,3 +112,18 @@ stale XLSX raw-aggregate test calls, and missing ODS test imports. The log and
 source receipt are preserved in [consumer-v8.json](results/0362uf/consumer-v8.json).
 The harness group was not reached. Record 0362uj repairs these consumers while
 retaining typed causes, cold payload accounting, and the existing assertions.
+
+## Required OPC ingress consumer check
+
+The ninth attempt ran on `b170204d17` after the required OPC constructors,
+retained token policy, prepared ZIP admission, and current XLSX harness
+consumers were assembled. It finished with exit 101 after 215.67 seconds.
+OPC compilation exposed a private relationship-token preflight call, an
+existing shared-pointer import spelling, and test imports/qualifications
+left by the constructor migration. The harness was not reached.
+
+[consumer-v9.json](results/0362uf/consumer-v9.json) retains the exact receipt.
+Record 0362uk preserves the repair: a narrow private preflight method keeps
+the retained XML private and enforces the same limits; tests use the canonical
+imports without changing their assertions. The next attempt starts with a
+focused OPC/ZIP all-target check before the complete consumer checks.
