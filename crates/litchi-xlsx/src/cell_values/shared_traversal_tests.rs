@@ -267,7 +267,10 @@ fn assert_valid_noop(sheet: &[u8]) {
 fn assert_rejected_with_retry(sheet: &[u8], expected: &str) {
     let (bytes, source, editor) = source_and_editor(sheet);
     for attempt in 0..2 {
-        assert_invalid(editor.edit_sheets(["Sheet1".into()]), expected);
+        let edit = editor
+            .edit_sheets(["Sheet1".into()])
+            .expect("source-backed entry remains lazy");
+        assert_invalid(edit.commit(), expected);
         assert_eq!(
             source.as_slice(),
             bytes.as_slice(),
