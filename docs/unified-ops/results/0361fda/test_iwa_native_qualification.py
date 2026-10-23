@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import stat
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -138,6 +139,20 @@ class NativeQualificationTests(unittest.TestCase):
         )
         identity = RUNNER.fixture_identity(fixture_dir)
         self.assertEqual(set(identity["files"]), set(RUNNER.OWNER_FIXTURES))
+        regenerated_paths: list[Path] = []
+
+        def replay_generator(output: Path) -> None:
+            regenerated_paths.append(output)
+            shutil.copyfile(fixture_dir / "footnote-fixture.pages", output)
+
+        # The replay output is intentionally at a different temporary path;
+        # fixture validation must compare content identity while retaining the
+        # manifest's original path and generated provenance.
+        with mock.patch.object(RUNNER, "_run_fixture_generator", side_effect=replay_generator):
+            replayed = RUNNER.fixture_identity(fixture_dir, regenerate=True)
+        self.assertEqual(replayed, identity)
+        self.assertEqual(len(regenerated_paths), 1)
+        self.assertNotEqual(regenerated_paths[0].resolve(), (fixture_dir / "footnote-fixture.pages").resolve())
         (fixture_dir / "tone.wav").write_bytes(b"changed")
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.fixture_identity(fixture_dir)
@@ -344,6 +359,16 @@ class NativeQualificationTests(unittest.TestCase):
         receipt = RUNNER.load_json(self.directory / "slow-command.receipt.json")
         self.assertTrue(receipt["timed_out"])
         self.assertEqual(receipt["timeout_s"], 0.05)
+
+    def test_generator_timeout_uses_coordinated_process_cleanup(self) -> None:
+        child = mock.Mock()
+        child.pid = 12345
+        child.wait.side_effect = subprocess.TimeoutExpired("generator", 1)
+        with mock.patch.object(RUNNER.subprocess, "Popen", return_value=child):
+            with mock.patch.object(RUNNER, "_terminate_generator") as terminate:
+                with self.assertRaises(RUNNER.QualificationError):
+                    RUNNER._run_fixture_generator(self.directory / "footnote-fixture.pages")
+        terminate.assert_called_once_with(child)
 
     def test_abba_identity_check_rejects_mismatched_outputs(self) -> None:
         values = [

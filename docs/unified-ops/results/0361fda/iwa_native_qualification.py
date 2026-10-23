@@ -88,7 +88,14 @@ FIXED_WARMUPS = 2
 FIXED_GROWTH = 1.2
 FIXED_TIMEOUT_S = 120.0
 COMMAND_TIMEOUT_S = 900.0
-FIXTURE_GENERATOR_TIMEOUT_S = 1_200.0
+# The generator has its own 900-second Cargo child bound.  Keep the outer
+# wrapper bound slightly longer so its normal timeout handler can reap that
+# child before the runner has to tear down both process groups.
+FIXTURE_GENERATOR_TIMEOUT_S = 900.0
+FIXTURE_GENERATOR_OUTER_GRACE_S = 30.0
+FIXTURE_GENERATOR_OUTER_TIMEOUT_S = (
+    FIXTURE_GENERATOR_TIMEOUT_S + FIXTURE_GENERATOR_OUTER_GRACE_S
+)
 SCHEMA = "litchi.iwa.native-qualification.v1"
 OWNER_FIXTURES = (
     "basic.numbers",
@@ -277,19 +284,14 @@ def fixture_identity(path: Path, *, regenerate: bool = False) -> dict[str, Any]:
             if regenerate:
                 with tempfile.TemporaryDirectory(prefix="litchi-iwa-footnote-") as temporary:
                     generated = Path(temporary) / name
-                    try:
-                        subprocess.run(
-                            [sys.executable, str(FIXTURE_GENERATOR), "--output", str(generated)],
-                            cwd=ROOT,
-                            check=True,
-                            timeout=FIXTURE_GENERATOR_TIMEOUT_S,
-                        )
-                    except (OSError, subprocess.SubprocessError) as error:
-                        raise QualificationError("footnote fixture generator replay failed") from error
+                    _run_fixture_generator(generated)
                     generated_identity = artifact(generated)
-                    if generated_identity != {
-                        key: row.get(key) for key in ("path", "bytes", "sha256")
-                    }:
+                    # The replay is deliberately written to a fresh temporary
+                    # path.  Compare content identity only; the manifest keeps
+                    # the original fixture path and generated provenance.
+                    if {
+                        key: generated_identity[key] for key in ("bytes", "sha256")
+                    } != {key: row.get(key) for key in ("bytes", "sha256")}:
                         raise QualificationError("generated footnote fixture bytes changed")
         else:
             expected_source = _tracked_identity(spec, name)
@@ -317,15 +319,7 @@ def prepare_fixtures(path: Path) -> None:
     }
     for name, source in sources.items():
         shutil.copyfile(source, directory / name)
-    try:
-        subprocess.run(
-            [sys.executable, str(FIXTURE_GENERATOR), "--output", str(directory / "footnote-fixture.pages")],
-            cwd=ROOT,
-            check=True,
-            timeout=FIXTURE_GENERATOR_TIMEOUT_S,
-        )
-    except (OSError, subprocess.SubprocessError) as error:
-        raise QualificationError("footnote fixture generator failed") from error
+    _run_fixture_generator(directory / "footnote-fixture.pages")
     files: dict[str, Any] = {}
     for name in OWNER_FIXTURES:
         row: dict[str, Any] = artifact(directory / name)
@@ -360,6 +354,85 @@ def new_external_directory(path: Path) -> Path:
     except OSError as error:
         raise QualificationError(f"cannot create fresh external directory {path}: {error}") from error
     return path
+
+
+def _generator_process_groups(child: subprocess.Popen[bytes]) -> set[int]:
+    """Find the wrapper and its descendants' process groups.
+
+    ``generate_footnote_fixture.py`` puts Cargo in a new session so that its
+    own timeout can cleanly stop Cargo's compiler tree.  An outer timeout must
+    therefore collect both the wrapper's group and that separate Cargo group.
+    The process snapshot is taken before signalling, while parent links are
+    still available; the group ids remain useful if the wrapper exits while a
+    compiler child is being reparented.
+    """
+
+    rows = process_rows()
+    descendants = _descendants(rows, child.pid)
+    groups: set[int] = set()
+    for pid in descendants:
+        try:
+            groups.add(os.getpgid(pid))
+        except ProcessLookupError:
+            continue
+    # The child is a session leader in normal operation.  Keeping its pid as
+    # a fallback also covers the short race where /proc has not listed it yet.
+    groups.add(child.pid)
+    return groups
+
+
+def _signal_process_groups(groups: Iterable[int], sig: signal.Signals) -> None:
+    for pgid in sorted(set(groups)):
+        try:
+            os.killpg(pgid, sig)
+        except ProcessLookupError:
+            continue
+
+
+def _terminate_generator(child: subprocess.Popen[bytes]) -> int:
+    """Stop a timed generator and every Cargo descendant it started."""
+
+    groups = _generator_process_groups(child)
+    _signal_process_groups(groups, signal.SIGTERM)
+    try:
+        status = child.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        # Refresh before the hard kill: a compiler may have appeared after the
+        # first snapshot, while the original groups still cover reparented
+        # children from the timed-out Cargo invocation.
+        groups.update(_generator_process_groups(child))
+        _signal_process_groups(groups, signal.SIGKILL)
+        try:
+            status = child.wait(timeout=2.0)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            status = child.wait(timeout=2.0)
+    # The wrapper can exit after SIGTERM while its separate-session Cargo
+    # child is still unwinding.  A final hard signal prevents that child from
+    # outliving the failed qualification process.
+    _signal_process_groups(groups, signal.SIGKILL)
+    return status
+
+
+def _run_fixture_generator(output: Path) -> None:
+    """Run the fixture wrapper with coordinated outer timeout cleanup."""
+
+    command = [sys.executable, str(FIXTURE_GENERATOR), "--output", str(output)]
+    try:
+        child = subprocess.Popen(command, cwd=ROOT, start_new_session=True)
+    except OSError as error:
+        raise QualificationError("footnote fixture generator failed to start") from error
+    try:
+        status = child.wait(timeout=FIXTURE_GENERATOR_OUTER_TIMEOUT_S)
+    except subprocess.TimeoutExpired as error:
+        _terminate_generator(child)
+        raise QualificationError(
+            f"footnote fixture generator exceeded {FIXTURE_GENERATOR_OUTER_TIMEOUT_S:g}s"
+        ) from error
+    if status:
+        raise QualificationError(f"footnote fixture generator failed with status {status}")
+    if not output.is_file():
+        raise QualificationError(f"footnote fixture generator did not produce {output}")
 
 
 def run_command(

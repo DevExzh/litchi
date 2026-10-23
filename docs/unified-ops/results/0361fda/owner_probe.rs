@@ -131,13 +131,11 @@ fn numbers_correctness(
         .set(changed)
         .commit()
         .unwrap();
-    let semantic_ok = commit
+    let returned = commit
         .package()
         .table_header_settings(0usize, 0usize)
-        .unwrap()
-        .header_rows_are_frozen()
-        == changed.header_rows_frozen.unwrap_or(false)
-        && before.header_rows_are_frozen() != changed.header_rows_frozen.unwrap_or(false);
+        .unwrap();
+    let semantic_ok = returned == changed && before != changed;
     let changed_bytes = write_numbers(commit.package());
     let replay = litchi_numbers::Package::from_bytes(source)
         .unwrap()
@@ -384,7 +382,7 @@ fn print_report(
     assert_eq!(sha256(output), correctness.changed_sha256);
     assert_eq!(output.len(), correctness.changed_bytes);
     println!(
-        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
+        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{},\"source_bytes\":{},\"changed_bytes\":{},\"noop_bytes\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
         output.len(),
         correctness.changed_sha256,
         correctness.replay_matches_changed,
@@ -392,6 +390,9 @@ fn print_report(
         correctness.noop_is_noop,
         correctness.noop_matches_expected,
         correctness.semantic_ok,
+        correctness.source_bytes,
+        correctness.changed_bytes,
+        correctness.noop_bytes,
         correctness.changed_sha256,
         correctness.replay_sha256,
         correctness.inverse_sha256,
