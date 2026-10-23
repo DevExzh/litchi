@@ -4842,6 +4842,10 @@ mod tests {
         let recipient_limits = SourceLimits::builder()
             .max_relationship_xml_bytes(largest_existing_relationship)
             .unwrap()
+            // Keep the target ceiling above the deliberately broad token so
+            // this regression isolates the recipient XML-byte refusal.
+            .max_relationship_target_bytes(8192)
+            .unwrap()
             .build()
             .unwrap();
         let mut recipient = OpcPackage::from_bytes(&archive, recipient_limits).unwrap();
