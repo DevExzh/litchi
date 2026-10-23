@@ -2,17 +2,27 @@
   "schema": "litchi-iwa-constructor-admission.v4",
   "status": "deterministic repair evidence; native qualification pending",
   "source": {
-    "commit": "f44804d2c24d204719c08fc77f0397ae5a5bd573",
+    "commit": "d56448c7e10251b217d973e037352675f5874980",
     "changes": [
       "The default minimal admission predicate rejects an oversized public length with a widened comparison before accepting the fixed-shape fast path.",
       "ArchiveInfo::new and MessageInfo::new are inlineable, and fixed message versions are copied with one extend operation.",
-      "Public mutation checks and strict-profile admission remain on their existing paths; no unchecked provenance is introduced."
+      "Public mutation checks and strict-profile admission remain on their existing paths; no unchecked provenance is introduced.",
+      "Retained-header comparison now uses target-derived lengths only while the current projection still matches; after divergence it emits the current payload and recalculates the length prefix.",
+      "A direct packed-field cardinality mutation regression proves canonical fallback preserves the changed public metadata and exact re-encoding."
     ],
-    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
+    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a",
+    "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+    "candidate_commit": "d56448c7e10251b217d973e037352675f5874980",
+    "prior_constructor_optimization_commit": "f44804d2c24d204719c08fc77f0397ae5a5bd573"
   },
   "method": {
     "callgrind": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
-    "message_counts": [1, 8, 32, 128],
+    "message_counts": [
+      1,
+      8,
+      32,
+      128
+    ],
     "output_check": "Every base and candidate row has matching checksum, encoded byte length and output SHA-256.",
     "raw_artifacts": "The captures and executables remain outside the repository under /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator."
   },
@@ -37,10 +47,38 @@
     "capture_files": 16,
     "capture_bytes": 1773127,
     "rows": [
-      {"messages": 1, "base_ir": 10587.0053, "candidate_ir": 8017.0057, "candidate_base": 0.757249616, "output_bytes": 1040, "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"},
-      {"messages": 8, "base_ir": 55524.2542, "candidate_ir": 39915.5046, "candidate_base": 0.718884120, "output_bytes": 8299, "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
-      {"messages": 32, "base_ir": 259512.0048, "candidate_ir": 173925.0052, "candidate_base": 0.670200230, "output_bytes": 33188, "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"},
-      {"messages": 128, "base_ir": 1070983.7656, "candidate_ir": 717469.9051, "candidate_base": 0.669916695, "output_bytes": 132740, "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"}
+      {
+        "messages": 1,
+        "base_ir": 10587.0053,
+        "candidate_ir": 8017.0057,
+        "candidate_base": 0.757249616,
+        "output_bytes": 1040,
+        "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"
+      },
+      {
+        "messages": 8,
+        "base_ir": 55524.2542,
+        "candidate_ir": 39915.5046,
+        "candidate_base": 0.71888412,
+        "output_bytes": 8299,
+        "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"
+      },
+      {
+        "messages": 32,
+        "base_ir": 259512.0048,
+        "candidate_ir": 173925.0052,
+        "candidate_base": 0.67020023,
+        "output_bytes": 33188,
+        "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"
+      },
+      {
+        "messages": 128,
+        "base_ir": 1070983.7656,
+        "candidate_ir": 717469.9051,
+        "candidate_base": 0.669916695,
+        "output_bytes": 132740,
+        "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"
+      }
     ]
   },
   "v21_fair_raw_constructor": {
@@ -58,24 +96,84 @@
     "capture_files": 32,
     "capture_bytes": 3444377,
     "direct_raw_rows": [
-      {"messages": 1, "base_ir": 46.0051, "candidate_ir": 101.0051, "candidate_base": 2.195519627},
-      {"messages": 8, "base_ir": 46.0051, "candidate_ir": 248.0041, "candidate_base": 5.390795803},
-      {"messages": 32, "base_ir": 46.0062, "candidate_ir": 752.0056, "candidate_base": 16.345744704},
-      {"messages": 128, "base_ir": 46.0036, "candidate_ir": 2768.0052, "candidate_base": 60.169317184}
+      {
+        "messages": 1,
+        "base_ir": 46.0051,
+        "candidate_ir": 101.0051,
+        "candidate_base": 2.195519627
+      },
+      {
+        "messages": 8,
+        "base_ir": 46.0051,
+        "candidate_ir": 248.0041,
+        "candidate_base": 5.390795803
+      },
+      {
+        "messages": 32,
+        "base_ir": 46.0062,
+        "candidate_ir": 752.0056,
+        "candidate_base": 16.345744704
+      },
+      {
+        "messages": 128,
+        "base_ir": 46.0036,
+        "candidate_ir": 2768.0052,
+        "candidate_base": 60.169317184
+      }
     ],
     "assembled_raw_rows": [
-      {"messages": 1, "base_ir": 1066.0056, "candidate_ir": 1218.0056, "candidate_base": 1.142588369, "output_bytes": 1040, "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"},
-      {"messages": 8, "base_ir": 2177.0041, "candidate_ir": 3246.0051, "candidate_base": 1.491042254, "output_bytes": 8299, "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
-      {"messages": 32, "base_ir": 10333.0062, "candidate_ir": 14761.0051, "candidate_base": 1.428529589, "output_bytes": 33188, "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"},
-      {"messages": 128, "base_ir": 51543.0041, "candidate_ir": 68362.0052, "candidate_base": 1.326310067, "output_bytes": 132740, "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"}
+      {
+        "messages": 1,
+        "base_ir": 1066.0056,
+        "candidate_ir": 1218.0056,
+        "candidate_base": 1.142588369,
+        "output_bytes": 1040,
+        "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"
+      },
+      {
+        "messages": 8,
+        "base_ir": 2177.0041,
+        "candidate_ir": 3246.0051,
+        "candidate_base": 1.491042254,
+        "output_bytes": 8299,
+        "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"
+      },
+      {
+        "messages": 32,
+        "base_ir": 10333.0062,
+        "candidate_ir": 14761.0051,
+        "candidate_base": 1.428529589,
+        "output_bytes": 33188,
+        "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"
+      },
+      {
+        "messages": 128,
+        "base_ir": 51543.0041,
+        "candidate_ir": 68362.0052,
+        "candidate_base": 1.326310067,
+        "output_bytes": 132740,
+        "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"
+      }
     ],
-    "interpretation": "The direct rows expose the required current public-record scan and are not a whole-lifecycle score. The assembled rows include metadata construction and show the comparable raw-constructor lifecycle after the repair."
+    "interpretation": "The direct rows expose the required current public-record scan and are not a whole-lifecycle score. The assembled rows include metadata construction and show the comparable raw-constructor lifecycle, but their 1.1426x\u20131.4910x range remains a returned performance regression pending further repair."
   },
   "validation": {
     "format": "cargo fmt --all -- --check passed; git diff --check passed.",
-    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 78 passed, 3 pre-existing failures in reference-pruning tests.",
+    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 82 passed, 0 failed, including the retained-header fallback regression.",
     "core_type_routes": "cargo test --offline --locked --manifest-path crates/litchi-iwa-archive/Cargo.toml --test core_type_routes: 2 passed.",
-    "failure_attribution": "Each of data_pruning_zero_and_noop_policies_preserve_existing_behavior, empty_reference_removal_delegates_to_preserving_replacement and exact_reference_transition_retains_duplicate_unselected_field_members was rerun exactly on baseline 57c2ff520b and failed with the same ArchiveInfo nested encoded length mismatch.",
-    "staged_size_and_binary_checks": "passed with no output; no evidence file or binary was staged."
+    "failure_attribution": "The three retained-header tests were rerun exactly on the original baseline ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2 and each passed. The candidate d56448c7e10251b217d973e037352675f5874980 passes all three and the direct packed-field-length mutation regression; no nested encoded length mismatch remains.",
+    "staged_size_and_binary_checks": "passed with no output; no evidence file or binary was staged.",
+    "retained_header_replay": {
+      "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+      "candidate_commit": "d56448c7e10251b217d973e037352675f5874980",
+      "tests": [
+        "archive::tests::data_pruning_zero_and_noop_policies_preserve_existing_behavior",
+        "archive::tests::empty_reference_removal_delegates_to_preserving_replacement",
+        "archive::tests::exact_reference_transition_retains_duplicate_unselected_field_members"
+      ],
+      "baseline_result": "3 passed, 0 failed",
+      "candidate_result": "3 passed, 0 failed",
+      "additional_regression": "archive::tests::retained_probe_falls_back_after_packed_field_length_changes: passed"
+    }
   }
 }

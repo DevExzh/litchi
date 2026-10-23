@@ -365,12 +365,18 @@ host is available.
 
 ## 0361fdc v22 complete authoring lifecycle repair
 
-Commit `f44804d2c2` keeps the public mutable `MessageInfo` contract while
-removing avoidable constructor work. The default minimal admission predicate
-now widens the public `u32` length before comparing it with the byte ceiling,
-and the fixed version vector uses one extend operation. `ArchiveInfo::new` and
-`MessageInfo::new` are inlineable. Strict profiles and nonminimal records still
-use the complete admission path; public mutable fields are never trusted after
+The retained-header correctness repair is in commit
+`d56448c7e1` (`d56448c7e10251b217d973e037352675f5874980`), based on the
+original source commit
+`ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2`. It keeps the public mutable
+`MessageInfo` contract: target-derived nested lengths are used only while the
+current projection still matches, and a divergence emits the current payload
+and recomputes its length prefix before falling back to canonical encoding.
+The earlier constructor optimization in `f44804d2c2` remains part of this
+candidate: the default minimal admission predicate widens the public `u32`
+length before comparing it with the byte ceiling, and the fixed version vector
+uses one extend operation. Strict profiles and nonminimal records still use
+the complete admission path; public mutable fields are never trusted after
 construction.
 
 The reduced receipt is
@@ -381,6 +387,11 @@ The capture manifests are `f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd
 for the 16 v20 output captures and
 `211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460` for the
 32 v21 output captures.
+
+The v20 and v21 performance endpoints were measured before this correctness
+repair (`5c2dc283...` candidate source); the v22 source pair above is the
+explicit correctness replay. The prior performance endpoints and their
+reduced manifests remain unchanged.
 
 The complete used authoring route constructs an `ArchiveObject` and serializes
 the containing `Archive` in every measured iteration. It is the relevant
@@ -401,13 +412,17 @@ not a whole-lifecycle score. With metadata assembly included, the same route
 is 1.1426×, 1.4910×, 1.4285× and 1.3263× of base at 1, 8, 32 and 128
 messages, respectively, with matching serialized output. This separates the
 unavoidable public-record admission work from the used authoring lifecycle and
-does not waive either route for native qualification.
+does not waive either route for native qualification. The assembled raw
+lifecycle remains a returned performance regression at 1.1426x, 1.4910x,
+1.4285x and 1.3263x of base; the correctness repair does not qualify or waive
+that cost.
 
 The consumer audit found no production raw `Vec<MessageInfo>` constructor call
 that can become `push_new`: `ArchiveObject::new` already uses its internal
 single-pass conventional constructor, while the external core-type sample
 deliberately mutates nested metadata and must retain the generic checked path.
-The focused core-type route test passed 2/2. The core unit run passed 78 tests;
-its three reference-pruning failures reproduce on the committed baseline with
-the same `ArchiveInfo nested encoded length mismatch` error and are recorded as
-pre-existing attribution, not caused by this repair.
+The focused core-type route test passed 2/2. The candidate core unit run passed
+82 tests with no failures. Each of the three retained-header tests passed on
+the original `ddf2ac8a...` baseline and on candidate `d56448c7e1`; the new
+packed-field-length mutation regression also passed. The former nested length
+mismatch is therefore repaired rather than attributed as a baseline failure.
