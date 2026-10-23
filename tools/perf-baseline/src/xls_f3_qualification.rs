@@ -26,6 +26,7 @@ use std::sync::{
 use std::time::Instant;
 
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_core::edit::RefusalKind;
 use litchi_core::sheet::CellValue;
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_xls::SourceBackedWorkbook;
@@ -95,6 +96,7 @@ struct EditSpec {
     sheet_name: &'static str,
     sheet_index: usize,
     reference: Reference,
+    original: f64,
     replacement: f64,
     storage: Storage,
 }
@@ -210,6 +212,13 @@ impl VersionedSource {
         }
         self.revision.fetch_add(1, Ordering::Relaxed);
     }
+
+    fn bytes(&self) -> Vec<u8> {
+        self.bytes
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
 }
 
 impl ReadAt for VersionedSource {
@@ -267,12 +276,34 @@ fn source_workbook(bytes: &[u8]) -> Result<SourceBackedWorkbook> {
 }
 
 fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
-    let source = Arc::new(VersionedSource::new(&fixture.archive));
-    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
     let specification = fixture
         .edits
         .first()
         .ok_or("XLS F3 fixture has no selected cell for freshness")?;
+
+    // An unchanged source is the control: it must still return the original
+    // value, and the source bytes must remain exactly the fixture bytes.
+    let control_source = Arc::new(VersionedSource::new(&fixture.archive));
+    let control_workbook = SourceBackedWorkbook::from_read_at(control_source.clone())?;
+    let control = control_workbook
+        .cell_value_by_index(
+            specification.sheet_index,
+            u32::from(specification.reference.row()),
+            u32::from(specification.reference.column()),
+        )?
+        .ok_or("XLS F3 unchanged source lost the selected cell")?;
+    let (CellValue::Float(value) | CellValue::DateTime(value)) = control else {
+        return Err("XLS F3 unchanged source returned a non-numeric value".into());
+    };
+    if value.to_bits() != specification.original.to_bits()
+        || control_source.bytes() != fixture.archive
+    {
+        return Err("XLS F3 unchanged source control changed its bytes or value".into());
+    }
+
+    // A stale read must report the source-backed typed freshness error.
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
     source.mutate();
     let error = match workbook.cell_value_by_index(
         specification.sheet_index,
@@ -285,7 +316,65 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     if !matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) {
         return Err(format!("XLS F3 freshness oracle returned the wrong error: {error:?}").into());
     }
+
+    // A mutation after staging must be caught at commit, before a deferred
+    // owner can retain a plan rooted in stale source bytes.
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let mut edit = workbook.edit_cells()?;
+    stage(&mut edit, fixture)?;
+    source.mutate();
+    let error = match edit.commit() {
+        Ok(_) => return Err("XLS F3 stale source was accepted at commit".into()),
+        Err(error) => error,
+    };
+    require_commit_source_changed(error, "stage/mutate/commit")?;
+
+    // A committed deferred owner must retain the original source freshness
+    // fence through publication as well.
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let mut edit = workbook.edit_cells()?;
+    stage(&mut edit, fixture)?;
+    let commit = edit.commit()?;
+    source.mutate();
+    let mut output = Vec::new();
+    let error = match commit.package().write_to(&mut output) {
+        Ok(_) => return Err("XLS F3 stale committed source was published".into()),
+        Err(error) => error,
+    };
+    require_output_source_changed(error, "mutate/committed-write")?;
     Ok(())
+}
+
+fn require_commit_source_changed(error: litchi_xls::Error, label: &str) -> Result<()> {
+    match error {
+        litchi_xls::Error::Io(error)
+            if error.kind() == io::ErrorKind::Other
+                && error.to_string() == "source changed during source-backed replay" =>
+        {
+            Ok(())
+        },
+        other => Err(format!(
+            "XLS F3 {label} returned the wrong source freshness error: {other:?}"
+        )
+        .into()),
+    }
+}
+
+fn require_output_source_changed(
+    error: litchi_xls::source_backed::OutputError,
+    label: &str,
+) -> Result<()> {
+    match error {
+        litchi_xls::source_backed::OutputError::Overlay(
+            litchi_cfb::OverlayError::SourceChanged { .. },
+        ) => Ok(()),
+        other => Err(format!(
+            "XLS F3 {label} returned the wrong output freshness error: {other:?}"
+        )
+        .into()),
+    }
 }
 
 fn cell_snapshot(bytes: &[u8]) -> Result<litchi_xls::cell_values::Snapshot> {
@@ -458,6 +547,13 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
 fn prepare_expected(fixture: &Fixture) -> Result<Expected> {
     let source = source_workbook(&fixture.archive)?;
     let commit = commit_fixture(&source, fixture)?;
+    if write_package(&source)? != fixture.archive {
+        return Err(format!(
+            "XLS F3 {} source bytes changed during commit preflight",
+            fixture.name
+        )
+        .into());
+    }
     let output = write_package(commit.package())?;
     if output == fixture.archive {
         return Err(format!("XLS F3 {} edit did not change its source", fixture.name).into());
@@ -486,6 +582,14 @@ fn verify_sample(
         .into());
     }
     verify_output(fixture, &measurement.output)?;
+    if write_package(&measurement.source)? != fixture.archive {
+        return Err(format!(
+            "XLS F3 {} {} source bytes changed during measurement",
+            fixture.name,
+            route.name()
+        )
+        .into());
+    }
     verify_patch(&measurement.source, &measurement.commit)?;
     if matches!(route, Route::FirstRead | Route::ReadAfterWrite) {
         verify_committed_values(measurement.commit.package(), fixture)?;
@@ -669,6 +773,7 @@ fn build_fixtures(choice: CorpusChoice) -> Result<Vec<Fixture>> {
                 sheet_name: "Untouched",
                 sheet_index: sheet.position(),
                 reference,
+                original: 42.0,
                 replacement: 43.0,
                 storage: Storage::Number,
             }],
@@ -697,6 +802,10 @@ fn build_fixtures(choice: CorpusChoice) -> Result<Vec<Fixture>> {
                 sheet_name: "Packed",
                 sheet_index: sheet.position(),
                 reference,
+                original: match cell.value() {
+                    Value::Number(value) => *value,
+                    _ => unreachable!("the storage/value guard above admits only numbers"),
+                },
                 replacement,
                 storage: cell.storage(),
             });
@@ -731,40 +840,86 @@ fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
         .edits
         .first()
         .ok_or("XLS F3 fixture has no edit for refusal checks")?;
+    // Boolean values have no fixed-width representation in any of the
+    // numeric Number/RK/MulRK slots. This is deliberately a typed refusal,
+    // not a broad "some error" assertion.
     let mut unsupported = source.edit_cells()?;
-    if unsupported
-        .set_value(
-            first.selector,
-            first.reference,
-            Value::Text("unsupported numeric family".to_owned()),
-        )
-        .is_ok()
-    {
-        if unsupported.commit().is_ok() {
-            return Err(format!("XLS F3 {} accepted a text cell replacement", fixture.name).into());
-        }
-    } else if unsupported.commit()?.diagnostics().changed() {
-        return Err(format!(
-            "XLS F3 {} unsupported edit was not failure-atomic",
-            fixture.name
-        )
-        .into());
+    let staged = unsupported.set_value(first.selector, first.reference, Value::Boolean(true));
+    match staged {
+        Err(error) => require_refusal(
+            error,
+            &format!("{} unsupported target", fixture.name),
+            RefusalKind::UnsupportedTarget,
+            "value is not representable in the fixed-width slot",
+        )?,
+        Ok(()) => {
+            let error = match unsupported.commit() {
+                Ok(_) => {
+                    return Err(format!(
+                        "XLS F3 {} accepted an unsupported numeric target",
+                        fixture.name
+                    )
+                    .into());
+                },
+                Err(error) => error,
+            };
+            require_refusal(
+                error,
+                &format!("{} unsupported target commit", fixture.name),
+                RefusalKind::UnsupportedTarget,
+                "value is not representable in the fixed-width slot",
+            )?;
+        },
     }
 
     let mut wrong_family = source.edit_cells()?;
-    if first.storage == Storage::Number {
-        wrong_family.set_numeric(first.selector, first.reference, first.replacement)?;
-    } else if wrong_family
-        .set_number(first.selector, first.reference, first.replacement)
-        .is_ok()
-    {
-        return Err(format!(
-            "XLS F3 {} accepted set_number for compressed storage",
-            fixture.name
-        )
-        .into());
+    if matches!(first.storage, Storage::Rk | Storage::MulRk) {
+        let error =
+            match wrong_family.set_number(first.selector, first.reference, first.replacement) {
+                Ok(()) => {
+                    return Err(format!(
+                        "XLS F3 {} accepted set_number for compressed storage",
+                        fixture.name
+                    )
+                    .into());
+                },
+                Err(error) => error,
+            };
+        let expected = format!(
+            "cell ({}, {}) is not encoded as a standalone BIFF8 Number record",
+            first.reference.row(),
+            first.reference.column()
+        );
+        match error {
+            litchi_xls::Error::UnsupportedFeature(message) if message == expected => {},
+            other => {
+                return Err(format!(
+                    "XLS F3 {} wrong-family refusal was not the exact typed error: {other:?}",
+                    fixture.name
+                )
+                .into());
+            },
+        }
     }
     Ok(())
+}
+
+fn require_refusal(
+    error: litchi_xls::Error,
+    label: &str,
+    kind: RefusalKind,
+    reason: &'static str,
+) -> Result<()> {
+    match error {
+        litchi_xls::Error::Refused(refusal)
+            if refusal.kind() == kind
+                && refusal.operation() == "edit cells"
+                && refusal.reason() == reason =>
+        {
+            Ok(())
+        },
+        other => Err(format!("XLS F3 {label} returned an unexpected refusal: {other:?}").into()),
+    }
 }
 
 fn copy_streams(source: &[u8]) -> Result<OleWriter> {
@@ -826,7 +981,10 @@ fn encrypted_fixture() -> Result<Vec<u8>> {
 
 #[derive(Clone, Copy)]
 enum SecurityExpectation {
-    Open,
+    RefuseEdit {
+        kind: RefusalKind,
+        reason: &'static str,
+    },
     RefuseSignedOpen,
     RefuseEncryptedOpen,
 }
@@ -933,39 +1091,49 @@ fn verify_security_refusal(
     expectation: SecurityExpectation,
 ) -> Result<()> {
     match expectation {
-        SecurityExpectation::Open => {},
-        SecurityExpectation::RefuseSignedOpen => require_signed_marker(bytes)?,
-        SecurityExpectation::RefuseEncryptedOpen => require_encrypted_marker(bytes)?,
+        SecurityExpectation::RefuseEdit { kind, reason } => {
+            verify_policy_refusal(bytes, label, kind, reason)
+        },
+        SecurityExpectation::RefuseSignedOpen => {
+            require_signed_marker(bytes)?;
+            let opened = source_workbook(bytes)
+                .map_err(SecurityOpenError::Source)
+                .and_then(|workbook| {
+                    workbook
+                        .edit_cells()
+                        .map(|_| ())
+                        .map_err(SecurityOpenError::Edit)
+                });
+            match opened {
+                Ok(()) => Err(format!("XLS F3 {label} fixture unexpectedly opened").into()),
+                Err(error) => require_signed_refusal(error, label),
+            }
+        },
+        SecurityExpectation::RefuseEncryptedOpen => {
+            require_encrypted_marker(bytes)?;
+            let opened = source_workbook(bytes)
+                .map_err(SecurityOpenError::Source)
+                .and_then(|workbook| {
+                    workbook
+                        .edit_cells()
+                        .map(|_| ())
+                        .map_err(SecurityOpenError::Edit)
+                });
+            match opened {
+                Ok(()) => Err(format!("XLS F3 {label} fixture unexpectedly opened").into()),
+                Err(error) => require_encrypted_refusal(error, label),
+            }
+        },
     }
-    let opened = source_workbook(bytes)
-        .map_err(SecurityOpenError::Source)
-        .and_then(|workbook| {
-            workbook
-                .edit_cells()
-                .map(|edit| (workbook, edit))
-                .map_err(SecurityOpenError::Edit)
-        });
-    let (workbook, mut edit) = match opened {
-        Ok(opened) => {
-            if !matches!(expectation, SecurityExpectation::Open) {
-                return Err(format!("XLS F3 {label} fixture unexpectedly opened").into());
-            }
-            opened
-        },
-        Err(error) => {
-            if matches!(expectation, SecurityExpectation::Open) {
-                return Err(format!("XLS F3 {label} fixture failed to open: {error:?}").into());
-            }
-            return match expectation {
-                SecurityExpectation::RefuseSignedOpen => require_signed_refusal(error, label),
-                SecurityExpectation::RefuseEncryptedOpen => require_encrypted_refusal(error, label),
-                SecurityExpectation::Open => {
-                    Err(format!("XLS F3 {label} fixture failed to open").into())
-                },
-            };
-        },
-    };
+}
 
+fn verify_policy_refusal(
+    bytes: &[u8],
+    label: &str,
+    kind: RefusalKind,
+    reason: &'static str,
+) -> Result<()> {
+    let workbook = source_workbook(bytes)?;
     let snapshot = litchi_xls::Package::from_source(workbook.clone())?.cell_values()?;
     let Some((sheet, reference, storage, value)) = snapshot.worksheets().find_map(|sheet| {
         sheet.cells().find_map(|cell| {
@@ -981,6 +1149,10 @@ fn verify_security_refusal(
     }) else {
         return Err(format!("XLS F3 {label} fixture has no numeric guard cell").into());
     };
+    let mut edit = match workbook.edit_cells() {
+        Ok(edit) => edit,
+        Err(error) => return require_refusal(error, label, kind, reason),
+    };
     let staged = match storage {
         Storage::Number => edit.set_number(
             Selector::Position(Position::new(sheet)),
@@ -994,28 +1166,26 @@ fn verify_security_refusal(
         ),
         _ => return Err(format!("XLS F3 {label} selected an invalid storage family").into()),
     };
-    if staged.is_ok() {
-        if edit.commit().is_ok() {
-            return Err(format!("XLS F3 {label} edit was accepted").into());
-        }
-    } else {
-        let noop = edit.commit()?;
-        let diagnostics = noop.diagnostics();
-        if diagnostics.changed()
-            || !noop.patch().is_noop()
-            || diagnostics.source_fingerprint() != diagnostics.target_fingerprint()
-        {
-            return Err(format!("XLS F3 {label} staged refusal was not failure-atomic").into());
-        }
+    match staged {
+        Err(error) => require_refusal(error, label, kind, reason),
+        Ok(()) => {
+            let error = match edit.commit() {
+                Ok(_) => return Err(format!("XLS F3 {label} edit was accepted").into()),
+                Err(error) => error,
+            };
+            require_refusal(error, label, kind, reason)
+        },
     }
-    Ok(())
 }
 
 fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
     verify_security_refusal(
         &protected_fixture()?,
         "protected",
-        SecurityExpectation::Open,
+        SecurityExpectation::RefuseEdit {
+            kind: RefusalKind::Protected,
+            reason: "protected worksheets are not eligible for source-backed numeric edits",
+        },
     )?;
     verify_security_refusal(
         &add_stream(&fixture.archive, &["DigitalSignature"], b"signature")?,
@@ -1025,7 +1195,10 @@ fn verify_security_fixtures(fixture: &Fixture) -> Result<()> {
     verify_security_refusal(
         &macro_fixture(&fixture.archive)?,
         "macro",
-        SecurityExpectation::Open,
+        SecurityExpectation::RefuseEdit {
+            kind: RefusalKind::UnsupportedOperation,
+            reason: "macro-bearing XLS sources are not eligible for source-backed numeric edits",
+        },
     )?;
     verify_security_refusal(
         &encrypted_fixture()?,

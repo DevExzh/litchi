@@ -46,8 +46,8 @@ xls_numeric_plan_only_number_edit_save
 xls_numeric_plan_only_rk_mulrk_edit_save
 ```
 
-The executable three-route probe was introduced by `d8fe3bcacb` and its
-freshness/refusal/replay gates plus the ABBA runner are committed as
+The executable three-route probe was introduced by `d8fe3bcacb`; its
+freshness/refusal/replay gates plus the first ABBA runner are committed as
 `b03aaf1aac` in
 `tools/perf-baseline/examples/xls_f3_qualification.rs`, with its library
 implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. It calls
@@ -66,6 +66,11 @@ CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candid
 git -C "$BASE" cherry-pick "${PROBE_COMMITS[@]}"
 git -C "$CAND" cherry-pick "${PROBE_COMMITS[@]}"
 ```
+
+The hardening commit that updates this record is copied to both snapshots as
+well. The runner checks the exact hashes of the probe, corpus, library and
+runner files against this checkout, and rejects a missing cherry-pick or any
+source edit before launching a child.
 
 If either snapshot already contains one of these commits, that cherry-pick is a
 no-op in the regeneration log and must be recorded as such. The copied source
@@ -107,13 +112,28 @@ bounded sink byte/write-call counts; untouched CFB streams and topology;
 selected value and storage-family readback through `cell_values`; raw
 `litchi_xls::raw::Reader` readback; forward replay and inverse replay to the
 original bytes; refusal when applying a patch to its committed owner; partial
-sink failure; exact no-op and fingerprint behavior; protected, signed, macro,
-encrypted and unsupported-value refusals; a mutable versioned-source
-`SourceChanged` oracle; typed stale-recipient `PatchConflict`; typed
-`IncompleteOutput` with an authored prefix; no-op source/target fingerprint
-equality; and the real-producer `54016.xls` RK/MulRK forward and inverse gate.
-Any route that omits one of these checks is diagnostic only and cannot qualify
-F3.
+sink failure; exact no-op and source/target fingerprint behavior; protected,
+signed, macro, encrypted and unsupported-value refusals matched to their exact
+`RefusalKind`, operation and fixed reason; the exact wrong-storage-family
+error; an unchanged mutable-source control; stale read, stage-then-mutate
+commit, and mutate-after-commit write `SourceChanged` oracles; source bytes
+unchanged from the original fixture; typed stale-recipient `PatchConflict`;
+typed `IncompleteOutput` with an authored prefix; and the real-producer
+`54016.xls` RK/MulRK forward and inverse gate. Any route that omits one of
+these checks is diagnostic only and cannot qualify F3.
+
+The qualification receipt is expected to make this checklist auditable:
+
+| review item | executable evidence |
+| --- | --- |
+| typed protected, macro, unsupported and wrong-family gates | probe refusal `kind`/operation/reason or exact fixed-family error |
+| freshness controls | unchanged read, stale read, stage→mutate→commit, and mutate→committed-write cases |
+| source preservation | source owner writes equal the original fixture before and after each sample |
+| lineage and identities | clean source status, pinned base ancestor, distinct source tree, and exact probe-file hashes |
+| matrix coverage | six unique route/corpus cells × four unique A1/B1/B2/A2 legs; subsets require diagnostic mode |
+| timing floor | independent control/candidate calibration and every retained leg at least 250 ms |
+| resource isolation | observed child affinity/RLIMIT_AS and `/proc` load/process scans before and after every child |
+| CSV protocol | exact header and exact field set on every row, with stable sample/output identities |
 
 The old external W5 probe at
 `/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`
@@ -167,15 +187,19 @@ are run separately with the README command. No evidence belongs under
 
 The native run is four process legs per route and corpus in strict A1/B1/B2/A2
 order, with baseline A and candidate B using the same route, sink and
-affinity. Calibrate the batch independently for each endpoint, then use the
-larger admitted batch for both sides; reject a leg shorter than 250 ms, retain
-every raw leg, and record host quiet checks before and after each child. The
-executable runner is `tools/xls_f3_qualification_abba.py`; it fails closed on
-child errors, malformed CSV, unstable output digests, equal control/candidate
-binary hashes, and any order other than A1/B1/B2/A2. It writes each child
-stdout/stderr and a JSON receipt containing source, binary, runner-script and
-host hashes. A coordinator-granted quiet CPU is represented below as `${CPU}`
-and must be fixed in the manifest:
+affinity. The runner calibrates both endpoints independently, then uses the
+larger admitted batch for both sides; it rejects every leg shorter than 250 ms,
+retains every raw leg, and records process/load scans before and after each
+child. The executable runner is `tools/xls_f3_qualification_abba.py`; it fails
+closed on dirty or same source snapshots, unpinned lineage, probe identity
+mismatches, child errors, malformed or extra CSV fields, unstable output
+digests, equal control/candidate binary hashes, and any order other than
+A1/B1/B2/A2. It writes each child stdout/stderr and a JSON receipt containing
+source, binary, runner-script, host, calibration, affinity and memory-scope
+hashes. A coordinator-granted quiet CPU is represented below as `${CPU}` and
+must be fixed in the manifest. A subset requires `--diagnostic` and its receipt
+has `qualification_eligible: false`; only the default six-cell matrix is
+eligible:
 
 ```sh
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
@@ -188,14 +212,18 @@ python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_
   --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235 \
   --output-dir "$OUT" \
   --cpu "${CPU}" \
-  --warmup 20 --samples 40 --batch "${BATCH}"
+  --memory-limit-bytes 2147483648 \
+  --warmup 20 --samples 40 \
+  --control-lineage 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
+  --candidate-lineage 8acd229235e3c01c6e529f6d1f055d84b8e03de4
 ```
 
 The runner emits A1/B1/B2/A2 for each route/corpus pair, and stores its script
-hash, binary hashes, source hashes, CPU, memory scope, raw stdout/stderr and
-the output digest in `$OUT/xls-f3-abba-receipt.json`. Batch calibration is an
-operator gate before this command; the receipt records the admitted common
-batch. It must not report a speedup from the old eager `ole_w5_probe`.
+hash, exact probe-file hashes, binary hashes, source hashes, CPU, memory scope,
+calibration attempts, quiet scans, raw stdout/stderr and output digest in
+`$OUT/xls-f3-abba-receipt.json`. The admitted common batch is measured by the
+runner itself, with both endpoint calibration legs required to reach 250 ms.
+It must not report a speedup from the old eager `ole_w5_probe`.
 
 For resource evidence, use the same release probe binaries and run direct
 heaptrack children (not a wrapper hidden behind `taskset`) in fresh
