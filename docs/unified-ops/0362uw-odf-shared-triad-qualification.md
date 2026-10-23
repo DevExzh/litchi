@@ -130,7 +130,20 @@ python3 tools/native_qualification/odf_shared_triad_runner.py \
 The runner supplies the final selected source SHA and lock SHA, rejects the
 historical `15ab` tip, verifies the clean source tree and package/probe/lock
 identities, rejects overlapping artifacts, captures stdout/stderr outside the
-checkout, and validates all four rows before writing the receipt. The current
-source correction has no baseline build, release build, quiet-host timing, or
-final native comparison; a locked debug validation is still required after the
-successor commit is selected. No PROGRESS edit is part of this lane.
+checkout, and validates all four rows before writing the receipt.
+
+On 2026-10-23, the runner completed that locked, untimed correctness check on
+source tip `c9b352265eb833423c6852f91227a28bbf1ead02` with lock SHA
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
+The external output is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-readiness-odf-shared-v2-output-c9b/probe.json`
+(27,537 bytes, SHA-256
+`11cb668cb3893de0ac9ad8858ead046e4a7dbf8a13628d3febf569d9035ac6a9`), with
+receipt `receipt.json` (2,194 bytes, SHA-256
+`1c3d427cee98f2e7977c13a1fbd05abdd387186110ba4342781ac2fe9fe88772`) and
+validation receipt `validated-receipt.json` (1,597 bytes, SHA-256
+`f639f344d52b7012036d19ab4e533882e32daa6255e9b18b0495452a544bb88c`). The
+external Cargo target measured 569,618,320 bytes; stderr was 6,349 bytes. This
+is a correctness-only candidate-source validation, not a baseline comparison,
+release build, quiet-host timing result, final native qualification, or
+acceptance claim. No PROGRESS edit is part of this lane.
