@@ -521,7 +521,9 @@ mod zip {
                 )
                 .map_err(litchi_core::Error::from)
                 .map_err(error)?;
-                let observed = spreadsheet.source_version().map_err(error)?;
+                let observed = spreadsheet
+                    .source_version()
+                    .map_err(crate::format::ods::odf_error)?;
                 if observed != version {
                     return Err(error(litchi_core::Error::SourceChanged {
                         expected: version,

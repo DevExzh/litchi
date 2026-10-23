@@ -11,9 +11,9 @@ use litchi_odc::{AxisSpec, ChartClass, Definition, LegendSpec, SeriesSpec, Text}
 use super::tree::{count, length, odf_length, text};
 use super::write::{
     Commit, Patch, added_path, bound, element_refusal, finish, key_refusal, refusal, required,
-    resolve, staging_error,
+    resolve,
 };
-use super::{Flavor, OdfTree, Owner, TreeBuilder, addable, element, writable};
+use super::{Flavor, OdfTree, Owner, TreeBuilder, addable, element, odf_staging_error, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -366,7 +366,7 @@ pub(crate) fn set(
     }
     if definition != source {
         edit.replace_chart(&definition)
-            .map_err(|error| staging_error(error, FileFormat::Odc))?;
+            .map_err(|error| odf_staging_error(error, FileFormat::Odc))?;
     }
     commit(file, edit, operations, limits)
 }
@@ -413,7 +413,7 @@ impl Write {
                 };
                 return edit
                     .update_axis(*index, update)
-                    .map_err(|error| staging_error(error, FileFormat::Odc));
+                    .map_err(|error| odf_staging_error(error, FileFormat::Odc));
             },
             Self::Class(class) => (T::Chart, A::Class, Some(class.lexical().to_owned())),
             Self::Size(width, value) => (
@@ -448,7 +448,7 @@ impl Write {
             },
         };
         edit.update_exact(target, attribute, value)
-            .map_err(|error| staging_error(error, FileFormat::Odc))
+            .map_err(|error| odf_staging_error(error, FileFormat::Odc))
     }
 
     fn apply(self, definition: &mut Definition) -> Result<()> {
@@ -538,7 +538,7 @@ fn retitle(title: Option<Text>, value: Option<String>) -> Option<Text> {
 /// lossless typed surface is a capability gap, not a corrupt file.
 fn definition(package: &litchi_odc::Package) -> Result<Definition> {
     package.chart().definition().map_err(|error| {
-        let mut refused = staging_error(error, FileFormat::Odc);
+        let mut refused = odf_staging_error(error, FileFormat::Odc);
         if refused.code() == Code::InvalidValue {
             refused = refusal(
                 Code::UnsupportedCapability,
@@ -706,7 +706,7 @@ pub(crate) fn add(
     }
     let mut edit = package.edit();
     edit.replace_chart(&definition)
-        .map_err(|error| staging_error(error, FileFormat::Odc))?;
+        .map_err(|error| odf_staging_error(error, FileFormat::Odc))?;
     let commit = commit(file, edit, 1, limits)?;
     let path = added_path(&commit.after, &[], &kind, Some(position))?;
     Ok((commit, path))
@@ -765,7 +765,7 @@ pub(crate) fn remove(
     series.sort_unstable_by(|left, right| right.cmp(left));
     series.dedup();
     let mut edit = package.edit();
-    let staging = |error| staging_error(error, FileFormat::Odc);
+    let staging = |error| odf_staging_error(error, FileFormat::Odc);
     if legend {
         // The legend has no typed removal on the leaf edit: the whole
         // removal goes through the chart's typed definition (lossless or
@@ -846,7 +846,7 @@ fn reorder(
     let mut edit = package.edit();
     if definition != source {
         edit.replace_chart(&definition)
-            .map_err(|error| staging_error(error, FileFormat::Odc))?;
+            .map_err(|error| odf_staging_error(error, FileFormat::Odc))?;
     }
     commit(file, edit, operations, limits)
 }

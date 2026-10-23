@@ -164,18 +164,32 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     .with_format(FileFormat::Ods)
 }
 
-/// A leaf staging refusal. The leaf reports a document shape it will not
+/// A leaf staging failure. The leaf reports a document shape it will not
 /// rewrite (dependencies, unmodeled markup) and a malformed authored value
 /// with the same `InvalidFormat` it uses for corrupt input; at a write call
-/// site the input already parsed, so the refusal is re-coded as `code`
-/// while keeping the typed leaf error.
+/// site the input already parsed, so those authored failures are re-coded as
+/// `code` while keeping the typed leaf error. A typed `Refused` keeps its
+/// `RefusalKind` classification.
 pub(super) fn leaf(error: litchi_core::Error, code: Code) -> Error {
     match error {
         litchi_core::Error::InvalidFormat(_)
         | litchi_core::Error::ParseError(_)
-        | litchi_core::Error::Unsupported(_)
-        | litchi_core::Error::Refused(_) => core_error(error).caused_by_argument(code),
+        | litchi_core::Error::Unsupported(_) => core_error(error).caused_by_argument(code),
         other => core_error(other),
+    }
+}
+
+/// The same caller-argument classification for the ODF-owned leaf errors.
+/// Typed limits, refusals, conflicts and source publication diagnostics retain
+/// their native classification and payload.
+pub(super) fn odf_leaf(error: litchi_odf_common::Error, code: Code) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(
+            error @ (litchi_core::Error::InvalidFormat(_)
+            | litchi_core::Error::ParseError(_)
+            | litchi_core::Error::Unsupported(_)),
+        ) => core_error(error).caused_by_argument(code),
+        other => odf_error(other),
     }
 }
 
@@ -839,7 +853,7 @@ pub(super) fn stage_cells(
         }
         Ok(())
     })
-    .map_err(|error| leaf(error, Code::InvalidValue))
+    .map_err(|error| odf_leaf(error, Code::InvalidValue))
 }
 
 /// Stage a merge (`true`) or unmerge (`false`) of `rect` into `cells`,
@@ -908,7 +922,7 @@ fn validate_style(file: &Ods, name: &str) -> Result<()> {
     file.materialized()?
         .effective_cell_style(name)
         .map(|_| ())
-        .map_err(|error| leaf(error, Code::InvalidValue).with_property("style"))
+        .map_err(|error| odf_leaf(error, Code::InvalidValue).with_property("style"))
 }
 
 fn single<T: Copy>(
@@ -974,9 +988,9 @@ fn set_sheet(
     // name in its own slot, then drop the original after it.
     let mut edit = file.leaf_edit()?;
     edit.copy_sheet(current, &name, SheetPosition::Index(position as usize))
-        .map_err(|error| leaf(error, Code::UnsupportedCapability).with_property("name"))?;
+        .map_err(|error| odf_leaf(error, Code::UnsupportedCapability).with_property("name"))?;
     edit.remove_sheet(current)
-        .map_err(|error| leaf(error, Code::UnsupportedCapability).with_property("name"))?;
+        .map_err(|error| odf_leaf(error, Code::UnsupportedCapability).with_property("name"))?;
     finish(file, edit, 1, limits)
 }
 
@@ -1101,7 +1115,7 @@ fn set_name(
             .replace(Position::new(index), updated)
             .map(|_| ())
     })
-    .map_err(|error| leaf(error, Code::InvalidValue))?;
+    .map_err(|error| odf_leaf(error, Code::InvalidValue))?;
     finish(file, edit, 1, limits)
 }
 
@@ -1151,7 +1165,7 @@ fn set_comment(
     }
     let mut edit = file.leaf_edit()?;
     edit.annotations(|transaction| transaction.replace(index, updated))
-        .map_err(|error| leaf(error, Code::InvalidValue))?;
+        .map_err(|error| odf_leaf(error, Code::InvalidValue))?;
     finish(file, edit, 1, limits)
 }
 
@@ -1232,7 +1246,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
             refuse_sheet_dependencies(file, name)?;
             let mut edit = file.leaf_edit()?;
             edit.remove_sheet(name)
-                .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+                .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         Kind::Row => {
@@ -1253,7 +1267,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
                     count: 1,
                 }],
             )
-            .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+            .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         Kind::NamedRange => {
@@ -1267,7 +1281,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
             )?;
             let mut edit = file.leaf_edit()?;
             edit.definitions(|definitions| definitions.remove(Position::new(index)).map(|_| ()))
-                .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+                .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         Kind::Comment => {
@@ -1294,7 +1308,7 @@ fn remove_targets(file: &Ods, targets: &[Target], limits: &SemanticLimits) -> Re
                 }
                 Ok(())
             })
-            .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+            .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, indexes.len(), limits)
         },
         Kind::MergeCell => {
@@ -1500,10 +1514,10 @@ fn add_sheet(
         .map_err(|error| leaf(error, Code::InvalidValue))?;
     let mut edit = file.leaf_edit()?;
     edit.append_sheet(&sheet)
-        .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+        .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
     if position != count {
         edit.move_sheet(&name, SheetPosition::Index(position))
-            .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+            .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
     }
     Ok((finish(file, edit, 1, limits)?, sheet_path(position)))
 }
@@ -1579,7 +1593,7 @@ fn add_row(
             rows: vec![Row::new()],
         }],
     )
-    .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+    .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
     let path = Path::from_steps([
         Step::new("sheet").with(Predicate::Index(Position::new(sheet as usize))),
         Step::new("row").with(Predicate::Index(Position::new(at as usize))),
@@ -1640,7 +1654,7 @@ fn add_name(
     let index = file.definitions()?.len();
     let mut edit = file.leaf_edit()?;
     edit.definitions(|definitions| definitions.add(definition))
-        .map_err(|error| leaf(error, Code::InvalidValue))?;
+        .map_err(|error| odf_leaf(error, Code::InvalidValue))?;
     let path =
         Path::from_steps([Step::new("namedrange").with(Predicate::Index(Position::new(index)))]);
     Ok((finish(file, edit, 1, limits)?, path))
@@ -1688,7 +1702,7 @@ fn add_comment(
     edit.annotations(|transaction| {
         transaction.add(&name, row as usize, column as usize, annotation)
     })
-    .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+    .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
     let commit = finish(file, edit, 1, limits)?;
     // The new annotation's ordinal among its sheet's annotations, in
     // document order of the committed snapshot.
@@ -1746,7 +1760,7 @@ fn move_target(
             let name = sheet_name(file, position)?;
             let mut edit = file.leaf_edit()?;
             edit.move_sheet(&name, SheetPosition::Index(to))
-                .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+                .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         Target::Row { sheet, index } => {
@@ -1785,7 +1799,7 @@ fn move_target(
                     to: to as usize,
                 }],
             )
-            .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+            .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         _ => Err(refusal(
@@ -1811,9 +1825,9 @@ fn swap_targets(
             let second_name = sheet_name(file, second as u32)?;
             let mut edit = file.leaf_edit()?;
             edit.move_sheet(&second_name, SheetPosition::Index(first))
-                .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+                .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             edit.move_sheet(&first_name, SheetPosition::Index(second))
-                .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+                .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         (
@@ -1844,7 +1858,7 @@ fn swap_targets(
                     },
                 ],
             )
-            .map_err(|error| leaf(error, Code::UnsupportedCapability))?;
+            .map_err(|error| odf_leaf(error, Code::UnsupportedCapability))?;
             finish(file, edit, 1, limits)
         },
         _ => Err(refusal(
@@ -1856,7 +1870,43 @@ fn swap_targets(
 
 #[cfg(test)]
 mod tests {
-    use super::{formula_token, range_address};
+    use super::{formula_token, leaf, odf_leaf, range_address};
+    use crate::error::{Code, Source};
+
+    #[test]
+    fn typed_odf_errors_keep_their_classification() {
+        let refusal = odf_leaf(
+            litchi_odf_common::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_feature",
+                "the target does not accept this feature",
+            ),
+            Code::InvalidValue,
+        );
+        assert_eq!(refusal.code(), Code::UnsupportedType);
+        assert!(matches!(refusal.leaf(), Source::Odf(_)));
+
+        let conflict = odf_leaf(
+            litchi_odf_common::Error::patch_conflict("set_feature", "the package base differs"),
+            Code::UnsupportedCapability,
+        );
+        assert_eq!(conflict.code(), Code::InvalidInput);
+        assert!(matches!(conflict.leaf(), Source::Odf(_)));
+    }
+
+    #[test]
+    fn typed_core_refusals_keep_their_classification() {
+        let refusal = leaf(
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "set_feature",
+                "the operation is unavailable",
+            )),
+            Code::InvalidValue,
+        );
+        assert_eq!(refusal.code(), Code::UnsupportedCapability);
+        assert!(matches!(refusal.leaf(), Source::Core(_)));
+    }
 
     #[test]
     fn formulas_gain_the_openformula_namespace() {

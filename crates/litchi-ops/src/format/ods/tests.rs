@@ -152,17 +152,14 @@ fn source_route_reports_a_changed_source_as_io_error() {
 }
 
 #[test]
-fn malformed_body_is_a_typed_core_error() {
+fn malformed_body_is_a_typed_odf_error() {
     let bytes = broken_package(litchi_odf_common::constants::ODF_SPREADSHEET);
-    let Err(leaf_error) = Package::from_bytes(&bytes)
-        .map_err(litchi_core::Error::from)
-        .and_then(|package| package.workbook())
-    else {
+    let Err(leaf_error) = Package::from_bytes(&bytes).and_then(|package| package.workbook()) else {
         panic!("a broken body must not open in the leaf");
     };
     let error = crate::open_bytes(bytes).expect_err("a broken body must not open");
     assert!(
-        matches!(error.leaf(), crate::error::Source::Core(_)),
+        matches!(error.leaf(), crate::error::Source::Odf(_)),
         "{error:?}"
     );
     assert_eq!(error.format(), Some(FileFormat::Ods));

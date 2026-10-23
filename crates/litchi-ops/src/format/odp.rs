@@ -147,7 +147,7 @@ impl Odp {
         origin: Option<Arc<Path>>,
         odf_options: litchi_odf_common::OpenOptions,
     ) -> Result<Self> {
-        let presentation = package.presentation().map_err(core_error)?;
+        let presentation = package.presentation().map_err(odf_error)?;
         Ok(Self::from_owner(
             OdpOwner::Eager {
                 package,
@@ -442,7 +442,7 @@ impl Odp {
     pub(crate) fn member(&self, path: &str) -> Result<Option<Vec<u8>>> {
         match &self.0.owner {
             OdpOwner::Eager { presentation, .. } => {
-                presentation.member_data(path).map_err(core_error)
+                presentation.member_data(path).map_err(odf_error)
             },
             #[cfg(any(unix, windows))]
             OdpOwner::Source(presentation) => presentation.member_data(path).map_err(core_error),
@@ -506,7 +506,7 @@ impl Odp {
         let package = self.package()?;
         if package
             .security_policy()
-            .map_err(|error| self.flat_refusal(core_error(error)))?
+            .map_err(|error| self.flat_refusal(odf_error(error)))?
             .is_editable()
         {
             return Ok(());
@@ -649,9 +649,9 @@ impl Odp {
     /// when a filesystem-backed source changed.
     pub fn text(&self) -> Result<String> {
         match &self.0.owner {
-            OdpOwner::Eager { presentation, .. } => presentation.text(),
+            OdpOwner::Eager { presentation, .. } => presentation.text().map_err(odf_error),
             #[cfg(any(unix, windows))]
-            OdpOwner::Source(presentation) => presentation.text(),
+            OdpOwner::Source(presentation) => presentation.text().map_err(core_error),
             OdpOwner::Flat(flat) => Ok(flat
                 .slides()
                 .iter()
@@ -660,7 +660,6 @@ impl Odp {
                 .collect::<Vec<_>>()
                 .join("\n\n")),
         }
-        .map_err(core_error)
     }
 
     /// The number of slides.
@@ -670,34 +669,31 @@ impl Odp {
     /// As for [`Self::text`].
     pub fn slide_count(&self) -> Result<usize> {
         match &self.0.owner {
-            OdpOwner::Eager { presentation, .. } => presentation.slide_count(),
+            OdpOwner::Eager { presentation, .. } => presentation.slide_count().map_err(odf_error),
             #[cfg(any(unix, windows))]
-            OdpOwner::Source(presentation) => presentation.slide_count(),
+            OdpOwner::Source(presentation) => presentation.slide_count().map_err(core_error),
             OdpOwner::Flat(flat) => Ok(flat.slide_count()),
         }
-        .map_err(core_error)
     }
 
     /// The parsed slides, for the presentation family view.
     pub(crate) fn slides(&self) -> Result<Vec<litchi_odp::Slide>> {
         match &self.0.owner {
-            OdpOwner::Eager { presentation, .. } => presentation.slides(),
+            OdpOwner::Eager { presentation, .. } => presentation.slides().map_err(odf_error),
             #[cfg(any(unix, windows))]
-            OdpOwner::Source(presentation) => presentation.slides(),
+            OdpOwner::Source(presentation) => presentation.slides().map_err(core_error),
             OdpOwner::Flat(flat) => Ok(flat.slides().to_vec()),
         }
-        .map_err(core_error)
     }
 
     /// One parsed slide, for the presentation family view.
     pub(crate) fn slide(&self, position: usize) -> Result<Option<litchi_odp::Slide>> {
         match &self.0.owner {
-            OdpOwner::Eager { presentation, .. } => presentation.slide(position),
+            OdpOwner::Eager { presentation, .. } => presentation.slide(position).map_err(odf_error),
             #[cfg(any(unix, windows))]
-            OdpOwner::Source(presentation) => presentation.slide(position),
+            OdpOwner::Source(presentation) => presentation.slide(position).map_err(core_error),
             OdpOwner::Flat(flat) => Ok(flat.slides().get(position).cloned()),
         }
-        .map_err(core_error)
     }
 
     /// Document properties projected from `meta.xml`. A flat document
@@ -710,7 +706,7 @@ impl Odp {
     pub fn metadata(&self) -> Result<Option<Metadata>> {
         match &self.0.owner {
             OdpOwner::Eager { presentation, .. } => {
-                presentation.metadata().map(Some).map_err(core_error)
+                presentation.metadata().map(Some).map_err(odf_error)
             },
             #[cfg(any(unix, windows))]
             OdpOwner::Source(presentation) => presentation.metadata().map(Some).map_err(core_error),

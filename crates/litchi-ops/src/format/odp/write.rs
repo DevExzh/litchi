@@ -676,12 +676,12 @@ fn finish(
 /// Map a leaf planning or publication refusal: capability refusals stay
 /// `unsupported_capability`; a request the scene refuses (an address,
 /// overlap or reference conflict) is `invalid_argument`.
-fn leaf_error(error: litchi_core::Error) -> Error {
+fn leaf_error(error: litchi_odf_common::Error) -> Error {
     match error {
-        litchi_core::Error::InvalidFormat(message) => {
-            Error::new(Code::InvalidArgument, message).with_format(FileFormat::Odp)
+        litchi_odf_common::Error::Core(error @ litchi_core::Error::InvalidFormat(_)) => {
+            core_error(error).caused_by_argument(Code::InvalidArgument)
         },
-        other => core_error(other),
+        other => odf_error(other),
     }
 }
 

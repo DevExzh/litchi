@@ -33,7 +33,7 @@ use super::features::{
 };
 use super::node::{Item, Node};
 use super::spec::Kind;
-use super::write::{Commit, finish, leaf, stage_cells};
+use super::write::{Commit, finish, leaf, odf_leaf, stage_cells};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
 use crate::placement::Placement as NodePlacement;
@@ -55,14 +55,47 @@ fn missing(key: &'static str, message: &'static str) -> Error {
     error(Code::MissingProperty, message).with_property(key)
 }
 
-/// A leaf refusal: an unsupported shape is a capability refusal, anything
-/// else an invalid value.
-fn native(error: litchi_core::Error) -> Error {
-    match error {
-        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_) => {
-            leaf(error, Code::UnsupportedCapability)
-        },
-        other => leaf(other, Code::InvalidValue),
+/// A leaf error: a generic unsupported shape is a capability refusal, while a
+/// typed edit refusal keeps the `RefusalKind` supplied by the leaf.
+fn native(error: litchi_odf_common::Error) -> Error {
+    let code = if matches!(
+        &error,
+        litchi_odf_common::Error::Core(litchi_core::Error::Unsupported(_))
+    ) {
+        Code::UnsupportedCapability
+    } else {
+        Code::InvalidValue
+    };
+    odf_leaf(error, code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::native;
+    use crate::error::{Code, Source};
+
+    #[test]
+    fn native_preserves_refusals_and_conflicts() {
+        let refusal = native(litchi_odf_common::Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedTarget,
+            "add_feature",
+            "the target does not accept this feature",
+        ));
+        assert_eq!(refusal.code(), Code::UnsupportedType);
+        assert!(matches!(refusal.leaf(), Source::Odf(_)));
+
+        let conflict = native(litchi_odf_common::Error::patch_conflict(
+            "add_feature",
+            "the package base differs",
+        ));
+        assert_eq!(conflict.code(), Code::InvalidInput);
+        assert!(matches!(conflict.leaf(), Source::Odf(_)));
+
+        let unsupported = native(litchi_odf_common::Error::Core(
+            litchi_core::Error::Unsupported("feature is unavailable".to_owned()),
+        ));
+        assert_eq!(unsupported.code(), Code::UnsupportedCapability);
+        assert!(matches!(unsupported.leaf(), Source::Core(_)));
     }
 }
 
@@ -1652,7 +1685,7 @@ impl CfState {
                 .clone()
                 .ok_or_else(|| error(Code::InternalError, "the graphic rule is missing"))?,
         };
-        cf::Format::new(addresses, vec![rule]).map_err(native)
+        cf::Format::new(addresses, vec![rule]).map_err(|error| leaf(error, Code::InvalidValue))
     }
 }
 

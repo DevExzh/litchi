@@ -197,6 +197,17 @@ pub(crate) fn core_error(error: litchi_core::Error, format: FileFormat) -> Error
     Error::from(error).with_format(format)
 }
 
+/// Map an ODF edit error without projecting its typed package payload into
+/// the common-core error.  The older object adapters still return a core
+/// error for some staging paths, so those retain the caller-argument
+/// classification supplied by the shared helper.
+pub(crate) fn odf_staging_error(error: litchi_odf_common::Error, format: FileFormat) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => write::staging_error(error, format),
+        other => odf_error(other, format),
+    }
+}
+
 impl OdfTree {
     /// Adopt the package detection prepared, without a second ZIP index.
     pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
@@ -892,7 +903,9 @@ pub(crate) const fn writes(adapter: crate::read::Adapter) -> Option<&'static Wri
 #[cfg(all(test, feature = "odb"))]
 mod tests {
     use litchi_core::detection::FileFormat;
+    use litchi_core::{Resource, SourceVersion};
 
+    use crate::error::{Code, Source};
     use crate::{File, NewNode, props};
 
     fn tree(file: &File) -> &super::OdfTree {
@@ -927,5 +940,46 @@ mod tests {
         let reopened = crate::open_bytes(file.to_bytes().expect("bytes")).expect("reopen");
         assert_eq!(lazy, format!("{:?}", tree(&reopened).tree()));
         assert!(lazy.contains("SELECT 20"));
+    }
+
+    #[test]
+    fn staging_refusals_keep_their_kind_through_the_odf_adapter() {
+        let error = litchi_odf_common::Error::Core(litchi_core::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedTarget,
+                "set_shape",
+                "the target does not accept this shape",
+            ),
+        ));
+        let mapped = super::odf_staging_error(error, FileFormat::Odb);
+        assert_eq!(mapped.code(), Code::UnsupportedType);
+        assert!(matches!(mapped.leaf(), Source::Core(_)));
+    }
+
+    #[test]
+    fn staging_preserves_source_and_limit_classifications() {
+        let source_changed = litchi_core::Error::SourceChanged {
+            expected: SourceVersion::new(0x10, 1),
+            observed: SourceVersion::new(0x10, 2),
+        };
+        let mapped = super::odf_staging_error(
+            litchi_odf_common::Error::Core(source_changed),
+            FileFormat::Odb,
+        );
+        assert_eq!(mapped.code(), Code::IoError);
+        assert!(matches!(mapped.leaf(), Source::Core(_)));
+
+        let resource_limit = litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+            resource: Resource::InputBytes,
+            observed: 11,
+            limit: 10,
+            scope: std::sync::Arc::from("ODF object bytes"),
+        });
+        let mapped = super::odf_staging_error(
+            litchi_odf_common::Error::Core(resource_limit),
+            FileFormat::Odb,
+        );
+        assert_eq!(mapped.code(), Code::LimitExceeded);
+        assert!(matches!(mapped.leaf(), Source::Core(_)));
     }
 }
