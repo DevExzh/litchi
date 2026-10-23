@@ -27,7 +27,7 @@ use litchi_core::{
 use litchi_docx::{Error as DocumentError, Package, SourceLimits, source_backed};
 use litchi_ooxml_common::mce::Error as MceError;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcError, PackURI, SourceBackedPackage};
+use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceCacheLimits};
 use soapberry_zip::ZipArchive;
 use soapberry_zip::office::StreamingArchiveWriter;
 

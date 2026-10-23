@@ -180,7 +180,7 @@ fn metadata_matches_the_leaf_core_properties_read() {
     let bytes = fixture("xlsb/Simple.xlsb");
     let package = SourceBackedPackage::from_vec(
         bytes.clone(),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         litchi_opc::SourceCacheLimits::default(),
         None,
     )
@@ -306,7 +306,7 @@ fn mixed_chart_tabs() -> Vec<u8> {
 }
 
 fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
@@ -333,7 +333,7 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
 fn malformed_second_sheet() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(
         Cursor::new(fixture("xlsb/Simple.xlsb")),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
     )
     .unwrap();
     let sheet = PackURI::new("/xl/worksheets/sheet2.bin").unwrap();

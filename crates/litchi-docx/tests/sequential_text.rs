@@ -9,6 +9,7 @@ use litchi_core::{
 };
 use litchi_docx::source_backed::Package as SourceBackedPackage;
 use litchi_docx::{Defect, Package, SourceLimits, TextDefect};
+use litchi_opc::SourceCacheLimits;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";

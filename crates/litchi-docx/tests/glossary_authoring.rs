@@ -278,7 +278,7 @@ fn invalid_graph_update_is_failure_atomic() {
 
     assert!({
         let mut edit = package.edit_opc();
-        let removed = glossary::raw::remove(edit.package_mut(), &glossary::Limits::DEFAULT)
+        let removed = raw::remove(edit.package_mut(), &Limits::DEFAULT)
             .unwrap()
             .is_some();
         package = edit.commit().unwrap().into_package();
@@ -287,7 +287,7 @@ fn invalid_graph_update_is_failure_atomic() {
     assert!(package.glossary().unwrap().is_none());
     assert!(!{
         let mut edit = package.edit_opc();
-        let removed = glossary::raw::remove(edit.package_mut(), &glossary::Limits::DEFAULT)
+        let removed = raw::remove(edit.package_mut(), &Limits::DEFAULT)
             .unwrap()
             .is_some();
         assert!(!edit.commit().unwrap().diagnostics().changed());
