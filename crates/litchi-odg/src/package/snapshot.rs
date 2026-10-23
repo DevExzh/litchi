@@ -1569,26 +1569,34 @@ impl Edit {
                 joined,
             ));
         }
-        if self.joined_conflicts_with_staged(&joined) {
-            return Err(JoinError::new(
-                joined_refusal("ODG joined edit overlaps staged work"),
-                joined,
-            ));
+        match self.joined_conflicts_with_staged(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit overlaps staged work"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
         }
-        if joined_has_dependent_conflict(&self.source, &joined) {
-            return Err(JoinError::new(
-                joined_refusal("ODG joined edit has dependent presentation effects"),
-                joined,
-            ));
+        match joined_has_dependent_conflict(&self.source, &joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal("ODG joined edit has dependent presentation effects"),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
         }
-        if let Err(error) = self.joined_page_name_targets(&joined) {
+        if let Err(error) = self.validate_joined_page_names(&joined) {
             return Err(JoinError::new(error, joined));
         }
         self.pending_joined = Some(joined);
         Ok(self)
     }
 
-    fn joined_conflicts_with_staged(&self, joined: &JoinedEdits) -> bool {
+    fn joined_conflicts_with_staged(&self, joined: &JoinedEdits) -> Result<bool> {
         let staged_package_effect = self.requires_package_projection
             || !self.resource_edits.is_empty()
             || self
@@ -1596,7 +1604,7 @@ impl Edit {
                 .iter()
                 .any(|change| matches!(change, Change::Structure(_)))
             || self.package_replacement.is_some();
-        joined.sub_edits().any(|sub_edit| {
+        let direct_conflict = joined.sub_edits().any(|sub_edit| {
             sub_edit.effects().writes().any(|effect| {
                 if effect == "package" {
                     return staged_package_effect || !self.changes.is_empty();
@@ -1609,21 +1617,45 @@ impl Edit {
                     .flat_map(|change| change_effect_keys(&self.source, change))
                     .any(|staged| staged == effect)
             })
-        }) || self.changes.iter().any(|change| {
-            joined.sub_edits().any(|sub_edit| {
-                sub_edit.payload().operations().iter().any(|operation| {
-                    change_conflicts_with_operation(&self.source, change, operation)
-                })
-            })
-        })
+        });
+        if direct_conflict {
+            return Ok(true);
+        }
+        projected_staged_style_conflict(self, joined)
     }
 
-    fn joined_page_name_targets(&self, joined: &JoinedEdits) -> Result<BTreeMap<usize, String>> {
-        self.page_name_targets_for_operations(
-            joined
-                .sub_edits()
-                .flat_map(|sub_edit| sub_edit.payload().operations().iter()),
-        )
+    fn validate_joined_page_names(&self, joined: &JoinedEdits) -> Result<()> {
+        let mut segment = Vec::new();
+        let mut active_replacement = None;
+        for sub_edit in joined.sub_edits() {
+            for operation in sub_edit.payload().operations() {
+                if operation.op == "package.replace" {
+                    self.validate_page_name_segment(active_replacement.as_ref(), &segment)?;
+                    segment.clear();
+                    let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                    let base = active_replacement.as_ref().unwrap_or(&self.source);
+                    active_replacement = Some(base.reopen_same_flavor(blob.to_vec())?);
+                } else {
+                    segment.push(operation);
+                }
+            }
+        }
+        self.validate_page_name_segment(active_replacement.as_ref(), &segment)
+    }
+
+    fn validate_page_name_segment(
+        &self,
+        active_replacement: Option<&Package>,
+        operations: &[&PatchOperation],
+    ) -> Result<()> {
+        if let Some(replacement) = active_replacement {
+            let edit =
+                replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+            edit.page_name_targets_for_operations(operations.iter().copied())?;
+        } else {
+            self.page_name_targets_for_operations(operations.iter().copied())?;
+        }
+        Ok(())
     }
 
     fn page_name_targets_for_operations<'a>(
@@ -4333,7 +4365,7 @@ impl Edit {
         let Some(joined) = self.pending_joined.as_ref() else {
             return Ok(());
         };
-        if self.joined_conflicts_with_staged(joined) {
+        if self.joined_conflicts_with_staged(joined)? {
             return invalid("ODG joined edit overlaps staged work");
         }
         let source_fingerprint = fingerprint(self.source.as_bytes());
@@ -4341,54 +4373,88 @@ impl Edit {
             validate_durable_patch(&sub_edit.payload().inner)?;
             validate_joined_preconditions(sub_edit.payload(), &source_fingerprint)?;
         }
-        let page_name_targets = self.joined_page_name_targets(joined)?;
+        self.validate_joined_page_names(joined)?;
         let joined = self
             .pending_joined
             .take()
             .expect("pending joined plan was borrowed above");
-        let mut replacement_operations = None;
+        let mut staged_before_replacement = Vec::new();
+        let mut replacement_operations: Option<Vec<PatchOperation>> = None;
         for sub_edit in joined.into_sub_edits() {
             let durable = sub_edit.into_payload();
             for operation in durable.operations() {
                 if operation.op == "package.replace" {
-                    enforce_security_policy(&self.source, self.security_policy)?;
-                    enforce_active_content_policy(&self.source, self.active_content_policy)?;
+                    if let Some(operations) = &replacement_operations {
+                        self.commit_replacement_operations(operations, &source_fingerprint)?;
+                    } else {
+                        self.stage_durable_operations(
+                            &staged_before_replacement,
+                            &source_fingerprint,
+                        )?;
+                        staged_before_replacement.clear();
+                    }
+                    let active = self.package_replacement.as_ref().unwrap_or(&self.source);
+                    enforce_security_policy(active, self.security_policy)?;
+                    enforce_active_content_policy(active, self.active_content_policy)?;
                     let blob = durable_blob(&durable, &operation.value)?;
-                    let replacement = self.source.reopen_same_flavor(blob.to_vec())?;
+                    let replacement = active.reopen_same_flavor(blob.to_vec())?;
                     enforce_active_content_policy(&replacement, self.active_content_policy)?;
                     self.package_replacement = Some(replacement);
                     replacement_operations = Some(Vec::new());
                 } else if let Some(operations) = &mut replacement_operations {
                     operations.push(operation.clone());
                 } else {
-                    self.stage_durable_operation(
-                        operation,
-                        &source_fingerprint,
-                        Some(&page_name_targets),
-                    )?;
+                    staged_before_replacement.push(operation.clone());
                 }
             }
         }
-        if let Some(operations) = replacement_operations
-            && !operations.is_empty()
-        {
-            let replacement = self
-                .package_replacement
-                .take()
-                .expect("package replacement was retained for ordered operations");
-            let mut replacement_edit =
-                replacement.edit_with_policies(self.security_policy, self.active_content_policy);
-            let page_name_targets =
-                replacement_edit.page_name_targets_for_operations(operations.iter())?;
-            for operation in &operations {
-                replacement_edit.stage_durable_operation(
-                    operation,
-                    &source_fingerprint,
-                    Some(&page_name_targets),
-                )?;
-            }
-            self.package_replacement = Some(replacement_edit.commit_core()?.into_package());
+        if let Some(operations) = &replacement_operations {
+            self.commit_replacement_operations(operations, &source_fingerprint)?;
+        } else {
+            self.stage_durable_operations(&staged_before_replacement, &source_fingerprint)?;
         }
+        Ok(())
+    }
+
+    fn stage_durable_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let page_name_targets = self.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            self.stage_durable_operation(operation, source_fingerprint, Some(&page_name_targets))?;
+        }
+        Ok(())
+    }
+
+    fn commit_replacement_operations(
+        &mut self,
+        operations: &[PatchOperation],
+        source_fingerprint: &str,
+    ) -> Result<()> {
+        if operations.is_empty() {
+            return Ok(());
+        }
+        let replacement = self
+            .package_replacement
+            .take()
+            .expect("package replacement was retained for ordered operations");
+        let mut replacement_edit =
+            replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+        let page_name_targets =
+            replacement_edit.page_name_targets_for_operations(operations.iter())?;
+        for operation in operations {
+            replacement_edit.stage_durable_operation(
+                operation,
+                source_fingerprint,
+                Some(&page_name_targets),
+            )?;
+        }
+        self.package_replacement = Some(replacement_edit.commit_core()?.into_package());
         Ok(())
     }
 
@@ -6235,135 +6301,255 @@ fn durable_effect_keys(operation: &PatchOperation) -> Vec<String> {
     }
 }
 
-fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> bool {
-    let sub_edits = joined.sub_edits().collect::<Vec<_>>();
-    sub_edits.iter().enumerate().any(|(index, left)| {
-        sub_edits[index.saturating_add(1)..].iter().any(|right| {
-            left.payload().operations().iter().any(|left_operation| {
-                right.payload().operations().iter().any(|right_operation| {
-                    operations_conflict(source, left_operation, right_operation)
-                })
-            })
+const ORDINARY_STYLE_GROUP: usize = usize::MAX;
+
+#[derive(Clone)]
+struct StyleProjection {
+    pages: Vec<Option<String>>,
+    parents: Arc<BTreeMap<String, Option<String>>>,
+}
+
+impl StyleProjection {
+    fn from_package(package: &Package) -> Result<Self> {
+        Ok(Self {
+            pages: package
+                .pages()
+                .iter()
+                .map(|page| page.style_name().map(str::to_owned))
+                .collect(),
+            parents: Arc::new(drawing_page_style_parents(
+                package.content_xml(),
+                package.styles_xml(),
+            )?),
         })
+    }
+
+    fn page_style(&self, page: usize) -> Option<String> {
+        self.pages.get(page).cloned().flatten()
+    }
+
+    fn set_page_style(&mut self, page: usize, style: String) {
+        if let Some(current) = self.pages.get_mut(page) {
+            *current = Some(style);
+        }
+    }
+}
+
+#[derive(Clone)]
+enum StyleDependencyEvent {
+    Retarget {
+        group: usize,
+        page: usize,
+        destination: String,
+    },
+    Transition {
+        group: usize,
+        page: usize,
+        source_style: Option<String>,
+        parents: Arc<BTreeMap<String, Option<String>>>,
+    },
+}
+
+fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> Result<bool> {
+    if !joined
+        .sub_edits()
+        .any(|sub_edit| has_style_dependency_operation(sub_edit.payload().operations()))
+    {
+        return Ok(false);
+    }
+    let events = projected_joined_style_events(source, joined)?;
+    style_events_conflict(&events)
+}
+
+fn projected_staged_style_conflict(edit: &Edit, joined: &JoinedEdits) -> Result<bool> {
+    if !edit
+        .changes
+        .iter()
+        .any(|change| matches!(change, Change::PageStyle(_) | Change::PageTransition(_)))
+    {
+        return Ok(false);
+    }
+    let mut projection = StyleProjection::from_package(&edit.source)?;
+    let mut events = Vec::new();
+    for change in &edit.changes {
+        match change {
+            Change::PageStyle(value) => {
+                events.push(StyleDependencyEvent::Retarget {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    destination: value.after.clone(),
+                });
+                projection.set_page_style(value.page, value.after.clone());
+            },
+            Change::PageTransition(value) => {
+                events.push(StyleDependencyEvent::Transition {
+                    group: ORDINARY_STYLE_GROUP,
+                    page: value.page,
+                    source_style: projection.page_style(value.page),
+                    parents: projection.parents.clone(),
+                });
+            },
+            _ => {},
+        }
+    }
+    events.extend(projected_joined_style_events_from_projection(
+        edit.source.clone(),
+        projection,
+        joined,
+    )?);
+    style_events_conflict(&events)
+}
+
+fn has_style_dependency_operation<'a>(
+    operations: impl IntoIterator<Item = &'a PatchOperation>,
+) -> bool {
+    operations.into_iter().any(|operation| {
+        matches!(
+            operation.op.as_str(),
+            "page.style.set" | "page.transition.set"
+        )
     })
 }
 
-fn operations_conflict(source: &Package, left: &PatchOperation, right: &PatchOperation) -> bool {
-    let left_style = left.op == "page.style.set";
-    let right_style = right.op == "page.style.set";
-    let left_transition = left.op == "page.transition.set";
-    let right_transition = right.op == "page.transition.set";
-    if (left_style && right_transition) || (left_transition && right_style) {
-        let (style_operation, transition_operation) = if left_style {
-            (left, right)
-        } else {
-            (right, left)
-        };
-        let Some(style_page) = parse_page_target(&style_operation.target).ok() else {
-            return false;
-        };
-        let Some(transition_page) = parse_page_target(&transition_operation.target).ok() else {
-            return false;
-        };
-        if style_page == transition_page {
-            return true;
-        }
-        let Ok(destination_style) = string_value(style_operation) else {
-            return false;
-        };
-        return source
-            .pages()
-            .get(transition_page)
-            .and_then(|page| page.style_name())
-            .is_some_and(|source_style| source_style == destination_style);
-    }
-    if left_transition && right_transition {
-        let left_page = parse_page_target(&left.target).ok();
-        let right_page = parse_page_target(&right.target).ok();
-        return left_page
-            .zip(right_page)
-            .and_then(|(left_page, right_page)| {
-                source
-                    .pages()
-                    .get(left_page)
-                    .and_then(|page| page.style_name())
-                    .zip(
-                        source
-                            .pages()
-                            .get(right_page)
-                            .and_then(|page| page.style_name()),
-                    )
-            })
-            .is_some_and(|(left_style, right_style)| left_style == right_style);
-    }
-    false
+fn projected_joined_style_events(
+    source: &Package,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    projected_joined_style_events_from_projection(
+        source.clone(),
+        StyleProjection::from_package(source)?,
+        joined,
+    )
 }
 
-fn change_conflicts_with_operation(
-    source: &Package,
-    change: &Change,
-    operation: &PatchOperation,
-) -> bool {
-    let operation_page = match operation.op.as_str() {
-        "page.style.set" | "page.transition.set" => parse_page_target(&operation.target).ok(),
-        _ => None,
-    };
-    match change {
-        Change::PageStyle(value) => {
-            if operation.op != "page.transition.set" {
-                return false;
+fn projected_joined_style_events_from_projection(
+    mut active_package: Package,
+    mut projection: StyleProjection,
+    joined: &JoinedEdits,
+) -> Result<Vec<StyleDependencyEvent>> {
+    let mut events = Vec::new();
+    for (group, sub_edit) in joined.sub_edits().enumerate() {
+        for operation in sub_edit.payload().operations() {
+            if operation.op == "package.replace" {
+                let blob = durable_blob(sub_edit.payload(), &operation.value)?;
+                active_package = active_package.reopen_same_flavor(blob.to_vec())?;
+                projection = StyleProjection::from_package(&active_package)?;
+                continue;
             }
-            let Some(transition_page) = operation_page else {
-                return false;
+            match operation.op.as_str() {
+                "page.style.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    let destination = string_value(operation)?.to_owned();
+                    events.push(StyleDependencyEvent::Retarget {
+                        group,
+                        page,
+                        destination: destination.clone(),
+                    });
+                    projection.set_page_style(page, destination);
+                },
+                "page.transition.set" => {
+                    let page = parse_page_target(&operation.target)?;
+                    events.push(StyleDependencyEvent::Transition {
+                        group,
+                        page,
+                        source_style: projection.page_style(page),
+                        parents: projection.parents.clone(),
+                    });
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(events)
+}
+
+fn style_events_conflict(events: &[StyleDependencyEvent]) -> Result<bool> {
+    for (index, left) in events.iter().enumerate() {
+        for right in events[index.saturating_add(1)..].iter() {
+            if style_event_group(left) == style_event_group(right) {
+                continue;
+            }
+            if style_event_pair_conflicts(left, right)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
+fn style_event_group(event: &StyleDependencyEvent) -> usize {
+    match event {
+        StyleDependencyEvent::Retarget { group, .. }
+        | StyleDependencyEvent::Transition { group, .. } => *group,
+    }
+}
+
+fn style_event_pair_conflicts(
+    left: &StyleDependencyEvent,
+    right: &StyleDependencyEvent,
+) -> Result<bool> {
+    match (left, right) {
+        (
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+        )
+        | (
+            StyleDependencyEvent::Transition {
+                page: right_page,
+                source_style,
+                parents,
+                ..
+            },
+            StyleDependencyEvent::Retarget {
+                page: left_page,
+                destination,
+                ..
+            },
+        ) => {
+            if left_page == right_page {
+                return Ok(true);
+            }
+            match source_style.as_deref() {
+                Some(source_style) => style_chain_contains(parents, destination, source_style),
+                None => Ok(false),
+            }
+        },
+        (
+            StyleDependencyEvent::Transition {
+                source_style: left_style,
+                parents: left_parents,
+                ..
+            },
+            StyleDependencyEvent::Transition {
+                source_style: right_style,
+                parents: right_parents,
+                ..
+            },
+        ) => {
+            let Some(left_style) = left_style.as_deref() else {
+                return Ok(false);
             };
-            if transition_page == value.page {
-                return true;
+            let Some(right_style) = right_style.as_deref() else {
+                return Ok(false);
+            };
+            if left_style == right_style {
+                return Ok(true);
             }
-            source
-                .pages()
-                .get(transition_page)
-                .and_then(|page| page.style_name())
-                .is_some_and(|source_style| source_style == value.after)
+            if style_chain_contains(left_parents, left_style, right_style)? {
+                return Ok(true);
+            }
+            style_chain_contains(right_parents, right_style, left_style)
         },
-        Change::PageTransition(value) => {
-            if operation.op == "page.style.set" {
-                let Some(style_page) = operation_page else {
-                    return false;
-                };
-                if style_page == value.page {
-                    return true;
-                }
-                let Ok(destination_style) = string_value(operation) else {
-                    return false;
-                };
-                return source
-                    .pages()
-                    .get(value.page)
-                    .and_then(|page| page.style_name())
-                    .is_some_and(|source_style| source_style == destination_style);
-            }
-            if operation.op != "page.transition.set" {
-                return false;
-            }
-            operation_page
-                .and_then(|page| source.pages().get(page).and_then(|page| page.style_name()))
-                .zip(
-                    source
-                        .pages()
-                        .get(value.page)
-                        .and_then(|page| page.style_name()),
-                )
-                .is_some_and(|(left_style, right_style)| left_style == right_style)
-        },
-        Change::ControlReference(_)
-        | Change::Text(_)
-        | Change::Name(_)
-        | Change::Layer(_)
-        | Change::Geometry(_)
-        | Change::Style(_)
-        | Change::Path(_)
-        | Change::PageName(_)
-        | Change::Structure(_) => false,
+        _ => Ok(false),
     }
 }
 
@@ -9495,35 +9681,64 @@ fn transition_style_is_shared(
     if pages.len() <= 1 {
         return Ok(false);
     }
+    let parents = drawing_page_style_parents(content, styles)?;
+    for (index, page) in pages.iter().enumerate() {
+        if index == selected_page {
+            continue;
+        }
+        if let Some(name) = page.style_name()
+            && style_chain_contains(&parents, name, selected_style)?
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn drawing_page_style_parents(
+    content: &str,
+    styles: Option<&str>,
+) -> Result<BTreeMap<String, Option<String>>> {
     let content_styles = parse_style_definitions(content)?;
     let named_styles = styles
         .map(parse_style_definitions)
         .transpose()?
         .unwrap_or_default();
     // Use the same family filter and automatic-style shadowing as transition
-    // resolution. An indirect inheritor also shares the selected style owner.
+    // resolution. Content definitions are inserted last so they shadow a
+    // same-named named style and its parent closure.
     let mut parents = BTreeMap::new();
     for definition in named_styles.iter().chain(&content_styles) {
         if definition.style.family() == "drawing-page" {
-            parents.insert(definition.style.name(), definition.style.parent());
+            parents.insert(
+                definition.style.name().to_owned(),
+                definition.style.parent().map(str::to_owned),
+            );
         }
     }
-    for (index, page) in pages.iter().enumerate() {
-        if index == selected_page {
-            continue;
+    Ok(parents)
+}
+
+fn style_chain_contains(
+    parents: &BTreeMap<String, Option<String>>,
+    start: &str,
+    target: &str,
+) -> Result<bool> {
+    let mut current = Some(start);
+    let mut visited = BTreeSet::new();
+    let mut depth = 0usize;
+    while let Some(name) = current {
+        if depth > MAX_DEPTH {
+            return invalid("ODG drawing-page style inheritance exceeds the limit");
         }
-        let mut current = page.style_name();
-        let mut depth = 0usize;
-        while let Some(name) = current {
-            if depth > MAX_DEPTH {
-                return invalid("ODG drawing-page style inheritance exceeds the limit");
-            }
-            if name == selected_style {
-                return Ok(true);
-            }
-            current = parents.get(name).copied().flatten();
-            depth += 1;
+        if !visited.insert(name) {
+            return invalid("ODG drawing-page style inheritance is cyclic");
         }
+        if name == target {
+            return Ok(true);
+        }
+        current = parents.get(name).and_then(|parent| parent.as_deref());
+        depth += 1;
     }
     Ok(false)
 }

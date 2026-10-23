@@ -1,7 +1,8 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_core::{
-    CompositionError, CompositionLimitKind, CompositionLimits, Error, SubEditJoinFailure,
+    CompositionError, CompositionLimitKind, CompositionLimits, DiagnosticFingerprint, Error,
+    SubEditJoinFailure,
 };
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::{Package, Transition, edit};
@@ -10,6 +11,8 @@ const CONTENT_AUTOMATIC: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office
 
 const CONTENT_SHARED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/><draw:page draw:name="Page 2" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
 
+const CONTENT_INHERITED_SHARED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="base"/><draw:page draw:name="Page 2" draw:style-name="parent"/></office:drawing></office:body></office:document-content>"#;
+
 const CONTENT_NAMED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
 
 const STYLES_NAMED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual"/></style:style></office:styles></office:document-styles>"#;
@@ -17,6 +20,8 @@ const STYLES_NAMED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:docu
 const CONTENT_INHERITED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="child"/></office:drawing></office:body></office:document-content>"#;
 
 const STYLES_INHERITED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:styles><style:style style:name="parent" style:family="drawing-page"><style:drawing-page-properties presentation:transition-style="fade-from-left"/></style:style><style:style style:name="child" style:family="drawing-page" style:parent-style-name="parent"><style:drawing-page-properties presentation:transition-type="manual"/></style:style></office:styles></office:document-styles>"#;
+
+const STYLES_INHERITED_SHARED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:styles><style:style style:name="base" style:family="drawing-page"/><style:style style:name="parent" style:family="drawing-page"><style:drawing-page-properties presentation:transition-style="fade-from-left"/></style:style><style:style style:name="child" style:family="drawing-page" style:parent-style-name="parent"><style:drawing-page-properties presentation:transition-type="manual"/></style:style></office:styles></office:document-styles>"#;
 
 const CONTENT_FOREIGN_PRESENTATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:example:foreign-presentation" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:vendor="keep"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
 
@@ -379,6 +384,141 @@ fn page_style_retarget_conflicts_with_shared_transition_in_any_order() {
 }
 
 #[test]
+fn inherited_page_style_dependencies_are_checked_in_both_orders_and_staging_positions() {
+    let source = Package::from_bytes(&package(
+        CONTENT_INHERITED_SHARED,
+        Some(STYLES_INHERITED_SHARED),
+    ))
+    .unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut style_edit = source.edit();
+    style_edit.set_page_style_name(0, "child").unwrap();
+    let style_commit = style_edit.commit().unwrap();
+    let mut transition_edit = source.edit();
+    transition_edit
+        .set_page_transition(1, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let transition_commit = transition_edit.commit().unwrap();
+
+    let make_plan = |style_id: &str, transition_id: &str| {
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(style_commit.patch().prepare(style_id, limits).unwrap())
+            .unwrap();
+        joined
+            .join(
+                transition_commit
+                    .patch()
+                    .prepare(transition_id, limits)
+                    .unwrap(),
+            )
+            .unwrap();
+        joined
+    };
+
+    for (style_id, transition_id) in [
+        ("a-inherited-style", "z-inherited-transition"),
+        ("z-inherited-style", "a-inherited-transition"),
+    ] {
+        let mut owner = source.edit();
+        let error = match owner.join(make_plan(style_id, transition_id)) {
+            Ok(_) => panic!("inherited style and transition effects were accepted"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.error(),
+            Error::Refused(refusal)
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+        ));
+        assert!(!owner.commit().unwrap().diagnostics().changed());
+    }
+
+    let mut ordinary_before = source.edit();
+    ordinary_before.set_page_style_name(0, "child").unwrap();
+    assert!(
+        ordinary_before
+            .join({
+                let mut joined = source.joined_edits(limits);
+                joined
+                    .join(
+                        transition_commit
+                            .patch()
+                            .prepare("inherited-ordinary-before", limits)
+                            .unwrap(),
+                    )
+                    .unwrap();
+                joined
+            })
+            .is_err()
+    );
+    assert!(ordinary_before.commit().is_ok());
+
+    let mut ordinary_after = source.edit();
+    ordinary_after
+        .join({
+            let mut joined = source.joined_edits(limits);
+            joined
+                .join(
+                    transition_commit
+                        .patch()
+                        .prepare("inherited-ordinary-after", limits)
+                        .unwrap(),
+                )
+                .unwrap();
+            joined
+        })
+        .unwrap();
+    ordinary_after.set_page_style_name(0, "child").unwrap();
+    assert!(ordinary_after.commit().is_err());
+}
+
+#[test]
+fn projected_sub_edit_style_state_conflicts_with_a_later_shared_retarget() {
+    let content = CONTENT_AUTOMATIC.replace(
+        r#"<draw:page draw:name="Page 2" draw:style-name="dp2"/>"#,
+        r#"<draw:page draw:name="Page 2" draw:style-name="dp1"/>"#,
+    );
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
+    let mut ordered_edit = source.edit();
+    ordered_edit.set_page_style_name(0, "dp2").unwrap();
+    ordered_edit
+        .set_page_transition(0, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let ordered_commit = ordered_edit.commit().unwrap();
+    assert_eq!(ordered_commit.patch().changes().len(), 2);
+
+    let mut retarget_edit = source.edit();
+    retarget_edit.set_page_style_name(1, "dp2").unwrap();
+    let retarget_commit = retarget_edit.commit().unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    for (ordered_id, retarget_id) in [("a-ordered", "z-retarget"), ("z-ordered", "a-retarget")] {
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(ordered_commit.patch().prepare(ordered_id, limits).unwrap())
+            .unwrap();
+        joined
+            .join(
+                retarget_commit
+                    .patch()
+                    .prepare(retarget_id, limits)
+                    .unwrap(),
+            )
+            .unwrap();
+        let mut owner = source.edit();
+        let error = match owner.join(joined) {
+            Ok(_) => panic!("projected shared style dependency was accepted"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.error(),
+            Error::Refused(refusal)
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+        ));
+        assert!(!owner.commit().unwrap().diagnostics().changed());
+    }
+}
+
+#[test]
 fn joined_page_name_renames_validate_final_names() {
     let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
@@ -566,6 +706,111 @@ fn one_ordered_mixed_replacement_payload_keeps_standalone_capability() {
     owner.join(joined).unwrap();
     let committed = owner.commit().unwrap();
     assert_eq!(committed.package().as_bytes(), expected.as_bytes());
+    assert_eq!(
+        committed
+            .package()
+            .apply(&committed.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn ordered_replacement_can_rename_a_page_added_by_the_same_payload() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let mut structural_edit = source.edit();
+    structural_edit
+        .add_page(litchi_odg::page::Page::new("Added"))
+        .unwrap();
+    let structural = structural_edit.commit().unwrap();
+    let structural_wire: serde_json::Value = serde_json::from_slice(
+        &structural
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let mut name_edit = source.edit();
+    name_edit.set_page_name(0, "Unused").unwrap();
+    let name_wire: serde_json::Value = serde_json::from_slice(
+        &name_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let name_operation = name_wire["operations"][0].clone();
+
+    let mut mixed_wire = structural_wire;
+    mixed_wire["operations"]
+        .as_array_mut()
+        .unwrap()
+        .push(name_operation);
+    mixed_wire["operations"][1]["forward"]["target"] =
+        serde_json::Value::String("page/2".to_owned());
+    mixed_wire["operations"][1]["forward"]["value"] =
+        serde_json::Value::String("Added renamed".to_owned());
+    mixed_wire["operations"][1]["inverse"]["target"] =
+        serde_json::Value::String("page/2".to_owned());
+    mixed_wire["operations"][1]["inverse"]["value"] = serde_json::Value::String("Added".to_owned());
+    mixed_wire["operations"][1]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String("0".repeat(64));
+
+    let provisional =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&mixed_wire).unwrap())
+            .unwrap();
+    let expected = provisional.apply(&source).unwrap();
+    let final_source = DiagnosticFingerprint::of(expected.as_bytes()).as_hex();
+    mixed_wire["operations"][0]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String(final_source.clone());
+    mixed_wire["operations"][1]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String(final_source);
+    let mixed =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&mixed_wire).unwrap())
+            .unwrap();
+    assert_eq!(
+        mixed.apply(&source).unwrap().as_bytes(),
+        expected.as_bytes()
+    );
+    assert_eq!(
+        mixed.inverse().apply(&expected).unwrap().as_bytes(),
+        source.as_bytes()
+    );
+
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut joined = source.joined_edits(limits);
+    let sub_edit = edit::SubEdit::new(
+        joined.lineage().clone(),
+        limits,
+        "replacement-then-rename",
+        Vec::<String>::new(),
+        vec!["package".to_owned(), "page/2#page.name.set".to_owned()],
+        mixed,
+    )
+    .unwrap();
+    joined.join(sub_edit).unwrap();
+    let mut owner = source.edit();
+    owner.join(joined).unwrap();
+    let committed = owner.commit().unwrap();
+    assert_eq!(committed.package().as_bytes(), expected.as_bytes());
+    assert_eq!(committed.package().pages()[2].name(), Some("Added renamed"));
+    assert_eq!(
+        source
+            .apply(committed.patch())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        expected.as_bytes()
+    );
     assert_eq!(
         committed
             .package()
