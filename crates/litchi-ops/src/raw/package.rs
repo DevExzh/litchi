@@ -14,7 +14,10 @@ pub(super) enum Container {
         package: Box<litchi_opc::OpcPackage>,
     },
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    Odf { bytes: Vec<u8> },
+    Odf {
+        bytes: Vec<u8>,
+        options: litchi_odf_common::OpenOptions,
+    },
 }
 
 impl Container {
@@ -36,12 +39,13 @@ impl Container {
         if is_odf(format) {
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             {
+                let options = file.odf_read_limits();
                 let bytes = file.to_bytes()?;
                 if !bytes.starts_with(b"PK") {
                     // A flat ODF document is one XML file, not a package.
                     return Err(no_parts(file));
                 }
-                return Ok(Self::Odf { bytes });
+                return Ok(Self::Odf { bytes, options });
             }
         }
         Err(no_parts(file))
@@ -63,16 +67,14 @@ impl Container {
                 Ok(parts)
             },
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-            Self::Odf { bytes } => {
+            Self::Odf { bytes, options } => {
                 let archive = litchi_odf_common::package::Archive::new(
                     bytes,
-                    litchi_odf_common::package::ArchiveLimits::default(),
+                    archive_limits(options.source_limits_value()),
                 )?;
-                let manifest = litchi_odf_common::package::read_manifest(
-                    &archive,
-                    litchi_odf_common::XmlStreamLimits::owner_default_value(),
-                )
-                .ok();
+                let manifest =
+                    litchi_odf_common::package::read_manifest(&archive, options.xml_limits_value())
+                        .ok();
                 let mut parts: Vec<PartInfo> = archive
                     .file_names()
                     .filter(|name| !name.ends_with('/'))
@@ -108,17 +110,15 @@ impl Container {
                 })
             },
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-            Self::Odf { bytes } => {
+            Self::Odf { bytes, options } => {
                 let archive = litchi_odf_common::package::Archive::new(
                     bytes,
-                    litchi_odf_common::package::ArchiveLimits::default(),
+                    archive_limits(options.source_limits_value()),
                 )?;
                 let member = odf_member(&archive, spec)?;
-                let manifest = litchi_odf_common::package::read_manifest(
-                    &archive,
-                    litchi_odf_common::XmlStreamLimits::owner_default_value(),
-                )
-                .ok();
+                let manifest =
+                    litchi_odf_common::package::read_manifest(&archive, options.xml_limits_value())
+                        .ok();
                 let content_type = manifest
                     .as_ref()
                     .and_then(|manifest| manifest.get_media_type(&member))
@@ -136,6 +136,22 @@ impl Container {
             },
         }
     }
+}
+
+/// Convert the retained ODF source admission profile to the archive codec's
+/// format-owned catalog profile without widening any selected dimension.
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn archive_limits(
+    limits: litchi_odf_common::SourceLimits,
+) -> litchi_odf_common::package::ArchiveLimits {
+    litchi_odf_common::package::ArchiveLimits::new(
+        limits.max_members(),
+        limits.max_archive_member_name_bytes(),
+        limits.max_archive_metadata_bytes(),
+        limits.max_archive_compressed_bytes(),
+        limits.max_entry_bytes(),
+        limits.max_aggregate_bytes(),
+    )
 }
 
 const fn is_opc(format: FileFormat) -> bool {

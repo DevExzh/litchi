@@ -267,6 +267,33 @@ impl File {
         }
     }
 
+    /// The retained ODF ingress policy for a package-backed handle.
+    ///
+    /// Raw package reads and validation publish the handle first and then
+    /// inspect those bytes again. Reusing the handle's policy keeps that
+    /// second admission from widening a caller-selected archive or XML
+    /// bound.
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+    pub(crate) fn odf_read_limits(&self) -> litchi_odf_common::OpenOptions {
+        match self {
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle.odf_options(),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle.odf_options(),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle.odf_options(),
+            #[cfg(odf_objects)]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle.odf_options(),
+            Self::Signed(signed) => signed.file().odf_read_limits(),
+            #[allow(unreachable_patterns, reason = "the helper is feature-gated")]
+            _ => litchi_odf_common::OpenOptions::new(),
+        }
+    }
+
     /// The object-tree handle of an ODG, ODC, ODI, ODB or ODF formula file.
     #[cfg(odf_objects)]
     pub(crate) fn odf_tree(&self) -> Option<&OdfTree> {

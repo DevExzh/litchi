@@ -91,6 +91,13 @@ impl OdfValidationLimits {
         self
     }
 
+    /// Returns a copy with a new `mimetype` member ceiling.
+    #[must_use]
+    pub const fn with_max_mimetype_bytes(mut self, maximum: u64) -> Self {
+        self.max_mimetype_bytes = maximum;
+        self
+    }
+
     /// Returns a copy with a new per-member declared-size ceiling.
     #[must_use]
     pub const fn with_max_archive_entry_bytes(mut self, maximum: u64) -> Self {
@@ -177,6 +184,12 @@ impl OdfValidationLimits {
     #[must_use]
     pub const fn max_manifest_bytes(self) -> u64 {
         self.max_manifest_bytes
+    }
+
+    /// Returns the `mimetype` member ceiling.
+    #[must_use]
+    pub const fn max_mimetype_bytes(self) -> u64 {
+        self.max_mimetype_bytes
     }
 
     /// Returns the manifest file-entry ceiling.

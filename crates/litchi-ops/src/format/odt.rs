@@ -41,6 +41,9 @@ pub struct Odt(Arc<OdtState>);
 
 struct OdtState {
     owner: OdtOwner,
+    /// The caller-selected ODF ingress policy retained across publication
+    /// and raw package reads.
+    odf_options: litchi_odf_common::OpenOptions,
     /// The package's format: ODT, or an ODF text-family format read through
     /// the same content model (OTH web template, ODM master document,
     /// record 0282).
@@ -129,19 +132,14 @@ impl Odt {
     /// prepared.
     pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
         let format = prepared.format();
+        let odf_options = options.odf_open_options();
         let package = if format == FileFormat::Odt {
-            litchi_odt::Package::from_prepared_package_with_options(
-                prepared,
-                options.odf_open_options(),
-            )
+            litchi_odt::Package::from_prepared_package_with_options(prepared, odf_options)
         } else {
-            litchi_odt::Package::from_prepared_text_package_with_options(
-                prepared,
-                options.odf_open_options(),
-            )
+            litchi_odt::Package::from_prepared_text_package_with_options(prepared, odf_options)
         }
         .map_err(|error| odf_error(error).with_format(format))?;
-        Self::from_package(package, None, format)
+        Self::from_package_with_options(package, None, format, odf_options)
     }
 
     /// Adopts an immutable leaf package (a commit result or a fresh one).
@@ -150,11 +148,26 @@ impl Odt {
         origin: Option<Arc<Path>>,
         format: FileFormat,
     ) -> Result<Self> {
+        Self::from_package_with_options(
+            package,
+            origin,
+            format,
+            litchi_odf_common::OpenOptions::new(),
+        )
+    }
+
+    fn from_package_with_options(
+        package: litchi_odt::Package,
+        origin: Option<Arc<Path>>,
+        format: FileFormat,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self> {
         let document = package
             .document()
             .map_err(|error| odf_error(error).with_format(format))?;
         Ok(Self(Arc::new(OdtState {
             owner: OdtOwner::Eager(document),
+            odf_options,
             format,
             package: OnceLock::from(package),
             tree: OnceLock::new(),
@@ -185,6 +198,7 @@ impl Odt {
         let document = package.document().map_err(odf_error)?;
         Ok(Self(Arc::new(OdtState {
             owner: OdtOwner::Eager(document),
+            odf_options: flat.options(),
             format: FileFormat::Odt,
             package: OnceLock::from(package),
             tree: OnceLock::new(),
@@ -207,6 +221,7 @@ impl Odt {
                 let document = package.document().map_err(odf_error)?;
                 Ok(Self(Arc::new(OdtState {
                     owner: OdtOwner::Eager(document),
+                    odf_options: self.0.odf_options,
                     format: FileFormat::Odt,
                     package: OnceLock::from(package),
                     tree: OnceLock::new(),
@@ -216,7 +231,12 @@ impl Odt {
                     flat: Some(republished),
                 })))
             },
-            None => Self::from_package(package, self.origin().cloned(), self.format()),
+            None => Self::from_package_with_options(
+                package,
+                self.origin().cloned(),
+                self.format(),
+                self.0.odf_options,
+            ),
         }
     }
 
@@ -244,12 +264,16 @@ impl Odt {
         let document = candidate
             .into_document(options.odf_open_options())
             .map_err(core_error)?;
-        Ok(Self::from_owner(OdtOwner::Source(document)))
+        Ok(Self::from_owner(
+            OdtOwner::Source(document),
+            options.odf_open_options(),
+        ))
     }
 
-    fn from_owner(owner: OdtOwner) -> Self {
+    fn from_owner(owner: OdtOwner, odf_options: litchi_odf_common::OpenOptions) -> Self {
         Self(Arc::new(OdtState {
             owner,
+            odf_options,
             format: FileFormat::Odt,
             package: OnceLock::new(),
             tree: OnceLock::new(),
@@ -277,6 +301,11 @@ impl Odt {
     #[must_use]
     pub fn format(&self) -> FileFormat {
         self.0.format
+    }
+
+    /// The ODF ingress policy retained by this handle.
+    pub(crate) fn odf_options(&self) -> litchi_odf_common::OpenOptions {
+        self.0.odf_options
     }
 
     /// Re-tags an error the shared ODT machinery reported as ODT with this

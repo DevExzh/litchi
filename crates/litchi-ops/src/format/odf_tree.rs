@@ -93,6 +93,9 @@ pub struct OdfTree(Arc<State>);
 
 struct State {
     owner: Owner,
+    /// The caller-selected ODF ingress policy retained across publication
+    /// and raw package reads.
+    odf_options: litchi_odf_common::OpenOptions,
     /// Built at open; after a write, on the first read (record 0288).
     tree: std::sync::OnceLock<Tree>,
     origin: Option<Arc<Path>>,
@@ -259,14 +262,19 @@ impl OdfTree {
                 return Err(Error::unsupported_format(Some(other)));
             },
         };
-        Self::from_owner(owner, None)
+        Self::from_owner(owner, None, options.odf_open_options())
     }
 
     /// Adopt a leaf owner (an open, a commit result or a fresh package).
-    pub(crate) fn from_owner(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
+    pub(crate) fn from_owner(
+        owner: Owner,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self> {
         let tree = owner.tree()?;
         Ok(Self(Arc::new(State {
             owner,
+            odf_options,
             tree: std::sync::OnceLock::from(tree),
             origin,
             flat: None,
@@ -296,6 +304,7 @@ impl OdfTree {
         let tree = owner.tree()?;
         Ok(Self(Arc::new(State {
             owner,
+            odf_options: options.odf_open_options(),
             tree: std::sync::OnceLock::from(tree),
             origin: None,
             flat: Some(FlatSource {
@@ -310,7 +319,7 @@ impl OdfTree {
     /// its flat bytes, element by element (record 0292).
     pub(crate) fn republish(&self, owner: Owner) -> Result<Self> {
         let Some(flat) = self.0.flat.as_ref() else {
-            return Self::from_commit(owner, self.origin().cloned());
+            return Self::from_commit(owner, self.origin().cloned(), self.0.odf_options);
         };
         let format = self.format();
         let parts = litchi_odf_common::flat::Parts::split(&flat.bytes, &flat.limits)
@@ -323,6 +332,7 @@ impl OdfTree {
         // built on the first read.
         Ok(Self(Arc::new(State {
             owner,
+            odf_options: self.0.odf_options,
             tree: std::sync::OnceLock::new(),
             origin: self.origin().cloned(),
             flat: Some(FlatSource {
@@ -350,9 +360,14 @@ impl OdfTree {
     /// `content.xml` as it was (records 0291 and 0292 made the same change independently; before, a database tree was
     /// built here and a single `set` on a 1,000-query database parsed the
     /// catalog twice).
-    pub(crate) fn from_commit(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
+    pub(crate) fn from_commit(
+        owner: Owner,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self> {
         Ok(Self(Arc::new(State {
             owner,
+            odf_options,
             tree: std::sync::OnceLock::new(),
             origin,
             flat: None,
@@ -380,6 +395,11 @@ impl OdfTree {
     #[must_use]
     pub fn format(&self) -> FileFormat {
         self.0.owner.format()
+    }
+
+    /// The ODF ingress policy retained by this handle.
+    pub(crate) fn odf_options(&self) -> litchi_odf_common::OpenOptions {
+        self.0.odf_options
     }
 
     /// The retained leaf owner.
