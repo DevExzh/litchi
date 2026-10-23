@@ -208,8 +208,25 @@ fn build_package(spec: CaseSpec) -> ProbeResult<Package> {
     Ok(Package::from_opc(package)?)
 }
 
+/// Open an owned archive with the revision's default OPC policy.
+///
+/// The 0bef/5726 source pair exposes the historical one-argument constructor,
+/// whose implementation applies `SourceLimits::default()` internally.  The
+/// current assembly keeps the same policy explicit at the required-limit
+/// constructor.  This is the only versioned ingress adapter; the lifecycle
+/// and ownership path around it stays identical.
+#[cfg(feature = "current-xlsx-raw-opc")]
+fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
+    Ok(OpcPackage::from_vec(bytes, SourceLimits::default())?)
+}
+
+#[cfg(not(feature = "current-xlsx-raw-opc"))]
+fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
+    Ok(OpcPackage::from_vec(bytes)?)
+}
+
 fn open_package(bytes: &[u8]) -> ProbeResult<Package> {
-    Ok(Package::from_opc(OpcPackage::from_vec(bytes.to_vec())?)?)
+    Ok(Package::from_opc(open_opc(bytes.to_vec())?)?)
 }
 
 fn cache_definition(index: usize, name: &str) -> ProbeResult<CacheDefinition> {
@@ -575,7 +592,7 @@ fn timed_commit(
 
 fn open_report(source_bytes: &[u8], iterations: usize, warmups: usize) -> ProbeResult<ReadReport> {
     for _ in 0..warmups {
-        let _ = Package::from_opc(OpcPackage::from_vec(source_bytes.to_vec())?)?;
+        let _ = open_package(source_bytes)?;
     }
     let mut elapsed_ns = Vec::with_capacity(iterations);
     let mut allocation_samples = Vec::with_capacity(iterations);
@@ -584,7 +601,7 @@ fn open_report(source_bytes: &[u8], iterations: usize, warmups: usize) -> ProbeR
         let owned = source_bytes.to_vec();
         let region = allocation_metrics::begin();
         let started = Instant::now();
-        let package = Package::from_opc(OpcPackage::from_vec(owned)?)?;
+        let package = Package::from_opc(open_opc(owned)?)?;
         elapsed_ns.push(started.elapsed().as_nanos());
         allocation_samples.push(
             region
@@ -609,14 +626,14 @@ fn first_read_report(
 ) -> ProbeResult<ReadReport> {
     let target = PackURI::new(WORKBOOK)?;
     for _ in 0..warmups {
-        let package = OpcPackage::from_vec(source_bytes.to_vec())?;
+        let package = open_opc(source_bytes.to_vec())?;
         let _ = package.get_part(&target)?.blob().len();
     }
     let mut elapsed_ns = Vec::with_capacity(iterations);
     let mut allocation_samples = Vec::with_capacity(iterations);
     let mut decode_counters_after = None;
     for _ in 0..iterations {
-        let package = OpcPackage::from_vec(source_bytes.to_vec())?;
+        let package = open_opc(source_bytes.to_vec())?;
         let region = allocation_metrics::begin();
         let started = Instant::now();
         let _ = package.get_part(&target)?.blob().len();
