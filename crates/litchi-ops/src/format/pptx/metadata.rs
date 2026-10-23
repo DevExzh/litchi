@@ -149,7 +149,6 @@ impl Pptx {
             metadata: OnceLock::from(Some(metadata).filter(Metadata::has_data)),
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
-            retained_source_len: OnceLock::new(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: super::owner::Related::default(),

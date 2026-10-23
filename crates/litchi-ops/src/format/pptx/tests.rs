@@ -567,6 +567,145 @@ fn native_pptx_commits_account_their_retained_proof() {
 }
 
 #[test]
+fn combined_click_edits_respect_the_remaining_snapshot_budget() {
+    let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
+    let target = "/slide[1]/shape[1]".into_target().unwrap();
+    let text = handle
+        .set_with_limits(
+            target.clone(),
+            crate::props! { "text" => "combined-link budget" },
+            &crate::transaction::SemanticLimits::default(),
+        )
+        .unwrap();
+    let limits = crate::transaction::SemanticLimits::builder()
+        .max_snapshot_bytes(text.snapshot_bytes())
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = handle
+        .set_with_limits(
+            target,
+            crate::props! {
+                "text" => "combined-link budget",
+                "link" => "https://example.com/combined-link-budget",
+            },
+            &limits,
+        )
+        .unwrap_err();
+    assert_eq!(error.code(), Code::LimitExceeded);
+}
+
+#[test]
+fn metadata_noop_accounts_its_complete_retained_scope() {
+    let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
+    let target = "/metadata".into_target().unwrap();
+    let default_limits = crate::transaction::SemanticLimits::default();
+    let noop = handle
+        .set_with_limits(target.clone(), crate::props! {}, &default_limits)
+        .unwrap();
+    let retained = noop.snapshot_bytes();
+    assert!(retained > 1, "metadata scope was not retained: {retained}");
+
+    let exact_limits = crate::transaction::SemanticLimits::builder()
+        .max_snapshot_bytes(retained)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(
+        handle
+            .set_with_limits(target.clone(), crate::props! {}, &exact_limits)
+            .is_ok()
+    );
+
+    let below_limits = crate::transaction::SemanticLimits::builder()
+        .max_snapshot_bytes(retained - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = handle
+        .set_with_limits(target, crate::props! {}, &below_limits)
+        .unwrap_err();
+    assert_eq!(error.code(), Code::LimitExceeded);
+}
+
+#[test]
+fn coalescer_uses_native_patch_budget_not_archive_size() {
+    let mut large_text = String::with_capacity(256 * 1024);
+    let mut state = 0x1234_5678_u32;
+    for _ in 0..256 * 1024 {
+        state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        large_text.push((b'a' + ((state >> 24) % 26) as u8) as char);
+    }
+    let mut builder = pptx::builder::Builder::new().unwrap();
+    {
+        let presentation = builder.presentation().unwrap();
+        presentation
+            .add_slide()
+            .unwrap()
+            .add_text_box("small", 0, 0, 914_400, 914_400);
+        presentation
+            .add_slide()
+            .unwrap()
+            .add_text_box(&large_text, 0, 0, 914_400, 914_400);
+    }
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    use litchi_core::{Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits};
+    use std::num::{NonZeroU64, NonZeroUsize};
+    let budget = Budget::root(
+        "litchi-ops-pptx-native-budget-test",
+        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (_, cancellation) = CancellationSource::pair();
+    let execution_limits =
+        ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap();
+    let source: Arc<dyn ReadAt> =
+        Arc::new(litchi_core::OwnedSource::from_arc(Arc::new(bytes.clone())));
+    let presentation = pptx::SourceBackedPresentation::from_read_at_with_options(
+        source,
+        litchi_pptx::OpenOptions::default()
+            .source_limits(pptx::SourceLimits::default())
+            .execution_context(ExecutionContext::new(
+                budget,
+                cancellation,
+                execution_limits,
+            )),
+    )
+    .unwrap();
+    let handle = Pptx::from_source(presentation, &options());
+    assert!(handle.is_source_backed());
+
+    // The first-slide edit retains only the changed native patch.  The
+    // source archive also contains the unrelated large second slide, so its
+    // size must not be used as a proxy for this exact patch budget.
+    let target = "/slide[1]/shape[1]".into_target().unwrap();
+    let probe = handle
+        .set_with_limits(
+            target.clone(),
+            crate::props! { "text" => "small patch" },
+            &crate::transaction::SemanticLimits::default(),
+        )
+        .unwrap();
+    let remaining = probe.snapshot_bytes();
+    assert!(remaining > 0);
+    assert!(bytes.len() > remaining);
+
+    let limits = crate::transaction::SemanticLimits::builder()
+        .max_snapshot_bytes(remaining)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut run =
+        super::write::coalesce::Run::new(&handle, &limits, remaining).expect("native edit");
+    let props = crate::Props::from_props(crate::props! { "text" => "small patch" }).unwrap();
+    let plan = run
+        .shape_plan(&target, &props, &limits)
+        .unwrap()
+        .expect("direct shape plan");
+    assert!(run.stage(plan, 0).unwrap());
+    run.commit().unwrap();
+}
+
+#[test]
 fn shared_source_promotion_retains_one_lineage_and_live_readers() {
     let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
     let snapshot = handle.clone();

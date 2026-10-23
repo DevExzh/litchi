@@ -541,7 +541,7 @@ impl Pptx {
             frame[3].unwrap_or(TABLE_ROW_HEIGHT.saturating_mul(row_count as i64)),
         );
         let scene = self
-            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
+            .slide_scene(slide)?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         let ordinal = scene
             .roots()

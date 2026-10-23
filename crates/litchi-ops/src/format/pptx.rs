@@ -41,7 +41,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
-use litchi_opc::{PackURI, Part};
+use litchi_opc::PackURI;
 
 use super::signature::{self, Opened, Signature};
 use crate::error::{Error, Result};
@@ -259,8 +259,6 @@ struct PptxState {
     /// Physical OPC limits retained with immutable facade revisions.
     /// Source promotion reuses the native package's admitted limits.
     ooxml_limits: opc::SourceLimits,
-    /// Cached lower bound used before coalesced native edits are admitted.
-    retained_source_len: OnceLock<Option<usize>>,
     /// The validated eager presentation catalog, retaining each ordered slide
     /// ID and its resolved physical target.  Selection can therefore build a
     /// borrowed leaf slide directly from the OPC graph without reparsing the
@@ -431,49 +429,6 @@ impl Pptx {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Return the source-size lower bound used before a native editor is
-    /// admitted. This is only an allocation preflight; the exact retained
-    /// proof is still charged after the edit commits. Eager owners with an
-    /// indexed archive are O(1); assembled packages sum their part payloads
-    /// once and cache that result without forcing lazy presentation reads.
-    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
-        if let Some(length) = self.0.retained_source_len.get() {
-            return Ok(*length);
-        }
-        let length = match &self.0.owner {
-            PptxOwner::Source(presentation) => Ok(Some(
-                usize::try_from(presentation.source_backed_package().source_artifact().len())
-                    .unwrap_or(usize::MAX),
-            )),
-            PptxOwner::Eager(package) => {
-                let opc = package.opc()?;
-                if let Some(length) = opc.exact_source_len() {
-                    Ok(Some(length))
-                } else {
-                    // A package assembled in memory has no ZIP source archive
-                    // to report. Sum its decoded part payloads as the honest
-                    // retained-input lower bound instead of silently turning
-                    // an unknown length into zero and skipping native admission.
-                    let length = opc.try_iter_parts().try_fold(0_usize, |total, part| {
-                        total.checked_add(part?.blob().len()).ok_or_else(|| {
-                            Error::from(pptx::Error::Invalid(
-                                "PPTX retained source length overflow".into(),
-                            ))
-                        })
-                    })?;
-                    Ok(Some(length))
-                }
-            },
-        };
-        match length {
-            Ok(length) => {
-                let _ = self.0.retained_source_len.set(length);
-                Ok(length)
-            },
-            Err(error) => Err(error),
-        }
-    }
-
     /// This handle's key for [`crate::path::fence::Scope`].
     pub(crate) fn fence_key(&self) -> usize {
         Arc::as_ptr(&self.0).addr()
@@ -508,7 +463,6 @@ impl Pptx {
             metadata: self.0.metadata.clone(),
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
-            retained_source_len: OnceLock::new(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: owner::Related::default(),
@@ -553,7 +507,6 @@ impl Pptx {
             metadata,
             retain_source: options.retain_source,
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
-            retained_source_len: OnceLock::new(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: owner::Related::default(),
@@ -598,7 +551,6 @@ impl Pptx {
             metadata: self.0.metadata.clone(),
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
-            retained_source_len: OnceLock::new(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
             related: owner::Related::default(),

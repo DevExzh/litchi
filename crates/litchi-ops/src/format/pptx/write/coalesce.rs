@@ -23,7 +23,6 @@
 use super::text::{self, TextValues};
 use super::{
     Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error,
-    native_snapshot_budget,
 };
 use crate::format::pptx::spec::{Kind, PARAGRAPH_WRITE_TABLE, RUN_WRITE_TABLE};
 use crate::format::pptx::steps;
@@ -309,12 +308,6 @@ impl Run {
         remaining_snapshot: usize,
     ) -> Result<Self> {
         base.check_source_for_write()?;
-        let source_bytes = base
-            .retained_source_len()?
-            .ok_or_else(|| super::snapshot_limit(usize::MAX, remaining_snapshot))?;
-        if source_bytes > remaining_snapshot {
-            return Err(super::snapshot_limit(source_bytes, remaining_snapshot));
-        }
         let source = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_owner_for_write()?
         } else {
@@ -589,9 +582,7 @@ fn shape_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != slide)
     {
-        let Some(scene) =
-            file.slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
-        else {
+        let Some(scene) = file.slide_scene(slide)? else {
             return Ok(None);
         };
         *scene_cache = Some((slide, cache_scene(scene)?));
@@ -789,9 +780,7 @@ fn format_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != slide)
     {
-        let Some(scene) =
-            file.slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
-        else {
+        let Some(scene) = file.slide_scene(slide)? else {
             return Ok(None);
         };
         *scene_cache = Some((slide, cache_scene(scene)?));
@@ -1012,9 +1001,7 @@ fn story_plan(
         .as_ref()
         .is_none_or(|(cached_slide, _)| *cached_slide != story.slide)
     {
-        let Some(scene) =
-            file.slide_scene_with_snapshot_budget(story.slide, native_snapshot_budget(limits))?
-        else {
+        let Some(scene) = file.slide_scene(story.slide)? else {
             return Ok(None);
         };
         *scene_cache = Some((story.slide, cache_scene(scene)?));

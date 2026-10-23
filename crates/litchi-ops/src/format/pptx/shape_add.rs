@@ -137,7 +137,7 @@ impl Pptx {
         );
         let slide = slide.position as usize;
         let scene = self
-            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
+            .slide_scene(slide)?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         // Ordinary shape paths count direct p:sp siblings, not mixed drawing
         // elements or group descendants. Reuse the read path's classification.

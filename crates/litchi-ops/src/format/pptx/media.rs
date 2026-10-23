@@ -238,7 +238,7 @@ impl Pptx {
             None => Kind::Media,
         };
         let scene = self
-            .slide_scene_with_snapshot_budget(slide, native_snapshot_budget(limits))?
+            .slide_scene(slide)?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         let ordinal = select(scene.roots(), element)?.len();
         let name = name.unwrap_or_else(|| {

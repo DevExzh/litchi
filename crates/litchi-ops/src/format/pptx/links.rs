@@ -599,7 +599,16 @@ impl Pptx {
         } else {
             Some(self.set_with_limits(target.clone(), rest, limits)?)
         };
-        let file = first.as_ref().map_or(self, |commit| &commit.after);
+        let (file, second_limits) = first.as_ref().map_or((self, *limits), |commit| {
+            (
+                &commit.after,
+                limits.with_snapshot_budget(
+                    limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(commit.snapshot_bytes()),
+                ),
+            )
+        });
         let owner = file
             .click_owner(target)?
             .ok_or_else(|| error(Code::InternalError, "the click target moved"))?;
@@ -636,7 +645,7 @@ impl Pptx {
             },
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let mut second = file.write_link(&owner, link.as_ref(), true, limits)?;
+        let second = file.write_link(&owner, link.as_ref(), true, &second_limits)?;
         Ok(Some(match first {
             None => second,
             Some(first) => {

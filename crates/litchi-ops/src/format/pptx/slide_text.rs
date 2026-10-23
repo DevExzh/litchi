@@ -120,7 +120,7 @@ impl Pptx {
             .with_suggestion("pass phType=title, body, subtitle, date, footer, slidenum, ...")
         })?;
         let scene = self
-            .slide_scene_with_snapshot_budget(slide as usize, native_snapshot_budget(limits))?
+            .slide_scene(slide as usize)?
             .ok_or_else(|| error(Code::PathNotFound, "slide parent is missing"))?;
         // The new shape's canonical path is its `shape[K]` ordinal, as
         // OfficeCLI returns it and as queries print placeholders.

@@ -150,11 +150,7 @@ impl Edit<'_> {
     /// not publish a partially materialized metadata revision.
     pub fn commit_with_options(self, options: EditOptions) -> Result<Commit> {
         let (_snapshot, patch, diagnostics) = self.inner.finish()?;
-        let retained = patch.changes().iter().fold(0_usize, |bytes, change| {
-            bytes
-                .saturating_add(change.before().map_or(0, <[u8]>::len))
-                .saturating_add(change.after().map_or(0, <[u8]>::len))
-        });
+        let retained = patch.retained_bytes();
         if retained > options.max_patch_bytes_value() {
             return Err(Error::Limit {
                 kind: LimitKind::XmlBytes,

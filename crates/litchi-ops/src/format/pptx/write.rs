@@ -37,11 +37,7 @@ impl Proof {
         match self {
             Self::Source(patch) => patch.retained_bytes(),
             Self::Eager(patch) => patch.retained_bytes(),
-            Self::Metadata(patch) => patch.changes().iter().fold(0_usize, |bytes, change| {
-                bytes
-                    .saturating_add(change.before().map_or(0, <[u8]>::len))
-                    .saturating_add(change.after().map_or(0, <[u8]>::len))
-            }),
+            Self::Metadata(patch) => patch.retained_bytes(),
             Self::Combined(proofs) => proofs.iter().fold(0, |bytes, proof| {
                 bytes.saturating_add(proof.retained_bytes())
             }),
