@@ -1022,8 +1022,10 @@ fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
         return false;
     }
     for message_info in message_infos {
-        let shape = (message_info.versions.len() ^ DEFAULT_MESSAGE_VERSIONS.len())
-            | message_info.field_infos.len()
+        if message_info.versions != DEFAULT_MESSAGE_VERSIONS {
+            return false;
+        }
+        let shape = message_info.field_infos.len()
             | message_info.object_references.len()
             | message_info.data_references.len()
             | usize::from(message_info.base_message_index.is_some())
@@ -10348,6 +10350,20 @@ mod tests {
             } if observed == Limits::MAX_MESSAGE_BYTES + 1
                 && maximum == Limits::MAX_MESSAGE_BYTES
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn default_archive_info_admission_checks_public_message_version_mutations() -> Result<()> {
+        let limits = Limits::default();
+        let mut message = MessageInfo::new(7, 1, limits)?;
+        message.versions[0] = u32::MAX;
+        assert!(!default_archive_info_bounds_are_safe(std::slice::from_ref(
+            &message
+        )));
+
+        let info = ArchiveInfo::new(0, vec![message], limits)?;
+        assert_eq!(info.message_infos[0].versions, [u32::MAX, 0, 5]);
         Ok(())
     }
 
