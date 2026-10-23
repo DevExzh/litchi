@@ -19,6 +19,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +32,7 @@ import tomllib
 
 MIN_TARGET_BYTES = 19_200_000_000
 MAX_TARGET_BYTES = 20_000_000_000
+MEMORY_CAP_BYTES = 20 * 1024**3
 DEFAULT_PACKAGE_COUNT = 68
 REQUIRED_RUSTC_PREFIX = "rustc 1.95.0"
 CAPTURE_ENV = {
@@ -42,8 +44,11 @@ CAPTURE_ENV = {
     "CARGO_NET_OFFLINE": "true",
     "RUSTC_BOOTSTRAP": "1",
     "LITCHI_MEM_MAX": "20G",
+    "LC_ALL": "C",
 }
-IDENTITY_ENV_KEYS = tuple(CAPTURE_ENV) + ("RUSTFLAGS", "RUSTDOCFLAGS", "RUSTUP_TOOLCHAIN")
+IDENTITY_ENV_KEYS = tuple(CAPTURE_ENV) + (
+    "LITCHI_CAPPED", "RUSTFLAGS", "RUSTDOCFLAGS", "RUSTUP_TOOLCHAIN"
+)
 RECEIPT_SCHEMA = 1
 
 
@@ -81,7 +86,7 @@ class CaptureResult:
     json_sha256: str
 
 
-CommandRunner = Callable[[Sequence[str], Path, Mapping[str, str], Path, Path], int]
+CommandRunner = Callable[[Sequence[str], Path, Mapping[str, str], Path, Path, Path], int]
 
 
 def sha256_file(path: Path) -> str:
@@ -159,16 +164,40 @@ def source_context(root: Path, *, cargo: str = "cargo", rustc: str = "rustc") ->
     if not rustc_version.startswith(REQUIRED_RUSTC_PREFIX):
         first_line = rustc_version.splitlines()[0] if rustc_version else "<empty>"
         raise InventoryError(f"expected {REQUIRED_RUSTC_PREFIX}, got {first_line!r}")
+    # Use the exact capture environment for tool identity probing too.  In
+    # particular, an inherited marker must not be able to make a capped Cargo
+    # shim take its uncapped path before captures begin.
+    identity_env = capture_env()
     return SourceContext(
         root=str(root),
         source_commit=commit,
         lock_sha256=sha256_file(lockfile),
         rustc=rustc_version,
-        cargo=run_text([cargo, "-V"], cwd=root, env={**os.environ, **CAPTURE_ENV}),
+        cargo=run_text([cargo, "-V"], cwd=root, env=identity_env),
         rust_toolchain_sha256=sha256_file(toolchain),
         cargo_path=cargo_path,
         rustc_path=rustc_path,
     )
+
+
+def source_stable(context: SourceContext) -> None:
+    """Reject a source/lock change before accepting another artifact."""
+    root = Path(context.root)
+    git_env = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+    commit = run_text(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=root, env=git_env)
+    dirty = run_text(["git", "status", "--porcelain"], cwd=root, env=git_env)
+    lock_hash = sha256_file(root / "Cargo.lock")
+    toolchain = next((root / name for name in ("rust-toolchain.toml", "rust-toolchain")
+                      if (root / name).is_file()), None)
+    toolchain_hash = sha256_file(toolchain) if toolchain is not None else ""
+    if commit != context.source_commit:
+        raise InventoryError(f"source commit changed during capture: {context.source_commit} -> {commit}")
+    if dirty:
+        raise InventoryError("source checkout became dirty during capture")
+    if lock_hash != context.lock_sha256:
+        raise InventoryError("Cargo.lock changed during capture")
+    if toolchain_hash != context.rust_toolchain_sha256:
+        raise InventoryError("rust-toolchain changed during capture")
 
 
 def target_bytes(target: Path) -> int:
@@ -198,14 +227,72 @@ def rustdoc_command(package: Package, target: Path, cargo: str = "cargo") -> lis
 def capture_env(base: Mapping[str, str] | None = None) -> dict[str, str]:
     environment = dict(base or os.environ)
     environment.update(CAPTURE_ENV)
+    # The coordinator shim deliberately bypasses its cgroup when this inherited
+    # marker is nonempty.  Never allow a caller's marker to leak into a run.
+    environment.pop("LITCHI_CAPPED", None)
+    environment["LITCHI_CAPPED"] = ""
     return environment
 
 
+def verify_cargo_shim(cargo_path: str, environment: Mapping[str, str]) -> dict[str, object]:
+    """Prove that Cargo resolves to the capped shim and cannot be bypassed."""
+    if environment.get("LITCHI_CAPPED"):
+        raise InventoryError("LITCHI_CAPPED must be unset before starting Cargo")
+    if environment.get("LITCHI_MEM_MAX") != "20G":
+        raise InventoryError("LITCHI_MEM_MAX must be exactly 20G")
+    systemd_run = shutil.which("systemd-run")
+    if not systemd_run:
+        raise InventoryError("systemd-run is unavailable; the Cargo cap cannot be verified")
+    shim = Path(cargo_path)
+    if not shim.is_file() or not os.access(shim, os.X_OK):
+        raise InventoryError(f"resolved Cargo is not an executable shim: {shim}")
+    try:
+        source = shim.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise InventoryError(f"cannot inspect Cargo shim {shim}: {error}") from error
+    if "systemd-run" not in source or "LITCHI_CAPPED" not in source:
+        raise InventoryError(f"Cargo path is not the coordinator cap shim: {shim}")
+    if not re.search(r"MemoryMax=\$\{LITCHI_MEM_MAX:-[^}]+\}", source):
+        raise InventoryError(f"Cargo shim has no configurable MemoryMax: {shim}")
+    return {
+        "path": str(shim),
+        "sha256": sha256_file(shim),
+        "systemd_run_path": systemd_run,
+        "memory_max": environment["LITCHI_MEM_MAX"],
+        "memory_max_bytes": MEMORY_CAP_BYTES,
+        "litchi_capped_unset": True,
+    }
+
+
 def default_runner(command: Sequence[str], cwd: Path, env: Mapping[str, str],
-                   stdout: Path, stderr: Path) -> int:
+                   stdout: Path, stderr: Path, resource_log: Path) -> int:
+    time_command = "/usr/bin/time"
+    if not Path(time_command).is_file():
+        raise InventoryError(f"resource measurement tool is missing: {time_command}")
+    timed_command = [time_command, "-v", "-o", str(resource_log), *command]
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        return subprocess.run(command, cwd=cwd, env=dict(env), stdout=out, stderr=err,
+        return subprocess.run(timed_command, cwd=cwd, env=dict(env), stdout=out, stderr=err,
                               check=False).returncode
+
+
+def peak_rss(resource_log: Path) -> dict[str, object]:
+    """Parse GNU time's per-command maximum resident set size."""
+    try:
+        text = resource_log.read_text(encoding="utf-8", errors="replace")
+    except OSError as error:
+        raise InventoryError(f"missing resource receipt {resource_log}: {error}") from error
+    match = re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)", text)
+    if match is None:
+        raise InventoryError(f"resource receipt has no peak RSS: {resource_log}")
+    kib = int(match.group(1))
+    return {
+        "tool": "/usr/bin/time -v",
+        "log": str(resource_log),
+        "peak_rss_kib": kib,
+        "peak_rss_bytes": kib * 1024,
+        "memory_cap": "20G",
+        "memory_cap_bytes": MEMORY_CAP_BYTES,
+    }
 
 
 def validate_json(path: Path, lib_name: str) -> tuple[int, str]:
@@ -228,7 +315,8 @@ def validate_json(path: Path, lib_name: str) -> tuple[int, str]:
 
 
 def _identity(context: SourceContext, package: Package, command: Sequence[str],
-              environment: Mapping[str, str]) -> dict[str, object]:
+              environment: Mapping[str, str],
+              shim_identity: Mapping[str, object] | None) -> dict[str, object]:
     return {
         "schema": RECEIPT_SCHEMA,
         "package": package.name,
@@ -244,6 +332,7 @@ def _identity(context: SourceContext, package: Package, command: Sequence[str],
         "rustc_path": context.rustc_path,
         "command": list(command),
         "capture_env": {key: environment.get(key, "") for key in IDENTITY_ENV_KEYS},
+        "cargo_shim": dict(shim_identity or {}),
     }
 
 
@@ -265,6 +354,10 @@ def _reusable(json_path: Path, receipt_path: Path, identity: dict[str, object]) 
     if (not isinstance(artifact, dict) or artifact.get("bytes") != size
             or artifact.get("sha256") != digest):
         return None
+    resource = receipt.get("resource")
+    if (not isinstance(resource, dict) or not isinstance(resource.get("peak_rss_bytes"), int)
+            or resource.get("peak_rss_bytes", 0) <= 0):
+        return None
     return CaptureResult(identity["package"], str(json_path), str(receipt_path), True, size, digest)
 
 
@@ -276,7 +369,8 @@ def _write_json(path: Path, value: object) -> None:
 def capture_package(package: Package, context: SourceContext, output: Path, target: Path,
                     *, cargo: str = "cargo", reuse: bool = True,
                     runner: CommandRunner = default_runner,
-                    base_env: Mapping[str, str] | None = None) -> CaptureResult:
+                    base_env: Mapping[str, str] | None = None,
+                    shim_identity: Mapping[str, object] | None = None) -> CaptureResult:
     output.mkdir(parents=True, exist_ok=True)
     inventory_dir = output / "inventory"
     receipt_dir = output / "receipts"
@@ -289,7 +383,7 @@ def capture_package(package: Package, context: SourceContext, output: Path, targ
     receipt_path = receipt_dir / f"{slug}.json"
     environment = capture_env(base_env)
     command = rustdoc_command(package, target, cargo)
-    identity = _identity(context, package, command, environment)
+    identity = _identity(context, package, command, environment, shim_identity)
     if reuse:
         cached = _reusable(json_path, receipt_path, identity)
         if cached is not None:
@@ -299,17 +393,22 @@ def capture_package(package: Package, context: SourceContext, output: Path, targ
     pre_bytes = check_target(target, MIN_TARGET_BYTES, label="target preflight")
     stdout = log_dir / f"{slug}.stdout.log"
     stderr = log_dir / f"{slug}.stderr.log"
+    resource_log = log_dir / f"{slug}.time.log"
     started = utc_now()
-    returncode = runner(command, Path(context.root), environment, stdout, stderr)
+    returncode = runner(command, Path(context.root), environment, stdout, stderr, resource_log)
     post_bytes = check_target(target, MAX_TARGET_BYTES, label="target hard cap")
+    resource = peak_rss(resource_log)
     if returncode != 0:
         _write_json(receipt_path, {
             "schema": RECEIPT_SCHEMA, "status": "failed", "identity": identity,
             "started": started, "finished": utc_now(), "returncode": returncode,
             "target_pre_bytes": pre_bytes, "target_post_bytes": post_bytes,
+            "resource": resource,
             "stdout": str(stdout), "stderr": str(stderr),
         })
         raise InventoryError(f"rustdoc failed for {package.name} with exit {returncode}")
+    if int(resource["peak_rss_bytes"]) >= MEMORY_CAP_BYTES:
+        raise InventoryError(f"{package.name} exceeded the 20G RSS cap")
     generated = target / "doc" / f"{package.lib_name}.json"
     size, digest = validate_json(generated, package.lib_name)
     shutil.copyfile(generated, json_path)
@@ -324,6 +423,7 @@ def capture_package(package: Package, context: SourceContext, output: Path, targ
         "finished": utc_now(),
         "target_pre_bytes": pre_bytes,
         "target_post_bytes": post_bytes,
+        "resource": resource,
         "artifact": {"path": str(json_path), "bytes": size, "sha256": digest},
         "stdout": str(stdout),
         "stderr": str(stderr),
@@ -343,6 +443,26 @@ def write_package_manifest(output: Path, context: SourceContext, packages: Itera
         "packages": [asdict(package) for package in packages],
     })
     return path
+
+
+def package_set_sha256(packages: Sequence[Package]) -> str:
+    payload = json.dumps([asdict(package) for package in packages],
+                         sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def write_run_state(path: Path, context: SourceContext, packages: Sequence[Package],
+                    *, status: str, **extra: object) -> None:
+    _write_json(path, {
+        "schema": RECEIPT_SCHEMA,
+        "status": status,
+        "source_commit": context.source_commit,
+        "cargo_lock_sha256": context.lock_sha256,
+        "package_count": len(packages),
+        "package_set_sha256": package_set_sha256(packages),
+        "updated": utc_now(),
+        **extra,
+    })
 
 
 def run_inventory(root: Path, output: Path, captures: Sequence[CaptureResult],
@@ -368,7 +488,7 @@ def write_disposition_scaffold(inventory: Path, destination: Path) -> Path:
     with inventory.open(newline="", encoding="utf-8") as source:
         rows = list(csv.DictReader(source, delimiter="\t"))
     fields = ["crate", "category", "path", "detail", "target",
-              "disposition", "evidence", "owner"]
+              "decision", "evidence", "owner"]
     with destination.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields, delimiter="\t", lineterminator="\n")
         writer.writeheader()
@@ -376,16 +496,16 @@ def write_disposition_scaffold(inventory: Path, destination: Path) -> Path:
             category = row.get("category", "")
             path = row.get("path", "")
             if category == "mut_draft" and "builder" in path.split("::"):
-                disposition = "DRAFT_CANDIDATE_REVIEW"
+                decision = "DRAFT_CANDIDATE_REVIEW"
             elif row.get("crate") in {"litchi-cfb", "soapberry-zip"}:
-                disposition = "SUBSTRATE_SCOPE_REVIEW"
+                decision = "SUBSTRATE_SCOPE_REVIEW"
             else:
-                disposition = "UNASSIGNED_REQUIRED_REVIEW"
-            writer.writerow({**row, "disposition": disposition, "evidence": "", "owner": ""})
+                decision = "UNASSIGNED_REQUIRED_REVIEW"
+            writer.writerow({**row, "decision": decision, "evidence": "", "owner": ""})
     return destination
 
 
-def capture_all(root: Path, output: Path, target: Path, *, expected_count: int = DEFAULT_PACKAGE_COUNT,
+def capture_all(root: Path, output: Path, target: Path, *,
                 cargo: str = "cargo", reuse: bool = True, run_final_inventory: bool = True,
                 runner: CommandRunner = default_runner) -> list[CaptureResult]:
     for label, path in (("output", output), ("target", target)):
@@ -396,27 +516,45 @@ def capture_all(root: Path, output: Path, target: Path, *, expected_count: int =
         raise InventoryError(f"{label} must be outside the source checkout: {path}")
     context = source_context(root, cargo=cargo)
     packages = enumerate_packages(root)
-    if len(packages) != expected_count:
-        raise InventoryError(f"expected {expected_count} direct library packages, found {len(packages)}")
+    if len(packages) != DEFAULT_PACKAGE_COUNT:
+        raise InventoryError(f"expected {DEFAULT_PACKAGE_COUNT} direct library packages, found {len(packages)}")
+    shim_identity = verify_cargo_shim(context.cargo_path, capture_env())
     output.mkdir(parents=True, exist_ok=True)
     marker = output / "run.json"
     previous = _read_json(marker)
-    if isinstance(previous, dict) and previous.get("source_commit") != context.source_commit:
-        raise InventoryError("output directory belongs to a different source freeze")
+    package_digest = package_set_sha256(packages)
+    if isinstance(previous, dict):
+        if previous.get("source_commit") != context.source_commit:
+            raise InventoryError("output directory belongs to a different source freeze")
+        if (previous.get("package_count") != DEFAULT_PACKAGE_COUNT
+                or previous.get("package_set_sha256") != package_digest):
+            raise InventoryError("output directory belongs to a different package set")
     write_package_manifest(output, context, packages)
-    captures = [capture_package(package, context, output, target, cargo=cargo,
-                                reuse=reuse, runner=runner) for package in packages]
-    if run_final_inventory:
-        run_inventory(root, output, captures)
-    _write_json(marker, {
-        "schema": RECEIPT_SCHEMA, "status": "complete",
-        "source_commit": context.source_commit,
-        "package_count": len(captures),
-        "reused": sum(item.reused for item in captures),
-        "captured": sum(not item.reused for item in captures),
-        "finished": utc_now(),
-    })
-    return captures
+    write_run_state(marker, context, packages, status="running", phase="captures")
+    captures: list[CaptureResult] = []
+    try:
+        for package in packages:
+            source_stable(context)
+            captures.append(capture_package(package, context, output, target, cargo=cargo,
+                                            reuse=reuse, runner=runner,
+                                            shim_identity=shim_identity))
+            source_stable(context)
+        if not run_final_inventory:
+            raise InventoryError("inventory was skipped; run is explicitly incomplete")
+        source_stable(context)
+        inventory_path, disposition_path = run_inventory(root, output, captures)
+        source_stable(context)
+        write_run_state(
+            marker, context, packages, status="complete", phase="complete",
+            inventory=str(inventory_path), disposition=str(disposition_path),
+            reused=sum(item.reused for item in captures),
+            captured=sum(not item.reused for item in captures),
+        )
+        return captures
+    except Exception as error:
+        write_run_state(marker, context, packages, status="incomplete", phase="failed",
+                        captured=len(captures), error=str(error))
+        raise
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -427,13 +565,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--target-dir", type=Path, required=True,
                         help="one shared Cargo target cache, preferably an existing external cache")
     parser.add_argument("--cargo", default="cargo")
-    parser.add_argument("--expected-package-count", type=int, default=DEFAULT_PACKAGE_COUNT)
     parser.add_argument("--no-reuse", action="store_true")
     parser.add_argument("--skip-inventory", action="store_true")
     args = parser.parse_args(argv)
     try:
         capture_all(args.root.resolve(), args.output.resolve(), args.target_dir.resolve(),
-                    expected_count=args.expected_package_count, cargo=args.cargo,
+                    cargo=args.cargo,
                     reuse=not args.no_reuse, run_final_inventory=not args.skip_inventory)
     except (InventoryError, OSError, subprocess.CalledProcessError, ValueError) as error:
         print(f"final API inventory: {error}", file=sys.stderr)

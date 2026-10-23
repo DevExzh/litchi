@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 from tools import final_api_inventory as inventory
 
@@ -63,7 +64,7 @@ class FinalInventoryTests(unittest.TestCase):
         target = root / "external" / "target"
         calls: list[tuple[list[str], dict[str, str]]] = []
 
-        def fake_runner(command, cwd, env, stdout, stderr):
+        def fake_runner(command, cwd, env, stdout, stderr, resource_log):
             calls.append((list(command), dict(env)))
             target_arg = Path(command[command.index("--target-dir") + 1])
             target_arg.joinpath("doc").mkdir(parents=True, exist_ok=True)
@@ -72,6 +73,8 @@ class FinalInventoryTests(unittest.TestCase):
                 json.dumps(rustdoc_fixture(lib)), encoding="utf-8")
             stdout.write_text("fake stdout\n", encoding="utf-8")
             stderr.write_text("", encoding="utf-8")
+            resource_log.write_text("Maximum resident set size (kbytes): 1234\n",
+                                    encoding="utf-8")
             return 0
 
         first = inventory.capture_package(package, context, output, target,
@@ -84,6 +87,9 @@ class FinalInventoryTests(unittest.TestCase):
         self.assertEqual(environment["CARGO_INCREMENTAL"], "0")
         self.assertEqual(environment["RUSTC_BOOTSTRAP"], "1")
         self.assertEqual(environment["LITCHI_MEM_MAX"], "20G")
+        self.assertEqual(environment["LITCHI_CAPPED"], "")
+        receipt = json.loads(Path(first.receipt_path).read_text(encoding="utf-8"))
+        self.assertEqual(receipt["resource"]["peak_rss_kib"], 1234)
 
         def should_not_run(*_args):
             raise AssertionError("matching JSON receipt should be reused")
@@ -100,7 +106,7 @@ class FinalInventoryTests(unittest.TestCase):
         target = root / "external" / "target"
         calls = 0
 
-        def fake_runner(command, cwd, env, stdout, stderr):
+        def fake_runner(command, cwd, env, stdout, stderr, resource_log):
             nonlocal calls
             calls += 1
             target_arg = Path(command[command.index("--target-dir") + 1])
@@ -109,6 +115,8 @@ class FinalInventoryTests(unittest.TestCase):
                 json.dumps(rustdoc_fixture("alpha")), encoding="utf-8")
             stdout.write_text("", encoding="utf-8")
             stderr.write_text("", encoding="utf-8")
+            resource_log.write_text("Maximum resident set size (kbytes): 1234\n",
+                                    encoding="utf-8")
             return 0
 
         inventory.capture_package(package, self.context(root), output, target,
@@ -126,6 +134,85 @@ class FinalInventoryTests(unittest.TestCase):
             inventory.check_target(target, inventory.MAX_TARGET_BYTES, label="hard cap",
                                    size_fn=lambda _: 20_000_000_000)
 
+    def test_cargo_shim_is_verified_and_inherited_bypass_is_rejected(self) -> None:
+        shim = Path(self.tmp.name) / "cargo"
+        shim.write_text(
+            "#!/bin/sh\n"
+            "if [ -n \"$LITCHI_CAPPED\" ]; then exec cargo \"$@\"; fi\n"
+            "systemd-run --scope -p MemoryMax=${LITCHI_MEM_MAX:-26G} cargo \"$@\"\n",
+            encoding="utf-8")
+        shim.chmod(0o755)
+        environment = {"LITCHI_MEM_MAX": "20G", "LITCHI_CAPPED": ""}
+        with patch.object(inventory.shutil, "which", return_value="/usr/bin/systemd-run"):
+            identity = inventory.verify_cargo_shim(str(shim), environment)
+        self.assertEqual(identity["memory_max"], "20G")
+        self.assertTrue(identity["litchi_capped_unset"])
+        with self.assertRaises(inventory.InventoryError):
+            with patch.object(inventory.shutil, "which", return_value="/usr/bin/systemd-run"):
+                inventory.verify_cargo_shim(str(shim), {"LITCHI_MEM_MAX": "20G",
+                                                        "LITCHI_CAPPED": "1"})
+
+    def test_capture_all_marks_inventory_skip_incomplete(self) -> None:
+        root = Path(self.tmp.name) / "source"
+        root.mkdir()
+        output = Path(self.tmp.name) / "output"
+        target = Path(self.tmp.name) / "target"
+        context = self.context(root)
+        packages = [inventory.Package(f"p{i}", f"p{i}", f"crates/p{i}/Cargo.toml", "d" * 64)
+                    for i in range(inventory.DEFAULT_PACKAGE_COUNT)]
+
+        def fake_capture(package, *_args, **_kwargs):
+            return inventory.CaptureResult(package.name, str(output / f"{package.name}.json"),
+                                            str(output / f"{package.name}.receipt.json"),
+                                            False, 1, "e" * 64)
+
+        with patch.object(inventory, "source_context", return_value=context), \
+                patch.object(inventory, "enumerate_packages", return_value=packages), \
+                patch.object(inventory, "verify_cargo_shim", return_value={}), \
+                patch.object(inventory, "capture_package", side_effect=fake_capture), \
+                patch.object(inventory, "source_stable") as stable:
+            with self.assertRaises(inventory.InventoryError):
+                inventory.capture_all(root, output, target, run_final_inventory=False)
+        marker = json.loads((output / "run.json").read_text(encoding="utf-8"))
+        self.assertEqual(marker["status"], "incomplete")
+        self.assertEqual(marker["phase"], "failed")
+        self.assertGreaterEqual(stable.call_count, 2 * inventory.DEFAULT_PACKAGE_COUNT)
+
+    def test_capture_all_requires_the_fixed_68_package_set(self) -> None:
+        root = Path(self.tmp.name) / "source"
+        root.mkdir()
+        context = self.context(root)
+        package = inventory.Package("only", "only", "crates/only/Cargo.toml", "d" * 64)
+        with patch.object(inventory, "source_context", return_value=context), \
+                patch.object(inventory, "enumerate_packages", return_value=[package]), \
+                patch.object(inventory, "verify_cargo_shim") as verify:
+            with self.assertRaisesRegex(inventory.InventoryError, "68 direct library packages"):
+                inventory.capture_all(root, Path(self.tmp.name) / "output",
+                                      Path(self.tmp.name) / "target")
+        verify.assert_not_called()
+
+    def test_capture_all_aborts_on_midrun_source_change(self) -> None:
+        root = Path(self.tmp.name) / "source"
+        root.mkdir()
+        output = Path(self.tmp.name) / "output"
+        target = Path(self.tmp.name) / "target"
+        context = self.context(root)
+        packages = [inventory.Package(f"p{i}", f"p{i}", f"crates/p{i}/Cargo.toml", "d" * 64)
+                    for i in range(inventory.DEFAULT_PACKAGE_COUNT)]
+        stable = Mock(side_effect=[None, inventory.InventoryError("changed")])
+
+        with patch.object(inventory, "source_context", return_value=context), \
+                patch.object(inventory, "enumerate_packages", return_value=packages), \
+                patch.object(inventory, "verify_cargo_shim", return_value={}), \
+                patch.object(inventory, "capture_package", return_value=inventory.CaptureResult(
+                    "p0", "p0.json", "p0.receipt.json", False, 1, "e" * 64)), \
+                patch.object(inventory, "source_stable", stable):
+            with self.assertRaises(inventory.InventoryError):
+                inventory.capture_all(root, output, target)
+        marker = json.loads((output / "run.json").read_text(encoding="utf-8"))
+        self.assertEqual(marker["status"], "incomplete")
+        self.assertEqual(marker["captured"], 1)
+
     def test_disposition_scaffold_requires_explicit_decision(self) -> None:
         root = Path(self.tmp.name)
         source = root / "inventory.tsv"
@@ -137,8 +224,8 @@ class FinalInventoryTests(unittest.TestCase):
         inventory.write_disposition_scaffold(source, destination)
         with destination.open(encoding="utf-8", newline="") as stream:
             rows = list(csv.DictReader(stream, delimiter="\t"))
-        self.assertEqual(rows[0]["disposition"], "UNASSIGNED_REQUIRED_REVIEW")
-        self.assertEqual(rows[1]["disposition"], "DRAFT_CANDIDATE_REVIEW")
+        self.assertEqual(rows[0]["decision"], "UNASSIGNED_REQUIRED_REVIEW")
+        self.assertEqual(rows[1]["decision"], "DRAFT_CANDIDATE_REVIEW")
         self.assertEqual(rows[0]["evidence"], "")
 
 

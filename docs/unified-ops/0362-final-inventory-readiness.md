@@ -113,14 +113,20 @@ OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
 python3 tools/final_api_inventory.py \
   --root "$PWD" \
   --output "$OUT" \
-  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target \
-  --expected-package-count 68
+  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target
 ```
 
-The wrapper writes `packages.json`, one JSON and receipt per package, external
-stdout/stderr logs, `inventory.tsv`, and an initially unassigned
-`disposition.tsv`. It invokes `api_debt_inventory.py` only after all 68 JSON
-captures succeed. Its fake-command fixture tests are build-free:
+The wrapper verifies the resolved Cargo shim (including `systemd-run`, the
+20G `MemoryMax` expression, and an empty inherited `LITCHI_CAPPED` marker),
+measures each command with `/usr/bin/time -v`, and records peak RSS beside
+the JSON size/SHA-256. It rechecks the full source commit, cleanliness,
+lockfile and toolchain identity before and after every package and around the
+final inventory. The wrapper writes `packages.json`, one JSON and receipt per
+package, external stdout/stderr/resource logs, `inventory.tsv`, and an
+initially unassigned `disposition.tsv` whose explicit column is `decision`.
+It invokes `api_debt_inventory.py` only after all 68 JSON captures succeed;
+diagnostic/skip paths are marked `incomplete`, never `complete`. Its
+fake-command fixture tests are build-free:
 
 ```sh
 python3 -m unittest tools.test_final_api_inventory
