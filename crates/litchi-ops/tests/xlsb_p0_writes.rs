@@ -458,6 +458,16 @@ fn unsigned_metadata_snapshot_charge_is_enforced() {
             })
             .expect_err("metadata publication must charge its retained patch");
         assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+
+        let exact = SemanticLimits::builder()
+            .max_snapshot_bytes(probe.diagnostics().snapshot_bytes())
+            .expect("exact snapshot limit")
+            .build()
+            .expect("exact semantic limits");
+        file.edit_with_options(EditOptions::new().semantic_limits(exact), |edit| {
+            edit.set("/metadata", props! { "title" => "measured" })
+        })
+        .expect("source-backed metadata must fit its exact retained-byte budget");
     }
 }
 

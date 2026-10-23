@@ -574,6 +574,11 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         Ok(Commit::new(self.staged.commit()?))
     }
+
+    /// Validate and publish with an exact retained-payload ceiling.
+    pub fn commit_with_options(self, options: crate::CommitOptions) -> Result<Commit> {
+        Ok(Commit::new(self.staged.commit_with_options(options)?))
+    }
 }
 
 fn map_authoring_error(error: super::Error) -> PackageError {

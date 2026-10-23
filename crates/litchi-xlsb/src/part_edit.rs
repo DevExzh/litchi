@@ -603,6 +603,40 @@ impl PartPatch {
         })
     }
 
+    /// Calculate the exact payload charge for the named part states before
+    /// retaining any patch deltas.
+    fn retained_bytes_for_names(
+        before: &OpcPackage,
+        after: &OpcPackage,
+        names: &[PackURI],
+    ) -> Result<(usize, usize)> {
+        names.iter().try_fold((0usize, 0usize), |(total, changed), name| {
+            let before = State::of(before, name)?;
+            let after = State::of(after, name)?;
+            if before == after {
+                return Ok((total, changed));
+            }
+            let size = |state: &Option<State>| state.as_ref().map_or(0, |state| state.blob.len());
+            Ok((
+                total
+                    .saturating_add(size(&before))
+                    .saturating_add(size(&after)),
+                changed.saturating_add(1),
+            ))
+        })
+    }
+
+    fn enforce_retained_limit(retained: usize, maximum: Option<usize>) -> Result<()> {
+        if let Some(maximum) = maximum.filter(|maximum| retained > *maximum) {
+            return Err(Error::limit(
+                crate::opc::LimitKind::PatchBytes,
+                retained,
+                maximum,
+            ));
+        }
+        Ok(())
+    }
+
     pub(crate) fn inverse(&self) -> Self {
         Self {
             deltas: self
@@ -786,10 +820,17 @@ impl PartPatch {
         before: &Arc<OpcPackage>,
         after: &Arc<OpcPackage>,
         names: &BTreeSet<String>,
+        max_snapshot_bytes: Option<usize>,
     ) -> Result<Self> {
+        let names: Vec<PackURI> = names
+            .iter()
+            .map(|name| PackURI::new(name.as_str()))
+            .collect::<std::result::Result<_, _>>()
+            .map_err(Error::from)?;
+        let (retained, _) = Self::retained_bytes_for_names(before, after, &names)?;
+        Self::enforce_retained_limit(retained, max_snapshot_bytes)?;
         let mut deltas = Vec::new();
         for name in names {
-            let name = PackURI::new(name.as_str())?;
             let before = State::of(before, &name)?;
             let after = State::of(after, &name)?;
             if before != after {
@@ -814,25 +855,14 @@ impl PartPatch {
     /// The staged graph is a clone of the source, so an untouched part shares
     /// its payload allocation and compares by pointer; only changed parts are
     /// compared by value.
-    pub(crate) fn capture_all(before: &Arc<OpcPackage>, after: &Arc<OpcPackage>) -> Result<Self> {
+    pub(crate) fn capture_all(
+        before: &Arc<OpcPackage>,
+        after: &Arc<OpcPackage>,
+        max_snapshot_bytes: Option<usize>,
+    ) -> Result<Self> {
         // One commit changes at most as many parts as the package's source
         // limits admit.
         let maximum = before.read_limits().max_parts();
-        let mut deltas = Vec::new();
-        let mut push = |delta: Delta| -> Result<()> {
-            if delta.before == delta.after {
-                return Ok(());
-            }
-            if deltas.len() >= maximum {
-                return Err(Error::limit(
-                    crate::opc::LimitKind::Parts,
-                    deltas.len() + 1,
-                    maximum,
-                ));
-            }
-            deltas.push(delta);
-            Ok(())
-        };
         // `changed_parts` compares the package-owned payload handles and
         // relationship graphs without decoding retained source members. The
         // staged graph is a clone of `before`, so every untouched payload is
@@ -862,6 +892,32 @@ impl PartPatch {
         }
         changed_names.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
         changed_names.dedup();
+
+        let (retained, changed) = Self::retained_bytes_for_names(before, after, &changed_names)?;
+        if changed > maximum {
+            return Err(Error::limit(
+                crate::opc::LimitKind::Parts,
+                changed,
+                maximum,
+            ));
+        }
+        Self::enforce_retained_limit(retained, max_snapshot_bytes)?;
+
+        let mut deltas = Vec::new();
+        let mut push = |delta: Delta| -> Result<()> {
+            if delta.before == delta.after {
+                return Ok(());
+            }
+            if deltas.len() >= maximum {
+                return Err(Error::limit(
+                    crate::opc::LimitKind::Parts,
+                    deltas.len() + 1,
+                    maximum,
+                ));
+            }
+            deltas.push(delta);
+            Ok(())
+        };
 
         for name in changed_names {
             let before_state = State::of(before, &name)?;
@@ -1198,14 +1254,31 @@ impl Staged {
     /// staging returns the source package. A changed staging of a signed
     /// package is refused with [`Error::Signed`] (ADR 0006).
     pub(crate) fn commit(self) -> Result<(Package, PartPatch)> {
+        self.commit_with_options(crate::CommitOptions::default())
+    }
+
+    /// Capture and publish with an exact native retained-payload ceiling.
+    pub(crate) fn commit_with_options(
+        self,
+        options: crate::CommitOptions,
+    ) -> Result<(Package, PartPatch)> {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
         let staged = Arc::new(staged);
         let patch = if self.all {
-            PartPatch::capture_all(self.source.opc_shared(), &staged)?
+            PartPatch::capture_all(
+                self.source.opc_shared(),
+                &staged,
+                options.max_snapshot_bytes_value(),
+            )?
         } else {
-            PartPatch::capture(self.source.opc_shared(), &staged, &self.touched)?
+            PartPatch::capture(
+                self.source.opc_shared(),
+                &staged,
+                &self.touched,
+                options.max_snapshot_bytes_value(),
+            )?
         };
         if patch.is_noop() {
             return Ok((self.source, patch));

@@ -56,6 +56,8 @@ pub enum LimitKind {
     /// Parts one commit may add, change or remove: at most the package's
     /// source-limit part count.
     Parts,
+    /// Retained before and after payload bytes of one captured patch.
+    PatchBytes,
 }
 
 /// A staged raw OPC edit of one [`Package`]. Dropping it discards it.
@@ -135,7 +137,7 @@ impl Edit {
             return Ok(Commit::new((self.source, PartPatch::default())));
         };
         let staged = std::sync::Arc::new(staged);
-        let patch = PartPatch::capture_all(self.source.opc_shared(), &staged)?;
+        let patch = PartPatch::capture_all(self.source.opc_shared(), &staged, None)?;
         if patch.is_noop() {
             return Ok(Commit::new((self.source, patch)));
         }

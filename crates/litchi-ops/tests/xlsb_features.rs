@@ -66,6 +66,22 @@ fn unsigned_feature_snapshot_charge_is_enforced() {
         })
         .expect_err("feature publication must charge its retained patch");
     assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+
+    let exact = SemanticLimits::builder()
+        .max_snapshot_bytes(probe.diagnostics().snapshot_bytes())
+        .expect("exact snapshot limit")
+        .build()
+        .expect("exact semantic limits");
+    workbook()
+        .edit_with_options(EditOptions::new().semantic_limits(exact), |edit| {
+            edit.add(
+                "/Sheet1",
+                NewNode::new("comment")
+                    .prop("ref", "A1")
+                    .prop("text", "measured"),
+            )
+        })
+        .expect("an exact native retained-byte budget must remain valid");
 }
 
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==";

@@ -162,6 +162,41 @@ pub mod xml_maps;
 
 /// OPC resource limits and diagnostics used by XLSB package and workbook ingress.
 pub use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimitKind, SourceLimits};
+
+/// Native commit configuration for a staged XLSB edit.
+///
+/// The optional snapshot ceiling is checked against the exact before and
+/// after payload bytes the native patch would retain, before that patch is
+/// captured. The default leaves the native family unbounded; callers that
+/// publish through a facade should pass its remaining snapshot budget.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CommitOptions {
+    max_snapshot_bytes: Option<usize>,
+}
+
+impl CommitOptions {
+    /// Start with no native snapshot ceiling.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            max_snapshot_bytes: None,
+        }
+    }
+
+    /// Bound the retained before/after patch payload bytes.
+    #[must_use]
+    pub const fn max_snapshot_bytes(mut self, maximum: usize) -> Self {
+        self.max_snapshot_bytes = Some(maximum);
+        self
+    }
+
+    /// The configured retained-payload ceiling, if any.
+    #[must_use]
+    pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
+        self.max_snapshot_bytes
+    }
+}
+
 pub(crate) mod writer;
 
 /// Canonical builder for authoring a new XLSB package.
