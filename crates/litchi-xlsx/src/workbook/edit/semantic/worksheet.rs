@@ -144,6 +144,15 @@ impl Sheet<'_> {
             .map(|stored| stored.cell.clone()))
     }
 
+    fn source_rich_text(&self, address: Address) -> Result<Option<crate::RichText>> {
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        sheet.rich_text(address)
+    }
+
     fn source_style(&self, address: Address) -> Result<Option<u32>> {
         let sheet = self
             .edit
@@ -507,7 +516,10 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
         }
-        if source.as_ref().is_some_and(|source| source.as_ref() == Some(&authored_cell)) {
+        if source
+            .as_ref()
+            .is_some_and(|source| source.as_ref() == Some(&authored_cell))
+        {
             let remove_action = self
                 .edit
                 .sheets
@@ -549,8 +561,16 @@ impl Sheet<'_> {
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         text.validate_for_write()?;
-        self.edit
-            .preflight_cell_capture(self.position, address, text.retained_bytes())?;
+        let capture =
+            self.edit
+                .preflight_cell_capture(self.position, address, text.retained_bytes())?;
+        let source_same = match self.source_rich_text(address) {
+            Ok(source) => source.as_ref().is_some_and(|source| source == &text),
+            Err(error) => {
+                self.edit.rollback_cell_capture(capture);
+                return Err(error);
+            },
+        };
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::rich(text));
@@ -558,6 +578,32 @@ impl Sheet<'_> {
             Entry::Occupied(mut entry) => {
                 entry.get_mut().set_payload(Payload::Rich(Box::new(text)))
             },
+        }
+        if source_same {
+            let mut remove = false;
+            if let Some(action) = self
+                .edit
+                .sheets
+                .get_mut(&self.position)
+                .and_then(|actions| actions.cells.get_mut(&address))
+            {
+                match action {
+                    Action::Update { payload, style } if style.is_none() => {
+                        *payload = None;
+                        remove = true;
+                    },
+                    Action::Update { payload, .. } => *payload = None,
+                    Action::Remove => {},
+                }
+            }
+            if remove {
+                self.edit
+                    .sheets
+                    .get_mut(&self.position)
+                    .and_then(|actions| actions.cells.remove(&address));
+            }
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Payload);
         }
         Ok(self)
     }
@@ -624,11 +670,20 @@ impl Sheet<'_> {
                 return Err(error);
             },
         };
-        let scalar = match sheet.store() {
-            Ok(store) => store.entry(address).is_some_and(|stored| {
-                matches!(&stored.cell, Cell::Formula(formula)
-                    if matches!(formula.kind(), crate::formula::Kind::Scalar))
-            }),
+        let (scalar, source_same) = match sheet.store() {
+            Ok(store) => match store.entry(address).map(|stored| &stored.cell) {
+                Some(Cell::Formula(formula))
+                    if matches!(formula.kind(), crate::formula::Kind::Scalar) =>
+                {
+                    (
+                        true,
+                        formula
+                            .cached()
+                            .is_some_and(|cache| cache.value() == &value),
+                    )
+                },
+                _ => (false, false),
+            },
             Err(error) => {
                 self.edit.rollback_cell_capture(capture);
                 return Err(error);
@@ -644,6 +699,32 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Cache(value)),
         }
+        if source_same {
+            let mut remove = false;
+            if let Some(action) = self
+                .edit
+                .sheets
+                .get_mut(&self.position)
+                .and_then(|actions| actions.cells.get_mut(&address))
+            {
+                match action {
+                    Action::Update { payload, style } if style.is_none() => {
+                        *payload = None;
+                        remove = true;
+                    },
+                    Action::Update { payload, .. } => *payload = None,
+                    Action::Remove => {},
+                }
+            }
+            if remove {
+                self.edit
+                    .sheets
+                    .get_mut(&self.position)
+                    .and_then(|actions| actions.cells.remove(&address));
+            }
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Payload);
+        }
         Ok(self)
     }
 
@@ -654,16 +735,21 @@ impl Sheet<'_> {
         let capture =
             self.edit
                 .preflight_cell_capture(self.position, address, size_of::<Content>())?;
-        let source_exists = if self.edit.capture_budgeted() {
+        let (source_exists, source_empty) = if self.edit.capture_budgeted() {
             match self.source_cell(address) {
-                Ok(source) => source.is_some(),
+                Ok(source) => {
+                    let empty = source
+                        .as_ref()
+                        .is_some_and(|cell| matches!(cell, Cell::Empty));
+                    (source.is_some(), empty)
+                },
                 Err(error) => {
                     self.edit.rollback_cell_capture(capture);
                     return Err(error);
                 },
             }
         } else {
-            true
+            (true, false)
         };
         if !source_exists && !self.has_pending_cell_effect(address) {
             self.edit.rollback_cell_capture(capture);
@@ -690,6 +776,35 @@ impl Sheet<'_> {
             } else {
                 Payload::ClearIfPresent
             }),
+        }
+        if source_empty {
+            let mut remove = false;
+            if let Some(action) = self
+                .edit
+                .sheets
+                .get_mut(&self.position)
+                .and_then(|actions| actions.cells.get_mut(&address))
+            {
+                match action {
+                    Action::Update {
+                        payload: Some(Payload::Clear | Payload::ClearIfPresent),
+                        style,
+                    } if style.is_none() => remove = true,
+                    Action::Update {
+                        payload: Some(Payload::Clear | Payload::ClearIfPresent),
+                        ..
+                    } => {},
+                    _ => {},
+                }
+            }
+            if remove {
+                self.edit
+                    .sheets
+                    .get_mut(&self.position)
+                    .and_then(|actions| actions.cells.remove(&address));
+                self.edit
+                    .release_cell_capture_facet(self.position, address, CaptureFacet::Payload);
+            }
         }
         Ok(self)
     }
@@ -976,20 +1091,30 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        self.edit.preflight_cell_capture_with_facet(
+        let previous = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.fonts.get(&address))
+            .cloned();
+        let mut merged = previous.clone().unwrap_or_default();
+        merged.merge(change);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Font,
-            change.retained_bytes(),
+            merged.retained_bytes(),
         )?;
+        if previous.as_ref() == Some(&merged) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         self.edit
             .sheets
             .entry(self.position)
             .or_default()
             .fonts
-            .entry(address)
-            .and_modify(|current| current.merge(change))
-            .or_insert_with(|| change.clone());
+            .insert(address, merged);
         Ok(self)
     }
 
@@ -1008,20 +1133,30 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        self.edit.preflight_cell_capture_with_facet(
+        let previous = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.alignments.get(&address))
+            .copied();
+        let mut merged = previous.unwrap_or_default();
+        merged.merge(change);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Alignment,
-            change.retained_bytes(),
+            merged.retained_bytes(),
         )?;
+        if previous.as_ref() == Some(&merged) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         self.edit
             .sheets
             .entry(self.position)
             .or_default()
             .alignments
-            .entry(address)
-            .and_modify(|current| current.merge(change))
-            .or_insert(*change);
+            .insert(address, merged);
         Ok(self)
     }
 
@@ -1056,13 +1191,13 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        let mut merged = self
+        let previous = self
             .edit
             .sheets
             .get(&self.position)
             .and_then(|actions| actions.borders.get(&address))
-            .cloned()
-            .unwrap_or_else(BorderChange::new);
+            .cloned();
+        let mut merged = previous.clone().unwrap_or_else(BorderChange::new);
         merged.merge(change);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
@@ -1070,6 +1205,10 @@ impl Sheet<'_> {
             CaptureFacet::Border,
             merged.retained_bytes(),
         )?;
+        if previous.as_ref() == Some(&merged) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         if let Err(error) = self.edit.stage_border(self.position, address, change) {
             self.edit.rollback_cell_capture(capture);
             return Err(error);
@@ -1128,13 +1267,13 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        let mut merged = self
+        let previous = self
             .edit
             .sheets
             .get(&self.position)
             .and_then(|actions| actions.fills.get(&address))
-            .cloned()
-            .unwrap_or_else(FillChange::new);
+            .cloned();
+        let mut merged = previous.clone().unwrap_or_else(FillChange::new);
         merged.merge(change);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
@@ -1142,6 +1281,10 @@ impl Sheet<'_> {
             CaptureFacet::Fill,
             merged.retained_bytes(),
         )?;
+        if previous.as_ref() == Some(&merged) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         if let Err(error) = self.edit.stage_fill(self.position, address, change) {
             self.edit.rollback_cell_capture(capture);
             return Err(error);
@@ -1163,20 +1306,30 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        self.edit.preflight_cell_capture_with_facet(
+        let previous = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.protections.get(&address))
+            .copied();
+        let mut merged = previous.unwrap_or_default();
+        merged.merge(change);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Protection,
-            change.retained_bytes(),
+            merged.retained_bytes(),
         )?;
+        if previous.as_ref() == Some(&merged) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         self.edit
             .sheets
             .entry(self.position)
             .or_default()
             .protections
-            .entry(address)
-            .and_modify(|current| current.merge(change))
-            .or_insert(*change);
+            .insert(address, merged);
         Ok(self)
     }
 
@@ -1188,6 +1341,15 @@ impl Sheet<'_> {
         value: Option<bool>,
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        if self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.quote_prefixes.get(&address))
+            .is_some_and(|current| *current == value)
+        {
+            return Ok(self);
+        }
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1227,6 +1389,15 @@ impl Sheet<'_> {
         let code = code
             .map(crate::style::validate_number_format_code)
             .transpose()?;
+        if self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.number_formats.get(&address))
+            .is_some_and(|current| *current == code)
+        {
+            return Ok(self);
+        }
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,

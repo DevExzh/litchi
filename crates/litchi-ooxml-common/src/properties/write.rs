@@ -139,6 +139,17 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
 
 pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
+    encode_preflighted(props, dialect, encoded_bytes)
+}
+
+/// Encode a core-properties value after its exact output length has already
+/// been admitted. Keeping the prepared length avoids a second codec walk in
+/// the metadata transaction's publication phase.
+pub(super) fn encode_preflighted(
+    props: &Core,
+    dialect: Dialect,
+    encoded_bytes: usize,
+) -> Result<String> {
     let mut xml = BoundedXml::with_capacity(encoded_bytes)?;
     xml.push_str(XML_DECLARATION)?;
     xml.push_str(CORE_OPEN_PREFIX)?;

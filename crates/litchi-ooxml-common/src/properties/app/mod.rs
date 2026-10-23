@@ -26,7 +26,10 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub(crate) use codec::{decode, encode_new, encode_new_len, splice, splice_len};
+pub(crate) use codec::{
+    SplicePlan, decode, encode_new, encode_new_len, encode_new_preflighted, plan_splice, splice,
+    splice_len, splice_planned,
+};
 pub use package::{clear, read, read_source_backed, write};
 pub(crate) use package::{inspect, inspect_source};
 

@@ -77,27 +77,26 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        // Metadata editing does not use the worksheet native editor. Reserve
-        // both immutable package owners before the common property editor
-        // materializes any after-image. The shared planner then counts the
-        // exact escaped XML lengths and patch descriptors under the remaining
-        // caller budget.
+        // Metadata editing does not use the worksheet native editor. Admit
+        // the source owner before the common property editor materializes an
+        // after-image. The common planner admits the exact escaped XML patch;
+        // `Commit::from_metadata` then projects the target endpoint from the
+        // actual changed property payload instead of assuming it is the same
+        // size as the source.
         let endpoint = source.retained_bytes();
-        let endpoint_bytes = endpoint.saturating_mul(2);
-        if endpoint_bytes > limits.max_snapshot_bytes() {
+        if endpoint > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,
-                observed: endpoint_bytes,
+                observed: endpoint,
                 maximum: limits.max_snapshot_bytes(),
             }
             .into());
         }
-        let remaining_patch_bytes = limits.max_snapshot_bytes().saturating_sub(endpoint_bytes);
         let (target, metadata, changed, native_patch_bytes) = commit(
             &source,
             |value| assignments.apply(value),
             Some(assignments),
-            Some(remaining_patch_bytes),
+            Some(limits.max_snapshot_bytes()),
         )?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)

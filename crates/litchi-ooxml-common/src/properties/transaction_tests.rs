@@ -9,7 +9,7 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
+use super::{Core, Edit, EditOptions, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
 use crate::leniency::ToleranceReport;
 
@@ -78,23 +78,84 @@ fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
     .unwrap();
     let expected = edit.clone().commit().unwrap().patch().retained_bytes();
 
-    let committed = Edit::new_with_retained_limit(&package, Host::Word, Some(expected))
-        .and_then(|mut edit| {
-            edit.update_metadata(|metadata| {
-                metadata.title = Some("A & <property> \r\n B".to_owned());
-            })?;
-            edit.commit()
-        })
-        .unwrap();
+    let committed = Edit::new_with_options(
+        &package,
+        Host::Word,
+        EditOptions::new().max_retained_bytes(expected),
+    )
+    .and_then(|mut edit| {
+        edit.update_metadata(|metadata| {
+            metadata.title = Some("A & <property> \r\n B".to_owned());
+        })?;
+        edit.commit()
+    })
+    .unwrap();
     assert_eq!(committed.patch().retained_bytes(), expected);
 
-    let mut under =
-        Edit::new_with_retained_limit(&package, Host::Word, Some(expected - 1)).unwrap();
+    let mut under = Edit::new_with_options(
+        &package,
+        Host::Word,
+        EditOptions::new().max_retained_bytes(expected - 1),
+    )
+    .unwrap();
     under
         .update_metadata(|metadata| {
             metadata.title = Some("A & <property> \r\n B".to_owned());
         })
         .unwrap();
+    assert!(matches!(
+        under.commit(),
+        Err(Error::Limit {
+            kind: super::LimitKind::RetainedBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn metadata_commit_admits_exact_app_and_custom_escape_sizes() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| {
+        metadata.company = Some("A & <application>".to_owned());
+    })
+    .unwrap();
+    let mut custom = edit.custom_props().clone();
+    custom.insert("Project", "A & <custom>").unwrap();
+    edit.set_custom_props(custom);
+    let expected = edit.clone().commit().unwrap().patch().retained_bytes();
+
+    let committed = Edit::new_with_options(
+        &package,
+        Host::Word,
+        EditOptions::new().max_retained_bytes(expected),
+    )
+    .and_then(|mut edit| {
+        edit.update_metadata(|metadata| {
+            metadata.company = Some("A & <application>".to_owned());
+        })?;
+        let mut custom = edit.custom_props().clone();
+        custom.insert("Project", "A & <custom>")?;
+        edit.set_custom_props(custom);
+        edit.commit()
+    })
+    .unwrap();
+    assert_eq!(committed.patch().retained_bytes(), expected);
+
+    let mut under = Edit::new_with_options(
+        &package,
+        Host::Word,
+        EditOptions::new().max_retained_bytes(expected - 1),
+    )
+    .unwrap();
+    under
+        .update_metadata(|metadata| {
+            metadata.company = Some("A & <application>".to_owned());
+        })
+        .unwrap();
+    let mut custom = under.custom_props().clone();
+    custom.insert("Project", "A & <custom>").unwrap();
+    under.set_custom_props(custom);
     assert!(matches!(
         under.commit(),
         Err(Error::Limit {

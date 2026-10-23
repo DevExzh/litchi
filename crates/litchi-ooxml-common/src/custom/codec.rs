@@ -576,6 +576,12 @@ fn repair_shape_fragments(props: &mut Props, sink: &mut Sink<'_>) -> Result<()> 
 
 pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     let encoded = encoded_len(props)?;
+    encode_preflighted(props, encoded)
+}
+
+/// Encode custom properties after the exact output length has already been
+/// admitted by the shared metadata planner.
+pub(crate) fn encode_preflighted(props: &Props, encoded: usize) -> Result<Vec<u8>> {
     let mut writer = Writer::new(Vec::with_capacity(encoded));
     writer.write_event(Event::Decl(BytesDecl::new(
         "1.0",
@@ -623,6 +629,11 @@ pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     writer.write_event(Event::End(BytesEnd::new("Properties")))?;
     let mut xml = writer.into_inner();
     xml.shrink_to_fit();
+    if xml.len() != encoded {
+        return Err(Error::Invalid(
+            "custom-properties encoded-size invariant failed".to_owned(),
+        ));
+    }
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
             crate::LimitKind::CustomPropertiesXmlBytes,

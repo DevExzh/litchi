@@ -73,6 +73,28 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
 /// The errors of [`decode`] for `xml`, and [`Error::Invalid`] when a target
 /// text value holds a character XML 1.0 cannot carry.
 pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
+    let Some(plan) = plan_splice(xml, target)? else {
+        return Ok(None);
+    };
+    splice_planned(xml, target, plan).map(Some)
+}
+
+/// The lossless layout and exact output size prepared for one changed app
+/// properties value. The layout is retained so publication does not scan the
+/// source XML a second time.
+#[derive(Debug)]
+pub(crate) struct SplicePlan {
+    layout: Layout,
+    output_len: usize,
+}
+
+impl SplicePlan {
+    pub(crate) const fn output_len(&self) -> usize {
+        self.output_len
+    }
+}
+
+pub(crate) fn plan_splice(xml: &[u8], target: &Props) -> Result<Option<SplicePlan>> {
     let layout = scan(xml)?;
     if layout.props == *target {
         return Ok(None);
@@ -80,6 +102,11 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or_else(|| {
         Error::Invalid("changed application-properties edit became a no-op".to_owned())
     })?;
+    Ok(Some(SplicePlan { layout, output_len }))
+}
+
+pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Result<Vec<u8>> {
+    let SplicePlan { layout, output_len } = plan;
     let prefix = qualified_prefix(&layout.root_name);
     let mut edits: Vec<(Range<usize>, Vec<u8>)> = Vec::new();
     let mut appended = Vec::new();
@@ -149,6 +176,11 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     }
     output.extend_from_slice(&xml[cursor..]);
     output.shrink_to_fit();
+    if output.len() != output_len {
+        return Err(Error::Invalid(
+            "extended-properties prepared-size invariant failed".to_owned(),
+        ));
+    }
     if output.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
             kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
@@ -161,7 +193,7 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
             "extended-properties edit did not read back as requested".to_owned(),
         ));
     }
-    Ok(Some(output))
+    Ok(output)
 }
 
 /// Plan the exact byte length of a lossless application-properties splice.
@@ -216,7 +248,7 @@ fn splice_len_from_layout(xml: &[u8], layout: &Layout, target: &Props) -> Result
     if appended != 0 {
         let (removed, replacement_len) = match &layout.root_end {
             RootEnd::EndTag(_) => (0, appended),
-            RootEnd::Empty(span) => (
+            RootEnd::Empty(_) => (
                 2,
                 4usize
                     .saturating_add(layout.root_name.len())
@@ -250,6 +282,10 @@ fn replace_len(current: usize, removed: usize, added: usize) -> Result<usize> {
 /// cannot carry, and [`Error::Limit`] when a bound is exceeded.
 pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
     let encoded_len = encode_new_len(props)?;
+    encode_new_preflighted(props, encoded_len)
+}
+
+pub(crate) fn encode_new_preflighted(props: &Props, encoded_len: usize) -> Result<Vec<u8>> {
     let mut xml = Vec::with_capacity(encoded_len);
     xml.extend_from_slice(XML_DECLARATION.as_bytes());
     xml.extend_from_slice(b"<Properties xmlns=\"");
@@ -278,6 +314,11 @@ pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
         });
     }
     xml.shrink_to_fit();
+    if xml.len() != encoded_len {
+        return Err(Error::Invalid(
+            "extended-properties encoded-size invariant failed".to_owned(),
+        ));
+    }
     Ok(xml)
 }
 
