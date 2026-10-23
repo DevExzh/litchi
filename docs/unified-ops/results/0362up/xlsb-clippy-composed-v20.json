@@ -1,0 +1,70 @@
+{
+  "source": "73a38420b844cd432dce50e5b3d36980720a3606",
+  "pid": 3218434,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-clippy-composed-v20-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-clippy-composed-v20"
+  ],
+  "started_unix_seconds": 1792786529.860769,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-xlsb",
+        "--all-features",
+        "--lib",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 52.50603364699782,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-clippy-composed-v20/check-0.log",
+      "bytes": 226363,
+      "sha256": "850bbfb5260f59f4a7e3db71c13244f2430374a3b5162428ab4b562907c0720f",
+      "target_bytes_before": 3904251553,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsb-a78e52581af29829",
+          "bytes": 47864888,
+          "sha256": "0dad984c1ef88320cd30acfbbadef629f550b3dce63075b43bc32e7a142d8b6e"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 81.96693132800283,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xlsb-clippy-composed-v20/check-1.log",
+      "bytes": 309401,
+      "sha256": "ef6f71c612121618e71eaa3d0d39156c5b14977aff4abd5304c9c96a2b10f0fd",
+      "target_bytes_before": 3904239259,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "test_summaries": [
+    "test result: ok. 772 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.27s"
+  ],
+  "note": "Complete all-feature XLSB library passes all772 tests. Workspace Clippy reaches7 redundant ODS forwarding wrappers already fixed on main integration a658b88ee3. Bring the current reviewed integration into this diagnostic composition before further lint validation instead of duplicating those accepted source changes. Full current-source gate remains required."
+}

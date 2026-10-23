@@ -154,3 +154,14 @@ co-located without changing them, and a redundant usize conversion is removed.
 No lint allowance or policy change is introduced.
 [docx-clippy-runtime-v18.json](results/0362up/docx-clippy-runtime-v18.json)
 retains both complete commands and log identities.
+
+## Complete XLSB runtime pass
+
+All 772 all-feature XLSB library tests pass on `73a38420b8`. The final
+transitive replay checks preserve logical member payloads and untouched
+source images under the existing OPC writer contract; same-owner and
+unreferenced replay retain exact archive comparisons. Workspace Clippy
+then reaches seven ODS forwarding lints already corrected on the current
+main integration. The coordinator is composing that reviewed source before
+further lint validation. [xlsb-clippy-composed-v20.json](results/0362up/xlsb-clippy-composed-v20.json)
+retains the complete source and log identities.
