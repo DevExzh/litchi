@@ -796,6 +796,10 @@ pub struct Plan {
 pub struct OwnerAdmission {
     source_bytes: usize,
     source_archive_bytes: usize,
+    /// Retained semantic caches that the host drops while reopening a
+    /// changed target. A no-op keeps these caches and therefore does not use
+    /// this projection.
+    discarded_target_bytes: usize,
     families: [FamilyAdmission; 3],
 }
 
@@ -806,11 +810,13 @@ impl OwnerAdmission {
     pub const fn new(
         source_bytes: usize,
         source_archive_bytes: usize,
+        discarded_target_bytes: usize,
         families: [FamilyAdmission; 3],
     ) -> Self {
         Self {
             source_bytes,
             source_archive_bytes,
+            discarded_target_bytes,
             families,
         }
     }
@@ -859,9 +865,11 @@ impl OwnerAdmission {
         } else {
             self.source_bytes
                 .checked_sub(self.source_archive_bytes)
+                .and_then(|value| value.checked_sub(self.discarded_target_bytes))
                 .ok_or_else(|| {
                     Error::Invalid(
-                        "metadata target endpoint underflowed its source archive".to_owned(),
+                        "metadata target endpoint underflowed its source archive or discarded cache"
+                            .to_owned(),
                     )
                 })?
         };

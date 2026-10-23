@@ -144,9 +144,11 @@ fn owner_family(
 }
 
 fn owner_admission(package: &Package, snapshot: &Snapshot) -> Result<properties::OwnerAdmission> {
+    let (source_bytes, discarded_target_bytes) = package.retained_bytes_for_metadata_admission();
     Ok(properties::OwnerAdmission::new(
-        package.retained_bytes(),
+        source_bytes,
         package.opc().exact_source_len().unwrap_or(0),
+        discarded_target_bytes,
         [
             owner_family(package, snapshot, Family::Core)?,
             owner_family(package, snapshot, Family::App)?,
@@ -410,6 +412,23 @@ mod tests {
         edit.commit().unwrap()
     }
 
+    fn warm_package() -> Package {
+        let source = Package::new().unwrap();
+        let mut edit = source.edit().unwrap();
+        edit.sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .set("A1", "warm")
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    }
+
+    fn warm_cells(package: &Package) {
+        let workbook = package.workbook();
+        let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        assert!(sheet.cell("A1").unwrap().stored().is_some());
+    }
+
     fn case_spelled_core_target() -> Package {
         let source = title_commit(&Package::new().unwrap(), "source").into_package();
         let mut opc = source.opc().clone();
@@ -577,6 +596,99 @@ mod tests {
                 observed,
                 maximum,
             }) if observed > maximum && maximum == required - 1
+        ));
+    }
+
+    #[test]
+    fn bounded_metadata_admission_projects_warm_target_boundaries() {
+        let long = title_commit(&Package::new().unwrap(), &"long title ".repeat(64)).into_package();
+        warm_cells(&long);
+        let (_, warm_cache_bytes) = long.retained_bytes_for_metadata_admission();
+        assert!(
+            warm_cache_bytes > 0,
+            "the source must carry a warm cell cache"
+        );
+        let shrinking = title_commit(&long, "short");
+        let shrinking_required = long
+            .retained_bytes()
+            .saturating_add(shrinking.package().retained_bytes())
+            .saturating_add(shrinking.patch().retained_bytes());
+        let mut shrinking_edit = long
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(shrinking_required))
+            .unwrap();
+        shrinking_edit
+            .update(|metadata| metadata.title = Some("short".to_owned()))
+            .unwrap();
+        assert!(shrinking_edit.commit().is_ok());
+        let mut shrinking_below = long
+            .edit_metadata_with_options(
+                EditOptions::new().max_retained_bytes(shrinking_required - 1),
+            )
+            .unwrap();
+        shrinking_below
+            .update(|metadata| metadata.title = Some("short".to_owned()))
+            .unwrap();
+        assert!(matches!(
+            shrinking_below.commit(),
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                ..
+            })
+        ));
+
+        let short = title_commit(&Package::new().unwrap(), "short").into_package();
+        warm_cells(&short);
+        let expanding = title_commit(&short, &"expanded title ".repeat(64));
+        let expanding_required = short
+            .retained_bytes()
+            .saturating_add(expanding.package().retained_bytes())
+            .saturating_add(expanding.patch().retained_bytes());
+        let mut expanding_edit = short
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(expanding_required))
+            .unwrap();
+        expanding_edit
+            .update(|metadata| metadata.title = Some("expanded title ".repeat(64)))
+            .unwrap();
+        assert!(expanding_edit.commit().is_ok());
+        let mut expanding_below = short
+            .edit_metadata_with_options(
+                EditOptions::new().max_retained_bytes(expanding_required - 1),
+            )
+            .unwrap();
+        expanding_below
+            .update(|metadata| metadata.title = Some("expanded title ".repeat(64)))
+            .unwrap();
+        assert!(matches!(
+            expanding_below.commit(),
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                ..
+            })
+        ));
+
+        let noop = warm_package();
+        warm_cells(&noop);
+        let expected_noop = noop.edit_metadata().unwrap().commit().unwrap();
+        let noop_required = noop
+            .retained_bytes()
+            .saturating_add(expected_noop.package().retained_bytes())
+            .saturating_add(expected_noop.patch().retained_bytes());
+        assert!(
+            noop.edit_metadata_with_options(EditOptions::new().max_retained_bytes(noop_required))
+                .unwrap()
+                .commit()
+                .is_ok()
+        );
+        assert!(matches!(
+            noop.edit_metadata_with_options(
+                EditOptions::new().max_retained_bytes(noop_required - 1)
+            )
+            .unwrap()
+            .commit(),
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                ..
+            })
         ));
     }
 

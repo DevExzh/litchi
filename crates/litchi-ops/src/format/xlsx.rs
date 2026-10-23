@@ -625,6 +625,30 @@ impl Xlsx {
         self.editor_after_source_check(self.0.signature() == Signature::Signed)
     }
 
+    /// Admit the single source-backed endpoint needed by the metadata route
+    /// before promotion. Metadata's common editor performs the exact
+    /// source/target/patch admission after promotion; this guard only keeps a
+    /// deferred source from being promoted when that one endpoint already
+    /// exceeds the caller's remaining snapshot budget.
+    pub(crate) fn editor_for_metadata_with_snapshot_limit(
+        &self,
+        maximum: usize,
+    ) -> Result<xlsx::Package> {
+        if let XlsxOwner::Source(workbook) = &self.0.owner {
+            self.check_source_for_replay()?;
+            let observed = workbook.retained_bytes_for_edit()?;
+            if observed > maximum {
+                return Err(crate::transaction::Error::Limit {
+                    kind: crate::transaction::LimitKind::SnapshotBytes,
+                    observed,
+                    maximum,
+                }
+                .into());
+            }
+        }
+        self.editor_for_write()
+    }
+
     /// Admit the native promotion against the transaction's remaining
     /// snapshot budget before it can copy the source archive or build the
     /// owning workbook graph. Eager owners can use the native endpoint
