@@ -214,7 +214,12 @@ impl<'data> Entry<'data> {
     /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
     /// fails FBSE validation.
     pub fn parse(record: Record<'data>, limits: Limits) -> Result<Self> {
-        check_record_bytes(&record, limits.records)?;
+        let effective_records = record.limits().constrained_by(limits.records);
+        check_record_bytes(&record, effective_records)?;
+        let limits = Limits {
+            records: effective_records,
+            ..limits
+        };
         if record.kind() != RecordKind::Bse {
             return Err(Error::NotImageRecord {
                 raw_kind: record.raw_kind(),
@@ -309,7 +314,7 @@ impl<'data> Entry<'data> {
         }
 
         let entry = Self {
-            record,
+            record: record.with_limits(effective_records),
             win,
             mac,
             uid,
