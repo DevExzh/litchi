@@ -14,6 +14,7 @@ use super::graph::{
 };
 use super::model::{Binding, Catalog, Conformance};
 use super::{Arc, Error, OpcError, OpcPackage, PackURI, Part, Result, ct};
+#[derive(Clone)]
 pub(in crate::glossary) struct Owner {
     pub(in crate::glossary) main: PackURI,
     pub(in crate::glossary) root: PackURI,

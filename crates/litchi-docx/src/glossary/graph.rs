@@ -442,7 +442,14 @@ pub mod raw {
             .zip(graph.owner_id.as_deref())
             .zip(graph.owner_target.as_deref())
             .map(|((main, id), target)| (main, id, target));
-        super::admit_graph_ledger(graph, limits, graph.root_xml(), generated_root_bytes, owner)?;
+        super::admit_graph_ledger(
+            graph,
+            limits,
+            graph.root_xml(),
+            generated_root_bytes,
+            false,
+            owner,
+        )?;
         Ok(())
     }
 
@@ -451,6 +458,7 @@ pub mod raw {
         limits: &Limits,
         root_xml: Option<&[u8]>,
         generated_root_bytes: Option<usize>,
+        root_xml_admitted: bool,
         owner_main: &str,
         owner_id: &str,
         owner_target: &str,
@@ -460,6 +468,7 @@ pub mod raw {
             limits,
             root_xml,
             generated_root_bytes,
+            root_xml_admitted,
             Some((owner_main, owner_id, owner_target)),
         )?;
         Ok(())
@@ -628,6 +637,7 @@ fn admit_graph_ledger(
     limits: &raw::Limits,
     root_xml: Option<&[u8]>,
     generated_root_bytes: Option<usize>,
+    root_xml_admitted: bool,
     owner: Option<(&str, &str, &str)>,
 ) -> Result<ClosureLedger> {
     let part_limit = limits.parts().min(MAX_VALUES);
@@ -640,7 +650,9 @@ fn admit_graph_ledger(
     }
     let root_xml_bytes = match (root_xml, generated_root_bytes) {
         (Some(xml), None) => {
-            raw::admit_xml(xml, limits)?;
+            if !root_xml_admitted {
+                raw::admit_xml(xml, limits)?;
+            }
             xml.len()
         },
         (None, Some(bytes)) => {
@@ -730,6 +742,8 @@ fn admit_graph_ledger(
         limits,
     )?;
 
+    preflight_graph_parts(graph, &mut ledger, limits)?;
+
     let mut part_names = HashSet::new();
     part_names
         .try_reserve(graph.parts.len())
@@ -750,12 +764,25 @@ fn admit_graph_ledger(
                 "duplicate glossary auxiliary part '{part_uri}'"
             )));
         }
-        add_selected_metadata(&mut ledger.metadata_bytes, &part.name, limits)?;
-        add_selected_metadata(&mut ledger.metadata_bytes, &part.content_type, limits)?;
-        add_graph_bytes(&mut ledger.total_bytes, part.data().len(), limits)?;
         if is_xml_content_type(&part.content_type) {
             raw::admit_xml(part.data(), limits)?;
         }
+    }
+    ledger.part_count = graph.parts.len();
+    Ok(ledger)
+}
+
+fn preflight_graph_parts(
+    graph: &raw::Graph,
+    ledger: &mut ClosureLedger,
+    limits: &raw::Limits,
+) -> Result<()> {
+    for part in &graph.parts {
+        admit_graph_name(&part.name, limits)?;
+        admit_graph_string(&part.content_type, limits)?;
+        add_selected_metadata(&mut ledger.metadata_bytes, &part.name, limits)?;
+        add_selected_metadata(&mut ledger.metadata_bytes, &part.content_type, limits)?;
+        add_graph_bytes(&mut ledger.total_bytes, part.data().len(), limits)?;
         admit_graph_relationships(
             &part.rels,
             graph.conformance,
@@ -764,8 +791,7 @@ fn admit_graph_ledger(
             limits,
         )?;
     }
-    ledger.part_count = graph.parts.len();
-    Ok(ledger)
+    Ok(())
 }
 
 fn admit_graph_name(value: &str, limits: &raw::Limits) -> Result<()> {
@@ -886,7 +912,16 @@ pub(in crate::glossary) fn load_graph_with_limits(
     package: &OpcPackage,
     limits: &raw::Limits,
 ) -> Result<Option<raw::Graph>> {
-    let Some(owner) = locate(package, limits)? else {
+    let owner = locate(package, limits)?;
+    load_graph_for_owner(package, limits, owner)
+}
+
+fn load_graph_for_owner(
+    package: &OpcPackage,
+    limits: &raw::Limits,
+    owner: Option<Owner>,
+) -> Result<Option<raw::Graph>> {
+    let Some(owner) = owner else {
         return Ok(None);
     };
     let metadata = owner_metadata_seed(&owner, limits)?;
@@ -1064,12 +1099,13 @@ pub(in crate::glossary) fn put_graph_checked(
     validate_raw_graph_metadata(value)?;
     validate_catalog_limits(&value.catalog, limits)?;
     raw::admit_catalog(&value.catalog, limits)?;
-    let preserve_root = if let Some(xml) = &value.root_xml {
+    let preserved_catalog = if let Some(xml) = &value.root_xml {
         let (source, source_conformance) = read_with_limits(xml.as_slice(), limits)?;
-        source_conformance == value.conformance && source == value.catalog
+        (source_conformance == value.conformance && source == value.catalog).then_some(source)
     } else {
-        false
+        None
     };
+    let preserve_root = preserved_catalog.is_some();
     let generated_plan = if preserve_root {
         None
     } else {
@@ -1085,8 +1121,11 @@ pub(in crate::glossary) fn put_graph_checked(
             "glossary root cannot use reserved OPC package infrastructure",
         ));
     }
-    let current = load_graph_with_limits(package, limits)?;
-    let main = package.main_document_part()?.partname().clone();
+    let main = {
+        let main_part = package.main_document_part()?;
+        admit_graph_name(main_part.partname().as_str(), limits)?;
+        main_part.partname().clone()
+    };
     let generated_target = root_uri.relative_ref(main.base_uri());
     let owner_target = if value.owner_main.as_deref() == Some(main.as_str()) {
         value
@@ -1110,10 +1149,17 @@ pub(in crate::glossary) fn put_graph_checked(
     }
     let owner_plan = {
         let main_part = package.main_document_part()?;
-        admit_graph_name(main_part.partname().as_str(), limits)?;
+        let current_owner_id = main_part
+            .rels()
+            .iter()
+            .find(|relationship| {
+                !relationship.is_external()
+                    && relationship.reltype() == value.conformance.glossary_relationship()
+            })
+            .map(|relationship| relationship.r_id());
         plan_owner_relationship(
             main_part,
-            current.as_ref().and_then(|graph| graph.owner_id.as_deref()),
+            current_owner_id,
             value.owner_id.as_deref(),
             value.conformance.glossary_relationship(),
             &owner_target,
@@ -1130,10 +1176,13 @@ pub(in crate::glossary) fn put_graph_checked(
                 .as_slice()
         }),
         generated_plan.as_ref().map(|plan| plan.bytes),
+        preserve_root,
         main.as_str(),
         &owner_plan.id,
         &owner_target,
     )?;
+    let current_owner = locate(package, limits)?;
+    let current = load_graph_for_owner(package, limits, current_owner)?;
     let mut root = if preserve_root {
         BlobPart::new_shared(
             root_uri.clone(),
@@ -1154,7 +1203,9 @@ pub(in crate::glossary) fn put_graph_checked(
     };
     let canonical_catalog;
     let effective_catalog = if preserve_root {
-        &value.catalog
+        preserved_catalog
+            .as_ref()
+            .ok_or_else(|| invalid("preserved glossary catalog is missing"))?
     } else {
         let (canonical, canonical_conformance) = read_with_limits(root.blob(), limits)?;
         if canonical_conformance != value.conformance {

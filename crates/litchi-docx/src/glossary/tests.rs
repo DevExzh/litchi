@@ -2478,6 +2478,44 @@ fn transaction_auxiliary_budget_is_admitted_before_staging() {
 }
 
 #[test]
+fn transaction_catalog_growth_replans_root_bytes_before_staging() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let source_root_bytes = raw::load(&package, &Limits::DEFAULT)
+        .unwrap()
+        .unwrap()
+        .root_xml()
+        .unwrap()
+        .len();
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        source_root_bytes + 1,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .expect("tight canonical-root policy");
+    let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();
+    let error = transaction
+        .add_entry(entry("Expanded"))
+        .expect_err("the larger generated root must be admitted before staging")
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
+    assert!(transaction.catalog().unwrap().is_empty());
+}
+
+#[test]
 fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
     let mut package = package();
     let mut catalog = Catalog::new();

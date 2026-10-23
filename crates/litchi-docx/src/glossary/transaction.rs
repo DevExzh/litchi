@@ -599,6 +599,14 @@ impl Transaction {
                 maximum: self.limits.xml_bytes(),
             });
         }
+        if self
+            .draft
+            .as_ref()
+            .is_none_or(|previous| previous.catalog != graph.catalog)
+        {
+            graph.root_xml = None;
+        }
+        check_usage(graph_usage(&graph, &self.limits)?, &self.limits)?;
         self.draft = Some(graph);
         Ok(result)
     }
