@@ -834,7 +834,8 @@ impl Package {
                 &ordered,
                 self.owner.package.execution_context().as_ref(),
             )?;
-            return topology::reorder(self, Arc::new(xml), ordered, max_patch_bytes);
+            let topology_budget = topology::topology_patch_budget(max_patch_bytes, shape_removals)?;
+            return topology::reorder(self, Arc::new(xml), ordered, topology_budget);
         }
         let source_order = source_order(&self.owner)?;
         let source_xml = self.owner._presentation.source_data().as_bytes();
@@ -913,7 +914,8 @@ impl Package {
         };
         let xml = Arc::new(sectioned.unwrap_or(xml));
         if self.topology.is_some() {
-            return topology::reorder(self, xml, ordered, max_patch_bytes);
+            let topology_budget = topology::topology_patch_budget(max_patch_bytes, shape_removals)?;
+            return topology::reorder(self, xml, ordered, topology_budget);
         }
         // The exact local durable envelope is admitted before its managed
         // root reservation.  A rejected order therefore does not retain the
@@ -1584,9 +1586,10 @@ impl Edit {
     /// previous staged state unchanged.
     pub fn insert_slide(&mut self, position: Position, layout_name: &str) -> Result<Slide> {
         self.working.check()?;
-        let candidate =
-            topology::insert(&self.working, position, layout_name, self.max_patch_bytes)
-                .map_err(insertion::map_error)?;
+        let topology_budget =
+            topology::topology_patch_budget(self.max_patch_bytes, self.shape_removals)?;
+        let candidate = topology::insert(&self.working, position, layout_name, topology_budget)
+            .map_err(insertion::map_error)?;
         let slide = candidate.presentation()?.slide(position)?;
         self.working = candidate;
         Ok(slide)
@@ -1625,10 +1628,22 @@ impl Edit {
             .as_ref()
             .map(|before| before.xml.as_bytes().len())
             .unwrap_or_else(|| snapshot.xml.as_bytes().len());
-        let output_limit = if self.working.topology.is_some() {
-            topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
+        let topology_budget = if self.working.topology.is_some() {
+            Some(topology::topology_patch_budget(
+                self.max_patch_bytes,
+                self.shape_removals,
+            )?)
         } else {
-            self.local_after_budget(&target_key, before_len)?
+            None
+        };
+        let output_limit = if self.working.topology.is_some() {
+            topology::replacement_after_budget(
+                &self.working,
+                &target_key,
+                topology_budget.ok_or(Error::PatchConflict)?,
+            )?
+        } else {
+            self.local_after_budget(&target_key, before_len, self.shape_removals)?
         };
         let mut edit = snapshot.edit_checked_with_max_patch_bytes(output_limit)?;
         let shape_id = edit.add_text_box(text, bounds)?;
@@ -1640,11 +1655,17 @@ impl Edit {
             ));
         }
         if self.working.topology.is_none() {
-            self.check_local_patch_budget(&target_key, before_len, after.xml.as_bytes().len())?;
+            self.check_local_patch_budget(
+                &target_key,
+                before_len,
+                after.xml.as_bytes().len(),
+                self.shape_removals,
+            )?;
         }
-        let candidate = self
-            .working
-            .with_snapshot_with_max_patch_bytes(after.clone(), self.max_patch_bytes)?;
+        let candidate = self.working.with_snapshot_with_max_patch_bytes(
+            after.clone(),
+            topology_budget.unwrap_or(self.max_patch_bytes),
+        )?;
         if self.working.topology.is_some() {
             self.working = candidate;
             return Ok(shape_id);
@@ -1737,7 +1758,9 @@ impl Edit {
             ));
         }
         let key = self.working.order[logical].clone();
-        let candidate = topology::remove(&self.working, &key, self.max_patch_bytes)?;
+        let topology_budget =
+            topology::topology_patch_budget(self.max_patch_bytes, self.shape_removals)?;
+        let candidate = topology::remove(&self.working, &key, topology_budget)?;
         self.working = candidate;
         Ok(true)
     }
@@ -1898,10 +1921,11 @@ impl Edit {
         if name.is_none() && hidden.is_none() {
             return Ok(false);
         }
-        let changed = self.stage_slide_edit(
+        let changed = self.stage_slide_edit_with_marker(
             slide.into(),
             |_package, _snapshot| Ok(None),
             |edit| edit.set_slide_properties(name, hidden).map(usize::from),
+            true,
         )? != 0;
         self.shape_removals |= changed;
         Ok(changed)
@@ -1928,10 +1952,11 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<bool> {
         let shape = shape.into();
-        let changed = self.stage_slide_edit(
+        let changed = self.stage_slide_edit_with_marker(
             slide.into(),
             |_package, _snapshot| Ok(None),
             |edit| edit.remove_shape(shape).map(usize::from),
+            true,
         )? != 0;
         self.shape_removals |= changed;
         Ok(changed)
@@ -2209,6 +2234,16 @@ impl Edit {
         reserve: impl FnOnce(&Package, &SourceBackedSlideSnapshot) -> Result<Option<Reservation>>,
         stage: impl FnOnce(&mut super::SourceBackedSlideEdit) -> Result<usize>,
     ) -> Result<usize> {
+        self.stage_slide_edit_with_marker(logical, reserve, stage, self.shape_removals)
+    }
+
+    fn stage_slide_edit_with_marker(
+        &mut self,
+        logical: Position,
+        reserve: impl FnOnce(&Package, &SourceBackedSlideSnapshot) -> Result<Option<Reservation>>,
+        stage: impl FnOnce(&mut super::SourceBackedSlideEdit) -> Result<usize>,
+        shape_removals: bool,
+    ) -> Result<usize> {
         self.working.check()?;
         let logical_position = logical.get();
         let target_key = self.working.order.get(logical_position).cloned().ok_or(
@@ -2228,10 +2263,22 @@ impl Edit {
             .as_ref()
             .map(|before| before.xml.as_bytes().len())
             .unwrap_or_else(|| snapshot.xml.as_bytes().len());
-        let output_limit = if self.working.topology.is_some() {
-            topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
+        let topology_budget = if self.working.topology.is_some() {
+            Some(topology::topology_patch_budget(
+                self.max_patch_bytes,
+                shape_removals,
+            )?)
         } else {
-            self.local_after_budget(&target_key, before_len)?
+            None
+        };
+        let output_limit = if self.working.topology.is_some() {
+            topology::replacement_after_budget(
+                &self.working,
+                &target_key,
+                topology_budget.ok_or(Error::PatchConflict)?,
+            )?
+        } else {
+            self.local_after_budget(&target_key, before_len, shape_removals)?
         };
         let bounded_snapshot = snapshot.with_max_patch_bytes(output_limit);
         let reservation = reserve(&self.working, &bounded_snapshot)?;
@@ -2262,11 +2309,17 @@ impl Edit {
             }
         }
         if self.working.topology.is_none() {
-            self.check_local_patch_budget(&target_key, before_len, after.xml.as_bytes().len())?;
+            self.check_local_patch_budget(
+                &target_key,
+                before_len,
+                after.xml.as_bytes().len(),
+                shape_removals,
+            )?;
         }
-        let candidate = self
-            .working
-            .with_snapshot_with_max_patch_bytes(after.clone(), self.max_patch_bytes)?;
+        let candidate = self.working.with_snapshot_with_max_patch_bytes(
+            after.clone(),
+            topology_budget.unwrap_or(self.max_patch_bytes),
+        )?;
         if self.working.topology.is_some() {
             self.working = candidate;
             return Ok(changed);
@@ -2312,8 +2365,13 @@ impl Edit {
     /// local durable envelope except the new slide's after image.  The native
     /// focused editor uses this bound before building candidate XML; the final
     /// exact envelope check below includes the after image itself.
-    fn local_after_budget(&self, key: &StableSlideKey, before: usize) -> Result<usize> {
-        let length = self.local_patch_wire_len(key, before, 0)?;
+    fn local_after_budget(
+        &self,
+        key: &StableSlideKey,
+        before: usize,
+        shape_removals: bool,
+    ) -> Result<usize> {
+        let length = self.local_patch_wire_len(key, before, 0, shape_removals)?;
         self.max_patch_bytes
             .checked_sub(length)
             .ok_or_else(|| limit("source-backed durable patch bytes", self.max_patch_bytes))
@@ -2324,8 +2382,9 @@ impl Edit {
         key: &StableSlideKey,
         before: usize,
         after: usize,
+        shape_removals: bool,
     ) -> Result<()> {
-        let length = self.local_patch_wire_len(key, before, after)?;
+        let length = self.local_patch_wire_len(key, before, after, shape_removals)?;
         if length > self.max_patch_bytes {
             return Err(limit(
                 "source-backed durable patch bytes",
@@ -2340,6 +2399,7 @@ impl Edit {
         target: &StableSlideKey,
         target_before: usize,
         target_after: usize,
+        shape_removals: bool,
     ) -> Result<usize> {
         let mut changes = Vec::new();
         changes
@@ -2358,7 +2418,7 @@ impl Edit {
         }
         changes.push((target.clone(), target_before, target_after));
         durable::local_wire_len(
-            self.shape_removals,
+            shape_removals,
             &self.source.order,
             &self.working.order,
             self.source.root.as_bytes().len(),
@@ -2373,8 +2433,10 @@ impl Edit {
         let max_patch_bytes = self.max_patch_bytes;
         if self.working.topology.is_some() {
             let source = self.source;
+            let topology_budget =
+                topology::topology_patch_budget(max_patch_bytes, self.shape_removals)?;
             let topology_patch =
-                topology::patch_from_packages(&source, &self.working, max_patch_bytes)?;
+                topology::patch_from_packages(&source, &self.working, topology_budget)?;
             let patch = Patch {
                 shape_removals: self.shape_removals,
                 data: PatchData::Topology(Arc::new(topology_patch)),

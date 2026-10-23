@@ -1824,6 +1824,21 @@ mod tests {
         assert_eq!(measured, data.encoded_len().expect("encoded topology wire"));
     }
 
+    #[test]
+    fn metadata_length_delta_is_admitted_before_structural_capture() {
+        let data = sample();
+        let mut candidate = data.clone();
+        let mut relationships = candidate.after.presentation_relationships.as_ref().clone();
+        relationships.extend_from_slice(b"<Relationship Id=\"rId-extra\"/>");
+        candidate.after.presentation_relationships = Arc::new(relationships);
+        let delta = candidate.after.presentation_relationships.len()
+            - data.after.presentation_relationships.len();
+        assert_eq!(
+            candidate.encoded_len().expect("candidate wire length"),
+            data.encoded_len().expect("base wire length") + delta
+        );
+    }
+
     fn empty_transition() -> Data {
         let added = key(7);
         Data {

@@ -296,6 +296,19 @@ impl PatchPlan {
     }
 }
 
+/// Reserve the durable envelope's optional removal marker before a topology
+/// candidate retains any source payload.  The marker is outside the topology
+/// body, so topology wire planning receives only the remaining budget.
+pub(super) fn topology_patch_budget(max_patch_bytes: usize, shape_removals: bool) -> Result<usize> {
+    max_patch_bytes
+        .checked_sub(if shape_removals {
+            super::durable::REMOVAL_MARKER_BYTES
+        } else {
+            0
+        })
+        .ok_or_else(|| limit("source-backed durable patch bytes", max_patch_bytes))
+}
+
 impl Revision {
     pub(super) fn check(&self) -> Result<()> {
         self.prepared.check_source()?;
@@ -430,8 +443,9 @@ pub(super) fn remove(
     order.remove(logical);
     let mut planned_changes = planned_current_changes(package)?;
     upsert_planned_change(&mut planned_changes, planned_remove_change(package, key)?);
+    let owned = owned_parts(package, std::slice::from_ref(&key.part_uri))?;
     let mut planned_dependents = planned_current_dependents(package);
-    for part_uri in owned_parts(package, std::slice::from_ref(&key.part_uri))?.parts() {
+    for part_uri in owned.parts() {
         let (before, content_type) = match planned_physical_dependent(package, part_uri)? {
             Some((image, content_type)) => (Some(image), content_type),
             None => {
@@ -495,7 +509,7 @@ pub(super) fn remove(
     );
     // The Parts the slide owns exclusively leave with it (record 0303).
     let mut dependents = current_dependents(package);
-    for part_uri in owned_parts(package, std::slice::from_ref(&key.part_uri))?.parts() {
+    for part_uri in owned.parts() {
         let (before, content_type) = match physical_dependent(package, part_uri, &mut retained)? {
             Some((image, content_type)) => (Some(image), content_type),
             None => {
@@ -768,8 +782,8 @@ fn plan_patch(source: &Package, target: &Package) -> Result<PatchPlan> {
     let changes = planned_diff_changes(source, target, source_changes, target_changes)?;
     let dependents = planned_diff_dependents(source, target)?;
     Ok(PatchPlan {
-        before: planned_state(source)?,
-        after: planned_state(target)?,
+        before: planned_state(source, true)?,
+        after: planned_state(target, true)?,
         changes,
         dependents,
     })
@@ -788,18 +802,32 @@ fn preflight_candidate(
         Some(changes) => changes.to_vec(),
         None => source_changes.clone(),
     };
-    let changes = planned_diff_changes(package, package, source_changes, target_changes)?;
+    let changes = planned_diff_changes(package, package, source_changes, target_changes.clone())?;
     let source_dependents = planned_current_dependents(package);
     let target_dependents = match candidate_dependents {
         Some(dependents) => dependents.to_vec(),
         None => source_dependents.clone(),
     };
-    let dependents =
-        planned_diff_dependents_from_entries(package, source_dependents, target_dependents)?;
-    let before = planned_state(package)?;
+    let dependents = planned_diff_dependents_from_entries(
+        package,
+        source_dependents,
+        target_dependents.clone(),
+    )?;
+    // Length-only admission needs the fixed digest field width, not the
+    // source catalog proof.  The proof is generated once when the durable
+    // patch is materialized below.
+    let before = planned_state(package, false)?;
     let mut after = before.clone();
     after.root = PlannedBytes::Length(root.len());
     after.order = order;
+    if candidate_changes.is_some() || candidate_dependents.is_some() {
+        if let Some((relationships, content_types)) =
+            candidate_metadata_lengths(package, &target_changes, &target_dependents)?
+        {
+            after.presentation_relationships = PlannedBytes::Length(relationships);
+            after.content_types = PlannedBytes::Length(content_types);
+        }
+    }
     let plan = PatchPlan {
         before,
         after,
@@ -814,6 +842,178 @@ fn preflight_candidate(
         ));
     }
     Ok(encoded)
+}
+
+/// Plan only the metadata operations of a candidate topology.
+///
+/// Structural admission must know the exact relationship and content-types
+/// images before it retains any source Part payload.  The full topology
+/// builder performs the same operations while capturing those payloads; this
+/// length-only mirror deliberately stages only additions/removals and typed
+/// relationship changes, using already-owned candidate images for newly
+/// restored Parts.  The native planner then produces the exact lexical
+/// metadata lengths, including dependent Parts and their relationship edges.
+fn candidate_metadata_lengths(
+    package: &Package,
+    changes: &[PlannedChange],
+    dependents: &[PlannedDependent],
+) -> Result<Option<(usize, usize)>> {
+    let presentation_uri = package.owner._presentation.source_partname().clone();
+    let mut plan = SourceTopologyPlan::new();
+    let mut changed = false;
+
+    for change in changes {
+        let physical = match package.owner.package.part(&change.key.part_uri) {
+            Ok(view) => Some(view),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(Error::Opc(error)),
+        };
+        match change.after.as_ref() {
+            None => {
+                if physical.is_some() {
+                    plan.try_remove_part(change.key.part_uri.clone())?;
+                    changed = true;
+                }
+                if package
+                    .owner
+                    ._presentation
+                    .rels()
+                    .get(&change.key.relationship_id)
+                    .is_some()
+                {
+                    plan.try_remove_relationship(
+                        presentation_uri.clone(),
+                        change.key.relationship_id.clone(),
+                    )?;
+                    changed = true;
+                }
+            },
+            Some(image) => {
+                if let Some(view) = &physical {
+                    if view.content_type() != change.content_type.as_str() {
+                        return Err(Error::PatchConflict);
+                    }
+                } else {
+                    plan.try_add_restored_part_shared(
+                        change.key.part_uri.clone(),
+                        change.content_type.clone(),
+                        planned_owned_bytes(&image.xml)?,
+                    )?;
+                    if let Some(relationships) = &image.relationships {
+                        let relationships = planned_owned_bytes(relationships)?;
+                        super::topology_admission::stage_layout(
+                            package,
+                            &mut plan,
+                            &change.key.part_uri,
+                            relationships.as_slice(),
+                        )?;
+                        plan.try_restore_relationships_xml(
+                            change.key.part_uri.clone(),
+                            None,
+                            Some(relationships),
+                        )?;
+                    }
+                    changed = true;
+                }
+                let relation = package
+                    .owner
+                    ._presentation
+                    .rels()
+                    .get(&change.key.relationship_id);
+                if let Some(relation) = relation {
+                    let target_matches = relation
+                        .target_partname()
+                        .map(|target| target.is_equivalent_to(&change.key.part_uri))
+                        .unwrap_or(false);
+                    if relation.is_external()
+                        || relation.reltype() != change.relationship_type
+                        || !crate::parts::is_relationship_type(
+                            relation.reltype(),
+                            litchi_opc::constants::relationship_type::SLIDE,
+                            "slide",
+                        )
+                        || !target_matches
+                    {
+                        plan.try_replace_internal_relationship(
+                            presentation_uri.clone(),
+                            change.key.relationship_id.clone(),
+                            change.relationship_type.clone(),
+                            change.key.part_uri.clone(),
+                        )?;
+                        changed = true;
+                    }
+                } else {
+                    plan.try_add_internal_relationship(
+                        presentation_uri.clone(),
+                        change.key.relationship_id.clone(),
+                        change.relationship_type.clone(),
+                        change.key.part_uri.clone(),
+                    )?;
+                    changed = true;
+                }
+            },
+        }
+    }
+
+    for dependent in dependents {
+        let physical = match package.owner.package.part(&dependent.part_uri) {
+            Ok(view) => Some(view),
+            Err(litchi_opc::OpcError::PartNotFound(_)) => None,
+            Err(error) => return Err(Error::Opc(error)),
+        };
+        match (&dependent.after, physical) {
+            (None, Some(_)) => {
+                plan.try_remove_part(dependent.part_uri.clone())?;
+                changed = true;
+            },
+            (None, None) => {},
+            (Some(_image), Some(view)) => {
+                if view.content_type() != dependent.content_type.as_str() {
+                    return Err(Error::PatchConflict);
+                }
+            },
+            (Some(image), None) => {
+                plan.try_add_restored_part_shared(
+                    dependent.part_uri.clone(),
+                    dependent.content_type.clone(),
+                    planned_owned_bytes(&image.xml)?,
+                )?;
+                if let Some(relationships) = &image.relationships {
+                    let relationships = planned_owned_bytes(relationships)?;
+                    super::topology_admission::stage_dependent_edges(
+                        package,
+                        &mut plan,
+                        &dependent.part_uri,
+                        relationships.as_slice(),
+                    )?;
+                    plan.try_restore_relationships_xml(
+                        dependent.part_uri.clone(),
+                        None,
+                        Some(relationships),
+                    )?;
+                }
+                changed = true;
+            },
+        }
+    }
+
+    if !changed {
+        return Ok(None);
+    }
+    let lengths = package
+        .owner
+        .package
+        .topology_metadata_lengths(&presentation_uri, plan)?;
+    Ok(Some(lengths))
+}
+
+fn planned_owned_bytes(bytes: &PlannedBytes) -> Result<Arc<Vec<u8>>> {
+    match bytes {
+        PlannedBytes::Owned { bytes, .. } => Ok(Arc::clone(bytes)),
+        PlannedBytes::Source(_) | PlannedBytes::Declared { .. } | PlannedBytes::Length(_) => {
+            Err(Error::PatchConflict)
+        },
+    }
 }
 
 pub(super) fn planned_change_for_admission(change: &Change) -> Result<PlannedChange> {
@@ -848,7 +1048,7 @@ pub(super) fn preflight_candidate_for_admission(
     )
 }
 
-fn planned_state(package: &Package) -> Result<PlannedState> {
+fn planned_state(package: &Package, include_source_digest: bool) -> Result<PlannedState> {
     if let Some(revision) = &package.topology {
         revision.check()?;
         return Ok(PlannedState {
@@ -872,7 +1072,11 @@ fn planned_state(package: &Package) -> Result<PlannedState> {
     Ok(PlannedState {
         root: planned_root(&package.root),
         order: Arc::clone(&package.order),
-        topology_digest: topology_digest::source_digest(&package.owner.package)?,
+        topology_digest: if include_source_digest {
+            topology_digest::source_digest(&package.owner.package)?
+        } else {
+            [0; 32]
+        },
         presentation_relationships,
         content_types,
     })
