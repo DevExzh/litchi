@@ -495,3 +495,79 @@ git worktree add /home/zhuhe/code/litchi-worktrees/uo2-xlsx-metadata-admission u
 git worktree add /home/zhuhe/code/litchi-worktrees/uo2-consumer-v9-facade-batch uo2/consumer-v9-facade-batch
 git worktree add /home/zhuhe/code/litchi-worktrees/uo2-xlsx-rich-transfer uo2/xlsx-rich-transfer
 ```
+
+## Eleventh cleanup wave — 2026-10-23
+
+The coordinator verified the external receipt and artifact identities before
+recording this completed cleanup on the retained integration branch.
+
+### Removed cleanup receipt worktree
+
+The inactive, tracked-clean `uo2/rtf-refusal-perf` worktree was verified at
+`3baa225cf8428b585e0f0a4b6113ac00a34a93bd`, an ancestor of the supplied main
+integration target `87ce73a7363c1e9f1d4587c616bcc01d2bf08256`. It had no
+process cwd or file-descriptor users. Its only ignored entry was `Cargo.lock`:
+139,553 bytes, SHA-256
+`925d25101fd62063b9bc6f5f95e504eb0c9fe492167de3504345eef8d11f067f`.
+
+The lock was moved to
+`quarantine/eleventh-wave/cleanup-lock/Cargo.lock`, with metadata in
+`cleanup-lock-manifest.json` and restore helper
+`restore-cleanup-lock.py`. The worktree was then removed with
+`git worktree remove` without `--force`. Its branch ref remains intact.
+The removed checkout path represented 6,257,821,238 apparent bytes; the lock
+remains in the external quarantine and is not counted as filesystem space
+freed.
+
+Recreate and restore:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-rtf-refusal-perf uo2/rtf-refusal-perf
+python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/restore-cleanup-lock.py
+```
+
+### Relocated abandoned ODF partial
+
+`/home/zhuhe/code/litchi-worktrees/uo2-odf-facade-runtime-v12-partial` was
+confirmed to be an unregistered duplicate checkout. Its `.git` file points to
+the valid registration
+`/home/zhuhe/code/litchi/.git/worktrees/uo2-odf-facade-runtime-v12`, whose
+real registered sparse leaf remains at
+`/home/zhuhe/code/litchi-worktrees/uo2-odf-facade-runtime-v12` on branch
+`uo2/odf-facade-runtime-v12`, HEAD
+`dbcb23941b0f31909c7ded27269fd14c0c9aa5f2`.
+
+The partial had no active process cwd/file-descriptor users. Index-only audits
+found zero nonignored untracked and zero ignored entries. Its pre-move
+manifest contains 48,383 regular files, 1,060,162,316 file bytes, and SHA-256
+`1a2c893250dd9a2c633171ab22014fb1b5a3983a665b9973d771bbddbc2e3645` for
+`partial-manifest.json`. No top-level target, binary, capture, native, or
+portable directory was present; tracked performance evidence inside the
+partial is preserved in the quarantine and remains recoverable from the
+branch objects.
+
+The entire directory was moved, not deleted, to
+`quarantine/eleventh-wave/partial/`. This relocation is reversible and is not
+claimed as filesystem space freed. Restore with:
+
+```sh
+python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/restore.py
+```
+
+The restore helper requires the original partial path to be absent and leaves
+the valid registered sparse leaf untouched. The external manifest records the
+exact source pointer, branch, HEAD, paths, modes, sizes, and SHA-256 values.
+
+### Retained signed replay leaf
+
+`/home/zhuhe/code/litchi-worktrees/uo2-signed-replay` at
+`06afe43fa08a4bddbdab0745b54042f6106dde8e` was assessed read-only and
+retained. It is 10,441,206,655 apparent bytes, has no tracked/untracked
+changes or active process users, and contains protected ignored
+`.coord/signed-native-repair/target` evidence plus generated lock/bytecode.
+No target or measurement artifact was moved.
+
+External receipt: `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/receipt.md` (3,292 bytes, SHA-256
+`ea5e131486b2a04a9c3b2088c778941ec82740ed83cc8cab0346945bd6ec5240`). The complete external partial manifest is
+9,604,583 bytes; regenerate it using `build-manifest.py` in the same quarantine
+directory. No complete manifest or target binary is committed.
