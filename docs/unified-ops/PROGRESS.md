@@ -2368,3 +2368,30 @@ See [0063](0063-source-pptx-modern-comments.md).
   All returned performance work, corpus dispositions, final inventory/glossary
   and the complete assembled gate remain open. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, reviewed consumer repairs and consolidation):
+  The integration assembly reaches `7abf64f495`, with the independently
+  reviewed XLSX raw aggregate admission repair, stable PPTX refusal guards,
+  typed ODF facade errors, and native ODF consumer migration merged. ODF
+  staging now recodes only invalid-format/parse and generic unsupported
+  errors; source changes, resource limits, I/O, and typed refusals retain
+  their classifications. Combined consumer and semantic validation remains
+  required. The seventh consumer attempt ended during resource preflight:
+  the runner and target-size process are absent and no command log or exit
+  receipt exists. It establishes no compiler result. A separate runner starts the eighth
+  attempt on `7abf64f495` with an explicit process and source receipt.
+
+  Two clean, inactive merged worktrees were removed without forcing, freeing
+  341,943,958 bytes. Branch refs and exact recreation commands are retained;
+  eleven generated files were quarantined with hashes. Worktrees containing
+  measurement evidence, protected artifacts, or tracked changes remain intact.
+  The reduced cleanup receipt is recorded in `e726df19c1`.
+
+  The XLSX lifecycle harness is returned for correctness checks before its
+  measurements can qualify the raw aggregate change. OPC streamed publication
+  is adding exact prepared ZIP output metrics so recipient admission can run
+  before the first sink byte while reusing the prepared compressed data.
+  Recipient-policy enforcement, raw helper limits, signed native no-op budget
+  preservation, performance returns, corpus dispositions, final inventory and
+  glossary, and the complete assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
