@@ -365,3 +365,12 @@ link, with no memory kill. The API now returns the ODF family's typed
 are corrected. [wsdoc-assembly-v1.json](results/0362uf/wsdoc-assembly-v1.json)
 records source, command, unchanged locks and log hash. This failed run does
 not establish a documentation or complete gate pass.
+
+The second isolated documentation run on `bee51d5de0` stops after 173.64
+seconds on an ODC link to the nonexistent qualified type
+`litchi_core::CoreError`; the correct exported type is `litchi_core::Error`.
+[wsdoc-assembly-v2.json](results/0362uf/wsdoc-assembly-v2.json) retains the
+failure. A preflight first blocked an overlapping Numbers worker; the
+documentation command ran only after that build ended. A broader diagnostic
+run with `--keep-going` will collect remaining documentation failures before
+the exact gate command is rerun. No memory kill occurred.

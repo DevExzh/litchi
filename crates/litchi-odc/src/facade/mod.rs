@@ -349,7 +349,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`litchi_core::CoreError::UnexpectedFormat`] (as
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
     /// [`crate::Error::Core`]) when the prepared package is not a chart or
     /// chart template, and otherwise as [`Self::open`].
     pub fn from_prepared_package(
