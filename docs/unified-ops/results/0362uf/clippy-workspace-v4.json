@@ -1,0 +1,39 @@
+{
+  "source": "045d3721ae6751b6474f0d7ff940709cddf51203",
+  "pid": 2735844,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4"
+  ],
+  "started_unix_seconds": 1792772571.2003434,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--keep-going",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 743.0287201630017,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4/check-0.log",
+      "bytes": 12934,
+      "sha256": "3d9fa3e00ce9eb4d026336220a83e3346b2571df80111b2eb796ca0e4b21534a",
+      "target_bytes_before": 3440007569,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Workspace Clippy stopped on the internal raw Container variant size lint and a nested Numbers test path. The subsequent Numbers library run was not reached. The transient container retains its full stack policy without an extra allocation; the expectation applies only when both variants exist."
+}
