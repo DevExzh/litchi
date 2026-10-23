@@ -9308,7 +9308,6 @@ impl SourceBackedPackage {
             usize::try_from(self.declared_content_types_uncompressed_size()?)
                 .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?
         } else {
-            let (source, _, _) = self.read_content_types_xml()?;
             let mut override_additions = Vec::new();
             override_additions
                 .try_reserve(additions.len())
@@ -9389,8 +9388,11 @@ impl SourceBackedPackage {
             override_removals.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
             override_removals.dedup_by(|left, right| left.is_equivalent_to(right));
             if override_additions.is_empty() && override_removals.is_empty() {
-                source.len()
+                usize::try_from(self.declared_content_types_uncompressed_size()?).map_err(|_| {
+                    overlay_unavailable("content-types metadata length exceeds usize")
+                })?
             } else {
+                let (source, _, _) = self.read_content_types_xml()?;
                 let content_plan = content_types_plan::ContentTypesPlan::plan_owned(
                     &source,
                     override_additions,
