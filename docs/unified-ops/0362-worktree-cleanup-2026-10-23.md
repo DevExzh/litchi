@@ -683,3 +683,34 @@ retained branch identities, source ancestry and removed path absence. The
 external receipt is `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/thirteenth-wave/receipt.md` (2317 bytes, SHA-256
 `0601cab17193857fdef67156c76ab7e67301b94b2ef9501c28a259f0e1f323bf`). The manifest is
 2791 bytes. No target, native binary or measurement evidence was removed.
+
+## Fourteenth cleanup: reviewed ODG source leaf
+
+After the ODG merge, `uo2/docx-runtime` at
+`0dca7284f9eb826d2f4361af1f3fef047d924811` was freshly checked as clean,
+inactive and ancestral to integration `8779d059ad`. It had no nonignored
+untracked files or live process cwd/file-descriptor users. Removal used
+`git worktree remove` without force and retained the branch. The checkout
+represented 6,263,368,185 apparent bytes.
+
+Three ignored generated files totaling 205,668 bytes were hash-quarantined
+under `.coord/worktree-cleanup-2026-10-23/quarantine/fourteenth-wave/`.
+The external receipt is 1,608 bytes, SHA-256
+`9c8594161122e80f4d50dfd442e75fbf7c7ab570b2b0bb0df3155f62f42f69cb`.
+The 1,213-byte manifest has SHA-256
+`bf72491ca41d33f6c218f109d2d6512efa2086ab728de2b2124bc0132e3b561a`;
+the 1,513-byte restore helper has SHA-256
+`a13f236862a31bc758ef0a60117ef68a967975a55072ff255568c5f8c3233619`.
+The coordinator independently verified all retained file identities, branch
+head, ancestry, removed path absence and protected external root existence.
+
+Recreate and restore with:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-docx-runtime uo2/docx-runtime
+python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/fourteenth-wave/restore.py
+```
+
+External `.coord/docx-runtime` and all `.coord/odg-joined*` targets and evidence
+remain untouched. Active sparse correction leaves and protected measurement
+worktrees were excluded from this cleanup.
