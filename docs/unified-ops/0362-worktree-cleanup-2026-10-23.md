@@ -569,5 +569,7 @@ No target or measurement artifact was moved.
 
 External receipt: `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/receipt.md` (3,292 bytes, SHA-256
 `ea5e131486b2a04a9c3b2088c778941ec82740ed83cc8cab0346945bd6ec5240`). The complete external partial manifest is
-9,604,583 bytes; regenerate it using `build-manifest.py` in the same quarantine
-directory. No complete manifest or target binary is committed.
+9,604,583 bytes. To regenerate its original-path manifest, first restore the
+partial with `python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/restore.py`,
+then run `python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eleventh-wave/build-manifest.py`.
+No complete manifest or target binary is committed.
