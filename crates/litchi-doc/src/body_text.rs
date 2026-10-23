@@ -1217,7 +1217,7 @@ impl Snapshot {
                             RevisionEditor::open_with_ole_file_profiled_with_admission(
                                 candidate.to_vec(),
                                 limits,
-                                |event| cfb_observer(event),
+                                cfb_observer,
                                 |ole| {
                                     crate::package::preflight_declared_streams(ole, source_limits)
                                         .map(|_| ())

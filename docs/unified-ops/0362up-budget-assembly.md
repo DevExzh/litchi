@@ -165,3 +165,16 @@ then reaches seven ODS forwarding lints already corrected on the current
 main integration. The coordinator is composing that reviewed source before
 further lint validation. [xlsb-clippy-composed-v20.json](results/0362up/xlsb-clippy-composed-v20.json)
 retains the complete source and log identities.
+
+## Complete composed lint pass, remaining source corrections
+
+The all-target/all-feature workspace Clippy run with `--keep-going` completes
+on `173dd53304` and returns 15 XLSX library/test lints, one DOC redundant
+forwarding closure, and the Pages fixture example inclusion errors. The DOC
+callback now passes directly without changing invocation order or error
+handling. XLSX corrections must retain capture reservation and restoration
+semantics; the Pages example must use its fixture helper without invalid
+inner documentation or unused test imports. No lint waiver is accepted.
+[clippy-composed-v22.json](results/0362up/clippy-composed-v22.json) retains
+the complete command and external log identity. A successful final composed
+lint run remains required.
