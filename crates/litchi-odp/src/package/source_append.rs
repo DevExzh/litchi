@@ -720,7 +720,7 @@ fn rebase_patch(
     let base = recipient.effective_with_odf_error().map_err(odf_error)?;
     let expected = &patch.before_proof;
     let package = Arc::clone(&base.package);
-    let facts = scan_source(&package, patch.limits, &patch.options)?;
+    let facts = scan_or_cached_source(base, &package, patch.limits, &patch.options)?;
     if facts.content_bytes != expected.content_bytes
         || facts.insert_at != expected.insert_at
         || facts.slide_count != expected.slide_count
@@ -787,6 +787,8 @@ fn rebase_patch(
             reason: "the recipient content bytes differ from the recorded base",
         });
     }
+
+    base.remember_append_facts(&facts, &patch.options);
 
     let options = patch.options.clone();
     let package = base.deferred(common, options);
@@ -858,7 +860,7 @@ impl<'a> Edit<'a> {
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
         }
-        let first = scan_source(&package, limits, &options)?;
+        let first = scan_or_cached_source(base, &package, limits, &options)?;
         if first.slide_count >= limits.max_slides {
             return Err(invalid("ODP append would exceed the slide-count limit"));
         }
@@ -914,6 +916,8 @@ impl<'a> Edit<'a> {
             |event, tracker| validator.observe(event, tracker),
         )
         .map_err(publication_error)?;
+
+        base.remember_append_facts(&first, &options);
 
         Ok(Plan {
             source,
@@ -1091,11 +1095,11 @@ impl Plan<'_> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ScanFacts {
-    content_bytes: u64,
-    insert_at: u64,
-    slide_count: usize,
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct ScanFacts {
+    pub(crate) content_bytes: u64,
+    pub(crate) insert_at: u64,
+    pub(crate) slide_count: usize,
 }
 
 fn scan_source(
@@ -1136,6 +1140,21 @@ fn scan_source(
     facts.slide_count = state.pages_seen;
     state.finish(&facts).map_err(Error::Invalid)?;
     Ok(facts)
+}
+
+fn scan_or_cached_source(
+    base: &SourceBackedPresentation,
+    package: &SourceBackedPackage,
+    limits: Limits,
+    options: &SourceContentPublicationOptions,
+) -> std::result::Result<ScanFacts, Error> {
+    if let Some(facts) = base
+        .cached_append_facts(limits.max_content_xml_bytes, limits.max_slides, options)
+        .map_err(Error::Invalid)?
+    {
+        return Ok(facts);
+    }
+    scan_source(package, limits, options)
 }
 
 #[derive(Debug, Default)]
@@ -1973,7 +1992,8 @@ mod tests {
     use litchi_core::{OwnedSource, ReadAt};
     use litchi_odf_common::Error as OdfError;
     use litchi_odf_common::constants::ODF_PRESENTATION;
-    use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use litchi_odf_common::core::OwnedPackage;
+    use soapberry_zip::office::StreamingArchiveWriter;
     use std::io;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -1985,9 +2005,19 @@ mod tests {
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
     fn source_package_bytes(content: &str) -> Vec<u8> {
-        let mut writer = PackageWriter::new();
-        writer.set_mimetype(ODF_PRESENTATION).unwrap();
-        writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
+        let manifest = format!(
+            r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{ODF_PRESENTATION}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+        );
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("mimetype", ODF_PRESENTATION.as_bytes())
+            .unwrap();
+        writer
+            .write_stored(ODF_CONTENT, content.as_bytes())
+            .unwrap();
+        writer
+            .write_stored("META-INF/manifest.xml", manifest.as_bytes())
+            .unwrap();
         writer.finish_to_bytes().unwrap()
     }
 
@@ -2052,6 +2082,34 @@ mod tests {
             Error::Invalid(CoreError::InvalidFormat(message))
                 if message.contains("non-empty")
         ));
+    }
+
+    #[test]
+    fn strict_open_keeps_the_legacy_body_probe_fallback_for_malformed_xml() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page></office:presentation></office:body></office:document-content>"#,
+        );
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content))
+            .expect("the historical open probe admits a body before semantic parsing");
+        assert!(
+            owner.slides().is_err(),
+            "semantic parsing still reports malformed XML"
+        );
+    }
+
+    #[test]
+    fn doctype_open_remains_accepted_but_append_keeps_its_refusal() {
+        let content = format!(
+            r#"<!DOCTYPE office:document-content><office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#,
+        );
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        let error = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .prepare()
+            .unwrap_err();
+        let message = format!("{error}");
+        assert!(message.contains("DTD") || message.contains("DOCTYPE"));
     }
 
     #[test]

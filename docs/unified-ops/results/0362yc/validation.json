@@ -1,0 +1,77 @@
+{
+  "record": "0362yc",
+  "scope": "ODP streamed-reader correction, encrypted fallback, and bounded text sink",
+  "base": "f854b651a8",
+  "source_changes": [
+    "clear the read_resolved_event_into event buffer before every event",
+    "restore encrypted content.xml materialized fallback for write_text_to",
+    "preserve prologue DOCTYPE neutralization and source/progress precedence"
+  ],
+  "workload": {
+    "slides": 2000,
+    "content_xml_bytes": 591185,
+    "media_bytes": 4194304,
+    "source_archive_bytes": 4215428
+  },
+  "allocator_probe": {
+    "source_path": "/tmp/odp_stream_probe-0362yb.rs",
+    "source_bytes": 5694,
+    "source_sha256": "73daf4691cdbc49b83a9e71eb0a10dc9f988ed53a9a8c3929ef3ce09c83f5e3c",
+    "open": {"peak": 116001, "allocated": 200325, "allocations": 72, "reallocations": 7},
+    "first_slide": {"peak": 116001, "allocated": 2714155, "allocations": 20087, "reallocations": 21},
+    "repeat_slide": {"peak": 990891, "allocated": 6369002, "allocations": 50099, "reallocations": 7950},
+    "first_text": {"peak": 990891, "allocated": 4175837, "allocations": 34084, "reallocations": 7945},
+    "repeat_text": {"peak": 990891, "allocated": 8257127, "allocations": 68097, "reallocations": 15883},
+    "write_text": {"peak": 116001, "allocated": 1853913, "allocations": 18080, "reallocations": 19},
+    "repeat_write_text": {"peak": 116001, "allocated": 3507501, "allocations": 36088, "reallocations": 31},
+    "append_commit_write": {"peak": 612845, "allocated": 5853743, "allocations": 36185, "reallocations": 99}
+  },
+  "paired_eager_arc_string_reference": {
+    "open": {"peak": 693231, "allocated": 777932},
+    "first_slide": {"peak": 693231, "allocated": 3211442},
+    "first_text": {"peak": 1501373, "allocated": 4673124},
+    "append_commit_write": {"peak": 1204071, "allocated": 6431822}
+  },
+  "accepted_0358a_reference": {
+    "before_peak": 5513403,
+    "after_peak_legs": [6107267, 6107267],
+    "samples": 15,
+    "source_bytes": 4215428,
+    "output_bytes": 4215645,
+    "before_median_us": 13131.943,
+    "after_median_us": [13296.183, 13314.163],
+    "source_probe_sha256": "7dad851981dec5075a67b8ee595efc9b5649cc255a7cf49207d0f29af160a2a4",
+    "binary_hashes": "docs/unified-ops/results/0358a/binaries.sha256"
+  },
+  "callgrind_diagnostics": {
+    "matched": {
+      "source": "/tmp/odp_stream_probe-0362yb.rs",
+      "binary_sha256": "273e9efe4bf59275acb8ecbfe975e0655135d11f81eb80ff87181ccd454b80ed",
+      "output": "/tmp/callgrind-0362yc-odp-stream-probe.out",
+      "output_bytes": 221768,
+      "output_sha256": "e1811b1a063d034e2db84b48bcaf6984347dd5ffa2174f4605d97027966efdaf",
+      "instruction_references": 1560857174
+    },
+    "repeated_readers": {
+      "source": "/tmp/odp_stream_probe-0362yc.rs",
+      "source_bytes": 6516,
+      "source_sha256": "19ea600a0fcebf340c21baae15dfb1c300b94320e0b500d4c0aed86e56c93359",
+      "binary_sha256": "78e65be1fce4393e54b9f102eb5324566b9e9c437b4e48f8de5ebf5c25f447cb",
+      "output": "/tmp/callgrind-0362yc-odp-stream-probe-final.out",
+      "output_bytes": 226434,
+      "output_sha256": "8e67bfaee6034a5d237e931c40dc898f8efa333a3ab1a2667de141d39a7ebf5d",
+      "instruction_references": 1984085064
+    },
+    "qualification": "diagnostic only; no native ABBA or timing qualification"
+  },
+  "checks": {
+    "odp_lib_tests": {"command": "cargo test --offline -p litchi-odp --lib -- --test-threads=4", "passed": 223},
+    "source_backed_tests": {"command": "cargo test --offline -p litchi-odp --test source_backed -- --test-threads=4", "passed": 12},
+    "sequential_text_tests": {"command": "cargo test --offline -p litchi-odp --test sequential_text -- --test-threads=4", "passed": 17},
+    "scaling_regression": {"command": "cargo test --offline -p litchi-odp --test sequential_text_scaling -- --exact --nocapture --test-threads=1", "passed": true},
+    "strict_clippy": {"command": "cargo clippy --offline -p litchi-odp --lib --tests -- -D warnings", "passed": true},
+    "rustfmt": {"command": "cargo fmt --all -- --check", "passed": true},
+    "native_abba": "open",
+    "repeated_reader_performance": "open"
+  }
+}

@@ -13,15 +13,15 @@ use super::validation::ElementAttrs;
 use litchi_core::{SequentialTextWriter, TextObjectKind, TextOutputError};
 use litchi_odf_common::leniency::{ContentDefect, DefectLocation, ToleranceReport};
 use quick_xml::name::ResolveResult;
-use std::io::Write;
+use std::io::{BufRead, Write};
 
 impl Parser {
     #[allow(
         clippy::too_many_arguments,
         reason = "the recursive subtree parser threads the shared scan state explicitly"
     )]
-    pub(super) fn parse_animation_node(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn parse_animation_node<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
         start: &BytesStart<'_>,
         kind: Kind,
@@ -164,8 +164,8 @@ impl Parser {
     /// Consume the rest of a skipped animation element's subtree, whose
     /// start tag was already read, feeding every event to the transition
     /// collector exactly as the subtree parsers do.
-    pub(super) fn skip_animation_subtree(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn skip_animation_subtree<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
     ) -> Result<()> {
         let mut depth = 1usize;
@@ -206,8 +206,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn parse_legacy_animation_node(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn parse_legacy_animation_node<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
         start: &BytesStart<'_>,
         kind: AnimationKind,
@@ -329,8 +329,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn parse_enhanced_geometry(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn parse_enhanced_geometry<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
         element: &BytesStart<'_>,
     ) -> Result<EnhancedGeometry> {
@@ -423,8 +423,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn script_event_listener(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn script_event_listener<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<ScriptEventListener> {
         let mut attributes = ElementAttrs::new(element);
@@ -458,8 +458,8 @@ impl Parser {
         Ok(listener)
     }
 
-    pub(super) fn presentation_event_listener(
-        reader: &NsReader<&[u8]>,
+    pub(super) fn presentation_event_listener<R: BufRead>(
+        reader: &NsReader<R>,
         element: &BytesStart<'_>,
     ) -> Result<EventListener> {
         let mut attributes = ElementAttrs::new(element);
@@ -521,8 +521,8 @@ impl Parser {
         Ok(listener)
     }
 
-    pub(super) fn consume_empty_content(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn consume_empty_content<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
         namespace_uri: &[u8],
         local_name: &[u8],
@@ -575,8 +575,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn parse_listener_body(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn parse_listener_body<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
         mut listener: EventListener,
     ) -> Result<EventListener> {
@@ -648,8 +648,8 @@ impl Parser {
         }
     }
 
-    pub(super) fn parse_event_listeners(
-        reader: &mut NsReader<&[u8]>,
+    pub(super) fn parse_event_listeners<R: BufRead>(
+        reader: &mut NsReader<R>,
         collector: &mut TransitionStyleCollector,
     ) -> Result<Vec<ShapeEventListener>> {
         let mut listeners = Vec::new();
@@ -899,9 +899,17 @@ impl Parser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<(Vec<Slide>, ToleranceReport)> {
+        Self::parse_slides_with_report_from_reader(xml_content.as_bytes(), styles_xml)
+    }
+
+    /// [`Self::parse_slides_with_report`] over a bounded caller-owned reader.
+    pub(crate) fn parse_slides_with_report_from_reader<R: BufRead>(
+        reader: R,
+        styles_xml: Option<&str>,
+    ) -> Result<(Vec<Slide>, ToleranceReport)> {
         let mut tolerance = ToleranceReport::default();
-        let slides = Self::parse_pages_with_styles::<false>(
-            xml_content,
+        let slides = Self::parse_pages_with_styles::<false, R>(
+            reader,
             styles_xml,
             0,
             false,
@@ -938,8 +946,23 @@ impl Parser {
         index: usize,
         tolerance: &mut ToleranceReport,
     ) -> Result<Option<Slide>> {
-        let mut slides = Self::parse_pages_with_styles::<true>(
-            xml_content,
+        Self::parse_slide_with_styles_at_recording_from_reader(
+            xml_content.as_bytes(),
+            styles_xml,
+            index,
+            tolerance,
+        )
+    }
+
+    /// [`Self::parse_slide_with_styles_at_recording`] over a bounded reader.
+    pub(crate) fn parse_slide_with_styles_at_recording_from_reader<R: BufRead>(
+        reader: R,
+        styles_xml: Option<&str>,
+        index: usize,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Option<Slide>> {
+        let mut slides = Self::parse_pages_with_styles::<true, R>(
+            reader,
             styles_xml,
             index,
             false,
@@ -955,8 +978,8 @@ impl Parser {
         xml_content: &str,
         styles_xml: Option<&str>,
     ) -> Result<Vec<Slide>> {
-        Self::parse_pages_with_styles::<false>(
-            xml_content,
+        Self::parse_pages_with_styles::<false, _>(
+            xml_content.as_bytes(),
             styles_xml,
             0,
             true,
@@ -972,8 +995,8 @@ impl Parser {
     /// inside individual table cells are not collected.
     #[allow(dead_code, reason = "reserved for the dedicated ODS facade")]
     pub(crate) fn parse_sheet_shape_tables(xml_content: &str) -> Result<Vec<Vec<Shape>>> {
-        let tables = Self::parse_pages_with_styles::<false>(
-            xml_content,
+        let tables = Self::parse_pages_with_styles::<false, _>(
+            xml_content.as_bytes(),
             None,
             0,
             true,
@@ -995,8 +1018,8 @@ impl Parser {
         matches!(error, Error::InvalidFormat(message) if message.starts_with("XML parsing error: "))
     }
 
-    pub(super) fn parse_pages_with_styles<const SELECT_ONE: bool>(
-        xml_content: &str,
+    pub(super) fn parse_pages_with_styles<const SELECT_ONE: bool, R: BufRead>(
+        reader: R,
         styles_xml: Option<&str>,
         selected_index: usize,
         retain_text_shapes: bool,
@@ -1011,7 +1034,7 @@ impl Parser {
             definitions = Self::parse_transition_style_definitions(styles_source)?;
         }
         let mut collector = TransitionStyleCollector::default();
-        let mut reader = NsReader::from_str(xml_content);
+        let mut reader = NsReader::from_reader(reader);
         let mut buf = Vec::new();
         let mut slides = Vec::new();
         // Deferred drawing-page transition lookups, one entry per pushed
@@ -1058,7 +1081,7 @@ impl Parser {
         // fed to the transition-definition collector before the slide scan
         // reacts to it, so collection errors keep their historical precedence
         // over slide-scan errors at the same or later positions.
-        let mut process = |reader: &mut NsReader<&[u8]>,
+        let mut process = |reader: &mut NsReader<R>,
                            collector: &mut TransitionStyleCollector,
                            ns_class: NsClass,
                            event: &Event<'_>|
@@ -2536,8 +2559,8 @@ fn sink_shape_kind(namespace: NsClass, local_name: &[u8]) -> Option<SinkShapeKin
     None
 }
 
-fn sink_shape(
-    reader: &NsReader<&[u8]>,
+fn sink_shape<R: BufRead>(
+    reader: &NsReader<R>,
     element: &BytesStart<'_>,
     namespace: NsClass,
 ) -> Result<SinkShape> {
@@ -2567,8 +2590,8 @@ enum SinkPresentationClass {
     Title,
 }
 
-fn sink_presentation_class(
-    reader: &NsReader<&[u8]>,
+fn sink_presentation_class<R: BufRead>(
+    reader: &NsReader<R>,
     element: &BytesStart<'_>,
 ) -> Result<SinkPresentationClass> {
     let mut attribute_count = 0usize;
@@ -2614,7 +2637,10 @@ fn sink_presentation_class(
     Ok(SinkPresentationClass::Absent)
 }
 
-fn sink_text_space_count(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<usize> {
+fn sink_text_space_count<R: BufRead>(
+    reader: &NsReader<R>,
+    element: &BytesStart<'_>,
+) -> Result<usize> {
     let mut attribute_count = 0usize;
     let mut count = None;
     for result in element.attributes() {
@@ -2741,8 +2767,8 @@ fn sink_push_xml_text(
     Ok(())
 }
 
-fn sink_push_control(
-    reader: &NsReader<&[u8]>,
+fn sink_push_control<R: BufRead>(
+    reader: &NsReader<R>,
     element: &BytesStart<'_>,
     local_name: &[u8],
     paragraph: &mut ParagraphText,
@@ -2828,7 +2854,26 @@ impl Parser {
         writer: &mut SequentialTextWriter<'options, 'output, W>,
         paragraph_separator: &str,
     ) -> std::result::Result<(), TextOutputError<Error>> {
-        let mut reader = NsReader::from_str(xml_content);
+        Self::write_slides_text_from_reader(xml_content.as_bytes(), writer, paragraph_separator)
+    }
+
+    /// [`Self::write_slides_text_to`] over a bounded caller-owned XML reader.
+    ///
+    /// The parser retains only the current slide and shape text. This route is
+    /// used by source-backed owners so a verified ZIP member can be consumed
+    /// directly without first allocating a second full `content.xml` string.
+    pub(crate) fn write_slides_text_from_reader<
+        'options,
+        'output,
+        W: Write + ?Sized,
+        R: BufRead,
+    >(
+        reader: R,
+        writer: &mut SequentialTextWriter<'options, 'output, W>,
+        paragraph_separator: &str,
+    ) -> std::result::Result<(), TextOutputError<Error>> {
+        let mut reader = NsReader::from_reader(reader);
+        let mut event_buffer = Vec::new();
         let mut depth = 0usize;
         let mut slide_count = 0usize;
         let mut shape_count = 0usize;
@@ -2843,9 +2888,18 @@ impl Parser {
         let mut element_names = SinkElementNameBudget::default();
 
         loop {
-            let (namespace, event) = reader.read_resolved_event().map_err(|error| {
-                writer.document_error(Error::InvalidFormat(format!("XML parsing error: {error}")))
-            })?;
+            // `read_resolved_event_into` appends into the caller-owned event
+            // buffer. Clear before every read so early `continue` paths do not
+            // retain one serialized event per document element.
+            event_buffer.clear();
+            let (namespace, event) =
+                reader
+                    .read_resolved_event_into(&mut event_buffer)
+                    .map_err(|error| {
+                        writer.document_error(Error::InvalidFormat(format!(
+                            "XML parsing error: {error}"
+                        )))
+                    })?;
             let ns_class = NsClass::from_resolve(&namespace);
 
             match event {
@@ -3226,7 +3280,12 @@ pub(super) struct TransitionStyleCollector {
 impl TransitionStyleCollector {
     /// Feeds one event; a poisoned collector ignores all further events, just
     /// like the standalone scan never reads past its first error.
-    pub(super) fn feed(&mut self, reader: &NsReader<&[u8]>, namespace: NsClass, event: &Event<'_>) {
+    pub(super) fn feed<R: BufRead>(
+        &mut self,
+        reader: &NsReader<R>,
+        namespace: NsClass,
+        event: &Event<'_>,
+    ) {
         if self.error.is_none()
             && let Err(error) = self.apply(reader, namespace, event)
         {
@@ -3246,9 +3305,9 @@ impl TransitionStyleCollector {
 
     /// The match arms of [`Parser::parse_transition_style_definitions`],
     /// transcribed one-to-one with the same arm order and guards.
-    fn apply(
+    fn apply<R: BufRead>(
         &mut self,
-        reader: &NsReader<&[u8]>,
+        reader: &NsReader<R>,
         namespace: NsClass,
         event: &Event<'_>,
     ) -> Result<()> {

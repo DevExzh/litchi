@@ -14,6 +14,9 @@ use litchi_core::{
 };
 use litchi_odp::{Package, Presentation, SourceBackedPresentation};
 
+#[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
+mod odf_rezip;
+
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -28,6 +31,18 @@ fn package(body: &str) -> Vec<u8> {
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
+}
+
+fn package_with_prologue_doctype(body: &str) -> Vec<u8> {
+    let bytes = package(body);
+    odf_rezip::edit_member(&bytes, "content.xml", |xml| {
+        let end = xml.find("?>").map_or(0, |index| index + 2);
+        format!(
+            "{}<!DOCTYPE office:document-content PUBLIC \"-//OpenOffice.org//DTD OfficeDocument 1.0//EN\" \"office.dtd\">{}",
+            &xml[..end],
+            &xml[end..]
+        )
+    })
 }
 
 fn representative_package() -> Vec<u8> {
@@ -99,6 +114,28 @@ fn controls_entities_cdata_utf8_and_custom_separators_match_semantics() {
     assert_eq!(output, expected.as_bytes());
     assert_eq!(bytes_written, expected.len() as u64);
     assert_eq!(objects_written, 1);
+}
+
+#[test]
+fn source_backed_sink_matches_owned_with_prologue_doctype() {
+    let bytes = package_with_prologue_doctype(
+        r#"<draw:page><draw:frame><draw:text-box><text:p>doctype text</text:p></draw:text-box></draw:frame></draw:page>"#,
+    );
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
+    let source =
+        SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+
+    let mut eager_output = Vec::new();
+    eager
+        .write_text_to(&mut eager_output, TextOutputOptions::default())
+        .unwrap();
+    let mut source_output = Vec::new();
+    source
+        .write_text_to(&mut source_output, TextOutputOptions::default())
+        .unwrap();
+
+    assert_eq!(source_output, eager_output);
+    assert_eq!(source_output, b"doctype text");
 }
 
 #[test]
@@ -361,9 +398,40 @@ fn source_backed_sink_matches_owned_and_does_not_use_text_cache() {
         b"Title\nbody one\nbody two\nouter shape\ninner shape\n\nretained child\n\n"
     );
     assert_eq!(report.objects_written(), 3);
-    assert_eq!(source.reads.load(Ordering::Relaxed), reads_before);
+    let reads_after_write = source.reads.load(Ordering::Relaxed);
+    assert!(
+        reads_after_write > reads_before,
+        "the first streaming semantic read materializes the lazy source projection"
+    );
     assert_eq!(presentation.text().unwrap(), owned.text().unwrap());
+    assert!(
+        source.reads.load(Ordering::Relaxed) > reads_after_write,
+        "the ordinary text projection is independently streamed from the source"
+    );
     assert_eq!(source.revision.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn source_backed_sink_reuses_small_content_for_repeat_write() {
+    let source = Arc::new(CountingSource::new(representative_package()));
+    let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+    let mut first = Vec::new();
+    presentation
+        .write_text_to(&mut first, TextOutputOptions::default())
+        .unwrap();
+    let reads_after_first_write = source.reads.load(Ordering::Relaxed);
+
+    let mut second = Vec::new();
+    presentation
+        .write_text_to(&mut second, TextOutputOptions::default())
+        .unwrap();
+
+    assert_eq!(second, first);
+    assert_eq!(
+        source.reads.load(Ordering::Relaxed),
+        reads_after_first_write,
+        "a small source write replay reuses the validated decoded member"
+    );
 }
 
 #[test]

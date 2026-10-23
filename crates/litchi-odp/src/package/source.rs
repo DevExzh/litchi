@@ -2,9 +2,9 @@
 //!
 //! [`SourceBackedPresentation`] is deliberately additive: the existing
 //! [`super::Presentation`] keeps its owned-byte and mutation behavior.  This
-//! facade retains only the validated XML needed for ordinary semantic reads;
-//! package media remains cold until [`SourceBackedPresentation::media_data`]
-//! selects a member.
+//! facade validates the XML needed for ordinary semantic reads at open, then
+//! keeps the source-backed projection lazy; package media remains cold until
+//! [`SourceBackedPresentation::media_data`] selects a member.
 
 use std::sync::{
     Arc, OnceLock,
@@ -24,12 +24,14 @@ use litchi_odf_common::core::source_publication::{
     SourceContentInsertionError, SourceContentInsertionPlan,
 };
 use litchi_odf_common::core::{
-    Meta, SourceBackedPackage, SourceContentPublicationOptions, SourceContentPublicationReport,
-    private::ContentDocumentValidator, validate_content_part,
+    Meta, SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
+    SourceContentPublicationReport, SourceMemberReaderError, XmlStreamLimits,
+    private::ContentDocumentValidator,
 };
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
 
+use super::source_append::ScanFacts;
 use crate::codec::Parser;
 use crate::model::{Reference, Slide};
 
@@ -37,27 +39,359 @@ const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation"
 const BODY_MARKER: &str = "<office:presentation";
 const FAMILY_NAME: &str = "ODP";
 const SLIDES_CACHE_QUERY_THRESHOLD: usize = 2;
-// The source-backed owner already retains bounded content.xml bytes.  Keep a
-// much smaller ceiling for the optional semantic projection so a repeated
-// query cannot turn an otherwise lazy source view into a large second model.
+// Keep a ceiling for the optional semantic projection so a repeated query
+// cannot turn an otherwise lazy source view into a large second model.
 const SLIDES_CACHE_MAX_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 const SLIDES_CACHE_MAX_COUNT: usize = 256;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
+// A small source may safely retain its validated XML so repeated text writes
+// reuse decompression. Larger sources stay reader-backed even when a caller
+// repeats a query; this ceiling is independent of the public content_xml()
+// accessor, which remains an explicit materialization request.
+const SEMANTIC_CONTENT_MEMO_MAX_SOURCE_BYTES: u64 = 1024 * 1024;
+const STREAM_PROBE_WINDOW_BYTES: usize = 4096;
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 #[cfg(any(unix, windows))]
 fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
     Ok(Arc::new(FileSource::open(path)?))
 }
 
+#[derive(Debug)]
+enum StreamProbeError {
+    Invalid(Error),
+    BodyMissing,
+}
+
+#[derive(Debug, Default)]
+struct Utf8Probe {
+    pending: [u8; 3],
+    pending_len: usize,
+}
+
+impl Utf8Probe {
+    fn feed(&mut self, bytes: &[u8], part: &str) -> std::result::Result<(), StreamProbeError> {
+        let mut rest = bytes;
+        loop {
+            if self.pending_len != 0 {
+                if rest.is_empty() {
+                    return Ok(());
+                }
+                // A UTF-8 scalar is at most four bytes.  Check the pending
+                // prefix with only a tiny stack boundary buffer so admission
+                // does not allocate a second copy of every streamed chunk.
+                let take = rest.len().min(3);
+                let mut boundary = [0_u8; 6];
+                let pending_len = self.pending_len;
+                boundary[..pending_len].copy_from_slice(&self.pending[..pending_len]);
+                boundary[pending_len..pending_len + take].copy_from_slice(&rest[..take]);
+                match std::str::from_utf8(&boundary[..pending_len + take]) {
+                    Ok(_) => {
+                        self.pending_len = 0;
+                        rest = &rest[take..];
+                    },
+                    Err(error) if error.error_len().is_none() => {
+                        let tail = &boundary[error.valid_up_to()..pending_len + take];
+                        debug_assert!(tail.len() <= self.pending.len());
+                        self.pending[..tail.len()].copy_from_slice(tail);
+                        self.pending_len = tail.len();
+                        rest = &rest[take..];
+                    },
+                    Err(error) => {
+                        return Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
+                            "{FAMILY_NAME} {part} is not UTF-8: {error}"
+                        ))));
+                    },
+                }
+                continue;
+            }
+
+            match std::str::from_utf8(rest) {
+                Ok(_) => return Ok(()),
+                Err(error) if error.error_len().is_none() => {
+                    let tail = &rest[error.valid_up_to()..];
+                    debug_assert!(tail.len() <= self.pending.len());
+                    self.pending[..tail.len()].copy_from_slice(tail);
+                    self.pending_len = tail.len();
+                    return Ok(());
+                },
+                Err(error) => {
+                    return Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
+                        "{FAMILY_NAME} {part} is not UTF-8: {error}"
+                    ))));
+                },
+            }
+        }
+    }
+
+    fn finish(self, part: &str) -> std::result::Result<(), StreamProbeError> {
+        if self.pending_len == 0 {
+            Ok(())
+        } else {
+            Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
+                "{FAMILY_NAME} {part} is not valid UTF-8"
+            ))))
+        }
+    }
+}
+
+#[derive(Debug)]
+struct BodyProbe {
+    window: [u8; STREAM_PROBE_WINDOW_BYTES],
+    window_len: usize,
+    alias_marker: Option<Vec<u8>>,
+    found: bool,
+    root_seen: bool,
+    doctype: bool,
+}
+
+impl BodyProbe {
+    fn new() -> Self {
+        Self {
+            window: [0; STREAM_PROBE_WINDOW_BYTES],
+            window_len: 0,
+            alias_marker: None,
+            found: false,
+            root_seen: false,
+            doctype: false,
+        }
+    }
+
+    fn feed(&mut self, bytes: &[u8]) {
+        let mut bytes = bytes;
+        while !bytes.is_empty() && !self.found {
+            // Retain each incoming subchunk while it is scanned. A single
+            // archive fill may be larger than the probe window; taking at
+            // most half keeps both the previous suffix and incoming prefix
+            // available for markers crossing that boundary.
+            let take = bytes.len().min(STREAM_PROBE_WINDOW_BYTES / 2);
+            let chunk = &bytes[..take];
+            let total = self.window_len + chunk.len();
+            if total > STREAM_PROBE_WINDOW_BYTES {
+                let remove = total - STREAM_PROBE_WINDOW_BYTES;
+                self.window.copy_within(remove..self.window_len, 0);
+                self.window_len -= remove;
+            }
+            self.window[self.window_len..self.window_len + chunk.len()].copy_from_slice(chunk);
+            self.window_len += chunk.len();
+
+            if !self.root_seen {
+                let window = &self.window[..self.window_len];
+                let doctype_start = find_subslice(window, b"<!DOCTYPE");
+                let root_start = root_tag_position(window);
+                if doctype_start.is_some_and(|doctype| root_start.is_none_or(|root| doctype < root))
+                {
+                    self.doctype = true;
+                }
+                self.root_seen = root_start.is_some();
+            }
+            let body_found =
+                find_subslice(&self.window[..self.window_len], BODY_MARKER.as_bytes()).is_some();
+            if body_found {
+                self.found = true;
+            } else {
+                self.find_alias_marker();
+                let window = &self.window[..self.window_len];
+                if let Some(marker) = self.alias_marker.as_deref()
+                    && find_subslice(window, marker).is_some()
+                {
+                    self.found = true;
+                }
+            }
+            bytes = &bytes[take..];
+        }
+    }
+
+    fn find_alias_marker(&mut self) {
+        if self.alias_marker.is_some() {
+            return;
+        }
+        let window = &self.window[..self.window_len];
+        let Some(uri_start) = find_subslice(window, OFFICE_NAMESPACE) else {
+            return;
+        };
+        let Some(namespace_start) = find_subslice(&window[..uri_start], b"xmlns:") else {
+            return;
+        };
+        let declaration = &window[namespace_start + b"xmlns:".len()..uri_start];
+        let Some(equals) = declaration.iter().rposition(|byte| *byte == b'=') else {
+            return;
+        };
+        let mut prefix = &declaration[..equals];
+        while prefix.last().is_some_and(u8::is_ascii_whitespace) {
+            prefix = &prefix[..prefix.len() - 1];
+        }
+        if prefix.is_empty()
+            || !prefix
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+        {
+            return;
+        }
+        let mut marker = Vec::with_capacity(1 + prefix.len() + 1 + b"presentation".len());
+        marker.push(b'<');
+        marker.extend_from_slice(prefix);
+        marker.extend_from_slice(b":presentation");
+        self.alias_marker = Some(marker);
+    }
+
+    fn finish(self) -> std::result::Result<bool, StreamProbeError> {
+        if self.found {
+            Ok(self.doctype)
+        } else {
+            Err(StreamProbeError::BodyMissing)
+        }
+    }
+}
+
+fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    if needle.is_empty() {
+        return Some(0);
+    }
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+fn root_tag_position(bytes: &[u8]) -> Option<usize> {
+    let mut search_from = 0;
+    while let Some(local) = find_subslice(&bytes[search_from..], b":document-content") {
+        let local = search_from + local;
+        let open = bytes[..local].iter().rposition(|byte| *byte == b'<')?;
+        let prefix = &bytes[open + 1..local];
+        if !prefix.is_empty()
+            && prefix
+                .iter()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+        {
+            return Some(open);
+        }
+        search_from = local + 1;
+    }
+    None
+}
+
+fn encrypted_member_cannot_stream(error: &Error) -> bool {
+    matches!(
+        error,
+        Error::InvalidFormat(message)
+            if message.contains("cannot be streamed without decryption")
+    )
+}
+
+fn source_reader_error(error: SourceMemberReaderError<Error>) -> Error {
+    match error {
+        SourceMemberReaderError::Core { error, .. } | SourceMemberReaderError::Callback(error) => {
+            error
+        },
+        _ => Error::InvalidFormat("ODP content.xml source read failed".to_string()),
+    }
+}
+
+fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)> {
+    let streamed = package.with_verified_member_reader("content.xml", |reader| {
+        let mut bytes = 0_u64;
+        let mut utf8 = Utf8Probe::default();
+        let mut body = BodyProbe::new();
+        loop {
+            let chunk = reader
+                .fill_buf()
+                .map_err(|error| StreamProbeError::Invalid(Error::Io(error)))?;
+            if chunk.is_empty() {
+                break;
+            }
+            bytes = bytes.saturating_add(u64::try_from(chunk.len()).unwrap_or(u64::MAX));
+            ContentDocumentValidator::check_materialized_size(Some(bytes), FAMILY_NAME)
+                .map_err(StreamProbeError::Invalid)?;
+            utf8.feed(chunk, "content.xml")?;
+            body.feed(chunk);
+            let consumed = chunk.len();
+            reader.consume(consumed);
+        }
+        utf8.finish("content.xml")?;
+        let doctype = body.finish()?;
+        Ok((bytes, doctype))
+    });
+
+    match streamed {
+        Ok((bytes, doctype)) => Ok((bytes, doctype)),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => {
+            validate_materialized_content(package)
+        },
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Invalid(error))) => Err(error),
+        Err(SourceMemberReaderError::Core {
+            error,
+            callback_error: _,
+        }) if encrypted_member_cannot_stream(&error) => validate_materialized_content(package),
+        Err(SourceMemberReaderError::Core { error, .. }) => Err(error),
+        Err(_) => Err(Error::InvalidFormat(
+            "ODP content.xml source validation failed".to_string(),
+        )),
+    }
+}
+
+fn validate_materialized_content(package: &SourceBackedPackage) -> Result<(u64, bool)> {
+    let mut content_xml = String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
+        Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+    })?;
+    let doctype = litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
+    litchi_odf_common::core::validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+    Ok((
+        u64::try_from(content_xml.len()).unwrap_or(u64::MAX),
+        doctype,
+    ))
+}
+
+fn validate_source_styles(package: &SourceBackedPackage) -> Result<()> {
+    let streamed = package.with_verified_member_reader("styles.xml", |reader| {
+        let mut utf8 = Utf8Probe::default();
+        loop {
+            let chunk = reader
+                .fill_buf()
+                .map_err(|error| StreamProbeError::Invalid(Error::Io(error)))?;
+            if chunk.is_empty() {
+                break;
+            }
+            utf8.feed(chunk, "styles.xml")?;
+            let consumed = chunk.len();
+            reader.consume(consumed);
+        }
+        utf8.finish("styles.xml")
+    });
+
+    match streamed {
+        Ok(()) => Ok(()),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Invalid(error))) => Err(error),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => Err(
+            Error::InvalidFormat("ODP styles.xml validation failed".to_string()),
+        ),
+        Err(SourceMemberReaderError::Core {
+            error,
+            callback_error: _,
+        }) if encrypted_member_cannot_stream(&error) => {
+            String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
+                Error::InvalidFormat(format!("{FAMILY_NAME} styles.xml is not UTF-8: {error}"))
+            })?;
+            Ok(())
+        },
+        Err(SourceMemberReaderError::Core { error, .. }) => Err(error),
+        Err(_) => Err(Error::InvalidFormat(
+            "ODP styles.xml source validation failed".to_string(),
+        )),
+    }
+}
+
 /// Read-only ODP access over an immutable positional source.
 ///
 /// Opening validates the ZIP archive, MIME member, and family content root,
-/// then loads only `content.xml` and the optional `styles.xml`.  Other package
-/// members—including pictures and audio/video payloads—remain deferred until
-/// [`Self::media_data`] is called.  Every public operation checks the captured
-/// [`SourceVersion`] before and after work, returning
-/// [`Error::SourceChanged`] when the source revision is no longer current.
+/// then validates only `content.xml` and the optional `styles.xml`.  Their
+/// semantic text is materialized on first use and retained only as a shared
+/// cache. Other package members—including pictures and audio/video payloads—
+/// remain deferred until [`Self::media_data`] is called. Every public
+/// operation checks the captured [`SourceVersion`] before and after work,
+/// returning [`Error::SourceChanged`] when the source revision is no longer
+/// current.
 ///
 /// This type has no edit or output methods.  Use [`super::Presentation`] for
 /// the established owned-byte/mutation API.
@@ -65,8 +399,10 @@ pub struct SourceBackedPresentation {
     pub(super) package: Arc<SourceBackedPackage>,
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
-    content_xml: Arc<str>,
-    styles_xml: Option<Arc<str>>,
+    content_xml_bytes: u64,
+    append_facts: Arc<OnceLock<ScanFacts>>,
+    content_xml: OnceLock<Arc<String>>,
+    styles_xml: OnceLock<Option<Arc<String>>>,
     metadata: Option<litchi_core::Metadata>,
     slides_queries: AtomicUsize,
     slides_cache: OnceLock<Option<Arc<[Slide]>>>,
@@ -243,25 +579,15 @@ impl SourceBackedPresentation {
                 package.member_materialized_size("content.xml")?,
                 FAMILY_NAME,
             )?;
-            let mut content_xml =
-                String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
-                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
-                })?;
-            let doctype =
-                litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
-            validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+            let (content_xml_bytes, doctype) = validate_source_content(&package)?;
 
-            let styles_xml = if package.has_file("styles.xml")? {
-                Some(
-                    String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
-                        Error::InvalidFormat(format!(
-                            "{FAMILY_NAME} styles.xml is not UTF-8: {error}"
-                        ))
-                    })?,
-                )
-            } else {
-                None
-            };
+            if package.has_file("styles.xml")? {
+                // Validate the optional styles part at open, but leave its
+                // semantic projection in the source until a caller asks for
+                // it.  This keeps the open and first-read contracts strict
+                // without retaining another potentially large XML string.
+                validate_source_styles(&package)?;
+            }
 
             // Match the ordinary family package's mandatory metadata
             // validation: a malformed optional meta.xml must not become
@@ -280,13 +606,13 @@ impl SourceBackedPresentation {
                 None
             };
 
-            Ok((content_xml, styles_xml, metadata, doctype))
+            Ok((content_xml_bytes, metadata, doctype))
         })();
 
         // Reconcile the source before exposing any secondary parse error. This
         // keeps stale-source errors authoritative across the whole open pass,
         // including pure validation and UTF-8/metadata parsing work.
-        let (content_xml, styles_xml, metadata, doctype) =
+        let (content_xml_bytes, metadata, doctype) =
             reconcile_source(source.as_ref(), source_version, parsed)?;
         let mut open_tolerance = package.tolerance_report().clone();
         if doctype {
@@ -300,8 +626,10 @@ impl SourceBackedPresentation {
             package: Arc::new(package),
             source,
             source_version,
-            content_xml: Arc::from(content_xml),
-            styles_xml: styles_xml.map(Arc::from),
+            content_xml_bytes,
+            append_facts: Arc::new(OnceLock::new()),
+            content_xml: OnceLock::new(),
+            styles_xml: OnceLock::new(),
             metadata,
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
@@ -316,12 +644,16 @@ impl SourceBackedPresentation {
     /// A share of this presentation's source, retained parts and pending
     /// output, with fresh caches.
     pub(crate) fn share(&self) -> Self {
+        let content_xml = clone_once_lock(&self.content_xml);
+        let styles_xml = clone_once_lock(&self.styles_xml);
         Self {
             package: Arc::clone(&self.package),
             source: Arc::clone(&self.source),
             source_version: self.source_version,
-            content_xml: Arc::clone(&self.content_xml),
-            styles_xml: self.styles_xml.clone(),
+            content_xml_bytes: self.content_xml_bytes,
+            append_facts: Arc::clone(&self.append_facts),
+            content_xml,
+            styles_xml,
             metadata: self.metadata.clone(),
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
@@ -382,6 +714,97 @@ impl SourceBackedPresentation {
         }
     }
 
+    fn read_content_xml(&self) -> Result<String> {
+        let result = (|| {
+            let mut content_xml = String::from_utf8(self.package.get_file("content.xml")?)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+                })?;
+            litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
+            Ok(content_xml)
+        })();
+        reconcile_source(self.source.as_ref(), self.source_version, result)
+    }
+
+    fn load_content_xml(&self) -> Result<Arc<String>> {
+        self.read_content_xml().map(Arc::new)
+    }
+
+    fn content_xml_snapshot(&self) -> Result<&str> {
+        self.check_source()?;
+        if self.content_xml.get().is_none() {
+            let content_xml = self.load_content_xml()?;
+            let _ = self.content_xml.set(content_xml);
+        }
+        self.check_source()?;
+        Ok(self
+            .content_xml
+            .get()
+            .expect("content.xml cache is initialized")
+            .as_ref())
+    }
+
+    fn read_styles_xml(&self) -> Result<Option<String>> {
+        let result = (|| {
+            if !self.package.has_file("styles.xml")? {
+                return Ok(None);
+            }
+            let styles_xml =
+                String::from_utf8(self.package.get_file("styles.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} styles.xml is not UTF-8: {error}"))
+                })?;
+            Ok(Some(styles_xml))
+        })();
+        reconcile_source(self.source.as_ref(), self.source_version, result)
+    }
+
+    fn load_styles_xml(&self) -> Result<Option<Arc<String>>> {
+        self.read_styles_xml().map(|styles| styles.map(Arc::new))
+    }
+
+    fn styles_xml_snapshot(&self) -> Result<Option<&str>> {
+        self.check_source()?;
+        if self.styles_xml.get().is_none() {
+            let styles_xml = self.load_styles_xml()?;
+            let _ = self.styles_xml.set(styles_xml);
+        }
+        self.check_source()?;
+        Ok(self
+            .styles_xml
+            .get()
+            .expect("styles.xml cache is initialized")
+            .as_ref()
+            .map(Arc::as_ref)
+            .map(String::as_str))
+    }
+
+    fn parse_slides_from_source(
+        &self,
+    ) -> Result<(Vec<Slide>, litchi_odf_common::leniency::ToleranceReport)> {
+        self.check_source()?;
+        // The optional styles part was validated during open.  Reuse its
+        // bounded lazy projection for semantic reads so repeated slide/text
+        // queries do not reopen and decode the same member on every call.
+        let styles_xml = self.styles_xml_snapshot()?;
+        let result = match self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::parse_slides_with_report_from_reader(reader, styles_xml)
+            }) {
+            Ok(result) => Ok(result),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                let content_xml = self.read_content_xml()?;
+                Parser::parse_slides_with_report(&content_xml, styles_xml)
+            },
+            Err(error) => Err(source_reader_error(error)),
+        };
+        let observed = self.source.version()?;
+        ensure_current(self.source_version, observed)?;
+        result
+    }
+
     /// Write this presentation as a complete ODP package: the source archive,
     /// or the committed output of a source-backed edit, which copies every
     /// untouched member raw from the retained source (record 0358a).
@@ -418,11 +841,16 @@ impl SourceBackedPresentation {
                 Some(materialized) => materialized.write_to_with_options(writer, options),
                 None => deferred.plan.write_to(writer, options),
             },
-            None => Ok(self.package.write_content_xml_to_stream_with_options(
-                writer,
-                self.content_xml.as_bytes(),
-                options,
-            )?),
+            None => {
+                let content_xml = self.content_xml_snapshot().map_err(|error| {
+                    SourceContentInsertionError::from(SourceContentPublicationError::from(error))
+                })?;
+                Ok(self.package.write_content_xml_to_stream_with_options(
+                    writer,
+                    content_xml.as_bytes(),
+                    options,
+                )?)
+            },
         }
     }
 
@@ -463,6 +891,51 @@ impl SourceBackedPresentation {
         ensure_current(self.source_version, self.source.version()?)
     }
 
+    /// Reuse the bounded structural facts collected during strict open when
+    /// the append operation has no per-operation accounting or cancellation
+    /// policy.  The common insertion plan still rechecks source freshness and
+    /// proves the complete source hash and exact splice.
+    pub(super) fn cached_append_facts(
+        &self,
+        max_content_xml_bytes: u64,
+        max_slides: usize,
+        options: &SourceContentPublicationOptions,
+    ) -> Result<Option<ScanFacts>> {
+        // Keep the cache path's error timing aligned with `scan_source`: an
+        // out-of-envelope source limit must fail before authored-fragment
+        // construction, even when the owner already has structural facts.
+        if XmlStreamLimits::new(max_content_xml_bytes, 256, 4_000_000, 1_000_000, 64 * 1024)
+            .is_err()
+        {
+            return Ok(None);
+        }
+        if options.execution_context().is_some() || options.cancellation().is_some() {
+            return Ok(None);
+        }
+        self.check_source()?;
+        let Some(facts) = self.append_facts.get() else {
+            return Ok(None);
+        };
+        if facts.content_bytes > max_content_xml_bytes || facts.slide_count >= max_slides {
+            return Ok(None);
+        }
+        Ok(Some(facts.clone()))
+    }
+
+    /// Retain append facts after a successful, uncancelled source scan. The
+    /// facts contain only bounded offsets and counts; the common insertion
+    /// plan still performs its independent freshness and byte proof.
+    pub(super) fn remember_append_facts(
+        &self,
+        facts: &ScanFacts,
+        options: &SourceContentPublicationOptions,
+    ) {
+        if options.execution_context().is_some() || options.cancellation().is_some() {
+            return;
+        }
+        let _ = self.append_facts.set(facts.clone());
+    }
+
     /// Everything a tolerant read repaired while this presentation was opened.
     ///
     /// An empty report means the document conformed; see
@@ -483,9 +956,7 @@ impl SourceBackedPresentation {
             // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
             // scan; a scan that fails outright reports its error through
             // `slides()`, and the report then lists the package repairs only.
-            if let Ok((_slides, content)) =
-                Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref())
-            {
+            if let Ok((_slides, content)) = self.parse_slides_from_source() {
                 merged.append(&content);
             }
             merged
@@ -504,8 +975,7 @@ impl SourceBackedPresentation {
         if self.deferred.is_some() {
             return self.effective()?.content_xml();
         }
-        self.check_source()?;
-        Ok(&self.content_xml)
+        self.content_xml_snapshot()
     }
 
     /// Borrow the optional validated `styles.xml` snapshot.
@@ -513,8 +983,7 @@ impl SourceBackedPresentation {
         if self.deferred.is_some() {
             return self.effective()?.styles_xml();
         }
-        self.check_source()?;
-        Ok(self.styles_xml.as_deref())
+        self.styles_xml_snapshot()
     }
 
     /// Return common document metadata projected from the optional
@@ -564,12 +1033,7 @@ impl SourceBackedPresentation {
     }
 
     fn slides_uncached(&self) -> Result<Vec<Slide>> {
-        self.check_source()?;
-        let result =
-            Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref());
-        let observed = self.source.version()?;
-        ensure_current(self.source_version, observed)?;
-        let (slides, content) = result?;
+        let (slides, content) = self.parse_slides_from_source()?;
         if self.tolerance.get().is_none() {
             let mut merged = self.open_tolerance.clone();
             merged.append(&content);
@@ -614,11 +1078,29 @@ impl SourceBackedPresentation {
 
     fn slide_uncached(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
-        let result = Parser::parse_slide_with_styles_at(
-            &self.content_xml,
-            self.styles_xml.as_deref(),
-            index,
-        );
+        // Keep indexed semantic reads on the same validated lazy styles
+        // projection as full slide scans.  This also memoizes an absent
+        // styles.xml member, avoiding repeated archive admission work.
+        let styles_xml = self.styles_xml_snapshot()?;
+        let result = match self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::parse_slide_with_styles_at_recording_from_reader(
+                    reader,
+                    styles_xml,
+                    index,
+                    &mut litchi_odf_common::leniency::ToleranceReport::default(),
+                )
+            }) {
+            Ok(result) => Ok(result),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                let content_xml = self.read_content_xml()?;
+                Parser::parse_slide_with_styles_at(&content_xml, styles_xml, index)
+            },
+            Err(error) => Err(source_reader_error(error)),
+        };
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         result
@@ -647,7 +1129,7 @@ impl SourceBackedPresentation {
     }
 
     fn publish_slides_cache(&self, slides: &[Slide]) {
-        if self.content_xml.len() > SLIDES_CACHE_MAX_SOURCE_BYTES
+        if self.content_xml_bytes > SLIDES_CACHE_MAX_SOURCE_BYTES as u64
             || slides.len() > SLIDES_CACHE_MAX_COUNT
         {
             let _ = self.slides_cache.set(None);
@@ -723,8 +1205,11 @@ impl SourceBackedPresentation {
 
     /// Stream one semantic text object per slide into `output` in document order.
     ///
-    /// The retained `content.xml` snapshot is used directly; package media is
-    /// not read. Output may be partial when parsing, limits, or the sink fail.
+    /// The validated source content is decoded for this pass; when its
+    /// declared size fits the bounded small-source memo it may be retained
+    /// for a repeated text write, while larger sources remain streaming.
+    /// Package media is not read. Output may be partial when parsing, limits,
+    /// or the sink fail.
     /// This method does not flush or roll back the sink and provides no
     /// cancellation hook. The paragraph separator applies to all paragraph,
     /// title/body, and shape-text boundaries within each slide; the slide
@@ -762,13 +1247,76 @@ impl SourceBackedPresentation {
             })?;
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
-        let result =
-            Parser::write_slides_text_to(&self.content_xml, &mut writer, paragraph_separator);
+        if let Some(content_xml) = self
+            .small_content_xml_snapshot()
+            .map_err(|source| TextOutputError::Document {
+                source,
+                progress: writer.progress(),
+            })?
+        {
+            let result = Parser::write_slides_text_to(
+                content_xml,
+                &mut writer,
+                paragraph_separator,
+            );
+            let progress = writer.progress();
+            if let Err(source) = self.check_source() {
+                return Err(TextOutputError::Document { source, progress });
+            }
+            return result.map(|()| writer.finish());
+        }
+        let result = self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::write_slides_text_from_reader(reader, &mut writer, paragraph_separator)
+            });
+        let result = match result {
+            Ok(()) => Ok(()),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                match self.read_content_xml() {
+                    Ok(content_xml) => {
+                        Parser::write_slides_text_to(&content_xml, &mut writer, paragraph_separator)
+                    },
+                    Err(source) => Err(TextOutputError::Document {
+                        source,
+                        progress: writer.progress(),
+                    }),
+                }
+            },
+            Err(SourceMemberReaderError::Callback(error)) => Err(error),
+            Err(SourceMemberReaderError::Core {
+                error,
+                callback_error,
+            }) => Err(TextOutputError::Document {
+                source: error,
+                progress: callback_error
+                    .as_ref()
+                    .map(TextOutputError::progress)
+                    .unwrap_or_else(|| writer.progress()),
+            }),
+            Err(_) => Err(TextOutputError::Document {
+                source: Error::InvalidFormat("ODP content.xml source text read failed".to_string()),
+                progress: writer.progress(),
+            }),
+        };
         let progress = writer.progress();
         if let Err(source) = self.check_source() {
             return Err(TextOutputError::Document { source, progress });
         }
         result.map(|()| writer.finish())
+    }
+
+    /// Reuse one bounded decoded content member for repeated text writes.
+    /// The source-size check is performed before materialization, and the
+    /// existing content snapshot retains source-version reconciliation around
+    /// the read and publication.
+    fn small_content_xml_snapshot(&self) -> Result<Option<&str>> {
+        if self.content_xml_bytes > SEMANTIC_CONTENT_MEMO_MAX_SOURCE_BYTES {
+            return Ok(None);
+        }
+        self.content_xml_snapshot().map(Some)
     }
 
     fn text_from_cache(&self, cache: &Option<String>) -> Result<String> {
@@ -877,6 +1425,14 @@ fn clone_text_result(text: &str) -> Result<String> {
     Ok(result)
 }
 
+fn clone_once_lock<T: Clone>(source: &OnceLock<T>) -> OnceLock<T> {
+    let cloned = OnceLock::new();
+    if let Some(value) = source.get() {
+        let _ = cloned.set(value.clone());
+    }
+    cloned
+}
+
 fn reconcile_source<T>(
     source: &dyn ReadAt,
     expected: SourceVersion,
@@ -917,6 +1473,10 @@ fn check_semantic_part_sizes(
 mod tests {
     use std::io;
 
+    use litchi_core::OwnedSource;
+    use litchi_odf_common::constants::ODF_PRESENTATION;
+    use litchi_odf_common::core::PackageWriter;
+
     use super::*;
 
     struct FixedSource;
@@ -944,5 +1504,83 @@ mod tests {
             reconcile_source(&FixedSource, expected, secondary),
             Err(Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn streamed_admission_probes_keep_utf8_boundaries_without_heap_scratch() {
+        let bytes = "prefix € and 𐍈 suffix".as_bytes();
+        for split in 0..=bytes.len() {
+            let mut probe = Utf8Probe::default();
+            probe.feed(&bytes[..split], "content.xml").unwrap();
+            probe.feed(&bytes[split..], "content.xml").unwrap();
+            probe.finish("content.xml").unwrap();
+        }
+
+        let mut invalid = Utf8Probe::default();
+        invalid.feed(&[0xe2], "content.xml").unwrap();
+        assert!(matches!(
+            invalid.feed(&[0x28], "content.xml"),
+            Err(StreamProbeError::Invalid(Error::InvalidFormat(message)))
+                if message.contains("not UTF-8")
+        ));
+    }
+
+    #[test]
+    fn streamed_body_probe_scans_a_fill_larger_than_its_window() {
+        let mut probe = BodyProbe::new();
+        let mut bytes = vec![b'x'; STREAM_PROBE_WINDOW_BYTES * 3];
+        let marker = b"<office:body><office:presentation";
+        bytes[128..128 + marker.len()].copy_from_slice(marker);
+        probe.feed(&bytes);
+        assert!(!probe.finish().unwrap());
+    }
+
+    #[test]
+    fn source_owner_drops_large_validation_buffer_before_semantic_read() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page><draw:frame><draw:text-box><text:p>{}</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#,
+            "x".repeat(1024 * 1024),
+        );
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(ODF_PRESENTATION).unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let owner =
+            SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+        assert!(owner.content_xml.get().is_none());
+        assert_eq!(owner.content_xml_bytes, content.len() as u64);
+
+        assert!(owner.slide(0).unwrap().is_some());
+        let mut output = Vec::new();
+        owner
+            .write_text_to(&mut output, TextOutputOptions::default())
+            .unwrap();
+        assert!(
+            owner.content_xml.get().is_none(),
+            "semantic projections must not retain the raw XML cache"
+        );
+        assert!(owner.content_xml().unwrap().contains(&"x".repeat(1024)));
+        assert!(owner.content_xml.get().is_some());
+    }
+
+    #[test]
+    fn append_facts_are_deferred_until_a_successful_prepare() {
+        let content = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(ODF_PRESENTATION).unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            writer.finish_to_bytes().unwrap(),
+        )))
+        .unwrap();
+        assert!(owner.append_facts.get().is_none());
+
+        owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .prepare()
+            .unwrap();
+        assert!(owner.append_facts.get().is_some());
     }
 }

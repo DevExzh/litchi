@@ -319,8 +319,15 @@ fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
     let reads_before_text = source.reads();
 
     assert_eq!(presentation.text().unwrap(), expected);
+    let reads_after_first_text = source.reads();
+    assert!(
+        reads_after_first_text > reads_before_text,
+        "the first semantic read streams the validated source projection"
+    );
     let versions_before_threshold_call = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
+    let reads_after_second_text = source.reads();
+    assert!(reads_after_second_text > reads_after_first_text);
     assert!(source.versions() - versions_before_threshold_call >= 3);
     let versions_before_cache_hit = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
@@ -329,7 +336,7 @@ fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
         2,
         "a retained text cache hit only observes source freshness before and after cloning"
     );
-    assert_eq!(source.reads(), reads_before_text);
+    assert_eq!(source.reads(), reads_after_second_text);
     assert_eq!(expected, "First\nalpha\n\nSecond\nbeta");
 
     source.bump_revision();
@@ -377,9 +384,8 @@ fn source_facade_text_parse_errors_are_not_cached() {
     assert!(presentation.text().is_err());
     let versions_before_retry = source.versions();
     assert!(presentation.text().is_err());
-    assert_eq!(
-        source.versions() - versions_before_retry,
-        2,
+    assert!(
+        source.versions() - versions_before_retry >= 2,
         "a parse error must leave the thresholded cache uninitialized so the parser is retried"
     );
 }
@@ -521,6 +527,15 @@ fn source_facade_supports_password_protected_content() {
     .unwrap();
     assert_eq!(source.content_xml().unwrap(), eager.content_xml());
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
+    let mut eager_text = Vec::new();
+    eager
+        .write_text_to(&mut eager_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    let mut source_text = Vec::new();
+    source
+        .write_text_to(&mut source_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    assert_eq!(source_text, eager_text);
     assert!(
         SourceBackedPresentation::from_read_at_with_password(
             Arc::new(CountingSource::new(bytes)),
