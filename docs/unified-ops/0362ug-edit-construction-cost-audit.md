@@ -18,7 +18,7 @@ The ODG correction and ODB/ODM correction are now assembled at
 | ODG | Primary edit copied content and styles XML, including unused copies for pure joined package replacement. | 0362utf, reviewed and merged at `c3f56b7a9d`; lazy part state retains the source package and materializes on mutation. |
 | ODB, ODM | ODB copied content XML; ODM title edits read raw meta.xml and copied projected title strings. | 0362ugb and 0362ugb-a, reviewed and merged at `8779d059ad`; borrowed XML/title state and deferred changed-title publication. |
 | ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, correction in progress. The already-lazy tail-append entry is not this finding. |
-| ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc, correction in progress. |
+| ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc, reviewed and merged at `f144cd6029`; deferred parsing/protection, cheap admission, cached resource counts and sparse flat staging. |
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd, correction in progress. |
 | XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, correction in progress. |
 | XLSX | Source-backed worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, correction in progress. |
@@ -77,6 +77,21 @@ output, not raw command logs. Review confirms the borrowed state and
 semantic behavior. ODB helper paths may materialize before discovering a
 self-move or validation failure; construction/read-only/discard stay borrowed.
 ODM raw meta.xml failures move from construction to a changed-title commit.
+
+ODS source `2e2f902179d8ea107d05d3805542e89d9a42f27a` is independently
+reviewed and passes 1,767 tests across 119 successful result blocks, including
+702 library tests. Strict all-target/all-feature Clippy also passes. Both
+final commands use the repository's pinned Rust 1.95 and tracked root Clippy
+configuration. The raw logs are
+`/home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/ods-full-tests-pinned195.log`
+(182,062 bytes, SHA-256
+`81f35af676d3546b6f94f7b9253b72e3f5be9026677ace21a288855afd3b9bba`)
+and `ods-all-targets-clippy-pinned195.log` beside it (729 bytes, SHA-256
+`72fd3add599ba9f7e2557891ec1a07f579ac187eeb2ef1d0717681496079782d`).
+The coordinator verified both hashes, every result block and actual root
+configuration against Git. A preceding fixture expansion had excluded root
+configuration and selected Rust 1.98; that run is historical evidence only.
+All 37 required fixture paths were already tracked; no fixture was added.
 
 The reviewed glossary policy still parses as 55 profiles after these merges.
 This is neither a fresh rustdoc inventory nor the 53-check gate. Complete
