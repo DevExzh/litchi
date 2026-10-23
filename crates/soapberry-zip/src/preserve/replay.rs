@@ -227,7 +227,6 @@ impl ReplayMeasurement {
 }
 
 /// A typed failure from replay measurement or publication.
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum ReplayPublicationError<E, A = E> {
     Archive {
@@ -265,6 +264,19 @@ pub enum ReplayPublicationError<E, A = E> {
         source: A,
         progress: ReplayProgress,
     },
+}
+
+impl<E, A> fmt::Debug for ReplayPublicationError<E, A> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive { .. } => "ReplayPublicationError::Archive",
+            Self::Callback { .. } => "ReplayPublicationError::Callback",
+            Self::Limit { .. } => "ReplayPublicationError::Limit",
+            Self::Sink { .. } => "ReplayPublicationError::Sink",
+            Self::NonDeterministic { .. } => "ReplayPublicationError::NonDeterministic",
+            Self::Admission { .. } => "ReplayPublicationError::Admission",
+        })
+    }
 }
 
 impl<E, A> ReplayPublicationError<E, A> {
@@ -375,10 +387,7 @@ impl<E: fmt::Display, A> fmt::Display for ReplayPublicationError<E, A> {
     }
 }
 
-impl<E: fmt::Debug + fmt::Display + 'static, A: fmt::Debug> std::error::Error
-    for ReplayPublicationError<E, A>
-{
-}
+impl<E: fmt::Display + 'static, A: 'static> std::error::Error for ReplayPublicationError<E, A> {}
 
 /// Run a bounded callback twice while replacing one existing source member.
 impl<'source, R> PreservationIndex<'source, R>
