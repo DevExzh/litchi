@@ -239,8 +239,6 @@ pub(crate) struct SourceCellEdit<'source> {
     touched: BTreeMap<usize, Sheet>,
     coordinates: Vec<(usize, usize, usize)>,
     hyperlink_edit: bool,
-    structure_protected: bool,
-    protected_sheets: Vec<String>,
 }
 
 impl fmt::Debug for SourceCellEdit<'_> {
@@ -250,7 +248,6 @@ impl fmt::Debug for SourceCellEdit<'_> {
             .field("source_version", &self.before.source_version)
             .field("touched_sheets", &self.touched.len())
             .field("changed_cells", &self.coordinates.len())
-            .field("structure_protected", &self.structure_protected)
             .finish_non_exhaustive()
     }
 }
@@ -290,15 +287,11 @@ impl<'source> SourceCellSnapshot<'source> {
     /// Start an isolated sparse transaction from this snapshot.
     pub(crate) fn edit(&self) -> Result<SourceCellEdit<'source>> {
         self.check_source()?;
-        let (structure_protected, protected_sheets) = self.owner.edit_protection()?.clone();
-        self.check_source()?;
         Ok(SourceCellEdit {
             before: self.clone(),
             touched: BTreeMap::new(),
             coordinates: Vec::new(),
             hyperlink_edit: false,
-            structure_protected,
-            protected_sheets,
         })
     }
 
@@ -326,6 +319,16 @@ impl<'source> SourceCellEdit<'source> {
     #[must_use]
     pub(crate) fn is_no_op(&self) -> bool {
         self.coordinates.is_empty()
+    }
+
+    fn check_protection(&self, sheet_name: &str) -> Result<()> {
+        let (structure_protected, protected_sheets) = self.before.owner.edit_protection()?;
+        if *structure_protected || protected_sheets.iter().any(|name| name == sheet_name) {
+            return Err(Error::InvalidFormat(
+                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Replace one existing ordinary scalar cell.
@@ -398,16 +401,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()
@@ -506,16 +500,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()
@@ -605,16 +590,7 @@ impl<'source> SourceCellEdit<'source> {
             self.before.check_source()?;
             return Ok(Some(0));
         }
-        if self.structure_protected
-            || self
-                .protected_sheets
-                .iter()
-                .any(|name| name == &source_sheet.name)
-        {
-            return Err(Error::InvalidFormat(
-                "ODS source cell edits refuse protected spreadsheets and worksheets".to_string(),
-            ));
-        }
+        self.check_protection(&source_sheet.name)?;
         let attempted = self
             .coordinates
             .len()

@@ -59,6 +59,7 @@ const BODY_MARKER: &str = "<office:spreadsheet";
 pub(crate) struct Archive {
     inner: Arc<family::Package>,
     xml_limits: XmlStreamLimits,
+    resource_count: usize,
 }
 
 impl fmt::Debug for Archive {
@@ -70,6 +71,7 @@ impl fmt::Debug for Archive {
                 "prepared_index",
                 &self.inner.package().prepared_index_identity(),
             )
+            .field("resources", &self.resource_count)
             .finish()
     }
 }
@@ -87,11 +89,7 @@ impl Archive {
         xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-            xml_limits,
-        })
+        Self::from_family_package(package, xml_limits)
     }
 
     /// Adopt the indexed package retained by smart ODF detection.
@@ -121,11 +119,7 @@ impl Archive {
             BODY_MARKER,
             "ODS",
         )?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-            xml_limits,
-        })
+        Self::from_family_package(package, xml_limits)
     }
 
     /// Adopt an already materialized, validated archive without copying its
@@ -140,11 +134,7 @@ impl Archive {
         xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
         let package = family::Package::from_owned_package(archive, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-            xml_limits,
-        })
+        Self::from_family_package(package, xml_limits)
     }
 
     /// Adopt shared ODS bytes for an internal source-bound transaction.
@@ -158,11 +148,7 @@ impl Archive {
         xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-            xml_limits,
-        })
+        Self::from_family_package(package, xml_limits)
     }
 
     /// Return a cloneable package owner that never retains a decryption
@@ -176,10 +162,20 @@ impl Archive {
             BODY_MARKER,
             "ODS",
         )?;
+        Self::from_family_package(package, self.xml_limits)
+    }
+
+    fn from_family_package(package: family::Package, xml_limits: XmlStreamLimits) -> Result<Self> {
         crate::authoring::validate_content_xml(package.content_xml())?;
+        let resource_count = package
+            .files()?
+            .into_iter()
+            .filter(|path| !crate::document::is_reserved_path(path) && !path.ends_with('/'))
+            .count();
         Ok(Self {
             inner: Arc::new(package),
-            xml_limits: self.xml_limits,
+            xml_limits,
+            resource_count,
         })
     }
 
@@ -201,6 +197,11 @@ impl Archive {
     #[must_use]
     pub(crate) fn package(&self) -> &OwnedPackage {
         self.inner.package()
+    }
+
+    #[must_use]
+    pub(crate) const fn resource_count(&self) -> usize {
+        self.resource_count
     }
 
     /// Everything a tolerant read repaired while this package was opened.
