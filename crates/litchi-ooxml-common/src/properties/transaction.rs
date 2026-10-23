@@ -942,7 +942,7 @@ impl Plan {
             core,
             app,
             custom,
-            changed_fields: changed_fields,
+            changed_fields: changed_fields.into_boxed_slice()
             planned_retained_bytes,
         })
     }
@@ -1111,7 +1111,7 @@ impl PreparedPlan {
             },
             Diagnostics {
                 families,
-                fields: changed_fields.into_boxed_slice(),
+                fields: changed_fields,
             },
         ))
     }

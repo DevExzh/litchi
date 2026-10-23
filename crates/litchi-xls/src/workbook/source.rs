@@ -1460,7 +1460,7 @@ impl SourceBackedWorkbook {
         self.ensure_current()
             .map_err(crate::source_backed::workbook_error)?;
         let identity = (|| {
-            Ok::<_, crate::Error>(match &self.inner.pending {
+            Ok::<_, Error>(match &self.inner.pending {
                 Some(plan) => {
                     let mut sink = io::sink();
                     let fingerprint = plan
