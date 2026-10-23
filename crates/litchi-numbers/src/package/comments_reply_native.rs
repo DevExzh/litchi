@@ -233,6 +233,14 @@ impl std::error::Error for NativeReplyError {}
 
 type Result<T> = std::result::Result<T, NativeReplyError>;
 
+fn map_constructor_error(error: litchi_iwa_core::Error) -> NativeReplyError {
+    match error {
+        litchi_iwa_core::Error::Limit { .. } => NativeReplyError::Limit,
+        litchi_iwa_core::Error::Allocation { .. } => NativeReplyError::Allocation,
+        _ => NativeReplyError::InvalidSource,
+    }
+}
+
 fn map_popup_native_error(error: popup_native::NativePopUpError) -> NativeReplyError {
     match error {
         popup_native::NativePopUpError::InvalidSource => NativeReplyError::InvalidSource,
@@ -1830,6 +1838,7 @@ fn adjust_reply_field_infos(
     route: NativeReplyObjectRoute,
     mutation: ReplyFieldMutation,
     after: &[u64],
+    limits: Limits,
 ) -> Result<()> {
     let info = archive
         .object_mut(route.identifier)
@@ -1854,7 +1863,10 @@ fn adjust_reply_field_infos(
             info.field_infos
                 .try_reserve_exact(1)
                 .map_err(|_| NativeReplyError::Allocation)?;
-            let mut field = litchi_iwa_core::FieldInfo::new(vec![REPLY_FIELD_PREFIX, ordinal]);
+            let path = litchi_iwa_core::FieldPath::new(vec![REPLY_FIELD_PREFIX, ordinal], limits)
+                .map_err(map_constructor_error)?;
+            let mut field =
+                litchi_iwa_core::FieldInfo::new(path, limits).map_err(map_constructor_error)?;
             field.r#type = Some(FieldType::ObjectReference);
             field
                 .object_references
@@ -1881,7 +1893,11 @@ fn adjust_reply_field_infos(
                     && path[0] == REPLY_FIELD_PREFIX
                     && path[1] > u32::try_from(removed).unwrap_or(u32::MAX)
                 {
-                    field.path = vec![REPLY_FIELD_PREFIX, path[1] - 1].into();
+                    field.path = litchi_iwa_core::FieldPath::new(
+                        vec![REPLY_FIELD_PREFIX, path[1] - 1],
+                        limits,
+                    )
+                    .map_err(map_constructor_error)?;
                 }
             }
         },
@@ -1934,6 +1950,7 @@ fn adjust_list_field_infos(
     route: NativeReplyObjectRoute,
     mutation: ListFieldMutation,
     new_identifier: u64,
+    limits: Limits,
 ) -> Result<()> {
     let info = archive
         .object_mut(route.identifier)
@@ -1957,8 +1974,10 @@ fn adjust_list_field_infos(
     info.field_infos
         .try_reserve_exact(1)
         .map_err(|_| NativeReplyError::Allocation)?;
-    let mut field =
-        litchi_iwa_core::FieldInfo::new(vec![LIST_ENTRY_FIELD_PREFIX, mutation.new_key]);
+    let path =
+        litchi_iwa_core::FieldPath::new(vec![LIST_ENTRY_FIELD_PREFIX, mutation.new_key], limits)
+            .map_err(map_constructor_error)?;
+    let mut field = litchi_iwa_core::FieldInfo::new(path, limits).map_err(map_constructor_error)?;
     field.r#type = Some(FieldType::ObjectReference);
     field
         .object_references
@@ -2642,6 +2661,7 @@ pub(super) fn rewrite_native_comment_reply(
         },
         reply_field_mutation,
         &after_reply_ids,
+        request.limits,
     )?;
     let new_root_object = root_archive
         .objects
@@ -2796,6 +2816,7 @@ pub(super) fn rewrite_native_comment_reply(
         request.list,
         list_mutation,
         request.new_root.identifier,
+        request.limits,
     )?;
 
     // The selected cell changes only its comment-list key.  The BNC helper

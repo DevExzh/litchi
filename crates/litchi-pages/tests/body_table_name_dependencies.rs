@@ -12,7 +12,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::append_length_delimited_field;
-use litchi_iwa_core::{Archive, FieldInfo, FieldPath, SnappyStream};
+use litchi_iwa_core::{Archive, FieldInfo, SnappyStream};
 use litchi_iwa_protos::{tp, tsce, tsp};
 use litchi_pages::{
     BodyTableSelector, Package, table::name::transaction::Error as BodyTableNameError,
@@ -294,7 +294,15 @@ fn malformed_root_calculation_engine_field_path_is_rejected_atomically() -> Test
             .message_infos
             .first_mut()
             .ok_or("missing document root metadata")?;
-        let mut field = FieldInfo::new(FieldPath::new(vec![15, ROOT_CALCULATION_ENGINE_FIELD + 1]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![15, ROOT_CALCULATION_ENGINE_FIELD + 1],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(CALCULATION_ENGINE_IDENTIFIER);
         info.field_infos.push(field);
         Ok(())

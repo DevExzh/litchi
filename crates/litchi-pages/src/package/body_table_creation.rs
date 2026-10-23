@@ -1014,7 +1014,8 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
             owner_data,
             Vec::new(),
         )?;
-        owner_object.archive_info.message_infos[0].versions = FORMULA_OWNER_VERSIONS.to_vec();
+        owner_object.archive_info.message_infos[0].versions =
+            FORMULA_OWNER_VERSIONS.to_vec().into();
         working.insert(&engine_member, owner_object)?;
         let engine_data =
             table_create::engine_payload(&engine_data, owner, internal, uid).map_err(storage)?;

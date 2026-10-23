@@ -56,6 +56,7 @@ pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
 pub(crate) mod slide_text;
 pub(crate) mod slide_transition;
+mod snappy_failure;
 pub(crate) mod soundtrack_items;
 pub(crate) mod soundtrack_order;
 pub(crate) mod soundtrack_physical;

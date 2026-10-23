@@ -854,6 +854,10 @@ fn rewrite_order(
     requested: &[NonZeroU64],
 ) -> Result<Package, Error> {
     let catalog = &source.state.source;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let component = catalog
         .components()
         .get_index(location.component_index)
@@ -944,7 +948,7 @@ fn rewrite_order(
         .map_err(map_core_error)?;
     let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let compressed =
-        SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
+        SnappyStream::compress(&archive_bytes, snappy_limits).map_err(map_core_error)?;
     let mut deleted_previews = Vec::new();
     deleted_previews
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())

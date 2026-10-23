@@ -214,7 +214,15 @@ pub(crate) fn set_field_info(
         .message_infos
         .first_mut()
         .ok_or_else(|| io::Error::other("synthetic object has no message info"))?;
-    let mut field = FieldInfo::new(field_path);
+    let mut field = FieldInfo::new(
+        litchi_iwa_archive::iwa::FieldPath::new(
+            field_path,
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap(),
+        litchi_iwa_archive::iwa::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = references.to_vec();
     info.field_infos.push(field);
@@ -464,7 +472,15 @@ pub(crate) fn sidecar(
         } else {
             3
         };
-        let mut field = FieldInfo::new(vec![field_number, u32::try_from(key + 1)?]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_archive::iwa::FieldPath::new(
+                vec![field_number, u32::try_from(key + 1)?],
+                litchi_iwa_archive::iwa::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![*root];
         info.field_infos.push(field);
@@ -1378,7 +1394,15 @@ pub(crate) fn multitable_same_key_fixture() -> TestResult<Vec<u8>> {
             .first_mut()
             .ok_or_else(|| io::Error::other("comment fixture sheet metadata is missing"))?;
         info.object_references.push(SECOND_TABLE_INFO_ID);
-        let mut field = FieldInfo::new(vec![4, 2]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_archive::iwa::FieldPath::new(
+                vec![4, 2],
+                litchi_iwa_archive::iwa::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(SECOND_TABLE_INFO_ID);
         info.field_infos.push(field);

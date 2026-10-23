@@ -2167,7 +2167,7 @@ fn nested_unique_field<'a>(
 
 #[cfg(test)]
 mod tests {
-    use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_core::FieldInfo;
 
     use super::*;
 
@@ -2214,7 +2214,11 @@ mod tests {
         for identifier in &identifiers {
             info.object_references.push(*identifier);
             info.field_infos.push(FieldInfo {
-                path: FieldPath::new(vec![1, 1, 1, 9]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![1, 1, 1, 9],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![*identifier],
                 ..FieldInfo::default()
             });
@@ -2231,7 +2235,11 @@ mod tests {
         object.archive_info.message_infos[message_index]
             .field_infos
             .push(FieldInfo {
-                path: FieldPath::new(vec![1, 1, 1, 9]),
+                path: litchi_iwa_core::FieldPath::new(
+                    vec![1, 1, 1, 9],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
                 object_references: vec![identifiers[0]],
                 ..FieldInfo::default()
             });

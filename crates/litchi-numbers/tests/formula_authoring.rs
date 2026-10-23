@@ -136,7 +136,12 @@ fn append_declared_reference(
     {
         field.object_references.push(identifier);
     } else {
-        let mut field = FieldInfo::new(path.to_vec());
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(path.to_vec(), litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(identifier);
         info.field_infos.push(field);
     }

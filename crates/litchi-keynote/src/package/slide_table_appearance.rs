@@ -1579,9 +1579,8 @@ fn rewrite_native_appearance(
         budget.output(encoded_len)?;
         budget.entry_bytes(encoded_len)?;
         budget.total_bytes(encoded_len)?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-                .map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, snappy_limits)
+            .map_err(map_core_error)?;
         budget.output(compressed_bound)?;
         budget.wire_output(compressed_bound)?;
         budget.entry_bytes(compressed_bound)?;
@@ -1590,7 +1589,7 @@ fn rewrite_native_appearance(
         if bytes.len() != encoded_len {
             return Err(Error::Verification);
         }
-        let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         if data.len() > compressed_bound {
             return Err(Error::Verification);
         }
@@ -2494,8 +2493,8 @@ fn rewrite_metadata_entry(
     budget.output(encoded_len)?;
     budget.entry_bytes(encoded_len)?;
     budget.total_bytes(encoded_len)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-        .map_err(map_core_error)?;
+    let compressed_bound =
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.wire_output(compressed_bound)?;
     budget.entry_bytes(compressed_bound)?;
@@ -2504,7 +2503,7 @@ fn rewrite_metadata_entry(
     if bytes.len() != encoded_len {
         return Err(Error::Verification);
     }
-    let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if data.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2654,7 +2653,12 @@ fn append_style_object(
                     .and_then(|size| size.checked_add(2usize.saturating_mul(size_of::<u32>())))
                     .ok_or(Error::InvalidSource)?,
             )?;
-            let mut field = litchi_iwa_core::FieldInfo::new(vec![1, 3]);
+            let mut field = litchi_iwa_core::FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1, 3], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references.push(new_parent);
             cloned_info.field_infos.insert(0, field);

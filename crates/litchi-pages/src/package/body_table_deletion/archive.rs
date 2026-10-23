@@ -125,6 +125,10 @@ pub(super) fn prepare(
     budget: &mut table_lock::WireBudget,
 ) -> Result<ArchivePlan, Error> {
     let source_catalog = &source.state.source;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(super::map_archive_error)?;
     if !source_catalog.source_is_exact() {
         return Err(Error::Refused(
             crate::table::deletion::Refusal::UnsupportedSource,
@@ -318,14 +322,8 @@ pub(super) fn prepare(
             .limits()
             .effective_archive_limits()
             .map_err(super::map_archive_error)?;
-        let stream = SnappyStream::decompress(
-            entry.data(),
-            source_catalog
-                .limits()
-                .snappy_limits()
-                .map_err(super::map_archive_error)?,
-        )
-        .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
         let mut archive =
             Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archive
@@ -349,8 +347,7 @@ pub(super) fn prepare(
             .charge_payload_work(encoded_len)
             .map_err(super::map_lock_error)?;
         let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-        let compressed =
-            SnappyStream::compress(&encoded, Default::default()).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
         if compressed.is_empty() {
             return Err(Error::Verification);
         }

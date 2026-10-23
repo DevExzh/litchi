@@ -1575,6 +1575,7 @@ fn rewrite_lock_state(
 ) -> Result<Package, Error> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     if State::from_locked(target.explicit_locked.unwrap_or(false)) != before {
         return Err(Error::InvalidSource);
     }
@@ -1602,11 +1603,7 @@ fn rewrite_lock_state(
     budget.charge_payload_work(entry.data().len())?;
     let expected_stream_length = parsed_archive_source_length(component.archive())?;
     budget.charge_archive_inventory(expected_stream_length, component.archive())?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical_limits.snappy_limits().map_err(map_archive_error)?,
-    )
-    .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     let stream_length = stream.as_bytes().len();
     if stream_length != expected_stream_length {
         return Err(Error::InvalidSource);
@@ -1729,8 +1726,7 @@ fn rewrite_lock_state(
     }
     drop(stream);
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -3195,7 +3191,7 @@ fn usize_as_u64(value: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use litchi_iwa_core::{FieldInfo, FieldPath};
+    use litchi_iwa_core::FieldInfo;
     use litchi_iwa_protos::tswp;
     use prost::Message as _;
 
@@ -3601,11 +3597,25 @@ mod tests {
 
     #[test]
     fn body_reference_metadata_accepts_unrelated_paths_but_keeps_selected_path_strict() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         message.object_references = vec![100, 900, 901];
-        let mut selected = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut selected = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         selected.object_references.push(100);
-        let mut sections = FieldInfo::new(FieldPath::new(vec![17]));
+        let mut sections = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         sections.object_references.extend([900, 901]);
         message.field_infos = vec![selected, sections];
 
@@ -3615,7 +3625,8 @@ mod tests {
                 .expect("unrelated aggregate references use their own path")
         );
 
-        message.field_infos[0].path = FieldPath::new(vec![17]);
+        message.field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![17], litchi_iwa_core::Limits::default()).unwrap();
         let mut strict_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
         assert!(matches!(
             message_declares_reference_prefix(
@@ -3630,10 +3641,22 @@ mod tests {
 
     #[test]
     fn data_reference_scans_are_bounded_before_semantic_checks() {
-        let mut message_data = litchi_iwa_core::MessageInfo::new(2_002, 0);
+        let mut message_data =
+            litchi_iwa_core::MessageInfo::new(2_002, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         message_data.object_references = vec![100];
         message_data.data_references = vec![100];
-        message_data.field_infos = vec![FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]))];
+        message_data.field_infos = vec![
+            FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![TABLE_BODY_FIELD],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+        ];
 
         let mut message_budget = budget_with_wire_limits(1024, 1024, 1024 * 1024);
         message_budget.maximum_payload_references = 1;
@@ -3667,9 +3690,19 @@ mod tests {
             })
         ));
 
-        let mut field_data = litchi_iwa_core::MessageInfo::new(2_003, 0);
+        let mut field_data =
+            litchi_iwa_core::MessageInfo::new(2_003, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
         field_data.object_references = vec![100];
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![100];
         field.data_references = vec![100];
         field_data.field_infos = vec![field];
@@ -3709,8 +3742,18 @@ mod tests {
 
     #[test]
     fn aggregate_reference_budget_is_charged_before_declaration_reserve() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(100);
         message.field_infos.push(field);
 
@@ -3731,8 +3774,18 @@ mod tests {
 
     #[test]
     fn empty_body_inventory_charges_references_before_declaration_reserve() {
-        let mut message = litchi_iwa_core::MessageInfo::new(2_001, 0);
-        let mut field = FieldInfo::new(FieldPath::new(vec![TABLE_BODY_FIELD]));
+        let mut message =
+            litchi_iwa_core::MessageInfo::new(2_001, 0, litchi_iwa_core::Limits::default())
+                .unwrap();
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![TABLE_BODY_FIELD],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(100);
         message.object_references.push(100);
         message.field_infos.push(field);

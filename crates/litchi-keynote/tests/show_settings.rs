@@ -7,9 +7,7 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{WireView, append_varint_field},
 };
-use litchi_iwa_core::{
-    Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveInfo, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
     OpenOptions, Package, ReadError, Seconds, SemanticLimits, SourceLimits,
@@ -280,7 +278,11 @@ fn package_bytes_with_slide_nodes(
     )?;
     let mut document = object(DOCUMENT_IDENTIFIER, 1, document.encode_to_vec())?;
     document.archive_info.message_infos[0].object_references = vec![SHOW_IDENTIFIER];
-    let mut show_field = FieldInfo::new(vec![2]);
+    let mut show_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     show_field.object_references = vec![SHOW_IDENTIFIER];
     document.archive_info.message_infos[0]
         .field_infos
@@ -367,7 +369,11 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
     };
     let mut document = object(DOCUMENT_IDENTIFIER, 1, document_value.encode_to_vec())?;
     document.archive_info.message_infos[0].object_references = vec![SHOW_IDENTIFIER];
-    let mut show_field = FieldInfo::new(vec![2]);
+    let mut show_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     show_field.object_references = vec![SHOW_IDENTIFIER];
     document.archive_info.message_infos[0]
         .field_infos
@@ -384,7 +390,11 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
         )?,
     )?;
     show.archive_info.message_infos[0].object_references = vec![SLIDE_NODE_IDENTIFIER];
-    let mut slide_tree_field = FieldInfo::new(vec![3, 2]);
+    let mut slide_tree_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3, 2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     slide_tree_field.object_references = vec![SLIDE_NODE_IDENTIFIER];
     show.archive_info.message_infos[0]
         .field_infos
@@ -420,12 +430,20 @@ fn cache_package_bytes(split_components: bool) -> TestResult<Vec<u8>> {
     let mut node = object(SLIDE_NODE_IDENTIFIER, 4, node_value.encode_to_vec())?;
     node.archive_info.message_infos[0].object_references = vec![SLIDE_IDENTIFIER];
     node.archive_info.message_infos[0].data_references = vec![7_001, 7_002];
-    let mut slide_field = FieldInfo::new(vec![2]);
+    let mut slide_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     slide_field.object_references = vec![SLIDE_IDENTIFIER];
     node.archive_info.message_infos[0]
         .field_infos
         .push(slide_field);
-    let mut thumbnails_field = FieldInfo::new(vec![16]);
+    let mut thumbnails_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     thumbnails_field.data_references = vec![7_001, 7_002];
     node.archive_info.message_infos[0]
         .field_infos
@@ -627,12 +645,17 @@ fn with_metadata_guard(
                 object.archive_info.message_infos[index].diff_merge_version = vec![1];
             },
             MetadataGuard::DiffPath => {
-                object.archive_info.message_infos[index].diff_field_path =
-                    Some(FieldPath::new(vec![4]));
+                object.archive_info.message_infos[index].diff_field_path = Some(
+                    litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                );
             },
             MetadataGuard::FieldsToRemove => object.archive_info.message_infos[index]
                 .fields_to_remove
-                .push(FieldPath::new(vec![4])),
+                .push(
+                    litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                ),
             MetadataGuard::ReadVersion => {
                 object.archive_info.message_infos[index].diff_read_version = vec![1];
             },
@@ -1658,7 +1681,8 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         Ok(())
     })?;
     let wrong_path = rewrite_root(&bytes, |root, index| {
-        root.archive_info.message_infos[index].field_infos[0].path = FieldPath::new(vec![3]);
+        root.archive_info.message_infos[index].field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })?;
     for malformed in [missing, duplicate, wrong_path] {
@@ -1681,7 +1705,11 @@ fn root_reference_and_ownership_metadata_fail_closed() -> TestResult<()> {
         root.archive_info.message_infos[0]
             .object_references
             .push(SIBLING_IDENTIFIER);
-        let mut unrelated = FieldInfo::new(vec![77]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![77], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.object_references = vec![SIBLING_IDENTIFIER];
         root.archive_info.message_infos[0]
             .field_infos

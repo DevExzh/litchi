@@ -1716,8 +1716,7 @@ fn rewrite_component<'a>(
     let allocation_bytes = archive_allocation_cost(&archive)?;
     let references_count = archive_reference_count(&archive)?;
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let decoded_bytes = rewritten.len();
     let peak_scratch_bytes = checked_add(source_decoded_bytes, source_allocation_bytes)?
         .max(checked_add(allocation_bytes, decoded_bytes)?)
@@ -2055,8 +2054,7 @@ fn rewrite_staged_component<'a>(
     let allocation_bytes = archive_allocation_cost(&archive)?;
     let references = archive_reference_count(&archive)?;
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let decoded_bytes = rewritten.len();
     let peak_scratch_bytes = checked_add(source_decoded_bytes, source_allocation_bytes)?
         .max(checked_add(allocation_bytes, decoded_bytes)?)
@@ -2797,7 +2795,12 @@ mod tests {
         .expect("test object is valid");
         let info = &mut object.archive_info.message_infos[0];
         info.object_references.extend([10, 20]);
-        let mut field = FieldInfo::new(vec![4, 1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![4, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(10);
         info.field_infos.push(field);
         object

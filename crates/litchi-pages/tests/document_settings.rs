@@ -5,7 +5,7 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream, UnknownFieldRule,
+    Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream, UnknownFieldRule,
 };
 use litchi_iwa_protos::{tp, tsa, tsk, tsp, tswp};
 use litchi_pages::{
@@ -206,7 +206,11 @@ fn view_objects() -> TestResult<Vec<ArchiveObject>> {
         .encode_to_vec(),
     )?;
     bridge.archive_info.message_infos[0].object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
-    let mut bridge_field = FieldInfo::new(vec![1]);
+    let mut bridge_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     bridge_field.object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
     bridge.archive_info.message_infos[0]
         .field_infos
@@ -237,7 +241,11 @@ fn view_objects() -> TestResult<Vec<ArchiveObject>> {
         Default::default(),
     )?;
     root.archive_info.message_infos[1].object_references = vec![LAYOUT_STATE_IDENTIFIER];
-    let mut root_field = FieldInfo::new(vec![1]);
+    let mut root_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     root_field.object_references = vec![LAYOUT_STATE_IDENTIFIER];
     root.archive_info.message_infos[1]
         .field_infos
@@ -256,7 +264,11 @@ fn view_objects() -> TestResult<Vec<ArchiveObject>> {
     )?;
     detached.archive_info.message_infos[0].object_references =
         vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
-    let mut detached_field = FieldInfo::new(vec![1]);
+    let mut detached_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     detached_field.object_references = vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
     detached.archive_info.message_infos[0]
         .field_infos
@@ -311,7 +323,11 @@ fn synthetic_package(
         (vec![15, 5], VIEW_STATE_IDENTIFIER),
         (vec![7], SETTINGS_IDENTIFIER),
     ] {
-        let mut field = FieldInfo::new(path);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![identifier];
         document_info.field_infos.push(field);
     }
@@ -1038,7 +1054,8 @@ fn root_reference_and_header_ownership_must_be_exact() -> TestResult {
             .iter_mut()
             .find(|field| field.object_references.contains(&SETTINGS_IDENTIFIER))
             .ok_or_else(|| io::Error::other("missing settings field metadata"))?;
-        field.path = FieldPath::new(vec![8]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![8], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })?;
 
@@ -1096,7 +1113,12 @@ fn unrelated_observer_references_do_not_claim_settings_ownership_and_stay_exact(
         )?;
         let info = &mut observer.archive_info.message_infos[0];
         info.object_references = vec![SETTINGS_IDENTIFIER];
-        let mut field = FieldInfo::new(vec![123, 456]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![123, 456], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![SETTINGS_IDENTIFIER];
         info.field_infos.push(field);
         archive.objects.push(observer);
@@ -1185,7 +1207,9 @@ fn stale_rooted_cache_headers_and_no_layout_merge_diff_fail_atomically() -> Test
             .iter_mut()
             .find(|info| info.type_ == VIEW_STATE_ROOT_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing rooted view-state metadata"))?;
-        info.diff_field_path = Some(FieldPath::new(vec![1]));
+        info.diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         info.diff_read_version = vec![1];
         Ok(())
     })?;
@@ -1321,7 +1345,9 @@ fn noncanonical_prefix_and_all_merge_diff_metadata_are_refused_atomically() -> T
             .ok_or_else(|| io::Error::other("missing settings object"))?
             .archive_info
             .message_infos[1]
-            .diff_field_path = Some(FieldPath::new(vec![1]));
+            .diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         Ok(())
     })?;
     let fields_to_remove = rewrite_component(&bytes, SETTINGS_MEMBER, |archive| {
@@ -1331,7 +1357,10 @@ fn noncanonical_prefix_and_all_merge_diff_metadata_are_refused_atomically() -> T
             .archive_info
             .message_infos[1]
             .fields_to_remove
-            .push(FieldPath::new(vec![1]));
+            .push(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+            );
         Ok(())
     })?;
     let read_version = rewrite_component(&bytes, SETTINGS_MEMBER, |archive| {
@@ -1529,7 +1558,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
         .position(|message| message.type_ == SETTINGS_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("native settings message is missing"))?;
     let settings_info = settings_object.archive_info.message_infos[settings_index].clone();
-    assert_eq!(settings_info.versions, [1, 0, 5]);
+    assert_eq!(settings_info.versions.as_slice(), [1, 0, 5]);
     let gap_info = settings_info
         .field_infos
         .iter()

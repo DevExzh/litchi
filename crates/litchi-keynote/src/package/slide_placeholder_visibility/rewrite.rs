@@ -23,6 +23,7 @@ pub(super) fn rewrite_visibility(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let preview_plan =
         crate::package::rendering_invalidation::root_preview_deletions(catalog.package())
@@ -129,8 +130,7 @@ pub(super) fn rewrite_visibility(
         }
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
-        let replacement =
-            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+        let replacement = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         drop(bytes);
         compressed.push((*name, replacement));
     }

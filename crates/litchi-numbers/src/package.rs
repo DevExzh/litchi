@@ -3307,6 +3307,49 @@ mod tests {
     }
 
     #[test]
+    fn retained_physical_catalog_uses_selected_public_snappy_profile() -> Result<()> {
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let source_catalog =
+            litchi_iwa_archive::package::Catalog::from_bytes(&bytes, Limits::default())?;
+        let selected_entry_bytes = source_catalog
+            .iter()
+            .map(|entry| entry.data().len())
+            .max()
+            .ok_or_else(|| Error::InvalidFormat("source has no entries".to_owned()))?;
+        let selected_entry_bytes = u64::try_from(selected_entry_bytes)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let source_limits = crate::SourceLimits::builder()
+            .max_entry_bytes(selected_entry_bytes)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().source_limits(source_limits),
+        )?;
+        let physical =
+            package.state.components.physical().ok_or_else(|| {
+                Error::InvalidFormat("package has no physical catalog".to_owned())
+            })?;
+        let physical_limits = physical.limits();
+
+        assert_eq!(
+            physical_limits.max_entry_bytes(),
+            selected_entry_bytes,
+            "the retained physical catalog must use the selected public entry ceiling"
+        );
+        assert_eq!(
+            physical_limits
+                .snappy_limits()
+                .map_err(Error::Archive)?
+                .max_compressed_stream(),
+            usize::try_from(selected_entry_bytes)
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            "the retained physical catalog must derive Snappy from that same ceiling"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn direct_package_requires_unambiguous_numbers_application_ownership() -> Result<()> {
         let mut pages = tp::DocumentArchive {
             super_: shared_document(),

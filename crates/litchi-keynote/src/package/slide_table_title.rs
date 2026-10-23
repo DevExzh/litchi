@@ -960,7 +960,7 @@ fn rewrite_title(
     let encoded_bound = archive
         .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
         .map_err(map_core_error)?;
     budget.output(
         encoded_bound
@@ -971,7 +971,7 @@ fn rewrite_title(
     if bytes.len() != encoded_bound {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

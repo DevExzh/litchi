@@ -5,7 +5,7 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{WireView, append_length_delimited_field, append_varint_field},
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
     MovieSelector, Package, SlideSelector, SourceLimits,
@@ -1727,7 +1727,8 @@ fn aggregate_and_field_info_caption_owners_fail_closed() -> TestResult<()> {
         .message_infos[0]
         .field_infos
         .push(FieldInfo {
-            path: FieldPath::new(vec![77, 1]),
+            path: litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
             object_references: vec![CAPTIONS[0]],
             ..FieldInfo::default()
         });

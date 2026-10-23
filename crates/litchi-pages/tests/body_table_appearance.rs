@@ -103,7 +103,11 @@ mod body_fixture {
         )?;
         let info = &mut object.archive_info.message_infos[0];
         info.object_references = vec![STYLESHEET_ID];
-        let mut field = FieldInfo::new(vec![5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![5], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(STYLESHEET_ID);
         info.field_infos.push(field);
         Ok(object)
@@ -230,7 +234,15 @@ mod body_fixture {
                 }
                 info.field_infos.clear();
                 if style != 0 {
-                    let mut field = FieldInfo::new(vec![3]);
+                    let mut field = FieldInfo::new(
+                        litchi_iwa_core::FieldPath::new(
+                            vec![3],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                     field.object_references.push(style);
                     info.field_infos.push(field);
                 }

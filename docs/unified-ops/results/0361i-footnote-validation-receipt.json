@@ -1,0 +1,27 @@
+{
+  "schema": "litchi_pages_footnote_validation.v1",
+  "source_commit": "3600111b59c6a8444776ba992a8657e8344dcb62",
+  "commands": [
+    {
+      "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-footnote-limits/env.sh && CARGO_BUILD_JOBS=1 cargo test --offline --locked -p litchi-pages --lib --all-features",
+      "exit_code": 0,
+      "tests": 211
+    },
+    {
+      "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-footnote-limits/env.sh && CARGO_BUILD_JOBS=1 cargo test --offline --locked -p litchi-iwa --lib --all-features",
+      "exit_code": 0,
+      "tests": 1695
+    },
+    {
+      "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-footnote-limits/env.sh && CARGO_BUILD_JOBS=1 cargo clippy --offline --locked -p litchi-pages -p litchi-iwa --all-features --lib -- -D warnings",
+      "exit_code": 0,
+      "warnings": 0
+    }
+  ],
+  "result": {
+    "pages_tests_passed": 211,
+    "iwa_tests_passed": 1695,
+    "clippy_warnings": 0,
+    "native_timing_claimed": false
+  }
+}

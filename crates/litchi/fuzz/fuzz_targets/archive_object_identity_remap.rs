@@ -12,7 +12,7 @@
 use std::{fmt::Debug, fmt::Display, hint::black_box};
 
 use libfuzzer_sys::fuzz_target;
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, Limits, RawMessage};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, Limits, RawMessage};
 
 const MAX_PAYLOAD_BYTES: usize = 256;
 const SOURCE_IDENTIFIER: u64 = 17;
@@ -61,7 +61,7 @@ fn source_object(data: &[u8]) -> ArchiveObject {
         FIRST_OBJECT_REFERENCE,
     ];
     first.data_references = vec![FIRST_DATA_REFERENCE, SECOND_DATA_REFERENCE];
-    let mut nested = FieldInfo::new(FieldPath::new(vec![1, 2, 3]));
+    let mut nested = FieldInfo::new(litchi_iwa_core::FieldPath::new(vec![1, 2, 3], litchi_iwa_core::Limits::default()).unwrap(), litchi_iwa_core::Limits::default()).unwrap();
     nested.object_references = vec![SECOND_OBJECT_REFERENCE, THIRD_OBJECT_REFERENCE];
     nested.data_references = vec![THIRD_DATA_REFERENCE, FIRST_DATA_REFERENCE];
     first.field_infos.push(nested);

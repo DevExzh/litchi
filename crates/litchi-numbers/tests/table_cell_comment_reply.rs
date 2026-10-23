@@ -792,6 +792,122 @@ fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResu
 }
 
 #[test]
+fn retained_compressed_entry_limit_accepts_exact_reply_output() -> TestResult {
+    let source = fixture(FixtureMode::SingleRoot, None)?;
+    let menu_text = "reply with an owner-level compressed budget boundary".repeat(8);
+    let baseline = load_package(&source)?;
+    let target = baseline.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(0, 0),
+        CommentReplyIndex::new(0),
+        &menu_text,
+    )?;
+    let target_bytes = exact_bytes(target.package())?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target_bytes, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let target_max_entry = target_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("target has no entries"))?;
+    assert!(target_max_entry > source_max_entry);
+    let target_max_entry = u64::try_from(target_max_entry)?;
+
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(target_max_entry))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let exact_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(exact_limits),
+    )?;
+    let exact_source_limits = exact_package.open_options().source_limits_value();
+    assert_eq!(
+        exact_source_limits.max_entry_bytes(),
+        target_max_entry,
+        "the admitted physical profile must retain the selected entry ceiling"
+    );
+    let exact_archive_limits = Limits::new(
+        exact_source_limits.max_input_bytes(),
+        exact_source_limits.max_members(),
+        exact_source_limits.max_entry_bytes(),
+        exact_source_limits.max_aggregate_bytes(),
+        exact_source_limits.max_component_bytes(),
+    )?;
+    assert_eq!(
+        exact_archive_limits.max_entry_bytes(),
+        target_max_entry,
+        "the catalog profile must retain the selected entry ceiling"
+    );
+    assert_eq!(
+        exact_archive_limits
+            .snappy_limits()?
+            .max_compressed_stream(),
+        usize::try_from(target_max_entry)?,
+        "the physical Snappy profile must use the selected compressed ceiling"
+    );
+    let exact_commit = exact_package.set_table_cell_comment_reply(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(0, 0),
+        CommentReplyIndex::new(0),
+        &menu_text,
+    )?;
+    let exact_catalog =
+        Catalog::from_bytes(&exact_bytes(exact_commit.package())?, Default::default())?;
+    assert_eq!(
+        exact_catalog.iter().map(|entry| entry.data().len()).max(),
+        usize::try_from(target_max_entry).ok()
+    );
+    assert_eq!(exact_bytes(exact_commit.package())?, target_bytes);
+
+    let one_under_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(target_max_entry - 1))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let one_under_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(one_under_limits),
+    )?;
+    let before = exact_bytes(&one_under_package)?;
+    let error = one_under_package
+        .set_table_cell_comment_reply(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+            CommentReplyIndex::new(0),
+            &menu_text,
+        )
+        .expect_err("one byte below the encoded reply member must refuse");
+    assert!(
+        format!("{error:?}").contains("CompressedBytes"),
+        "expected typed compressed-budget refusal, got {error:?}"
+    );
+    assert_eq!(exact_bytes(&one_under_package)?, before);
+    Ok(())
+}
+
+#[test]
 fn reply_index_is_checked_and_duplicate_text_uses_source_ordinal() -> TestResult {
     let source = fixture(FixtureMode::DuplicateText, None)?;
     let original = source.clone();

@@ -74,6 +74,7 @@ pub(super) fn rewrite(
             .ok_or(Error::InvalidSource)?,
     )?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -159,8 +160,7 @@ pub(super) fn rewrite(
     budget.charge_transaction_work(decoded_extent.saturating_mul(3))?;
     let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(rewritten);
     let package_bound = source
@@ -1188,7 +1188,12 @@ mod tests {
         document.archive_info.message_infos[0].object_references =
             [SHEETS.as_slice(), &[SIDEBAR]].concat();
         if field_attribution {
-            let mut field = FieldInfo::new(vec![1]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references = SHEETS.to_vec();
             document.archive_info.message_infos[0]
                 .field_infos

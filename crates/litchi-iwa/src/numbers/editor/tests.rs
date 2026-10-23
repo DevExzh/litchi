@@ -3116,7 +3116,9 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
         .identifier;
     let comment_table = archive.object(comment_table_id).unwrap();
     assert_eq!(
-        comment_table.archive_info.message_infos[0].versions,
+        comment_table.archive_info.message_infos[0]
+            .versions
+            .as_slice(),
         [1, 0, 5]
     );
     let list = TableDataList::decode(comment_table.messages[0].data.as_slice()).unwrap();

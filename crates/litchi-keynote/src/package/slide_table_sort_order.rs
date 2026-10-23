@@ -557,6 +557,7 @@ fn rewrite_sort(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source.state.options.archive();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -634,8 +635,8 @@ fn rewrite_sort(
     let encoded_len = archive
         .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-        .map_err(map_core_error)?;
+    let compressed_bound =
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget
         .output(
             encoded_len
@@ -648,7 +649,7 @@ fn rewrite_sort(
     if bytes.len() != encoded_len {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

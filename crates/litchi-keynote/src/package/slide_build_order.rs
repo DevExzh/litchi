@@ -1462,6 +1462,10 @@ fn rewrite_build_order(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
@@ -1500,8 +1504,7 @@ fn rewrite_build_order(
         .replace_message_preserving_header(message_index, replacement, archive_limits)
         .map_err(map_core_error)?;
     let serialized = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    let compressed =
-        SnappyStream::compress(&serialized, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(

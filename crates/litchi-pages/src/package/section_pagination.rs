@@ -614,6 +614,7 @@ fn rewrite_package_pagination(
     }
 
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -659,7 +660,7 @@ fn rewrite_package_pagination(
         .map_err(map_core_error)?;
     let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let compressed =
-        SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)?;
+        SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(

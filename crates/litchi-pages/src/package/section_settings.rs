@@ -1410,7 +1410,15 @@ mod tests {
         )?;
         object.archive_info.message_infos[0].object_references = aggregate;
         for (field_number, references) in declarations {
-            let mut field = FieldInfo::new(vec![field_number]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![field_number],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references = references;
             object.archive_info.message_infos[0].field_infos.push(field);
         }

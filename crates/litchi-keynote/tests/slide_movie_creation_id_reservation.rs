@@ -61,7 +61,17 @@ fn with_dangling_header_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         for object in &mut archive.objects {
             if let Some(message_info) = object.archive_info.message_infos.first_mut() {
                 if message_info.field_infos.is_empty() {
-                    message_info.field_infos.push(FieldInfo::new(vec![99_999]));
+                    message_info.field_infos.push(
+                        FieldInfo::new(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![99_999],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    );
                 }
                 message_info.object_references.push(DANGLING_REFERENCE);
                 message_info.field_infos[0]

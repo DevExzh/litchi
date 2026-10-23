@@ -686,7 +686,7 @@ pub(super) fn set_text_style(
                 .find(|(message, _)| message.type_ == CHARACTER_STYLE)
                 .map(|(_, info)| info.versions.clone())
         })
-        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec());
+        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec().into());
     let mut created: Vec<(Option<u64>, u64)> = Vec::with_capacity(previous.len());
     for parent in &previous {
         if let Some(parent) = parent

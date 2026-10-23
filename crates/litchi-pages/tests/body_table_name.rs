@@ -15,7 +15,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
-use litchi_iwa_core::{Archive, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use litchi_pages::{
     BodyTableSelector, Package, table::name::Error as BodyTableNameValueError,
@@ -249,7 +249,11 @@ fn with_foreign_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
 fn with_foreign_field_data_inbound(package: &[u8]) -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut inbound = header_fixture::object(7_000, 7_001, vec![0x08, 0x01], &[])?;
-    let mut field = FieldInfo::new(FieldPath::from(vec![1]));
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.data_references.push(FIRST_MODEL_IDENTIFIER);
     inbound.archive_info.message_infos[0]
         .field_infos

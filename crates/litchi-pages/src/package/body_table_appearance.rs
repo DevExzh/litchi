@@ -1127,7 +1127,7 @@ fn rewrite_native_appearance(
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
     let maximum_compressed_bytes =
-        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(
         component_indices.len().saturating_mul(4).saturating_add(8),
@@ -1245,7 +1245,7 @@ fn rewrite_native_appearance(
         let bytes = archive
             .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let compressed = SnappyStream::compress(&bytes, Default::default())
+        let compressed = SnappyStream::compress(&bytes, snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
         edits.push(NativeEdit {
             name,
@@ -2448,9 +2448,13 @@ fn rewrite_metadata_entry(
         .limits()
         .effective_archive_limits()
         .map_err(|error| map_archive_error(error, path))?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
     let maximum_compressed_bytes =
-        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(4, path)?;
     budget.charge_transaction_work(
@@ -2494,7 +2498,7 @@ fn rewrite_metadata_entry(
     let bytes = archive
         .to_bytes(archive_limits)
         .map_err(|error| map_core_error(error, path))?;
-    let compressed = SnappyStream::compress(&bytes, Default::default())
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
         .map_err(|error| map_core_error(error, path))?;
     Ok(NativeEdit {
         name: METADATA_ENTRY_NAME.to_owned(),

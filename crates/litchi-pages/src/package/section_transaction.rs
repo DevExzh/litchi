@@ -483,6 +483,12 @@ impl TransactionBudget {
             .limits()
             .effective_archive_limits()
             .map_err(map_archive_error)?;
+        let snappy_limits = source
+            .state
+            .source
+            .limits()
+            .snappy_limits()
+            .map_err(map_archive_error)?;
         let source_archive_bytes = component
             .archive()
             .encoded_len(archive_limits)
@@ -508,9 +514,8 @@ impl TransactionBudget {
             .and_then(|value| value.checked_add(rewritten_message_bytes))
             .and_then(|value| value.checked_add(framing_slack))
             .ok_or(Error::InvalidSource { path })?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bound, Default::default())
-                .map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(archive_bound, snappy_limits)
+            .map_err(map_core_error)?;
         self.charge_limit(LimitKind::WireOutputBytes, rewritten_message_bytes, path)?;
         self.observe_limit(LimitKind::PayloadBytes, archive_bound, path)?;
         self.charge_limit(LimitKind::EntryBytes, compressed_bound, path)?;
@@ -1087,7 +1092,7 @@ pub(super) fn rewrite_package(
         )
         .map_err(map_page_layout_error)?;
     }
-    let section_compressed = compress_archive(archive, archive_limits)?;
+    let section_compressed = compress_archive(source, archive, archive_limits)?;
 
     let mut compressed = Vec::new();
     compressed
@@ -1105,7 +1110,7 @@ pub(super) fn rewrite_package(
         .map_err(map_page_layout_error)?;
         compressed.push((
             location.component_name.clone(),
-            compress_archive(view_archive, view_limits)?,
+            compress_archive(source, view_archive, view_limits)?,
         ));
     }
 
@@ -1231,11 +1236,18 @@ pub(super) fn editable_archive(
 }
 
 pub(super) fn compress_archive(
+    source: &Package,
     archive: Archive,
     limits: litchi_iwa_core::Limits,
 ) -> Result<Vec<u8>, Error> {
     let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
-    SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)
 }
 
 pub(super) fn unique_message(

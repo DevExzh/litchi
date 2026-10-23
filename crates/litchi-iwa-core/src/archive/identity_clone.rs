@@ -297,7 +297,7 @@ fn clone_message_info_with_identity_remap(
 
     let message_info = MessageInfo {
         type_: source.type_,
-        versions: try_copy_slice(&source.versions, "IWA clone message versions")?,
+        versions: try_copy_versions(&source.versions, "IWA clone message versions")?,
         length: replacement_length,
         field_infos,
         object_references: map_object_references(
@@ -580,25 +580,18 @@ pub(super) fn retained_clone_source_header<'a>(
     canonical: &'a [u8],
     limits: Limits,
 ) -> Result<&'a [u8]> {
-    match (
-        object.original_header.as_deref(),
-        object.original_canonical_header.as_deref(),
-    ) {
-        (Some(original), Some(original_canonical)) if original_canonical == canonical => {
+    match object.source_headers() {
+        Some((original, original_canonical)) if original_canonical == canonical => {
             preflight_header(original, HeaderKind::ArchiveInfo, limits)?;
             Ok(original)
         },
-        (None, None) => {
+        None => {
             preflight_header(canonical, HeaderKind::ArchiveInfo, limits)?;
             Ok(canonical)
         },
-        (Some(_), Some(_)) => Err(Error::invalid_archive(
+        Some(_) => Err(Error::invalid_archive(
             0,
             "retained ArchiveInfo header provenance is stale",
-        )),
-        _ => Err(Error::invalid_archive(
-            0,
-            "retained ArchiveInfo header provenance is incomplete",
         )),
     }
 }

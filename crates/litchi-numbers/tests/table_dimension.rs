@@ -287,7 +287,12 @@ fn expand_native_to_second_row_bucket(source: &[u8], rows: u32) -> TestResult<Ve
         info.object_references.push(904_937);
         info.field_infos
             .retain(|field| field.path.as_slice() != [4, 1, 2]);
-        let mut field = FieldInfo::new(vec![4, 1, 2]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![4, 1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![904_855, 904_937];
         info.field_infos.push(field);
         Ok(())
@@ -1017,7 +1022,12 @@ fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestRe
         })?;
     let wrong_field_authority =
         rewrite_native_table_model(&source, |object, message_index, _model| {
-            let mut field = FieldInfo::new(vec![4, 2]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![4, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(904_855);
             object.archive_info.message_infos[message_index]
                 .field_infos
@@ -1029,7 +1039,12 @@ fn row_bucket_authority_and_declared_reference_contradictions_refuse() -> TestRe
             object.archive_info.message_infos[message_index]
                 .object_references
                 .push(904_937);
-            let mut field = FieldInfo::new(vec![4, 1, 2]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![4, 1, 2], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(904_937);
             object.archive_info.message_infos[message_index]
                 .field_infos

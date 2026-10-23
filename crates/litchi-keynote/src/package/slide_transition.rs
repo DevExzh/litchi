@@ -1358,6 +1358,12 @@ fn rewrite_transition(
     after: Option<&Settings>,
 ) -> Result<(Package, usize), Error> {
     let catalog = physical_catalog(source)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let mut compressed_components: Vec<(&str, Vec<u8>)> = Vec::new();
     let mut component_names: Vec<&str> = Vec::new();
     for component_name in [
@@ -1468,8 +1474,7 @@ fn rewrite_transition(
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
         drop(stream);
-        let compressed =
-            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         drop(bytes);
         compressed_components.push((name, compressed));
     }

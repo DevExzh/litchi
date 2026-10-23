@@ -15,9 +15,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::appearance::transaction::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
@@ -83,8 +81,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifiers: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifiers: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references.extend_from_slice(identifiers);
     field
@@ -1267,20 +1269,32 @@ fn broad_native_archive_metadata_and_omitted_false_flags_roundtrip_exactly() -> 
     let source = synthetic_package(false, false)?;
     let source = rewrite_archive_info(&source, DOCUMENT_MEMBER, SLIDE_ID, |info| {
         info.object_references.push(SHOW_ID);
-        let mut unrelated = FieldInfo::new(vec![45]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![45], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         info.field_infos = vec![unrelated];
     })?;
     let source = rewrite_archive_info(&source, DOCUMENT_MEMBER, TABLE_INFO_IDS[0], |info| {
         info.object_references.push(SHOW_ID);
-        let mut unrelated = FieldInfo::new(vec![10]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![10], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         info.field_infos = vec![unrelated];
     })?;
     let source = rewrite_archive_info(&source, MODEL_MEMBER, TABLE_MODEL_IDS[0], |info| {
         info.object_references.push(SHOW_ID);
         info.object_references.push(NON_TABLE_DRAWABLE_ID);
-        let mut unrelated = FieldInfo::new(vec![70]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![70], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         unrelated.object_references.push(NON_TABLE_DRAWABLE_ID);
         info.field_infos = vec![unrelated];
@@ -1293,7 +1307,11 @@ fn broad_native_archive_metadata_and_omitted_false_flags_roundtrip_exactly() -> 
         info.object_references
             .retain(|identifier| *identifier != PRESET_STYLE_ID);
         info.object_references.push(NON_TABLE_DRAWABLE_ID);
-        let mut unrelated = FieldInfo::new(vec![14]);
+        let mut unrelated = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![14], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         unrelated.r#type = Some(FieldType::Message);
         unrelated.object_references.push(NON_TABLE_DRAWABLE_ID);
         info.field_infos = vec![unrelated];
@@ -1427,7 +1445,12 @@ fn unrelated_archive_field_and_data_references_are_authoritative() -> TestResult
 
     let undeclared_field_reference =
         rewrite_archive_info(&source, MODEL_MEMBER, TABLE_MODEL_IDS[0], |info| {
-            let mut field = FieldInfo::new(vec![70]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![70], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::Message);
             field.object_references.push(9_999_999);
             info.field_infos.push(field);

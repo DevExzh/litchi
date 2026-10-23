@@ -1144,13 +1144,17 @@ impl<'p> Working<'p> {
     pub(super) fn publish(mut self, transition: &Transition) -> FaultResult<(Package, usize)> {
         self.apply_registry(transition)?;
         let catalog = &self.source.state.source;
+        let snappy_limits = catalog
+            .limits()
+            .snappy_limits()
+            .map_err(|error| map_archive(&error))?;
         let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
         for (name, archive) in &self.edited {
             let bytes = archive
                 .to_bytes(self.archive_limits)
                 .map_err(|error| map_core(&error))?;
-            let compressed = SnappyStream::compress(&bytes, Default::default())
-                .map_err(|error| map_core(&error))?;
+            let compressed =
+                SnappyStream::compress(&bytes, snappy_limits).map_err(|error| map_core(&error))?;
             encoded.push((name.clone(), compressed));
         }
         let edits: Vec<EntryEdit<'_>> = encoded

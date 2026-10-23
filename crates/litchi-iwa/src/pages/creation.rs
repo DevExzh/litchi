@@ -1368,7 +1368,7 @@ fn raw_object(
         Default::default(),
     )?;
     let message_info = &mut object.archive_info.message_infos[0];
-    message_info.versions = MESSAGE_VERSION.to_vec();
+    message_info.versions = MESSAGE_VERSION.to_vec().into();
     message_info.object_references = references
         .iter()
         .copied()
@@ -1392,7 +1392,7 @@ fn raw_object_with_id(
         Default::default(),
     )?;
     let message_info = &mut object.archive_info.message_infos[0];
-    message_info.versions = MESSAGE_VERSION.to_vec();
+    message_info.versions = MESSAGE_VERSION.to_vec().into();
     message_info.object_references = references.to_vec();
     Ok(object)
 }

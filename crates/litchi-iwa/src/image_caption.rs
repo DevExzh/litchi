@@ -784,7 +784,7 @@ pub(crate) fn standin_caption_object(identifier: u64) -> Result<ArchiveObject> {
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = STANDIN_CAPTION_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = STANDIN_CAPTION_MESSAGE_VERSION.to_vec().into();
     Ok(object)
 }
 
@@ -1109,9 +1109,9 @@ fn archive_object(
             message_type,
             CAPTION_INFO_MESSAGE_TYPE | CAPTION_PLACEMENT_MESSAGE_TYPE
         ) {
-        COMPONENTIZED_CAPTION_MESSAGE_VERSION.to_vec()
+        COMPONENTIZED_CAPTION_MESSAGE_VERSION.to_vec().into()
     } else {
-        STANDARD_MESSAGE_VERSION.to_vec()
+        STANDARD_MESSAGE_VERSION.to_vec().into()
     };
     info.object_references = object_references.to_vec();
     if profile == CaptionGraphProfile::Componentized && message_type == CAPTION_INFO_MESSAGE_TYPE {
@@ -1253,17 +1253,17 @@ mod tests {
 
         assert_eq!(ids.component_objects(), [352, 353, 354]);
         assert_eq!(
-            style.archive_info.message_infos[0].versions,
+            style.archive_info.message_infos[0].versions.as_slice(),
             STANDARD_MESSAGE_VERSION
         );
         assert_eq!(
-            storage.archive_info.message_infos[0].versions,
+            storage.archive_info.message_infos[0].versions.as_slice(),
             STANDARD_MESSAGE_VERSION
         );
 
         let info_metadata = &info.archive_info.message_infos[0];
         assert_eq!(
-            info_metadata.versions,
+            info_metadata.versions.as_slice(),
             COMPONENTIZED_CAPTION_MESSAGE_VERSION
         );
         assert_eq!(info_metadata.object_references, [351, 353, 354]);
@@ -1285,7 +1285,7 @@ mod tests {
 
         let placement_metadata = &placement.archive_info.message_infos[0];
         assert_eq!(
-            placement_metadata.versions,
+            placement_metadata.versions.as_slice(),
             COMPONENTIZED_CAPTION_MESSAGE_VERSION
         );
         let decoded = tsa::CaptionPlacementArchive::decode(placement.messages[0].data.as_slice())

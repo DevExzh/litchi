@@ -368,14 +368,14 @@ fn source_object_with_adversarial_header() -> Result<(ArchiveObject, Vec<u8>), E
     first.data_references = vec![9001];
     first.field_infos = vec![
         FieldInfo {
-            path: FieldPath::new(vec![7, 1]),
+            path: FieldPath::new(vec![7, 1], litchi_iwa_core::Limits::default()).unwrap(),
             r#type: Some(FieldType::ObjectReference),
             object_references: vec![44, 45],
             data_references: vec![901],
             ..FieldInfo::default()
         },
         FieldInfo {
-            path: FieldPath::new(vec![7, 2]),
+            path: FieldPath::new(vec![7, 2], litchi_iwa_core::Limits::default()).unwrap(),
             object_references: vec![46, 43],
             data_references: vec![902],
             ..FieldInfo::default()
@@ -385,7 +385,7 @@ fn source_object_with_adversarial_header() -> Result<(ArchiveObject, Vec<u8>), E
     second.object_references = vec![47, 48];
     second.data_references = vec![9002];
     second.field_infos = vec![FieldInfo {
-        path: FieldPath::new(vec![8]),
+        path: FieldPath::new(vec![8], litchi_iwa_core::Limits::default()).unwrap(),
         object_references: vec![41, 49],
         data_references: vec![903],
         ..FieldInfo::default()

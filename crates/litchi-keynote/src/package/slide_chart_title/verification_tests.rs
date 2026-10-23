@@ -5,9 +5,7 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit, EntryInsertion, ExactArtifacts},
 };
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
-};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use prost::Message as _;
 
@@ -394,11 +392,23 @@ fn chart_title_rejects_mediator_and_merge_diff_metadata() {
                         .push(1),
                     3 => {
                         object.archive_info.message_infos[selection.non_style_message_index]
-                            .diff_field_path = Some(FieldPath::new(vec![1]))
+                            .diff_field_path = Some(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                        )
                     },
                     4 => object.archive_info.message_infos[selection.non_style_message_index]
                         .fields_to_remove
-                        .push(FieldPath::new(vec![1])),
+                        .push(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                        ),
                     5 => object.archive_info.message_infos[selection.non_style_message_index]
                         .diff_read_version
                         .push(1),
@@ -541,7 +551,15 @@ fn chart_title_rejects_duplicate_foreign_or_field_stylesheet_metadata() {
                     0 => info.object_references.push(selection.non_style_identifier),
                     1 => info.data_references.push(selection.non_style_identifier),
                     2 => {
-                        let mut field = FieldInfo::new(vec![1]);
+                        let mut field = FieldInfo::new(
+                            litchi_iwa_core::FieldPath::new(
+                                vec![1],
+                                litchi_iwa_core::Limits::default(),
+                            )
+                            .unwrap(),
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap();
                         field.r#type = Some(FieldType::ObjectReference);
                         field.object_references.push(selection.non_style_identifier);
                         info.field_infos.push(field);
@@ -572,7 +590,12 @@ fn chart_title_accepts_one_expected_chart_field_metadata_edge() {
     let candidate = if existing_field_edges == 0 {
         reassemble_object(&source, selection.chart_identifier, |object| {
             let info = &mut object.archive_info.message_infos[chart_message_index];
-            let mut field = FieldInfo::new(vec![1]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references.push(selection.non_style_identifier);
             info.field_infos.push(field);
@@ -721,7 +744,14 @@ fn chart_graph_owner_scan_admits_exact_work_and_rejects_one_under() {
     let with_empty_field_info = reassemble_object(&source, unrelated_identifier, |object| {
         object.archive_info.message_infos[unrelated_message_index]
             .field_infos
-            .push(FieldInfo::new(vec![99]));
+            .push(
+                FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+            );
     });
     let augmented_package =
         Package::from_bytes(&with_empty_field_info).expect("empty field-info package");

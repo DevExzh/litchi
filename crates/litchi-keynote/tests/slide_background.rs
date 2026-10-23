@@ -1021,7 +1021,7 @@ fn companion_style_messages_fail_closed_without_mutation() -> TestResult<()> {
     style
         .archive_info
         .message_infos
-        .push(MessageInfo::new(991, u32::try_from(payload.len())?));
+        .push(MessageInfo::new(991, payload.len(), litchi_iwa_core::Limits::default()).unwrap());
     style.messages.push(RawMessage {
         type_: 991,
         data: payload,
@@ -1137,7 +1137,12 @@ fn reset_rejects_identity_edges_attributed_to_fill_metadata_atomically() -> Test
         let style = archive
             .object_mut(VARIATION_STYLE_ID)
             .ok_or_else(|| io::Error::other("missing variation style"))?;
-        let mut field = FieldInfo::new(vec![11, 1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![11, 1], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(reference);
         style.archive_info.message_infos[0].field_infos.push(field);
         let stream = archive.to_bytes(Default::default())?;
@@ -1322,7 +1327,12 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
                 .object_references
                 .push(BASE_STYLE_ID),
             1 => {
-                let mut field = FieldInfo::new(vec![99]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.object_references.push(BASE_STYLE_ID);
                 slide.archive_info.message_infos[0].field_infos.push(field);
             },
@@ -1330,7 +1340,12 @@ fn unsupported_slide_style_metadata_refs_fail_closed_atomically() -> TestResult<
                 .data_references
                 .push(BASE_STYLE_ID),
             _ => {
-                let mut field = FieldInfo::new(vec![1]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::DataReference);
                 field.object_references.push(BASE_STYLE_ID);
                 slide.archive_info.message_infos[0].field_infos.push(field);
@@ -1411,7 +1426,13 @@ fn sparse_versioned_stylesheet_metadata_allows_cow_and_stays_unchanged() -> Test
         ..tss::stylesheet_archive::VersionedStyles::default()
     });
     stylesheet.messages[0].data = payload.encode_to_vec();
-    stylesheet.archive_info.message_infos[0].field_infos = vec![FieldInfo::new(vec![14])];
+    stylesheet.archive_info.message_infos[0].field_infos = vec![
+        FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![14], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap(),
+    ];
     let stream = archive.to_bytes(Default::default())?;
     let compressed = SnappyStream::compress(&stream, Default::default())?;
     bytes = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(

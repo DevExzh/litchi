@@ -428,7 +428,7 @@ pub(super) fn variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -462,7 +462,7 @@ pub(super) fn geometry_variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -499,7 +499,7 @@ pub(super) fn indentation_variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -534,7 +534,7 @@ pub(super) fn label_color_variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -568,7 +568,7 @@ pub(super) fn number_format_variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -602,7 +602,7 @@ pub(super) fn number_tiering_variation_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = STANDARD_MESSAGE_VERSION.to_vec();
+    info.versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     Ok(object)
 }
@@ -1551,7 +1551,7 @@ pub(super) fn style_object(
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec().into();
     Ok(object)
 }
 

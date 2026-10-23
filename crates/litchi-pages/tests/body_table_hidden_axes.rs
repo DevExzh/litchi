@@ -19,7 +19,7 @@ use litchi_iwa_common::{
     decode_varint_from_bytes,
     wire::{RawWireField, RawWireFields, WireView},
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsce, tsd, tsp, tst, tswp};
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
@@ -190,8 +190,12 @@ fn table_formula_object(index: usize, column: bool) -> u64 {
         + u64::try_from(index * 2 + usize::from(!column)).expect("fixture index fits")
 }
 
-fn field_reference(path: impl Into<FieldPath>, identifier: u64) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, identifier: u64) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.push(identifier);
     field
 }
@@ -1873,7 +1877,12 @@ fn source_built_provenance_variants(
                 .message_infos
                 .first_mut()
                 .ok_or("missing calculation-engine message metadata")?;
-            let mut field = FieldInfo::new(FieldPath::new(vec![99]));
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(table_formula_owner(index + 1));
             info.field_infos.push(field);
             Ok(())
@@ -2426,7 +2435,7 @@ fn qualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8>>
         map.messages[message_index].type_ = 6_200;
         let info = &mut map.archive_info.message_infos[message_index];
         info.type_ = 6_200;
-        info.versions = vec![1, 0, 5];
+        info.versions = vec![1, 0, 5].into();
         Ok(())
     })
 }
@@ -2438,7 +2447,7 @@ fn unqualified_legacy_uid_map(package: &[u8], index: usize) -> TestResult<Vec<u8
         info.type_ = 6_200;
         // A legacy type without the native archive version tuple is not a
         // qualified Pages UID-map route.
-        info.versions = vec![1, 0, 4];
+        info.versions = vec![1, 0, 4].into();
         Ok(())
     })
 }
@@ -2477,16 +2486,18 @@ fn uid_map_diff_merge_version(package: &[u8], index: usize) -> TestResult<Vec<u8
 
 fn uid_map_diff_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_uid_map_metadata(package, index, |map, message_index| {
-        map.archive_info.message_infos[message_index].diff_field_path =
-            Some(FieldPath::new(vec![1]));
+        map.archive_info.message_infos[message_index].diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         Ok(())
     })
 }
 
 fn uid_map_fields_to_remove(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
     rewrite_uid_map_metadata(package, index, |map, message_index| {
-        map.archive_info.message_infos[message_index].fields_to_remove =
-            vec![FieldPath::new(vec![1])];
+        map.archive_info.message_infos[message_index].fields_to_remove = vec![
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        ];
         Ok(())
     })
 }
@@ -4007,7 +4018,8 @@ fn wrong_model_map_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8
             .iter_mut()
             .find(|field| field.path.as_slice() == [46])
             .ok_or("missing model map field declaration")?;
-        field.path = FieldPath::new(vec![47]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![47], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
@@ -4075,7 +4087,11 @@ fn source_built_aggregate_metadata_conflict(package: &[u8], index: usize) -> Tes
         metadata
             .field_infos
             .retain(|field| matches!(field.path.as_slice(), [34] | [35]));
-        let mut field = FieldInfo::new(FieldPath::new(vec![47]));
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![47], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(table_uid_map(index));
         metadata.field_infos.push(field);
         Ok(())
@@ -4095,7 +4111,8 @@ fn wrong_info_map_field_path(package: &[u8], index: usize) -> TestResult<Vec<u8>
             .iter_mut()
             .find(|field| field.path.as_slice() == [6])
             .ok_or("missing info map field declaration")?;
-        field.path = FieldPath::new(vec![7]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![7], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }
@@ -4288,7 +4305,9 @@ fn native_model_filter_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
                 .iter_mut()
                 .find(|field| field.path.as_slice() == [70])
                 .ok_or("missing native hidden-state-owner metadata")?;
-            field.path = FieldPath::new(vec![71]);
+            field.path =
+                litchi_iwa_core::FieldPath::new(vec![71], litchi_iwa_core::Limits::default())
+                    .unwrap();
             Ok(())
         },
     )
@@ -4317,7 +4336,7 @@ fn native_formula_owner_version_mismatch(package: &[u8]) -> TestResult<Vec<u8>> 
         NATIVE_FORMULA_OWNER_IDENTIFIER,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5];
+            object.archive_info.message_infos[message_index].versions = vec![1, 0, 5].into();
             Ok(())
         },
     )
@@ -4336,7 +4355,12 @@ fn native_model_filter_data_alias_at_unrelated_path(package: &[u8]) -> TestResul
                 .find(|field| field.path.as_slice() == [70])
                 .and_then(|field| field.object_references.first())
                 .ok_or("missing native filter reference")?;
-            let mut alias = FieldInfo::new(FieldPath::new(vec![71]));
+            let mut alias = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![71], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             alias.data_references.push(filter);
             info.field_infos.push(alias);
             Ok(())
@@ -4629,7 +4653,7 @@ fn formula_owner_bad_versions(package: &[u8], identifier: u64) -> TestResult<Vec
         identifier,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0];
+            object.archive_info.message_infos[message_index].versions = vec![2, 0, 0].into();
             Ok(())
         },
     )
@@ -4665,8 +4689,10 @@ fn formula_owner_bad_diff(package: &[u8], identifier: u64) -> TestResult<Vec<u8>
         identifier,
         FORMULA_OWNER_MESSAGE_TYPE,
         |object, message_index| {
-            object.archive_info.message_infos[message_index].diff_field_path =
-                Some(FieldPath::new(vec![1]));
+            object.archive_info.message_infos[message_index].diff_field_path = Some(
+                litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+            );
             Ok(())
         },
     )
@@ -4874,7 +4900,7 @@ fn assert_rejected_without_mutation(
 fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
     let source = normal_package()?;
     let mixed = rewrite_model_metadata(&source, 0, |model, message_index| {
-        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10];
+        model.archive_info.message_infos[message_index].versions = vec![3, 2, 10].into();
         Ok(())
     })?;
     let package = Package::from_bytes(&mixed)?;

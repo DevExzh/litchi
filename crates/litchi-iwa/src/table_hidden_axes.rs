@@ -872,7 +872,8 @@ fn insert_hidden_state_objects(
                 }],
                 Default::default(),
             )?;
-            object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+            object.archive_info.message_infos[0].versions =
+                STANDARD_MESSAGE_VERSION.to_vec().into();
             archive.insert_object(object, Default::default())?;
         }
         for (identifier, uid) in [
@@ -899,7 +900,8 @@ fn insert_hidden_state_objects(
                 }],
                 Default::default(),
             )?;
-            object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
+            object.archive_info.message_infos[0].versions =
+                STANDARD_MESSAGE_VERSION.to_vec().into();
             archive.insert_object(object, Default::default())?;
         }
         Ok(())

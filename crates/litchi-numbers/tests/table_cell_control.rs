@@ -450,7 +450,12 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
             .get_mut(index)
             .ok_or_else(|| io::Error::other("control message metadata is missing"))?;
         info.object_references = vec![CONTROL_MODEL_ID];
-        let mut field = FieldInfo::new(vec![3, 5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![3, 5], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![CONTROL_MODEL_ID];
         info.field_infos.push(field);
@@ -602,7 +607,11 @@ fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
     info.archive_info.message_infos[0].object_references = vec![TABLE_MODEL_ID];
     let mut model = object(TABLE_MODEL_ID, 6_001, table_model().encode_to_vec())?;
     model.archive_info.message_infos[0].object_references = vec![SIDECAR_ID, TILE_ID];
-    let mut unknown = FieldInfo::new(vec![99, 1]);
+    let mut unknown = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown.data_references = vec![700];
     model.archive_info.message_infos[0]
         .field_infos
@@ -1165,10 +1174,18 @@ fn with_split_popup_control_metadata_corruption(
     corruption: SplitPopupControlMetadataCorruption,
 ) -> TestResult<Vec<u8>> {
     rewrite_control_info(source, |info| {
-        let mut field = FieldInfo::new(match corruption {
-            SplitPopupControlMetadataCorruption::DuplicateField => vec![3, 5],
-            SplitPopupControlMetadataCorruption::WrongPath => vec![3, 6],
-        });
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                match corruption {
+                    SplitPopupControlMetadataCorruption::DuplicateField => vec![3, 5],
+                    SplitPopupControlMetadataCorruption::WrongPath => vec![3, 6],
+                },
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![CONTROL_MODEL_ID];
         match corruption {
@@ -1973,7 +1990,12 @@ fn with_corruption(source: &[u8], corruption: Corruption) -> TestResult<Vec<u8>>
             Ok(())
         }),
         Corruption::ControlFieldInfoExtra => rewrite_control_info(source, |info| {
-            let mut field = FieldInfo::new(vec![3, 99]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(vec![3, 99], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.r#type = Some(FieldType::ObjectReference);
             field.object_references = vec![999];
             info.field_infos.push(field);
@@ -2403,14 +2425,24 @@ fn with_split_model_reference_corruption(
                 info.object_references.push(FORMAT_LIST_ID);
             },
             SplitModelReferenceCorruption::WrongFormatFieldType => {
-                let mut field = FieldInfo::new(vec![99]);
+                let mut field = FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap();
                 field.r#type = Some(FieldType::Value);
                 field.object_references.push(FORMAT_LIST_ID);
                 info.field_infos.push(field);
             },
             SplitModelReferenceCorruption::DuplicateFormatField => {
                 for path in [vec![98], vec![99]] {
-                    let mut field = FieldInfo::new(path);
+                    let mut field = FieldInfo::new(
+                        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default())
+                            .unwrap(),
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap();
                     field.r#type = Some(FieldType::ObjectReference);
                     field.object_references.push(FORMAT_LIST_ID);
                     info.field_infos.push(field);

@@ -142,7 +142,15 @@ fn set_message_info(
         .ok_or_else(|| std::io::Error::other("synthetic object has no message info"))?;
     info.object_references = references.to_vec();
     for (field_index, reference) in references.iter().copied().enumerate() {
-        let mut field = FieldInfo::new(vec![u32::try_from(field_index.saturating_add(1))?]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(
+                vec![u32::try_from(field_index.saturating_add(1))?],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references.push(reference);
         info.field_infos.push(field);

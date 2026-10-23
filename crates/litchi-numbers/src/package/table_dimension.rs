@@ -891,6 +891,7 @@ fn rewrite(
         ));
     }
     let physical_limits = catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -947,8 +948,7 @@ fn rewrite(
         .map_err(map_core_error)?;
     phase!(COMPONENT_ENCODE);
     let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     phase!(REASSEMBLY);
     phase!(OUTPUT);
     let output = catalog

@@ -218,6 +218,7 @@ pub(super) fn create_root_comment(
                 list_data,
                 key,
                 comment_fresh.identifier,
+                archive_limits,
                 path,
             )?);
         }
@@ -245,7 +246,9 @@ pub(super) fn create_root_comment(
             .objects
             .try_reserve(1)
             .map_err(|_| Error::Allocation { amount: 1, path })?;
-        archive.objects.push(author_object(fresh.identifier, path)?);
+        archive
+            .objects
+            .push(author_object(fresh.identifier, archive_limits, path)?);
     } else if let (Some(author), Some(storage)) = (author_fresh, author_storage_fresh) {
         let archive = archives.get(owner_component_index)?;
         archive
@@ -254,10 +257,11 @@ pub(super) fn create_root_comment(
             .map_err(|_| Error::Allocation { amount: 2, path })?;
         archive
             .objects
-            .push(author_object(author.identifier, path)?);
+            .push(author_object(author.identifier, archive_limits, path)?);
         archive.objects.push(author_storage_object(
             storage.identifier,
             author.identifier,
+            archive_limits,
             path,
         )?);
     }
@@ -477,7 +481,7 @@ impl<'a> Archives<'a> {
                     .snappy_limits()
                     .map_err(|_| Error::InvalidSource { path })?,
             )
-            .map_err(|_| Error::InvalidSource { path })?;
+            .map_err(|error| super::map_core_error(error, path))?;
             let archive = Archive::parse(stream.as_bytes(), self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
             archive
@@ -510,6 +514,11 @@ impl<'a> Archives<'a> {
                 amount: self.parsed.len(),
                 path,
             })?;
+        let snappy_limits = self
+            .physical
+            .limits()
+            .snappy_limits()
+            .map_err(|_| Error::InvalidSource { path })?;
         for (component_index, (mut archive, parsed_objects)) in self.parsed {
             if archive.objects.len() != parsed_objects {
                 archive
@@ -519,8 +528,8 @@ impl<'a> Archives<'a> {
             let bytes = archive
                 .to_bytes(self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
-            let compressed = SnappyStream::compress(&bytes, Default::default())
-                .map_err(|_| Error::InvalidSource { path })?;
+            let compressed = SnappyStream::compress(&bytes, snappy_limits)
+                .map_err(|error| super::map_core_error(error, path))?;
             let name = self
                 .source
                 .state
@@ -852,14 +861,23 @@ fn append_author_storage(
         .message_infos
         .get_mut(route.message_index)
         .ok_or(Error::InvalidSource { path })?;
-    let mut field = FieldInfo::new(vec![1]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![identifier];
     info.field_infos.push(field);
     Ok(())
 }
 
-fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
+fn author_object(
+    identifier: u64,
+    limits: litchi_iwa_core::Limits,
+    path: Path,
+) -> Result<ArchiveObject, Error> {
     let mut payload = Vec::new();
     append_length_delimited_field(
         &mut payload,
@@ -875,21 +893,28 @@ fn author_object(identifier: u64, path: Path) -> Result<ArchiveObject, Error> {
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
             data: payload,
         }],
-        Default::default(),
+        limits,
     )
-    .map_err(|_| Error::InvalidSource { path })?;
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Error::InvalidSource { path })?;
-    info.field_infos.push(FieldInfo::new(vec![4]));
+    let field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![4], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
+    info.field_infos.push(field);
     Ok(object)
 }
 
 fn author_storage_object(
     identifier: u64,
     author_identifier: u64,
+    limits: litchi_iwa_core::Limits,
     path: Path,
 ) -> Result<ArchiveObject, Error> {
     let reference = canonical_reference(author_identifier, path)?;
@@ -902,16 +927,21 @@ fn author_storage_object(
             type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
             data: payload,
         }],
-        Default::default(),
+        limits,
     )
-    .map_err(|_| Error::InvalidSource { path })?;
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Error::InvalidSource { path })?;
     info.object_references = vec![author_identifier];
-    let mut field = FieldInfo::new(vec![1]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![author_identifier];
     info.field_infos.push(field);
@@ -981,21 +1011,24 @@ fn comment_list_object(
     data: Vec<u8>,
     key: u32,
     storage_identifier: u64,
+    limits: litchi_iwa_core::Limits,
     path: Path,
 ) -> Result<ArchiveObject, Error> {
-    let mut object = ArchiveObject::new(
-        identifier,
-        vec![RawMessage { type_: 6_005, data }],
-        Default::default(),
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+    let mut object =
+        ArchiveObject::new(identifier, vec![RawMessage { type_: 6_005, data }], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Error::InvalidSource { path })?;
     info.object_references = vec![storage_identifier];
-    let mut field = FieldInfo::new(vec![3, key]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3, key], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![storage_identifier];
     info.field_infos.push(field);
@@ -1075,7 +1108,12 @@ fn attach_comment_list_to_model(
         .message_infos
         .get_mut(route.message_index)
         .ok_or(Error::InvalidSource { path })?;
-    let mut field = FieldInfo::new(vec![4, 19]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![4, 19], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![identifier];
     info.field_infos.push(field);
@@ -1131,16 +1169,21 @@ fn storage_object(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data,
         }],
-        Default::default(),
+        limits,
     )
-    .map_err(|_| Error::InvalidSource { path })?;
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     let info = object
         .archive_info
         .message_infos
         .first_mut()
         .ok_or(Error::InvalidSource { path })?;
     info.object_references = vec![author];
-    let mut field = FieldInfo::new(vec![3]);
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3], limits)
+            .map_err(|error| map_archive_constructor_error(error, path))?,
+        limits,
+    )
+    .map_err(|error| map_archive_constructor_error(error, path))?;
     field.r#type = Some(FieldType::ObjectReference);
     field.object_references = vec![author];
     info.field_infos.push(field);
@@ -1209,7 +1252,12 @@ fn replace_list_with_transition(
             .message_infos
             .get_mut(route.message_index)
             .ok_or(Error::InvalidSource { path })?;
-        let mut field = FieldInfo::new(vec![3, key]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![3, key], limits)
+                .map_err(|error| map_archive_constructor_error(error, path))?,
+            limits,
+        )
+        .map_err(|error| map_archive_constructor_error(error, path))?;
         field.r#type = Some(FieldType::ObjectReference);
         field.object_references = vec![identifier];
         info.field_infos.push(field);
@@ -1356,6 +1404,43 @@ fn map_tile_error(error: tile::TileError, path: Path) -> Error {
     }
 }
 
+fn map_archive_constructor_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::HeaderFields => super::LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyFrames => super::LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderNesting
+                | litchi_iwa_core::LimitKind::Objects
+                | litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject
+                | litchi_iwa_core::LimitKind::MetadataItems => super::LimitKind::WireWork,
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
 pub(super) fn metadata_options(bytes: usize, additions: usize) -> MetadataRewriteOptions {
     MetadataRewriteOptions::new(
         bytes.max(1),
@@ -1385,14 +1470,12 @@ pub(super) fn pack_metadata(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical
-            .limits()
-            .snappy_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+        .map_err(|error| super::map_core_error(error, path))?;
     let mut archive =
         Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::InvalidSource { path })?;
     archive
@@ -1411,5 +1494,6 @@ pub(super) fn pack_metadata(
     let bytes = archive
         .to_bytes(limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    SnappyStream::compress(&bytes, Default::default()).map_err(|_| Error::InvalidSource { path })
+    SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| super::map_core_error(error, path))
 }

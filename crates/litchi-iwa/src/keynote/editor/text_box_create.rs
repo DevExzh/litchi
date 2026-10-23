@@ -446,7 +446,7 @@ fn keynote_object(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = references.to_vec();
     Ok(object)
 }

@@ -362,18 +362,16 @@ impl ArchiveCloneInventory {
             )?;
         }
 
-        if let Some(header) = object.original_header.as_deref() {
+        if let Some((header, canonical)) = object.source_headers() {
             self.admit_optional_bytes(
                 visitor,
                 ArchiveCloneInventoryKind::OriginalHeader,
                 header.len(),
             )?;
-        }
-        if let Some(header) = object.original_canonical_header.as_deref() {
             self.admit_optional_bytes(
                 visitor,
                 ArchiveCloneInventoryKind::OriginalCanonicalHeader,
-                header.len(),
+                canonical.len(),
             )?;
         }
         Ok(())
@@ -630,14 +628,22 @@ mod tests {
             Default::default(),
         )?;
         let message = &mut object.archive_info.message_infos[0];
-        message.versions = vec![1, 2];
+        message.versions = vec![1, 2].into();
         message.object_references = vec![10, 11];
         message.data_references = vec![20];
         message.diff_merge_version = vec![3];
-        message.diff_field_path = Some(FieldPath::new(vec![4, 5]));
-        message.fields_to_remove = vec![FieldPath::new(vec![6]), FieldPath::default()];
+        message.diff_field_path =
+            Some(FieldPath::new(vec![4, 5], crate::Limits::default()).unwrap());
+        message.fields_to_remove = vec![
+            FieldPath::new(vec![6], crate::Limits::default()).unwrap(),
+            FieldPath::default(),
+        ];
         message.diff_read_version = vec![7];
-        let mut field = FieldInfo::new(vec![8, 9]);
+        let mut field = FieldInfo::new(
+            FieldPath::new(vec![8, 9], crate::Limits::default()).unwrap(),
+            crate::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![12];
         field.data_references = vec![21, 22];
         field.known_field_version = vec![10];
@@ -650,8 +656,10 @@ mod tests {
         raw.extend_from_slice(&[0xb2, 0x06, 0x01, b'x']);
         let raw_len = raw.len();
         let canonical_len = canonical.len();
-        object.original_header = Some(raw.into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(raw.into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
 
         let archive = Archive {
             objects: vec![object],
@@ -710,7 +718,13 @@ mod tests {
             Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..32)
-            .map(|index| FieldInfo::new(vec![index; 128]))
+            .map(|index| {
+                FieldInfo::new(
+                    FieldPath::new(vec![index; 128], crate::Limits::default()).unwrap(),
+                    crate::Limits::default(),
+                )
+                .unwrap()
+            })
             .collect();
 
         let mut calls = 0;
@@ -746,7 +760,13 @@ mod tests {
             Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..8)
-            .map(|index| FieldInfo::new(vec![index; 16]))
+            .map(|index| {
+                FieldInfo::new(
+                    FieldPath::new(vec![index; 16], crate::Limits::default()).unwrap(),
+                    crate::Limits::default(),
+                )
+                .unwrap()
+            })
             .collect();
 
         let mut exact_chunks = Chunks::default();

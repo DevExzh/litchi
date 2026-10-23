@@ -2027,7 +2027,7 @@ fn strict_varint(payload: &[u8]) -> Result<u64, InvalidationError> {
 
 #[cfg(test)]
 mod tests {
-    use litchi_iwa_core::{FieldInfo, FieldPath, MessageInfo};
+    use litchi_iwa_core::{FieldInfo, MessageInfo};
 
     use super::*;
 
@@ -2811,7 +2811,11 @@ mod tests {
             info.data_references.push(identifier.saturating_add(10_000));
         }
         info.field_infos.push(FieldInfo {
-            path: FieldPath::new(vec![27, 1, 2, 3]),
+            path: litchi_iwa_core::FieldPath::new(
+                vec![27, 1, 2, 3],
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap(),
             object_references: info.object_references.clone(),
             data_references: info.data_references.clone(),
             known_field_version: (0..u32::try_from(METADATA_ITEMS)
@@ -2888,22 +2892,38 @@ mod tests {
             data_references: vec![55, 56],
             field_infos: vec![
                 FieldInfo {
-                    path: FieldPath::new(vec![DATABASE_THUMBNAIL_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![DATABASE_THUMBNAIL_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![77],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![DATABASE_THUMBNAILS_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![DATABASE_THUMBNAILS_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![78],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![THUMBNAILS_FIELD]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![THUMBNAILS_FIELD],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     data_references: vec![55],
                     ..FieldInfo::default()
                 },
                 FieldInfo {
-                    path: FieldPath::new(vec![2]),
+                    path: litchi_iwa_core::FieldPath::new(
+                        vec![2],
+                        litchi_iwa_core::Limits::default(),
+                    )
+                    .unwrap(),
                     object_references: vec![99],
                     data_references: vec![56],
                     ..FieldInfo::default()

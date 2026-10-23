@@ -333,7 +333,11 @@ fn synthetic_package(dependent_title_content: bool) -> TestResult<Vec<u8>> {
 
     let mut first_node_object = object(3, 4, &first_node)?;
     first_node_object.archive_info.message_infos[0].data_references = vec![7_001, 7_002];
-    let mut thumbnail_field = FieldInfo::new(vec![16]);
+    let mut thumbnail_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![16], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     thumbnail_field.data_references = vec![7_001, 7_002];
     first_node_object.archive_info.message_infos[0]
         .field_infos
@@ -1546,7 +1550,11 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
         let object = archive
             .object_mut(FIRST_SLIDE)
             .ok_or_else(|| io::Error::other("missing first slide"))?;
-        let mut field = FieldInfo::new(vec![6]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![6], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references.push(BODY_OWNER);
         object.archive_info.message_infos[0]
             .field_infos
@@ -1584,8 +1592,19 @@ fn selected_storage_merge_and_diff_metadata_refuse_changed_commits() -> TestResu
                 0 => object.archive_info.should_merge = Some(true),
                 1 => info.base_message_index = Some(0),
                 2 => info.diff_merge_version.push(1),
-                3 => info.diff_field_path = Some(vec![1].into()),
-                4 => info.fields_to_remove.push(vec![1].into()),
+                3 => {
+                    info.diff_field_path = Some(
+                        litchi_iwa_core::FieldPath::new(
+                            vec![1],
+                            litchi_iwa_core::Limits::default(),
+                        )
+                        .unwrap(),
+                    )
+                },
+                4 => info.fields_to_remove.push(
+                    litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default())
+                        .unwrap(),
+                ),
                 5 => info.diff_read_version.push(1),
                 _ => return Err(io::Error::other("unknown metadata mutation").into()),
             }

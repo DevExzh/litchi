@@ -36,6 +36,7 @@ use litchi_numbers_wire::{BncCellView, CachedScalar, StoredValue};
 
 use super::slide_table_core as core;
 use super::slide_table_sort_order::Error as SlideTableSortError;
+use super::snappy_failure::SnappyFailure;
 use super::{Package, PayloadLimitKind, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -1783,6 +1784,9 @@ fn rewrite_physical(
     let path = selection.path();
     let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
     let physical_limits = source.state.options.archive();
+    let snappy_limits = physical_limits
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
@@ -2186,9 +2190,8 @@ fn rewrite_physical(
             .archive
             .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-                .map_err(|_| Error::InvalidSource { path })?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, snappy_limits)
+            .map_err(|error| map_snappy_error(error, path))?;
         budget
             .output(
                 encoded_len
@@ -2221,8 +2224,8 @@ fn rewrite_physical(
         budget
             .scratch(compressed_bound)
             .map_err(|error| map_core(error, path))?;
-        let compressed = SnappyStream::compress(&decoded, Default::default())
-            .map_err(|_| Error::InvalidSource { path })?;
+        let compressed = SnappyStream::compress(&decoded, snappy_limits)
+            .map_err(|error| map_snappy_error(error, path))?;
         if compressed.len() > compressed_bound {
             return Err(Error::Verification { path });
         }
@@ -4016,6 +4019,36 @@ fn preview_deletion_count(source: &Package, candidate: &Package) -> usize {
     match (source, candidate) {
         (Some(source), Some(candidate)) => source.len().saturating_sub(candidate.len()),
         _ => 0,
+    }
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+fn map_snappy_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed,
+            maximum,
+            path,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed,
+            maximum,
+            path,
+        },
+        SnappyFailure::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+            path,
+        },
+        SnappyFailure::Allocation { requested } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        SnappyFailure::Invalid => Error::InvalidSource { path },
     }
 }
 

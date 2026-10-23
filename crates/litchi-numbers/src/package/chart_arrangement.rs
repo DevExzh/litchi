@@ -89,6 +89,8 @@ pub enum LimitKind {
     ScratchBytes,
     /// Native graph references inspected by the selector.
     References,
+    /// Compressed IWA member bytes inspected or emitted.
+    CompressedBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -103,6 +105,7 @@ impl fmt::Display for LimitKind {
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
             Self::References => "references",
+            Self::CompressedBytes => "compressed bytes",
         })
     }
 }
@@ -1922,8 +1925,9 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
     let encoded_bound =
         rewritten_archive_bound(source_encoded_len, original.len(), rewritten.len())?;
     let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
-        .map_err(|_| Error::InvalidSource)?;
-    let (snappy_allocations, snappy_scratch) = snappy_compression_requirements(encoded_bound)?;
+        .map_err(map_core_error)?;
+    let (snappy_allocations, snappy_scratch) =
+        snappy_compression_requirements(encoded_bound, snappy_limits)?;
     budget.preflight_output(encoded_bound)?;
     budget.preflight_output(compressed_bound)?;
     budget.preflight_work(encoded_bound.saturating_add(compressed_bound))?;
@@ -1982,8 +1986,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .map_err(|_| Error::InvalidSource)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed =
-        SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),
@@ -2443,7 +2446,10 @@ fn rewritten_archive_bound(
 /// obtains one temporary compressed vector for each independently encoded
 /// chunk. The neutral stream API exposes the chunk size and output bound, so
 /// account for both before invoking the allocation-bearing compressor.
-fn snappy_compression_requirements(input_len: usize) -> Result<(usize, usize), Error> {
+fn snappy_compression_requirements(
+    input_len: usize,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+) -> Result<(usize, usize), Error> {
     let frame_count = if input_len == 0 {
         0
     } else {
@@ -2457,9 +2463,9 @@ fn snappy_compression_requirements(input_len: usize) -> Result<(usize, usize), E
     } else {
         SnappyStream::maximum_compressed_len(
             input_len.min(SnappyStream::WRITE_CHUNK_SIZE),
-            Default::default(),
+            snappy_limits,
         )
-        .map_err(|_| Error::InvalidSource)?
+        .map_err(map_core_error)?
         .checked_sub(4)
         .ok_or(Error::InvalidSource)?
     };
@@ -2782,6 +2788,43 @@ fn add_clone_bytes(
     retained: &mut usize,
 ) -> Result<(), Error> {
     add_clone_vec::<u8>(length, allocations, retained)
+}
+
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    LimitKind::CompressedBytes
+                },
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::Objects
+                | litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject
+                | litchi_iwa_core::LimitKind::MetadataItems
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::References,
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::WireBytes,
+            },
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    }
 }
 
 fn map_common_error(error: CommonError) -> Error {

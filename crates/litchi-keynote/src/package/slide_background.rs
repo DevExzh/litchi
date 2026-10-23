@@ -1023,6 +1023,12 @@ fn rewrite_package(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let metadata_component = metadata_component_name(source)?;
     let mut names = vec![
         selection.slide_component.as_str(),
@@ -1087,7 +1093,7 @@ fn rewrite_package(
     let mut compressed = Vec::new();
     for (name, archive) in &archives {
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-        let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
     let edits = compressed

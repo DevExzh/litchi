@@ -1,0 +1,253 @@
+{
+  "schema": "litchi.iwa-constructor-push-admission.v2",
+  "status": "deterministic complete return; native qualification pending",
+  "source": {
+    "commit": "cad8523c0c",
+    "changes": [
+      "Default-profile dispatch uses a private marker without widening Limits.",
+      "Minimal collection totals defer fixed fields, memory and metadata counts until publication.",
+      "A minimal prefix is materialized before a later nonminimal push.",
+      "push(MessageInfo) checks the current public shape and length before using fixed-shape totals.",
+      "MessageInfo constructors append the fixed version values directly after exact reservation."
+    ],
+    "probe_source_sha256": {
+      "base": "91f5cdacb8725780ee6e3cc8ed18f449fb37bb8b02007791718a20bca4a1273e",
+      "candidate": "1b7f55f89b3d619cc66882c23573a34b5f718b39f04864f020811468b6e3850a"
+    },
+    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
+  },
+  "method": {
+    "build_source": "protected release binaries; no Cargo command in v16",
+    "base_feature": "before",
+    "callgrind": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
+    "message_counts": [
+      1,
+      8,
+      32,
+      128
+    ],
+    "iterations": [
+      2000,
+      12000
+    ],
+    "routes_completed": [
+      "archive_info (generic push)",
+      "archive_info_e2e (push_new)",
+      "archive_info_generic_e2e (generic push)"
+    ],
+    "fixture": "constructor, collection setup and admission are inside each end-to-end iteration; output parse/encode setup is outside the timed loop",
+    "binaries": {
+      "base_sha256": "858bc0ca15473c6a0fb73a8dbb99fe4309cc3fab74831f94821010275e646bb3",
+      "candidate_sha256": "98743620f0442548341265fab16c8c20f11f939944481f68466a29f580311324"
+    },
+    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v16",
+    "capture_manifest_sha256": "69cc3f6d2f591aa60257693f4ab3c2ce638c98ae3f7a745908255fa84f2354fd",
+    "capture_manifest_files": 48,
+    "capture_bytes": 5208388,
+    "serialization": {
+      "fixture_operation": "parse -> validate -> encode before the timed constructor loop",
+      "timed_in_constructor_routes": false,
+      "output_bytes_and_sha256_recorded_for_every_message_count": true,
+      "note": "The constructor timings include collection assembly and admission; the serialized fixture digest is checked as an exact semantic comparison. Native combined latency remains a separate qualification."
+    }
+  },
+  "callgrind_results": {
+    "normalization": "Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
+    "rows": [
+      {
+        "route": "archive_info",
+        "message_count": 1,
+        "base_ir_2000": 591506,
+        "base_ir_12000": 1101556,
+        "candidate_ir_2000": 2068109,
+        "candidate_ir_12000": 10008164,
+        "base_ir_per_operation": 51.005,
+        "candidate_ir_per_operation": 794.0055,
+        "candidate_over_base": 15.567209097147337,
+        "base_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "candidate_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "base_output_bytes": 1040,
+        "candidate_output_bytes": 1040
+      },
+      {
+        "route": "archive_info",
+        "message_count": 8,
+        "base_ir_2000": 1596910,
+        "base_ir_12000": 2106960,
+        "candidate_ir_2000": 6221763,
+        "candidate_ir_12000": 30126803,
+        "base_ir_per_operation": 51.005,
+        "candidate_ir_per_operation": 2390.504,
+        "candidate_over_base": 46.86803254582884,
+        "base_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "candidate_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "base_output_bytes": 8299,
+        "candidate_output_bytes": 8299
+      },
+      {
+        "route": "archive_info",
+        "message_count": 32,
+        "base_ir_2000": 5301961,
+        "base_ir_12000": 5812022,
+        "candidate_ir_2000": 19507676,
+        "candidate_ir_12000": 92762726,
+        "base_ir_per_operation": 51.0061,
+        "candidate_ir_per_operation": 7325.505,
+        "candidate_over_base": 143.62017484183264,
+        "base_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "candidate_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "base_output_bytes": 33188,
+        "candidate_output_bytes": 33188
+      },
+      {
+        "route": "archive_info",
+        "message_count": 128,
+        "base_ir_2000": 20097810,
+        "base_ir_12000": 20607845,
+        "candidate_ir_2000": 71354132,
+        "candidate_ir_12000": 335324168,
+        "base_ir_per_operation": 51.0035,
+        "candidate_ir_per_operation": 26397.0036,
+        "candidate_over_base": 517.5527875537953,
+        "base_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "candidate_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "base_output_bytes": 132740,
+        "candidate_output_bytes": 132740
+      },
+      {
+        "route": "archive_info_e2e",
+        "message_count": 1,
+        "base_ir_2000": 2611399,
+        "base_ir_12000": 13221454,
+        "candidate_ir_2000": 3940007,
+        "candidate_ir_12000": 21240047,
+        "base_ir_per_operation": 1061.0055,
+        "candidate_ir_per_operation": 1730.004,
+        "candidate_over_base": 1.6305325467210112,
+        "base_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "candidate_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "base_output_bytes": 1040,
+        "candidate_output_bytes": 1040
+      },
+      {
+        "route": "archive_info_e2e",
+        "message_count": 8,
+        "base_ir_2000": 5838818,
+        "base_ir_12000": 27558858,
+        "candidate_ir_2000": 10384646,
+        "candidate_ir_12000": 55104696,
+        "base_ir_per_operation": 2172.004,
+        "candidate_ir_per_operation": 4472.005,
+        "candidate_over_base": 2.0589303702939774,
+        "base_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "candidate_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "base_output_bytes": 8299,
+        "candidate_output_bytes": 8299
+      },
+      {
+        "route": "archive_info_e2e",
+        "message_count": 32,
+        "base_ir_2000": 25860988,
+        "base_ir_12000": 129141049,
+        "candidate_ir_2000": 41731210,
+        "candidate_ir_12000": 226081250,
+        "base_ir_per_operation": 10328.0061,
+        "candidate_ir_per_operation": 18435.004,
+        "candidate_over_base": 1.7849528574542572,
+        "base_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "candidate_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "base_output_bytes": 33188,
+        "candidate_output_bytes": 33188
+      },
+      {
+        "route": "archive_info_e2e",
+        "message_count": 128,
+        "base_ir_2000": 123076133,
+        "base_ir_12000": 638456173,
+        "candidate_ir_2000": 182220353,
+        "candidate_ir_12000": 1000500404,
+        "base_ir_per_operation": 51538.004,
+        "candidate_ir_per_operation": 81828.0051,
+        "candidate_over_base": 1.5877216568185293,
+        "base_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "candidate_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "base_output_bytes": 132740,
+        "candidate_output_bytes": 132740
+      },
+      {
+        "route": "archive_info_generic_e2e",
+        "message_count": 1,
+        "base_ir_2000": 2617490,
+        "base_ir_12000": 13257545,
+        "candidate_ir_2000": 4588235,
+        "candidate_ir_12000": 24408151,
+        "base_ir_per_operation": 1064.0055,
+        "candidate_ir_per_operation": 1981.9916,
+        "candidate_over_base": 1.862764431198899,
+        "base_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "candidate_output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+        "base_output_bytes": 1040,
+        "candidate_output_bytes": 1040
+      },
+      {
+        "route": "archive_info_generic_e2e",
+        "message_count": 8,
+        "base_ir_2000": 5844909,
+        "base_ir_12000": 27594949,
+        "candidate_ir_2000": 13568737,
+        "candidate_ir_12000": 73488663,
+        "base_ir_per_operation": 2175.004,
+        "candidate_ir_per_operation": 5991.9926,
+        "candidate_over_base": 2.754934059891384,
+        "base_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "candidate_output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+        "base_output_bytes": 8299,
+        "candidate_output_bytes": 8299
+      },
+      {
+        "route": "archive_info_generic_e2e",
+        "message_count": 32,
+        "base_ir_2000": 25867079,
+        "base_ir_12000": 129177140,
+        "candidate_ir_2000": 52061138,
+        "candidate_ir_12000": 288061178,
+        "base_ir_per_operation": 10331.0061,
+        "candidate_ir_per_operation": 23600.004,
+        "candidate_over_base": 2.2843858353737687,
+        "base_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "candidate_output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+        "base_output_bytes": 33188,
+        "candidate_output_bytes": 33188
+      },
+      {
+        "route": "archive_info_generic_e2e",
+        "message_count": 128,
+        "base_ir_2000": 123082224,
+        "base_ir_12000": 638492264,
+        "candidate_ir_2000": 220626829,
+        "candidate_ir_12000": 1230936880,
+        "base_ir_per_operation": 51541.004,
+        "candidate_ir_per_operation": 101031.0051,
+        "candidate_over_base": 1.9602063844157944,
+        "base_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "candidate_output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+        "base_output_bytes": 132740,
+        "candidate_output_bytes": 132740
+      }
+    ],
+    "interpretation": "archive_info is the direct original Vec<MessageInfo> constructor comparison; archive_info_e2e uses push_new; archive_info_generic_e2e includes metadata Vec assembly and generic push(MessageInfo). All three candidate routes retain exact output bytes and SHA-256. The generic push route has a linear admission slope because it must inspect each current public record; push_new avoids the caller-record inspection but still pays collection admission."
+  },
+  "semantic_validation": {
+    "base_candidate_output_sha256_match": true,
+    "base_candidate_output_bytes_match": true,
+    "mutation_tests": [
+      "default_archive_info_admission_checks_public_message_length_mutations",
+      "message_info_collection_admission_is_invalidated_by_public_mutation",
+      "message_info_collection_admission_materializes_minimal_prefix"
+    ],
+    "meaning": "archive_info compares the original generic Vec<MessageInfo> constructor with the certified push(MessageInfo) route; archive_info_e2e compares the original metadata assembly with push_new. The public mutation tests force exact fallback, and the mixed minimal-prefix test checks aggregate totals before a nonminimal push."
+  },
+  "pending": [
+    "No native latency or memory qualification is claimed; a quiet-host native run remains separate."
+  ]
+}

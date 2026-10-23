@@ -76,10 +76,18 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
 fn add_model_archive_metadata(object: &mut ArchiveObject, style_identifier: u64) {
     let info = &mut object.archive_info.message_infos[0];
     info.data_references = vec![700 + style_identifier];
-    let mut style_field = FieldInfo::new(vec![3]);
+    let mut style_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![3], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     style_field.object_references = vec![style_identifier];
     style_field.data_references = vec![800 + style_identifier];
-    let mut unknown_tail = FieldInfo::new(vec![99, 1]);
+    let mut unknown_tail = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![99, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     unknown_tail.data_references = vec![900 + style_identifier];
     info.field_infos = vec![style_field, unknown_tail];
 }
@@ -1030,10 +1038,18 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
     ];
     let mut stylesheet_object = stylesheet()?;
     stylesheet_object.archive_info.message_infos[0].data_references = vec![6_000];
-    let mut stylesheet_reference_field = FieldInfo::new(vec![1]);
+    let mut stylesheet_reference_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     stylesheet_reference_field.object_references = vec![PARENT_STYLE_ID, UNUSED_STYLE_ID];
     stylesheet_reference_field.data_references = vec![6_002];
-    let mut stylesheet_tail = FieldInfo::new(vec![77, 1]);
+    let mut stylesheet_tail = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![77, 1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     stylesheet_tail.data_references = vec![6_001];
     stylesheet_object.archive_info.message_infos[0]
         .field_infos

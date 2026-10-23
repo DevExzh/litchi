@@ -244,7 +244,7 @@ fn conditional_style_graph_objects(
         Default::default(),
     )?;
     let info = &mut set_object.archive_info.message_infos[0];
-    info.versions = NATIVE_MESSAGE_VERSION.to_vec();
+    info.versions = NATIVE_MESSAGE_VERSION.to_vec().into();
     info.object_references = references.clone();
     info.field_infos.push(FieldInfo {
         path: FieldPath { path: vec![3] },
@@ -333,7 +333,7 @@ fn style_object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<Arc
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec();
+    object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec().into();
     Ok(object)
 }
 

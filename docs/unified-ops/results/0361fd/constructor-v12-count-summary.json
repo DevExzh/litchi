@@ -1,0 +1,333 @@
+{
+  "attribution": {
+    "constructor": "The corrected candidate performs one default-profile validation branch and a branchless aggregate check of every public MessageInfo shape field plus length; it does not encode a header, allocate metadata, or retain a cache.",
+    "linear_fit": {
+      "base_archive_info_route_ir_per_op": "approximately 51",
+      "candidate_archive_info_new_body_ir_per_call": "98 + 21 * message_count",
+      "candidate_archive_info_route_ir_per_op": "164 + 21 * message_count",
+      "interpretation": "The 21-instruction slope is the aggregate public shape and length admission pass; the fixed route cost includes exact default-profile equality and constructor ownership setup. No encoded header or cache allocation occurs in this route.",
+      "measured_archive_info_new_body_ir_per_call": {
+        "1": 119,
+        "128": 2786,
+        "32": 770,
+        "8": 266
+      }
+    },
+    "repair": "Default Limits skip the repeated invariant walk only after exact equality with Limits::default(); nondefault profiles still call Limits::validate() and the exact admission path.",
+    "return": "The constructor remains returned for owner review. Retained noncanonical validation is below base at 1 and 32/128 messages and 3.0% above at 8 messages; no native qualification was run."
+  },
+  "method": {
+    "canonical_route": "archive_info",
+    "commands": [
+      "IWA_MESSAGE_COUNT=N valgrind --tool=callgrind --callgrind-out-file=.../archive_info-SIDE-N-ITER.out .../iwa-constructor-probe archive_info ITER",
+      "IWA_MESSAGE_COUNT=N valgrind --tool=callgrind --callgrind-out-file=.../retained_validate-SIDE-N-ITER.out .../iwa-constructor-probe retained_validate ITER"
+    ],
+    "event": "Ir",
+    "fixture": "IWA_MESSAGE_COUNT in {1,8,32,128}; setup and archive encoding outside timed loop",
+    "iterations": "per operation = (Ir at 12000 - Ir at 2000) / 10000",
+    "noncanonical_route": "retained_validate (64 unknown fields and noncanonical unknown varint in retained header)",
+    "raw_artifacts": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3",
+    "tool": "valgrind --tool=callgrind"
+  },
+  "results": {
+    "archive_info": {
+      "outputs": [
+        {
+          "checksum": 215888,
+          "message_count": 1,
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "side": "base"
+        },
+        {
+          "checksum": 299883,
+          "message_count": 8,
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "side": "base"
+        },
+        {
+          "checksum": 587804,
+          "message_count": 32,
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "side": "base"
+        },
+        {
+          "checksum": 1739835,
+          "message_count": 128,
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "side": "base"
+        },
+        {
+          "checksum": 215888,
+          "message_count": 1,
+          "output_bytes": 1040,
+          "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1",
+          "side": "candidate"
+        },
+        {
+          "checksum": 299883,
+          "message_count": 8,
+          "output_bytes": 8299,
+          "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15",
+          "side": "candidate"
+        },
+        {
+          "checksum": 587804,
+          "message_count": 32,
+          "output_bytes": 33188,
+          "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698",
+          "side": "candidate"
+        },
+        {
+          "checksum": 1739835,
+          "message_count": 128,
+          "output_bytes": 132740,
+          "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2",
+          "side": "candidate"
+        }
+      ],
+      "records": [
+        {
+          "ir_12000": 1101556,
+          "ir_2000": 591506,
+          "ir_per_op": 51.005,
+          "message_count": 1,
+          "side": "base"
+        },
+        {
+          "ir_12000": 2106960,
+          "ir_2000": 1596910,
+          "ir_per_op": 51.005,
+          "message_count": 8,
+          "side": "base"
+        },
+        {
+          "ir_12000": 5812022,
+          "ir_2000": 5301961,
+          "ir_per_op": 51.0061,
+          "message_count": 32,
+          "side": "base"
+        },
+        {
+          "ir_12000": 20607845,
+          "ir_2000": 20097810,
+          "ir_per_op": 51.0035,
+          "message_count": 128,
+          "side": "base"
+        },
+        {
+          "ir_12000": 2698078,
+          "ir_2000": 848038,
+          "ir_per_op": 185.004,
+          "message_count": 1,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 5420505,
+          "ir_2000": 2100465,
+          "ir_per_op": 332.004,
+          "message_count": 8,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 14876479,
+          "ir_2000": 6516424,
+          "ir_per_op": 836.0055,
+          "message_count": 32,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 52741955,
+          "ir_2000": 24221904,
+          "ir_per_op": 2852.0051,
+          "message_count": 128,
+          "side": "candidate"
+        }
+      ],
+      "slopes": {
+        "1": {
+          "base_ir_per_op": 51.005,
+          "candidate_ir_per_op": 185.004,
+          "candidate_over_base": 3.6271738064895596
+        },
+        "128": {
+          "base_ir_per_op": 51.0035,
+          "candidate_ir_per_op": 2852.0051,
+          "candidate_over_base": 55.91783112923623
+        },
+        "32": {
+          "base_ir_per_op": 51.0061,
+          "candidate_ir_per_op": 836.0055,
+          "candidate_over_base": 16.390304296937032
+        },
+        "8": {
+          "base_ir_per_op": 51.005,
+          "candidate_ir_per_op": 332.004,
+          "candidate_over_base": 6.509244191745907
+        }
+      }
+    },
+    "retained_validate": {
+      "outputs": [
+        {
+          "checksum": 11803,
+          "message_count": 1,
+          "output_bytes": 1297,
+          "output_sha256": "fbc25e83f1335fb75cc8bb9528f44136afb42fb0022944d258fb5b3a8a3e18d2",
+          "side": "base"
+        },
+        {
+          "checksum": 11931,
+          "message_count": 8,
+          "output_bytes": 8556,
+          "output_sha256": "7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af",
+          "side": "base"
+        },
+        {
+          "checksum": 11839,
+          "message_count": 32,
+          "output_bytes": 33444,
+          "output_sha256": "df3234b6ada3a1b0ab45ff7a1879fbc2d89e94855a52158f7aedbb38b78566be",
+          "side": "base"
+        },
+        {
+          "checksum": 11892,
+          "message_count": 128,
+          "output_bytes": 132996,
+          "output_sha256": "9430c642517b796e685fe2cf5a6125331387f893c8328da7f1e797e4ac972a02",
+          "side": "base"
+        },
+        {
+          "checksum": 11803,
+          "message_count": 1,
+          "output_bytes": 1297,
+          "output_sha256": "fbc25e83f1335fb75cc8bb9528f44136afb42fb0022944d258fb5b3a8a3e18d2",
+          "side": "candidate"
+        },
+        {
+          "checksum": 11931,
+          "message_count": 8,
+          "output_bytes": 8556,
+          "output_sha256": "7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af",
+          "side": "candidate"
+        },
+        {
+          "checksum": 11839,
+          "message_count": 32,
+          "output_bytes": 33444,
+          "output_sha256": "df3234b6ada3a1b0ab45ff7a1879fbc2d89e94855a52158f7aedbb38b78566be",
+          "side": "candidate"
+        },
+        {
+          "checksum": 11892,
+          "message_count": 128,
+          "output_bytes": 132996,
+          "output_sha256": "9430c642517b796e685fe2cf5a6125331387f893c8328da7f1e797e4ac972a02",
+          "side": "candidate"
+        }
+      ],
+      "records": [
+        {
+          "ir_12000": 26123655,
+          "ir_2000": 4853608,
+          "ir_per_op": 2127.0047,
+          "message_count": 1,
+          "side": "base"
+        },
+        {
+          "ir_12000": 110434841,
+          "ir_2000": 19764784,
+          "ir_per_op": 9067.0057,
+          "message_count": 8,
+          "side": "base"
+        },
+        {
+          "ir_12000": 582113048,
+          "ir_2000": 101558008,
+          "ir_per_op": 48055.504,
+          "message_count": 32,
+          "side": "base"
+        },
+        {
+          "ir_12000": 2361534636,
+          "ir_2000": 410770585,
+          "ir_per_op": 195076.4051,
+          "message_count": 128,
+          "side": "base"
+        },
+        {
+          "ir_12000": 24723889,
+          "ir_2000": 4613853,
+          "ir_per_op": 2011.0036,
+          "message_count": 1,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 113663472,
+          "ir_2000": 20263426,
+          "ir_per_op": 9340.0046,
+          "message_count": 8,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 423095614,
+          "ir_2000": 74815563,
+          "ir_per_op": 34828.0051,
+          "message_count": 32,
+          "side": "candidate"
+        },
+        {
+          "ir_12000": 1653015255,
+          "ir_2000": 291695204,
+          "ir_per_op": 136132.0051,
+          "message_count": 128,
+          "side": "candidate"
+        }
+      ],
+      "slopes": {
+        "1": {
+          "base_ir_per_op": 2127.0047,
+          "candidate_ir_per_op": 2011.0036,
+          "candidate_over_base": 0.9454626969089444
+        },
+        "128": {
+          "base_ir_per_op": 195076.4051,
+          "candidate_ir_per_op": 136132.0051,
+          "candidate_over_base": 0.6978394185099734
+        },
+        "32": {
+          "base_ir_per_op": 48055.504,
+          "candidate_ir_per_op": 34828.0051,
+          "candidate_over_base": 0.7247453923280047
+        },
+        "8": {
+          "base_ir_per_op": 9067.0057,
+          "candidate_ir_per_op": 9340.0046,
+          "candidate_over_base": 1.030109046915014
+        }
+      }
+    }
+  },
+  "schema": "litchi.iwa-constructor-repair.v2",
+  "source": {
+    "base_binary": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-base/release/iwa-constructor-probe",
+      "sha256": "cce613ebdc209e4b272e87396a6947cfb1d4ffcc53b5898bfec64cb00993109b",
+      "size": 630816
+    },
+    "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+    "candidate_binary": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-candidate/release/iwa-constructor-probe",
+      "sha256": "5d0000fa6977b5bbdd6d8d7367e083ab50ad1c2648ff45ef1606115c8bc18c3b",
+      "size": 647600
+    },
+    "candidate_commit": "ed10b876afcf8efa2c46a0c3e8087027db42d376",
+    "candidate_fix_commit": "ada701ba3a",
+    "cargo_lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a",
+    "probe_source_sha256": "eb3157342b9bd2c5c9e0c5d373ad4c507987b3acf46c680246d84bae7f6efdf0"
+  },
+  "status": "returned_constructor_performance"
+}

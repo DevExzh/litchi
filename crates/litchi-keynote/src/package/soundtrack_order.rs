@@ -2675,8 +2675,7 @@ fn rewrite(
     if serialized.len() > serialized_bound {
         return Err(Error::Verification);
     }
-    let compressed =
-        SnappyStream::compress(&serialized, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let output = catalog
         .package()
         .reassemble_to_bytes(

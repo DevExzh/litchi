@@ -583,7 +583,12 @@ fn form_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
         )?;
         let info = &mut sheet.archive_info.message_infos[0];
         info.field_infos.clear();
-        let mut drawables = FieldInfo::new(vec![1, 2]);
+        let mut drawables = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         drawables.object_references = vec![FIRST_INFO, SECOND_INFO];
         info.field_infos.push(drawables);
         Ok(())

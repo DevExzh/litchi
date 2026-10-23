@@ -31,6 +31,7 @@ use crate::soundtrack::items::{
     Patch, StagedOperation,
 };
 
+use super::snappy_failure::SnappyFailure;
 use super::soundtrack_physical::{
     self, Budget, PACKAGE_METADATA_MESSAGE_TYPE, SOUNDTRACK_MEDIA_FIELD, Selection, SelectionPolicy,
 };
@@ -821,6 +822,10 @@ fn rewrite_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let snappy_limits = package
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let mut archive =
         Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
@@ -861,7 +866,7 @@ fn rewrite_metadata_payload(
     let serialized = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    SnappyStream::compress(&serialized, Default::default()).map_err(|_| Error::InvalidSource)
+    SnappyStream::compress(&serialized, snappy_limits).map_err(map_snappy_error)
 }
 
 fn rewrite_package(
@@ -933,6 +938,10 @@ fn rewrite_package(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let stream = SnappyStream::decompress(
         archive_entry.data(),
         source
@@ -999,8 +1008,8 @@ fn rewrite_package(
     let serialized_soundtrack = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    let compressed_soundtrack = SnappyStream::compress(&serialized_soundtrack, Default::default())
-        .map_err(|_| Error::InvalidSource)?;
+    let compressed_soundtrack =
+        SnappyStream::compress(&serialized_soundtrack, snappy_limits).map_err(map_snappy_error)?;
 
     let mut data_additions = Vec::new();
     let mut owner_additions = Vec::new();
@@ -1398,5 +1407,29 @@ impl Edit<'_> {
                 Diagnostics::published(2)
             },
         })
+    }
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+fn map_snappy_error(error: litchi_iwa_core::Error) -> Error {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::WireBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => Error::Limit {
+            kind: crate::soundtrack::items::LimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => Error::Allocation { amount: requested },
+        SnappyFailure::Invalid => Error::InvalidSource,
     }
 }

@@ -890,6 +890,7 @@ fn rewrite_package_settings(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
@@ -931,7 +932,7 @@ fn rewrite_package_settings(
     let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
     let compressed =
-        SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)?;
+        SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)?;
     drop(rewritten_archive);
     let preview_plan =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())

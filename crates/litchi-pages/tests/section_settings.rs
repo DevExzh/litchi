@@ -243,7 +243,12 @@ fn synthetic_package_with_first_message(
     )?;
     first_section.archive_info.message_infos[1].object_references = FIRST_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(FIRST_TEMPLATES) {
-        let mut field = FieldInfo::new(vec![field_number]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![field_number], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![identifier];
         first_section.archive_info.message_infos[1]
             .field_infos
@@ -256,7 +261,12 @@ fn synthetic_package_with_first_message(
     )?;
     second_section.archive_info.message_infos[0].object_references = SECOND_TEMPLATES.to_vec();
     for (field_number, identifier) in [23_u32, 24, 25].into_iter().zip(SECOND_TEMPLATES) {
-        let mut field = FieldInfo::new(vec![field_number]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![field_number], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![identifier];
         second_section.archive_info.message_infos[0]
             .field_infos
@@ -265,9 +275,17 @@ fn synthetic_package_with_first_message(
     let mut document_root = object(DOCUMENT_IDENTIFIER, 10_000, root.encode_to_vec())?;
     document_root.archive_info.message_infos[0].object_references =
         vec![BODY_IDENTIFIER, VIEW_STATE_IDENTIFIER];
-    let mut body_field = FieldInfo::new(vec![4]);
+    let mut body_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![4], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     body_field.object_references = vec![BODY_IDENTIFIER];
-    let mut view_state_field = FieldInfo::new(vec![15, 5]);
+    let mut view_state_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![15, 5], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     view_state_field.object_references = vec![VIEW_STATE_IDENTIFIER];
     document_root.archive_info.message_infos[0]
         .field_infos
@@ -324,7 +342,11 @@ fn synthetic_package_with_first_message(
         .encode_to_vec(),
     )?;
     view_bridge.archive_info.message_infos[0].object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
-    let mut bridge_field = FieldInfo::new(vec![1]);
+    let mut bridge_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     bridge_field.object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
     view_bridge.archive_info.message_infos[0]
         .field_infos
@@ -341,7 +363,11 @@ fn synthetic_package_with_first_message(
         view_root_payload,
     )?;
     view_root.archive_info.message_infos[0].object_references = vec![LAYOUT_STATE_IDENTIFIER];
-    let mut layout_field = FieldInfo::new(vec![1]);
+    let mut layout_field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     layout_field.object_references = vec![LAYOUT_STATE_IDENTIFIER];
     view_root.archive_info.message_infos[0]
         .field_infos

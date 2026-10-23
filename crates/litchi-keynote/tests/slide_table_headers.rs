@@ -21,7 +21,7 @@ use litchi_iwa_common::{
         repeated_length_delimited_payloads,
     },
 };
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::headers::{Count, Settings};
 use litchi_keynote::{
@@ -90,8 +90,12 @@ fn reference(identifier: u64) -> tsp::Reference {
     }
 }
 
-fn field_reference(path: impl Into<FieldPath>, references: &[u64]) -> FieldInfo {
-    let mut field = FieldInfo::new(path);
+fn field_reference(path: Vec<u32>, references: &[u64]) -> FieldInfo {
+    let mut field = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(path, litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     field.object_references.extend_from_slice(references);
     field
 }
@@ -1071,7 +1075,8 @@ fn field_info_wrong_path(package: &[u8]) -> TestResult<Vec<u8>> {
         let object = archive
             .object_mut(TABLE_INFOS[0])
             .ok_or_else(|| io::Error::other("missing table-info object"))?;
-        object.archive_info.message_infos[0].field_infos[0].path = FieldPath::new(vec![99]);
+        object.archive_info.message_infos[0].field_infos[0].path =
+            litchi_iwa_core::FieldPath::new(vec![99], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })
 }

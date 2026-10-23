@@ -755,6 +755,9 @@ fn publish(
     let wire = style_wire_limits(source)?;
     let catalog = &source.state.source;
     let limits = catalog.limits();
+    let snappy_limits = limits
+        .snappy_limits()
+        .map_err(|error| map_archive(&error))?;
     let archive_limits = limits
         .effective_archive_limits()
         .map_err(|error| map_archive(&error))?;
@@ -855,7 +858,7 @@ fn publish(
                 .find(|(message, _)| message.type_ == CHARACTER_STYLE_MESSAGE_TYPE)
                 .map(|(_, info)| info.versions.clone())
         })
-        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec());
+        .unwrap_or_else(|| CHARACTER_STYLE_VERSION.to_vec().into());
 
     let mut created: Vec<u64> = Vec::new();
     let mut taken = registry.uuids.clone();
@@ -1045,7 +1048,7 @@ fn publish(
         let bytes = archive.to_bytes(archive_limits)?;
         encoded.push((
             name.to_owned(),
-            SnappyStream::compress(&bytes, Default::default())?,
+            SnappyStream::compress(&bytes, snappy_limits)?,
         ));
         Ok(())
     };

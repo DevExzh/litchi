@@ -681,8 +681,8 @@ fn rewrite_title(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
+    let compressed = page_layout::compress_archive(source, archive, archive_limits)
+        .map_err(map_page_layout_error)?;
     let mut deletions = Vec::new();
     deletions
         .try_reserve_exact(PREVIEW_ENTRY_NAMES.len())

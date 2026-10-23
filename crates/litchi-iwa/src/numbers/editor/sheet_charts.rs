@@ -1159,49 +1159,77 @@ mod tests {
                     NumbersCaptionMetadataMode::FieldOnly => {
                         info.object_references.retain(|id| *id != old_reference_id);
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![old_reference_id],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::WrongFieldPath => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![9, 9]),
+                            path: crate::archive::FieldPath::new(
+                                vec![9, 9],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![old_reference_id],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::DuplicateField => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![old_reference_id, old_reference_id],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::StaleField => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![old_reference_id, 999_999],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::NewField => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![replacement_id],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::DataReference => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             data_references: vec![old_reference_id],
                             ..Default::default()
                         });
                     },
                     NumbersCaptionMetadataMode::AuthorizedField => {
                         info.field_infos.push(crate::archive::FieldInfo {
-                            path: crate::archive::FieldPath::new(vec![1, 11, 1]),
+                            path: crate::archive::FieldPath::new(
+                                vec![1, 11, 1],
+                                crate::archive::Limits::default(),
+                            )
+                            .unwrap(),
                             object_references: vec![old_reference_id],
                             ..Default::default()
                         });

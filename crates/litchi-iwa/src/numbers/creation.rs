@@ -1287,7 +1287,7 @@ fn raw_object(
         }],
         Default::default(),
     )?;
-    object.archive_info.message_infos[0].versions = vec![1, 0, 5];
+    object.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
     object.archive_info.message_infos[0].object_references = references.to_vec();
     Ok(object)
 }

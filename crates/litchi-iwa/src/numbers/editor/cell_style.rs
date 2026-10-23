@@ -698,7 +698,7 @@ fn cell_style_variation(
         Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
-    info.versions = CELL_STYLE_MESSAGE_VERSION.to_vec();
+    info.versions = CELL_STYLE_MESSAGE_VERSION.to_vec().into();
     info.object_references.push(parent_style_id);
     if let Some(data_identifier) = data_identifier {
         info.data_references.push(data_identifier);

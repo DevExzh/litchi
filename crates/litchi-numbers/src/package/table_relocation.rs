@@ -849,6 +849,9 @@ fn rewrite_bytes_with_parent_policy(
 ) -> Result<Vec<u8>, Error> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits
+        .snappy_limits()
+        .map_err(|_error| invalid_source(operation.path()))?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(|_error| invalid_source(operation.path()))?;
@@ -937,7 +940,7 @@ fn rewrite_bytes_with_parent_policy(
         let encoded = archive
             .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, operation.path()))?;
-        let compressed = SnappyStream::compress(&encoded, Default::default())
+        let compressed = SnappyStream::compress(&encoded, snappy_limits)
             .map_err(|error| map_core_error(error, operation.path()))?;
         rewritten.push((name, compressed));
     }

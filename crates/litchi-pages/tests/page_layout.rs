@@ -4,7 +4,7 @@ use std::sync::Arc;
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsk, tsp, tswp};
 use litchi_pages::{
     Package,
@@ -192,7 +192,12 @@ fn synthetic_package_with_view_location(
         document.archive_info.message_infos[1]
             .object_references
             .push(VIEW_STATE_IDENTIFIER);
-        let mut field = FieldInfo::new(vec![15, 5]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![15, 5], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![VIEW_STATE_IDENTIFIER];
         document.archive_info.message_infos[1]
             .field_infos
@@ -239,7 +244,11 @@ fn synthetic_package_with_view_location(
             .encode_to_vec(),
         )?;
         bridge.archive_info.message_infos[0].object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
-        let mut bridge_field = FieldInfo::new(vec![1]);
+        let mut bridge_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         bridge_field.object_references = vec![VIEW_STATE_ROOT_IDENTIFIER];
         bridge.archive_info.message_infos[0]
             .field_infos
@@ -270,7 +279,11 @@ fn synthetic_package_with_view_location(
         )?;
         let message_info = &mut view_state.archive_info.message_infos[1];
         message_info.object_references = vec![LAYOUT_STATE_IDENTIFIER];
-        let mut field = FieldInfo::new(vec![1]);
+        let mut field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         field.object_references = vec![LAYOUT_STATE_IDENTIFIER];
         message_info.field_infos.push(field);
         let mut detached_payload = tp::ViewStateRootArchive {
@@ -286,7 +299,11 @@ fn synthetic_package_with_view_location(
         )?;
         detached.archive_info.message_infos[0].object_references =
             vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
-        let mut detached_field = FieldInfo::new(vec![1]);
+        let mut detached_field = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1], litchi_iwa_core::Limits::default()).unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
         detached_field.object_references = vec![DETACHED_LAYOUT_STATE_IDENTIFIER];
         detached.archive_info.message_infos[0]
             .field_infos
@@ -876,7 +893,8 @@ fn rooted_view_state_header_reference_proof_fails_closed_at_every_hop() -> TestR
             .field_infos
             .first_mut()
             .ok_or_else(|| io::Error::other("missing rooted layout field metadata"))?;
-        field.path = FieldPath::new(vec![2]);
+        field.path =
+            litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap();
         Ok(())
     })?;
 
@@ -913,13 +931,18 @@ fn noncanonical_metadata_groups_and_deprecated_cache_edges_fail_changed_admissio
         Ok(())
     })?;
     let diff_path = rewrite_document(&bytes, |object, index| {
-        object.archive_info.message_infos[index].diff_field_path = Some(FieldPath::new(vec![30]));
+        object.archive_info.message_infos[index].diff_field_path = Some(
+            litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default()).unwrap(),
+        );
         Ok(())
     })?;
     let remove = rewrite_document(&bytes, |object, index| {
         object.archive_info.message_infos[index]
             .fields_to_remove
-            .push(FieldPath::new(vec![30]));
+            .push(
+                litchi_iwa_core::FieldPath::new(vec![30], litchi_iwa_core::Limits::default())
+                    .unwrap(),
+            );
         Ok(())
     })?;
     let read_version = rewrite_document(&bytes, |object, index| {

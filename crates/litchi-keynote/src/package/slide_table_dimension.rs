@@ -3190,6 +3190,12 @@ fn rewrite_component(
     budget: &mut DimensionBudget,
 ) -> Result<Vec<u8>, Error> {
     let catalog = physical_catalog(source)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     budget.transaction_work(catalog.package().len())?;
     let entry = catalog
         .package()
@@ -3251,7 +3257,7 @@ fn rewrite_component(
     let encoded_length = archive
         .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_length, Default::default())
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_length, snappy_limits)
         .map_err(map_core_error)?;
     budget.output(encoded_length.saturating_add(compressed_bound))?;
     budget.allocations(encoded_length)?;
@@ -3262,8 +3268,7 @@ fn rewrite_component(
     if encoded.len() != encoded_length {
         return Err(Error::Verification);
     }
-    let compressed =
-        SnappyStream::compress(&encoded, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

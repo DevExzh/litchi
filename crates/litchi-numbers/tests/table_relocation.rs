@@ -116,7 +116,11 @@ fn table_info(
     let mut result = object(identifier, TABLE_INFO_MESSAGE_TYPE, payload)?;
     result.archive_info.message_infos[0].object_references =
         vec![parent_identifier, model_identifier];
-    let mut parent_path = FieldInfo::new(vec![1, 2]);
+    let mut parent_path = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     parent_path.object_references = vec![parent_identifier];
     result.archive_info.message_infos[0].field_infos = vec![parent_path];
     Ok(result)
@@ -164,7 +168,11 @@ fn sheet(
 
     let mut result = object(identifier, SHEET_MESSAGE_TYPE, payload)?;
     result.archive_info.message_infos[0].object_references = drawable_identifiers.to_vec();
-    let mut drawable_path = FieldInfo::new(vec![2]);
+    let mut drawable_path = FieldInfo::new(
+        litchi_iwa_core::FieldPath::new(vec![2], litchi_iwa_core::Limits::default()).unwrap(),
+        litchi_iwa_core::Limits::default(),
+    )
+    .unwrap();
     drawable_path.object_references = drawable_identifiers.to_vec();
     result.archive_info.message_infos[0].field_infos = vec![drawable_path];
     Ok(result)

@@ -200,7 +200,15 @@ fn with_movie_role_alias(source: &[u8], role: PlaceholderRole) -> TestResult<Vec
                 field.object_references.push(movie_identifier);
             }
         } else {
-            let mut field = FieldInfo::new(vec![role.field()]);
+            let mut field = FieldInfo::new(
+                litchi_iwa_core::FieldPath::new(
+                    vec![role.field()],
+                    litchi_iwa_core::Limits::default(),
+                )
+                .unwrap(),
+                litchi_iwa_core::Limits::default(),
+            )
+            .unwrap();
             field.object_references.push(movie_identifier);
             info.field_infos.push(field);
         }

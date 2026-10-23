@@ -379,7 +379,7 @@ fn native_object(
         .message_infos
         .first_mut()
         .ok_or(StructureError::Unexpected("message info"))?;
-    info.versions = versions.to_vec();
+    info.versions = versions.to_vec().into();
     info.object_references = object_references.to_vec();
     info.data_references = data_references.to_vec();
     Ok(object)
