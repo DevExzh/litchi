@@ -1448,7 +1448,6 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Font);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1459,6 +1458,7 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         self.edit
             .sheets
             .entry(self.position)
@@ -1509,7 +1509,6 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Alignment);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1520,6 +1519,7 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         self.edit
             .sheets
             .entry(self.position)
@@ -1581,7 +1581,6 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Border);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1596,6 +1595,7 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Err(error);
         }
+        self.promote_remove_for_typed(address);
         Ok(self)
     }
 
@@ -1671,7 +1671,6 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Fill);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1686,6 +1685,7 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Err(error);
         }
+        self.promote_remove_for_typed(address);
         Ok(self)
     }
 
@@ -1729,7 +1729,6 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::Protection);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1740,6 +1739,7 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Ok(self);
         }
+        self.promote_remove_for_typed(address);
         self.edit
             .sheets
             .entry(self.position)
@@ -1784,13 +1784,13 @@ impl Sheet<'_> {
                 .release_cell_capture_facet(self.position, address, CaptureFacet::QuotePrefix);
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
-        self.edit.preflight_cell_capture_with_facet(
+        let _capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::QuotePrefix,
             size_of::<Option<bool>>(),
         )?;
+        self.promote_remove_for_typed(address);
         self.edit
             .sheets
             .entry(self.position)
@@ -1854,14 +1854,14 @@ impl Sheet<'_> {
             );
             return Ok(self);
         }
-        self.promote_remove_for_typed(address);
-        self.edit.preflight_cell_capture_with_facet(
+        let _capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::NumberFormat,
             size_of::<Option<Arc<str>>>()
                 .saturating_add(code.as_ref().map_or(0, |value| value.len())),
         )?;
+        self.promote_remove_for_typed(address);
         self.edit
             .sheets
             .entry(self.position)
@@ -2115,7 +2115,11 @@ fn authored_alignment_bool_matches(
 ) -> bool {
     match requested {
         None => true,
-        Some(None) => source.is_none_or(|alignment| !value(alignment)),
+        // The semantic format exposes boolean values but not whether a false
+        // flag was authored.  A removal against an existing alignment record
+        // must therefore remain an authored operation; otherwise an explicit
+        // `wrapText="0"`/`shrinkToFit="0"` is silently retained.
+        Some(None) => source.is_none(),
         Some(Some(true)) => source.is_some_and(value),
         // `Format` exposes the value of a boolean, not whether its XML
         // attribute was absent or explicitly false. Keep an authored false
@@ -2260,7 +2264,10 @@ pub(super) fn protection_change_matches_source(
 
 pub(super) fn quote_prefix_matches_source(requested: Option<bool>, source: Option<bool>) -> bool {
     match requested {
-        None => source != Some(true),
+        // `None` removes the authored attribute.  An explicit false remains
+        // distinct from absence even though the public format projection
+        // reports both as disabled.
+        None => source.is_none(),
         Some(true) => source == Some(true),
         // `Format::quote_prefix` reports only an enabled flag, so an absent
         // and an explicit false attribute cannot be distinguished here.

@@ -1823,6 +1823,43 @@ pub struct ConflictSet {
     pub(super) conflicts: Box<[Conflict]>,
 }
 
+/// Typed source-equivalence planning failure returned when two deferred edits
+/// are joined.  Resource and edit-limit failures remain inspectable instead of
+/// being flattened into a formatted string; other source failures retain their
+/// stable diagnostic text for display and logging.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinNormalization {
+    /// A format-family edit limit rejected the normalization census.
+    Limit {
+        /// The bounded dimension that was exceeded.
+        kind: crate::error::LimitKind,
+        /// The amount required by the normalized effects.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// A shared hierarchical resource budget rejected the census.
+    ResourceLimit(litchi_core::ResourceLimit),
+    /// A source, structure, or unsupported-operation error that has no
+    /// additional join-specific typed payload.
+    Source(Box<str>),
+}
+
+impl fmt::Display for JoinNormalization {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "{kind}: {observed} exceeds {maximum}"),
+            Self::ResourceLimit(limit) => limit.fmt(formatter),
+            Self::Source(reason) => formatter.write_str(reason),
+        }
+    }
+}
+
 impl ConflictSet {
     /// Conflicts in deterministic workbook-effect and sheet order.
     #[must_use]
@@ -1870,7 +1907,7 @@ pub enum JoinFailure {
     /// Both edits stage worksheet drawing graph transfers that cannot be joined.
     DrawingTransfer,
     /// Planning the deferred source-equivalence effect projection failed.
-    Normalization(Box<str>),
+    Normalization(JoinNormalization),
 }
 
 /// Recoverable join failure that returns ownership of the rejected edit.

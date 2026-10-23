@@ -346,6 +346,44 @@ fn canceled_payload_and_absent_remove_release_capture() {
 }
 
 #[test]
+fn failed_typed_admission_preserves_a_pending_remove() {
+    let source = styled_workbook();
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<PartChange>())
+        .saturating_add(size_of::<Change>())
+        .saturating_add(size_of::<Action>());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.remove("A1").expect("remove admission");
+    let error = sheet
+        .font("A1", &crate::FontChange::new().bold(Some(true)))
+        .expect_err("typed admission exceeds the remaining capture budget");
+    assert!(matches!(error, Error::Limit { .. }));
+    assert!(matches!(
+        edit.sheets
+            .get(&0)
+            .and_then(|actions| actions.cells.get(&Address::from_a1("A1").expect("A1"))),
+        Some(Action::Remove)
+    ));
+}
+
+#[test]
 fn mixed_bounded_and_unbounded_join_admits_staged_capture() {
     let source = crate::Package::new().expect("source workbook");
     let sheet = &source.inner.sheets[0];

@@ -814,6 +814,36 @@ fn clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record() {
 }
 
 #[test]
+fn copying_an_explicit_empty_cell_creates_the_target_record() {
+    let source = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut create = source.edit().expect("create edit");
+    create
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "temporary")
+        .and_then(|sheet| sheet.clear("A1"))
+        .expect("explicit empty");
+    let source = create.commit().expect("empty commit").into_package();
+
+    let mut copy = source.edit().expect("copy edit");
+    copy.copy_cells("Sheet1", "A1", "Sheet2", "B2")
+        .expect("copy explicit empty");
+    let committed = copy.commit().expect("copy commit");
+    assert!(matches!(
+        committed
+            .package()
+            .sheet("Sheet2")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .cell("B2")
+            .expect("target cell")
+            .stored(),
+        Some(Cell::Empty)
+    ));
+}
+
+#[test]
 fn calculation_chain_removal_is_atomic_and_reversible() {
     let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
@@ -1419,6 +1449,22 @@ fn unbounded_plain_set_preserves_shared_string_identity() {
     assert!(committed.patch().is_noop());
     assert_eq!(
         committed.package().to_bytes().expect("target bytes"),
+        source_bytes
+    );
+
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    bounded
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "plain shared text")
+        .expect("same bounded plain value");
+    let bounded = bounded.commit().expect("bounded no-op commit");
+    assert!(bounded.patch().is_noop());
+    assert_eq!(
+        bounded.package().to_bytes().expect("bounded target bytes"),
         source_bytes
     );
 }
@@ -6198,11 +6244,7 @@ fn alignment_after_style_reset_uses_reset_base_and_inverse_restores_source() {
 #[test]
 fn alignment_and_complete_style_actions_conflict_when_joined() {
     let source = styled_workbook();
-    let accent = source
-        .styles()
-        .expect("styles")
-        .get(1)
-        .expect("accent style");
+    let replacement_style = source.styles().expect("styles").get(0).expect("base style");
     let address = Address::from_a1("A1").expect("address");
     let change = AlignmentChange::new().horizontal(Some(Horizontal::Center));
 
@@ -6218,7 +6260,7 @@ fn alignment_and_complete_style_actions_conflict_when_joined() {
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
-        .style(address, &accent)
+        .style(address, &replacement_style)
         .expect("style replacement");
     let error = alignment
         .join(replacement)

@@ -95,8 +95,8 @@ pub(crate) fn attach_worksheet_drawing(xml: &[u8], relationship_id: &str) -> Res
 }
 pub(crate) use model::workbook_retained_bytes;
 pub use model::{
-    ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
-    State,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, JoinNormalization,
+    PackageChange, Patch, State,
 };
 pub use planning::{MergeChoice, MergeLimits, ThreeWayPlan};
 pub use semantic::{Column, Defaults, Edit, FormControl, NewSheet, Row, Sheet, Tab};

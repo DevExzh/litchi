@@ -48,8 +48,8 @@ use super::super::validation::{
     Placement, SheetActions, TabAction, Target, pending_merge,
 };
 use super::super::{
-    ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
-    State,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, JoinNormalization,
+    PackageChange, Patch, State,
 };
 use super::super::{codec, package, workbook_retained_bytes};
 
@@ -308,29 +308,6 @@ fn verify_sparse_changed_cells(
     Ok(true)
 }
 
-/// Compare a staged rich-text payload with the source's exact run structure.
-///
-/// `State` deliberately exposes the ordinary cell value, so comparing only
-/// its content would collapse a same-text rich-text rewrite and lose run
-/// properties. Keep that compact state for the common path, but consult the
-/// source rich reader when a rich payload would otherwise look like a no-op.
-fn rich_payload_matches_source(
-    sheet: &Worksheet,
-    address: Address,
-    action: &Action,
-) -> Result<bool> {
-    let source = sheet.rich_text(address)?;
-    match action.payload() {
-        Some(Payload::Rich(rich)) => Ok(source.as_ref() == Some(rich.as_ref())),
-        // A plain payload would erase an existing inline/shared rich run even
-        // when `State` reports the same visible text. Preserve that authored
-        // representation so a plain-to-rich or rich-to-plain edit is not
-        // collapsed into a semantic no-op.
-        Some(_) => Ok(source.is_none()),
-        None => Ok(true),
-    }
-}
-
 fn map_sparse_stream_error(error: StreamError<Error, Error>) -> Error {
     match error {
         StreamError::Input {
@@ -448,6 +425,95 @@ struct EffectiveTypedFacets {
     protection: bool,
     quote_prefix: bool,
     number_format: bool,
+}
+
+/// The source-equivalence projection produced before a deferred edit is
+/// published.  Keeping the authored values alongside the projected values
+/// lets a join inspect a normalized edit without permanently mutating the
+/// rejected side when a later conflict or budget check fails.
+#[derive(Debug)]
+struct NormalizationPlan {
+    position: usize,
+    address: Address,
+    action: Option<Action>,
+    font: bool,
+    alignment: bool,
+    fill: bool,
+    border: bool,
+    protection: bool,
+    quote_prefix: bool,
+    number_format: bool,
+    original_action: Option<Action>,
+    original_font: Option<FontChange>,
+    original_alignment: Option<AlignmentChange>,
+    original_fill: Option<FillChange>,
+    original_border: Option<BorderChange>,
+    original_protection: Option<ProtectionChange>,
+    original_quote_prefix: Option<Option<bool>>,
+    original_number_format: Option<Option<Arc<str>>>,
+}
+
+#[derive(Debug)]
+struct NormalizationUndo {
+    plans: Vec<NormalizationPlan>,
+    capture_budget: Option<CaptureBudget>,
+}
+
+impl NormalizationUndo {
+    fn restore(self, edit: &mut Edit) {
+        edit.capture_budget = self.capture_budget;
+        let mut positions = BTreeSet::new();
+        for plan in self.plans.into_iter().rev() {
+            positions.insert(plan.position);
+            let actions = edit.sheets.entry(plan.position).or_default();
+            restore_map_entry(&mut actions.cells, plan.address, plan.original_action);
+            restore_map_entry(&mut actions.fonts, plan.address, plan.original_font);
+            restore_map_entry(
+                &mut actions.alignments,
+                plan.address,
+                plan.original_alignment,
+            );
+            restore_map_entry(&mut actions.fills, plan.address, plan.original_fill);
+            restore_map_entry(&mut actions.borders, plan.address, plan.original_border);
+            restore_map_entry(
+                &mut actions.protections,
+                plan.address,
+                plan.original_protection,
+            );
+            restore_map_entry(
+                &mut actions.quote_prefixes,
+                plan.address,
+                plan.original_quote_prefix,
+            );
+            restore_map_entry(
+                &mut actions.number_formats,
+                plan.address,
+                plan.original_number_format,
+            );
+        }
+        for position in positions {
+            if let Some(actions) = edit.sheets.get_mut(&position) {
+                actions.staged_fill_bytes = actions
+                    .fills
+                    .values()
+                    .map(FillChange::retained_bytes)
+                    .fold(0, usize::saturating_add);
+                actions.staged_border_bytes = actions
+                    .borders
+                    .keys()
+                    .map(|_| border_staged_entry_bytes())
+                    .fold(0, usize::saturating_add);
+            }
+        }
+    }
+}
+
+fn restore_map_entry<V>(map: &mut BTreeMap<Address, V>, address: Address, value: Option<V>) {
+    if let Some(value) = value {
+        map.insert(address, value);
+    } else {
+        map.remove(&address);
+    }
 }
 
 impl CellCapture {
@@ -673,7 +739,7 @@ impl CaptureBudget {
                     let before_state = State::read(before, base);
                     let after_state = State::after(before, action, base);
                     before_state != after_state
-                        || !rich_payload_matches_source(&source, address, action)?
+                        || !action_payload_matches_source(&source, before, address, action)?
                 } else {
                     false
                 };
@@ -3096,20 +3162,14 @@ impl Edit {
     /// no-op. Rich-text identity remains part of the comparison: a plain set
     /// over rich text is an authored representation change.
     fn normalize_effects(&mut self) -> Result<()> {
-        #[derive(Debug)]
-        struct Plan {
-            position: usize,
-            address: Address,
-            action: Option<Action>,
-            font: bool,
-            alignment: bool,
-            fill: bool,
-            border: bool,
-            protection: bool,
-            quote_prefix: bool,
-            number_format: bool,
-        }
+        self.normalize_effects_impl(false).map(|_| ())
+    }
 
+    fn normalize_effects_with_undo(&mut self) -> Result<NormalizationUndo> {
+        self.normalize_effects_impl(true)
+    }
+
+    fn normalize_effects_impl(&mut self, retain_undo: bool) -> Result<NormalizationUndo> {
         let mut plans = Vec::new();
         for (&position, actions) in &self.sheets {
             let mut addresses = BTreeSet::new();
@@ -3131,9 +3191,8 @@ impl Edit {
             let store = source.store()?;
             for address in addresses {
                 let stored = store.entry(address);
-                let source_cell = stored.map(|value| value.cell.clone());
+                let source_cell = stored.map(|value| &value.cell);
                 let source_style = stored.and_then(|value| value.style);
-                let source_rich = source.rich_text(address)?;
                 let source_format = source_style
                     .map(|style| self.base.inner.format(style))
                     .transpose()?;
@@ -3195,10 +3254,10 @@ impl Edit {
                     && number_format_matches);
                 let mut action = original_action.cloned();
                 if let Some(Action::Update { payload, style }) = action.as_mut() {
-                    if payload.as_ref().is_some_and(|payload| {
-                        payload_matches_source(payload, &source_cell, &source_rich)
-                    }) {
-                        *payload = None;
+                    if let Some(current) = payload.as_ref() {
+                        if payload_matches_source(&source, stored, address, current)? {
+                            *payload = None;
+                        }
                     }
                     if style
                         .as_ref()
@@ -3219,7 +3278,7 @@ impl Edit {
                         action = None;
                     }
                 }
-                plans.push(Plan {
+                plans.push(NormalizationPlan {
                     position,
                     address,
                     action,
@@ -3230,11 +3289,37 @@ impl Edit {
                     protection: !protection_matches,
                     quote_prefix: !quote_prefix_matches,
                     number_format: !number_format_matches,
+                    original_action: retain_undo.then(|| original_action.cloned()).flatten(),
+                    original_font: retain_undo
+                        .then(|| actions.fonts.get(&address).cloned())
+                        .flatten(),
+                    original_alignment: retain_undo
+                        .then(|| actions.alignments.get(&address).copied())
+                        .flatten(),
+                    original_fill: retain_undo
+                        .then(|| actions.fills.get(&address).cloned())
+                        .flatten(),
+                    original_border: retain_undo
+                        .then(|| actions.borders.get(&address).cloned())
+                        .flatten(),
+                    original_protection: retain_undo
+                        .then(|| actions.protections.get(&address).copied())
+                        .flatten(),
+                    original_quote_prefix: if retain_undo {
+                        actions.quote_prefixes.get(&address).copied()
+                    } else {
+                        None
+                    },
+                    original_number_format: if retain_undo {
+                        actions.number_formats.get(&address).cloned()
+                    } else {
+                        None
+                    },
                 });
             }
         }
 
-        for plan in plans {
+        for plan in &plans {
             if !plan.fill {
                 self.discard_fill(plan.position, plan.address)?;
             }
@@ -3269,22 +3354,42 @@ impl Edit {
             } else {
                 actions.number_formats.remove(&plan.address);
             }
-            if let Some(action) = plan.action {
+            if let Some(action) = plan.action.clone() {
                 actions.cells.insert(plan.address, action);
             } else {
                 actions.cells.remove(&plan.address);
             }
         }
 
-        if let Some(previous) = self.capture_budget.take() {
-            self.capture_budget = Some(CaptureBudget::from_staged(
-                &self.base,
-                previous.maximum,
-                &self.sheets,
-                &self.added,
-            )?);
+        let previous_capture_budget = self.capture_budget.take();
+        let mut undo_capture_budget = None;
+        if let Some(previous) = previous_capture_budget {
+            let maximum = previous.maximum;
+            match CaptureBudget::from_staged(&self.base, maximum, &self.sheets, &self.added) {
+                Ok(budget) => {
+                    self.capture_budget = Some(budget);
+                    if retain_undo {
+                        undo_capture_budget = Some(previous);
+                    }
+                },
+                Err(error) => {
+                    if retain_undo {
+                        NormalizationUndo {
+                            plans,
+                            capture_budget: Some(previous),
+                        }
+                        .restore(self);
+                    } else {
+                        self.capture_budget = Some(previous);
+                    }
+                    return Err(error);
+                },
+            }
         }
-        Ok(())
+        Ok(NormalizationUndo {
+            plans,
+            capture_budget: undo_capture_budget,
+        })
     }
 
     /// Join an independently prepared edit when every effect is disjoint.
@@ -3300,24 +3405,22 @@ impl Edit {
             });
         }
         let mut candidate = self.clone();
-        match candidate.join_in_place(other.clone()) {
+        match candidate.join_in_place(other) {
             Ok(()) => {
                 *self = candidate;
                 Ok(self)
             },
-            Err(JoinError { failure, .. }) => Err(JoinError {
-                failure,
-                rejected: Box::new(other),
-            }),
+            Err(error) => Err(error),
         }
     }
 
     fn join_in_place(&mut self, other: Self) -> std::result::Result<(), JoinError> {
         let mut other = other;
+        let mut normalization_undo = None;
         if !Arc::ptr_eq(&self.base.inner, &other.base.inner) {
             return Err(JoinError {
                 failure: JoinFailure::DifferentSnapshot,
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         // Normalize both sides at the deferred join boundary.  Setters on an
@@ -3327,20 +3430,23 @@ impl Edit {
         // source/format error cannot partially publish either edit.
         if let Err(error) = self.normalize_effects() {
             return Err(JoinError {
-                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
-                rejected: Box::new(other),
+                failure: JoinFailure::Normalization(join_normalization(&error)),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
-        if let Err(error) = other.normalize_effects() {
-            return Err(JoinError {
-                failure: JoinFailure::Normalization(error.to_string().into_boxed_str()),
-                rejected: Box::new(other),
-            });
+        match other.normalize_effects_with_undo() {
+            Ok(undo) => normalization_undo = Some(undo),
+            Err(error) => {
+                return Err(JoinError {
+                    failure: JoinFailure::Normalization(join_normalization(&error)),
+                    rejected: rejected_after_normalization(other, normalization_undo.take()),
+                });
+            },
         }
         if self.panes.is_some() && other.panes.is_some() {
             return Err(JoinError {
                 failure: JoinFailure::TaskPanes,
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if (self.defined_names.is_some()
@@ -3349,7 +3455,7 @@ impl Edit {
         {
             return Err(JoinError {
                 failure: JoinFailure::DefinedNames,
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if self.drawings.keys().any(|position| {
@@ -3365,7 +3471,7 @@ impl Edit {
         }) {
             return Err(JoinError {
                 failure: JoinFailure::DrawingTransfer,
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if self.svg_lifecycle.iter().any(|intent| {
@@ -3377,14 +3483,14 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         let conflicts = self.conflicts_with(&other);
         if !conflicts.is_empty() {
             return Err(JoinError {
                 failure: JoinFailure::Overlap(conflicts),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         let projected_fill_bytes = match projected_fill_retained_bytes(&self.sheets, &other.sheets)
@@ -3396,7 +3502,7 @@ impl Edit {
                         u64::MAX,
                         style_staged_memory_limit(&self.base),
                     )),
-                    rejected: Box::new(other),
+                    rejected: rejected_after_normalization(other, normalization_undo.take()),
                 });
             },
         };
@@ -3409,7 +3515,7 @@ impl Edit {
                             u64::MAX,
                             style_staged_memory_limit(&self.base),
                         )),
-                        rejected: Box::new(other),
+                        rejected: rejected_after_normalization(other, normalization_undo.take()),
                     });
                 },
             };
@@ -3420,7 +3526,7 @@ impl Edit {
                     u64::try_from(projected_fill_bytes).unwrap_or(u64::MAX),
                     maximum,
                 )),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if projected_border_bytes > maximum {
@@ -3429,7 +3535,7 @@ impl Edit {
                     u64::try_from(projected_border_bytes).unwrap_or(u64::MAX),
                     maximum,
                 )),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         let projected_style_bytes = match projected_fill_bytes.checked_add(projected_border_bytes) {
@@ -3440,7 +3546,7 @@ impl Edit {
                         u64::MAX,
                         maximum,
                     )),
-                    rejected: Box::new(other),
+                    rejected: rejected_after_normalization(other, normalization_undo.take()),
                 });
             },
         };
@@ -3450,7 +3556,7 @@ impl Edit {
                     u64::try_from(projected_style_bytes).unwrap_or(u64::MAX),
                     maximum,
                 )),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
 
@@ -3463,7 +3569,7 @@ impl Edit {
                         failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
                             observed, maximum,
                         )),
-                        rejected: Box::new(other),
+                        rejected: rejected_after_normalization(other, normalization_undo.take()),
                     });
                 },
             },
@@ -3481,7 +3587,10 @@ impl Edit {
                                 usize::MAX,
                                 left.maximum,
                             )),
-                            rejected: Box::new(other),
+                            rejected: rejected_after_normalization(
+                                other,
+                                normalization_undo.take(),
+                            ),
                         });
                     },
                 };
@@ -3492,7 +3601,10 @@ impl Edit {
                             failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
                                 observed, maximum,
                             )),
-                            rejected: Box::new(other),
+                            rejected: rejected_after_normalization(
+                                other,
+                                normalization_undo.take(),
+                            ),
                         });
                     },
                 }
@@ -3511,7 +3623,10 @@ impl Edit {
                                 usize::MAX,
                                 right.maximum,
                             )),
-                            rejected: Box::new(other),
+                            rejected: rejected_after_normalization(
+                                other,
+                                normalization_undo.take(),
+                            ),
                         });
                     },
                 };
@@ -3522,7 +3637,10 @@ impl Edit {
                             failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
                                 observed, maximum,
                             )),
-                            rejected: Box::new(other),
+                            rejected: rejected_after_normalization(
+                                other,
+                                normalization_undo.take(),
+                            ),
                         });
                     },
                 }
@@ -3540,7 +3658,7 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         };
         if combined_svg_intents > super::super::svg_lifecycle::MAX_SVG_LIFECYCLE_INTENTS {
@@ -3548,7 +3666,7 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         let other_svg_staged_payload_bytes = other.svg_staged_payload_bytes;
@@ -3560,7 +3678,7 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         };
         if svg_plan::check_payload_budget(&self.base, 0, combined_svg_staged_payload_bytes).is_err()
@@ -3569,7 +3687,7 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if self
@@ -3590,7 +3708,7 @@ impl Edit {
                 failure: JoinFailure::Overlap(ConflictSet {
                     conflicts: Box::new([]),
                 }),
-                rejected: Box::new(other),
+                rejected: rejected_after_normalization(other, normalization_undo.take()),
             });
         }
         if self.panes.is_none() {
@@ -4352,7 +4470,7 @@ impl Edit {
                 let before_state = State::read(before, &base);
                 let after_state = State::after(before, &action, &base);
                 if before_state == after_state
-                    && rich_payload_matches_source(&sheet, address, &action)?
+                    && action_payload_matches_source(&sheet, before, address, &action)?
                 {
                     continue;
                 }
@@ -6574,26 +6692,83 @@ fn payload_capture_bytes(payload: &Payload) -> usize {
     }
 }
 
+fn join_normalization(error: &Error) -> JoinNormalization {
+    match error {
+        Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => JoinNormalization::Limit {
+            kind: *kind,
+            observed: *observed,
+            maximum: *maximum,
+        },
+        Error::ResourceLimit(limit) => JoinNormalization::ResourceLimit(limit.clone()),
+        other => JoinNormalization::Source(other.to_string().into_boxed_str()),
+    }
+}
+
+fn rejected_after_normalization(
+    mut other: Edit,
+    normalization_undo: Option<NormalizationUndo>,
+) -> Box<Edit> {
+    if let Some(undo) = normalization_undo {
+        undo.restore(&mut other);
+    }
+    Box::new(other)
+}
+
+fn action_payload_matches_source(
+    sheet: &Worksheet,
+    stored: Option<&crate::cell::Stored>,
+    address: Address,
+    action: &Action,
+) -> Result<bool> {
+    action.payload().map_or(Ok(true), |payload| {
+        payload_matches_source(sheet, stored, address, payload)
+    })
+}
+
 fn payload_matches_source(
+    sheet: &Worksheet,
+    stored: Option<&crate::cell::Stored>,
+    address: Address,
     payload: &Payload,
-    source: &Option<Cell>,
-    source_rich: &Option<crate::RichText>,
-) -> bool {
+) -> Result<bool> {
+    let source = stored.map(|value| &value.cell);
     match payload {
         Payload::Set(content) => {
-            source_rich.is_none()
-                && source
-                    .as_ref()
-                    .is_some_and(|value| value == &content.as_cell())
+            if !source.is_some_and(|value| value == &content.as_cell()) {
+                return Ok(false);
+            }
+            let Some(stored) = stored else {
+                return Ok(false);
+            };
+            if stored.inline_rich {
+                return Ok(false);
+            }
+            if stored.shared_string.is_some() {
+                return Ok(!sheet.has_rich_text(address)?);
+            }
+            Ok(true)
         },
-        Payload::SharedString { text, .. } => {
-            source_rich.is_none()
-                && source.as_ref().is_some_and(|value| {
-                    matches!(value, Cell::Value(crate::Value::Text(current)) if current == text)
-                })
+        Payload::SharedString { index, text } => Ok(stored.is_some_and(|value| {
+            value.shared_string == Some(*index)
+                && matches!(&value.cell, Cell::Value(crate::Value::Text(current)) if current == text)
+        })),
+        Payload::Rich(text) => {
+            let Some(stored) = stored else {
+                return Ok(false);
+            };
+            // `set_rich_text` authors an inline rich string. A shared rich
+            // item with identical runs is still a representation change, and
+            // an unsupported inline run payload is not proof of equality.
+            if !stored.inline_rich {
+                return Ok(false);
+            }
+            Ok(sheet.rich_text(address)?.as_ref() == Some(text.as_ref()))
         },
-        Payload::Rich(text) => source_rich.as_ref() == Some(text.as_ref()),
-        Payload::Cache(value) => source.as_ref().is_some_and(|current| {
+        Payload::Cache(value) => Ok(source.is_some_and(|current| {
             matches!(
                 current,
                 Cell::Formula(formula)
@@ -6601,11 +6776,12 @@ fn payload_matches_source(
                         .cached()
                         .is_some_and(|cache| cache.value() == value)
             )
-        }),
-        Payload::Clear | Payload::ClearIfPresent => {
-            source.as_ref().is_none_or(|value| matches!(value, Cell::Empty))
+        })),
+        Payload::Clear => Ok(source.is_some_and(|value| matches!(value, Cell::Empty))),
+        Payload::ClearIfPresent => {
+            Ok(source.is_none_or(|value| matches!(value, Cell::Empty)))
         },
-        Payload::SharedFormula { .. } => false,
+        Payload::SharedFormula { .. } => Ok(false),
     }
 }
 
