@@ -610,20 +610,23 @@ impl PartPatch {
         after: &OpcPackage,
         names: &[PackURI],
     ) -> Result<(usize, usize)> {
-        names.iter().try_fold((0usize, 0usize), |(total, changed), name| {
-            let before = State::of(before, name)?;
-            let after = State::of(after, name)?;
-            if before == after {
-                return Ok((total, changed));
-            }
-            let size = |state: &Option<State>| state.as_ref().map_or(0, |state| state.blob.len());
-            Ok((
-                total
-                    .saturating_add(size(&before))
-                    .saturating_add(size(&after)),
-                changed.saturating_add(1),
-            ))
-        })
+        names
+            .iter()
+            .try_fold((0usize, 0usize), |(total, changed), name| {
+                let before = State::of(before, name)?;
+                let after = State::of(after, name)?;
+                if before == after {
+                    return Ok((total, changed));
+                }
+                let size =
+                    |state: &Option<State>| state.as_ref().map_or(0, |state| state.blob.len());
+                Ok((
+                    total
+                        .saturating_add(size(&before))
+                        .saturating_add(size(&after)),
+                    changed.saturating_add(1),
+                ))
+            })
     }
 
     fn enforce_retained_limit(retained: usize, maximum: Option<usize>) -> Result<()> {
@@ -895,11 +898,7 @@ impl PartPatch {
 
         let (retained, changed) = Self::retained_bytes_for_names(before, after, &changed_names)?;
         if changed > maximum {
-            return Err(Error::limit(
-                crate::opc::LimitKind::Parts,
-                changed,
-                maximum,
-            ));
+            return Err(Error::limit(crate::opc::LimitKind::Parts, changed, maximum));
         }
         Self::enforce_retained_limit(retained, max_snapshot_bytes)?;
 
@@ -1254,30 +1253,26 @@ impl Staged {
     /// staging returns the source package. A changed staging of a signed
     /// package is refused with [`Error::Signed`] (ADR 0006).
     pub(crate) fn commit(self) -> Result<(Package, PartPatch)> {
-        self.commit_with_options(crate::CommitOptions::default())
+        self.commit_with_snapshot_limit(None)
     }
 
     /// Capture and publish with an exact native retained-payload ceiling.
-    pub(crate) fn commit_with_options(
+    pub(crate) fn commit_with_snapshot_limit(
         self,
-        options: crate::CommitOptions,
+        max_snapshot_bytes: Option<usize>,
     ) -> Result<(Package, PartPatch)> {
         let Some(staged) = self.staged else {
             return Ok((self.source, PartPatch::default()));
         };
         let staged = Arc::new(staged);
         let patch = if self.all {
-            PartPatch::capture_all(
-                self.source.opc_shared(),
-                &staged,
-                options.max_snapshot_bytes_value(),
-            )?
+            PartPatch::capture_all(self.source.opc_shared(), &staged, max_snapshot_bytes)?
         } else {
             PartPatch::capture(
                 self.source.opc_shared(),
                 &staged,
                 &self.touched,
-                options.max_snapshot_bytes_value(),
+                max_snapshot_bytes,
             )?
         };
         if patch.is_noop() {
@@ -1851,3 +1846,35 @@ macro_rules! limits_options {
 }
 
 pub(crate) use limits_options;
+
+/// The native retained-snapshot option shared by the worksheet feature
+/// families. Each family expands this into its own `EditOptions` type so the
+/// limit enters at `Package::edit_x_with_options` and `Edit::commit()` keeps
+/// the common family shape.
+macro_rules! snapshot_options {
+    ($what:literal) => {
+        #[doc = concat!("The configuration of a ", $what, " edit.")]
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+        pub struct EditOptions {
+            max_snapshot_bytes: Option<usize>,
+        }
+
+        impl EditOptions {
+            /// Bound the exact before/after payload bytes retained by the
+            /// native patch.
+            #[must_use]
+            pub const fn max_snapshot_bytes(mut self, maximum: usize) -> Self {
+                self.max_snapshot_bytes = Some(maximum);
+                self
+            }
+
+            /// The configured native retained-payload ceiling, if any.
+            #[must_use]
+            pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
+                self.max_snapshot_bytes
+            }
+        }
+    };
+}
+
+pub(crate) use snapshot_options;

@@ -77,8 +77,10 @@ fn native(error: xlsb::package::PackageError) -> Error {
     Error::from(error).with_format(FileFormat::Xlsb)
 }
 
-fn native_commit_options(max_snapshot_bytes: usize) -> xlsb::CommitOptions {
-    xlsb::CommitOptions::new().max_snapshot_bytes(max_snapshot_bytes)
+macro_rules! feature_edit_options {
+    ($family:ident, $maximum:expr) => {
+        xlsb::$family::edit::EditOptions::default().max_snapshot_bytes($maximum)
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +187,7 @@ trait FeatureCommit: Sized {
 }
 
 macro_rules! feature_commit {
-    ($commit:path, $edit:ident, $proof:ident) => {
+    ($commit:path, $edit:ident, $edit_with_options:ident, $family:ident, $proof:ident) => {
         impl FeatureCommit for $commit {
             fn parts(&self) -> usize {
                 self.diagnostics().parts()
@@ -205,9 +207,9 @@ macro_rules! feature_commit {
             ) -> Result<(xlsb::Package, NativeFeatureProof, usize)> {
                 let original = base.original_package_for_noop()?;
                 let commit = original
-                    .$edit()
+                    .$edit_with_options(feature_edit_options!($family, max_snapshot_bytes))
                     .map_err(native)?
-                    .commit_with_options(native_commit_options(max_snapshot_bytes))
+                    .commit()
                     .map_err(native)?;
                 let (package, patch) = commit.into_parts();
                 let retained = patch.retained_bytes();
@@ -217,27 +219,53 @@ macro_rules! feature_commit {
     };
 }
 
-feature_commit!(xlsb::comments::edit::Commit, edit_comments, Comments);
-feature_commit!(xlsb::hyperlinks::edit::Commit, edit_hyperlinks, Hyperlinks);
-feature_commit!(xlsb::drawing::edit::Commit, edit_drawings, Drawings);
+feature_commit!(
+    xlsb::comments::edit::Commit,
+    edit_comments,
+    edit_comments_with_options,
+    comments,
+    Comments
+);
+feature_commit!(
+    xlsb::hyperlinks::edit::Commit,
+    edit_hyperlinks,
+    edit_hyperlinks_with_options,
+    hyperlinks,
+    Hyperlinks
+);
+feature_commit!(
+    xlsb::drawing::edit::Commit,
+    edit_drawings,
+    edit_drawings_with_options,
+    drawing,
+    Drawings
+);
 feature_commit!(
     xlsb::conditional_formatting::edit::Commit,
     edit_conditional_formats,
+    edit_conditional_formats_with_options,
+    conditional_formatting,
     ConditionalFormatting
 );
 feature_commit!(
     xlsb::data_validation::edit::Commit,
     edit_data_validations,
+    edit_data_validations_with_options,
+    data_validation,
     DataValidation
 );
 feature_commit!(
     xlsb::auto_filter::edit::Commit,
     edit_auto_filter,
+    edit_auto_filter_with_options,
+    auto_filter,
     AutoFilter
 );
 feature_commit!(
     xlsb::page_breaks::edit::Commit,
     edit_page_breaks,
+    edit_page_breaks_with_options,
+    page_breaks,
     PageBreaks
 );
 
@@ -302,9 +330,7 @@ impl Xlsb {
 /// Split a leaf commit of any family into what [`Xlsb::publish`] needs.
 macro_rules! publish {
     ($file:expr, $edit:expr, $limits:expr) => {{
-        let commit = $edit
-            .commit_with_options(native_commit_options($limits.max_snapshot_bytes()))
-            .map_err(native)?;
+        let commit = $edit.commit().map_err(native)?;
         $file.publish(commit, 1, $limits.max_snapshot_bytes())
     }};
 }
@@ -616,12 +642,22 @@ impl Xlsb {
         let editor = self.editor_for_write()?;
         let commit = match &feature.data {
             Data::Comment(note) => {
-                let mut edit = editor.edit_comments().map_err(native)?;
+                let mut edit = editor
+                    .edit_comments_with_options(feature_edit_options!(
+                        comments,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.remove(sheet, note.row, note.col).map_err(native)?;
                 publish!(self, edit, limits)
             },
             Data::Hyperlink(_) => {
-                let mut edit = editor.edit_hyperlinks().map_err(native)?;
+                let mut edit = editor
+                    .edit_hyperlinks_with_options(feature_edit_options!(
+                        hyperlinks,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit, limits)
             },
@@ -631,23 +667,43 @@ impl Xlsb {
                 } else {
                     ElementKind::Shape
                 };
-                let mut edit = editor.edit_drawings().map_err(native)?;
+                let mut edit = editor
+                    .edit_drawings_with_options(feature_edit_options!(
+                        drawing,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.remove(sheet, kind, feature.index as usize)
                     .map_err(native)?;
                 publish!(self, edit, limits)
             },
             Data::Cf(_) => {
-                let mut edit = editor.edit_conditional_formats().map_err(native)?;
+                let mut edit = editor
+                    .edit_conditional_formats_with_options(feature_edit_options!(
+                        conditional_formatting,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit, limits)
             },
             Data::Validation(_) => {
-                let mut edit = editor.edit_data_validations().map_err(native)?;
+                let mut edit = editor
+                    .edit_data_validations_with_options(feature_edit_options!(
+                        data_validation,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.remove(sheet, feature.index as usize).map_err(native)?;
                 publish!(self, edit, limits)
             },
             Data::Autofilter(_) => {
-                let mut edit = editor.edit_auto_filter().map_err(native)?;
+                let mut edit = editor
+                    .edit_auto_filter_with_options(feature_edit_options!(
+                        auto_filter,
+                        limits.max_snapshot_bytes()
+                    ))
+                    .map_err(native)?;
                 edit.set_auto_filter(sheet, None).map_err(native)?;
                 publish!(self, edit, limits)
             },
@@ -698,7 +754,9 @@ impl Xlsb {
             },
         };
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_comments().map_err(native)?;
+        let mut edit = editor
+            .edit_comments_with_options(feature_edit_options!(comments, max_snapshot_bytes))
+            .map_err(native)?;
         let index = edit
             .add(
                 parent.sheet,
@@ -714,12 +772,7 @@ impl Xlsb {
                 .with_property("ref")
                 .with_suggestion("set the existing comment instead"));
         };
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
@@ -745,7 +798,12 @@ impl Xlsb {
             }
         }
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_comments().map_err(native)?;
+        let mut edit = editor
+            .edit_comments_with_options(feature_edit_options!(
+                comments,
+                limits.max_snapshot_bytes()
+            ))
+            .map_err(native)?;
         if cell != (note.row, note.col) {
             if edit
                 .comments(sheet)
@@ -851,7 +909,9 @@ impl Xlsb {
         })?;
         let link = hyperlink(&reference, location, url, display, tooltip)?;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_hyperlinks().map_err(native)?;
+        let mut edit = editor
+            .edit_hyperlinks_with_options(feature_edit_options!(hyperlinks, max_snapshot_bytes))
+            .map_err(native)?;
         // As XLSX's `put_hyperlink`: a link on the same cells is replaced.
         let existing = edit
             .hyperlinks(parent.sheet)
@@ -865,12 +925,7 @@ impl Xlsb {
             },
             None => edit.add(parent.sheet, link).map_err(authored)?,
         };
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "hyperlink", Some(index))))
     }
 
@@ -912,7 +967,12 @@ impl Xlsb {
         }
         let replacement = hyperlink(&reference, location, url, display, tooltip)?;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_hyperlinks().map_err(native)?;
+        let mut edit = editor
+            .edit_hyperlinks_with_options(feature_edit_options!(
+                hyperlinks,
+                limits.max_snapshot_bytes()
+            ))
+            .map_err(native)?;
         edit.set(sheet, feature.index as usize, replacement)
             .map_err(authored)?;
         publish!(self, edit, limits)
@@ -1306,14 +1366,11 @@ impl Xlsb {
             flip_v,
         };
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_drawings().map_err(native)?;
+        let mut edit = editor
+            .edit_drawings_with_options(feature_edit_options!(drawing, max_snapshot_bytes))
+            .map_err(native)?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "picture", Some(index))))
     }
 
@@ -1468,14 +1525,11 @@ impl Xlsb {
         };
         let _: &Font = &spec.font;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_drawings().map_err(native)?;
+        let mut edit = editor
+            .edit_drawings_with_options(feature_edit_options!(drawing, max_snapshot_bytes))
+            .map_err(native)?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
     }
 
@@ -1559,7 +1613,9 @@ impl Xlsb {
             ElementKind::Shape
         };
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_drawings().map_err(native)?;
+        let mut edit = editor
+            .edit_drawings_with_options(feature_edit_options!(drawing, limits.max_snapshot_bytes()))
+            .map_err(native)?;
         edit.set(sheet, kind, feature.index as usize, &change)
             .map_err(authored)?;
         publish!(self, edit, limits)
@@ -2318,7 +2374,12 @@ impl Xlsb {
             None => cf_ranges("ref", parent.reference.as_deref().unwrap_or("A1:A10"))?,
         };
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_conditional_formats().map_err(native)?;
+        let mut edit = editor
+            .edit_conditional_formats_with_options(feature_edit_options!(
+                conditional_formatting,
+                max_snapshot_bytes
+            ))
+            .map_err(native)?;
         let worksheet_formats = editor
             .workbook()
             .map_err(native)?
@@ -2356,12 +2417,7 @@ impl Xlsb {
         let mut format = Formatting::new(ranges);
         format.add_rule(rule);
         let index = edit.add(parent.sheet, format).map_err(authored)?;
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "cf", Some(index))))
     }
 
@@ -2402,7 +2458,12 @@ impl Xlsb {
             }
         }
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_conditional_formats().map_err(native)?;
+        let mut edit = editor
+            .edit_conditional_formats_with_options(feature_edit_options!(
+                conditional_formatting,
+                limits.max_snapshot_bytes()
+            ))
+            .map_err(native)?;
         if !style_is_empty(&request.style) {
             let first = format
                 .rules
@@ -2612,7 +2673,12 @@ impl Xlsb {
         validation.show_input_message = true;
         apply_validation(&mut validation, props, Operation::Add)?;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_data_validations().map_err(native)?;
+        let mut edit = editor
+            .edit_data_validations_with_options(feature_edit_options!(
+                data_validation,
+                max_snapshot_bytes
+            ))
+            .map_err(native)?;
         let existing = edit.validations(parent.sheet).map_err(native)?;
         let added = rects(&validation.cell_ranges);
         if existing
@@ -2626,12 +2692,7 @@ impl Xlsb {
             .with_property("ref"));
         }
         let index = edit.add(parent.sheet, validation).map_err(authored)?;
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((
             commit,
             feature_path(parent.sheet, "dataValidation", Some(index)),
@@ -2654,7 +2715,12 @@ impl Xlsb {
         let mut validation = (**current).clone();
         apply_validation(&mut validation, props, Operation::Set)?;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_data_validations().map_err(native)?;
+        let mut edit = editor
+            .edit_data_validations_with_options(feature_edit_options!(
+                data_validation,
+                limits.max_snapshot_bytes()
+            ))
+            .map_err(native)?;
         let existing = edit.validations(sheet).map_err(native)?;
         let changed = rects(&validation.cell_ranges);
         let clash = existing.iter().enumerate().any(|(index, other)| {
@@ -2703,15 +2769,12 @@ impl Xlsb {
         let range = range.ok_or_else(|| missing("range", "an auto-filter needs a range"))?;
         let filter = filter_range("range", &range)?;
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_auto_filter().map_err(native)?;
+        let mut edit = editor
+            .edit_auto_filter_with_options(feature_edit_options!(auto_filter, max_snapshot_bytes))
+            .map_err(native)?;
         edit.set_auto_filter(parent.sheet, Some(filter))
             .map_err(authored)?;
-        let commit = self.publish(
-            edit.commit_with_options(native_commit_options(max_snapshot_bytes))
-                .map_err(native)?,
-            1,
-            max_snapshot_bytes,
-        )?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "autofilter", None)))
     }
 
@@ -2722,7 +2785,12 @@ impl Xlsb {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_auto_filter().map_err(native)?;
+        let mut edit = editor
+            .edit_auto_filter_with_options(feature_edit_options!(
+                auto_filter,
+                limits.max_snapshot_bytes()
+            ))
+            .map_err(native)?;
         let mut filter = edit
             .auto_filter(sheet)
             .map_err(native)?
@@ -2785,7 +2853,9 @@ impl Xlsb {
         max_snapshot_bytes: usize,
     ) -> Result<Commit> {
         let editor = self.editor_for_write()?;
-        let mut edit = editor.edit_page_breaks().map_err(native)?;
+        let mut edit = editor
+            .edit_page_breaks_with_options(feature_edit_options!(page_breaks, max_snapshot_bytes))
+            .map_err(native)?;
         let mut all = edit.page_breaks(sheet).map_err(native)?;
         if kind == Kind::RowBreak {
             all.rows = breaks;
@@ -2793,9 +2863,7 @@ impl Xlsb {
             all.columns = breaks;
         }
         edit.set_page_breaks(sheet, &all).map_err(authored)?;
-        let commit = edit
-            .commit_with_options(native_commit_options(max_snapshot_bytes))
-            .map_err(native)?;
+        let commit = edit.commit().map_err(native)?;
         self.publish(commit, 1, max_snapshot_bytes)
     }
 

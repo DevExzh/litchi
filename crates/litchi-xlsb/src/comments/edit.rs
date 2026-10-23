@@ -39,11 +39,14 @@ use litchi_opc::{BlobPart, PackURI};
 use super::{MAX_COLUMNS, MAX_ROWS, MAX_TEXT_UNITS, Record};
 use crate::package::Package;
 use crate::package::error::{Error as PackageError, Result};
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{
+    Rank, SheetLayout, Staged, family, invalid, record, snapshot_options, splice,
+};
 use crate::raw::{Encoder, Records, kind};
 use litchi_spreadsheet_drawing::vml;
 
 family!("note");
+snapshot_options!("note");
 
 /// A bounded dimension of this family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -63,6 +66,7 @@ const COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    options: EditOptions,
 }
 
 impl Package {
@@ -72,8 +76,14 @@ impl Package {
     ///
     /// Returns the workbook materialization errors of this package.
     pub fn edit_comments(&self) -> Result<Edit> {
+        self.edit_comments_with_options(EditOptions::default())
+    }
+
+    /// Start a note edit with an explicit retained-payload ceiling.
+    pub fn edit_comments_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
+            options,
         })
     }
 
@@ -558,12 +568,9 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit()?))
-    }
-
-    /// Validate and publish with an exact retained-payload ceiling.
-    pub fn commit_with_options(self, options: crate::CommitOptions) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit_with_options(options)?))
+        Ok(Commit::new(self.staged.commit_with_snapshot_limit(
+            self.options.max_snapshot_bytes_value(),
+        )?))
     }
 }
 
