@@ -100,7 +100,7 @@ fn owner_family(
             let part = package.opc().part_metadata(part_name).ok_or_else(|| {
                 Error::Invalid("metadata part disappeared during admission".to_owned())
             })?;
-            let relationship = match snapshot.relationship_id(family) {
+            let relationship = match snapshot.relationship_id_value(family) {
                 Some(relationship_id) => package_relationships.get(relationship_id),
                 None => package_relationships.iter().find(|relationship| {
                     is_family_relationship(family, relationship.reltype())

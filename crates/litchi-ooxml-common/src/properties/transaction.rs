@@ -487,7 +487,7 @@ impl Snapshot {
     /// The package-level relationship selecting `family`, when present.
     #[doc(hidden)]
     #[must_use]
-    pub fn relationship_id(&self, family: Family) -> Option<&str> {
+    pub fn relationship_id_value(&self, family: Family) -> Option<&str> {
         self.family(family)
             .present
             .as_ref()
