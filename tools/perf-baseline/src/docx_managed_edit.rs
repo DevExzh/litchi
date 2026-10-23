@@ -1109,13 +1109,13 @@ fn prepare() -> Result<Prepared, Box<dyn Error>> {
     }
     crate::verify_docx_source_edit_output(&corpus, &expected_output)?;
     let source_document_xml = commit.patch().source().xml_bytes().to_vec();
-    let candidate_document_xml = commit.snapshot().xml_bytes().to_vec();
+    let candidate_document_xml = commit.patch().target().xml_bytes().to_vec();
     let replayed = commit.patch().apply(commit.patch().source())?;
-    let replay_forward_verified = replayed.xml_bytes() == commit.snapshot().xml_bytes();
-    let restored = commit.patch().inverse().apply(commit.snapshot())?;
+    let replay_forward_verified = replayed.xml_bytes() == commit.patch().target().xml_bytes();
+    let restored = commit.patch().inverse().apply(commit.patch().target())?;
     let inverse_restores_source_verified =
         restored.xml_bytes() == commit.patch().source().xml_bytes();
-    let stale_target_refusal_verified = commit.patch().apply(commit.snapshot()).is_err();
+    let stale_target_refusal_verified = commit.patch().apply(commit.patch().target()).is_err();
     let foreign_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(expected_output.clone()),
     ))?;

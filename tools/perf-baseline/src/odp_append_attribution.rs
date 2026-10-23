@@ -394,7 +394,7 @@ fn phase_add(
     transaction: &mut litchi_odp::authoring::edit::Edit,
     title: &str,
     body: &str,
-) -> litchi_core::Result<()> {
+) -> Result<(), litchi_odf_common::Error> {
     let result = transaction.add(title, body);
     std::hint::black_box(&result);
     result

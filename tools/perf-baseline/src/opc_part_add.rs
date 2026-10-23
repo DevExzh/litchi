@@ -511,8 +511,8 @@ pub(crate) fn run(
         let start = std::time::Instant::now();
         let package = SourceBackedPackage::from_read_at(
             source.clone(),
+            SourceLimits::default(),
             limits,
-            litchi_opc::SourceCacheLimits::default(),
             litchi_opc::SourceReadPolicy::exact(),
             None,
         )?;

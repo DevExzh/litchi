@@ -21,7 +21,7 @@ use serde::Serialize;
 use std::{
     error::Error,
     ffi::OsString,
-    fs::{self, File, OpenOptions},
+    fs::{self, File},
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
     sync::Arc,
@@ -838,7 +838,7 @@ fn create_output_directory(directory: &Path) -> AllocationResult<()> {
 
 fn write_atomic_json(path: &Path, bytes: &[u8]) -> AllocationResult<()> {
     let temporary = path.with_extension("json.tmp");
-    let mut file = OpenOptions::new()
+    let mut file = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(&temporary)?;

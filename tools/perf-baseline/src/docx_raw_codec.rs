@@ -10,7 +10,7 @@ use litchi_docx::sanitize;
 use litchi_docx::source_backed;
 use litchi_docx::story_hyperlinks::{self, Mode};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use serde::Serialize;
 use std::error::Error;
 use std::ffi::OsString;
@@ -106,13 +106,7 @@ fn prepare() -> Result<Prepared, Box<dyn Error>> {
     let xml = main_xml();
     let sanitize_snapshot =
         sanitize::Snapshot::from_xml(xml.clone(), relationships(), sanitize_limits)?;
-    let redact_snapshot = redact::Snapshot::from_xml(
-        xml,
-        relationships(),
-        litchi_core::SourceVersion::new(0, 0),
-        litchi_opc::SourceArtifactFingerprint::from_sha256([0; 32]),
-        sanitize_limits,
-    )?;
+    let redact_snapshot = redact::Snapshot::from_xml(xml, relationships(), sanitize_limits)?;
     let archive = story_archive()?;
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(archive));
     let package = source_backed::Package::from_read_at(source)?;
@@ -163,7 +157,7 @@ fn verify_semantics(prepared: &Prepared) -> Result<(), Box<dyn Error>> {
 
     let story_patch = prepared
         .story_snapshot
-        .plan_target_urls(&[HYPERLINK], Mode::Strict)?
+        .plan_target_urls(&[HYPERLINK])?
         .apply()?;
     let mut story_codec = story_hyperlinks::raw::Codec::from_snapshot(
         prepared.story_snapshot.clone(),
@@ -376,7 +370,7 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
         measurements: collect(samples, warmup, || {
             let patch = prepared
                 .story_snapshot
-                .plan_target_urls(&[HYPERLINK], Mode::Strict)?
+                .plan_target_urls(&[HYPERLINK])?
                 .apply()?;
             let result = usize::from(patch.is_noop());
             drop(patch);
@@ -400,7 +394,7 @@ pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box
     });
     let story_patch = prepared
         .story_snapshot
-        .plan_target_urls(&[HYPERLINK], Mode::Strict)?
+        .plan_target_urls(&[HYPERLINK])?
         .apply()?;
     let mut story_after_codec = story_hyperlinks::raw::Codec::from_snapshot(
         prepared.story_snapshot.clone(),

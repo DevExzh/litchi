@@ -13,13 +13,12 @@ use std::path::Path;
 use litchi_docx::source_backed::paragraph_copy::raw::{
     Error as CopyError, Patch as CopyRecordPatch,
 };
-use litchi_docx::source_backed::tail_append::Error as TailAppendError;
+use litchi_docx::source_backed::tail_append::{
+    CandidateProof as TailAppendCandidateProof, Error as TailAppendError, Plan as TailAppendPlan,
+};
 use litchi_docx::source_backed::tail_append_stream::patch::ParagraphStreamPatch;
 use litchi_docx::source_backed::tail_append_stream::{Error as StreamError, ParagraphStreamPlan};
-use litchi_docx::source_backed::{
-    self, TailAppendCandidateProof, TailAppendPlan, paragraph_stream, plain_paragraph_copy,
-    tail_append,
-};
+use litchi_docx::source_backed::{self, paragraph_stream, plain_paragraph_copy, tail_append};
 use litchi_opc::SourceArtifactFingerprint;
 
 /// A written plain-paragraph copy commit.
