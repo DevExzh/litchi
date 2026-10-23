@@ -299,6 +299,12 @@ or file-descriptor user was present. Before quarantine it measured
 measured 18,609,608,396 apparent bytes and 19,113,074,688 allocated bytes,
 reclaiming 440,535,840 apparent and 492,449,792 allocated bytes.
 
+The per-file manifest sums are 754,466,808 apparent bytes and 793,866,240
+4-KiB-rounded bytes. Those are record sums, not reclaim totals: 10,940 records
+collapse to 10,745 hard-linked inodes. The quarantined payload therefore has
+440,535,840 apparent bytes under `du`; its 492,662,784 allocated bytes differ
+slightly from the target delta because of directory accounting.
+
 The external quarantine is
 `/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave2/`.
 Its pre-move manifest has 3,705 item roots and 10,940 file records; SHA-256:
@@ -317,9 +323,20 @@ The moved generated cache was limited to:
   the closure guard retained all 32 build-output names referenced by dep-info.
 - The two known stale unit-test groups `e5a12b34de2106e0` and
   `4040652213167156`, including sidecars and fingerprints (101,933,591
-  apparent bytes).
+  apparent bytes); the two main files are ELF unit-test executables, not
+  release or measurement binaries.
 - 2,977 fingerprint-only directories (6,788,484 apparent bytes) with no
   matching output hash anywhere outside `.fingerprint`.
+
+The rejected first selection was fully restored before the corrected wave2.
+The external receipt
+`/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave1/restoration.json`
+cites the wave1 manifest SHA-256
+`e0997eb7f0ba67b91e95e3831cd15fd5c3a169fcec62f24f13657973f195629b`, the
+successful `restored 23027 items` output, and wave1's verification of all
+92,487 file hashes. Wave2 later re-quarantined 3,703 overlapping roots and
+10,938 of those file records, plus two corrected sidecars; the wave1 payload
+is empty.
 
 The compiled historical `.rmeta`/`.rlib` groups whose dep-info names other
 worktrees were not moved: Cargo crate-hash dependency closure could not be
@@ -327,9 +344,10 @@ proven without a build. The all-feature root
 `liblitchi_ops-b00e406e2533c222.rmeta`, format-only root
 `litchi_ops-572a08bc21edd59c`, every artifact at or after the 14:30 UTC cutoff,
 all release/measurement examples, and the isolated wsdoc target were retained.
-The only moved executable files were generated Cargo build-script outputs under
-unreferenced `target/debug/build` directories; no release or measurement binary
-was touched. No tracked file or PROGRESS file was changed.
+Moved executable files consisted of generated Cargo build-script outputs under
+unreferenced `target/debug/build` directories and exactly the two stale unit-test
+ELF executables named above; no release or measurement binary was touched. No
+tracked file or PROGRESS file was changed.
 
 ## Eighth cleanup wave
 
