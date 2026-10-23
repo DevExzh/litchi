@@ -444,9 +444,10 @@ fn mce_preprocessing_respects_web_settings_xml_bound() {
 
     assert!(matches!(
         raw::parse(&xml, &Limits::DEFAULT),
-        Err(Error::Mce(
-            litchi_ooxml_common::mce::Error::LimitExceeded { .. },
-        ))
+        Err(Error::WebLimit {
+            kind: LimitKind::XmlBytes,
+            ..
+        })
     ));
 }
 
