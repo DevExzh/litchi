@@ -40,14 +40,14 @@
           "sha256": "3b5289d120cf5dc518eb3c6fcc7f3e14e21349a3b0cf01b0d8f2a30d54ff06fe"
         },
         {
-          "bytes": 843,
+          "bytes": 982,
           "path": "crates/litchi-pages/examples/generate_footnote_fixture.rs",
-          "sha256": "415a695ea1d8bd83cc968974d4d4f46e7f02ea8b156af44d7cfd5d3715a934de"
+          "sha256": "8bf4e6704cedf230a8b0e94a796f956757d1c2f07ced255716b68060788a36fb"
         },
         {
-          "bytes": 54612,
+          "bytes": 54653,
           "path": "crates/litchi-pages/tests/body_footnote.rs",
-          "sha256": "a26546e6bc9c9776d3d8213062f1b4858e19791e0d1062859ee39f5ededa1eed"
+          "sha256": "56b7062bae16a99a63bae1a7d17b39e8a089fdd67ef7977fe2ec5fe5ee19f8e0"
         }
       ]
     },
