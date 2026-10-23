@@ -304,3 +304,12 @@ The twenty-second pass on `c2329a970d` reports one unused `self` import
 left by the glossary test qualification migration. It is removed directly,
 without a lint allowance. [consumer-v22.json](results/0362uf/consumer-v22.json)
 records the 180.84-second workspace failure; the harness groups were not reached.
+
+The twenty-third pass on `7de3789ede` passes the workspace check with all
+targets and all features. The full performance harness then fails on 35
+consumer migration errors: removed DOCX snapshot/plan APIs, raw-codec and
+hyperlink signatures, required OPC/ODF policies, the ODF error type, and an
+XLSX/filesystem `OpenOptions` name collision. These consumers must preserve
+the same workload and fidelity checks under the canonical API. The isolated
+XLSX harness group is not reached.
+[consumer-v23.json](results/0362uf/consumer-v23.json) records both outcomes.
