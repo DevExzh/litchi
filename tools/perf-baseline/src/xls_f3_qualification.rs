@@ -27,7 +27,7 @@ use std::time::Instant;
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::edit::RefusalKind;
-use litchi_core::sheet::CellValue;
+use litchi_core::sheet::{Cell, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_xls::SourceBackedWorkbook;
 use litchi_xls::cell_values::{Reference, Selector, Storage, Value};
@@ -269,7 +269,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn source_workbook(bytes: &[u8]) -> Result<SourceBackedWorkbook> {
+fn source_workbook(
+    bytes: &[u8],
+) -> std::result::Result<SourceBackedWorkbook, litchi_xls::SourceBackedError> {
     Ok(SourceBackedWorkbook::from_read_at(Arc::new(
         litchi_core::OwnedSource::new(bytes.to_vec()),
     ))?)
@@ -546,7 +548,7 @@ fn run_once(route: Route, fixture: &Fixture, output_capacity: usize) -> Result<M
     let commit = edit.commit()?;
     let commit_ns = elapsed_ns(commit_started.elapsed())?;
 
-    let mut output = Vec::new();
+    let output;
     let mut write_ns = 0;
     let mut read_ns = 0;
     let route_elapsed_ns;

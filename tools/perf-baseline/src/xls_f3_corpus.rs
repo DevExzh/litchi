@@ -5,10 +5,7 @@
 //! callers add their own corpus manifests and semantic checks, but neither
 //! caller owns a second copy of the workload construction.
 
-use std::{
-    error::Error,
-    io::{Cursor, Write},
-};
+use std::{error::Error, io::Cursor};
 
 use litchi_cfb::{OleFile, OleWriter};
 

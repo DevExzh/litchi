@@ -623,6 +623,7 @@ version = "0.1.0"
 dependencies = [
  "litchi-cfb",
  "litchi-core",
+ "litchi-ole-common",
  "litchi-xls",
  "sha2 0.11.1",
 ]
