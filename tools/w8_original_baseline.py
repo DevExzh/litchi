@@ -237,7 +237,9 @@ def verify_source_archive(archive: Path, tree: dict[str, tuple[str, str]]) -> di
                 if relative is None:
                     continue
                 seen.add(relative)
-                _expected_mode, expected_blob = tree[relative]
+                expected_mode, expected_blob = tree[relative]
+                if (member.mode & 0o111) != (int(expected_mode, 8) & 0o111):
+                    raise fail(f"source archive executable mode differs at {relative}")
                 handle = stream.extractfile(member)
                 if handle is None:
                     raise fail(f"source archive member is unreadable: {relative}")
@@ -263,12 +265,14 @@ def _workspace_files(workspace: Path) -> set[str]:
     return actual
 
 
-def _check_workspace_blob(path: Path, _expected_mode: str, expected_blob: str, label: str) -> None:
+def _check_workspace_blob(path: Path, expected_mode: str, expected_blob: str, label: str) -> None:
     if not path.is_file() or path.is_symlink():
         raise fail(f"workspace {label} is not a regular file: {path}")
     # Git archive extraction and this worktree use a shared umask, so the
     # writable bits are not a source identity.  The Git blob identity below
     # is the production closure; the tree mode is retained in tree_digest.
+    if (path.stat().st_mode & 0o111) != (int(expected_mode, 8) & 0o111):
+        raise fail(f"workspace executable mode differs at {path}")
     try:
         payload = path.read_bytes()
     except OSError as error:
