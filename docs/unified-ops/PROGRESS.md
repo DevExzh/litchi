@@ -2883,3 +2883,59 @@ See [0063](0063-source-pptx-modern-comments.md).
   and fresh inventory/glossary validation remain required. Source integration
   is staging, not accepted into trunk. Only the comprehensive redaction audit
   is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, shared types and twelfth cleanup):
+  Main integration and diagnostic composition reach `5dae0abf78`. The earlier
+  XLSB return is closed: all 772 all-feature library tests pass on
+  `73a38420b8`, with logical transitive member comparison scoped by the existing
+  OPC contract and same-owner/unreferenced exact checks retained. The full
+  facade, DOCX and XLSX passes recorded above remain source-pinned evidence;
+  the complete final gate is still required.
+
+  The final-sweep audit found changed-only Diagnostics and plain Commit copies
+  still required to migrate under 0351 section 2.2. PPT/PPTX, XLS/XLSB, Pages
+  and ODF now use the shared core shapes; genuinely richer diagnostics and
+  PPTX's extra opened snapshot state remain custom. Pages metadata replay now
+  returns the Commit triad, and its consumers and replay/no-op tests migrate
+  with it. ODI flat planning/source helpers move to Patch. Records 0362us and
+  0362usa–0362usd retain the audit and review boundaries. ODM's changed-byte
+  comparison now occurs during commit rather than lazily in diagnostics; its
+  final native qualification remains required, with no performance waiver.
+
+  The glossary now enforces 30 nominated shared identities through rustdoc
+  nominal IDs, including alias/re-export resolution and fail-closed missing,
+  ambiguous, cyclic and unrelated cases. The Pages replay rule and ODI helper
+  bans survive conflict resolution. Glossary/inventory tool tests pass 54/54.
+  The shared Commit Debug now prints only content-free diagnostics, avoiding
+  a newly exposed payload route through derived format Debug implementations;
+  six core edit tests pass, including payload-formatting rejection. This is
+  a narrow obligation of the changed API, not completion of redaction audit 22.
+
+  The complete composed Clippy v23 run returns three spelling-only lints in
+  XLSX facade admission and a PPTX test seam. These are fixed. The v24 complete
+  all-target/all-feature workspace pass is active on `5dae0abf78`. A separate
+  owner-replay sweep found ODG's three apply_joined plan-publication methods
+  still returning Package; that work is returned for migration into Edit
+  staging, preserving bounded composition, policies, source checks, aggregate
+  patch/diagnostics and one publication.
+
+  The pristine f2 W8 baseline build now passes all 109 untimed route checks
+  and its fail-closed endpoint verification; receipt 43c9fc24fd is reviewed
+  and merged. IWork's harness now admits only source-declared inactive lock
+  edges and rejects undeclared edges even when both endpoint locks and seed
+  contain them. Its 20 tests pass. The reusable Pages fixture example builds
+  without the previous inclusion errors. Earlier build/preflight packets
+  remain external; fresh coherent final-candidate qualification waits for
+  source freeze. No new native timing result is claimed.
+
+  Twelfth cleanup removes four clean, inactive, merged source worktrees
+  without force, retaining their branch refs. Their apparent checkout size
+  totals 25,037,023,460 bytes. Twenty-five ignored generated files totaling
+  8,173,100 bytes are hash-verified in external quarantine with restore
+  instructions. Protected targets, measurements and incomplete checkouts
+  remain untouched; the coordinator verified every retained file identity.
+
+  Source integration remains staging, not accepted into trunk. ODG completion,
+  the full 53-check gate, all 68 final inventory captures and dispositions,
+  corpus replay, glossary closure and native qualification remain open.
+  Only comprehensive redaction audit 22 is deferred. Nothing has been pushed.
