@@ -31,3 +31,11 @@ PPTX proposal replaces that planner with affected-member metadata sizing
 and removes both mismatches. Independent review and combined compilation
 remain required. [native-check-v2.json](results/0362up/native-check-v2.json)
 records the exact command and failure; no dependent-crate pass is inferred.
+
+The third check on `c9bf9c8c40` reaches the native implementations and
+reports 21 compiler diagnostics: PPTX wire-length helpers and current metadata
+APIs, XLSX retained source projections, DOCX XML views/error conversions and
+commit ownership, and XLSB metadata planning. The complete batch is assigned
+from that exact assembled source.
+[native-check-v3.json](results/0362up/native-check-v3.json) retains the
+93.21-second failure. The dependent facade compilation was not reached.
