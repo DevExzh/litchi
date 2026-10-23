@@ -2722,3 +2722,42 @@ See [0063](0063-source-pptx-modern-comments.md).
   replay/dispositions and fresh inventory/glossary validation remain required.
   Source integration has not been accepted into trunk. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, strict budget compilation and scoped proofs):
+  Main integration reaches `66110f0fb9`. DOC final qualification now includes
+  the structural CHPX audit: removed history blocks are unreachable through
+  the active FIB/BTE graph, and all 28 active formatting-page payloads and
+  ranges are unchanged. The ordinary route is byte-exact. Record 0359qe
+  preserves the controlled baseline, instruction/heap results and the pending
+  quiet-host timing boundary. Reviewed DOCX Ink and ODP qualification harnesses
+  are merged; fresh builds and correctness preflights are starting. Harness
+  infrastructure does not itself establish performance acceptance.
+
+  Diagnostic budget composition reaches `4470ecce16`. Strict combined
+  all-target/all-feature native/facade compilation passes on `2cadd934b7`,
+  followed by the facade without default features. Metadata runtime initially
+  passes ten tests and exposes one empty-fixture setup error; the corrected
+  populated fixture then passes all eleven tests, preserving exact-limit and
+  one-below assertions. Record 0362up retains source/command/log receipts.
+  Cache-independent endpoint accounting and bulk rich-transfer fidelity
+  passed scoped review. The two PPTX runtime repairs and obsolete helper
+  removal are composed, with combined PPTX runtime validation now running.
+
+  The new cell-normalization proposal `06afe43fa0` remains under review for
+  atomic joins, signed and source-equivalent no-ops, typed error preservation
+  and default-path costs. It has not been accepted. IWork qualification is
+  returned for its original footnote workload, semantic expectations and
+  complete validation proofs; W4b/W5 orchestration is correcting analyzer
+  output and stale-result isolation. These remain engineering requirements.
+
+  The tenth cleanup removes one clean merged metadata leaf without force,
+  reclaiming 6,262,042,222 apparent bytes. Its ignored 139,592-byte lockfile
+  is retained in a hashed external quarantine with restoration instructions.
+  Two other leaves remain because active processes hold their directories
+  or files. Branch references, targets and measurement artifacts are retained;
+  receipt `3baa225cf8` is merged.
+
+  Final combined runtime/gates, native and quiet-host qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain required.
+  Source integration is still staging, not accepted into trunk. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
