@@ -21,9 +21,7 @@
 //! writes keep the ordinary writer, which promotes it.
 
 use super::text::{self, TextValues};
-use super::{
-    Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error,
-};
+use super::{Commit, Editable, Pptx, Proof, Target, admit_shape_props, allocation, error};
 use crate::format::pptx::spec::{Kind, PARAGRAPH_WRITE_TABLE, RUN_WRITE_TABLE};
 use crate::format::pptx::steps;
 use crate::registry::Operation;
@@ -457,6 +455,12 @@ impl Run {
                 // changed patch is then discarded in favor of a native empty
                 // edit over the original signed owner.
                 let original = base.original_owner_for_noop()?;
+                // Replacement is a peak-accounted phase, not an overlap: the
+                // staged target and proof must be released before the
+                // canonical signed owner is captured.  Keep only the
+                // measured peak and authored operation count below.
+                drop(commit);
+                drop(after);
                 (after, commit) = commit_native(
                     &base,
                     original.clone(),

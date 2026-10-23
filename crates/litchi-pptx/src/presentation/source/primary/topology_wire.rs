@@ -94,6 +94,16 @@ pub(super) struct PartImage {
     pub(super) relationships: Option<Arc<Vec<u8>>>,
 }
 
+/// Lengths used by a topology replacement preflight.  The preflight must be
+/// able to account for a source image before retaining its bytes; keeping
+/// only lengths here avoids constructing a second owned image merely to
+/// discover that the durable wire ceiling cannot admit it.
+#[derive(Clone, Copy)]
+pub(super) struct ImageLengths {
+    pub(super) xml: usize,
+    pub(super) relationships: Option<usize>,
+}
+
 impl Data {
     pub(super) fn is_noop(&self) -> bool {
         self.before == self.after && self.changes.is_empty() && self.dependents.is_empty()
@@ -240,6 +250,63 @@ impl Data {
         add_len(&mut total, state_payload_len(&self.after)?)?;
         for change in self.changes.iter() {
             add_len(&mut total, change_len(change)?)?;
+        }
+        if !self.dependents.is_empty() {
+            add_len(&mut total, 4)?;
+            for dependent in self.dependents.iter() {
+                add_len(&mut total, dependent_len(dependent)?)?;
+            }
+        }
+        if total > MAX_WIRE_BYTES {
+            return Err(wire_limit());
+        }
+        Ok(total)
+    }
+
+    /// Compute the exact wire length after replacing one slide change.  The
+    /// replacement is evaluated from lengths only, so callers can preflight a
+    /// source image before `physical_image` copies its payload into retained
+    /// patch state.  Existing changes retain their metadata and all unrelated
+    /// changes/dependents are accounted for exactly as in `encoded_len`.
+    pub(super) fn encoded_len_with_replacement(
+        &self,
+        key: &StableSlideKey,
+        before: Option<ImageLengths>,
+        after: Option<ImageLengths>,
+        content_type: &str,
+        relationship_type: &str,
+    ) -> Result<usize> {
+        let mut total = HEADER_BYTES
+            .checked_add(CHECKSUM_BYTES)
+            .ok_or_else(|| invalid("wire length overflows"))?;
+        for order_key in self.before.order.iter().chain(self.after.order.iter()) {
+            add_len(&mut total, key_len(order_key)?)?;
+        }
+        add_len(&mut total, state_payload_len(&self.before)?)?;
+        add_len(&mut total, state_payload_len(&self.after)?)?;
+        let mut replaced = false;
+        for change in self.changes.iter() {
+            if &change.key == key {
+                add_len(
+                    &mut total,
+                    change_len_from_lengths(
+                        &change.key,
+                        &change.content_type,
+                        &change.relationship_type,
+                        before,
+                        after,
+                    )?,
+                )?;
+                replaced = true;
+            } else {
+                add_len(&mut total, change_len(change)?)?;
+            }
+        }
+        if !replaced {
+            add_len(
+                &mut total,
+                change_len_from_lengths(key, content_type, relationship_type, before, after)?,
+            )?;
         }
         if !self.dependents.is_empty() {
             add_len(&mut total, 4)?;
@@ -1186,15 +1253,31 @@ fn state_payload_len(state: &State) -> Result<usize> {
 }
 
 fn change_len(change: &Change) -> Result<usize> {
-    let mut total = key_len(&change.key)?;
+    change_len_from_lengths(
+        &change.key,
+        &change.content_type,
+        &change.relationship_type,
+        change.before.as_ref().map(image_lengths),
+        change.after.as_ref().map(image_lengths),
+    )
+}
+
+fn change_len_from_lengths(
+    key: &StableSlideKey,
+    content_type: &str,
+    relationship_type: &str,
+    before: Option<ImageLengths>,
+    after: Option<ImageLengths>,
+) -> Result<usize> {
+    let mut total = key_len(key)?;
     total = total
         .checked_add(4)
-        .and_then(|length| length.checked_add(change.content_type.len()))
+        .and_then(|length| length.checked_add(content_type.len()))
         .and_then(|length| length.checked_add(4))
-        .and_then(|length| length.checked_add(change.relationship_type.len()))
+        .and_then(|length| length.checked_add(relationship_type.len()))
         .ok_or_else(|| invalid("change length overflows"))?;
-    let before_len = image_len(change.before.as_ref())?;
-    let after_len = image_len(change.after.as_ref())?;
+    let before_len = image_lengths_len(before)?;
+    let after_len = image_lengths_len(after)?;
     total = total
         .checked_add(before_len)
         .and_then(|length| length.checked_add(after_len))
@@ -1219,17 +1302,28 @@ fn dependent_len(dependent: &Dependent) -> Result<usize> {
 }
 
 fn image_len(image: Option<&PartImage>) -> Result<usize> {
+    image_lengths_len(image.map(image_lengths))
+}
+
+fn image_lengths(image: &PartImage) -> ImageLengths {
+    ImageLengths {
+        xml: image.xml.len(),
+        relationships: image.relationships.as_ref().map(|bytes| bytes.len()),
+    }
+}
+
+fn image_lengths_len(image: Option<ImageLengths>) -> Result<usize> {
     let mut total = 1usize;
     if let Some(image) = image {
         total = total
             .checked_add(8)
-            .and_then(|length| length.checked_add(image.xml.len()))
+            .and_then(|length| length.checked_add(image.xml))
             .and_then(|length| length.checked_add(1))
             .ok_or_else(|| invalid("image length overflows"))?;
-        if let Some(relationships) = image.relationships.as_ref() {
+        if let Some(relationships) = image.relationships {
             total = total
                 .checked_add(8)
-                .and_then(|length| length.checked_add(relationships.len()))
+                .and_then(|length| length.checked_add(relationships))
                 .ok_or_else(|| invalid("image length overflows"))?;
         }
     }
@@ -1547,6 +1641,42 @@ mod tests {
             ]
             .into(),
         }
+    }
+
+    #[test]
+    fn replacement_length_matches_encoded_wire() {
+        let data = sample();
+        let change = &data.changes[0];
+        let before = change.before.as_ref().map(image_lengths);
+        let after = change.after.as_ref().map(image_lengths);
+        let measured = data
+            .encoded_len_with_replacement(
+                &change.key,
+                before,
+                after,
+                &change.content_type,
+                &change.relationship_type,
+            )
+            .expect("length-only replacement");
+        assert_eq!(measured, data.encoded_len().expect("encoded length"));
+
+        let after_image = after.expect("after image");
+        let replacement = ImageLengths {
+            xml: after_image.xml + 17,
+            relationships: after_image.relationships.map(|length| length + 3),
+        };
+        let expected = data.encoded_len().expect("encoded length") + 17 + 3;
+        assert_eq!(
+            data.encoded_len_with_replacement(
+                &change.key,
+                before,
+                Some(replacement),
+                &change.content_type,
+                &change.relationship_type,
+            )
+            .expect("replacement length"),
+            expected
+        );
     }
 
     fn empty_transition() -> Data {

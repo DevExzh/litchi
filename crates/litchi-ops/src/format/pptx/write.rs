@@ -302,9 +302,14 @@ impl Pptx {
                         // peak charge of both phases, just like a coalesced
                         // run does.
                         let staged_snapshot_bytes = commit.snapshot_bytes();
+                        // The canonical replacement is a separate peak
+                        // phase. Release the staged target/proof before
+                        // retaining the canonical empty patch.
+                        let operations = commit.operations;
+                        drop(commit);
                         let mut commit = canonical_signed_noop(
                             self,
-                            commit.operations,
+                            operations,
                             native_snapshot_budget(limits),
                         )?;
                         commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);

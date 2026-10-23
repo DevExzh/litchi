@@ -11,6 +11,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use litchi_core::{Position, Reservation, Resource};
 use litchi_opc::xml_splice::authored_xml_requires_source_proof;
@@ -23,7 +24,7 @@ use super::super::{
     PartBinding, RelationshipBinding, SlideBinding, SourceBackedSlideSnapshot, SourcePayload,
 };
 use super::topology_digest;
-use super::topology_wire::{Change, Data, Dependent, PartImage, State};
+use super::topology_wire::{Change, Data, Dependent, ImageLengths, PartImage, State};
 use super::{Package, RootPayload, allocation, limit};
 use crate::presentation::order::{StableSlideKey, stable_slide_key};
 use crate::{Error, Result};
@@ -119,6 +120,16 @@ pub(super) struct Retention {
     pub(super) prepared_metadata: Vec<PreparedMetadataData>,
     pub(super) reservations: Vec<Arc<Reservation>>,
     pub(super) source_xml: Vec<litchi_opc::SourceXmlPart>,
+    /// Optional preflight charge shared while a durable topology patch is
+    /// being captured.  It counts source/relationship payload bytes before
+    /// each owned copy, so a patch that cannot fit never materializes its
+    /// complete retained image merely to discover the limit at encoding.
+    wire_budget: Option<Arc<WireBudget>>,
+}
+
+struct WireBudget {
+    used: AtomicUsize,
+    maximum: usize,
 }
 
 impl Revision {
@@ -365,6 +376,7 @@ pub(super) fn reorder(
 pub(super) fn replace_snapshot(
     package: &Package,
     snapshot: SourceBackedSlideSnapshot,
+    max_patch_bytes: usize,
 ) -> Result<Package> {
     let revision = package.topology.as_ref().ok_or(Error::PatchConflict)?;
     let key = package
@@ -375,6 +387,44 @@ pub(super) fn replace_snapshot(
         .ok_or(Error::PatchConflict)?;
     let mut changes = revision.data.changes.to_vec();
     let existing = changes.iter().find(|change| change.key == key).cloned();
+    let (before_lengths, content_type, relationship_type, relationship_lengths) =
+        if let Some(change) = existing.as_ref() {
+            (
+                change.before.as_ref().map(image_lengths),
+                change.content_type.clone(),
+                change.relationship_type.clone(),
+                change
+                    .after
+                    .as_ref()
+                    .and_then(|image| image.relationships.as_ref().map(|bytes| bytes.len())),
+            )
+        } else {
+            let (image_lengths, content_type, relationship_type) =
+                physical_image_lengths(package, &key)?.ok_or(Error::PatchConflict)?;
+            (
+                Some(image_lengths),
+                content_type,
+                relationship_type,
+                image_lengths.relationships,
+            )
+        };
+    let after_lengths = ImageLengths {
+        xml: snapshot.xml.as_bytes().len(),
+        relationships: relationship_lengths,
+    };
+    let candidate_wire = revision.data.encoded_len_with_replacement(
+        &key,
+        before_lengths,
+        Some(after_lengths),
+        &content_type,
+        &relationship_type,
+    )?;
+    if candidate_wire > max_patch_bytes {
+        return Err(limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        ));
+    }
     let mut seed = Retention::default();
     let relationships = match existing.as_ref().and_then(|change| change.after.as_ref()) {
         Some(image) => image.relationships.clone(),
@@ -422,21 +472,91 @@ pub(super) fn replace_snapshot(
         Some(&revision.data.after),
         seed,
     )?;
+    if revision.data.encoded_len()? > max_patch_bytes {
+        return Err(limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        ));
+    }
     package_from_revision(package, revision)
+}
+
+/// Return the exact remaining XML budget for replacing one slide in a
+/// topology revision.  Existing staged changes remain part of the candidate
+/// wire image; only the replacement's XML payload is left variable.  This is
+/// used before the native editor allocates its candidate output.
+pub(super) fn replacement_after_budget(
+    package: &Package,
+    key: &StableSlideKey,
+    max_patch_bytes: usize,
+) -> Result<usize> {
+    let revision = package.topology.as_ref().ok_or(Error::PatchConflict)?;
+    let existing = revision
+        .data
+        .changes
+        .iter()
+        .find(|change| &change.key == key);
+    let (before_lengths, content_type, relationship_type, relationship_lengths) =
+        if let Some(change) = existing {
+            (
+                change.before.as_ref().map(image_lengths),
+                change.content_type.clone(),
+                change.relationship_type.clone(),
+                change
+                    .after
+                    .as_ref()
+                    .and_then(|image| image.relationships.as_ref().map(|bytes| bytes.len())),
+            )
+        } else {
+            let (image_lengths, content_type, relationship_type) =
+                physical_image_lengths(package, key)?.ok_or(Error::PatchConflict)?;
+            (
+                Some(image_lengths),
+                content_type,
+                relationship_type,
+                image_lengths.relationships,
+            )
+        };
+    let baseline = revision.data.encoded_len_with_replacement(
+        key,
+        before_lengths,
+        Some(ImageLengths {
+            xml: 0,
+            relationships: relationship_lengths,
+        }),
+        &content_type,
+        &relationship_type,
+    )?;
+    max_patch_bytes.checked_sub(baseline).ok_or_else(|| {
+        limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        )
+    })
 }
 
 /// Build a durable topology patch from the exact before/after package
 /// revisions.  The before image is the caller's effective state; the physical
 /// source image is retained in the recipe only where the target topology must
 /// be rebuilt on another open.
-pub(super) fn patch_from_packages(source: &Package, target: &Package) -> Result<Patch> {
+pub(super) fn patch_from_packages(
+    source: &Package,
+    target: &Package,
+    max_patch_bytes: usize,
+) -> Result<Patch> {
     source.check()?;
     target.check()?;
     if !source.same_source_owner(target) {
         return Err(Error::PatchConflict);
     }
-    let (before, mut retained) = effective_state_with_retention(source)?;
-    let (after, target_retained) = effective_state_with_retention(target)?;
+    let wire_budget = Arc::new(WireBudget {
+        used: AtomicUsize::new(0),
+        maximum: max_patch_bytes,
+    });
+    let (before, mut retained) =
+        effective_state_with_retention_budget(source, Some(Arc::clone(&wire_budget)))?;
+    let (after, target_retained) =
+        effective_state_with_retention_budget(target, Some(Arc::clone(&wire_budget)))?;
     merge_retention(&mut retained, target_retained);
     validate_root_delta(source, &before, &after)?;
     let changes = diff_changes(source, target, &mut retained)?;
@@ -447,10 +567,17 @@ pub(super) fn patch_from_packages(source: &Package, target: &Package) -> Result<
         changes: changes.into(),
         dependents: dependents.into(),
     };
+    if data.encoded_len()? > max_patch_bytes {
+        return Err(limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        ));
+    }
     let prepared = target
         .topology
         .as_ref()
         .map(|revision| revision.prepared.clone());
+    retained.wire_budget = None;
     Ok(Patch {
         data,
         prepared,
@@ -545,11 +672,23 @@ fn validate_root_delta(package: &Package, before: &State, after: &State) -> Resu
 }
 
 fn effective_state_with_retention(package: &Package) -> Result<(State, Retention)> {
+    effective_state_with_retention_budget(package, None)
+}
+
+fn effective_state_with_retention_budget(
+    package: &Package,
+    wire_budget: Option<Arc<WireBudget>>,
+) -> Result<(State, Retention)> {
     if let Some(revision) = &package.topology {
         revision.check()?;
-        return Ok((revision.data.after.clone(), (*revision.retained).clone()));
+        let mut retained = (*revision.retained).clone();
+        retained.wire_budget = wire_budget;
+        return Ok((revision.data.after.clone(), retained));
     }
-    let mut retained = Retention::default();
+    let mut retained = Retention {
+        wire_budget,
+        ..Retention::default()
+    };
     let (presentation_relationships, content_types) = source_metadata(package, &mut retained)?;
     retained
         .source_parts
@@ -667,6 +806,10 @@ fn build_revision_with_retention(
             return Err(Error::PatchConflict);
         }
     }
+    // A capture preflight may borrow a transient wire budget while retaining
+    // source images.  Never carry that allocator-side cell into the
+    // immutable revision after admission succeeds.
+    retained.wire_budget = None;
     let after = State {
         topology_digest,
         root,
@@ -1653,6 +1796,42 @@ fn physical_image(
     )))
 }
 
+fn physical_image_lengths(
+    package: &Package,
+    key: &StableSlideKey,
+) -> Result<Option<(ImageLengths, String, String)>> {
+    let Some(slide) = package.owner.slides.iter().find(|slide| {
+        stable_slide_key(
+            slide.part_uri.clone(),
+            slide.slide_id,
+            slide.binding.slide_reference_id.clone(),
+        ) == *key
+    }) else {
+        return Ok(None);
+    };
+    let view = package.owner.package.part(&slide.part_uri)?;
+    let data = view.data()?;
+    let relationships = package.owner.package.relationships_data_for_with_limit(
+        &slide.part_uri,
+        package.owner.limits.max_relationship_xml_bytes(),
+    )?;
+    Ok(Some((
+        ImageLengths {
+            xml: data.as_bytes().len(),
+            relationships: relationships.as_ref().map(|value| value.as_bytes().len()),
+        },
+        slide.binding.slide.content_type.clone(),
+        slide.binding.presentation_relationship.kind.clone(),
+    )))
+}
+
+fn image_lengths(image: &PartImage) -> ImageLengths {
+    ImageLengths {
+        xml: image.xml.len(),
+        relationships: image.relationships.as_ref().map(|bytes| bytes.len()),
+    }
+}
+
 fn upsert_change(changes: &mut Vec<Change>, change: Change) {
     if change.before == change.after {
         changes.retain(|existing| existing.key != change.key);
@@ -1835,6 +2014,16 @@ fn copy_state_bytes(
     bytes: &[u8],
     retained: &mut Retention,
 ) -> Result<Arc<Vec<u8>>> {
+    if let Some(budget) = &retained.wire_budget {
+        let maximum = budget.maximum;
+        budget
+            .used
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
+                used.checked_add(bytes.len())
+                    .filter(|next| *next <= maximum)
+            })
+            .map_err(|_| limit("source-backed primary retained patch bytes", maximum))?;
+    }
     if let Some(reservation) = reserve_payload(package, bytes.len())? {
         retained.reservations.push(Arc::new(reservation));
     }

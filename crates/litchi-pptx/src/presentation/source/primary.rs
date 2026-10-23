@@ -665,10 +665,21 @@ impl Package {
         self.snapshot(physical)
     }
 
-    fn with_snapshot(&self, mut snapshot: SourceBackedSlideSnapshot) -> Result<Self> {
+    fn with_snapshot(&self, snapshot: SourceBackedSlideSnapshot) -> Result<Self> {
+        self.with_snapshot_with_max_patch_bytes(
+            snapshot,
+            crate::opened::Limits::default().max_patch_bytes(),
+        )
+    }
+
+    fn with_snapshot_with_max_patch_bytes(
+        &self,
+        mut snapshot: SourceBackedSlideSnapshot,
+        max_patch_bytes: usize,
+    ) -> Result<Self> {
         self.check()?;
         if self.topology.is_some() {
-            return topology::replace_snapshot(self, snapshot);
+            return topology::replace_snapshot(self, snapshot, max_patch_bytes);
         }
         if snapshot.xml.as_bytes().len() > snapshot.max_output_bytes {
             return Err(limit(
@@ -1515,16 +1526,30 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
-        let mut edit = snapshot.edit_checked_with_max_patch_bytes(self.max_patch_bytes)?;
+        let output_limit = if self.working.topology.is_some() {
+            topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
+        } else {
+            self.local_after_budget(&target_key, snapshot.xml.as_bytes().len())?
+        };
+        let mut edit = snapshot.edit_checked_with_max_patch_bytes(output_limit)?;
         let shape_id = edit.add_text_box(text, bounds)?;
         let after = edit.commit_checked()?.snapshot;
-        if after.xml.as_bytes().len() > self.max_patch_bytes {
+        if after.xml.as_bytes().len() > output_limit {
             return Err(limit(
                 "source-backed primary slide output bytes",
-                self.max_patch_bytes,
+                output_limit,
             ));
         }
-        let candidate = self.working.with_snapshot(after.clone())?;
+        if self.working.topology.is_none() {
+            self.check_local_patch_budget(
+                &target_key,
+                snapshot.xml.as_bytes().len(),
+                after.xml.as_bytes().len(),
+            )?;
+        }
+        let candidate = self
+            .working
+            .with_snapshot_with_max_patch_bytes(after.clone(), self.max_patch_bytes)?;
         if self.working.topology.is_some() {
             self.working = candidate;
             return Ok(shape_id);
@@ -2086,9 +2111,14 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
-        let bounded_snapshot = snapshot.with_max_patch_bytes(self.max_patch_bytes);
+        let output_limit = if self.working.topology.is_some() {
+            topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
+        } else {
+            self.local_after_budget(&target_key, snapshot.xml.as_bytes().len())?
+        };
+        let bounded_snapshot = snapshot.with_max_patch_bytes(output_limit);
         let reservation = reserve(&self.working, &bounded_snapshot)?;
-        let mut edit = snapshot.edit_checked_with_max_patch_bytes(self.max_patch_bytes)?;
+        let mut edit = snapshot.edit_checked_with_max_patch_bytes(output_limit)?;
         let changed = stage(&mut edit)?;
         if changed == 0 {
             self.working.check()?;
@@ -2100,10 +2130,10 @@ impl Edit {
         // revision builder.  Passing a clone into `with_snapshot` first used
         // to allocate the candidate XML before the facade ceiling was
         // observed; a rejected candidate must never escape that preflight.
-        if after.xml.as_bytes().len() > self.max_patch_bytes {
+        if after.xml.as_bytes().len() > output_limit {
             return Err(limit(
                 "source-backed primary slide output bytes",
-                self.max_patch_bytes,
+                output_limit,
             ));
         }
         if let Some(reservation) = reservation {
@@ -2114,7 +2144,16 @@ impl Edit {
                 };
             }
         }
-        let candidate = self.working.with_snapshot(after.clone())?;
+        if self.working.topology.is_none() {
+            self.check_local_patch_budget(
+                &target_key,
+                snapshot.xml.as_bytes().len(),
+                after.xml.as_bytes().len(),
+            )?;
+        }
+        let candidate = self
+            .working
+            .with_snapshot_with_max_patch_bytes(after.clone(), self.max_patch_bytes)?;
         if self.working.topology.is_some() {
             self.working = candidate;
             return Ok(changed);
@@ -2157,13 +2196,73 @@ impl Edit {
         Ok(changed)
     }
 
+    /// Return the output-only remainder after accounting for the complete
+    /// local durable envelope except the new slide's after image.  The native
+    /// focused editor uses this bound before building candidate XML; the final
+    /// exact envelope check below includes the after image itself.
+    fn local_after_budget(&self, key: &StableSlideKey, before: usize) -> Result<usize> {
+        let length = self.local_patch_wire_len(key, before, 0)?;
+        self.max_patch_bytes
+            .checked_sub(length)
+            .ok_or_else(|| limit("source-backed durable patch bytes", self.max_patch_bytes))
+    }
+
+    fn check_local_patch_budget(
+        &self,
+        key: &StableSlideKey,
+        before: usize,
+        after: usize,
+    ) -> Result<()> {
+        let length = self.local_patch_wire_len(key, before, after)?;
+        if length > self.max_patch_bytes {
+            return Err(limit(
+                "source-backed durable patch bytes",
+                self.max_patch_bytes,
+            ));
+        }
+        Ok(())
+    }
+
+    fn local_patch_wire_len(
+        &self,
+        target: &StableSlideKey,
+        target_before: usize,
+        target_after: usize,
+    ) -> Result<usize> {
+        let mut changes = Vec::new();
+        changes
+            .try_reserve_exact(self.changes.len().saturating_add(1))
+            .map_err(allocation)?;
+        for change in &self.changes {
+            let key = source_key_for_position(&self.source, change.before.position)?;
+            if key == *target {
+                continue;
+            }
+            changes.push((
+                key,
+                change.before.xml.as_bytes().len(),
+                change.after.xml.as_bytes().len(),
+            ));
+        }
+        changes.push((target.clone(), target_before, target_after));
+        durable::local_wire_len(
+            self.shape_removals,
+            &self.source.order,
+            &self.working.order,
+            self.source.root.as_bytes().len(),
+            self.working.root.as_bytes().len(),
+            &changes,
+        )
+    }
+
     /// Publish a new immutable package, exact-source patch, and diagnostics.
     pub fn commit(mut self) -> Result<Commit> {
         self.working.check()?;
         let max_patch_bytes = self.max_patch_bytes;
         if self.working.topology.is_some() {
             let source = self.source;
-            let topology_patch = topology::patch_from_packages(&source, &self.working)?;
+            let topology_patch =
+                topology::patch_from_packages(&source, &self.working, max_patch_bytes)?;
             let patch = Patch {
                 shape_removals: self.shape_removals,
                 data: PatchData::Topology(Arc::new(topology_patch)),
