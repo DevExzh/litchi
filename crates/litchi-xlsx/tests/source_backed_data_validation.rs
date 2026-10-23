@@ -327,7 +327,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     .unwrap();
     let snapshot = editor
         .edit_data_validations("Sheet1")
-        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -379,7 +379,7 @@ fn managed_one_under_budget_refuses_before_selected_payload_retention() {
     assert!(matches!(
         editor
             .edit_data_validations("Sheet1")
-            .and_then(|edit| edit.before().map(|snapshot| snapshot.clone())),
+            .and_then(|edit| edit.before().cloned()),
         Err(Error::Package(OpcError::Execution(
             ExecutionError::ResourceLimit(_)
         )))

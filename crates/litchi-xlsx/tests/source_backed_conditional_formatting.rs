@@ -487,7 +487,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
     .unwrap();
     let snapshot = editor
         .edit_conditional_formats("Sheet1")
-        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -727,7 +727,7 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         assert!(
             editor
                 .edit_conditional_formats("Sheet1")
-                .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
+                .and_then(|edit| edit.before().cloned())
                 .is_err()
         );
     }

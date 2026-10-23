@@ -338,7 +338,7 @@ fn managed_snapshot_changed_publication_and_budget_release_are_exact() {
     .unwrap();
     let snapshot = editor
         .edit_sheet_protection("Sheet1")
-        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert_eq!(snapshot.metadata(), &Metadata::new());
     assert_eq!(budget.used(Resource::Memory), exact);

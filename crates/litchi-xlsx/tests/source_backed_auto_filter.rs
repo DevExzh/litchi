@@ -347,7 +347,7 @@ fn managed_snapshot_changed_publication_and_exact_inverse_are_bounded() {
     .unwrap();
     let snapshot = editor
         .edit_auto_filter("Sheet1")
-        .and_then(|edit| edit.before().map(|snapshot| snapshot.clone()))
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert!(snapshot.auto_filter().is_none());
     assert_eq!(budget.used(Resource::Memory), exact);
