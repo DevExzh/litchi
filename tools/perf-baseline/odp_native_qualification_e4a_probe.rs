@@ -238,7 +238,7 @@ fn owner(source: Arc<dyn ReadAt>) -> Result<SourceBackedPresentation, Box<dyn Er
 }
 
 fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
-    let mut archive = ArchiveReader::new(fixture)?;
+    let archive = ArchiveReader::new(fixture)?;
     Ok(Digest::from_bytes(&archive.read("content.xml")?))
 }
 
@@ -454,16 +454,18 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<String, Box<dyn Err
         .join(",");
     Ok(format!(
         concat!(
-            r#"{{"schema":"{SCHEMA}","mode":"verify","capabilities":{{"patch_replay":false,"inverse_replay":false,"scoped_replay":false,"timed_routes":["open","read","write","append"],"replay_scope":"independent_plan_not_patch"}},"#,
+            r#"{{"schema":"{}","mode":"verify","capabilities":{{"patch_replay":false,"inverse_replay":false,"scoped_replay":false,"timed_routes":["open","read","write","append"],"replay_scope":"independent_plan_not_patch"}},"#,
             r#""fixture":{{"bytes":{},"sha256":"{}","content":{}}},"#,
-            r#""checks":{{{checks_json}}},"#,
+            r#""checks":{{{}}},"#,
             r#""read":{{"slide_count":{},"first_slide_present":{},"text_bytes":{},"text_sha256":"{}"}},"#,
             r#""patch":{{"is_noop":false,"source_content_sha256":"{}","target_content_sha256":"{}"}},"#,
             r#""outputs":{{"source":{},"no_op":{},"append":{},"independent_append":{}}}}}"#
         ),
+        SCHEMA,
         source.bytes,
         source.sha256,
         content.json(),
+        checks_json,
         slide_count,
         first_slide_present,
         text.bytes,
@@ -547,7 +549,7 @@ fn hex_bytes(bytes: &[u8; 32]) -> String {
 }
 
 fn run(args: Args) -> Result<String, Box<dyn Error>> {
-    let fixture = fs::read(args.fixture)?;
+    let fixture = fs::read(&args.fixture)?;
     match args.mode {
         Mode::Verify => verify(&fixture, &args.title, &args.body),
         Mode::Calibrate => calibrate(&args, &fixture),
@@ -556,7 +558,11 @@ fn run(args: Args) -> Result<String, Box<dyn Error>> {
 }
 
 fn main() {
-    match Args::parse().and_then(run) {
+    let result = match Args::parse() {
+        Ok(args) => run(args),
+        Err(error) => Err(io::Error::other(error).into()),
+    };
+    match result {
         Ok(report) => println!("{report}"),
         Err(error) => {
             eprintln!("legacy ODP qualification probe failed: {error}");

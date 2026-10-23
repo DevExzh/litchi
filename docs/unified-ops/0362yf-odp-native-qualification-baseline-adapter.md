@@ -28,7 +28,7 @@ The pinned source identities are:
 | source | identity |
 |---|---|
 | e4a commit | `e4a0614f5d3a1d768346cc33a4a3b86522dda986` (revision) |
-| external-fixture protocol adapter | `f8c0544e057a5aedf7bee759ed21313858efad36b4f6460c8a368f55411a7203` |
+| external-fixture protocol adapter | `47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7` |
 | historical route adapter | `7c79858b4626135f4b7cdb695fca5e185d76665e5717c1ec7e610b3ec3a03875` |
 | included e4a route | `fc08a3d65ec38c9053b1927e25943762c06c6894026e186b011bfb0dab028bb9` |
 | common probe source | `9d709068b90f685fd45b367320296484020c4af45bd42da32d7ac13d5ac41650` |
@@ -44,7 +44,7 @@ BASELINE=/path/to/uo2-odp-heap-repair-0362yd-baseline
 ADAPTER_DST=$BASELINE/crates/litchi-odp/examples/odp_native_qualification_legacy_probe.rs
 TARGET=/external/odp-0362yd-baseline-target
 RECEIPT=/external/odp-qualification/0362yf-baseline-build-receipt.txt
-ADAPTER_SHA=f8c0544e057a5aedf7bee759ed21313858efad36b4f6460c8a368f55411a7203
+ADAPTER_SHA=47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7
 test -z "$(git -C "$BASELINE" status --porcelain --untracked-files=all)"
 test ! -e "$ADAPTER_DST"
 cleanup() {
