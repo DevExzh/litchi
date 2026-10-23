@@ -341,8 +341,7 @@ fn source_edit_checks_its_output_limit_and_patches_check_their_owner() {
         .expect("stage source");
     assert!(matches!(
         limited.commit(),
-        Err(litchi_odf_common::Error::Core(CoreError::ResourceLimit(_))
-            | litchi_odf_common::Error::Limit { .. })
+        Err(Error::Core(CoreError::ResourceLimit(_)) | Error::Limit { .. })
     ));
 
     let mut edit = owner
@@ -355,7 +354,7 @@ fn source_edit_checks_its_output_limit_and_patches_check_their_owner() {
         .expect("second owner");
     assert!(matches!(
         second.apply_dde(commit.patch()),
-        Err(litchi_odf_common::Error::PatchConflict { .. })
+        Err(Error::PatchConflict { .. })
     ));
 }
 

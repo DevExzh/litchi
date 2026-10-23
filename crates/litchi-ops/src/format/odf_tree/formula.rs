@@ -9,6 +9,7 @@ use litchi_odf_formula::{Element, NodePath, OpaqueStarMath, StarMathVersion};
 use super::tree::{count, text};
 use super::write::{
     Commit, Patch, bound, element_refusal, finish, key_refusal, refusal, required, resolve,
+    staging_error,
 };
 use super::{Flavor, OdfTree, Owner, TreeBuilder, element, odf_staging_error, writable};
 use crate::Result;
@@ -350,8 +351,9 @@ pub(crate) fn add(
     }
     let tag = required(tag, "tag")?;
     let staging = |error| odf_staging_error(error, FileFormat::Odf);
-    let mut element =
-        Element::new(&tag).map_err(|error| staging(error).with_property("tag".to_owned()))?;
+    let mut element = Element::new(&tag)
+        .map_err(|error| staging_error(error, FileFormat::Odf))
+        .map_err(|error| error.with_property("tag".to_owned()))?;
     if let Some(content) = content.filter(|content| !content.is_empty()) {
         if !is_token(&element) {
             return Err(refusal(
@@ -365,7 +367,7 @@ pub(crate) fn add(
     if let Some(variant) = variant {
         element
             .set_attribute(None, "mathvariant", &variant)
-            .map_err(staging)?;
+            .map_err(|error| staging_error(error, FileFormat::Odf))?;
     }
     let count = element_at(package.formula().root(), &parent_route)?
         .children()

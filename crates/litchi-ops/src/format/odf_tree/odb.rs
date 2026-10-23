@@ -8,9 +8,9 @@ use litchi_core::selector::Path;
 use super::tree::{count, text};
 use super::write::{
     Commit, Patch, added_path, bound, element_refusal, finish, key_refusal, refusal, required,
-    resolve,
+    resolve, staging_error,
 };
-use super::{Flavor, OdfTree, Owner, TreeBuilder, addable, element, odf_staging_error, writable};
+use super::{Flavor, OdfTree, Owner, TreeBuilder, addable, element, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -246,7 +246,7 @@ pub(crate) fn set(
 ) -> Result<Commit> {
     let mut edit = package.edit();
     let mut operations = 0usize;
-    let staging = |error| odf_staging_error(error, FileFormat::Odb);
+    let staging = |error| staging_error(error, FileFormat::Odb);
     for (node, props) in groups
         .iter()
         .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
@@ -369,7 +369,7 @@ pub(crate) fn add(
     let command = required(command, "command")?;
     let mut edit = package.edit();
     edit.add_query(litchi_odb::Query::new(name.as_str(), command))
-        .map_err(|error| odf_staging_error(error, FileFormat::Odb))?;
+        .map_err(|error| staging_error(error, FileFormat::Odb))?;
     let commit = commit(file, edit, 1, limits)?;
     let path = added_path(&commit.after, &[], "query", None)?;
     Ok((commit, path))
@@ -384,7 +384,7 @@ pub(crate) fn remove(
 ) -> Result<Commit> {
     let nodes = resolve::<Odb>(file, target, limits.max_expanded_targets())?;
     let mut edit = package.edit();
-    let staging = |error| odf_staging_error(error, FileFormat::Odb);
+    let staging = |error| staging_error(error, FileFormat::Odb);
     for node in &nodes {
         let own = own_name(node);
         match node.item().type_name() {
@@ -429,7 +429,7 @@ fn stage_move(
     to: usize,
 ) -> Result<()> {
     let own = own_name(node);
-    let staging = |error| odf_staging_error(error, FileFormat::Odb);
+    let staging = |error| staging_error(error, FileFormat::Odb);
     match node.item().type_name() {
         "table" => edit.move_table(&own, to).map_err(staging),
         "column" => edit

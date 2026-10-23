@@ -119,19 +119,26 @@ fn a_dtd_never_declares_entities() {
             &declared[open_end..]
         )
     });
-    let never_expanded = |slides: litchi_core::Result<Vec<litchi_odp::model::Slide>>| match slides {
-        Err(_) => true,
-        Ok(slides) => slides
-            .iter()
-            .all(|slide| !format!("{slide:?}").contains("EXPANDED-PAYLOAD")),
-    };
+    fn never_expanded<E>(slides: Result<Vec<litchi_odp::model::Slide>, E>) -> bool {
+        match slides {
+            Err(_) => true,
+            Ok(slides) => slides
+                .iter()
+                .all(|slide| !format!("{slide:?}").contains("EXPANDED-PAYLOAD")),
+        }
+    }
     assert!(never_expanded(
         Package::from_bytes(&bytes)
             .and_then(|package| package.presentation())
             .and_then(|presentation| presentation.slides())
     ));
     assert!(never_expanded(
-        SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes)))
-            .and_then(|presentation| presentation.slides())
+        SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes))).and_then(
+            |presentation| {
+                presentation
+                    .slides()
+                    .map_err(litchi_odf_common::Error::from)
+            }
+        )
     ));
 }

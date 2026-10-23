@@ -4657,7 +4657,7 @@ mod retained_xml_policy_tests {
 
     use super::Package;
     use crate::{Cell, CellValue, OpenOptions};
-    use litchi_odf_common::XmlStreamLimits;
+    use litchi_odf_common::{Error, LimitKind, XmlStreamLimits};
 
     fn strict_xml_limits() -> XmlStreamLimits {
         XmlStreamLimits::new(256 * 1024 * 1024, 1_024, 4_000_000, 1_000_000, 64 * 1024).unwrap()
