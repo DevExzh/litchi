@@ -321,3 +321,12 @@ writer `io_other_error` diagnostics. Replacing the constructors with
 partial gate, including the source/lock hashes and capped target. The safe
 runner preserves targets and only releases completed, hashed debug test
 executables; this single Clippy attempt is not the full 53-check gate.
+
+The broader Clippy pass on `af415286f3` checks the whole workspace, all
+targets and all features with `--keep-going`. It stops after 448.53 seconds
+on OPC bound/borrow-scope diagnostics and ODF error-conversion/test-style
+diagnostics. The full batch is assigned for behavior-preserving cleanup.
+[clippy-workspace-v2.json](results/0362uf/clippy-workspace-v2.json) retains
+the exact command and log hash. The reviewed performance harness consumer
+repair is merged through `7d8b47bdbf`, preserving projection-based DOCX
+verification and existing publication timing boundaries.
