@@ -6,7 +6,8 @@ use litchi_core::{
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
-    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, raw::Reader,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, cell_values::Reference,
+    raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -2135,6 +2136,92 @@ fn stale_sources_are_rejected_before_selected_reads() {
         owner.materialize_eager(),
         Err(SourceBackedError::SourceChanged { .. })
     ));
+}
+
+#[test]
+fn deferred_projection_handles_keep_the_original_source_fence() {
+    fn committed_fixture() -> (
+        Arc<CountingSource>,
+        SourceBackedWorkbook,
+        usize,
+        Reference,
+        String,
+    ) {
+        let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let mut numeric = None;
+        for worksheet in workbook.worksheets().unwrap() {
+            let sheet_index = worksheet.index().unwrap();
+            let sheet_name = worksheet.name().unwrap();
+            worksheet
+                .visit_cells(|cell| {
+                    if numeric.is_none() {
+                        numeric = match cell.value() {
+                            CellValue::Float(value) => Some((
+                                sheet_index,
+                                Reference::new(cell.row(), cell.column()).unwrap(),
+                                *value,
+                            )),
+                            CellValue::Int(value) => Some((
+                                sheet_index,
+                                Reference::new(cell.row(), cell.column()).unwrap(),
+                                *value as f64,
+                            )),
+                            CellValue::Empty
+                            | CellValue::Bool(_)
+                            | CellValue::DateTime(_)
+                            | CellValue::String(_)
+                            | CellValue::Error(_)
+                            | CellValue::Formula { .. } => None,
+                        };
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            if numeric.is_some() {
+                let (index, reference, value) = numeric.take().unwrap();
+                let mut edit = workbook.edit_cells().unwrap();
+                edit.set_number(index, reference, value + 1.0).unwrap();
+                let committed = edit.commit().unwrap().into_package();
+                return (source, committed, index, reference, sheet_name);
+            }
+        }
+        panic!("Simple.xls has no numeric cell for deferred projection test");
+    }
+
+    let (source, package, sheet_index, reference, sheet_name) = committed_fixture();
+    let by_index = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    let by_name = package.worksheet_by_name(&sheet_name).unwrap().unwrap();
+    let from_list = package.worksheets().unwrap().into_iter().next().unwrap();
+
+    // The first read materializes the deferred target; all three projections
+    // must retain the original owner rather than only that cache.
+    assert!(
+        by_index
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        by_name
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        from_list
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+
+    source.bump();
+    for worksheet in [by_index, by_name, from_list] {
+        assert!(matches!(
+            worksheet.cell_value(reference.row(), reference.column()),
+            Err(SourceBackedError::SourceChanged { .. })
+        ));
+    }
 }
 
 #[test]

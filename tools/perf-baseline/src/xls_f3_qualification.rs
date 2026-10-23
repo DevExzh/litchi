@@ -1499,7 +1499,7 @@ where
     I: IntoIterator<Item = String>,
 {
     let mut route = None;
-    let mut implementation = Implementation::Candidate;
+    let mut implementation = None;
     let mut corpus = CorpusChoice::All;
     let mut warmup = 20;
     let mut samples = 40;
@@ -1508,9 +1508,9 @@ where
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--implementation" => {
-                implementation = Implementation::parse(
+                implementation = Some(Implementation::parse(
                     &arguments.next().ok_or("--implementation needs a value")?,
-                )?
+                )?)
             },
             "--route" => {
                 route = Some(Route::parse(
@@ -1532,6 +1532,7 @@ where
             other => return Err(format!("unknown XLS F3 argument {other:?}").into()),
         }
     }
+    let implementation = implementation.ok_or("--implementation is required")?;
     let route = route.ok_or("--route is required")?;
     if samples == 0 || batch == 0 {
         return Err("--samples and --batch must be nonzero".into());

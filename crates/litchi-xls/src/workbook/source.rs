@@ -1645,7 +1645,13 @@ impl SourceBackedWorkbook {
             .iter()
             .position(|sheet| sheet.worksheet_index == Some(index));
         owner.ensure_current()?;
-        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet { owner, sheet_index }))
+        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+            // Keep the deferred publication owner on the projection. Its
+            // effective target is a cache, while the original owner carries
+            // the dynamic-source freshness fence.
+            owner: Arc::clone(&self.inner),
+            sheet_index,
+        }))
     }
 
     /// Alias for [`Self::worksheet_by_index`].
@@ -1660,7 +1666,10 @@ impl SourceBackedWorkbook {
             sheet.worksheet_index.is_some() && crate::sheet_name::equivalent(&sheet.name, name)
         });
         owner.ensure_current()?;
-        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet { owner, sheet_index }))
+        Ok(sheet_index.map(|sheet_index| SourceBackedWorksheet {
+            owner: Arc::clone(&self.inner),
+            sheet_index,
+        }))
     }
 
     /// Iterates ordinary worksheet handles without reading worksheet payloads.
@@ -1672,7 +1681,7 @@ impl SourceBackedWorkbook {
             .enumerate()
             .filter_map(|(sheet_index, sheet)| {
                 sheet.worksheet_index.map(|_| SourceBackedWorksheet {
-                    owner: Arc::clone(&owner),
+                    owner: Arc::clone(&self.inner),
                     sheet_index,
                 })
             })

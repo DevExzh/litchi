@@ -62,6 +62,10 @@ const BATCH: usize = 64;
 /// ```
 pub struct CellCursor {
     owner: Arc<SourceInner>,
+    /// The projection owner, retained separately from the effective scan
+    /// owner so a deferred publication keeps checking its dynamic source
+    /// while batches are read from the materialized target.
+    source_owner: Arc<SourceInner>,
     sheet_index: usize,
     /// Whether a formula of the worksheet renders no text without the
     /// workbook's name and external-sheet tables.
@@ -88,8 +92,8 @@ impl SourceBackedWorksheet {
     /// The framing, limit, parse and freshness errors of
     /// [`Self::visit_cells`], from the validating scan.
     pub fn cell_cursor(&self) -> Result<Option<CellCursor>> {
-        let kept = self
-            .owner
+        let owner = self.effective_owner()?;
+        let kept = owner
             .cursor_checks
             .get(self.sheet_index)
             .and_then(std::sync::OnceLock::get)
@@ -107,19 +111,24 @@ impl SourceBackedWorksheet {
                     ascending: true,
                     needs_formula_context: false,
                 };
-                scan_worksheet(&self.owner, self.sheet_index, None, &mut order)?;
+                let scan = scan_worksheet(&owner, self.sheet_index, None, &mut order);
+                if self.owner.deferred {
+                    self.owner.ensure_current()?;
+                }
+                scan?;
                 let check = Check {
                     ascending: order.ascending,
                     needs_formula_context: order.needs_formula_context,
                 };
-                if let Some(slot) = self.owner.cursor_checks.get(self.sheet_index) {
+                if let Some(slot) = owner.cursor_checks.get(self.sheet_index) {
                     let _kept = slot.set(check);
                 }
                 check
             },
         };
         Ok(check.ascending.then(|| CellCursor {
-            owner: Arc::clone(&self.owner),
+            owner,
+            source_owner: Arc::clone(&self.owner),
             sheet_index: self.sheet_index,
             needs_formula_context: check.needs_formula_context,
             resume: None,
@@ -141,6 +150,9 @@ impl CellCursor {
 
     /// Scan the next batch.
     fn refill(&mut self) -> Result<()> {
+        if self.source_owner.deferred {
+            self.source_owner.ensure_current()?;
+        }
         let count = std::cell::Cell::new(0_usize);
         let batch = &mut self.batch;
         let mut sink = Batch {
@@ -153,8 +165,11 @@ impl CellCursor {
             },
             count: &count,
         };
-        let resume =
-            scan_worksheet_from(&self.owner, self.sheet_index, None, &mut sink, self.resume)?;
+        let scan = scan_worksheet_from(&self.owner, self.sheet_index, None, &mut sink, self.resume);
+        if self.source_owner.deferred {
+            self.source_owner.ensure_current()?;
+        }
+        let resume = scan?;
         match resume {
             Some(resume) => self.resume = Some(resume),
             None => self.done = true,

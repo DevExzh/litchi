@@ -306,12 +306,15 @@ HEAPTRACK=$(command -v heaptrack)
 HEAPTRACK_PRINT=$(command -v heaptrack_print)
 for side in base candidate; do
   binary=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/$side/xls_f3_qualification
+  implementation=baseline
+  if [ "$side" = candidate ]; then implementation=candidate; fi
   for route in write-only first-read read-after-write; do
     for corpus in number rk-mulrk; do
       dir=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/heap/$side/$route/$corpus
       mkdir -p "$dir"
       "$HEAPTRACK" --record-only --output "$dir/heaptrack" "$binary" \
-        --route "$route" --corpus "$corpus" --warmup 0 --samples 1 --batch 1 \
+        --implementation "$implementation" --route "$route" --corpus "$corpus" \
+        --warmup 0 --samples 1 --batch 1 \
         > "$dir/probe.stdout" 2> "$dir/heaptrack.stderr"
       capture=$(find "$dir" -maxdepth 1 -type f \( -name 'heaptrack.*.zst' -o -name 'heaptrack.*.gz' \) -print)
       "$HEAPTRACK_PRINT" -f "$capture" -l -H "$dir/histogram.tsv" \
