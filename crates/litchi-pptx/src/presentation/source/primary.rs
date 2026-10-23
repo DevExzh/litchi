@@ -122,7 +122,6 @@ impl EditOptions {
     }
 
     /// Set the exact encoded retained-patch ceiling for this edit.
-    #[must_use]
     pub const fn max_patch_bytes(mut self, maximum: usize) -> Self {
         self.max_patch_bytes = maximum;
         self

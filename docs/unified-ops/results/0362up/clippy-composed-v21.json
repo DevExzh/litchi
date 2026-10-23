@@ -1,0 +1,39 @@
+{
+  "source": "ad1dc9835bd932e0bd0e02ff0fe8af5594e8dc1c",
+  "pid": 3406801,
+  "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
+  "command": [
+    "python3",
+    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v21-commands.json",
+    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v21"
+  ],
+  "started_unix_seconds": 1792787049.1606588,
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--message-format=json-render-diagnostics",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 63.863373583000794,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v21/check-0.log",
+      "bytes": 305706,
+      "sha256": "82a2c5626d247a39df4add15ff2a988ed7d8c2b3d339d07a3d280c8120283bf6",
+      "target_bytes_before": 3975970850,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Current integration and native-budget composition merged, preserving both branches and resolving one equivalent guard-error scope expression. Workspace Clippy reports a duplicate must_use on a PPTX option setter whose return type is already must_use. Remove only the redundant method attribute; retain the type-level diagnostic and getter attribute. Next pass uses keep-going to collect independent crate diagnostics."
+}
