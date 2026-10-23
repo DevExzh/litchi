@@ -101,6 +101,31 @@ and matching toolchain. A feature-specific output from
 `check_api_glossary.py` is not an all-features inventory substitute merely
 because the file has the right rustdoc schema.
 
+The executable wrapper enumerates the direct library manifests itself and
+requires the expected 68-package count. Run it only after the final candidate
+is frozen; the command below keeps all generated output external and reuses a
+single existing target cache when Cargo can fingerprint it safely:
+
+```sh
+source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
+FREEZE=$(GIT_OPTIONAL_LOCKS=0 git rev-parse HEAD)
+OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
+python3 tools/final_api_inventory.py \
+  --root "$PWD" \
+  --output "$OUT" \
+  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target \
+  --expected-package-count 68
+```
+
+The wrapper writes `packages.json`, one JSON and receipt per package, external
+stdout/stderr logs, `inventory.tsv`, and an initially unassigned
+`disposition.tsv`. It invokes `api_debt_inventory.py` only after all 68 JSON
+captures succeed. Its fake-command fixture tests are build-free:
+
+```sh
+python3 -m unittest tools.test_final_api_inventory
+```
+
 ## Disposition
 
 Every non-draft inventory row gets a table entry with `crate`, `category`,
