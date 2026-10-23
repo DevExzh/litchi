@@ -1563,7 +1563,9 @@ impl Edit {
         }
         if joined_contains_mixed_package_effects(&joined) {
             return Err(JoinError::new(
-                joined_refusal("ODG joined package replacement cannot mix with staged effects"),
+                joined_refusal(
+                    "ODG joined package replacement conflicts with independent staged effects",
+                ),
                 joined,
             ));
         }
@@ -1578,6 +1580,9 @@ impl Edit {
                 joined_refusal("ODG joined edit has dependent presentation effects"),
                 joined,
             ));
+        }
+        if let Err(error) = self.joined_page_name_targets(&joined) {
+            return Err(JoinError::new(error, joined));
         }
         self.pending_joined = Some(joined);
         Ok(self)
@@ -1611,6 +1616,65 @@ impl Edit {
                 })
             })
         })
+    }
+
+    fn joined_page_name_targets(&self, joined: &JoinedEdits) -> Result<BTreeMap<usize, String>> {
+        self.page_name_targets_for_operations(
+            joined
+                .sub_edits()
+                .flat_map(|sub_edit| sub_edit.payload().operations().iter()),
+        )
+    }
+
+    fn page_name_targets_for_operations<'a>(
+        &self,
+        operations: impl Iterator<Item = &'a PatchOperation>,
+    ) -> Result<BTreeMap<usize, String>> {
+        let mut operations = operations
+            .filter(|operation| operation.op == "page.name.set")
+            .peekable();
+        if operations.peek().is_none() {
+            return Ok(BTreeMap::new());
+        }
+        let parsed = parse_content(&self.content)?;
+        let mut names = parsed
+            .pages
+            .iter()
+            .map(|page| page.name().map(str::to_owned))
+            .collect::<Vec<_>>();
+        let mut targets = BTreeMap::new();
+        for operation in operations {
+            let page = parse_page_target(&operation.target)?;
+            let after = string_value(operation)?.to_owned();
+            validate_bounded_value(&after, "ODG page name")?;
+            let before = names.get(page).and_then(Option::as_deref).ok_or_else(|| {
+                Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename requires an existing draw:name",
+                ))
+            })?;
+            if before != after.as_str()
+                && xml_has_attribute(&self.content, DRAW, b"page-name", before)?
+            {
+                return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                    litchi_core::edit::RefusalKind::UnsupportedOperation,
+                    "odg.edit.join",
+                    "ODG page rename is blocked by a draw:page-name dependency",
+                )));
+            }
+            names[page] = Some(after.clone());
+            targets.insert(page, after);
+        }
+        let mut owners = BTreeMap::new();
+        for (page, name) in names.into_iter().enumerate() {
+            if let Some(name) = name
+                && owners.insert(name.clone(), page).is_some()
+            {
+                return Err(joined_refusal("ODG joined page names would duplicate"));
+            }
+        }
+        Ok(targets)
     }
 
     fn replace_or_insert_shape_attribute(
@@ -4154,6 +4218,7 @@ impl Edit {
         &mut self,
         operation: &PatchOperation,
         source_fingerprint: &str,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
     ) -> Result<()> {
         if operation
             .preconditions
@@ -4165,9 +4230,10 @@ impl Edit {
         }
         match operation.op.as_str() {
             "page.name.set" => {
-                self.set_page_name(
+                self.stage_page_name_operation(
                     parse_page_target(&operation.target)?,
-                    string_value(operation)?,
+                    string_value(operation)?.to_owned(),
+                    page_name_targets,
                 )?;
             },
             "page.style.set" => {
@@ -4218,12 +4284,49 @@ impl Edit {
         Ok(())
     }
 
-    fn has_staged_edits(&self) -> bool {
-        self.content != self.source.content_xml()
-            || self.styles != self.source.styles_xml().map(str::to_owned)
-            || !self.changes.is_empty()
-            || !self.resource_edits.is_empty()
-            || self.requires_package_projection
+    fn stage_page_name_operation(
+        &mut self,
+        page: usize,
+        after: String,
+        page_name_targets: Option<&BTreeMap<usize, String>>,
+    ) -> Result<()> {
+        if page_name_targets.is_none() {
+            return self.set_page_name(page, after);
+        }
+        validate_bounded_value(&after, "ODG page name")?;
+        let parsed = parse_content(&self.content)?;
+        let selected = parsed
+            .pages
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let before = selected.name().ok_or_else(|| {
+            Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename requires an existing draw:name",
+            ))
+        })?;
+        if before == after {
+            return Ok(());
+        }
+        if xml_has_attribute(&self.content, DRAW, b"page-name", before)? {
+            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odg.package.snapshot",
+                "ODG page rename is blocked by a draw:page-name dependency",
+            )));
+        }
+        let span = parsed.page_attribute_spans[page][0]
+            .as_ref()
+            .ok_or_else(|| Error::InvalidFormat("ODG page name source span is missing".into()))?;
+        let before_owned = before.to_owned();
+        self.replace_content_value(span, &after)?;
+        self.changes.push(Change::PageName(PageNameChange {
+            page,
+            before: before_owned,
+            after,
+        }));
+        Ok(())
     }
 
     fn apply_pending_joined(&mut self) -> Result<()> {
@@ -4238,34 +4341,53 @@ impl Edit {
             validate_durable_patch(&sub_edit.payload().inner)?;
             validate_joined_preconditions(sub_edit.payload(), &source_fingerprint)?;
         }
+        let page_name_targets = self.joined_page_name_targets(joined)?;
         let joined = self
             .pending_joined
             .take()
             .expect("pending joined plan was borrowed above");
+        let mut replacement_operations = None;
         for sub_edit in joined.into_sub_edits() {
             let durable = sub_edit.into_payload();
             for operation in durable.operations() {
                 if operation.op == "package.replace" {
-                    if self.has_staged_edits() || self.package_replacement.is_some() {
-                        return invalid(
-                            "ODG joined package replacement cannot mix with staged edits",
-                        );
-                    }
                     enforce_security_policy(&self.source, self.security_policy)?;
                     enforce_active_content_policy(&self.source, self.active_content_policy)?;
                     let blob = durable_blob(&durable, &operation.value)?;
                     let replacement = self.source.reopen_same_flavor(blob.to_vec())?;
                     enforce_active_content_policy(&replacement, self.active_content_policy)?;
                     self.package_replacement = Some(replacement);
+                    replacement_operations = Some(Vec::new());
+                } else if let Some(operations) = &mut replacement_operations {
+                    operations.push(operation.clone());
                 } else {
-                    if self.package_replacement.is_some() {
-                        return invalid(
-                            "ODG joined package replacement cannot mix with staged edits",
-                        );
-                    }
-                    self.stage_durable_operation(operation, &source_fingerprint)?;
+                    self.stage_durable_operation(
+                        operation,
+                        &source_fingerprint,
+                        Some(&page_name_targets),
+                    )?;
                 }
             }
+        }
+        if let Some(operations) = replacement_operations
+            && !operations.is_empty()
+        {
+            let replacement = self
+                .package_replacement
+                .take()
+                .expect("package replacement was retained for ordered operations");
+            let mut replacement_edit =
+                replacement.edit_with_policies(self.security_policy, self.active_content_policy);
+            let page_name_targets =
+                replacement_edit.page_name_targets_for_operations(operations.iter())?;
+            for operation in &operations {
+                replacement_edit.stage_durable_operation(
+                    operation,
+                    &source_fingerprint,
+                    Some(&page_name_targets),
+                )?;
+            }
+            self.package_replacement = Some(replacement_edit.commit_core()?.into_package());
         }
         Ok(())
     }
@@ -4449,7 +4571,7 @@ fn change_effect_keys(_source: &Package, change: &Change) -> Vec<String> {
             format!("page/{}/shape/{}", value.page, value.shape),
             "shape.path.set",
         ),
-        Change::PageName(_) => return vec!["pages#page.name.unique".to_owned()],
+        Change::PageName(value) => (format!("page/{}", value.page), "page.name.set"),
         Change::PageStyle(value) => (format!("page/{}", value.page), "page.style.set"),
         Change::PageTransition(value) => (format!("page/{}", value.page), "page.transition.set"),
         Change::Structure(_) => return vec!["package".to_owned()],
@@ -5939,7 +6061,7 @@ fn apply_durable_patch(
             continue;
         }
         let mut edit = current.edit_with_policies(security_policy, active_content_policy);
-        edit.stage_durable_operation(operation, &source_fingerprint)?;
+        edit.stage_durable_operation(operation, &source_fingerprint, None)?;
         current = edit.commit_core()?.into_package();
     }
     Ok(current)
@@ -6108,20 +6230,21 @@ fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str)
 fn durable_effect_keys(operation: &PatchOperation) -> Vec<String> {
     match operation.op.as_str() {
         "package.replace" => vec!["package".to_owned()],
-        "page.name.set" => vec!["pages#page.name.unique".to_owned()],
+        "page.name.set" => vec![format!("{}#{}", operation.target, operation.op)],
         _ => vec![format!("{}#{}", operation.target, operation.op)],
     }
 }
 
 fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> bool {
-    let operations = joined
-        .sub_edits()
-        .flat_map(|sub_edit| sub_edit.payload().operations().iter())
-        .collect::<Vec<_>>();
-    operations.iter().enumerate().any(|(index, left)| {
-        operations[index.saturating_add(1)..]
-            .iter()
-            .any(|right| operations_conflict(source, left, right))
+    let sub_edits = joined.sub_edits().collect::<Vec<_>>();
+    sub_edits.iter().enumerate().any(|(index, left)| {
+        sub_edits[index.saturating_add(1)..].iter().any(|right| {
+            left.payload().operations().iter().any(|left_operation| {
+                right.payload().operations().iter().any(|right_operation| {
+                    operations_conflict(source, left_operation, right_operation)
+                })
+            })
+        })
     })
 }
 
@@ -6131,7 +6254,28 @@ fn operations_conflict(source: &Package, left: &PatchOperation, right: &PatchOpe
     let left_transition = left.op == "page.transition.set";
     let right_transition = right.op == "page.transition.set";
     if (left_style && right_transition) || (left_transition && right_style) {
-        return parse_page_target(&left.target).ok() == parse_page_target(&right.target).ok();
+        let (style_operation, transition_operation) = if left_style {
+            (left, right)
+        } else {
+            (right, left)
+        };
+        let Some(style_page) = parse_page_target(&style_operation.target).ok() else {
+            return false;
+        };
+        let Some(transition_page) = parse_page_target(&transition_operation.target).ok() else {
+            return false;
+        };
+        if style_page == transition_page {
+            return true;
+        }
+        let Ok(destination_style) = string_value(style_operation) else {
+            return false;
+        };
+        return source
+            .pages()
+            .get(transition_page)
+            .and_then(|page| page.style_name())
+            .is_some_and(|source_style| source_style == destination_style);
     }
     if left_transition && right_transition {
         let left_page = parse_page_target(&left.target).ok();
@@ -6166,11 +6310,37 @@ fn change_conflicts_with_operation(
     };
     match change {
         Change::PageStyle(value) => {
-            operation.op == "page.transition.set" && operation_page == Some(value.page)
+            if operation.op != "page.transition.set" {
+                return false;
+            }
+            let Some(transition_page) = operation_page else {
+                return false;
+            };
+            if transition_page == value.page {
+                return true;
+            }
+            source
+                .pages()
+                .get(transition_page)
+                .and_then(|page| page.style_name())
+                .is_some_and(|source_style| source_style == value.after)
         },
         Change::PageTransition(value) => {
             if operation.op == "page.style.set" {
-                return operation_page == Some(value.page);
+                let Some(style_page) = operation_page else {
+                    return false;
+                };
+                if style_page == value.page {
+                    return true;
+                }
+                let Ok(destination_style) = string_value(operation) else {
+                    return false;
+                };
+                return source
+                    .pages()
+                    .get(value.page)
+                    .and_then(|page| page.style_name())
+                    .is_some_and(|source_style| source_style == destination_style);
             }
             if operation.op != "page.transition.set" {
                 return false;
@@ -6198,19 +6368,16 @@ fn change_conflicts_with_operation(
 }
 
 fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> bool {
-    let has_package = joined.sub_edits().any(|sub_edit| {
-        sub_edit
-            .effects()
-            .writes()
-            .any(|effect| effect == "package")
-    });
-    let has_other = joined.sub_edits().any(|sub_edit| {
-        sub_edit
-            .effects()
-            .writes()
-            .any(|effect| effect != "package")
-    });
-    has_package && has_other
+    let sub_edits = joined.sub_edits().collect::<Vec<_>>();
+    sub_edits.iter().enumerate().any(|(index, left)| {
+        let left_package = left.effects().writes().any(|effect| effect == "package");
+        let left_other = left.effects().writes().any(|effect| effect != "package");
+        sub_edits[index.saturating_add(1)..].iter().any(|right| {
+            let right_package = right.effects().writes().any(|effect| effect == "package");
+            let right_other = right.effects().writes().any(|effect| effect != "package");
+            (left_package && right_other) || (left_other && right_package)
+        })
+    })
 }
 
 struct Parsed {

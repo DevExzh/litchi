@@ -4,7 +4,7 @@ use litchi_core::{
     CompositionError, CompositionLimitKind, CompositionLimits, Error, SubEditJoinFailure,
 };
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::{Package, Transition};
+use litchi_odg::{Package, Transition, edit};
 
 const CONTENT_AUTOMATIC: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual" presentation:transition-style="fade-from-left"/></style:style><style:style style:name="dp2" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-style="dissolve"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/><draw:page draw:name="Page 2" draw:style-name="dp2"/></office:drawing></office:body></office:document-content>"#;
 
@@ -293,7 +293,93 @@ fn joined_transition_rejects_a_preceding_page_style_retarget() {
 }
 
 #[test]
-fn joined_page_name_effects_share_the_document_uniqueness_key() {
+fn page_style_retarget_conflicts_with_shared_transition_in_any_order() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut style_edit = source.edit();
+    style_edit.set_page_style_name(0, "dp2").unwrap();
+    let style_commit = style_edit.commit().unwrap();
+    let mut transition_edit = source.edit();
+    transition_edit
+        .set_page_transition(1, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let transition_commit = transition_edit.commit().unwrap();
+
+    let make_plan = |style_id: &str, transition_id: &str| {
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(style_commit.patch().prepare(style_id, limits).unwrap())
+            .unwrap();
+        joined
+            .join(
+                transition_commit
+                    .patch()
+                    .prepare(transition_id, limits)
+                    .unwrap(),
+            )
+            .unwrap();
+        joined
+    };
+
+    for (style_id, transition_id) in [("a-style", "z-transition"), ("z-style", "a-transition")] {
+        let mut owner = source.edit();
+        let error = match owner.join(make_plan(style_id, transition_id)) {
+            Ok(_) => panic!("dependent style and transition effects were accepted"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.error(),
+            Error::Refused(refusal)
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+        ));
+        assert!(!owner.commit().unwrap().diagnostics().changed());
+    }
+
+    let mut ordinary_before = source.edit();
+    ordinary_before.set_page_style_name(0, "dp2").unwrap();
+    let error = match ordinary_before.join({
+        let mut joined = source.joined_edits(limits);
+        joined
+            .join(
+                transition_commit
+                    .patch()
+                    .prepare("ordinary-before", limits)
+                    .unwrap(),
+            )
+            .unwrap();
+        joined
+    }) {
+        Ok(_) => panic!("ordinary style retarget was accepted before join"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(ordinary_before.commit().is_ok());
+
+    let mut ordinary_after = source.edit();
+    ordinary_after
+        .join({
+            let mut joined = source.joined_edits(limits);
+            joined
+                .join(
+                    transition_commit
+                        .patch()
+                        .prepare("ordinary-after", limits)
+                        .unwrap(),
+                )
+                .unwrap();
+            joined
+        })
+        .unwrap();
+    ordinary_after.set_page_style_name(0, "dp2").unwrap();
+    assert!(ordinary_after.commit().is_err());
+}
+
+#[test]
+fn joined_page_name_renames_validate_final_names() {
     let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let mut first_edit = source.edit();
@@ -307,10 +393,188 @@ fn joined_page_name_effects_share_the_document_uniqueness_key() {
     joined
         .join(first.patch().prepare("first", limits).unwrap())
         .unwrap();
-    let error = joined
+    joined
         .join(second.patch().prepare("second", limits).unwrap())
-        .unwrap_err();
-    assert!(matches!(error.failure(), SubEditJoinFailure::Overlap(_)));
+        .unwrap();
+    let mut owner = source.edit();
+    owner.join(joined).unwrap();
+    let committed = owner.commit().unwrap();
+    assert_eq!(committed.diagnostics().change_count(), 2);
+    assert_eq!(committed.package().pages()[0].name(), Some("First renamed"));
+    assert_eq!(
+        committed.package().pages()[1].name(),
+        Some("Second renamed")
+    );
+
+    let mut duplicate_first = source.edit();
+    duplicate_first.set_page_name(0, "Same final name").unwrap();
+    let duplicate_first = duplicate_first.commit().unwrap();
+    let mut duplicate_second = source.edit();
+    duplicate_second
+        .set_page_name(1, "Same final name")
+        .unwrap();
+    let duplicate_second = duplicate_second.commit().unwrap();
+    let mut duplicate = source.joined_edits(limits);
+    duplicate
+        .join(
+            duplicate_first
+                .patch()
+                .prepare("duplicate-first", limits)
+                .unwrap(),
+        )
+        .unwrap();
+    duplicate
+        .join(
+            duplicate_second
+                .patch()
+                .prepare("duplicate-second", limits)
+                .unwrap(),
+        )
+        .unwrap();
+    let mut unchanged = source.edit();
+    let error = match unchanged.join(duplicate) {
+        Ok(_) => panic!("duplicate final page names were accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(!unchanged.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
+fn one_prepared_style_and_transition_sequence_replays_exactly() {
+    let content = CONTENT_AUTOMATIC.replace(
+        "draw:name=\"Page 2\" draw:style-name=\"dp2\"",
+        "draw:name=\"Page 2\" draw:style-name=\"dp1\"",
+    );
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut multi_edit = source.edit();
+    multi_edit.set_page_style_name(0, "dp2").unwrap();
+    multi_edit
+        .set_page_transition(0, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let multi_commit = multi_edit.commit().unwrap();
+    assert_eq!(multi_commit.patch().changes().len(), 2);
+
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(multi_commit.patch().prepare("ordered", limits).unwrap())
+        .unwrap();
+    let mut owner = source.edit();
+    owner.join(joined).unwrap();
+    let committed = owner.commit().unwrap();
+    assert_eq!(committed.package().pages()[0].style_name(), Some("dp2"));
+    assert_eq!(
+        committed.package().pages()[0].transition().unwrap().style(),
+        Some("fade-from-right")
+    );
+    assert_eq!(
+        source
+            .apply(committed.patch())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        committed.package().as_bytes()
+    );
+    assert_eq!(
+        committed
+            .package()
+            .apply(&committed.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+    let durable = committed.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(&source).unwrap().as_bytes(),
+        committed.package().as_bytes()
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(committed.package())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn one_ordered_mixed_replacement_payload_keeps_standalone_capability() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let mut structural_edit = source.edit();
+    structural_edit
+        .add_page(litchi_odg::page::Page::new("Added"))
+        .unwrap();
+    let structural = structural_edit.commit().unwrap();
+    let structural_wire: serde_json::Value = serde_json::from_slice(
+        &structural
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let mut semantic_edit = source.edit();
+    semantic_edit
+        .set_page_transition(0, Some(transition("manual", "fade-from-right")))
+        .unwrap();
+    let semantic_wire: serde_json::Value = serde_json::from_slice(
+        &semantic_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let mut mixed_wire = structural_wire;
+    mixed_wire["operations"]
+        .as_array_mut()
+        .unwrap()
+        .push(semantic_wire["operations"][0].clone());
+    let mixed =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&mixed_wire).unwrap())
+            .unwrap();
+    let expected = mixed.apply(&source).unwrap();
+
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut joined = source.joined_edits(limits);
+    let sub_edit = edit::SubEdit::new(
+        joined.lineage().clone(),
+        limits,
+        "mixed-ordered",
+        Vec::<String>::new(),
+        vec![
+            "package".to_owned(),
+            "page/0#page.transition.set".to_owned(),
+        ],
+        mixed.clone(),
+    )
+    .unwrap();
+    joined.join(sub_edit).unwrap();
+    let mut owner = source.edit();
+    owner.join(joined).unwrap();
+    let committed = owner.commit().unwrap();
+    assert_eq!(committed.package().as_bytes(), expected.as_bytes());
+    assert_eq!(
+        committed
+            .package()
+            .apply(&committed.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
 }
 
 #[test]
