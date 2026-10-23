@@ -346,31 +346,6 @@ impl PartPayload {
         }
     }
 
-    /// Return the payload size available from retained storage metadata.
-    ///
-    /// A deferred payload is not inflated: its ZIP central-directory
-    /// declaration is enough for callers that need to admit a retained
-    /// snapshot before exposing the bytes.  The normal decode path still
-    /// validates the actual inflated size and CRC when the payload is used.
-    pub(crate) fn declared_size(&self) -> Result<usize> {
-        let declared = match self {
-            Self::Ready(bytes) => bytes.len() as u64,
-            Self::Deferred(deferred) => deferred
-                .source
-                .index()?
-                .metadata(deferred.member())
-                .map_err(OpcError::from)?
-                .uncompressed_size(),
-            Self::Transferred(transferred) => transferred.decoded().len() as u64,
-            Self::Verified(verified) => verified.bytes().len() as u64,
-        };
-        usize::try_from(declared).map_err(|_| OpcError::Limit {
-            kind: SourceLimitKind::PartBytes,
-            observed: declared,
-            maximum: usize::MAX as u64,
-        })
-    }
-
     /// The payload bytes, or **an empty slice** while a deferred payload has
     /// not been decoded (or its decode failed).
     ///

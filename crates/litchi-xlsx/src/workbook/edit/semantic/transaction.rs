@@ -342,30 +342,45 @@ pub struct Edit {
     pub(in crate::workbook::edit) svg_base_part_bytes: Option<usize>,
     #[allow(dead_code, reason = "the facade consumes the native capture budget")]
     capture_budget: Option<CaptureBudget>,
-    capture_sheets: HashSet<usize>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub(super) struct CaptureBudget {
     maximum: usize,
     reserved: usize,
+    /// Retained bytes for the worksheet-before image. A worksheet is charged
+    /// once, when the first semantic action for it is admitted.
+    worksheets: BTreeMap<usize, usize>,
+    /// Retained bytes for the final semantic cell deltas. The key is the
+    /// worksheet position and address, so replacing an action releases the
+    /// old estimate instead of charging every intermediate action.
+    cells: BTreeMap<(usize, Address), usize>,
+    /// Retained bytes for each newly-created worksheet's final change.
+    added_sheets: BTreeMap<usize, usize>,
+    /// Retained bytes for the final cell deltas on newly-created worksheets.
+    added_cells: BTreeMap<(usize, Address), usize>,
 }
 
 impl CaptureBudget {
     fn new(base: &Workbook, maximum: usize) -> Self {
         let archive_hint = base.inner.package.exact_source_len().unwrap_or(0);
         let endpoint = workbook_retained_bytes(base, archive_hint);
-        let reserved = endpoint
-            .saturating_mul(2)
-            .saturating_add(size_of::<Edit>())
-            .saturating_add(size_of::<Patch>())
-            .saturating_add(size_of::<Commit>());
-        Self { maximum, reserved }
+        // `Patch::retained_bytes` charges the two immutable endpoints and the
+        // semantic/native delta buffers. It does not charge the transient
+        // `Edit`, `Action`, or `SheetActions` containers, which disappear at
+        // commit and used to make this preflight reject valid edits.
+        Self {
+            maximum,
+            reserved: endpoint.saturating_mul(2),
+            worksheets: BTreeMap::new(),
+            cells: BTreeMap::new(),
+            added_sheets: BTreeMap::new(),
+            added_cells: BTreeMap::new(),
+        }
     }
 
-    #[allow(dead_code, reason = "called by the facade's worksheet preflight")]
-    fn charge(&mut self, additional: usize) -> Result<()> {
-        let observed = self.reserved.saturating_add(additional);
+    fn replace(&mut self, previous: usize, next: usize) -> Result<()> {
+        let observed = self.reserved.saturating_sub(previous).saturating_add(next);
         if observed > self.maximum {
             return Err(Error::Limit {
                 kind: super::super::LimitKind::SnapshotBytes.into(),
@@ -377,16 +392,88 @@ impl CaptureBudget {
         Ok(())
     }
 
-    pub(super) fn charge_new_sheet(&mut self, authored_bytes: usize) -> Result<()> {
-        self.charge(
-            authored_bytes
-                .saturating_add(size_of::<super::super::validation::Added>())
-                .saturating_add(size_of::<super::super::validation::SheetActions>())
-                .saturating_add(size_of::<Action>())
-                .saturating_add(size_of::<Change>())
-                .saturating_add(size_of::<PartChange>()),
-        )
+    fn admit_cell(
+        &mut self,
+        position: usize,
+        address: Address,
+        worksheet_bytes: usize,
+        authored_bytes: usize,
+    ) -> Result<CaptureReservation> {
+        let key = (position, address);
+        let previous = self.cells.get(&key).copied();
+        let worksheet_previous = self.worksheets.get(&position).copied();
+        let worksheet_next = if worksheet_previous.is_none() {
+            worksheet_bytes
+        } else {
+            worksheet_previous.unwrap_or(0)
+        };
+        // One semantic Change and one changed-part descriptor are retained by
+        // the final patch. Authored payloads are replaced by their final value
+        // for a coordinate, rather than accumulating for every staged call.
+        let next = size_of::<Change>()
+            .saturating_add(size_of::<PartChange>())
+            .saturating_add(authored_bytes);
+        let old_total = previous
+            .unwrap_or(0)
+            .saturating_add(worksheet_previous.unwrap_or(0));
+        let new_total = next.saturating_add(worksheet_next);
+        self.replace(old_total, new_total)?;
+        self.cells.insert(key, next);
+        if worksheet_previous.is_none() {
+            self.worksheets.insert(position, worksheet_bytes);
+        }
+        Ok(CaptureReservation {
+            key,
+            previous,
+            worksheet_previous,
+            next,
+            worksheet_next,
+            active: true,
+        })
     }
+
+    pub(super) fn admit_new_sheet(&mut self, index: usize, authored_bytes: usize) -> Result<()> {
+        let previous = self.added_sheets.get(&index).copied().unwrap_or(0);
+        let next = size_of::<Change>()
+            .saturating_add(size_of::<PartChange>())
+            .saturating_add(authored_bytes);
+        self.replace(previous, next)?;
+        self.added_sheets.insert(index, next);
+        Ok(())
+    }
+
+    pub(super) fn charge_new_sheet(&mut self, index: usize, authored_bytes: usize) -> Result<()> {
+        self.admit_new_sheet(index, authored_bytes)
+    }
+
+    pub(super) fn charge_new_sheet_cell(
+        &mut self,
+        index: usize,
+        address: Address,
+        authored_bytes: usize,
+    ) -> Result<()> {
+        let key = (index, address);
+        let previous = self.added_cells.get(&key).copied().unwrap_or(0);
+        let next = size_of::<Change>()
+            .saturating_add(size_of::<PartChange>())
+            .saturating_add(authored_bytes);
+        self.replace(previous, next)?;
+        self.added_cells.insert(key, next);
+        Ok(())
+    }
+}
+
+/// A successful cell admission can be rolled back when a source validation
+/// that necessarily follows the admission proves the operation is not a
+/// mutation (for example, `set_cached` on a non-formula cell).
+#[derive(Debug)]
+pub(super) struct CaptureReservation {
+    key: (usize, Address),
+    previous: Option<usize>,
+    worksheet_previous: Option<usize>,
+    next: usize,
+    worksheet_next: usize,
+    active: bool,
 }
 
 impl Edit {
@@ -401,7 +488,7 @@ impl Edit {
         let capture_budget = options
             .max_retained_bytes_value()
             .map(|maximum| CaptureBudget::new(&base, maximum));
-        if let Some(budget) = capture_budget {
+        if let Some(budget) = capture_budget.as_ref() {
             if budget.reserved > budget.maximum {
                 return Err(Error::Limit {
                     kind: super::super::LimitKind::SnapshotBytes.into(),
@@ -427,7 +514,6 @@ impl Edit {
             svg_staged_payload_bytes: 0,
             svg_base_part_bytes: None,
             capture_budget,
-            capture_sheets: HashSet::new(),
         })
     }
 
@@ -437,10 +523,18 @@ impl Edit {
     pub(crate) fn preflight_cell_capture(
         &mut self,
         position: usize,
+        address: Address,
         authored_bytes: usize,
-    ) -> Result<()> {
+    ) -> Result<CaptureReservation> {
         if self.capture_budget.is_none() {
-            return Ok(());
+            return Ok(CaptureReservation {
+                key: (position, address),
+                previous: None,
+                worksheet_previous: None,
+                next: 0,
+                worksheet_next: 0,
+                active: false,
+            });
         }
         let sheet = self
             .base
@@ -448,8 +542,11 @@ impl Edit {
             .sheets
             .get(position)
             .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
-        let first_sheet_capture = !self.capture_sheets.contains(&position);
-        let worksheet_bytes = if first_sheet_capture {
+        let worksheet_bytes = if !self
+            .capture_budget
+            .as_ref()
+            .is_some_and(|budget| budget.worksheets.contains_key(&position))
+        {
             match self.base.inner.package.part_metadata(&sheet.part_uri) {
                 Some(metadata) if metadata.payload_is_decoded() => self
                     .base
@@ -459,27 +556,69 @@ impl Edit {
                     .blob()
                     .len(),
                 // A deferred source payload must not be decoded merely to
-                // decide whether the capture budget admits the edit. The
-                // owned archive is a bounded estimate; the exact native
-                // patch check remains authoritative.
-                Some(_) | None => self.base.inner.package.exact_source_len().unwrap_or(0),
+                // decide whether the capture budget admits the edit. Use its
+                // central-directory uncompressed declaration as the bound;
+                // the later payload force still validates the actual bytes.
+                Some(metadata) => metadata.payload_len()?,
+                None => return Err(invalid("worksheet capture part disappeared")),
             }
         } else {
             0
         };
-        let additional = worksheet_bytes
-            .saturating_add(authored_bytes)
-            .saturating_add(size_of::<Action>())
-            .saturating_add(size_of::<SheetActions>())
-            .saturating_add(size_of::<Change>())
-            .saturating_add(size_of::<PartChange>());
-        if let Some(budget) = &mut self.capture_budget {
-            budget.charge(additional)?;
+        self.capture_budget
+            .as_mut()
+            .expect("capture budget checked above")
+            .admit_cell(position, address, worksheet_bytes, authored_bytes)
+    }
+
+    /// Admit a cell's native before-image before a caller reads the projected
+    /// state that may decode a deferred worksheet. The semantic worksheet
+    /// methods perform the precise replacement charge again when they stage
+    /// the final action.
+    #[doc(hidden)]
+    pub fn reserve_cell_capture(
+        &mut self,
+        position: usize,
+        address: Address,
+        authored_bytes: usize,
+    ) -> Result<()> {
+        self.preflight_cell_capture(position, address, authored_bytes)
+            .map(drop)
+    }
+
+    pub(super) fn rollback_cell_capture(&mut self, mut reservation: CaptureReservation) {
+        if !reservation.active {
+            return;
         }
-        if first_sheet_capture {
-            self.capture_sheets.insert(position);
+        let Some(budget) = &mut self.capture_budget else {
+            return;
+        };
+        if budget.cells.get(&reservation.key).copied() != Some(reservation.next)
+            || budget.worksheets.get(&reservation.key.0).copied()
+                != Some(reservation.worksheet_next)
+        {
+            return;
         }
-        Ok(())
+        let current = reservation.next.saturating_add(reservation.worksheet_next);
+        let previous = reservation
+            .previous
+            .unwrap_or(0)
+            .saturating_add(reservation.worksheet_previous.unwrap_or(0));
+        budget.reserved = budget
+            .reserved
+            .saturating_sub(current)
+            .saturating_add(previous);
+        if let Some(previous) = reservation.previous.take() {
+            budget.cells.insert(reservation.key, previous);
+        } else {
+            budget.cells.remove(&reservation.key);
+        }
+        if let Some(previous) = reservation.worksheet_previous.take() {
+            budget.worksheets.insert(reservation.key.0, previous);
+        } else {
+            budget.worksheets.remove(&reservation.key.0);
+        }
+        reservation.active = false;
     }
 
     /// Take, once, the base census the SVG lifecycle planner checks at commit.
@@ -3827,13 +3966,13 @@ impl Edit {
                 reason: TabEditBlock::SheetLimit,
             });
         }
+        let index = self.added.len();
         if let Some(budget) = &mut self.capture_budget {
-            budget.charge_new_sheet(name.as_str().len())?;
+            budget.charge_new_sheet(index, name.as_str().len())?;
         }
         self.added
             .try_reserve(1)
             .map_err(|source| allocation("worksheet creation", source))?;
-        let index = self.added.len();
         self.added.push(Added {
             name,
             actions: SheetActions::default(),
@@ -3970,6 +4109,7 @@ impl Edit {
         position: usize,
         hyperlink: crate::hyperlinks::Hyperlink,
     ) -> Result<()> {
+        let address = hyperlink.reference().range().start();
         let key = crate::hyperlinks::model::reference_key(hyperlink.reference().range());
         let source = self.source_hyperlink(position, key)?;
         if source.as_ref() == Some(&hyperlink) {
@@ -3998,7 +4138,7 @@ impl Edit {
                 + hyperlink.display().map_or(0, str::len)
                 + hyperlink.tooltip().map_or(0, str::len)
                 + size_of::<crate::hyperlinks::Hyperlink>();
-            self.preflight_cell_capture(position, authored_bytes)?;
+            self.preflight_cell_capture(position, address, authored_bytes)?;
             self.sheets
                 .entry(position)
                 .or_default()
@@ -4013,6 +4153,7 @@ impl Edit {
         position: usize,
         reference: crate::hyperlinks::HyperlinkReference,
     ) -> Result<Option<crate::hyperlinks::Hyperlink>> {
+        let address = reference.range().start();
         let key = crate::hyperlinks::model::reference_key(reference.range());
         let current = self.pending_hyperlink(position, key)?;
         let Some(current) = current else {
@@ -4041,6 +4182,7 @@ impl Edit {
             }
             self.preflight_cell_capture(
                 position,
+                address,
                 reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
             )?;
             self.sheets

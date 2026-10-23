@@ -656,21 +656,6 @@ impl Edit {
             // PPT planner needs the post-flush snapshot remainder before it
             // captures its native before image.
             self.flush_pending()?;
-            #[cfg(any(
-                feature = "doc",
-                feature = "docx",
-                feature = "ppt",
-                feature = "xlsx",
-                feature = "pptx",
-                feature = "xlsb",
-                feature = "xls",
-                feature = "rtf",
-                feature = "ods",
-                feature = "odt",
-                feature = "odp",
-                odf_objects,
-                feature = "iwork-adapter"
-            ))]
             let limits = self.limits;
             let remaining_snapshot = limits
                 .max_snapshot_bytes()
@@ -692,9 +677,9 @@ impl Edit {
                 #[cfg(feature = "docx")]
                 File::Docx(handle) => {
                     let commit = if _command_text {
-                        handle.set_command(&target, props)?
+                        handle.set_command_with_limits(&target, props, &operation_limits)?
                     } else {
-                        handle.set(&target, props)?
+                        handle.set_with_limits(&target, props, &operation_limits)?
                     };
                     wrap(handle, commit, ())
                 },
@@ -801,25 +786,14 @@ impl Edit {
                 .max_snapshot_bytes()
                 .saturating_sub(self.snapshot_bytes),
         );
-        #[cfg(any(
-            feature = "doc",
-            feature = "docx",
-            feature = "pptx",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "rtf",
-            feature = "ppt",
-            feature = "xls",
-            feature = "ods",
-            feature = "odt",
-            feature = "odp",
-            odf_objects,
-            feature = "iwork-adapter"
-        ))]
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
-                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap(handle, commit, path)
             },
             #[cfg(feature = "xls")]
@@ -955,26 +929,14 @@ impl Edit {
                 .max_snapshot_bytes()
                 .saturating_sub(self.snapshot_bytes),
         );
-        #[cfg(any(
-            feature = "doc",
-            feature = "docx",
-            feature = "pptx",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "rtf",
-            feature = "ppt",
-            feature = "xls",
-            feature = "ods",
-            feature = "odt",
-            feature = "odp",
-            odf_objects,
-            feature = "iwork-adapter"
-        ))]
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
-                let (commit, path) =
-                    handle.add_command(_parent.into_path()?, _node.into_node()?)?;
+                let (commit, path) = handle.add_command_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &operation_limits,
+                )?;
                 wrap(handle, commit, path)
             },
             #[cfg(feature = "xls")]
@@ -1134,21 +1096,6 @@ impl Edit {
             // here so the leaf sees the post-flush snapshot remainder while
             // it preflights its native before image.
             self.flush_pending()?;
-            #[cfg(any(
-                feature = "doc",
-                feature = "docx",
-                feature = "xlsx",
-                feature = "xlsb",
-                feature = "xls",
-                feature = "pptx",
-                feature = "ppt",
-                feature = "rtf",
-                feature = "ods",
-                feature = "odt",
-                feature = "odp",
-                odf_objects,
-                feature = "iwork-adapter"
-            ))]
             let limits = self.limits;
             let operation_limits = limits.with_snapshot_budget(
                 limits
@@ -1157,7 +1104,11 @@ impl Edit {
             );
             self.execute(|file| match file {
                 #[cfg(feature = "docx")]
-                File::Docx(handle) => wrap(handle, handle.remove(target.clone())?, ()),
+                File::Docx(handle) => wrap(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &operation_limits)?,
+                    (),
+                ),
                 #[cfg(feature = "xlsx")]
                 File::Xlsx(handle) => wrap_xlsx(
                     handle,
@@ -1439,26 +1390,15 @@ impl Edit {
             .max_snapshot_bytes()
             .saturating_sub(self.snapshot_bytes);
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
-        #[cfg(any(
-            feature = "doc",
-            feature = "docx",
-            feature = "pptx",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "xls",
-            feature = "ppt",
-            feature = "rtf",
-            feature = "ods",
-            feature = "odt",
-            feature = "odp",
-            odf_objects,
-            feature = "iwork-adapter"
-        ))]
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(
                 handle,
-                handle.move_to(_path.into_path()?, _to.into_placement()?)?,
+                handle.move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &operation_limits,
+                )?,
                 (),
             ),
             #[cfg(feature = "xls")]
@@ -1602,24 +1542,13 @@ impl Edit {
             .max_snapshot_bytes()
             .saturating_sub(self.snapshot_bytes);
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
-        #[cfg(any(
-            feature = "doc",
-            feature = "docx",
-            feature = "pptx",
-            feature = "xlsx",
-            feature = "xlsb",
-            feature = "xls",
-            feature = "ppt",
-            feature = "rtf",
-            feature = "ods",
-            feature = "odt",
-            feature = "odp",
-            odf_objects,
-            feature = "iwork-adapter"
-        ))]
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
-            File::Docx(handle) => wrap(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ()),
+            File::Docx(handle) => wrap(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &operation_limits)?,
+                (),
+            ),
             #[cfg(feature = "xls")]
             File::Xls(handle) => wrap_xls(
                 handle,
@@ -1856,7 +1785,14 @@ impl Edit {
                 let File::Docx(handle) = &self.current else {
                     return Err(pending());
                 };
-                self.formatting = Some(crate::format::docx::write::coalesce::Run::new(handle)?);
+                self.formatting = Some(
+                    crate::format::docx::write::coalesce::Run::new_with_snapshot_budget(
+                        handle,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?,
+                );
             }
             let run = self
                 .formatting
@@ -2502,7 +2438,14 @@ impl Edit {
         if let File::Xlsx(handle) = &self.current {
             let planned = match &self.cells {
                 Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => handle.cell_plan(_target, _props, &self.limits),
+                None => handle.cell_plan_with_snapshot_limit(
+                    _target,
+                    _props,
+                    &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
+                ),
             };
             if planned.is_err() {
                 // An earlier deferred native failure takes precedence over

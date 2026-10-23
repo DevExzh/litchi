@@ -520,14 +520,20 @@ impl Xlsx {
         }) {
             return Ok(None);
         }
-        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        // Promote/admit before resolving the run node: resolving it may clone
+        // the complete rich-text payload from a deferred source worksheet.
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let resolved = self.adopt_workbook(source.clone());
+        let node = crate::path::resolve::get(&Nav::new(&resolved), path)?;
         let Item::Run(run) = node.item() else {
             return Ok(None);
         };
         let assignments = admit(props, Operation::Set)?;
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
-        let read = xlsx::RichText::clone(&run.rich);
-        self.edit_runs_with(sheet, at, false, Some(read), limits, |rich| {
+        // Resolve the rich payload only after the native source owner has
+        // admitted its snapshot budget. The path node supplies identity and
+        // index; `editable_runs` below reads the bounded source once.
+        self.edit_runs_with_source(source, sheet, at, false, None, limits, |rich| {
             let run = rich.run_mut(index).ok_or_else(|| {
                 Error::new(Code::PathNotFound, "the run is no longer in the cell")
             })?;
@@ -578,13 +584,14 @@ impl Xlsx {
         }) {
             return Ok(None);
         }
-        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let resolved = self.adopt_workbook(source.clone());
+        let node = crate::path::resolve::get(&Nav::new(&resolved), path)?;
         let Item::Run(run) = node.item() else {
             return Ok(None);
         };
         let (sheet, at, index) = (node.sheet_position(), run.at, run.index as usize);
-        let read = xlsx::RichText::clone(&run.rich);
-        self.edit_runs_with(sheet, at, true, Some(read), limits, |rich| {
+        self.edit_runs_with_source(source, sheet, at, true, None, limits, |rich| {
             rich.remove_run(index)
                 .map(drop)
                 .map_err(super::write::native_error)
@@ -619,13 +626,28 @@ impl Xlsx {
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        self.edit_runs_with_source(source, sheet, at, plain, read, limits, change)
+    }
+
+    fn edit_runs_with_source(
+        &self,
+        source: xlsx::Package,
+        sheet: usize,
+        at: Address,
+        plain: bool,
+        read: Option<xlsx::RichText>,
+        limits: &SemanticLimits,
+        change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
+    ) -> Result<Commit> {
+        // Start the bounded native edit before reading the source rich runs;
+        // the read can decode a deferred worksheet payload.
+        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut rich = match read {
             Some(rich) => rich,
             None => editable_runs(&source, sheet, at)?,
         };
         change(&mut rich)?;
         self.check_source_for_replay()?;
-        let mut edit = edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
         let mut worksheet = edit
             .sheet(sheet)
             .map_err(super::write::native_error)?

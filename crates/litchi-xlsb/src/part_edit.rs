@@ -574,7 +574,7 @@ impl RetainedAccounting {
         metadata: litchi_opc::PartMetadata<'_>,
     ) -> Result<()> {
         self.add_str(metadata.content_type());
-        self.add_storage(metadata.payload_size_hint()?);
+        self.add_storage(metadata.payload_len()?);
         self.add_relationship_state(&RelationshipState::read(package, name, metadata.rels())?);
         Ok(())
     }

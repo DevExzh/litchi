@@ -7,7 +7,7 @@ use std::sync::Arc;
 use litchi_ooxml_common::web as common_web;
 use litchi_opc::Part;
 use litchi_sheet::{
-    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Row as RowIndex, RowAt,
+    Area, At, Cell as Address, Column as ColumnIndex, ColumnAt, Rect, Row as RowIndex, RowAt,
 };
 
 use super::super::super::{Selector, Visibility, Workbook, Worksheet, WorksheetKind};
@@ -301,7 +301,7 @@ impl Sheet<'_> {
             .as_str();
         ensure_merge_area(sheet, range)?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<MergeIntent>())?;
+            .preflight_cell_capture(self.position, range.start(), 0)?;
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
@@ -313,7 +313,13 @@ impl Sheet<'_> {
     /// Unmerge the range containing one checked cell, if any.
     pub fn unmerge<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        let range = {
+        // Admit the worksheet-before image before asking the source store for
+        // its merge index. A deferred worksheet store can allocate its full
+        // XML payload during that lookup.
+        let capture = self
+            .edit
+            .preflight_cell_capture(self.position, address, 0)?;
+        let range = match (|| -> Result<Option<Rect>> {
             let data = self
                 .edit
                 .base
@@ -332,13 +338,22 @@ impl Sheet<'_> {
                 .sheets
                 .get(&self.position)
                 .map_or(&[][..], |actions| actions.merges.as_slice());
-            pending_merge(sheet.store()?.merge_ranges(), intents, address)
+            Ok(pending_merge(
+                sheet.store()?.merge_ranges(),
+                intents,
+                address,
+            ))
+        })() {
+            Ok(range) => range,
+            Err(error) => {
+                self.edit.rollback_cell_capture(capture);
+                return Err(error);
+            },
         };
         let Some(range) = range else {
+            self.edit.rollback_cell_capture(capture);
             return Ok(self);
         };
-        self.edit
-            .preflight_cell_capture(self.position, size_of::<MergeIntent>())?;
         let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
         intents
             .try_reserve(1)
@@ -357,7 +372,7 @@ impl Sheet<'_> {
         let content = content.into();
         content.validate_for_write()?;
         self.edit
-            .preflight_cell_capture(self.position, content.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, content.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
@@ -383,7 +398,7 @@ impl Sheet<'_> {
         let address = at.into().resolve()?;
         text.validate_for_write()?;
         self.edit
-            .preflight_cell_capture(self.position, text.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, text.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::rich(text));
@@ -441,20 +456,36 @@ impl Sheet<'_> {
                 "a formula cache cannot join another payload change of the same cell",
             ));
         }
-        let sheet = self
-            .edit
-            .base
-            .sheet(self.position)?
-            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
-        let scalar = sheet.store()?.entry(address).is_some_and(|stored| {
-            matches!(&stored.cell, Cell::Formula(formula)
-                if matches!(formula.kind(), crate::formula::Kind::Scalar))
-        });
+        // The capture admission deliberately precedes `store()`: reading the
+        // source formula store may decode a deferred worksheet payload.
+        let capture =
+            self.edit
+                .preflight_cell_capture(self.position, address, value.retained_bytes())?;
+        let sheet = match self.edit.base.sheet(self.position) {
+            Ok(Some(sheet)) => sheet,
+            Ok(None) => {
+                self.edit.rollback_cell_capture(capture);
+                return Err(invalid("worksheet edit target disappeared"));
+            },
+            Err(error) => {
+                self.edit.rollback_cell_capture(capture);
+                return Err(error);
+            },
+        };
+        let scalar = match sheet.store() {
+            Ok(store) => store.entry(address).is_some_and(|stored| {
+                matches!(&stored.cell, Cell::Formula(formula)
+                    if matches!(formula.kind(), crate::formula::Kind::Scalar))
+            }),
+            Err(error) => {
+                self.edit.rollback_cell_capture(capture);
+                return Err(error);
+            },
+        };
         if !scalar {
+            self.edit.rollback_cell_capture(capture);
             return Err(invalid("a formula cache needs a stored scalar formula"));
         }
-        self.edit
-            .preflight_cell_capture(self.position, value.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::cache(value));
@@ -469,7 +500,7 @@ impl Sheet<'_> {
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<Content>())?;
+            .preflight_cell_capture(self.position, address, size_of::<Content>())?;
         let actions = self.edit.actions(self.position);
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
@@ -592,7 +623,7 @@ impl Sheet<'_> {
         }
         let address = at.into().resolve()?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<StyleEffect>())?;
+            .preflight_cell_capture(self.position, address, size_of::<StyleEffect>())?;
         // An explicit shared-style assignment is the later, complete style
         // operation. It supersedes any deferred property-level style request
         // staged for the same cell.
@@ -644,7 +675,7 @@ impl Sheet<'_> {
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<StyleEffect>())?;
+            .preflight_cell_capture(self.position, address, size_of::<StyleEffect>())?;
         self.edit.discard_fill(self.position, address)?;
         self.edit.discard_border(self.position, address)?;
         self.edit
@@ -697,7 +728,7 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
-            .preflight_cell_capture(self.position, change.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, change.retained_bytes())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -725,7 +756,7 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
-            .preflight_cell_capture(self.position, change.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, change.retained_bytes())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -769,7 +800,7 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
-            .preflight_cell_capture(self.position, change.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, change.retained_bytes())?;
         self.edit.stage_border(self.position, address, change)?;
         Ok(self)
     }
@@ -826,7 +857,7 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
-            .preflight_cell_capture(self.position, change.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, change.retained_bytes())?;
         self.edit.stage_fill(self.position, address, change)?;
         Ok(self)
     }
@@ -846,7 +877,7 @@ impl Sheet<'_> {
             return Ok(self);
         }
         self.edit
-            .preflight_cell_capture(self.position, change.retained_bytes())?;
+            .preflight_cell_capture(self.position, address, change.retained_bytes())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -867,7 +898,7 @@ impl Sheet<'_> {
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<Option<bool>>())?;
+            .preflight_cell_capture(self.position, address, size_of::<Option<bool>>())?;
         self.edit
             .sheets
             .entry(self.position)
@@ -903,6 +934,7 @@ impl Sheet<'_> {
             .transpose()?;
         self.edit.preflight_cell_capture(
             self.position,
+            address,
             size_of::<Option<Arc<str>>>()
                 .saturating_add(code.as_ref().map_or(0, |value| value.len())),
         )?;
@@ -919,7 +951,7 @@ impl Sheet<'_> {
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         self.edit
-            .preflight_cell_capture(self.position, size_of::<Action>())?;
+            .preflight_cell_capture(self.position, address, 0)?;
         self.edit.discard_fill(self.position, address)?;
         self.edit.discard_border(self.position, address)?;
         self.edit
@@ -973,9 +1005,9 @@ pub struct NewSheet<'a> {
 }
 
 impl NewSheet<'_> {
-    fn preflight_capture(&mut self, authored_bytes: usize) -> Result<()> {
+    fn preflight_capture(&mut self, address: Address, authored_bytes: usize) -> Result<()> {
         if let Some(budget) = self.capture_budget.as_mut() {
-            budget.charge_new_sheet(authored_bytes)?;
+            budget.charge_new_sheet_cell(self.index, address, authored_bytes)?;
         }
         Ok(())
     }
@@ -1084,7 +1116,7 @@ impl NewSheet<'_> {
     pub fn merge<'b>(&mut self, area: impl Into<Area<'b>>) -> Result<&mut Self> {
         let range = area.into().resolve()?;
         ensure_merge_area(self.added.name.as_str(), range)?;
-        self.preflight_capture(size_of::<MergeIntent>())?;
+        self.preflight_capture(range.start(), 0)?;
         self.added
             .actions
             .merges
@@ -1100,7 +1132,7 @@ impl NewSheet<'_> {
         let Some(range) = pending_merge(&[], &self.added.actions.merges, address) else {
             return Ok(self);
         };
-        self.preflight_capture(size_of::<MergeIntent>())?;
+        self.preflight_capture(range.start(), 0)?;
         self.added
             .actions
             .merges
@@ -1119,7 +1151,7 @@ impl NewSheet<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
-        self.preflight_capture(content.retained_bytes())?;
+        self.preflight_capture(address, content.retained_bytes())?;
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
@@ -1133,7 +1165,7 @@ impl NewSheet<'_> {
     /// previous operation in this transaction created it.
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.preflight_capture(size_of::<Content>())?;
+        self.preflight_capture(address, size_of::<Content>())?;
         let actions = &mut self.added.actions.cells;
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
@@ -1165,7 +1197,7 @@ impl NewSheet<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
-        self.preflight_capture(size_of::<StyleEffect>())?;
+        self.preflight_capture(address, size_of::<StyleEffect>())?;
         let effect = StyleEffect::Set(style.raw());
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
@@ -1179,7 +1211,7 @@ impl NewSheet<'_> {
     /// Remove an explicit local style reference from the pending cell.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.preflight_capture(size_of::<StyleEffect>())?;
+        self.preflight_capture(address, size_of::<StyleEffect>())?;
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::reset_style());
@@ -1192,7 +1224,7 @@ impl NewSheet<'_> {
     /// Remove the pending cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.preflight_capture(size_of::<Action>())?;
+        self.preflight_capture(address, 0)?;
         self.added.actions.cells.insert(address, Action::Remove);
         Ok(self)
     }
