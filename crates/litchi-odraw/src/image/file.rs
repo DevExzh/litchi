@@ -138,9 +138,10 @@ impl<'data> File<'data> {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedImage` when the BLIP framing cannot be
-    /// encoded, or `Error::ArithmeticOverflow` when the owned data range
-    /// underflows.
+    /// Returns `Error::ImageLimitExceeded` when the retained raw or BLIP
+    /// budget no longer admits the record, `Error::MalformedImage` when the
+    /// BLIP framing cannot be encoded, or `Error::ArithmeticOverflow` when
+    /// the owned data range underflows.
     pub fn into_owned(self) -> Result<File<'static>> {
         let kind = self.kind();
         let (record, data_start, raw_limits, max_blip_bytes) = match self.source {
@@ -156,6 +157,21 @@ impl<'data> File<'data> {
                 max_blip_bytes,
             } => {
                 let raw_limits = blip.record().limits();
+                let record_len = blip.record().len();
+                if record_len > raw_limits.max_record_bytes {
+                    return Err(Error::ImageLimitExceeded {
+                        limit: ImageLimitKind::RecordBytes,
+                        observed: u64::from(record_len),
+                        maximum: u64::from(raw_limits.max_record_bytes),
+                    });
+                }
+                if record_len > max_blip_bytes {
+                    return Err(Error::ImageLimitExceeded {
+                        limit: ImageLimitKind::BlipBytes,
+                        observed: u64::from(record_len),
+                        maximum: u64::from(max_blip_bytes),
+                    });
+                }
                 let limits = Limits {
                     records: raw_limits,
                     max_blip_bytes,
@@ -202,8 +218,15 @@ impl<'data> File<'data> {
 pub fn store(data: &[u8], limits: Limits) -> Result<Option<Store<'_>>> {
     let mut found = None;
     let mut visited = 0_u32;
-    for result in Parser::new(data, limits.record_limits()).records() {
-        let record = result?;
+    // Keep this scanner's image-specific record count classification. The
+    // generic Children iterator enforces the same raw budget for callers that
+    // consume it directly, but this route reports its own typed image limit.
+    let parser_limits = crate::Limits {
+        max_records: u32::MAX,
+        ..limits.record_limits()
+    };
+    for result in Parser::new(data, parser_limits).records() {
+        let record = result.map_err(super::map_traversal_limit)?;
         visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
             limit: ImageLimitKind::Records,
             observed: u64::from(visited) + 1,
@@ -222,9 +245,10 @@ pub fn store(data: &[u8], limits: Limits) -> Result<Option<Store<'_>>> {
         }
         if record.is_container() {
             let container = Container::try_new(record)?;
-            for store in
-                container.find_recursive(RecordKind::BStoreContainer, limits.record_limits())?
-            {
+            let stores = container
+                .find_recursive(RecordKind::BStoreContainer, limits.record_limits())
+                .map_err(super::map_traversal_limit)?;
+            for store in stores {
                 set_store(&mut found, store)?;
             }
         }
@@ -265,7 +289,8 @@ pub fn all<'data>(
     store: &Store<'data>,
     delay_store: Option<&'data [u8]>,
 ) -> Result<Vec<File<'data>>> {
-    let mut files = Vec::with_capacity(usize::from(store.len()));
+    let file_cap = usize::try_from(store.limits().max_files).unwrap_or(usize::MAX);
+    let mut files = Vec::with_capacity(usize::from(store.len()).min(file_cap));
     for raw in 1..=u32::from(store.len()) {
         let id = Id::new(raw)?;
         if let Some(file) = get(store, id, delay_store)? {
@@ -474,7 +499,7 @@ fn collect<'data>(
             stack.pop();
             continue;
         };
-        let record = result?;
+        let record = result.map_err(super::map_traversal_limit)?;
         visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
             limit: ImageLimitKind::Records,
             observed: u64::from(visited) + 1,
@@ -499,9 +524,13 @@ fn collect<'data>(
             }
         } else if record.kind() == RecordKind::BStoreContainer {
             let store = Store::from_record(record, limits)?;
-            let store_files = all(&store, delay_store)?;
-            check_count(files.len(), store_files.len(), limits)?;
-            files.extend(store_files);
+            for raw in 1..=u32::from(store.len()) {
+                let id = Id::new(raw)?;
+                if let Some(file) = get(&store, id, delay_store)? {
+                    check_count(files.len(), 1, limits)?;
+                    files.push(file);
+                }
+            }
         } else if record.is_container() {
             let depth = stack.len().saturating_add(1);
             if depth > usize::from(limits.records.max_depth) {
@@ -605,8 +634,8 @@ mod tests {
         };
         assert!(matches!(
             file.blip(),
-            Err(Error::LimitExceeded {
-                limit: crate::LimitKind::RecordBytes,
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
                 observed: 20,
                 maximum: 19,
             })
@@ -673,6 +702,50 @@ mod tests {
                 .limits(),
             origin
         );
+    }
+
+    #[test]
+    fn detaching_a_view_rechecks_the_retained_blip_budget() {
+        let bytes = png_blip(b"png");
+        let blip = Blip::parse(&bytes, Limits::default()).expect("valid PNG");
+        let body_len = u32::try_from(bytes.len() - 8).expect("body length fits");
+        let raw_limited = File::new(
+            blip.clone(),
+            None,
+            0,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: body_len - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(
+            raw_limited.into_owned(),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+        let file = File::new(
+            blip,
+            None,
+            0,
+            Limits {
+                max_blip_bytes: body_len - 1,
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(
+            file.into_owned(),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::BlipBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
     }
 
     #[test]
@@ -746,6 +819,35 @@ mod tests {
             .expect("resolve")
             .expect("image");
         assert_eq!(file.data().expect("image data"), b"png");
+    }
+
+    #[test]
+    fn all_enforces_the_retained_file_budget() {
+        let blip = png_blip(b"png");
+        let fbse = delayed_fbse(&blip, 0, &[]);
+        let mut bytes = vec![0x1f, 0, 0x01, 0xf0];
+        bytes.extend_from_slice(
+            &u32::try_from(fbse.len())
+                .expect("FBSE length fits in u32")
+                .to_le_bytes(),
+        );
+        bytes.extend_from_slice(&fbse);
+        let store = Store::parse(
+            &bytes,
+            Limits {
+                max_files: 0,
+                ..Limits::default()
+            },
+        )
+        .expect("valid store");
+        assert!(matches!(
+            all(&store, Some(&blip)),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Files,
+                observed: 1,
+                maximum: 0,
+            })
+        ));
     }
 
     #[test]
@@ -832,6 +934,27 @@ mod tests {
     }
 
     #[test]
+    fn recursive_scan_maps_raw_record_limit_to_image_kind() {
+        let data = png_blip(b"one");
+        let body_len = u32::try_from(data.len() - 8).expect("body length fits");
+        let limits = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len - 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            scan(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+    }
+
+    #[test]
     fn container_scan_retains_the_admitted_root_policy() {
         let first = png_blip(b"one");
         let second = png_blip(b"two");
@@ -874,6 +997,129 @@ mod tests {
                 limit: ImageLimitKind::Records,
                 observed: 2,
                 maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn container_scan_maps_raw_record_limit_to_image_kind() {
+        let child = png_blip(b"one");
+        let data = officeart_container(0xf002, &child);
+        let root = Record::parse(&data, 0, crate::Limits::default())
+            .expect("valid drawing container")
+            .0;
+        let container = Container::try_new(root).expect("container");
+        let body_len = u32::try_from(child.len() - 8).expect("body length fits");
+        let limits = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len - 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::container(&container, None, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+    }
+
+    #[test]
+    fn delay_maps_raw_record_limit_to_image_kind() {
+        let data = png_blip(b"one");
+        let body_len = u32::try_from(data.len() - 8).expect("body length fits");
+        let limits = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len - 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            delay(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+    }
+
+    fn officeart_container(kind: u16, body: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0x0f, 0, 0, 0];
+        bytes[2..4].copy_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(
+            &u32::try_from(body.len())
+                .expect("container body length fits")
+                .to_le_bytes(),
+        );
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    #[test]
+    fn store_maps_nested_record_limit_to_image_kind() {
+        let mut body = png_blip(b"one");
+        body.extend_from_slice(&png_blip(b"two"));
+        let data = officeart_container(0xf002, &body);
+        let limits = Limits {
+            records: crate::Limits {
+                max_records: 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Records,
+                maximum: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn store_maps_top_level_record_limit_to_image_kind() {
+        let data = png_blip(b"one");
+        let body_len = u32::try_from(data.len() - 8).expect("body length fits");
+        let limits = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len - 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+    }
+
+    #[test]
+    fn store_maps_nested_depth_limit_to_image_kind() {
+        let nested = officeart_container(0xf002, &[]);
+        let data = officeart_container(0xf002, &nested);
+        let limits = Limits {
+            records: crate::Limits {
+                max_depth: 0,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Depth,
+                maximum: 0,
+                ..
             })
         ));
     }

@@ -9,6 +9,7 @@
     reason = "zerocopy's wire-layout derives emit compiler-generated identifiers"
 )]
 
+pub mod builder;
 mod container;
 mod error;
 pub mod image;

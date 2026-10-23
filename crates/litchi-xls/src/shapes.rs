@@ -597,7 +597,12 @@ mod tests {
 
     #[test]
     fn projects_the_typed_sheet_anchor_from_officeart() {
-        use litchi_odraw::{shape::Flags, shape::Native, write};
+        use litchi_odraw::{
+            builder::{PropertyBuilder, ShapeBuilder},
+            shape::Flags,
+            shape::Native,
+            write,
+        };
 
         let expected = SheetAnchor::new(
             crate::AnchorPoint::new(1, 2, -4, 3).unwrap(),
@@ -606,11 +611,11 @@ mod tests {
         )
         .unwrap();
         let mut children = Vec::new();
-        write::ShapeBuilder::new(Native::RECTANGLE, 42)
+        ShapeBuilder::new(Native::RECTANGLE, 42)
             .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
             .write(&mut children, Default::default())
             .unwrap();
-        write::PropertyBuilder::new()
+        PropertyBuilder::new()
             .write(&mut children, Default::default())
             .unwrap();
         children.extend_from_slice(&expected.to_record_bytes());

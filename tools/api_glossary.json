@@ -21783,6 +21783,41 @@
           "scope": "litchi_odraw",
           "replacement": "use find_recursive(kind, limits)"
         },
+    {
+      "name": "PropertyBuilder",
+      "scope": "litchi_odraw::write",
+      "replacement": "use litchi_odraw::builder::PropertyBuilder"
+    },
+    {
+      "name": "PropertyKey",
+      "scope": "litchi_odraw::write",
+      "replacement": "use litchi_odraw::builder::PropertyKey"
+    },
+    {
+      "name": "ShapeBuilder",
+      "scope": "litchi_odraw::write",
+      "replacement": "use litchi_odraw::builder::ShapeBuilder"
+    },
+    {
+      "name": "BlipBuilder",
+      "scope": "litchi_odraw::image::write",
+      "replacement": "use litchi_odraw::image::builder::BlipBuilder"
+    },
+    {
+      "name": "EntryBuilder",
+      "scope": "litchi_odraw::image::write",
+      "replacement": "use litchi_odraw::image::builder::EntryBuilder"
+    },
+    {
+      "name": "Placement",
+      "scope": "litchi_odraw::image::write",
+      "replacement": "use litchi_odraw::image::builder::Placement"
+    },
+    {
+      "name": "StoreBuilder",
+      "scope": "litchi_odraw::image::write",
+      "replacement": "use litchi_odraw::image::builder::StoreBuilder"
+    },
         {
           "name": "with_limits",
           "scope": "litchi_odraw",

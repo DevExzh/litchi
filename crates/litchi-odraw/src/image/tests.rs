@@ -86,6 +86,50 @@ fn preserves_unknown_file_block_kinds() {
 }
 
 #[test]
+fn direct_image_parsers_classify_record_byte_admission() {
+    let blip = record(0, 0x6E0, 0xF01E, &png_body(false, b"png"));
+    let blip_body = u32::try_from(blip.len() - 8).unwrap();
+    assert!(matches!(
+        Blip::parse(
+            &blip,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: blip_body - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            }
+        ),
+        Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed,
+            maximum,
+        }) if observed == u64::from(blip_body) && maximum == u64::from(blip_body - 1)
+    ));
+
+    let child = record(0, 0, 0xF01E, &[]);
+    let store = record(0x0F, 1, 0xF001, &child);
+    let store_body = u32::try_from(store.len() - 8).unwrap();
+    assert!(matches!(
+        Store::parse(
+            &store,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: store_body - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            }
+        ),
+        Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed,
+            maximum,
+        }) if observed == u64::from(store_body) && maximum == u64::from(store_body - 1)
+    ));
+}
+
+#[test]
 fn entry_admission_checks_the_complete_instance_before_resolution() {
     for instance in [255_u16, 256, 4095] {
         let mut body = vec![0; 36];
@@ -221,6 +265,38 @@ fn store_retains_origin_and_caller_policy_intersection() {
     let store =
         Store::from_record(permissive_origin, strict_caller).expect("caller policy admits store");
     assert_eq!(store.limits().records, strict_caller.records);
+}
+
+#[test]
+fn entry_retains_origin_and_caller_policy_intersection() {
+    let mut body = vec![0; 36];
+    body[0] = Kind::Png.raw();
+    body[1] = Kind::Png.raw();
+    let bytes = record(2, u16::from(Kind::Png.raw()), 0xF007, &body);
+    let body_len = u32::try_from(bytes.len() - 8).unwrap();
+    let origin = crate::Limits {
+        max_record_bytes: body_len,
+        max_depth: 2,
+        max_records: 1,
+    };
+
+    let origin_record = crate::Record::parse(&bytes, 0, origin).unwrap().0;
+    let entry = Entry::parse(origin_record, Limits::default()).expect("origin policy admits entry");
+    assert_eq!(entry.record().limits(), origin);
+
+    let strict_caller = Limits {
+        records: crate::Limits {
+            max_record_bytes: body_len,
+            max_depth: 1,
+            max_records: 1,
+        },
+        ..Limits::default()
+    };
+    let permissive_origin = crate::Record::parse(&bytes, 0, crate::Limits::default())
+        .unwrap()
+        .0;
+    let entry = Entry::parse(permissive_origin, strict_caller).expect("caller policy admits entry");
+    assert_eq!(entry.record().limits(), strict_caller.records);
 }
 
 #[test]

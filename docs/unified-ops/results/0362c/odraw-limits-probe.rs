@@ -18,7 +18,8 @@ fn png(size: usize) -> Vec<u8> {
 }
 fn shape_bytes() -> Vec<u8> {
     let mut body = Vec::new();
-    use litchi_odraw::write::{self, Atom, Container, ShapeBuilder};
+    use litchi_odraw::builder::ShapeBuilder;
+    use litchi_odraw::write::{self, Atom, Container};
     ShapeBuilder::new(shape::Native::RECTANGLE, 7)
         .with_flags(shape::Flags::HAVE_ANCHOR | shape::Flags::HAVE_SPT)
         .write(&mut body).unwrap();

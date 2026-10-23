@@ -5,7 +5,8 @@
 )]
 
 use super::{Bounds, Flags, Kind, Native, Shape, parse};
-use crate::write::{self, Atom, Container as OutContainer, ShapeBuilder};
+use crate::builder::ShapeBuilder;
+use crate::write::{self, Atom, Container as OutContainer};
 use crate::{Error, LimitKind, Limits, Record, RecordKind};
 
 fn shape(kind: Native, id: u32, child: bool) -> Vec<u8> {

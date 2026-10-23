@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use litchi_imgconv::{Options, to_png};
-use litchi_odraw::image::{Blip, Kind, write::BlipBuilder};
+use litchi_odraw::image::{Blip, Kind, builder::BlipBuilder};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);

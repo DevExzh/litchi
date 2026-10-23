@@ -4,11 +4,12 @@ use crate::writer::shape::Anchor;
 use crate::writer::{ShapeFill, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite};
 use crate::{Error, Result};
 use litchi_odraw::{
+    builder::{PropertyBuilder, ShapeBuilder},
     prop::Id,
     shape::{Flags, Native},
     write::{
-        Atom as WriteAtom, Container as WriteContainer, PropertyBuilder, ShapeBuilder,
-        atom as write_escher_atom, atom_header as write_atom_header, container as write_container,
+        Atom as WriteAtom, Container as WriteContainer, atom as write_escher_atom,
+        atom_header as write_atom_header, container as write_container,
         container_header as write_container_header,
     },
 };
