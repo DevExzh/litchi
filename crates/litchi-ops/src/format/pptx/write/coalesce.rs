@@ -34,6 +34,7 @@ use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
 use std::collections::{HashMap, HashSet};
+use std::mem::{size_of, size_of_val};
 use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
@@ -86,14 +87,14 @@ enum Scope {
 #[derive(Default)]
 struct Touched {
     shape: bool,
-    paragraphs: std::collections::HashSet<usize>,
-    run_paragraphs: std::collections::HashSet<usize>,
-    runs: std::collections::HashSet<(usize, usize)>,
-    cells: std::collections::HashSet<(usize, usize)>,
-    cell_texts: std::collections::HashSet<(usize, usize)>,
-    cell_paragraphs: std::collections::HashSet<(usize, usize, usize)>,
-    cell_run_paragraphs: std::collections::HashSet<(usize, usize, usize)>,
-    cell_runs: std::collections::HashSet<(usize, usize, usize, usize)>,
+    paragraphs: HashSet<usize>,
+    run_paragraphs: HashSet<usize>,
+    runs: HashSet<(usize, usize)>,
+    cells: HashSet<(usize, usize)>,
+    cell_texts: HashSet<(usize, usize)>,
+    cell_paragraphs: HashSet<(usize, usize, usize)>,
+    cell_run_paragraphs: HashSet<(usize, usize, usize)>,
+    cell_runs: HashSet<(usize, usize, usize, usize)>,
 }
 
 impl Touched {
@@ -129,10 +130,7 @@ impl Touched {
     }
 
     fn insert(&mut self, scope: Scope) -> Result<()> {
-        fn add<T: std::hash::Hash + Eq>(
-            set: &mut std::collections::HashSet<T>,
-            value: T,
-        ) -> Result<()> {
+        fn add<T: std::hash::Hash + Eq>(set: &mut HashSet<T>, value: T) -> Result<()> {
             set.try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
             set.insert(value);
@@ -238,9 +236,9 @@ impl Cells {
             return 0;
         };
         rows.iter()
-            .fold(std::mem::size_of_val(rows.as_slice()), |total, row| {
+            .fold(size_of_val(rows.as_slice()), |total, row| {
                 total
-                    .saturating_add(std::mem::size_of_val(row.as_slice()))
+                    .saturating_add(size_of_val(row.as_slice()))
                     .saturating_add(
                         row.iter()
                             .flatten()
@@ -498,8 +496,8 @@ fn proof_is_noop(proof: &Proof) -> bool {
 /// and formatting-only plans retain no complete original state and therefore
 /// remain a real commit unless the native patch itself proves an exact no-op.
 fn logical_noop(items: &[Item]) -> bool {
-    let mut originals = std::collections::HashMap::<(usize, usize, bool, Scope), String>::new();
-    let mut finals = std::collections::HashMap::<(usize, usize, bool, Scope), String>::new();
+    let mut originals = HashMap::<(usize, usize, bool, Scope), String>::new();
+    let mut finals = HashMap::<(usize, usize, bool, Scope), String>::new();
     for item in items {
         let plan = &item.plan;
         let Some(original) = plan.original_text.as_ref() else {
@@ -575,7 +573,7 @@ fn shape_plan(
         return Ok(None);
     }
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let mut staged_bytes = values.charge();
+    let staged_bytes = values.charge();
     bound(
         LimitKind::StagedBytes,
         staged_bytes,
@@ -676,7 +674,7 @@ fn shape_plan(
         changed = true;
     }
     let original_text = (file.signature() == crate::format::signature::Signature::Signed)
-        .then_some(current_text)
+        .then(|| current_text.map(|text| text.into_owned()))
         .flatten();
     Ok(Some(Plan {
         target: Target {
@@ -774,7 +772,7 @@ fn format_plan(
     scene_cache: &mut Option<(usize, CachedScene)>,
 ) -> Result<Option<Plan>> {
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let mut staged_bytes = values.charge();
+    let staged_bytes = values.charge();
     bound(
         LimitKind::StagedBytes,
         staged_bytes,
@@ -1033,7 +1031,7 @@ fn story_plan(
                     .as_ref()
                     .and_then(|notes| notes.as_ref())
                     .and_then(|(_, _, body)| body.as_ref())
-                    .map(body_capture_charge)
+                    .map(|body| body_capture_charge(body.as_ref()))
                     .unwrap_or(0);
                 staged_bytes = staged_bytes.saturating_add(charge);
                 bound(
@@ -1365,15 +1363,11 @@ fn read_cells(
         // `Arc<Body>`. The caller passes the remaining run budget, so this
         // preflight keeps a large signed table from bypassing the limit while
         // a partially filled cache is still private.
-        let mut retained = std::mem::size_of::<Vec<CapturedRow>>().saturating_add(
-            rows.len()
-                .saturating_mul(std::mem::size_of::<CapturedRow>()),
-        );
+        let mut retained = size_of::<Vec<CapturedRow>>()
+            .saturating_add(rows.len().saturating_mul(size_of::<CapturedRow>()));
         for row in &rows {
-            retained = retained.saturating_add(
-                row.len()
-                    .saturating_mul(std::mem::size_of::<Option<CapturedBody>>()),
-            );
+            retained = retained
+                .saturating_add(row.len().saturating_mul(size_of::<Option<CapturedBody>>()));
             for (_, body) in row {
                 if let Some(body) = body {
                     retained = retained.saturating_add(body_capture_charge(body));
@@ -1410,21 +1404,19 @@ fn read_cells(
 }
 
 fn body_capture_charge(body: &litchi_drawingml::text::body::Body) -> usize {
-    let mut bytes = std::mem::size_of_val(body);
+    let mut bytes = size_of_val(body);
     for paragraph in &body.paragraphs {
-        bytes = bytes
-            .saturating_add(std::mem::size_of_val(paragraph))
-            .saturating_add(
-                paragraph
-                    .runs
-                    .iter()
-                    .map(|run| {
-                        std::mem::size_of_val(run)
-                            .saturating_add(run.text.len())
-                            .saturating_add(std::mem::size_of_val(&run.properties))
-                    })
-                    .sum::<usize>(),
-            );
+        bytes = bytes.saturating_add(size_of_val(paragraph)).saturating_add(
+            paragraph
+                .runs
+                .iter()
+                .map(|run| {
+                    size_of_val(run)
+                        .saturating_add(run.text.len())
+                        .saturating_add(size_of_val(&run.properties))
+                })
+                .sum::<usize>(),
+        );
     }
     bytes
 }
@@ -1874,7 +1866,7 @@ fn commit_native(
                     commit_after,
                     source,
                     target,
-                    super::Proof::Source(patch),
+                    Proof::Source(patch),
                     operations,
                 ),
             ))
@@ -1898,7 +1890,7 @@ fn commit_native(
                     commit_after,
                     source,
                     target,
-                    super::Proof::Eager(patch),
+                    Proof::Eager(patch),
                     operations,
                 ),
             ))

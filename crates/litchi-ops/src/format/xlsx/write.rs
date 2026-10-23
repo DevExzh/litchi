@@ -10,7 +10,7 @@
 use litchi_core::FileFormat;
 use litchi_xlsx::{self as xlsx, Address, Rect};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet, TryReserveError};
+use std::collections::{HashSet, TryReserveError};
 use std::mem::size_of;
 
 use super::node::{Node, SheetHandle};
@@ -3107,7 +3107,8 @@ pub(crate) mod refresh;
 
 pub(crate) mod coalesce {
     use super::{
-        CellOperation, CellTarget, Xlsx, admit_properties_with_limits, native_error, snapshot_limit,
+        CellOperation, CellTarget, Commit, Xlsx, admit_properties_with_limits,
+        edit_with_snapshot_limit, native_error, snapshot_limit,
     };
     use crate::error::{Code, Error, Result};
     use crate::format::signature::Signature;
@@ -3471,7 +3472,7 @@ pub(crate) mod coalesce {
         /// Commit one native patch for the run.  Native aggregate failures
         /// are replayed through fresh editors to retain the originating wire
         /// index, following the DOCX coalescer's error-only bisection rule.
-        pub(crate) fn commit(self) -> Result<(Xlsx, super::Commit)> {
+        pub(crate) fn commit(self) -> Result<(Xlsx, Commit)> {
             let Self {
                 base,
                 source,
@@ -3566,13 +3567,9 @@ pub(crate) mod coalesce {
         native: xlsx::workbook::Commit,
         operations: usize,
         max_snapshot_bytes: usize,
-    ) -> Result<(Xlsx, super::Commit)> {
-        let mut commit = super::Commit::from_native_with_limit(
-            base,
-            source.clone(),
-            native,
-            max_snapshot_bytes,
-        )?;
+    ) -> Result<(Xlsx, Commit)> {
+        let mut commit =
+            Commit::from_native_with_limit(base, source.clone(), native, max_snapshot_bytes)?;
         commit.operations = operations;
         let snapshot_bytes = commit.snapshot_bytes();
         if snapshot_bytes > max_snapshot_bytes {

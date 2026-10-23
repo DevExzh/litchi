@@ -2,7 +2,8 @@
 #![cfg(feature = "pptx")]
 
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
-use litchi_ops::{Code, File, OpenOptions, SemanticLimits, SourceMode, props};
+use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::{Code, File, OpenOptions, SourceMode, props};
 
 fn fixture() -> Vec<u8> {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();

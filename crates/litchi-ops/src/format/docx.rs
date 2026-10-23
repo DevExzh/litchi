@@ -744,13 +744,6 @@ impl Docx {
         )
     }
 
-    /// Build a native writer for the unified setter's signed no-op path. The
-    /// native commit still rejects a changed result, while an unchanged
-    /// result returns the original package and signature byte-identically.
-    pub(crate) fn edit_for_write(&self) -> Result<DocxEditor> {
-        self.edit_for_write_with_options(litchi_docx::document::EditOptions::default())
-    }
-
     /// Build a native writer under one explicit main-document edit profile.
     /// Signed documents retain their exact no-op exception while the selected
     /// profile is admitted before any owning or source-backed snapshot.

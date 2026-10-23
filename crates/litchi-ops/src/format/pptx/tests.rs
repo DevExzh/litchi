@@ -590,16 +590,17 @@ fn combined_click_edits_respect_the_remaining_snapshot_budget() {
         .unwrap()
         .build()
         .unwrap();
-    let error = handle
-        .set_with_limits(
-            target,
-            crate::props! {
-                "text" => "combined-link budget",
-                "link" => "https://example.com/combined-link-budget",
-            },
-            &limits,
-        )
-        .unwrap_err();
+    let error = match handle.set_with_limits(
+        target,
+        crate::props! {
+            "text" => "combined-link budget",
+            "link" => "https://example.com/combined-link-budget",
+        },
+        &limits,
+    ) {
+        Ok(_) => panic!("combined click edit unexpectedly succeeded"),
+        Err(error) => error,
+    };
     assert_eq!(error.code(), Code::LimitExceeded);
 }
 
@@ -630,9 +631,10 @@ fn metadata_noop_accounts_its_complete_retained_scope() {
         .unwrap()
         .build()
         .unwrap();
-    let error = handle
-        .set_with_limits(target, crate::props! {}, &below_limits)
-        .unwrap_err();
+    let error = match handle.set_with_limits(target, crate::props! {}, &below_limits) {
+        Ok(_) => panic!("metadata no-op unexpectedly exceeded its lower bound"),
+        Err(error) => error,
+    };
     assert_eq!(error.code(), Code::LimitExceeded);
 }
 

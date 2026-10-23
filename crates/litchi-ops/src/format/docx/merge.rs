@@ -34,9 +34,9 @@ fn merge_inner(
     options: &Options,
     limits: &SemanticLimits,
 ) -> Result<(Option<Commit>, Summary)> {
-    let options = litchi_docx::document::EditOptions::default()
+    let edit_options = litchi_docx::document::EditOptions::default()
         .max_snapshot_bytes(limits.max_snapshot_bytes());
-    let editor = owning_editor(file, options)?;
+    let editor = owning_editor(file, edit_options)?;
     let WorkEdit::Eager(mut edit) = WorkEdit::from(editor)? else {
         return Err(Error::new(
             Code::InternalError,
