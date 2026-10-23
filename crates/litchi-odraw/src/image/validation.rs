@@ -156,7 +156,7 @@ impl<'data> Store<'data> {
         let mut visited = 0_u32;
         let mut actual = 0u16;
         for child in crate::Children::new(record.data(), parser_limits) {
-            child?;
+            child.map_err(super::map_traversal_limit)?;
             visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
                 limit: LimitKind::Records,
                 observed: u64::from(visited) + 1,
@@ -206,7 +206,9 @@ pub(super) fn validate_embedded(entry: &Entry<'_>, instance: u8) -> Result<()> {
 
     let mut selected = false;
     for record in crate::Children::new(entry.embedded, entry.limits.record_limits()) {
-        let blip = record.and_then(|child| Blip::from_record(child, entry.limits))?;
+        let blip = record
+            .map_err(super::map_traversal_limit)
+            .and_then(|child| Blip::from_record(child, entry.limits))?;
         if matches_instance(&blip, instance) {
             entry.validate_selected(&blip, false)?;
             selected = true;

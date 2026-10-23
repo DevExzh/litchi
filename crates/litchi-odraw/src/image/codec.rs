@@ -512,7 +512,9 @@ impl<'data> Iterator for Embedded<'data> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.records.next().map(|record| {
-            record.and_then(|blip_record| Blip::from_record(blip_record, self.limits))
+            record
+                .map_err(super::map_traversal_limit)
+                .and_then(|blip_record| Blip::from_record(blip_record, self.limits))
         })
     }
 }
@@ -539,7 +541,7 @@ impl<'data> Iterator for super::model::Blocks<'data> {
             },
             Some(Err(error)) => {
                 self.done = true;
-                Some(Err(error))
+                Some(Err(super::map_traversal_limit(error)))
             },
             None if self.seen != self.expected => {
                 self.done = true;
@@ -579,7 +581,7 @@ impl<'data> Iterator for DelayBlocks<'data> {
             },
             Some(Err(error)) => {
                 self.done = true;
-                Some(Err(error))
+                Some(Err(super::map_traversal_limit(error)))
             },
             None => {
                 self.done = true;

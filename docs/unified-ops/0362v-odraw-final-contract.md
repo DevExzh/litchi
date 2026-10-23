@@ -23,7 +23,10 @@ one-to-seven-byte tail. Nested `image::store` traversal maps raw record,
 record-count and depth ceilings to the image-owned typed limit kind. Direct
 BLIP/store/delay ingress admits declared raw lengths before calling the generic
 record parser, and detaching a file preserves typed raw/BLIP limit failures
-instead of flattening them into malformed-image errors.
+instead of flattening them into malformed-image errors. The same mapper now
+covers recursive scan/container collection, store validation, embedded/file
+block iterators, and delay iteration, so raw record ceilings remain typed at
+every image boundary.
 
 Authoring drafts now live in canonical builder modules:
 `litchi_odraw::builder` owns property and shape builders, while
