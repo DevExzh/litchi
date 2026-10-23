@@ -1770,7 +1770,6 @@ where
             entry_count,
             local_bytes: local_size,
             central_directory_bytes: central_size,
-            central_metadata_bytes: central_metadata_bytes(prepared, &self.entries)?,
             tail_bytes: tail_size,
             archive_comment_bytes: archive_comment_len,
         })
@@ -1807,7 +1806,6 @@ struct OutputLayout {
     entry_count: u64,
     local_bytes: u64,
     central_directory_bytes: u64,
-    central_metadata_bytes: u64,
     tail_bytes: u64,
     archive_comment_bytes: u64,
 }
@@ -1838,26 +1836,6 @@ impl PreparedOutputProfile {
             archive_bytes: self.archive_bytes,
         }
     }
-}
-
-fn central_metadata_bytes(
-    prepared: &[PreparedEntry],
-    source_entries: &[PreservedEntry],
-) -> Result<u64, Error> {
-    prepared.iter().try_fold(0_u64, |total, entry| {
-        if entry.omitted {
-            return Ok(total);
-        }
-        let central = entry.central.checked_bytes(source_entries)?;
-        let fixed = ZipFileHeaderFixed::parse(central)?;
-        let metadata = u64::from(fixed.file_name_len)
-            .checked_add(u64::from(fixed.extra_field_len))
-            .and_then(|size| size.checked_add(u64::from(fixed.file_comment_len)))
-            .ok_or_else(|| unsupported("central-directory metadata length"))?;
-        total
-            .checked_add(metadata)
-            .ok_or_else(|| unsupported("central-directory metadata length"))
-    })
 }
 
 fn central_entry_sizes(central: &[u8]) -> Result<(u64, u64), Error> {
@@ -1960,9 +1938,7 @@ fn build_output_profile(
             uncompressed_size,
         });
     }
-    if usize_to_u64(entries.len(), "preservation output entry count")? != layout.entry_count
-        || metadata_total != layout.central_metadata_bytes
-    {
+    if usize_to_u64(entries.len(), "preservation output entry count")? != layout.entry_count {
         return Err(unsupported("preservation output profile mismatch"));
     }
     Ok(PreparedOutputProfile {
@@ -1971,7 +1947,7 @@ fn build_output_profile(
         entry_count: layout.entry_count,
         local_bytes: layout.local_bytes,
         central_directory_bytes: layout.central_directory_bytes,
-        central_metadata_bytes: layout.central_metadata_bytes,
+        central_metadata_bytes: metadata_total,
         tail_bytes: layout.tail_bytes,
         archive_comment_bytes: layout.archive_comment_bytes,
         archive_bytes: layout.output_size,
@@ -6088,6 +6064,103 @@ mod tests {
             },
             PreparedTail::Zip32(_) => panic!("ZIP64 geometry needs a synthesized tail"),
         }
+    }
+
+    #[test]
+    fn admission_profile_reports_exact_zip64_tail_and_comment_geometry() {
+        let source = with_comment(
+            with_file_comment(two_stored_archive(), b"entry comment"),
+            b"archive comment",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX) + 1),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            PreparedEntry {
+                local: PreparedLocal::Copy(index.entries[1].local_span.clone()),
+                central: PreparedCentral::Copy(1),
+                generated_payload: None,
+                omitted: false,
+            },
+        ];
+
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let profile = build_output_profile(&prepared, &layout, &synthetic.entries).unwrap();
+        let profile = profile.view();
+        let entries = profile.entries();
+        let expected_tail = u64::try_from(
+            ZIP64_EOCD_FIXED_SIZE + ZIP64_LOCATOR_SIZE + EndOfCentralDirectoryRecordFixed::SIZE,
+        )
+        .unwrap();
+        let second_local_bytes = index.entries[1]
+            .local_span
+            .end
+            .checked_sub(index.entries[1].local_span.start)
+            .unwrap();
+
+        assert_eq!(profile.prefix_bytes(), 0);
+        assert_eq!(profile.entry_count(), 2);
+        assert_eq!(profile.tail_bytes(), expected_tail);
+        assert_eq!(
+            profile.archive_comment_bytes(),
+            b"archive comment".len() as u64
+        );
+        assert_eq!(
+            profile.local_bytes(),
+            u64::from(u32::MAX) + 1 + second_local_bytes
+        );
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].comment_len(), b"entry comment".len() as u64);
+        assert_eq!(entries[1].comment_len(), 0);
+        assert_eq!(
+            entries[0].central_record_len(),
+            u64::try_from(index.entries[0].central_bytes.len()).unwrap()
+        );
+        assert_eq!(
+            entries[1].central_record_len(),
+            u64::try_from(index.entries[1].central_bytes.len()).unwrap() + 12
+        );
+        assert!(entries[1].extra_len() > entries[0].extra_len());
+        assert_eq!(
+            profile.central_directory_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.central_record_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.central_metadata_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.metadata_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            profile.prefix_bytes()
+                + profile.local_bytes()
+                + profile.central_directory_bytes()
+                + profile.tail_bytes()
+                + profile.archive_comment_bytes()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            layout.output_size,
+            "the admission profile must report the preflight output size exactly"
+        );
     }
 
     #[test]
