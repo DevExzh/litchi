@@ -395,7 +395,7 @@ impl Edit {
             append_actions(&before, *address, value, &mut actions)?;
         }
         if actions.is_empty() {
-            let patch = SheetRecord::new(before.clone(), before);
+            let patch = SheetRecord::new(before.clone(), before, 0);
             return commit_change(self.source.workbook(), patch);
         }
         let changed = actions.len();
