@@ -382,3 +382,13 @@ linked private `PackageState`. The links are corrected without exposing
 private state or changing behavior.
 [wsdoc-assembly-v3.json](results/0362uf/wsdoc-assembly-v3.json) records the
 complete diagnosed batch. The exact workspace gate command is rerun next.
+
+The exact isolated workspace documentation gate passes on `0f8ce50050`:
+`cargo doc -q --workspace --no-deps --all-features`, with warnings denied,
+one Cargo job, offline/locked dependency resolution and a 20 GB memory cap.
+It finishes in 316.00 seconds with an empty diagnostic log; the target is
+3,440,007,569 bytes.
+[wsdoc-assembly-v4.json](results/0362uf/wsdoc-assembly-v4.json) preserves the
+source, unchanged lock hashes and runner provenance. This resolves the
+documentation failure on the assembled source. It is one passing gate step,
+not the complete 53-check acceptance gate or native qualification.
