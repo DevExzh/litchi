@@ -1544,8 +1544,7 @@ fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
                 .saturating_add(retained_string(&present.relationship_target).capacity())
                 .saturating_add(present.bytes.capacity().saturating_mul(2)),
             None => {
-                let relationship_id =
-                    retained_string(&next_relationship_id(&mut relationship_ids)?);
+                let relationship_id = retained_string(&next_relationship_id(&relationship_ids)?);
                 relationship_ids.insert(relationship_id.clone());
                 let relationship_type = retained_string(match family {
                     Family::Core => rt::CORE_PROPERTIES,

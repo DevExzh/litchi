@@ -461,7 +461,7 @@ fn lexical_len(field: Field, value: Value<'_>) -> Result<usize> {
                         '\r' => 5,
                         other => other.len_utf8(),
                     })
-                    .ok_or_else(|| Error::Limit {
+                    .ok_or(Error::Limit {
                         kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
                         maximum: MAX_XML_BYTES,
                         observed: usize::MAX,
