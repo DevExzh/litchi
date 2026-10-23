@@ -3,17 +3,1715 @@
 use super::splice::{
     check_inverse_state, fingerprint_inverse_snapshot, finish_inverse_publication,
 };
+use super::PackURI;
 use super::{
     ContextCheckedSink, Counted, OpcError, OutputBudgetedSink, Result,
     SOURCE_PUBLICATION_CHUNK_BYTES, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
     SourceCheckedSink, SourceSnapshot, map_execution_error, map_io_error, overlay_unavailable,
     read_source_at_with_context,
 };
+use crate::limits::{SourceLimitKind, SourceLimits};
+use crate::pkgreader::PackageReader;
 use crate::SpliceResource;
-use litchi_core::{ExecutionContext, ExecutionError, Resource};
+use litchi_core::{ExecutionContext, ExecutionError, Reservation, Resource};
 use sha2::{Digest as _, Sha256};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
+
+/// The phase in which an artifact producer is being invoked.
+///
+/// A probe authenticates a producer into a bounded digest sink and therefore
+/// must not consume the recipient's output allowance. A publication writes to
+/// the caller's sink and charges that allowance exactly once.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArtifactStreamPhase {
+    Probe,
+    Publish,
+}
+
+/// Recipient-owned policy passed through a source-backed artifact stream.
+///
+/// The policy contains the recipient's complete source/output profile. A
+/// producer keeps using its own source, work and freshness context while it
+/// writes, while the recipient profile owns every output admission and byte
+/// charge. This split is what lets a deferred format producer publish into a
+/// different package without inheriting the producer's output allowance or
+/// charging the recipient twice. Format crates receive this value from a
+/// callback; they do not construct or retain it.
+pub struct ArtifactStreamPolicy<'recipient> {
+    phase: ArtifactStreamPhase,
+    recipient_limits: SourceLimits,
+    recipient_context: Option<&'recipient ExecutionContext>,
+    recipient_output_reservation_failures: Option<Arc<super::DiagnosticCounter>>,
+    failure: Arc<Mutex<Option<ExecutionError>>>,
+}
+
+struct SourceCatalogView<'source> {
+    source: &'source SourceSnapshot,
+    archive: &'source soapberry_zip::office::IndexedArchive<super::SourceReader>,
+    catalog: &'source super::AdmittedCatalog,
+    /// An optional final decoded size for one ordinary Part being replaced.
+    /// Source-backed splice admission uses this to avoid charging the
+    /// recipient for an oversized original that the final plan shrinks.
+    replacement: Option<(usize, u64)>,
+}
+
+struct StructuralMember {
+    bytes: Vec<u8>,
+    _memory: Option<Reservation>,
+}
+
+/// Read one structural XML member for a recipient re-admission pass.
+///
+/// The source catalog retains parsed relationship/content-type facts, but it
+/// intentionally does not retain XML bytes. A stricter recipient must still
+/// re-run the bounded XML grammar (not just compare the producer's scalar
+/// metrics), so this helper reads at most one already-size-checked structural
+/// member at a time. Ordinary Part payloads never use this path.
+fn read_structural_member(
+    source: &SourceSnapshot,
+    archive: &soapberry_zip::office::IndexedArchive<super::SourceReader>,
+    member_name: &str,
+    kind: SourceLimitKind,
+    maximum: u64,
+    limits: SourceLimits,
+) -> Result<Option<StructuralMember>> {
+    let entry_id = if let Some(entry_id) = archive.entry_id(member_name) {
+        Some(entry_id)
+    } else {
+        let mut casefolded = None;
+        for (candidate_id, candidate_name) in archive.file_entries() {
+            if !candidate_name.eq_ignore_ascii_case(member_name) {
+                continue;
+            }
+            if casefolded.replace(candidate_id).is_some() {
+                return Err(overlay_unavailable(
+                    "structural OPC member name is ambiguous under ASCII case folding",
+                ));
+            }
+        }
+        casefolded
+    };
+    let Some(entry_id) = entry_id else {
+        return Ok(None);
+    };
+    let metadata = archive
+        .metadata_for(entry_id)
+        .map_err(super::map_preservation_error)?;
+    let declared = metadata.uncompressed_size();
+    limits.check(kind, declared, maximum)?;
+    limits.check(
+        SourceLimitKind::EntryBytes,
+        declared,
+        limits.max_entry_bytes(),
+    )?;
+    let memory = source
+        .context
+        .as_ref()
+        .map(|context| {
+            let bound = declared
+                .checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                .ok_or_else(|| overlay_unavailable("structural XML memory bound overflows"))?;
+            context
+                .reserve(Resource::Memory, bound)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    source.ensure_current()?;
+    source
+        .context
+        .as_ref()
+        .map(|context| context.check().map_err(map_execution_error))
+        .transpose()?;
+    let bytes = archive
+        .read_entry(entry_id)
+        .map_err(super::map_preservation_error)?;
+    source.ensure_current()?;
+    source
+        .context
+        .as_ref()
+        .map(|context| context.check().map_err(map_execution_error))
+        .transpose()?;
+    if let Some(context) = source.context.as_ref() {
+        context
+            .consume(Resource::Work, bytes.len() as u64)
+            .map_err(map_execution_error)?;
+        source.ensure_current()?;
+    }
+    if u64::try_from(bytes.len()).ok() != Some(declared) {
+        return Err(OpcError::ZipError(format!(
+            "structural OPC member '{member_name}' declared {declared} uncompressed bytes but read {}",
+            bytes.len()
+        )));
+    }
+    Ok(Some(StructuralMember {
+        bytes,
+        _memory: memory,
+    }))
+}
+
+fn relationship_member_name(owner: &PackURI) -> Result<String> {
+    if owner.as_str() == super::PACKAGE_URI {
+        Ok("_rels/.rels".to_owned())
+    } else {
+        owner
+            .rels_uri()
+            .map_err(OpcError::InvalidPackUri)
+            .map(|uri| uri.membername().to_owned())
+    }
+}
+
+fn relationship_owner_from_member(member_name: &str) -> Result<Option<PackURI>> {
+    if !super::is_relationship_member_name(member_name) {
+        return Ok(None);
+    }
+    if member_name == "_rels/.rels" {
+        return PackURI::new(super::PACKAGE_URI)
+            .map(Some)
+            .map_err(OpcError::InvalidPackUri);
+    }
+    let Some((directory, filename)) = member_name.rsplit_once("/_rels/") else {
+        return Err(overlay_unavailable(
+            "relationship member owner cannot be derived",
+        ));
+    };
+    let Some((filename, extension)) = filename.rsplit_once('.') else {
+        return Err(overlay_unavailable(
+            "relationship member owner has an invalid suffix",
+        ));
+    };
+    if !extension.eq_ignore_ascii_case("rels") {
+        return Err(overlay_unavailable(
+            "relationship member owner has an invalid suffix",
+        ));
+    }
+    let owner = format!("/{directory}/{filename}");
+    PackURI::new(owner)
+        .map(Some)
+        .map_err(OpcError::InvalidPackUri)
+}
+
+fn admit_content_types_xml(xml: &[u8], limits: SourceLimits) -> Result<()> {
+    let _ = super::ContentTypeMap::from_xml(xml, limits)?;
+    Ok(())
+}
+
+fn parse_relationship_xml(
+    xml: &[u8],
+    owner: &PackURI,
+    limits: SourceLimits,
+) -> Result<super::Relationships> {
+    PackageReader::parse_owned_relationships(xml, owner, limits)
+}
+
+fn admit_relationship_xml(xml: &[u8], owner: &PackURI, limits: SourceLimits) -> Result<()> {
+    let _ = parse_relationship_xml(xml, owner, limits)?;
+    Ok(())
+}
+
+/// The typed failure bridge for a source-backed producer.
+///
+/// `Opc` retains failures raised by the OPC publication seam. `Producer`
+/// retains the format crate's original error value. When a sink or freshness
+/// fence fails during publication, `Publication` keeps the
+/// exact prefix and both observed causes when they are available. The enum's
+/// display/debug text is intentionally fixed; callers inspect the typed
+/// accessors for details.
+pub enum ArtifactStreamError<E> {
+    /// Failure raised by the OPC source or publication layer.
+    Opc(OpcError),
+    /// Failure returned by the producer format crate.
+    Producer(E),
+    /// A failure observed while publishing, with an exact accepted prefix.
+    Publication {
+        /// Exact bytes accepted by the caller's sink. This may be zero when a
+        /// second freshness failure accompanies a producer error before output.
+        written: u64,
+        /// The primary failure.
+        source: Box<Self>,
+        /// A second failure observed while closing the operation, if any.
+        secondary: Option<Box<Self>>,
+    },
+}
+
+impl<E> ArtifactStreamError<E> {
+    fn opc(error: OpcError) -> Self {
+        Self::Opc(error)
+    }
+
+    fn producer(error: E) -> Self {
+        Self::Producer(error)
+    }
+
+    fn incomplete(written: u64, source: Self, secondary: Option<Self>) -> Self {
+        Self::Publication {
+            written,
+            source: Box::new(source),
+            secondary: secondary.map(Box::new),
+        }
+    }
+
+    /// Return the exact accepted prefix, when output was partially emitted.
+    #[must_use]
+    pub fn written(&self) -> Option<u64> {
+        match self {
+            Self::Publication { written, .. } => Some(*written),
+            _ => None,
+        }
+    }
+
+    /// Return the first OPC failure in this error tree.
+    #[must_use]
+    pub fn opc_error(&self) -> Option<&OpcError> {
+        match self {
+            Self::Opc(error) => Some(error),
+            Self::Producer(_) => None,
+            Self::Publication {
+                source, secondary, ..
+            } => source
+                .opc_error()
+                .or_else(|| secondary.as_deref().and_then(Self::opc_error)),
+        }
+    }
+
+    /// Return the first producer failure in this error tree.
+    #[must_use]
+    pub fn producer_error(&self) -> Option<&E> {
+        match self {
+            Self::Opc(_) => None,
+            Self::Producer(error) => Some(error),
+            Self::Publication {
+                source, secondary, ..
+            } => source
+                .producer_error()
+                .or_else(|| secondary.as_deref().and_then(Self::producer_error)),
+        }
+    }
+
+    /// Return a secondary failure observed after the primary failure.
+    #[must_use]
+    pub fn secondary(&self) -> Option<&Self> {
+        match self {
+            Self::Publication { secondary, .. } => secondary.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+impl<E> fmt::Debug for ArtifactStreamError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("artifact stream operation failed")
+    }
+}
+
+impl<E> fmt::Display for ArtifactStreamError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("artifact stream operation failed")
+    }
+}
+
+impl<E> std::error::Error for ArtifactStreamError<E> {}
+
+/// A bounded source-backed producer that can be authenticated before output
+/// is accepted by a caller-owned sink.
+pub trait ArtifactStream {
+    type Error;
+
+    /// Check the producer's source/version and execution context.
+    fn check_fresh(&self) -> std::result::Result<(), Self::Error>;
+
+    /// Stream this artifact into `writer` under the recipient policy.
+    ///
+    /// Implementations must use the policy-aware OPC writers for every
+    /// source-backed publication they perform. Those writers keep producer
+    /// input/work checks and charge recipient output only in `Publish` mode.
+    fn stream_to(
+        &self,
+        writer: &mut dyn Write,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> std::result::Result<(), Self::Error>;
+}
+
+impl<'recipient> ArtifactStreamPolicy<'recipient> {
+    fn for_recipient(package: &'recipient SourceBackedPackage) -> Result<Self> {
+        let recipient_context = package.cache.context();
+        let recipient_output_reservation_failures = package
+            .source
+            .output_reservation_failures
+            .clone();
+        if recipient_context.is_some() && recipient_output_reservation_failures.is_none() {
+            return Err(overlay_unavailable(
+                "managed artifact stream output counter is unavailable",
+            ));
+        }
+        Ok(Self {
+            phase: ArtifactStreamPhase::Publish,
+            recipient_limits: package.limits,
+            recipient_context,
+            recipient_output_reservation_failures,
+            failure: Arc::new(Mutex::new(None)),
+        })
+    }
+
+    pub(crate) fn probe(&self) -> Self {
+        Self {
+            phase: ArtifactStreamPhase::Probe,
+            recipient_limits: self.recipient_limits,
+            recipient_context: self.recipient_context,
+            recipient_output_reservation_failures: self
+                .recipient_output_reservation_failures
+                .clone(),
+            failure: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn is_publish(&self) -> bool {
+        self.phase == ArtifactStreamPhase::Publish
+    }
+
+    fn recipient_context(&self) -> Option<&ExecutionContext> {
+        self.recipient_context
+    }
+
+    fn failure(&self) -> Arc<Mutex<Option<ExecutionError>>> {
+        Arc::clone(&self.failure)
+    }
+
+    pub(crate) fn take_failure(&self) -> Option<ExecutionError> {
+        self.failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+    }
+
+    pub(crate) fn check_recipient(&self) -> Result<()> {
+        self.recipient_context
+            .map_or(Ok(()), |context| context.check().map_err(map_execution_error))
+    }
+
+    /// Return the complete resource profile of the recipient package.
+    ///
+    /// The profile is used by a deferred/effective producer to admit its
+    /// final OPC topology before publication.  It is deliberately separate
+    /// from the producer's source profile: a producer keeps its own input and
+    /// work checks while the recipient owns all output admission.
+    #[must_use]
+    pub const fn recipient_limits(&self) -> SourceLimits {
+        self.recipient_limits
+    }
+
+    /// Check one recipient-owned resource without charging output bytes.
+    ///
+    /// Callers use this while census-ing a final topology.  Publication
+    /// writers still charge accepted bytes through the policy sink after this
+    /// check succeeds.
+    pub fn check_recipient_limit(
+        &self,
+        resource: SourceLimitKind,
+        actual: u64,
+        maximum: u64,
+    ) -> Result<()> {
+        self.recipient_limits.check(resource, actual, maximum)
+    }
+
+    /// Admit the unchanged source catalog against the recipient profile.
+    ///
+    /// This is the bounded metadata census used by policy-aware OPC writers
+    /// before they touch an external sink. It checks the retained ZIP member,
+    /// Part, relationship, content-type, XML-event, attribute, target, and
+    /// aggregate dimensions that are available without materializing ordinary
+    /// payloads. A changed/effective producer must add its final-plan census
+    /// through the same accessors before calling a policy writer.
+    pub(crate) fn admit_source_catalog(&self, package: &SourceBackedPackage) -> Result<()> {
+        self.admit_source_view(SourceCatalogView {
+            source: &package.source,
+            archive: &package.archive,
+            catalog: &package.catalog,
+            replacement: None,
+        })
+    }
+
+    pub(crate) fn admit_source_artifact(&self, artifact: &SourceArtifact) -> Result<()> {
+        self.admit_source_view(SourceCatalogView {
+            source: &artifact.snapshot,
+            archive: &artifact.archive,
+            catalog: &artifact.catalog,
+            replacement: None,
+        })
+    }
+
+    /// Admit a decoded splice's final topology while allowing its target Part
+    /// to shrink or grow relative to the source catalog. The ZIP profile
+    /// callback still owns the exact final compressed/archive measurements;
+    /// this pass covers the recipient's OPC Part and structural XML policy
+    /// before replay can touch the publication sink.
+    pub(crate) fn admit_splice_candidate(
+        &self,
+        package: &SourceBackedPackage,
+        target: usize,
+        candidate_bytes: u64,
+    ) -> Result<()> {
+        if target >= package.catalog.parts.len() {
+            return Err(OpcError::PartNotFound(target.to_string()));
+        }
+        self.admit_source_view(SourceCatalogView {
+            source: &package.source,
+            archive: &package.archive,
+            catalog: &package.catalog,
+            replacement: Some((target, candidate_bytes)),
+        })
+    }
+
+    fn admit_source_view(&self, view: SourceCatalogView<'_>) -> Result<()> {
+        self.check_recipient()?;
+        view.source.ensure_current()?;
+        view.source
+            .context
+            .as_ref()
+            .map(|context| context.check().map_err(map_execution_error))
+            .transpose()?;
+        let limits = self.recipient_limits;
+        if view.replacement.is_none() {
+            limits.check(
+                SourceLimitKind::InputBytes,
+                view.source.length,
+                limits.max_input_bytes(),
+            )?;
+        }
+        let member_count = u64::try_from(view.archive.len())
+            .map_err(|_| overlay_unavailable("recipient member count exceeds u64"))?;
+        limits.check(SourceLimitKind::Members, member_count, limits.max_members() as u64)?;
+        let total_entries = u64::try_from(view.archive.preservation_entry_count())
+            .map_err(|_| overlay_unavailable("recipient ZIP entry count exceeds u64"))?;
+        limits.check(
+            SourceLimitKind::ArchiveTotalEntries,
+            total_entries,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        if view.replacement.is_none() {
+            limits.check(
+                SourceLimitKind::ArchiveMetadataBytes,
+                view.archive.preservation_metadata_bytes(),
+                limits.max_archive_metadata_bytes(),
+            )?;
+        }
+
+        let mut aggregate_bytes = 0_u64;
+        let mut relationship_parts = 0_u64;
+        let replacement_entry = view
+            .replacement
+            .and_then(|(index, _)| view.catalog.parts.get(index))
+            .map(|part| part.entry_id);
+        for (index, (entry_id, name)) in view.archive.file_entries().enumerate() {
+            if index & 0xff == 0 {
+                view.source.ensure_current()?;
+                view.source
+                    .context
+                    .as_ref()
+                    .map(|context| context.check().map_err(map_execution_error))
+                    .transpose()?;
+            }
+            let name_bytes = u64::try_from(name.len())
+                .map_err(|_| overlay_unavailable("recipient member name exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                name_bytes,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let metadata = view.archive.metadata_for(entry_id)?;
+            let compressed = metadata.compressed_size();
+            let replacement = replacement_entry == Some(entry_id);
+            let entry = if replacement {
+                view.replacement
+                    .map(|(_, bytes)| bytes)
+                    .ok_or_else(|| overlay_unavailable("replacement entry bytes are unavailable"))?
+            } else {
+                metadata.uncompressed_size()
+            };
+            if !replacement {
+                limits.check(
+                    SourceLimitKind::ArchiveCompressedBytes,
+                    compressed,
+                    limits.max_archive_compressed_bytes(),
+                )?;
+            }
+            limits.check(SourceLimitKind::EntryBytes, entry, limits.max_entry_bytes())?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(entry)
+                .ok_or_else(|| overlay_unavailable("recipient aggregate bytes overflow"))?;
+            if super::is_relationship_member_name(name) {
+                relationship_parts = relationship_parts
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
+            }
+        }
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            aggregate_bytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::RelationshipParts,
+            relationship_parts,
+            limits.max_relationship_parts() as u64,
+        )?;
+
+        let part_count = u64::try_from(view.catalog.parts.len())
+            .map_err(|_| overlay_unavailable("recipient Part count exceeds u64"))?;
+        limits.check(SourceLimitKind::Parts, part_count, limits.max_parts() as u64)?;
+        let mut total_part_bytes = 0_u64;
+        for (index, part) in view.catalog.parts.iter().enumerate() {
+            if index & 0xff == 0 {
+                view.source.ensure_current()?;
+            }
+            let metadata = view.archive.metadata_for(part.entry_id)?;
+            let bytes = if view.replacement.is_some_and(|(target, _)| target == index) {
+                view.replacement
+                    .map(|(_, bytes)| bytes)
+                    .ok_or_else(|| overlay_unavailable("replacement Part bytes are unavailable"))?
+            } else {
+                metadata.uncompressed_size()
+            };
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            total_part_bytes = total_part_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient Part bytes overflow"))?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_part_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+
+        let content_types_entry = view
+            .archive
+            .entry_id(&view.catalog.content_types_member)
+            .ok_or_else(|| OpcError::PartNotFound(view.catalog.content_types_member.clone()))?;
+        let content_types_bytes = view.archive.metadata_for(content_types_entry)?.uncompressed_size();
+        limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            content_types_bytes,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            content_types_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::EntryBytes,
+            content_types_bytes,
+            limits.max_entry_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::ContentTypeMappings,
+            view.catalog.content_types.mapping_count() as u64,
+            limits.max_content_type_mappings() as u64,
+        )?;
+        if let Some(xml) = read_structural_member(
+            view.source,
+            view.archive,
+            &view.catalog.content_types_member,
+            SourceLimitKind::ContentTypesBytes,
+            limits.max_content_types_bytes() as u64,
+            limits,
+        )? {
+            admit_content_types_xml(&xml.bytes, limits)?;
+        }
+
+        let mut relationship_xml_bytes = 0_u64;
+        let mut relationship_events = 0_u64;
+        let mut total_relationships = 0_u64;
+        let mut relationship_owners = HashSet::new();
+        for owner in view.catalog.relationship_xml_metrics.keys() {
+            relationship_owners.insert(owner.clone());
+        }
+        for (_, member_name) in view.archive.file_entries() {
+            if let Some(owner) = relationship_owner_from_member(member_name)? {
+                relationship_owners.insert(owner);
+            }
+        }
+
+        let mut check_relationships = |relationships: &super::Relationships| -> Result<()> {
+            let count = u64::try_from(relationships.len())
+                .map_err(|_| overlay_unavailable("recipient relationship count exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::RelationshipsPerPart,
+                count,
+                limits.max_relationships_per_part() as u64,
+            )?;
+            total_relationships = total_relationships
+                .checked_add(count)
+                .ok_or_else(|| overlay_unavailable("recipient relationship count overflow"))?;
+            for relationship in relationships.iter() {
+                for value in [
+                    relationship.r_id(),
+                    relationship.reltype(),
+                    relationship.target_ref(),
+                ] {
+                    limits.check(
+                        SourceLimitKind::XmlAttributeBytes,
+                        value.len() as u64,
+                        limits.max_xml_attribute_bytes() as u64,
+                    )?;
+                    limits.check(
+                        SourceLimitKind::XmlAttributeBytes,
+                        super::escaped_xml_attribute_len(value)? as u64,
+                        limits.max_xml_attribute_bytes() as u64,
+                    )?;
+                }
+                limits.check(
+                    SourceLimitKind::RelationshipTargetBytes,
+                    relationship.target_ref().len() as u64,
+                    limits.max_relationship_target_bytes() as u64,
+                )?;
+            }
+            Ok(())
+        };
+
+        for owner in relationship_owners {
+            let member_name = relationship_member_name(&owner)?;
+            let Some(xml) = read_structural_member(
+                view.source,
+                view.archive,
+                &member_name,
+                SourceLimitKind::RelationshipXmlBytes,
+                limits.max_relationship_xml_bytes() as u64,
+                limits,
+            )? else {
+                return Err(overlay_unavailable(
+                    "source relationship XML is unavailable for recipient admission",
+                ));
+            };
+            let bytes = u64::try_from(xml.bytes.len())
+                .map_err(|_| overlay_unavailable("relationship XML length exceeds u64"))?;
+            let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
+            limits.check(
+                SourceLimitKind::RelationshipXmlBytes,
+                bytes,
+                limits.max_relationship_xml_bytes() as u64,
+            )?;
+            relationship_xml_bytes = relationship_xml_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient relationship bytes overflow"))?;
+            relationship_events = relationship_events
+                .checked_add(events)
+                .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
+            let parsed = parse_relationship_xml(&xml.bytes, &owner, limits)?;
+            if !view.catalog.relationship_xml_metrics.contains_key(&owner) {
+                check_relationships(&parsed)?;
+            }
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            relationship_xml_bytes,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            relationship_events,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+
+        check_relationships(&view.catalog.package_relationships)?;
+        for part in &view.catalog.parts {
+            check_relationships(&part.relationships)?;
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationships,
+            total_relationships,
+            limits.max_total_relationships() as u64,
+        )?;
+
+        // Count the reachable relationship graph without allocating payloads.
+        // This is exact for the unchanged source catalog and remains a useful
+        // lower-level guard before a changed producer supplies its final-plan
+        // graph census.
+        let mut graph = HashSet::new();
+        let mut work = Vec::new();
+        for relationship in view.catalog.package_relationships.iter() {
+            if !relationship.is_external() {
+                let target = relationship.target_partname()?;
+                if graph.insert(target.clone()) {
+                    let count = u64::try_from(graph.len())
+                        .map_err(|_| overlay_unavailable("recipient graph node count exceeds u64"))?;
+                    limits.check(
+                        SourceLimitKind::RelationshipGraphNodes,
+                        count,
+                        limits.max_relationship_graph_nodes() as u64,
+                    )?;
+                    work.push(target);
+                }
+            }
+        }
+        while let Some(owner) = work.pop() {
+            let Some(index) = view.catalog.parts_by_name.get(&owner).copied() else {
+                continue;
+            };
+            for relationship in view.catalog.parts[index].relationships.iter() {
+                if !relationship.is_external() {
+                    let target = relationship.target_partname()?;
+                    if graph.insert(target.clone()) {
+                        let count = u64::try_from(graph.len()).map_err(|_| {
+                            overlay_unavailable("recipient graph node count exceeds u64")
+                        })?;
+                        limits.check(
+                            SourceLimitKind::RelationshipGraphNodes,
+                            count,
+                            limits.max_relationship_graph_nodes() as u64,
+                        )?;
+                        work.push(target);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Admit the exact final ZIP layout prepared by the preservation writer.
+    ///
+    /// The source/catalog checks above cannot know the compressed size or
+    /// ZIP64 promotion of a changed member. The preservation profile is
+    /// produced after those facts are final and before the first sink write,
+    /// so this pass closes that gap without retaining archive bytes.
+    pub(crate) fn admit_preservation_profile(
+        &self,
+        profile: &soapberry_zip::PreservationOutputProfile<'_>,
+    ) -> Result<()> {
+        self.check_recipient()?;
+        let limits = self.recipient_limits;
+        limits.check(
+            SourceLimitKind::InputBytes,
+            profile.archive_bytes(),
+            limits.max_input_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::ArchiveTotalEntries,
+            profile.entry_count(),
+            limits.max_archive_total_entries() as u64,
+        )?;
+        let metadata_bytes = profile
+            .prefix_bytes()
+            .checked_add(profile.central_directory_bytes())
+            .and_then(|bytes| bytes.checked_add(profile.tail_bytes()))
+            .and_then(|bytes| bytes.checked_add(profile.archive_comment_bytes()))
+            .ok_or_else(|| overlay_unavailable("recipient ZIP metadata bytes overflow"))?;
+        let geometry = profile
+            .prefix_bytes()
+            .checked_add(profile.local_bytes())
+            .and_then(|bytes| bytes.checked_add(profile.central_directory_bytes()))
+            .and_then(|bytes| bytes.checked_add(profile.tail_bytes()))
+            .and_then(|bytes| bytes.checked_add(profile.archive_comment_bytes()))
+            .ok_or_else(|| overlay_unavailable("recipient ZIP archive geometry overflows"))?;
+        if geometry != profile.archive_bytes() {
+            return Err(overlay_unavailable(
+                "recipient ZIP output profile geometry is inconsistent",
+            ));
+        }
+        limits.check(
+            SourceLimitKind::ArchiveMetadataBytes,
+            metadata_bytes,
+            limits.max_archive_metadata_bytes(),
+        )?;
+
+        let mut aggregate_bytes = 0_u64;
+        let mut central_metadata_bytes = 0_u64;
+        if u64::try_from(profile.entries().len()).ok() != Some(profile.entry_count()) {
+            return Err(overlay_unavailable(
+                "recipient ZIP entry count profile is inconsistent",
+            ));
+        }
+        for entry in profile.entries() {
+            let variable_metadata = entry
+                .raw_name_len()
+                .checked_add(entry.extra_len())
+                .and_then(|bytes| bytes.checked_add(entry.comment_len()))
+                .ok_or_else(|| overlay_unavailable("recipient ZIP entry metadata overflows"))?;
+            if entry.metadata_len() != variable_metadata
+                || entry.central_record_len() < variable_metadata
+            {
+                return Err(overlay_unavailable(
+                    "recipient ZIP entry metadata profile is inconsistent",
+                ));
+            }
+            central_metadata_bytes = central_metadata_bytes
+                .checked_add(entry.metadata_len())
+                .ok_or_else(|| overlay_unavailable("recipient ZIP metadata bytes overflow"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                entry.raw_name_len(),
+                limits.max_archive_member_name_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::ArchiveCompressedBytes,
+                entry.compressed_size(),
+                limits.max_archive_compressed_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::EntryBytes,
+                entry.uncompressed_size(),
+                limits.max_entry_bytes(),
+            )?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(entry.uncompressed_size())
+                .ok_or_else(|| overlay_unavailable("recipient ZIP aggregate bytes overflow"))?;
+        }
+        if central_metadata_bytes != profile.central_metadata_bytes() {
+            return Err(overlay_unavailable(
+                "recipient ZIP central metadata profile is inconsistent",
+            ));
+        }
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            aggregate_bytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        Ok(())
+    }
+
+    /// Admit a prepared effective topology against the recipient profile.
+    ///
+    /// A prepared plan may remove source members or replace their logical
+    /// payloads, so checking the producer's original catalog here would both
+    /// over-refuse valid shrinking plans and miss replacement-specific XML and
+    /// graph facts.  This census uses the retained effective catalog and
+    /// scalar plan metadata.  ZIP central-directory metadata for retained
+    /// members remains exact; generated compressed sizes are deliberately
+    /// checked by the writer's generated-entry admission hook before that
+    /// hook exposes a publication plan.
+    pub(crate) fn admit_prepared_topology(
+        &self,
+        package: &SourceBackedPackage,
+        state: &super::PreparedTopologyState,
+    ) -> Result<()> {
+        self.check_recipient()?;
+        package.source.ensure_current()?;
+        package.cache.check_context().map_err(map_execution_error)?;
+        if state.no_op {
+            return self.admit_source_catalog(package);
+        }
+        let limits = self.recipient_limits;
+        let effective = state.effective_data();
+        let retained = state.retained();
+        let totals = state
+            .totals
+            .as_ref()
+            .ok_or_else(|| overlay_unavailable("prepared topology totals are unavailable"))?;
+
+        let part_count = u64::try_from(effective.parts.len())
+            .map_err(|_| overlay_unavailable("recipient effective Part count exceeds u64"))?;
+        limits.check(SourceLimitKind::Parts, part_count, limits.max_parts() as u64)?;
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            totals.parts,
+            limits.max_total_part_bytes(),
+        )?;
+
+        let is_omitted = |name: &str| {
+            retained
+                .omitted_members
+                .iter()
+                .any(|omitted| omitted.eq_ignore_ascii_case(name))
+        };
+        let changed_payload = |name: &str| {
+            state.changed.iter().find_map(|change| {
+                (super::replacement_member_name(change, &package.catalog.parts)
+                    .eq_ignore_ascii_case(name))
+                .then(|| change.replacement.as_slice())
+            })
+        };
+
+        let mut aggregate_bytes = 0_u64;
+        let mut relationship_parts = 0_u64;
+        let mut retained_members = 0_u64;
+        for (index, (entry_id, name)) in package.archive.file_entries().enumerate() {
+            if index & 0xff == 0 {
+                package.source.ensure_current()?;
+                package.cache.check_context().map_err(map_execution_error)?;
+            }
+            if is_omitted(name) {
+                continue;
+            }
+            retained_members = retained_members
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("recipient member count overflows"))?;
+            let name_bytes = u64::try_from(name.len())
+                .map_err(|_| overlay_unavailable("recipient member name exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                name_bytes,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let metadata = package.archive.metadata_for(entry_id)?;
+            let bytes = changed_payload(name)
+                .map_or(metadata.uncompressed_size(), |payload| payload.len() as u64);
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            // A changed member is regenerated with the source compression
+            // method.  Store's compressed size is exact; Deflate size is
+            // admitted by the generated-entry writer immediately before its
+            // plan is exposed, rather than guessed from the source member.
+            if changed_payload(name).is_none() {
+                limits.check(
+                    SourceLimitKind::ArchiveCompressedBytes,
+                    metadata.compressed_size(),
+                    limits.max_archive_compressed_bytes(),
+                )?;
+            }
+            aggregate_bytes = aggregate_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient aggregate bytes overflow"))?;
+            if super::is_relationship_member_name(name) {
+                relationship_parts = relationship_parts
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
+            }
+        }
+        let generated_names = effective.added_member_names.as_ref();
+        for name in generated_names {
+            let name_bytes = u64::try_from(name.len())
+                .map_err(|_| overlay_unavailable("generated member name exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                name_bytes,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let payload = retained
+                .appended_metadata
+                .iter()
+                .find(|(member, _)| member.eq_ignore_ascii_case(name))
+                .map(|(_, payload)| payload.as_slice())
+                .or_else(|| {
+                    effective.parts.iter().find_map(|part| {
+                        (part.source_index.is_none()
+                            && part.partname(package).membername().eq_ignore_ascii_case(name))
+                        .then(|| part.replacement.as_deref().unwrap_or_default())
+                    })
+                })
+                .ok_or_else(|| {
+                    overlay_unavailable("generated member payload metadata is unavailable")
+                })?;
+            let bytes = payload.len() as u64;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            aggregate_bytes = aggregate_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient aggregate bytes overflow"))?;
+            if super::is_relationship_member_name(name) {
+                relationship_parts = relationship_parts
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
+            }
+        }
+        let member_count = retained_members
+            .checked_add(u64::try_from(generated_names.len()).map_err(|_| {
+                overlay_unavailable("generated member count exceeds u64")
+            })?)
+            .ok_or_else(|| overlay_unavailable("recipient member count overflows"))?;
+        limits.check(SourceLimitKind::Members, member_count, limits.max_members() as u64)?;
+        let source_entry_count = u64::try_from(package.archive.preservation_entry_count())
+            .map_err(|_| overlay_unavailable("source ZIP entry count exceeds u64"))?;
+        let omitted_entry_count = u64::try_from(retained.omitted_members.len())
+            .map_err(|_| overlay_unavailable("omitted ZIP entry count exceeds u64"))?;
+        let final_entry_count = source_entry_count
+            .checked_sub(omitted_entry_count)
+            .and_then(|count| count.checked_add(generated_names.len() as u64))
+            .ok_or_else(|| overlay_unavailable("recipient ZIP entry count underflows"))?;
+        limits.check(
+            SourceLimitKind::ArchiveTotalEntries,
+            final_entry_count,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            aggregate_bytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::RelationshipParts,
+            relationship_parts,
+            limits.max_relationship_parts() as u64,
+        )?;
+
+        let mut total_part_bytes = 0_u64;
+        for (index, part) in effective.parts.iter().enumerate() {
+            if index & 0xff == 0 {
+                package.source.ensure_current()?;
+            }
+            let name_bytes = u64::try_from(part.partname(package).membername().len())
+                .map_err(|_| overlay_unavailable("recipient Part name exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                name_bytes,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let bytes = if let Some(payload) = part.replacement.as_deref() {
+                payload.len() as u64
+            } else {
+                let source_index = part
+                    .source_index
+                    .ok_or_else(|| overlay_unavailable("effective Part payload is unavailable"))?;
+                package
+                    .archive
+                    .metadata_for(package.catalog.parts[source_index].entry_id)?
+                    .uncompressed_size()
+            };
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            total_part_bytes = total_part_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient Part bytes overflow"))?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_part_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        let package_relationships = effective
+            .package_relationships
+            .as_deref()
+            .unwrap_or(&package.catalog.package_relationships);
+        let mut total_relationships = 0_u64;
+        check_relationships(limits, package_relationships, &mut total_relationships)?;
+        for part in &effective.parts {
+            check_relationships(
+                limits,
+                part.relationships(package),
+                &mut total_relationships,
+            )?;
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationships,
+            total_relationships,
+            limits.max_total_relationships() as u64,
+        )?;
+
+        let content_types_name = package.catalog.content_types_member.as_str();
+        let changed_content_types = changed_payload(content_types_name);
+        let content_types_bytes = if let Some(payload) = changed_content_types {
+            admit_content_types_xml(payload, limits)?;
+            payload.len() as u64
+        } else {
+            let entry = package
+                .archive
+                .entry_id(content_types_name)
+                .ok_or_else(|| OpcError::PartNotFound(content_types_name.to_owned()))?;
+            let bytes = package.archive.metadata_for(entry)?.uncompressed_size();
+            if let Some(xml) = read_structural_member(
+                &package.source,
+                &package.archive,
+                content_types_name,
+                SourceLimitKind::ContentTypesBytes,
+                limits.max_content_types_bytes() as u64,
+                limits,
+            )? {
+                admit_content_types_xml(&xml.bytes, limits)?;
+            }
+            bytes
+        };
+        limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            content_types_bytes,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(SourceLimitKind::PartBytes, content_types_bytes, limits.max_part_bytes())?;
+        limits.check(SourceLimitKind::EntryBytes, content_types_bytes, limits.max_entry_bytes())?;
+        let mapping_count = effective
+            .content_types
+            .as_ref()
+            .map_or(package.catalog.content_types.mapping_count(), |map| map.mapping_count());
+        limits.check(
+            SourceLimitKind::ContentTypeMappings,
+            mapping_count as u64,
+            limits.max_content_type_mappings() as u64,
+        )?;
+
+        let mut relationship_xml_bytes = 0_u64;
+        let mut relationship_events = 0_u64;
+        let mut relationship_owners = HashSet::new();
+        for owner in package.catalog.relationship_xml_metrics.keys() {
+            relationship_owners.insert(owner.clone());
+        }
+        for (_, member_name) in package.archive.file_entries() {
+            if let Some(owner) = relationship_owner_from_member(member_name)? {
+                relationship_owners.insert(owner);
+            }
+        }
+        relationship_owners.insert(
+            PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?,
+        );
+        for part in &effective.parts {
+            relationship_owners.insert(part.partname(package).clone());
+        }
+        for owner in relationship_owners {
+            let member = relationship_member_name(&owner)?;
+            if is_omitted(&member) {
+                continue;
+            }
+            let changed = changed_payload(&member).or_else(|| {
+                retained
+                    .appended_metadata
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(&member))
+                    .map(|(_, payload)| payload.as_slice())
+            });
+            let (bytes, events) = if let Some(xml) = changed {
+                admit_relationship_xml(xml, &owner, limits)?;
+                let bytes = xml.len() as u64;
+                (bytes, super::relationship_xml_event_count(xml, limits)?)
+            } else if package.catalog.relationship_xml_metrics.contains_key(&owner) {
+                let Some(xml) = read_structural_member(
+                    &package.source,
+                    &package.archive,
+                    &member,
+                    SourceLimitKind::RelationshipXmlBytes,
+                    limits.max_relationship_xml_bytes() as u64,
+                    limits,
+                )? else {
+                    return Err(overlay_unavailable(
+                        "source relationship XML is unavailable for effective topology",
+                    ));
+                };
+                admit_relationship_xml(&xml.bytes, &owner, limits)?;
+                let bytes = u64::try_from(xml.bytes.len())
+                    .map_err(|_| overlay_unavailable("relationship XML length exceeds u64"))?;
+                let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
+                (bytes, events)
+            } else {
+                let Some(xml) = read_structural_member(
+                    &package.source,
+                    &package.archive,
+                    &member,
+                    SourceLimitKind::RelationshipXmlBytes,
+                    limits.max_relationship_xml_bytes() as u64,
+                    limits,
+                )? else {
+                    continue;
+                };
+                admit_relationship_xml(&xml.bytes, &owner, limits)?;
+                let bytes = u64::try_from(xml.bytes.len())
+                    .map_err(|_| overlay_unavailable("relationship XML length exceeds u64"))?;
+                let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
+                (bytes, events)
+            };
+            limits.check(
+                SourceLimitKind::RelationshipXmlBytes,
+                bytes,
+                limits.max_relationship_xml_bytes() as u64,
+            )?;
+            limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
+            relationship_xml_bytes = relationship_xml_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient relationship bytes overflow"))?;
+            relationship_events = relationship_events
+                .checked_add(events)
+                .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            relationship_xml_bytes,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            relationship_events,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+
+        // Traverse the effective graph, checking before each new target is
+        // retained so the admission itself cannot grow beyond the recipient
+        // graph bound.
+        let mut graph = HashSet::new();
+        let mut work = Vec::new();
+        enqueue_graph_targets(
+            package_relationships,
+            &mut graph,
+            &mut work,
+            limits,
+        )?;
+        while let Some(owner) = work.pop() {
+            let Some(part) = effective.parts.iter().find(|part| {
+                part.partname(package).is_equivalent_to(&owner)
+            }) else {
+                continue;
+            };
+            enqueue_graph_targets(part.relationships(package), &mut graph, &mut work, limits)?;
+        }
+        Ok(())
+    }
+
+    /// Admit a direct replacement/deletion publication against the final
+    /// physical member set.  This path has no prepared effective catalog, so
+    /// it derives the final scalar gauges from source metadata plus the
+    /// replacement bytes and reparses changed relationship XML before output.
+    pub(crate) fn admit_changed_overlays(
+        &self,
+        package: &SourceBackedPackage,
+        replacements: &[super::ChangedOverlay],
+        omitted_members: &[String],
+    ) -> Result<()> {
+        self.check_recipient()?;
+        package.source.ensure_current()?;
+        package.cache.check_context().map_err(map_execution_error)?;
+        let limits = self.recipient_limits;
+        let is_omitted = |name: &str| {
+            omitted_members
+                .iter()
+                .any(|omitted| omitted.eq_ignore_ascii_case(name))
+        };
+        let changed_payload = |name: &str| {
+            replacements.iter().find_map(|change| {
+                (super::replacement_member_name(change, &package.catalog.parts)
+                    .eq_ignore_ascii_case(name))
+                .then(|| change.replacement.as_slice())
+            })
+        };
+        let mut members = 0_u64;
+        let mut relationships_parts = 0_u64;
+        let mut aggregate_bytes = 0_u64;
+        for (index, (entry_id, name)) in package.archive.file_entries().enumerate() {
+            if index & 0xff == 0 {
+                package.source.ensure_current()?;
+            }
+            if is_omitted(name) {
+                continue;
+            }
+            members = members
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("recipient member count overflows"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                name.len() as u64,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            let metadata = package.archive.metadata_for(entry_id)?;
+            let changed = changed_payload(name);
+            let bytes = changed.map_or(metadata.uncompressed_size(), |payload| payload.len() as u64);
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            if changed.is_none() {
+                limits.check(
+                    SourceLimitKind::ArchiveCompressedBytes,
+                    metadata.compressed_size(),
+                    limits.max_archive_compressed_bytes(),
+                )?;
+            }
+            aggregate_bytes = aggregate_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient aggregate bytes overflow"))?;
+            if super::is_relationship_member_name(name) {
+                relationships_parts = relationships_parts
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship parts overflow"))?;
+            }
+        }
+        limits.check(SourceLimitKind::Members, members, limits.max_members() as u64)?;
+        let source_entry_count = u64::try_from(package.archive.preservation_entry_count())
+            .map_err(|_| overlay_unavailable("source ZIP entry count exceeds u64"))?;
+        let omitted_entry_count = u64::try_from(omitted_members.len())
+            .map_err(|_| overlay_unavailable("omitted ZIP entry count exceeds u64"))?;
+        let final_entry_count = source_entry_count
+            .checked_sub(omitted_entry_count)
+            .ok_or_else(|| overlay_unavailable("recipient ZIP entry count underflows"))?;
+        limits.check(
+            SourceLimitKind::ArchiveTotalEntries,
+            final_entry_count,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            aggregate_bytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::RelationshipParts,
+            relationships_parts,
+            limits.max_relationship_parts() as u64,
+        )?;
+
+        let mut total_part_bytes = 0_u64;
+        for part in &package.catalog.parts {
+            let member = part.partname.membername();
+            if is_omitted(member) {
+                continue;
+            }
+            let changed = changed_payload(member);
+            let bytes = changed.map_or(
+                package.archive.metadata_for(part.entry_id)?.uncompressed_size(),
+                |payload| payload.len() as u64,
+            );
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            total_part_bytes = total_part_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| overlay_unavailable("recipient Part bytes overflow"))?;
+        }
+        let part_count = package
+            .catalog
+            .parts
+            .iter()
+            .filter(|part| !is_omitted(part.partname.membername()))
+            .count();
+        limits.check(
+            SourceLimitKind::Parts,
+            u64::try_from(part_count)
+                .map_err(|_| overlay_unavailable("recipient Part count exceeds u64"))?,
+            limits.max_parts() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_part_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+
+        let content_types_name = package.catalog.content_types_member.as_str();
+        let (content_types_bytes, content_type_mapping_count) =
+            if let Some(payload) = changed_payload(content_types_name) {
+                let parsed = super::ContentTypeMap::from_xml(payload, limits)?;
+                (payload.len() as u64, parsed.mapping_count() as u64)
+        } else {
+            let entry = package
+                .archive
+                .entry_id(content_types_name)
+                .ok_or_else(|| OpcError::PartNotFound(content_types_name.to_owned()))?;
+            let bytes = package.archive.metadata_for(entry)?.uncompressed_size();
+            if let Some(xml) = read_structural_member(
+                &package.source,
+                &package.archive,
+                content_types_name,
+                SourceLimitKind::ContentTypesBytes,
+                limits.max_content_types_bytes() as u64,
+                limits,
+            )? {
+                admit_content_types_xml(&xml.bytes, limits)?;
+            }
+            (bytes, package.catalog.content_types.mapping_count() as u64)
+        };
+        limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            content_types_bytes,
+            limits.max_content_types_bytes() as u64,
+        )?;
+        limits.check(SourceLimitKind::PartBytes, content_types_bytes, limits.max_part_bytes())?;
+        limits.check(SourceLimitKind::EntryBytes, content_types_bytes, limits.max_entry_bytes())?;
+        limits.check(
+            SourceLimitKind::ContentTypeMappings,
+            content_type_mapping_count,
+            limits.max_content_type_mappings() as u64,
+        )?;
+
+        let mut relationship_xml_bytes = 0_u64;
+        let mut relationship_events = 0_u64;
+        let mut relationship_total = 0_u64;
+        let mut relationship_map = HashMap::new();
+        let mut relationship_owners = HashSet::new();
+        for owner in package.catalog.relationship_xml_metrics.keys() {
+            relationship_owners.insert(owner.clone());
+        }
+        for (_, member_name) in package.archive.file_entries() {
+            if let Some(owner) = relationship_owner_from_member(member_name)? {
+                relationship_owners.insert(owner);
+            }
+        }
+        for owner in relationship_owners {
+            let member = relationship_member_name(&owner)?;
+            if is_omitted(&member) {
+                continue;
+            }
+            let changed = changed_payload(&member);
+            let relationships = if let Some(xml) = changed {
+                let parsed = PackageReader::parse_owned_relationships(xml, &owner, limits)?;
+                let events = super::relationship_xml_event_count(xml, limits)?;
+                relationship_xml_bytes = relationship_xml_bytes
+                    .checked_add(xml.len() as u64)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship bytes overflow"))?;
+                relationship_events = relationship_events
+                    .checked_add(events)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
+                parsed
+            } else {
+                let Some(xml) = read_structural_member(
+                    &package.source,
+                    &package.archive,
+                    &member,
+                    SourceLimitKind::RelationshipXmlBytes,
+                    limits.max_relationship_xml_bytes() as u64,
+                    limits,
+                )? else {
+                    return Err(overlay_unavailable(
+                        "source relationship XML is unavailable for overlay admission",
+                    ));
+                };
+                let parsed = parse_relationship_xml(&xml.bytes, &owner, limits)?;
+                let events = super::relationship_xml_event_count(&xml.bytes, limits)?;
+                relationship_xml_bytes = relationship_xml_bytes
+                    .checked_add(xml.bytes.len() as u64)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship bytes overflow"))?;
+                relationship_events = relationship_events
+                    .checked_add(events)
+                    .ok_or_else(|| overlay_unavailable("recipient relationship events overflow"))?;
+                parsed
+            };
+            check_relationships(limits, &relationships, &mut relationship_total)?;
+            relationship_map.insert(owner.clone(), relationships);
+        }
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            relationship_xml_bytes,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            relationship_events,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationships,
+            relationship_total,
+            limits.max_total_relationships() as u64,
+        )?;
+
+        let root_owner =
+            PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let Some(root) = relationship_map.get(&root_owner) else {
+            return Ok(());
+        };
+        let mut graph = HashSet::new();
+        let mut work = Vec::new();
+        enqueue_graph_targets(root, &mut graph, &mut work, limits)?;
+        while let Some(owner) = work.pop() {
+            if let Some(relationships) = relationship_map.get(&owner) {
+                enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn check_relationships(
+    limits: SourceLimits,
+    relationships: &super::Relationships,
+    total: &mut u64,
+) -> Result<()> {
+    let count = u64::try_from(relationships.len())
+        .map_err(|_| overlay_unavailable("recipient relationship count exceeds u64"))?;
+    limits.check(
+        SourceLimitKind::RelationshipsPerPart,
+        count,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    *total = total
+        .checked_add(count)
+        .ok_or_else(|| overlay_unavailable("recipient relationship count overflows"))?;
+    for relationship in relationships.iter() {
+        for value in [
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        ] {
+            limits.check(
+                SourceLimitKind::XmlAttributeBytes,
+                value.len() as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+            limits.check(
+                SourceLimitKind::XmlAttributeBytes,
+                super::escaped_xml_attribute_len(value)? as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            )?;
+        }
+        limits.check(
+            SourceLimitKind::RelationshipTargetBytes,
+            relationship.target_ref().len() as u64,
+            limits.max_relationship_target_bytes() as u64,
+        )?;
+    }
+    Ok(())
+}
+
+fn enqueue_graph_targets(
+    relationships: &super::Relationships,
+    graph: &mut HashSet<PackURI>,
+    work: &mut Vec<PackURI>,
+    limits: SourceLimits,
+) -> Result<()> {
+    for relationship in relationships.iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        let target = relationship.target_partname()?;
+        if graph.insert(target.clone()) {
+            let count = u64::try_from(graph.len())
+                .map_err(|_| overlay_unavailable("recipient graph node count exceeds u64"))?;
+            limits.check(
+                SourceLimitKind::RelationshipGraphNodes,
+                count,
+                limits.max_relationship_graph_nodes() as u64,
+            )?;
+            work.push(target);
+        }
+    }
+    Ok(())
+}
+
+pub(crate) enum ArtifactPolicySink<W> {
+    Budgeted(OutputBudgetedSink<
+        ContextCheckedSink<ContextCheckedSink<SourceCheckedSink<W>>>,
+    >),
+    Cooperative(ContextCheckedSink<ContextCheckedSink<SourceCheckedSink<W>>>),
+}
+
+impl<W: Write> Write for ArtifactPolicySink<W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Budgeted(sink) => sink.write(bytes),
+            Self::Cooperative(sink) => sink.write(bytes),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Self::Budgeted(sink) => sink.flush(),
+            Self::Cooperative(sink) => sink.flush(),
+        }
+    }
+}
+
+pub(crate) fn policy_source_sink<W: Write>(
+    policy: &ArtifactStreamPolicy<'_>,
+    writer: W,
+    source: &SourceSnapshot,
+    producer_context: Option<&ExecutionContext>,
+) -> Result<ArtifactPolicySink<W>> {
+    let failure = policy.failure();
+    let checked = SourceCheckedSink {
+        inner: writer,
+        snapshot: source.clone(),
+    };
+    let producer = ContextCheckedSink {
+        inner: checked,
+        context: producer_context.cloned(),
+        failure: Arc::clone(&failure),
+    };
+    let recipient = ContextCheckedSink {
+        inner: producer,
+        context: policy.recipient_context().cloned(),
+        failure,
+    };
+    if policy.is_publish() && policy.recipient_context().is_some() {
+        let output_reservation_failures = policy
+            .recipient_output_reservation_failures
+            .clone()
+            .ok_or_else(|| {
+                overlay_unavailable("managed artifact stream output counter is unavailable")
+            })?;
+        Ok(ArtifactPolicySink::Budgeted(OutputBudgetedSink {
+            inner: recipient,
+            context: policy
+                .recipient_context()
+                .expect("recipient context checked above")
+                .clone(),
+            failure: policy.failure(),
+            output_reservation_failures,
+        }))
+    } else {
+        Ok(ArtifactPolicySink::Cooperative(recipient))
+    }
+}
+
+/// Copy one exact source snapshot with producer input/work checks and the
+/// recipient output policy supplied separately.
+pub(crate) fn write_exact_snapshot_with_policy<W: Write>(
+    source: &SourceSnapshot,
+    writer: W,
+    policy: &ArtifactStreamPolicy<'_>,
+) -> Result<()> {
+    policy.check_recipient()?;
+    if let Some(context) = source.context.as_ref() {
+        context.check().map_err(map_execution_error)?;
+    }
+    let _monitored = source.monitor_publication();
+    source.ensure_current()?;
+    let _workspace = reserve_policy_workspace(source.context.as_ref())?;
+    const STACK_BYTES: usize = 4 * 1024;
+    let mut buffer = [0_u8; STACK_BYTES];
+    let mut written = 0_u64;
+    let mut sink = policy_source_sink(policy, Counted::new(writer, &mut written), source, source.context.as_ref())?;
+    let mut offset = 0_u64;
+    let result = (|| {
+        while offset < source.length {
+            if let Some(context) = source.context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+            let count = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+            let read = read_source_at_with_context(
+                source,
+                source.context.as_ref(),
+                offset,
+                &mut buffer[..count],
+                "policy publication",
+            )?;
+            if read == 0 {
+                return Err(OpcError::IoError(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "source-backed OPC source ended during policy publication",
+                )));
+            }
+            if let Some(context) = source.context.as_ref() {
+                context
+                    .consume(Resource::Work, read as u64)
+                    .map_err(map_execution_error)?;
+            }
+            sink.write_all(&buffer[..read]).map_err(map_io_error)?;
+            offset = offset
+                .checked_add(read as u64)
+                .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+        }
+        sink.flush().map_err(map_io_error)
+    })();
+    let result = policy
+        .take_failure()
+        .map_or(result, |error| Err(map_execution_error(error)));
+    finish_source_publication(result, source, written)
+}
+
+fn reserve_policy_workspace(context: Option<&ExecutionContext>) -> Result<Option<super::Reservation>> {
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let requested = SOURCE_PUBLICATION_CHUNK_BYTES as u64;
+    match context.reserve(Resource::Memory, requested) {
+        Ok(reservation) => Ok(Some(reservation)),
+        Err(ExecutionError::ResourceLimit(limit)) if limit.resource == Resource::Memory => {
+            let used = limit.observed.saturating_sub(requested);
+            let available = limit.limit.saturating_sub(used);
+            if available == 0 {
+                Ok(None)
+            } else {
+                Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)))
+            }
+        },
+        Err(error) => Err(map_execution_error(error)),
+    }
+}
+
+impl ArtifactStream for SourceArtifact {
+    type Error = OpcError;
+
+    fn check_fresh(&self) -> Result<()> {
+        self.snapshot.ensure_current()
+    }
+
+    fn stream_to(
+        &self,
+        writer: &mut dyn Write,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_source_artifact(self)?;
+        write_exact_snapshot_with_policy(&self.snapshot, writer, policy)
+    }
+}
 
 /// Complete artifact identities for a durable exact inverse.
 ///
@@ -29,7 +1727,320 @@ pub struct SourceArtifactRestoreProof {
     pub original_sha256: SourceArtifactFingerprint,
 }
 
+struct DigestLimitSink {
+    hasher: Sha256,
+    accepted: u64,
+    limit: u64,
+}
+
+impl DigestLimitSink {
+    fn new(limit: u64) -> Self {
+        Self {
+            hasher: Sha256::new(),
+            accepted: 0,
+            limit,
+        }
+    }
+
+    fn fingerprint(self) -> SourceArtifactFingerprint {
+        SourceArtifactFingerprint::from_sha256(self.hasher.finalize().into())
+    }
+}
+
+impl Write for DigestLimitSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let remaining = self.limit.saturating_sub(self.accepted);
+        let accepted = bytes.len().min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        if accepted == 0 {
+            return Ok(0);
+        }
+        self.hasher.update(&bytes[..accepted]);
+        self.accepted = self.accepted.saturating_add(accepted as u64);
+        Ok(accepted)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn preflight_stream<S: ArtifactStream + ?Sized>(
+    artifact: &S,
+    expected_len: u64,
+    expected_fingerprint: SourceArtifactFingerprint,
+    name: &'static str,
+    policy: &ArtifactStreamPolicy<'_>,
+) -> std::result::Result<(), ArtifactStreamError<S::Error>> {
+    policy.check_recipient().map_err(ArtifactStreamError::opc)?;
+    artifact
+        .check_fresh()
+        .map_err(ArtifactStreamError::producer)?;
+    let mut digest = DigestLimitSink::new(expected_len.saturating_add(1));
+    let result = artifact
+        .stream_to(&mut digest, policy)
+        .map_err(ArtifactStreamError::producer);
+    let policy_result = policy
+        .take_failure()
+        .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
+    let result = match (result, policy_result) {
+        (Ok(()), None) => Ok(()),
+        (Err(error), None) | (Ok(()), Some(error)) => Err(error),
+        (Err(error), Some(policy_error)) => {
+            Err(ArtifactStreamError::incomplete(0, error, Some(policy_error)))
+        },
+    };
+    let freshness = artifact
+        .check_fresh()
+        .map_err(ArtifactStreamError::producer);
+    if let Err(freshness) = freshness {
+        return match result {
+            Ok(()) => Err(freshness),
+            Err(error) => Err(ArtifactStreamError::incomplete(
+                0,
+                freshness,
+                Some(error),
+            )),
+        };
+    }
+    if let Err(error) = result {
+        if digest.accepted > expected_len {
+            let mismatch = ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
+                artifact: name,
+                field: "length",
+            });
+            return Err(ArtifactStreamError::incomplete(0, mismatch, Some(error)));
+        }
+        return Err(error);
+    }
+    if digest.accepted != expected_len {
+        return Err(ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
+            artifact: name,
+            field: "length",
+        }));
+    }
+    if digest.fingerprint() != expected_fingerprint {
+        return Err(ArtifactStreamError::opc(OpcError::SourceArtifactMismatch {
+            artifact: name,
+            field: "fingerprint",
+        }));
+    }
+    Ok(())
+}
+
+fn finish_streamed_publication<SCurrent, SOriginal>(
+    result: std::result::Result<(), ArtifactStreamError<SCurrent::Error>>,
+    current: &SCurrent,
+    original: &SOriginal,
+    written: u64,
+) -> std::result::Result<(), ArtifactStreamError<SCurrent::Error>>
+where
+    SCurrent: ArtifactStream + ?Sized,
+    SOriginal: ArtifactStream<Error = SCurrent::Error> + ?Sized,
+{
+    let current_freshness = current
+        .check_fresh()
+        .map_err(ArtifactStreamError::producer);
+    let original_freshness = original
+        .check_fresh()
+        .map_err(ArtifactStreamError::producer);
+    let freshness = match (current_freshness, original_freshness) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(current), Ok(())) => Err(current),
+        (Ok(()), Err(original)) => Err(original),
+        (Err(current), Err(original)) => Err(ArtifactStreamError::incomplete(
+            0,
+            current,
+            Some(original),
+        )),
+    };
+    if let Err(freshness) = freshness {
+        return match (written != 0, result) {
+            (true, Err(error)) | (false, Err(error)) => Err(ArtifactStreamError::incomplete(
+                written,
+                freshness,
+                Some(error),
+            )),
+            (true, Ok(())) => Err(ArtifactStreamError::incomplete(written, freshness, None)),
+            (false, Ok(())) => Err(freshness),
+        };
+    }
+    match result {
+        Err(error @ ArtifactStreamError::Publication { .. }) => Err(error),
+        Err(error) if written != 0 => Err(ArtifactStreamError::incomplete(written, error, None)),
+        other => other,
+    }
+}
+
 impl SourceBackedPackage {
+    /// Probe one producer into a bounded digest sink without accepting caller
+    /// output or charging `OutputBytes`.
+    pub fn probe_artifact_stream<S: ArtifactStream + ?Sized>(
+        &self,
+        stream: &S,
+        max_output_bytes: u64,
+        outer_policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> std::result::Result<(u64, SourceArtifactFingerprint), ArtifactStreamError<S::Error>> {
+        self.disable_read_ahead_for_publication()
+            .map_err(ArtifactStreamError::opc)?;
+        let policy_owned;
+        let policy = if let Some(policy) = outer_policy {
+            policy
+        } else {
+            policy_owned = ArtifactStreamPolicy::for_recipient(self)
+                .map_err(ArtifactStreamError::opc)?;
+            &policy_owned
+        };
+        policy
+            .check_recipient()
+            .map_err(ArtifactStreamError::opc)?;
+        let probe = policy.probe();
+        stream
+            .check_fresh()
+            .map_err(ArtifactStreamError::producer)?;
+        let mut digest = DigestLimitSink::new(max_output_bytes.saturating_add(1));
+        let result = stream
+            .stream_to(&mut digest, &probe)
+            .map_err(ArtifactStreamError::producer);
+        let policy_result = probe
+            .take_failure()
+            .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
+        let result = match (result, policy_result) {
+            (Ok(()), None) => Ok(()),
+            (Err(error), None) | (Ok(()), Some(error)) => Err(error),
+            (Err(error), Some(policy_error)) => {
+                Err(ArtifactStreamError::incomplete(0, error, Some(policy_error)))
+            },
+        };
+        let freshness = stream
+            .check_fresh()
+            .map_err(ArtifactStreamError::producer);
+        if let Err(freshness) = freshness {
+            return match result {
+                Ok(()) => Err(freshness),
+                Err(error) => Err(ArtifactStreamError::incomplete(
+                    0,
+                    freshness,
+                    Some(error),
+                )),
+            };
+        }
+        if let Err(error) = result {
+            if digest.accepted <= max_output_bytes {
+                return Err(error);
+            }
+            let limit = ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
+                resource: SpliceResource::OutputBytes,
+                actual: digest.accepted,
+                maximum: max_output_bytes,
+            });
+            return Err(ArtifactStreamError::incomplete(0, limit, Some(error)));
+        }
+        if digest.accepted > max_output_bytes {
+            return Err(ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
+                resource: SpliceResource::OutputBytes,
+                actual: digest.accepted,
+                maximum: max_output_bytes,
+            }));
+        }
+        let accepted = digest.accepted;
+        let fingerprint = digest.fingerprint();
+        Ok((accepted, fingerprint))
+    }
+
+    /// Authenticate two bounded artifact streams before publishing the
+    /// retained original through the recipient sink.
+    ///
+    /// The current and original streams are each probed through a fixed
+    /// max-plus-one digest sink before the caller's writer is touched. During
+    /// publication, producer source/work checks remain attached to each
+    /// producer while `ArtifactStreamPolicy` charges recipient output once.
+    /// Passing an outer policy is required for nested deferred streams so the
+    /// recipient allowance and probe/publication phase are shared.
+    pub fn restore_streamed_artifact_to_stream<
+        C: ArtifactStream + ?Sized,
+        O: ArtifactStream + ?Sized,
+        W: Write,
+    >(
+        &self,
+        current: &C,
+        original: &O,
+        proof: SourceArtifactRestoreProof,
+        max_output_bytes: u64,
+        writer: W,
+        outer_policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> std::result::Result<(), ArtifactStreamError<O::Error>>
+    where
+        C: ArtifactStream<Error = O::Error>,
+    {
+        self.disable_read_ahead_for_publication()
+            .map_err(ArtifactStreamError::opc)?;
+        let policy_owned;
+        let policy = if let Some(policy) = outer_policy {
+            policy
+        } else {
+            policy_owned = ArtifactStreamPolicy::for_recipient(self)
+                .map_err(ArtifactStreamError::opc)?;
+            &policy_owned
+        };
+        policy
+            .check_recipient()
+            .map_err(ArtifactStreamError::opc)?;
+        if max_output_bytes == 0 || max_output_bytes == u64::MAX {
+            return Err(ArtifactStreamError::opc(OpcError::InvalidSourcePartSpliceLimit {
+                resource: SpliceResource::OutputBytes,
+                value: max_output_bytes,
+            }));
+        }
+        if proof.original_len > max_output_bytes {
+            return Err(ArtifactStreamError::opc(OpcError::SourcePartSpliceLimit {
+                resource: SpliceResource::OutputBytes,
+                actual: proof.original_len,
+                maximum: max_output_bytes,
+            }));
+        }
+        let probe = policy.probe();
+        preflight_stream(
+            current,
+            proof.current_len,
+            proof.current_sha256,
+            "current",
+            &probe,
+        )?;
+        preflight_stream(
+            original,
+            proof.original_len,
+            proof.original_sha256,
+            "original",
+            &probe,
+        )?;
+
+        let mut written = 0_u64;
+        let mut counted = Counted::new(writer, &mut written);
+        policy
+            .check_recipient()
+            .map_err(ArtifactStreamError::opc)?;
+        let result = original
+            .stream_to(&mut counted, policy)
+            .map_err(ArtifactStreamError::producer)
+            .and_then(|()| {
+                counted
+                    .flush()
+                    .map_err(map_io_error)
+                    .map_err(ArtifactStreamError::opc)
+            });
+        let policy_result = policy
+            .take_failure()
+            .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
+        let result = match (result, policy_result) {
+            (Ok(()), None) => Ok(()),
+            (Err(error), None) | (Ok(()), Some(error)) => Err(error),
+            (Err(error), Some(policy_error)) => {
+                Err(ArtifactStreamError::incomplete(written, error, Some(policy_error)))
+            },
+        };
+        finish_streamed_publication(result, current, original, written)
+    }
+
     /// Restore an explicit original artifact after authenticating both complete
     /// artifacts, without materializing either artifact.
     ///
@@ -250,4 +2261,75 @@ fn copy_authenticated(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct BytesStream(&'static [u8]);
+
+    impl ArtifactStream for BytesStream {
+        type Error = OpcError;
+
+        fn check_fresh(&self) -> Result<()> {
+            Ok(())
+        }
+
+        fn stream_to(
+            &self,
+            writer: &mut dyn Write,
+            _policy: &ArtifactStreamPolicy<'_>,
+        ) -> Result<()> {
+            writer.write_all(self.0).map_err(map_io_error)
+        }
+    }
+
+    fn fingerprint(bytes: &[u8]) -> SourceArtifactFingerprint {
+        SourceArtifactFingerprint::from_sha256(Sha256::digest(bytes).into())
+    }
+
+    #[test]
+    fn preflight_caps_an_overlong_stream_before_publication() {
+        let stream = BytesStream(b"abcd");
+        let policy = ArtifactStreamPolicy {
+            phase: ArtifactStreamPhase::Probe,
+            recipient_limits: SourceLimits::default(),
+            recipient_context: None,
+            recipient_output_reservation_failures: None,
+            failure: Arc::new(Mutex::new(None)),
+        };
+        let error = preflight_stream(&stream, 3, fingerprint(b"abc"), "original", &policy)
+            .expect_err("the bounded probe must reject a fourth byte");
+        assert!(matches!(
+            error,
+            ArtifactStreamError::Opc(OpcError::SourceArtifactMismatch {
+                artifact: "original",
+                field: "length"
+            })
+        ));
+    }
+
+    #[test]
+    fn preflight_authenticates_exact_length_and_digest() {
+        let stream = BytesStream(b"abc");
+        let policy = ArtifactStreamPolicy {
+            phase: ArtifactStreamPhase::Probe,
+            recipient_limits: SourceLimits::default(),
+            recipient_context: None,
+            recipient_output_reservation_failures: None,
+            failure: Arc::new(Mutex::new(None)),
+        };
+        preflight_stream(&stream, 3, fingerprint(b"abc"), "original", &policy)
+            .expect("matching length and digest should pass");
+        let error = preflight_stream(&stream, 3, fingerprint(b"abd"), "original", &policy)
+            .expect_err("a changed digest must be rejected");
+        assert!(matches!(
+            error,
+            ArtifactStreamError::Opc(OpcError::SourceArtifactMismatch {
+                artifact: "original",
+                field: "fingerprint"
+            })
+        ));
+    }
 }

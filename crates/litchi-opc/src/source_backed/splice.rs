@@ -493,7 +493,16 @@ impl<'package> SourcePartSplicePlan<'package> {
     /// Publish the plan to a sequential sink and retain an exact inverse
     /// authorization for the resulting artifact.
     pub fn write_to<W: Write>(self, writer: W) -> Result<SourcePartSplicePublication> {
-        self.write_to_inner(writer, None, true)
+        self.write_to_inner(writer, None, true, None)
+    }
+
+    /// Publish this splice through a recipient-owned artifact stream policy.
+    pub fn write_to_with_policy<W: Write>(
+        self,
+        writer: W,
+        policy: &super::artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<SourcePartSplicePublication> {
+        self.write_to_inner(writer, None, true, Some(policy))
     }
 
     /// Publish while recording accepted output and low-level ZIP work in an
@@ -503,7 +512,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         writer: W,
         accounting: &mut OpcOperationAccounting,
     ) -> Result<SourcePartSplicePublication> {
-        self.write_to_inner(writer, Some(accounting), true)
+        self.write_to_inner(writer, Some(accounting), true, None)
     }
 
     /// Authenticate the complete candidate artifact in a bounded sink before
@@ -519,7 +528,7 @@ impl<'package> SourcePartSplicePlan<'package> {
     ) -> Result<SourcePartSplicePublication> {
         let (preview_len, preview_sha256) = {
             let preview = self.clone_for_preview();
-            let publication = match preview.write_to_inner(io::sink(), None, false) {
+            let publication = match preview.write_to_inner(io::sink(), None, false, None) {
                 Ok(publication) => publication,
                 Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
                 Err(error) => return Err(error),
@@ -542,7 +551,59 @@ impl<'package> SourcePartSplicePlan<'package> {
             });
         }
 
-        let publication = self.write_to_inner(writer, None, true)?;
+        let publication = self.write_to_inner(writer, None, true, None)?;
+        if publication.candidate_artifact_len != expected_len {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "length",
+                }),
+            });
+        }
+        if publication.candidate_artifact != expected_sha256 {
+            return Err(OpcError::IncompleteOutput {
+                written: publication.candidate_artifact_len,
+                source: Box::new(OpcError::SourceArtifactMismatch {
+                    artifact: "candidate",
+                    field: "fingerprint",
+                }),
+            });
+        }
+        Ok(publication)
+    }
+
+    /// Authenticate and publish this splice through a recipient-owned policy.
+    pub fn write_to_with_expected_artifact_with_policy<W: Write>(
+        self,
+        writer: W,
+        expected_len: u64,
+        expected_sha256: SourceArtifactFingerprint,
+        policy: &super::artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<SourcePartSplicePublication> {
+        let probe = policy.probe();
+        let (preview_len, preview_sha256) = {
+            let preview = self.clone_for_preview();
+            let publication = match preview.write_to_inner(io::sink(), None, false, Some(&probe)) {
+                Ok(publication) => publication,
+                Err(OpcError::IncompleteOutput { source, .. }) => return Err(*source),
+                Err(error) => return Err(error),
+            };
+            (publication.candidate_artifact_len, publication.candidate_artifact)
+        };
+        if preview_len != expected_len {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "length",
+            });
+        }
+        if preview_sha256 != expected_sha256 {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "candidate",
+                field: "fingerprint",
+            });
+        }
+        let publication = self.write_to_inner(writer, None, true, Some(policy))?;
         if publication.candidate_artifact_len != expected_len {
             return Err(OpcError::IncompleteOutput {
                 written: publication.candidate_artifact_len,
@@ -610,6 +671,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         writer: W,
         mut accounting: Option<&mut OpcOperationAccounting>,
         charge_output: bool,
+        policy: Option<&super::artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<SourcePartSplicePublication> {
         self.package.disable_read_ahead_for_publication()?;
         self.package.source.ensure_current()?;
@@ -627,7 +689,9 @@ impl<'package> SourcePartSplicePlan<'package> {
                 self.limits.archive_limit(),
             )?;
             let mut hashing = HashingSink::new(writer);
-            if charge_output {
+            if let Some(policy) = policy {
+                self.source_artifact.write_to_with_policy(&mut hashing, policy)?;
+            } else if charge_output {
                 match accounting.as_deref_mut() {
                     Some(report) => self
                         .source_artifact
@@ -709,6 +773,13 @@ impl<'package> SourcePartSplicePlan<'package> {
             self.limits.archive_limit(),
         )
         .map_err(map_preservation_error)?;
+        if let Some(policy) = policy {
+            policy.admit_splice_candidate(
+                &self.package,
+                self.target,
+                proof.candidate_len,
+            )?;
+        }
 
         let source_snapshot = self.package.source.clone();
         let part = PartView {
@@ -754,7 +825,37 @@ impl<'package> SourcePartSplicePlan<'package> {
             }
         };
 
-        let result = if let Some(context) = self.package.cache.context() {
+        let result = if let Some(policy) = policy {
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    &mut hashing,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(&mut hashing, &mut written),
+            };
+            let policy_sink = super::artifact_restore::policy_source_sink(
+                policy,
+                counted,
+                &source_snapshot,
+                self.package.cache.context(),
+            )?;
+            match run_replay_with_admission(
+                &index,
+                preservation_target,
+                compression,
+                replay_limits,
+                Chunked { inner: policy_sink },
+                &mut callback,
+                &mut zip_accounting,
+                |profile| policy.admit_preservation_profile(profile),
+            ) {
+                Ok(mut sink) => sink.flush().map_err(map_io_error),
+                Err(error) => Err(map_replay_error(error)),
+            }
+        } else if let Some(context) = self.package.cache.context() {
             if charge_output {
                 let output_reservation_failures = self
                     .package
@@ -875,6 +976,9 @@ impl<'package> SourcePartSplicePlan<'package> {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take()
+            .map_or(result, |error| Err(map_execution_error(error)));
+        let result = policy
+            .and_then(|policy| policy.take_failure())
             .map_or(result, |error| Err(map_execution_error(error)));
         let result = match (
             result,
@@ -3125,7 +3229,7 @@ impl BufRead for SpliceAuditReader<'_, '_, '_, '_, '_> {
     }
 }
 
-fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
+fn map_replay_error(error: ReplayPublicationError<OpcError, OpcError>) -> OpcError {
     match error {
         ReplayPublicationError::Archive { source, .. } => map_preservation_error(source),
         ReplayPublicationError::Callback { source, .. } => source,
@@ -3147,7 +3251,7 @@ fn map_replay_error(error: ReplayPublicationError<OpcError>) -> OpcError {
         ReplayPublicationError::NonDeterministic { .. } => {
             overlay_unavailable("decoded splice replay produced non-deterministic output")
         },
-        _ => overlay_unavailable("decoded splice replay returned an unknown failure"),
+        ReplayPublicationError::Admission { source, .. } => source,
     }
 }
 
@@ -3172,6 +3276,33 @@ where
         sink,
         accounting,
         callback,
+    )
+}
+
+fn run_replay_with_admission<'archive, R, W, F, G>(
+    index: &soapberry_zip::PreservationIndex<'archive, R>,
+    target: PreservationEntryId,
+    compression: soapberry_zip::CompressionMethod,
+    limits: ReplayLimits,
+    sink: W,
+    callback: F,
+    accounting: &mut soapberry_zip::ZipOperationAccounting,
+    admission: G,
+) -> std::result::Result<W, ReplayPublicationError<OpcError, OpcError>>
+where
+    R: ReaderAt,
+    W: Write,
+    F: FnMut(&mut dyn Write) -> Result<()>,
+    G: FnOnce(&soapberry_zip::PreservationOutputProfile<'_>) -> Result<()>,
+{
+    index.write_replacing_with_replay_with_admission_and_accounting(
+        target,
+        compression,
+        limits,
+        sink,
+        accounting,
+        callback,
+        admission,
     )
 }
 

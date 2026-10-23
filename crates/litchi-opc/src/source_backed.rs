@@ -52,6 +52,7 @@ mod materialize;
 mod revision;
 mod view;
 pub use artifact_restore::SourceArtifactRestoreProof;
+pub use artifact_restore::{ArtifactStream, ArtifactStreamError, ArtifactStreamPolicy};
 pub use view::{PreparedMetadataData, PreparedPartData, PreparedPartView};
 mod read_ahead;
 use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
@@ -3213,6 +3214,36 @@ impl PreparedTopology {
             self.state.retained().transfer_sources.clone(),
         )
     }
+
+    /// Publish this topology through a recipient-owned artifact stream
+    /// policy. Producer source/work checks remain attached to this package;
+    /// the policy controls the recipient output allowance.
+    pub fn publish_to_stream_with_policy<W: Write>(
+        &self,
+        writer: W,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_prepared_topology(&self.package, &self.state)?;
+        self.state.check_readback_sources(&self.package)?;
+        if self.state.no_op {
+            let package = self.package.clone();
+            package.disable_read_ahead_for_publication()?;
+            return artifact_restore::write_exact_snapshot_with_policy(
+                &package.source,
+                writer,
+                policy,
+            );
+        }
+        publish_prepared_topology_with_policy(
+            self.package.clone(),
+            writer,
+            &self.state.changed,
+            &self.state.retained().omitted_members,
+            &self.state.retained().appended,
+            self.state.retained().transfer_sources.clone(),
+            policy,
+        )
+    }
 }
 
 impl PreparedTopologyState {
@@ -3313,6 +3344,65 @@ fn publish_prepared_topology<W: Write>(
         // The preservation writer already classifies sink failures with its
         // exact Counted byte total. Keep that typed result intact; the final
         // source fence must not erase an IncompleteOutput written count.
+        (Err(publication), _) => Err(publication),
+        (Ok(()), Some(error)) if transfer_accepted != 0 => Err(OpcError::IncompleteOutput {
+            written: transfer_accepted,
+            source: Box::new(error),
+        }),
+        (Ok(()), Some(error)) => Err(error),
+        (Ok(()), None) => Ok(()),
+    }
+}
+
+fn publish_prepared_topology_with_policy<W: Write>(
+    package: SourceBackedPackage,
+    writer: W,
+    changed: &[ChangedOverlay],
+    omitted_members: &[String],
+    appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+    transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
+    policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+) -> Result<()> {
+    let Some(transfer_sources) = transfer_sources else {
+        return package.write_changed_overlays_with_appended_inner(
+            writer,
+            changed,
+            omitted_members,
+            appended,
+            None,
+            Some(policy),
+        );
+    };
+    let transfer_state = Arc::new(Mutex::new(TransferSourceState::default()));
+    let checked_writer = TransferSourceCheckedSink {
+        inner: writer,
+        sources: Arc::clone(&transfer_sources),
+        state: Arc::clone(&transfer_state),
+        pending_failure: None,
+    };
+    let publication = package.write_changed_overlays_with_appended_inner(
+        checked_writer,
+        changed,
+        omitted_members,
+        appended,
+        None,
+        Some(policy),
+    );
+    let transfer_error = transfer_sources.iter().find_map(|source| {
+        source.ensure_current().err().or_else(|| {
+            source
+                .context
+                .as_ref()?
+                .check()
+                .err()
+                .map(map_execution_error)
+        })
+    });
+    let transfer_accepted = transfer_state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .accepted;
+    match (publication, transfer_error) {
         (Err(publication), _) => Err(publication),
         (Ok(()), Some(error)) if transfer_accepted != 0 => Err(OpcError::IncompleteOutput {
             written: transfer_accepted,
@@ -4239,10 +4329,17 @@ impl PartialEq for SourceLineage {
 impl Eq for SourceLineage {}
 
 /// Exact immutable source artifact retained for a later reversible restore.
+///
+/// The archive index and admitted catalog travel with the artifact as a
+/// shared final-output profile. A recipient policy can therefore re-admit an
+/// exact artifact's ZIP and OPC dimensions after its original package owner
+/// has been dropped, without materializing or reopening the source bytes.
 #[derive(Clone)]
 pub struct SourceArtifact {
     snapshot: SourceSnapshot,
     fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
+    archive: Arc<IndexedArchive<SourceReader>>,
+    catalog: Arc<AdmittedCatalog>,
 }
 
 /// SHA-256 identity of an exact source artifact.
@@ -4395,6 +4492,19 @@ impl SourceArtifact {
     /// policy failure after accepted bytes returns [`OpcError::IncompleteOutput`].
     pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
         write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
+    }
+
+    /// Copy this artifact under a recipient-owned stream policy.
+    ///
+    /// The source keeps its own input/work and freshness context. The policy
+    /// controls only whether the recipient output allowance is charged.
+    pub fn write_to_with_policy<W: Write>(
+        &self,
+        writer: W,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_source_artifact(self)?;
+        artifact_restore::write_exact_snapshot_with_policy(&self.snapshot, writer, policy)
     }
 
     /// Copy the retained source artifact while recording exact accepted output
@@ -8241,6 +8351,8 @@ impl SourceBackedPackage {
         SourceArtifact {
             snapshot: self.source.clone(),
             fingerprint_memo: self.fingerprint_memo.clone(),
+            archive: Arc::clone(&self.archive),
+            catalog: Arc::clone(&self.catalog),
         }
     }
 
@@ -8420,6 +8532,8 @@ impl SourceBackedPackage {
             source_artifact: SourceArtifact {
                 snapshot: self.source.clone(),
                 fingerprint_memo: self.fingerprint_memo.clone(),
+                archive: Arc::clone(&self.archive),
+                catalog: Arc::clone(&self.catalog),
             },
             source_lineage: self.source.lineage.clone(),
             source_version: self.source.version,
@@ -9051,6 +9165,7 @@ impl SourceBackedPackage {
             pending_replacements
                 .iter()
                 .map(|overlay| (overlay.target, overlay.replacement.len())),
+            self.limits,
         )?;
 
         // Build the source/new Part namespace with the same duplicate,
@@ -9629,6 +9744,7 @@ impl SourceBackedPackage {
             &preflight_relationships,
             content_types_summary,
             &[],
+            self.limits,
         )?;
         let mut relationship_overrides = preflight_relationship_overrides;
         let mut raw_relationship_memory_reservations = Vec::new();
@@ -10563,6 +10679,7 @@ impl SourceBackedPackage {
             &relationship_publications,
             materialized_content_types_summary,
             &raw_relationship_removed_entries,
+            self.limits,
         )?;
 
         // Materialize only changed existing payloads. Exact no-op replacements
@@ -11274,6 +11391,32 @@ impl SourceBackedPackage {
         self.prepare_topology(plan)?.publish_to_stream(writer)
     }
 
+    /// Publish a topology plan through a recipient-owned artifact policy.
+    pub fn write_topology_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        plan: SourceTopologyPlan,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        if plan.is_empty() {
+            self.disable_read_ahead_for_publication()?;
+            return self.write_exact_source_with_policy(writer, policy);
+        }
+        self.prepare_topology(plan)?
+            .publish_to_stream_with_policy(writer, policy)
+    }
+
+    /// Copy the physical source through a recipient-owned artifact policy.
+    pub fn write_exact_source_with_policy<W: Write>(
+        self,
+        writer: W,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_source_catalog(&self)?;
+        self.disable_read_ahead_for_publication()?;
+        artifact_restore::write_exact_snapshot_with_policy(&self.source, writer, policy)
+    }
+
     fn topology_relationship_target_ref(
         target: &SourceRelationshipTarget,
         owner_base: &str,
@@ -11346,7 +11489,25 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
     ) -> Result<()> {
-        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new, None)
+        self.write_single_part_overlay_to_stream(writer, partname, replacement, Arc::new, None, None)
+    }
+
+    /// Policy-aware counterpart for a deferred artifact producer.
+    pub fn write_part_overlay_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            None,
+            Some(policy),
+        )
     }
 
     /// Replace one existing ordinary Part with caller-owned shared bytes and
@@ -11370,6 +11531,25 @@ impl SourceBackedPackage {
             replacement,
             std::convert::identity,
             None,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload counterpart.
+    pub fn write_part_overlay_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Arc<Vec<u8>>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            std::convert::identity,
+            None,
+            Some(policy),
         )
     }
 
@@ -11397,6 +11577,7 @@ impl SourceBackedPackage {
             replacement,
             Arc::new,
             Some(accounting),
+            None,
         )
     }
 
@@ -11415,6 +11596,7 @@ impl SourceBackedPackage {
         replacement: P,
         into_shared: F,
         mut accounting: Option<&mut OpcOperationAccounting>,
+        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<()>
     where
         F: FnOnce(P) -> Arc<Vec<u8>>,
@@ -11427,7 +11609,7 @@ impl SourceBackedPackage {
             .copied()
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
         let replacement = into_shared(replacement);
-        self.validate_overlay_limits(std::iter::once((target, replacement.len())))?;
+        self.validate_overlay_limits(std::iter::once((target, replacement.len())), self.limits)?;
 
         // Reading the original before any XML audit preserves the exact
         // no-op contract: malformed but byte-identical source payloads still
@@ -11441,9 +11623,13 @@ impl SourceBackedPackage {
             // payload. Drop it before the first publication write so a
             // managed oversized-cache bypass releases its reservation.
             drop(original);
-            return match accounting {
-                Some(accounting) => self.write_exact_source_with_accounting(writer, accounting),
-                None => self.write_exact_source(writer),
+            return match (accounting, policy) {
+                (Some(accounting), None) => self.write_exact_source_with_accounting(writer, accounting),
+                (None, Some(policy)) => self.write_exact_source_with_policy(writer, policy),
+                (None, None) => self.write_exact_source(writer),
+                (Some(_), Some(_)) => Err(overlay_unavailable(
+                    "accounting and artifact stream policy cannot be combined",
+                )),
             };
         }
         if self.has_signature_infrastructure() {
@@ -11469,14 +11655,23 @@ impl SourceBackedPackage {
             target: ChangedOverlayTarget::Part(target),
             replacement: ChangedOverlayPayload::Shared(replacement),
         }];
-        match accounting {
-            Some(accounting) => self.write_changed_overlays_with_appended_accounting(
+        match (accounting, policy) {
+            (Some(accounting), None) => self.write_changed_overlays_with_appended_accounting(
                 writer,
                 &changed,
                 &[],
                 accounting,
             ),
-            None => self.write_changed_overlays(writer, &changed),
+            (None, Some(policy)) => self.write_changed_overlays_with_appended_with_policy(
+                writer,
+                &changed,
+                &[],
+                policy,
+            ),
+            (None, None) => self.write_changed_overlays(writer, &changed),
+            (Some(_), Some(_)) => Err(overlay_unavailable(
+                "accounting and artifact stream policy cannot be combined",
+            )),
         }
     }
 
@@ -11502,6 +11697,42 @@ impl SourceBackedPackage {
         replacement: Vec<u8>,
         mut removed_relationship_ids: Vec<String>,
     ) -> Result<()> {
+        self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
+            writer,
+            partname,
+            replacement,
+            removed_relationship_ids,
+            None,
+        )
+    }
+
+    /// Policy-aware single-Part publication with external relationship
+    /// removals.
+    pub fn write_part_overlay_with_external_relationship_removals_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        removed_relationship_ids: Vec<String>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
+            writer,
+            partname,
+            replacement,
+            removed_relationship_ids,
+            Some(policy),
+        )
+    }
+
+    fn write_part_overlay_with_external_relationship_removals_to_stream_inner<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        mut removed_relationship_ids: Vec<String>,
+        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
             return Err(overlay_unavailable(format!(
@@ -11509,7 +11740,12 @@ impl SourceBackedPackage {
             )));
         }
         if removed_relationship_ids.is_empty() {
-            return self.write_part_overlay_to_stream(writer, partname, replacement);
+            return match policy {
+                Some(policy) => {
+                    self.write_part_overlay_to_stream_with_policy(writer, partname, replacement, policy)
+                }
+                None => self.write_part_overlay_to_stream(writer, partname, replacement),
+            };
         }
         removed_relationship_ids.sort_unstable();
         if let Some(duplicate) = removed_relationship_ids
@@ -11552,12 +11788,13 @@ impl SourceBackedPackage {
                 relationship_uri.as_str()
             ))
         })?;
-        self.validate_overlay_limits(std::iter::once((target, replacement.len())))?;
+        self.validate_overlay_limits(std::iter::once((target, replacement.len())), self.limits)?;
         self.validate_part_and_relationship_overlay_limits(
             target,
             replacement.len(),
             relationship_entry,
             relationship_xml.len(),
+            self.limits,
         )?;
         let original_part = self.read_part(target)?;
         let original_relationships = match self.archive.read_entry(relationship_entry) {
@@ -11595,7 +11832,15 @@ impl SourceBackedPackage {
                 replacement: ChangedOverlayPayload::Owned(relationship_xml),
             },
         ];
-        self.write_changed_overlays(writer, &changed)
+        match policy {
+            Some(policy) => self.write_changed_overlays_with_appended_with_policy(
+                writer,
+                &changed,
+                &[],
+                policy,
+            ),
+            None => self.write_changed_overlays(writer, &changed),
+        }
     }
 
     /// Replace several existing Parts while removing bounded sets of
@@ -11609,7 +11854,34 @@ impl SourceBackedPackage {
     pub fn write_part_overlays_with_external_relationship_removals_to_stream<W: Write>(
         self,
         writer: W,
+        overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+    ) -> Result<()> {
+        self.write_part_overlays_with_external_relationship_removals_to_stream_inner(
+            writer, overlays, None,
+        )
+    }
+
+    /// Policy-aware bounded publication with external relationship removals.
+    pub fn write_part_overlays_with_external_relationship_removals_to_stream_with_policy<
+        W: Write,
+    >(
+        self,
+        writer: W,
+        overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_with_external_relationship_removals_to_stream_inner(
+            writer,
+            overlays,
+            Some(policy),
+        )
+    }
+
+    fn write_part_overlays_with_external_relationship_removals_to_stream_inner<W: Write>(
+        self,
+        writer: W,
         mut overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         if overlays.len() > MAX_SOURCE_OVERLAY_PARTS {
@@ -11618,7 +11890,10 @@ impl SourceBackedPackage {
             )));
         }
         if overlays.is_empty() {
-            return self.write_exact_source(writer);
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
         }
         overlays.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
         if let Some(duplicate) = overlays.windows(2).find(|pair| pair[0].0 == pair[1].0) {
@@ -11790,6 +12065,7 @@ impl SourceBackedPackage {
         self.validate_combined_relationship_overlay_limits(
             &payload_lengths,
             &relationship_entries,
+            self.limits,
         )?;
 
         for (_, _, relationship_member, relationship_xml) in relationship_overlays {
@@ -11825,12 +12101,23 @@ impl SourceBackedPackage {
         }
 
         if changed.is_empty() {
-            return self.write_exact_source(writer);
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
         }
         if self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
-        self.write_changed_overlays(writer, &changed)
+        match policy {
+            Some(policy) => self.write_changed_overlays_with_appended_with_policy(
+                writer,
+                &changed,
+                &[],
+                policy,
+            ),
+            None => self.write_changed_overlays(writer, &changed),
+        }
     }
 
     /// Replace a bounded set of existing ordinary Parts and publish to a
@@ -11859,7 +12146,23 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Vec<u8>)>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new)
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new, None)
+    }
+
+    /// Policy-aware bounded overlay publication.
+    pub fn write_part_overlays_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            Vec::new(),
+            Arc::new,
+            Some(policy),
+        )
     }
 
     /// Replace a bounded set of existing ordinary Parts with caller-owned
@@ -11878,7 +12181,29 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, Vec::new(), std::convert::identity)
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            Vec::new(),
+            std::convert::identity,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload overlay publication.
+    pub fn write_part_overlays_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            Vec::new(),
+            std::convert::identity,
+            Some(policy),
+        )
     }
 
     /// Replace and physically delete bounded sets of existing ordinary Parts.
@@ -11911,7 +12236,24 @@ impl SourceBackedPackage {
         replacements: Vec<(PackURI, Vec<u8>)>,
         deletions: Vec<PackURI>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new)
+        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new, None)
+    }
+
+    /// Policy-aware overlay publication with physical deletions.
+    pub fn write_part_overlays_with_deletions_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        deletions: Vec<PackURI>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            deletions,
+            Arc::new,
+            Some(policy),
+        )
     }
 
     /// Shared-payload counterpart to
@@ -11926,7 +12268,30 @@ impl SourceBackedPackage {
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
         deletions: Vec<PackURI>,
     ) -> Result<()> {
-        self.write_part_overlays_impl(writer, replacements, deletions, std::convert::identity)
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            deletions,
+            std::convert::identity,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload overlay publication with deletions.
+    pub fn write_part_overlays_with_deletions_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        deletions: Vec<PackURI>,
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            deletions,
+            std::convert::identity,
+            Some(policy),
+        )
     }
 
     fn write_part_overlays_impl<W: Write, P, F>(
@@ -11935,6 +12300,7 @@ impl SourceBackedPackage {
         mut replacements: Vec<(PackURI, P)>,
         mut deletions: Vec<PackURI>,
         mut into_shared: F,
+        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<()>
     where
         F: FnMut(P) -> Arc<Vec<u8>>,
@@ -11950,7 +12316,10 @@ impl SourceBackedPackage {
             )));
         }
         if replacements.is_empty() && deletions.is_empty() {
-            return self.write_exact_source(writer);
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
         }
         replacements.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
         for (index, (partname, _)) in replacements.iter().enumerate() {
@@ -12010,6 +12379,7 @@ impl SourceBackedPackage {
             overlays
                 .iter()
                 .map(|overlay| (overlay.target, overlay.replacement.len())),
+            self.limits,
         )?;
 
         let mut changed = Vec::new();
@@ -12041,7 +12411,10 @@ impl SourceBackedPackage {
             }
         }
         if changed.is_empty() && omitted_members.is_empty() {
-            return self.write_exact_source(writer);
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
         }
         if self.has_signature_infrastructure() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
@@ -12078,10 +12451,23 @@ impl SourceBackedPackage {
                 replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
             });
         }
-        self.write_changed_overlays_with_omissions(writer, &replacements, &omitted_members)
+        match policy {
+            Some(policy) => self.write_changed_overlays_with_omissions_and_appended_with_policy(
+                writer,
+                &replacements,
+                &omitted_members,
+                &[],
+                policy,
+            ),
+            None => self.write_changed_overlays_with_omissions(
+                writer,
+                &replacements,
+                &omitted_members,
+            ),
+        }
     }
 
-    fn validate_overlay_limits<I>(&self, overlays: I) -> Result<()>
+    fn validate_overlay_limits<I>(&self, overlays: I, limits: SourceLimits) -> Result<()>
     where
         I: Iterator<Item = (usize, usize)> + Clone,
     {
@@ -12090,17 +12476,17 @@ impl SourceBackedPackage {
                 u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
                     kind: SourceLimitKind::PartBytes,
                     observed: u64::MAX,
-                    maximum: self.limits.max_part_bytes(),
+                    maximum: limits.max_part_bytes(),
                 })?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::PartBytes,
                 replacement_bytes,
-                self.limits.max_part_bytes(),
+                limits.max_part_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
         }
 
@@ -12115,7 +12501,7 @@ impl SourceBackedPackage {
                 part_total,
                 bytes,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
         }
         for name in self.archive.file_names() {
@@ -12123,7 +12509,7 @@ impl SourceBackedPackage {
                 archive_total,
                 self.archive.metadata(name)?.uncompressed_size(),
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
         }
         let mut adjusted_parts = part_total;
@@ -12139,25 +12525,25 @@ impl SourceBackedPackage {
                 target_bytes,
                 replacement_bytes,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
             adjusted_archive = adjusted_overlay_total(
                 adjusted_archive,
                 target_bytes,
                 replacement_bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
         }
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalPartBytes,
             adjusted_parts,
-            self.limits.max_total_part_bytes(),
+            limits.max_total_part_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
         Ok(())
     }
@@ -12168,17 +12554,18 @@ impl SourceBackedPackage {
         replacement_len: usize,
         relationship_entry: EntryId,
         relationship_len: usize,
+        limits: SourceLimits,
     ) -> Result<()> {
         let relationship_bytes = relationship_len as u64;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::EntryBytes,
             relationship_bytes,
-            self.limits.max_entry_bytes(),
+            limits.max_entry_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::RelationshipXmlBytes,
             relationship_bytes,
-            self.limits.max_relationship_xml_bytes() as u64,
+            limits.max_relationship_xml_bytes() as u64,
         )?;
 
         let mut archive_total = 0_u64;
@@ -12192,14 +12579,14 @@ impl SourceBackedPackage {
                 archive_total,
                 bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
                     relationship_total,
                     bytes,
                     SourceLimitKind::TotalRelationshipXmlBytes,
-                    self.limits.max_total_relationship_xml_bytes() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
                 )?;
             }
         }
@@ -12216,31 +12603,31 @@ impl SourceBackedPackage {
             original_part,
             replacement_len as u64,
             SourceLimitKind::AggregateBytes,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
         let adjusted_archive = adjusted_overlay_total(
             adjusted_archive,
             original_relationship,
             relationship_bytes,
             SourceLimitKind::AggregateBytes,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
         let adjusted_relationships = adjusted_overlay_total(
             relationship_total,
             original_relationship,
             relationship_bytes,
             SourceLimitKind::TotalRelationshipXmlBytes,
-            self.limits.max_total_relationship_xml_bytes() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
             adjusted_relationships,
-            self.limits.max_total_relationship_xml_bytes() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
         )
     }
 
@@ -12248,31 +12635,32 @@ impl SourceBackedPackage {
         &self,
         part_overlays: &[(usize, usize)],
         relationship_overlays: &[(EntryId, usize)],
+        limits: SourceLimits,
     ) -> Result<()> {
         for (_, replacement_len) in part_overlays {
             let replacement_bytes = *replacement_len as u64;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::PartBytes,
                 replacement_bytes,
-                self.limits.max_part_bytes(),
+                limits.max_part_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
         }
         for (_, replacement_len) in relationship_overlays {
             let replacement_bytes = *replacement_len as u64;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::RelationshipXmlBytes,
                 replacement_bytes,
-                self.limits.max_relationship_xml_bytes() as u64,
+                limits.max_relationship_xml_bytes() as u64,
             )?;
         }
         let mut archive_total = 0_u64;
@@ -12287,14 +12675,14 @@ impl SourceBackedPackage {
                 archive_total,
                 bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
                     relationship_total,
                     bytes,
                     SourceLimitKind::TotalRelationshipXmlBytes,
-                    self.limits.max_total_relationship_xml_bytes() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
                 )?;
             }
         }
@@ -12308,7 +12696,7 @@ impl SourceBackedPackage {
                     .metadata_for(part.entry_id)?
                     .uncompressed_size(),
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
         }
         let mut adjusted_archive = archive_total;
@@ -12324,14 +12712,14 @@ impl SourceBackedPackage {
                 original,
                 *replacement_len as u64,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             adjusted_parts = adjusted_overlay_total(
                 adjusted_parts,
                 original,
                 *replacement_len as u64,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
         }
         for (entry, replacement_len) in relationship_overlays {
@@ -12341,30 +12729,30 @@ impl SourceBackedPackage {
                 original,
                 *replacement_len as u64,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             adjusted_relationships = adjusted_overlay_total(
                 adjusted_relationships,
                 original,
                 *replacement_len as u64,
                 SourceLimitKind::TotalRelationshipXmlBytes,
-                self.limits.max_total_relationship_xml_bytes() as u64,
+                limits.max_total_relationship_xml_bytes() as u64,
             )?;
         }
-        self.limits.check(
+        limits.check(
             SourceLimitKind::AggregateBytes,
             adjusted_archive,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalPartBytes,
             adjusted_parts,
-            self.limits.max_total_part_bytes(),
+            limits.max_total_part_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
             adjusted_relationships,
-            self.limits.max_total_relationship_xml_bytes() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
         )
     }
 
@@ -12376,6 +12764,7 @@ impl SourceBackedPackage {
         relationship_publications: &[P],
         content_types_replacement: Option<ContentTypesPublicationSummary>,
         raw_relationship_removed_entries: &[(EntryId, u64)],
+        limits: SourceLimits,
     ) -> Result<PreparedTopologyTotals> {
         let mut part_total = 0_u64;
         let mut archive_total = 0_u64;
@@ -12390,14 +12779,14 @@ impl SourceBackedPackage {
                 archive_total,
                 bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             if is_relationship_member_name(name) {
                 relationship_total = checked_overlay_total(
                     relationship_total,
                     bytes,
                     SourceLimitKind::TotalRelationshipXmlBytes,
-                    self.limits.max_total_relationship_xml_bytes() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
                 )?;
             }
         }
@@ -12406,7 +12795,7 @@ impl SourceBackedPackage {
                 relationship_event_total,
                 metrics.event_count,
                 SourceLimitKind::TotalRelationshipXmlEvents,
-                self.limits.max_total_relationship_xml_events() as u64,
+                limits.max_total_relationship_xml_events() as u64,
             )?;
         }
         // The source totals above include every physical member.  A prepared
@@ -12431,7 +12820,7 @@ impl SourceBackedPackage {
                 part_bytes,
                 0,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
             let relationship_member = relationships_uri.membername();
@@ -12444,14 +12833,14 @@ impl SourceBackedPackage {
                 relationship_bytes,
                 0,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             relationship_total = adjusted_overlay_total(
                 relationship_total,
                 relationship_bytes,
                 0,
                 SourceLimitKind::TotalRelationshipXmlBytes,
-                self.limits.max_total_relationship_xml_bytes() as u64,
+                limits.max_total_relationship_xml_bytes() as u64,
             )?;
             let metrics = self
                 .catalog
@@ -12465,7 +12854,7 @@ impl SourceBackedPackage {
                 metrics.event_count,
                 0,
                 SourceLimitKind::TotalRelationshipXmlEvents,
-                self.limits.max_total_relationship_xml_events() as u64,
+                limits.max_total_relationship_xml_events() as u64,
             )?;
         }
         for (entry, event_count) in raw_relationship_removed_entries {
@@ -12486,21 +12875,21 @@ impl SourceBackedPackage {
                 relationship_bytes,
                 0,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
             relationship_total = adjusted_overlay_total(
                 relationship_total,
                 relationship_bytes,
                 0,
                 SourceLimitKind::TotalRelationshipXmlBytes,
-                self.limits.max_total_relationship_xml_bytes() as u64,
+                limits.max_total_relationship_xml_bytes() as u64,
             )?;
             relationship_event_total = adjusted_overlay_total(
                 relationship_event_total,
                 *event_count,
                 0,
                 SourceLimitKind::TotalRelationshipXmlEvents,
-                self.limits.max_total_relationship_xml_events() as u64,
+                limits.max_total_relationship_xml_events() as u64,
             )?;
         }
         for (index, part) in self.catalog.parts.iter().enumerate() {
@@ -12513,7 +12902,7 @@ impl SourceBackedPackage {
                     .metadata_for(part.entry_id)?
                     .uncompressed_size(),
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
         }
         for (index, target) in removals.iter().enumerate() {
@@ -12532,7 +12921,7 @@ impl SourceBackedPackage {
                 part_bytes,
                 0,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
         }
         for (index, replacement) in replacements.iter().enumerate() {
@@ -12541,15 +12930,15 @@ impl SourceBackedPackage {
             }
             let replacement_bytes = u64::try_from(replacement.replacement.len())
                 .map_err(|_| overlay_unavailable("topology replacement length overflows u64"))?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::PartBytes,
                 replacement_bytes,
-                self.limits.max_part_bytes(),
+                limits.max_part_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 replacement_bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
             let original = self
                 .archive
@@ -12560,14 +12949,14 @@ impl SourceBackedPackage {
                 original,
                 replacement_bytes,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
             archive_total = adjusted_overlay_total(
                 archive_total,
                 original,
                 replacement_bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
         }
         for (index, addition) in additions.iter().enumerate() {
@@ -12592,57 +12981,57 @@ impl SourceBackedPackage {
             };
             let member_name_bytes = u64::try_from(addition.partname.membername().len())
                 .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::ArchiveMemberNameBytes,
                 member_name_bytes,
-                self.limits.max_archive_member_name_bytes(),
+                limits.max_archive_member_name_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::PartBytes,
                 bytes,
-                self.limits.max_part_bytes(),
+                limits.max_part_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
             if let Some(compressed_bytes) = compressed_bytes {
-                self.limits.check(
+                limits.check(
                     SourceLimitKind::ArchiveCompressedBytes,
                     compressed_bytes,
-                    self.limits.max_archive_compressed_bytes(),
+                    limits.max_archive_compressed_bytes(),
                 )?;
             }
             part_total = checked_overlay_total(
                 part_total,
                 bytes,
                 SourceLimitKind::TotalPartBytes,
-                self.limits.max_total_part_bytes(),
+                limits.max_total_part_bytes(),
             )?;
             archive_total = checked_overlay_total(
                 archive_total,
                 bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
         }
         if let Some(summary) = content_types_replacement {
             let bytes = summary.bytes;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::PartBytes,
                 bytes,
-                self.limits.max_part_bytes(),
+                limits.max_part_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::ContentTypesBytes,
                 bytes,
-                self.limits.max_content_types_bytes() as u64,
+                limits.max_content_types_bytes() as u64,
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
             let entry = self
                 .archive
@@ -12654,12 +13043,12 @@ impl SourceBackedPackage {
                 original,
                 bytes,
                 SourceLimitKind::AggregateBytes,
-                self.limits.max_aggregate_bytes(),
+                limits.max_aggregate_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::ContentTypeMappings,
                 summary.mappings,
-                self.limits.max_content_type_mappings() as u64,
+                limits.max_content_type_mappings() as u64,
             )?;
         }
         for (index, publication) in relationship_publications.iter().enumerate() {
@@ -12667,26 +13056,26 @@ impl SourceBackedPackage {
                 self.check_topology_progress()?;
             }
             let bytes = publication.output_bytes()?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::ArchiveMemberNameBytes,
                 publication.member_name().len() as u64,
-                self.limits.max_archive_member_name_bytes(),
+                limits.max_archive_member_name_bytes(),
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::RelationshipsPerPart,
                 publication.relationship_count() as u64,
-                self.limits.max_relationships_per_part() as u64,
+                limits.max_relationships_per_part() as u64,
             )?;
-            let events = publication.output_events(self.limits)?;
-            self.limits.check(
+            let events = publication.output_events(limits)?;
+            limits.check(
                 SourceLimitKind::RelationshipXmlBytes,
                 bytes,
-                self.limits.max_relationship_xml_bytes() as u64,
+                limits.max_relationship_xml_bytes() as u64,
             )?;
-            self.limits.check(
+            limits.check(
                 SourceLimitKind::EntryBytes,
                 bytes,
-                self.limits.max_entry_bytes(),
+                limits.max_entry_bytes(),
             )?;
             if let Some(entry) = publication.existing_entry() {
                 let original = self.archive.metadata_for(entry)?.uncompressed_size();
@@ -12695,14 +13084,14 @@ impl SourceBackedPackage {
                     original,
                     bytes,
                     SourceLimitKind::AggregateBytes,
-                    self.limits.max_aggregate_bytes(),
+                    limits.max_aggregate_bytes(),
                 )?;
                 relationship_total = adjusted_overlay_total(
                     relationship_total,
                     original,
                     bytes,
                     SourceLimitKind::TotalRelationshipXmlBytes,
-                    self.limits.max_total_relationship_xml_bytes() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
                 )?;
                 let original_events = self
                     .catalog
@@ -12728,48 +13117,48 @@ impl SourceBackedPackage {
                     original_events,
                     events,
                     SourceLimitKind::TotalRelationshipXmlEvents,
-                    self.limits.max_total_relationship_xml_events() as u64,
+                    limits.max_total_relationship_xml_events() as u64,
                 )?;
             } else {
                 archive_total = checked_overlay_total(
                     archive_total,
                     bytes,
                     SourceLimitKind::AggregateBytes,
-                    self.limits.max_aggregate_bytes(),
+                    limits.max_aggregate_bytes(),
                 )?;
                 relationship_total = checked_overlay_total(
                     relationship_total,
                     bytes,
                     SourceLimitKind::TotalRelationshipXmlBytes,
-                    self.limits.max_total_relationship_xml_bytes() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
                 )?;
                 relationship_event_total = checked_overlay_total(
                     relationship_event_total,
                     events,
                     SourceLimitKind::TotalRelationshipXmlEvents,
-                    self.limits.max_total_relationship_xml_events() as u64,
+                    limits.max_total_relationship_xml_events() as u64,
                 )?;
             }
         }
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalPartBytes,
             part_total,
-            self.limits.max_total_part_bytes(),
+            limits.max_total_part_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::AggregateBytes,
             archive_total,
-            self.limits.max_aggregate_bytes(),
+            limits.max_aggregate_bytes(),
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalRelationshipXmlBytes,
             relationship_total,
-            self.limits.max_total_relationship_xml_bytes() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
         )?;
-        self.limits.check(
+        limits.check(
             SourceLimitKind::TotalRelationshipXmlEvents,
             relationship_event_total,
-            self.limits.max_total_relationship_xml_events() as u64,
+            limits.max_total_relationship_xml_events() as u64,
         )?;
 
         let mut output_bound = self.source.length;
@@ -13388,6 +13777,25 @@ impl SourceBackedPackage {
         write_exact_snapshot(&self.source, writer, self.cache.context())
     }
 
+    fn write_changed_overlays_with_omissions_and_appended_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names)?;
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            appended,
+            None,
+            Some(policy),
+        )
+    }
+
     fn write_exact_source_with_accounting<W: Write>(
         self,
         writer: W,
@@ -13416,6 +13824,7 @@ impl SourceBackedPackage {
             omitted_member_names,
             &[],
             None,
+            None,
         )
     }
 
@@ -13432,6 +13841,7 @@ impl SourceBackedPackage {
             omitted_member_names,
             appended,
             None,
+            None,
         )
     }
 
@@ -13441,7 +13851,32 @@ impl SourceBackedPackage {
         replacements: &[ChangedOverlay],
         appended: &[Arc<soapberry_zip::RegeneratedEntry>],
     ) -> Result<()> {
-        self.write_changed_overlays_with_appended_inner(writer, replacements, &[], appended, None)
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            &[],
+            appended,
+            None,
+            None,
+        )
+    }
+
+    fn write_changed_overlays_with_appended_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names)?;
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            &[],
+            None,
+            Some(policy),
+        )
     }
 
     fn write_changed_overlays_with_appended_accounting<W: Write>(
@@ -13457,6 +13892,7 @@ impl SourceBackedPackage {
             &[],
             appended,
             Some(accounting),
+            None,
         )
     }
 
@@ -13467,6 +13903,7 @@ impl SourceBackedPackage {
         omitted_member_names: &[String],
         appended: &[Arc<soapberry_zip::RegeneratedEntry>],
         mut accounting: Option<&mut OpcOperationAccounting>,
+        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         let _monitored = self.source.monitor_publication();
@@ -13676,7 +14113,92 @@ impl SourceBackedPackage {
         let mut accounting_error = None;
         let has_accounting = accounting.is_some();
         let execution_failure = Arc::new(Mutex::new(None));
-        let result = if let Some(context) = self.cache.context() {
+        let result = if let Some(policy) = policy {
+            // Preserve the managed package's compression admission and
+            // parallel wave for policy publications. The admission callback
+            // below runs after that wave has prepared the exact ZIP profile,
+            // but before the first byte is accepted by the policy sink.
+            let scheduled = match self.cache.write_session() {
+                Some(session) => {
+                    let wave = session.wave_for(&plan);
+                    let (wave, wave_permits) = self
+                        .cache
+                        .admit_deflate_wave(wave)
+                        .map_err(map_execution_error)?;
+                    wave.is_parallel().then_some((session, wave, wave_permits))
+                },
+                None => None,
+            };
+            let cancellation = self.cache.context().cloned().map(PublicationCancellation);
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
+            };
+            let policy_sink = artifact_restore::policy_source_sink(
+                policy,
+                counted,
+                &self.source,
+                self.cache.context(),
+            )?;
+            if has_accounting {
+                match scheduled {
+                    Some((session, wave, _wave_permits)) => index
+                        .write_to_with_admission_and_accounting_and_session(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            &mut zip_accounting,
+                            session,
+                            wave,
+                            cancellation
+                                .as_ref()
+                                .expect("parallel ZIP publication requires a context"),
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                    None => index
+                        .write_to_with_admission_and_accounting(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            &mut zip_accounting,
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                }
+            } else {
+                match scheduled {
+                    Some((session, wave, _wave_permits)) => index
+                        .write_to_with_admission_and_session(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            session,
+                            wave,
+                            cancellation
+                                .as_ref()
+                                .expect("parallel ZIP publication requires a context"),
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                    None => index
+                        .write_to_with_admission(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                }
+            }
+
+        } else if let Some(context) = self.cache.context() {
             let Some(output_reservation_failures) =
                 self.source.output_reservation_failures.as_ref()
             else {
@@ -13793,13 +14315,17 @@ impl SourceBackedPackage {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .take()
             .map_or(result, |error| Err(map_execution_error(error)));
+        let result = policy
+            .and_then(|policy| policy.take_failure())
+            .map_or(result, |error| Err(map_execution_error(error)));
         let result = match (
             result,
             self.cache.check_context().map_err(map_execution_error),
+            policy.map_or(Ok(()), |policy| policy.check_recipient()),
         ) {
-            (Err(error), _) => Err(error),
-            (Ok(()), Err(error)) => Err(error),
-            (Ok(()), Ok(())) => Ok(()),
+            (Err(error), _, _) => Err(error),
+            (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(()), Ok(())) => Ok(()),
         };
         let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
         // Merge the operation-local ZIP report before the final source
@@ -15428,6 +15954,17 @@ fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
         };
     }
     OpcError::from(error)
+}
+
+fn map_preservation_admission_error(
+    error: soapberry_zip::PreservationAdmissionError<OpcError>,
+) -> OpcError {
+    match error {
+        soapberry_zip::PreservationAdmissionError::Archive(error) => {
+            map_preservation_error(error)
+        },
+        soapberry_zip::PreservationAdmissionError::Admission(error) => error,
+    }
 }
 
 fn map_verified_decoded_reader_error<E>(
