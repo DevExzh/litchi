@@ -20,8 +20,12 @@ impl Edit {
     /// wires one: notes slide → slide and → notes master, slide → notes
     /// slide.
     pub(super) fn create_notes_slide(&mut self, slide: &PackURI, text: &str) -> Result<()> {
+        let (presentation_name, max_parts) = {
+            let source = self.source_ref()?;
+            (source.presentation_name.clone(), source.limits.max_parts())
+        };
         let master = {
-            let presentation = self.working.get_part(&self.source.presentation_name)?;
+            let presentation = self.working.get_part(&presentation_name)?;
             let mut masters = presentation.rels().iter().filter(|relationship| {
                 !relationship.is_external()
                     && (relationship.reltype() == rt::NOTES_MASTER
@@ -51,10 +55,10 @@ impl Edit {
         {
             return Err(refuse("the slide already relates a notes page"));
         }
-        if self.working.part_count() >= self.source.limits.max_parts() {
+        if self.working.part_count() >= max_parts {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::Parts,
-                maximum: self.source.limits.max_parts(),
+                maximum: max_parts,
             });
         }
         let name = self.free_notes_name()?;

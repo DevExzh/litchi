@@ -928,7 +928,10 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
                 continue;
             };
             let opc = package.opc()?;
-            for slide in edit.slides()? {
+            let Ok(slides) = edit.slides() else {
+                continue;
+            };
+            for slide in slides {
                 let xml = opc.get_part(slide.part_name())?.blob().to_vec();
                 let Ok(scene) = crate::shape::owned::Scene::read(xml) else {
                     continue;

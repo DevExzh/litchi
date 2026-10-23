@@ -145,6 +145,7 @@ impl Edit {
         scope: Scope,
         link: Option<&Link>,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         if let Some(link) = link {
             let text_ok = match &link.target {
                 Target::Url(url) => !url.is_empty() && valid_text(url),

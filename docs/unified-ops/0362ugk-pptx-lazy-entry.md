@@ -12,13 +12,16 @@ returns its ordinary typed error. A failed capture restores the deferred
 state, so retries do not observe a partial edit.
 
 `Package::opened_presentation*` remains the explicit eager, fallible read
-projection. `Snapshot::edit` remains eager because its source is already a
-validated snapshot. The edit's source, slides, and retained-MCE getters are
-fallible where materialization is required; all consumers in the PPTX crate,
-tests, and example are migrated. Releasing retained MCE before materializing
-is remembered and applied to the captured snapshot. The existing digest memo
-is projected back to the package's own payload allocations, preserving the
-memo fast path for later edits and replay. Signed admission, no-op publication,
+projection. `Snapshot::edit` now also keeps its package graph, slide catalog,
+and name index behind shared ownership: cloning the edit root is O(1), and the
+first mutating operation obtains the private OPC graph with copy-on-write.
+The edit's source, slides, and retained-MCE getters are fallible where
+materialization is required; every direct consumer (including masters,
+layouts, themes, SmartArt, notes, pictures, text, and hyperlinks) resolves
+that state before reading it. Releasing retained MCE before materializing is
+remembered and applied to the captured snapshot. The existing digest memo is
+projected back to the package's own payload allocations, preserving the memo
+fast path for later edits and replay. Signed admission, no-op publication,
 patch/replay behavior, source provenance, owner policy, and output limits stay
 on the existing capture/commit paths.
 

@@ -47,9 +47,10 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 pub struct Edit {
     source: Option<Snapshot>,
     lazy: Option<LazySource>,
-    working: OpcPackage,
+    working: Working,
     slides: Vec<Slide>,
     slide_name_index: Option<SlideNameIndex>,
+    state_ready: bool,
     /// Slide payloads this transaction read back as a complete scene when it
     /// staged them, by part name.
     ///
@@ -81,12 +82,66 @@ struct LazySource {
     release_retained_mce: bool,
 }
 
+/// Copy-on-write graph state for an edit. A detached edit keeps the source's
+/// `Arc` until an operation actually needs a mutable graph; this covers both
+/// `Package::edit` and `Snapshot::edit` without traversing the OPC part map in
+/// their constructors.
+#[derive(Clone)]
+enum Working {
+    Deferred(Arc<OpcPackage>),
+    Owned(OpcPackage),
+}
+
+impl Working {
+    fn new(package: Arc<OpcPackage>) -> Self {
+        Self::Deferred(package)
+    }
+
+    fn into_owned(self) -> OpcPackage {
+        match self {
+            Self::Owned(package) => package,
+            Self::Deferred(package) => match Arc::try_unwrap(package) {
+                Ok(package) => package,
+                Err(package) => package.as_ref().clone(),
+            },
+        }
+    }
+}
+
+impl std::ops::Deref for Working {
+    type Target = OpcPackage;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Deferred(package) => package.as_ref(),
+            Self::Owned(package) => package,
+        }
+    }
+}
+
+impl std::ops::DerefMut for Working {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        loop {
+            match self {
+                Self::Owned(package) => return package,
+                Self::Deferred(package) => {
+                    let package = package.as_ref().clone();
+                    *self = Self::Owned(package);
+                },
+            }
+        }
+    }
+}
+
 impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
             .field("captured", &self.source.is_some())
-            .field("slide_count", &self.slides.len())
+            .field(
+                "slide_count",
+                &self.state_ready.then_some(self.slides.len()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -94,9 +149,10 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
-            working: source.package.as_ref().clone(),
-            slides: source.slides.clone(),
-            slide_name_index: Some(source.slide_name_index.clone()),
+            working: Working::new(Arc::clone(&source.package)),
+            slides: Vec::new(),
+            slide_name_index: None,
+            state_ready: false,
             scene_read: HashMap::new(),
             planned: None,
             source: Some(source),
@@ -115,9 +171,10 @@ impl Edit {
     ) -> Self {
         let parent_digests = digest_sink.get().cloned();
         Self {
-            working: package.as_ref().clone(),
+            working: Working::new(Arc::clone(&package)),
             slides: Vec::new(),
             slide_name_index: None,
+            state_ready: false,
             scene_read: HashMap::new(),
             planned: None,
             source: None,
@@ -137,7 +194,13 @@ impl Edit {
     /// once. An error leaves the lazy source intact, so a caller can retry a
     /// failed operation without observing a partially initialized edit.
     fn ensure_ready(&mut self) -> Result<()> {
-        if self.source.is_some() {
+        if self.source.is_some() && self.state_ready {
+            return Ok(());
+        }
+        if let Some(source) = self.source.as_ref() {
+            self.slides = source.slides.as_ref().clone();
+            self.slide_name_index = Some(source.slide_name_index.as_ref().clone());
+            self.state_ready = true;
             return Ok(());
         }
         let Some(lazy) = self.lazy.take() else {
@@ -174,10 +237,17 @@ impl Edit {
         {
             let _kept = lazy.digest_sink.set(Arc::new(projected));
         }
-        self.slides = snapshot.slides.clone();
-        self.slide_name_index = Some(snapshot.slide_name_index.clone());
+        self.slides = snapshot.slides.as_ref().clone();
+        self.slide_name_index = Some(snapshot.slide_name_index.as_ref().clone());
+        self.state_ready = true;
         self.source = Some(snapshot);
         Ok(())
+    }
+
+    /// Borrow the currently staged graph, or the immutable source graph before
+    /// the first mutation has required a private working copy.
+    fn working_ref(&self) -> Result<&OpcPackage> {
+        Ok(&self.working)
     }
 
     fn source_ref(&self) -> Result<&Snapshot> {
@@ -191,7 +261,10 @@ impl Edit {
     /// visible payload, or a record that cannot be reserved, is simply not
     /// recorded, which only costs the commit a second read.
     fn note_scene_read(&mut self, part_name: &PackURI) {
-        let Ok(part) = self.working.get_part(part_name) else {
+        let Ok(part) = self
+            .working_ref()
+            .and_then(|working| working.get_part(part_name))
+        else {
             return;
         };
         let payload = part.blob_arc();
@@ -280,9 +353,9 @@ impl Edit {
             .get(position.get())
             .cloned()
             .ok_or_else(|| invalid("slide insertion lost its checked position"))?;
-        self.working = working;
-        self.slides = published.slides;
-        self.slide_name_index = Some(published.slide_name_index);
+        self.working = Working::Owned(working);
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         Ok(selected)
     }
 
@@ -456,16 +529,16 @@ impl Edit {
             plan.patch(),
             physical_source_provenance,
         )?;
-        self.slides = published.slides;
-        self.slide_name_index = Some(published.slide_name_index);
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         Ok(selected)
     }
 
     /// Record a staged plan's publication when it was this edit's first
     /// change, so commit can publish it without capturing it again.
     fn record_plan(&mut self, source_revision: [u8; 32], published: Snapshot, patch: &Patch) {
-        self.slides = published.slides.clone();
-        self.slide_name_index = Some(published.slide_name_index.clone());
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         self.planned = (self
             .source
             .as_ref()
@@ -2511,7 +2584,8 @@ impl Edit {
         {
             // The staged graph is exactly the candidate a plan published as
             // this edit's first change: its validated snapshot and patch stand.
-            let package = crate::Package::from_opened_candidate(self.working, &snapshot);
+            let package =
+                crate::Package::from_opened_candidate(self.working.into_owned(), &snapshot);
             return Ok(Commit::new(package, snapshot, patch));
         }
         let mut working = self.working;
@@ -2558,7 +2632,7 @@ impl Edit {
             Some(source.slide_roots.as_ref()),
         )?;
         snapshot.owner_state = Arc::clone(&source.owner_state);
-        let package = crate::Package::from_opened_candidate(working, &snapshot);
+        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot);
         Ok(Commit {
             package: Arc::new(package),
             snapshot,

@@ -33,6 +33,7 @@ impl Edit {
     /// Returns an error for a missing master, a name XML cannot carry, or a
     /// malformed master part.
     pub fn set_master_name(&mut self, master: Position, name: &str) -> Result<bool> {
+        self.ensure_ready()?;
         let part = self.master_part(master)?;
         self.set_part_name(&part, ct::PML_SLIDE_MASTER, b"sldMaster", name)
     }
@@ -54,6 +55,7 @@ impl Edit {
         layout: Position,
         name: &str,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let part = self.layout_part(master, layout)?;
         self.set_part_name(&part, ct::PML_SLIDE_LAYOUT, b"sldLayout", name)
     }
@@ -73,6 +75,7 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
         text: &str,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let part = self.master_part(master)?;
         self.set_part_shape_text(&part, ct::PML_SLIDE_MASTER, shape.into(), text)
     }
@@ -91,14 +94,15 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
         text: &str,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let part = self.layout_part(master, layout)?;
         self.set_part_shape_text(&part, ct::PML_SLIDE_LAYOUT, shape.into(), text)
     }
 
     fn master_part(&self, master: Position) -> Result<PackURI> {
         let presentation = crate::presentation::Presentation::new(
-            crate::parts::PresentationPart::from_package(&self.working)?,
-            &self.working,
+            crate::parts::PresentationPart::from_package(self.working_ref()?)?,
+            self.working_ref()?,
         );
         let masters = presentation.slide_masters()?;
         let selected = masters
@@ -109,8 +113,8 @@ impl Edit {
 
     fn layout_part(&self, master: Position, layout: Position) -> Result<PackURI> {
         let presentation = crate::presentation::Presentation::new(
-            crate::parts::PresentationPart::from_package(&self.working)?,
-            &self.working,
+            crate::parts::PresentationPart::from_package(self.working_ref()?)?,
+            self.working_ref()?,
         );
         let masters = presentation.slide_masters()?;
         let selected = masters
@@ -167,7 +171,7 @@ impl Edit {
             owner.blob(),
             span,
             text,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
         )?;
         let staged = crate::shape::Scene::read(&xml)?;
         if staged.shape(key)?.common().text() != Some(text) || staged.len() != scene.len() {
