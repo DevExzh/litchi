@@ -29,10 +29,11 @@
 use super::{PageBreaks, encode, read_layout};
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, snapshot_options, splice};
 use crate::raw::kind;
 
 family!("page-break");
+snapshot_options!("page-break");
 
 /// A bounded dimension of this family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -46,6 +47,7 @@ pub enum LimitKind {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    options: EditOptions,
 }
 
 impl Package {
@@ -55,8 +57,14 @@ impl Package {
     ///
     /// Returns the workbook materialization errors of this package.
     pub fn edit_page_breaks(&self) -> Result<Edit> {
+        self.edit_page_breaks_with_options(EditOptions::default())
+    }
+
+    /// Start a page-break edit with an explicit retained-payload ceiling.
+    pub fn edit_page_breaks_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
+            options,
         })
     }
 
@@ -146,7 +154,9 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit()?))
+        Ok(Commit::new(self.staged.commit_with_snapshot_limit(
+            self.options.max_snapshot_bytes_value(),
+        )?))
     }
 }
 

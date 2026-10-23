@@ -32,10 +32,13 @@ use litchi_opc::{PackURI, TargetMode};
 use super::Hyperlink;
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record_with_limits, splice};
+use crate::part_edit::{
+    Rank, SheetLayout, Staged, family, invalid, record_with_limits, snapshot_options, splice,
+};
 use crate::raw::{Records, kind};
 
 family!("hyperlink");
+snapshot_options!("hyperlink");
 
 /// A bounded dimension of this family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -52,6 +55,7 @@ pub const MAX_HYPERLINKS: usize = 65_530;
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    options: EditOptions,
 }
 
 impl Package {
@@ -61,8 +65,14 @@ impl Package {
     ///
     /// Returns the workbook materialization errors of this package.
     pub fn edit_hyperlinks(&self) -> Result<Edit> {
+        self.edit_hyperlinks_with_options(EditOptions::default())
+    }
+
+    /// Start a hyperlink edit with an explicit retained-payload ceiling.
+    pub fn edit_hyperlinks_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
+            options,
         })
     }
 
@@ -284,7 +294,9 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit()?))
+        Ok(Commit::new(self.staged.commit_with_snapshot_limit(
+            self.options.max_snapshot_bytes_value(),
+        )?))
     }
 }
 

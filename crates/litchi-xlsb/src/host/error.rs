@@ -220,6 +220,7 @@ impl fmt::Display for LimitKind {
         match self {
             Self::CellValues(kind) => fmt::Display::fmt(kind, f),
             Self::Opc(crate::opc::LimitKind::Parts) => f.write_str("changed package parts"),
+            Self::Opc(crate::opc::LimitKind::PatchBytes) => f.write_str("retained patch bytes"),
             Self::BinaryIndex(kind) => fmt::Display::fmt(kind, f),
             Self::CalculationChain(kind) => fmt::Display::fmt(kind, f),
             Self::Connections(kind) => fmt::Display::fmt(kind, f),

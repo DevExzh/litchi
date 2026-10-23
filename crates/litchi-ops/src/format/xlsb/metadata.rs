@@ -66,7 +66,8 @@ impl Images {
 
 /// Retain the expensive full-package charge only for a signed probe, whose
 /// private candidate is about to be replaced by a canonical identity patch.
-/// Unsigned metadata history keeps its endpoint images lazy and uncharged.
+/// Unsigned metadata history charges the changed property payloads directly;
+/// its endpoint images remain lazy and are not serialized for accounting.
 fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize, usize)> {
     if file.signature() != super::Signature::Signed {
         return Ok((0, 0));
@@ -77,6 +78,10 @@ fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize,
         before.saturating_add(Images::image(&candidate).len()),
         before,
     ))
+}
+
+fn native_options(maximum: usize) -> xlsb::metadata::EditOptions {
+    xlsb::metadata::EditOptions::default().max_snapshot_bytes(maximum)
 }
 
 fn native(error: xlsb::metadata::Error) -> crate::Error {
@@ -134,24 +139,31 @@ impl Xlsb {
         // (record 0281).
         let editor = self.editor_for_write()?;
         let (target, patch, metadata) = commit(
-            editor.edit_metadata(),
+            editor.edit_metadata_with_options(native_options(limits.max_snapshot_bytes())),
             |value| assignments.apply(value),
             Some(assignments),
         )?;
         if !patch.is_noop() && self.signature() == super::Signature::Signed {
             return Err(crate::Error::signed(FileFormat::Xlsb));
         }
-        let (staged_retained, signed_before) = staged_retained_bytes(self, &target)?;
+        let (staged_retained, signed_before) = if self.signature() == super::Signature::Signed {
+            staged_retained_bytes(self, &target)?
+        } else {
+            (patch.retained_bytes(), 0)
+        };
+        let staged_noop = patch.is_noop();
         drop(editor);
         let (target, patch, retained) =
-            if patch.is_noop() && self.signature() == super::Signature::Signed {
+            if staged_noop && self.signature() == super::Signature::Signed {
                 // The writable probe strips signature parts. Rebuild the genuine
                 // native metadata identity patch over the retained signed package
                 // before publishing the leaf; the staged charge remains part of
                 // the peak even though that probe is discarded.
+                drop(target);
+                drop(patch);
                 let original = self.original_package_for_noop()?;
                 let (target, patch) = original
-                    .edit_metadata()
+                    .edit_metadata_with_options(native_options(limits.max_snapshot_bytes()))
                     .map_err(native)?
                     .commit()
                     .map_err(native)?
@@ -197,10 +209,13 @@ impl Xlsb {
         source: &super::source::SourceWorkbook,
         assignments: &Assignments,
         authored_operations: usize,
-        _limits: &SemanticLimits,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         self.check_source_for_replay()?;
-        let mut edit = source.workbook().edit_metadata().map_err(native)?;
+        let mut edit = source
+            .workbook()
+            .edit_metadata_with_options(native_options(limits.max_snapshot_bytes()))
+            .map_err(native)?;
         edit.update(|value| assignments.apply(value))
             .map_err(native)?;
         if assignments.has_custom() {
@@ -210,9 +225,13 @@ impl Xlsb {
         // The staged value is the committed one; no second read of the parts.
         let metadata = edit.metadata().map_err(native)?;
         let (workbook, patch) = edit.commit().map_err(native)?.into_parts();
-        // Source-backed metadata is used only for unsigned owners above, so
-        // its endpoint images remain lazy and uncharged here.
-        let (staged_retained, signed_before) = (0usize, 0usize);
+        // Source-backed metadata is used only for unsigned owners above. The
+        // native patch already owns the changed property payloads, so charge
+        // that proof without materializing or serializing the whole source.
+        let retained = patch.retained_bytes();
+        if retained > limits.max_snapshot_bytes() {
+            return Err(snapshot_limit(retained, limits.max_snapshot_bytes()));
+        }
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -238,7 +257,7 @@ impl Xlsb {
                 after_file,
                 before: OnceLock::new(),
                 after: OnceLock::new(),
-                retained: staged_retained.max(signed_before.saturating_mul(2)),
+                retained,
                 authored_operations,
                 patch,
             },

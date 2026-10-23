@@ -9,8 +9,8 @@ use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
     Commit, NativeCellOptions, NativeFormat, NativeScalar, NativeSelector, Reference,
-    TransferLimits, caller_value_error, cell_semantic_charge, native_error, package_from_editor,
-    snapshot_limit,
+    caller_value_error, cell_patch_container_bytes, cell_snapshot_budget, cell_transfer_limits,
+    native_error, package_from_editor,
 };
 use crate::error::{Code, Error, Result};
 use crate::import::{Origin, Summary, Table, Value, Written, serial};
@@ -65,19 +65,8 @@ pub(crate) fn import(
         // Empty fields clear only stored cells, so the read grid is pinned
         // when the first one is met.
         let mut existing: Option<Grid> = None;
-        let semantic_charge = cell_semantic_charge(table.fields().len(), limits)?;
-        let image_budget = limits
-            .max_snapshot_bytes()
-            .checked_sub(semantic_charge)
-            .filter(|budget| *budget > 0)
-            .ok_or_else(|| {
-                snapshot_limit(
-                    semantic_charge.saturating_add(1),
-                    limits.max_snapshot_bytes(),
-                )
-            })?;
         let native_limits =
-            TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+            cell_transfer_limits(cell_snapshot_budget(limits.max_snapshot_bytes())?, limits)?;
         let package = package_from_editor(file.editor_for_write()?);
         let mut edit = package
             .edit_cell_values_with_options(
@@ -167,11 +156,15 @@ pub(crate) fn import(
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
+        let retained_snapshot = cell_patch_container_bytes()
+            .checked_add(patch.retained_bytes())
+            .ok_or_else(|| super::snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
         let commit = Commit::from_cell_parts(
             file,
             next,
             vec![patch],
             (sheet, native_limits),
+            retained_snapshot,
             limits.max_snapshot_bytes(),
             table.fields().len(),
         )?;

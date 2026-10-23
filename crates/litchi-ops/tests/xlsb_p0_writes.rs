@@ -7,7 +7,8 @@ use std::io::Cursor;
 
 use litchi_core::edit::RefusalKind;
 use litchi_ops::error::Source;
-use litchi_ops::{Code, File, OpenOptions, Props, SourceMode, props};
+use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::{Code, EditOptions, File, OpenOptions, Props, SourceMode, props};
 use litchi_xlsb::package::PackageError;
 
 fn fixture() -> Vec<u8> {
@@ -452,6 +453,40 @@ fn signed_workbooks_refuse_every_p0_write_until_unsigned() {
             property(&edited, "/Data/A1", "font.bold").as_deref(),
             Some("true")
         );
+    }
+}
+
+#[test]
+fn unsigned_metadata_snapshot_charge_is_enforced() {
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(1)
+        .expect("snapshot limit")
+        .build()
+        .expect("semantic limits");
+    for file in owners(&fixture()) {
+        let probe = file
+            .edit(|edit| edit.set("/metadata", props! { "title" => "measured" }))
+            .expect("metadata probe");
+        assert!(
+            probe.diagnostics().snapshot_bytes() > 0,
+            "metadata commits must report their retained property payloads"
+        );
+        let error = file
+            .edit_with_options(EditOptions::new().semantic_limits(limits), |edit| {
+                edit.set("/metadata", props! { "title" => "bounded" })
+            })
+            .expect_err("metadata publication must charge its retained patch");
+        assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+
+        let exact = SemanticLimits::builder()
+            .max_snapshot_bytes(probe.diagnostics().snapshot_bytes())
+            .expect("exact snapshot limit")
+            .build()
+            .expect("exact semantic limits");
+        file.edit_with_options(EditOptions::new().semantic_limits(exact), |edit| {
+            edit.set("/metadata", props! { "title" => "measured" })
+        })
+        .expect("source-backed metadata must fit its exact retained-byte budget");
     }
 }
 

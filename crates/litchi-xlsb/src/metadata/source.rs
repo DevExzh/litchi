@@ -44,7 +44,7 @@ use litchi_ooxml_common::custom::{self, Host};
 use litchi_ooxml_common::properties::{self, Snapshot, app};
 use litchi_opc::PreparedTopology;
 
-use super::{Diagnostics, Error, Patch};
+use super::{Diagnostics, EditOptions, Error, Patch, enforce_snapshot_limit};
 use crate::SourceBackedWorkbook;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -100,6 +100,7 @@ pub struct Edit {
     /// The properties this edit started from.
     start: Snapshot,
     inner: properties::Plan,
+    options: EditOptions,
 }
 
 impl std::fmt::Debug for Edit {
@@ -171,18 +172,25 @@ impl Edit {
     /// cannot carry, [`Error::Signed`] for a changed edit of a signed
     /// workbook, and the source-change and topology errors of the planner.
     pub fn commit(self) -> Result<Commit> {
-        let (current, patch, diagnostics) = self.inner.finish()?;
+        let Self {
+            workbook,
+            start,
+            inner,
+            options,
+        } = self;
+        let (current, patch, diagnostics) = inner.finish()?;
+        enforce_snapshot_limit(&patch, options)?;
         if patch.is_noop() {
             return Ok(Commit {
-                package: self.workbook,
+                package: workbook,
                 patch,
                 diagnostics,
             });
         }
-        let source = self.workbook.source_backed_package();
-        let (base, composed) = match &self.workbook.metadata {
+        let source = workbook.source_backed_package();
+        let (base, composed) = match &workbook.metadata {
             Some(revision) => (revision.base.clone(), revision.patch.compose(&patch)?),
-            None => (self.start, patch.clone()),
+            None => (start, patch.clone()),
         };
         // The plan itself is prepared on first publication; its preconditions
         // are checked now, so a stale or signed source fails the commit.
@@ -192,16 +200,14 @@ impl Edit {
                 return Err(Error::Signed);
             }
         }
-        let package = self
-            .workbook
-            .with_metadata_revision((!composed.is_noop()).then(|| {
-                Arc::new(Revision {
-                    base,
-                    current,
-                    patch: composed,
-                    topology: OnceLock::new(),
-                })
-            }));
+        let package = workbook.with_metadata_revision((!composed.is_noop()).then(|| {
+            Arc::new(Revision {
+                base,
+                current,
+                patch: composed,
+                topology: OnceLock::new(),
+            })
+        }));
         Ok(Commit {
             package,
             patch,
@@ -293,11 +299,19 @@ impl SourceBackedWorkbook {
     ///
     /// The errors of [`Self::metadata`].
     pub fn edit_metadata(&self) -> Result<Edit> {
+        self.edit_metadata_with_options(EditOptions::default())
+    }
+
+    /// Start a source-backed metadata edit with an explicit retained-snapshot
+    /// ceiling. The check runs after the exact patch is planned and before a
+    /// revision is retained on the source owner.
+    pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
         let start = self.metadata_snapshot()?;
         Ok(Edit {
             workbook: self.clone(),
             inner: start.plan(),
             start,
+            options,
         })
     }
 

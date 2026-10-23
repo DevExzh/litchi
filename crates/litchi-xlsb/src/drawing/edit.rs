@@ -49,10 +49,11 @@ use litchi_spreadsheet_drawing::objects;
 
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, snapshot_options, splice};
 use crate::raw::{Encoder, kind};
 
 family!("drawing");
+snapshot_options!("drawing");
 
 pub use objects::{
     Align, COLUMN_EMU, Change, DASHES, ElementKind, Image, LimitKind, MAX_DRAWING_BYTES,
@@ -172,8 +173,14 @@ impl Package {
     ///
     /// Returns the workbook materialization errors of this package.
     pub fn edit_drawings(&self) -> Result<Edit> {
+        self.edit_drawings_with_options(EditOptions::default())
+    }
+
+    /// Start a worksheet drawing edit with an explicit retained-payload ceiling.
+    pub fn edit_drawings_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
+            options,
         })
     }
 
@@ -194,6 +201,7 @@ impl Package {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    options: EditOptions,
 }
 
 impl Edit {
@@ -377,7 +385,9 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit()?))
+        Ok(Commit::new(self.staged.commit_with_snapshot_limit(
+            self.options.max_snapshot_bytes_value(),
+        )?))
     }
 }
 

@@ -28,10 +28,13 @@
 use super::{AutoFilter, encode_range, read_layout};
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, record_with_limits, splice};
+use crate::part_edit::{
+    Rank, SheetLayout, Staged, family, record_with_limits, snapshot_options, splice,
+};
 use crate::raw::{Records, kind};
 
 family!("auto-filter");
+snapshot_options!("auto-filter");
 
 /// A bounded dimension of this family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -45,6 +48,7 @@ pub enum LimitKind {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    options: EditOptions,
 }
 
 impl Package {
@@ -54,8 +58,14 @@ impl Package {
     ///
     /// Returns the workbook materialization errors of this package.
     pub fn edit_auto_filter(&self) -> Result<Edit> {
+        self.edit_auto_filter_with_options(EditOptions::default())
+    }
+
+    /// Start an auto-filter edit with an explicit retained-payload ceiling.
+    pub fn edit_auto_filter_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
+            options,
         })
     }
 
@@ -149,7 +159,9 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        Ok(Commit::new(self.staged.commit()?))
+        Ok(Commit::new(self.staged.commit_with_snapshot_limit(
+            self.options.max_snapshot_bytes_value(),
+        )?))
     }
 }
 
