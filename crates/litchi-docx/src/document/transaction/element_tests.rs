@@ -283,6 +283,21 @@ fn cell_text_replacement_refuses_content_it_would_drop() {
 }
 
 #[test]
+fn paragraph_text_replacement_preserves_bookmark_markers() {
+    let base = snapshot(
+        r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/><w:r><w:t>one</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>"#,
+    );
+    let mut edit = base.edit();
+    edit.replace_paragraph_text(Position::new(0), "new")
+        .unwrap();
+    let commit = commit_and_check(&base, edit);
+    let output = xml(&commit);
+    assert!(output.contains(r#"<w:bookmarkStart w:id="1" w:name="b"/>"#));
+    assert!(output.contains(r#"<w:t>new</w:t>"#));
+    assert!(output.contains(r#"<w:bookmarkEnd w:id="1"/>"#));
+}
+
+#[test]
 fn removals_that_would_orphan_ranges_are_refused() {
     let base = snapshot(
         r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/></w:p><w:tbl><w:tr><w:tc><w:p><w:bookmarkEnd w:id="1"/></w:p></w:tc></w:tr></w:tbl>"#,

@@ -65,3 +65,47 @@ The command logs remain outside the repository:
 
 They are regenerated under the leaf's capped target with the three commands
 above and are not committed as evidence.
+
+## v16 correction
+
+The v16 runtime exposed that a marker-preserving paragraph scanner must not be
+used by an operation that removes the rest of a cell. The policy is now
+explicit: `scan_text_owner` remains strict for `replace_table_cell_text` and
+the path-addressed `replace_cell_text_at`, while
+`scan_paragraph_text_owner` is used only by paragraph-preserving editors and
+their managed/base/replay plans. Thus a paragraph edit retains empty direct
+bookmark markers byte-for-byte, but whole-cell replacement still returns its
+existing typed `ComplexContent` refusal rather than admitting content it could
+drop. The new native test also commits a changed bookmarked paragraph and
+checks both markers and the exact reversible patch.
+
+The focused follow-up checks passed with the same one-job capped offline
+configuration:
+
+```text
+cargo test -p litchi-docx --lib \
+  document::transaction::element_tests::cell_text_replacement_refuses_content_it_would_drop \
+  --offline --locked                         # 1 passed
+cargo test -p litchi-docx --lib \
+  document::transaction::element_tests::paragraph_text_replacement_preserves_bookmark_markers \
+  --offline --locked                         # 1 passed (TMPDIR on external target)
+cargo test -p litchi-ops --all-features --lib \
+  tests::signature::signed_docx_paragraph_setter_preserves_exact_noops_and_refuses_changes \
+  --offline --locked                         # 1 passed
+```
+
+The first paragraph-marker attempt was not a source failure: the linker could
+not create a temporary file because `/tmp` had exhausted its inode quota
+(`df -i /tmp`: 100%). It was rerun unchanged with
+`TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/docx-runtime/tmp`.
+
+| Follow-up log | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `cell-test-v17.log` | 1,110 | `6a1c0a7a624e084573aa181b55e000b0ebd34ce4d34b05a98866eca53f07020d` |
+| `paragraph-marker-test-v17-tmpdir.log` | 522 | `0d8ed3814042c535075cc243fcb8e6f513b494968c40de1892c4d547fbe21c63` |
+| `signature-test-v17.log` | 620 | `c61b1a8c28f079f1a40fbeb72be5eec47bb9835cb81911d4920f133511a4e26b` |
+
+The inode-exhaustion failure is retained outside the checkout as
+`paragraph-marker-test-v17.log` (4,369 bytes,
+`6636d22591be4d2cdbf48d4006117c34ccb9489ab4080e56e7db60fb9c9f1ed7`) for
+diagnostic provenance only.
