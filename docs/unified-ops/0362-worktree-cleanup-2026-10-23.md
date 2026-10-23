@@ -49,3 +49,57 @@ git worktree add /home/zhuhe/code/litchi-worktrees/uo2-odf-consumer-repair uo2/o
 
 The second wave reclaimed 6,484,524,650 bytes. It used `git worktree remove`
 without `--force`; no branch or tracked object was deleted.
+
+## Third cleanup wave
+
+Five further inactive source-only leaves were removed on 2026-10-23 after
+their commits were confirmed as ancestors of integration
+`18983596a3a1b0f2ab937f4fb1f7d9ef29f18f4c`:
+
+- `uo2/consumer-v9-repair` at
+  `59b9a87de1aa8162b1ca9fe8fdc5cca21ebb314b`: 124,336,611 bytes.
+- `uo2/xlsx-current-consumers` at
+  `1469c148f71cdd7dd494731ac378d60897c98c05`: 6,258,986,092 bytes.
+- `uo2/opc-required-policy` at
+  `d6ff788d3fe1d8a139b5e26d55102e274b1cd890`: 6,259,140,205 bytes.
+- `uo2/0362ui-pptx-consumers` at
+  `c077e9f8d19be821cd682d03d550b4d579f7b10a`: 64,327,811 bytes.
+- `uo2/0362rnb-opc-recipient-policy` at
+  `752a5fa9d1d0ba00ff5e2adb2144e0d46d192988`: 36,456,058 bytes.
+
+The apparent checkout total was 12,743,246,777 bytes. The required-policy
+checkout included four generated ignored Python bytecode files totaling
+131,671 bytes; those were moved before removal, so the retained source/tree
+total was 12,743,115,106 bytes. The quarantine is outside the checkout at
+`.coord/worktree-cleanup-2026-10-23/quarantine/third-wave/`, with relative
+paths, sizes, and SHA-256 values in `manifest.json`:
+
+- `tools/__pycache__/api_debt_inventory.cpython-314.pyc`, 17,557 bytes,
+  `cabb601951fd23533aee89139df55a11d29dd5cf28cd29960aabedad36437522`.
+- `tools/__pycache__/check_api_glossary.cpython-314.pyc`, 44,684 bytes,
+  `e9255bc1b6625cb53fffb246f8b8b8b3d8e8e09ca882b758648bedc0f82ec0ff`.
+- `tools/__pycache__/rustdoc_return_types.cpython-314.pyc`, 15,603 bytes,
+  `293c01eeb71adb89ed39789d0f27c469db1996fbc210dee64da3f9d63a0fcb90`.
+- `tools/__pycache__/test_check_api_glossary.cpython-314.pyc`, 53,827 bytes,
+  `ddff51a86d068e6ef5df9fc0f89356258bf442c9c173b7f8d24a5725afb1a1aa`.
+
+All five trees had clean tracked state. Target, binary, capture, native,
+portable-evidence, and other protected measurement checks found no local
+artifacts, and the process cwd/file-descriptor audit found no active users.
+Shared tracked `docs/performance/results` and `docs/report` evidence was not
+changed or removed from Git; all five branch refs remain at the hashes above.
+No active/source leaf was touched. Removal used `git worktree remove` without
+`--force`.
+
+Exact recreation commands:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-consumer-v9-repair uo2/consumer-v9-repair
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-xlsx-current-consumers uo2/xlsx-current-consumers
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362rd-substrate-scope uo2/opc-required-policy
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362ui-pptx-consumers uo2/0362ui-pptx-consumers
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362rnb-opc-recipient-policy uo2/0362rnb-opc-recipient-policy
+```
+
+The third wave reclaimed 12,743,246,777 checkout bytes while retaining all
+source refs, tracked evidence, and quarantined generated files.
