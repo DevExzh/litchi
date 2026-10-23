@@ -288,3 +288,94 @@ git worktree add /home/zhuhe/code/litchi-worktrees/uo2-clippy-v2-consumers uo2/c
 
 The seventh wave reclaimed 12,522,187,690 checkout bytes while retaining both
 branch refs, tracked evidence, and all protected worktrees.
+
+## Main target cache quarantine
+
+On 2026-10-23 the idle main target at
+`/home/zhuhe/code/litchi-worktrees/unified-ops-api/target` was reduced
+reversibly. The integration target was `eb718eece7`; no Cargo, rustc, rustdoc,
+or file-descriptor user was present. Before quarantine it measured
+19,050,144,236 apparent bytes and 19,605,524,480 allocated bytes. Afterward it
+measured 18,609,608,396 apparent bytes and 19,113,074,688 allocated bytes,
+reclaiming 440,535,840 apparent and 492,449,792 allocated bytes.
+
+The per-file manifest sums are 754,466,808 apparent bytes and 793,866,240
+4-KiB-rounded bytes. Those are record sums, not reclaim totals: 10,940 records
+collapse to 10,745 hard-linked inodes. The quarantined payload therefore has
+440,535,840 apparent bytes under `du`; its 492,662,784 allocated bytes differ
+slightly from the target delta because of directory accounting.
+
+The external quarantine is
+`/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave2/`.
+Its pre-move manifest has 3,705 item roots and 10,940 file records; SHA-256:
+`5d3b995657c7c477472c9475d30a62608b0b37ffa3cec2c1f64b7efea76e88e2`.
+`postcheck.json` reports all 3,705 source paths absent and destination hashes
+verified. The exact restore command is:
+
+```sh
+python3 /home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave2/restore.py
+```
+
+The moved generated cache was limited to:
+
+- 361 old `target/debug/build` directories (645,498,373 apparent bytes) that
+  no dep-info file references, plus 361 matching old fingerprint directories;
+  the closure guard retained all 32 build-output names referenced by dep-info.
+- The two known stale unit-test groups `e5a12b34de2106e0` and
+  `4040652213167156`, including sidecars and fingerprints (101,933,591
+  apparent bytes); the two main files are ELF unit-test executables, not
+  release or measurement binaries.
+- 2,977 fingerprint-only directories (6,788,484 apparent bytes) with no
+  matching output hash anywhere outside `.fingerprint`.
+
+The rejected first selection was fully restored before the corrected wave2.
+The external receipt
+`/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave1/restoration.json`
+cites the wave1 manifest SHA-256
+`e0997eb7f0ba67b91e95e3831cd15fd5c3a169fcec62f24f13657973f195629b`, the
+successful `restored 23027 items` output, and wave1's verification of all
+92,487 file hashes. Wave2 later re-quarantined 3,703 overlapping roots and
+10,938 of those file records, plus two corrected sidecars; the wave1 payload
+is empty.
+
+The compiled historical `.rmeta`/`.rlib` groups whose dep-info names other
+worktrees were not moved: Cargo crate-hash dependency closure could not be
+proven without a build. The all-feature root
+`liblitchi_ops-b00e406e2533c222.rmeta`, format-only root
+`litchi_ops-572a08bc21edd59c`, every artifact at or after the 14:30 UTC cutoff,
+all release/measurement examples, and the isolated wsdoc target were retained.
+Moved executable files consisted of generated Cargo build-script outputs under
+unreferenced `target/debug/build` directories and exactly the two stale unit-test
+ELF executables named above; no release or measurement binary was touched. No
+tracked file or PROGRESS file was changed.
+
+## Eighth cleanup wave
+
+Three clean inactive source leaves were removed on 2026-10-23. Their branch
+refs remain available for source recreation:
+
+- `uo2/0362us-native-budget` at
+  `78ad0abc0ea4ec642eb0da27b0fab693048ea45b`: 6,261,575,540 checkout bytes;
+  its tip is an ancestor of `uo2/budget-validation` and has no commits unique
+  against that validation branch.
+- `uo2/budget-v3-native-errors` at
+  `4cd986a67c0581234c4c3f6888a2acca41c6aed8`: 6,261,550,620 checkout bytes;
+  its tip is an ancestor of `uo2/budget-validation`.
+- `uo2/clippy-v3-consumers` at
+  `ed359c95c19e02aafdb208dc4e68383caf98e005`: 6,261,108,633 checkout bytes;
+  its tip is an ancestor of integration `eb718eece7`.
+
+All three trees had clean tracked state and no untracked or ignored files.
+Targeted checks found no target, binary, capture, native, portable, or other
+protected measurement artifact. Process cwd and file-descriptor audits found
+no active users. Active budget-validation and other budget leaves were not
+touched. Removal used `git worktree remove` without `--force`; no Cargo or
+build command ran. The wave reclaimed 18,784,234,793 checkout bytes.
+
+Exact recreation commands:
+
+```sh
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-0362us-native-budget uo2/0362us-native-budget
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-budget-v3-native-errors uo2/budget-v3-native-errors
+git worktree add /home/zhuhe/code/litchi-worktrees/uo2-clippy-v3-consumers uo2/clippy-v3-consumers
+```
