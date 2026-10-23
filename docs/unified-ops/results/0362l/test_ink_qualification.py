@@ -101,6 +101,20 @@ class DurableInkQualificationTests(unittest.TestCase):
         self.assertIn("let matching_noop = apply(&matching_base, &fixture.noop);", source)
         self.assertIn("assert_eq!(encode(&matching_noop), fixture.original);", source)
 
+    def test_shared_source_delta_records_changes_and_missing_files(self):
+        base = {
+            "crates/litchi-opc/old.rs": (3, "a"),
+            "crates/litchi-opc/changed.rs": (4, "b"),
+        }
+        candidate = {
+            "crates/litchi-opc/changed.rs": (5, "c"),
+            "crates/litchi-opc/new.rs": (6, "d"),
+        }
+        delta = QUALIFY.source_delta(base, candidate, ("crates/litchi-opc/",))
+        self.assertEqual(delta["base_only"], ["crates/litchi-opc/old.rs"])
+        self.assertEqual(delta["candidate_only"], ["crates/litchi-opc/new.rs"])
+        self.assertEqual(delta["changed"][0]["path"], "crates/litchi-opc/changed.rs")
+
 
 if __name__ == "__main__":
     unittest.main()
