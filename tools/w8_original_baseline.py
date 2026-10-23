@@ -491,12 +491,14 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     lock_origin = args.lock_origin.strip()
     if not lock_origin:
         raise fail("lock origin must explicitly describe the external f2 resolution")
+    if "f2" not in lock_origin.lower() and BASELINE_COMMIT not in lock_origin:
+        raise fail("lock origin must identify the pristine f2 dependency resolution")
     corrected = object_bytes(root, PROBE_SOURCE_COMMIT, PROBE_RELATIVE)
     if not probe.is_file() or probe.read_bytes() != corrected:
         raise fail("workspace corrected probe is not the reviewed d39 source")
     adapter_bytes, transforms = consumer_adapter(corrected.decode("utf-8"))
-    adapter_artifact, adapter_created = ensure_adapter(adapter, adapter_bytes)
     archive_info = verify_source_archive(args.source_archive.resolve(), tree)
+    adapter_artifact, adapter_created = ensure_adapter(adapter, adapter_bytes)
     workspace_info = verify_workspace(workspace, tree, probe, adapter, lock, adapter_bytes)
     output_dir = external_output(args.output_dir, "output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
