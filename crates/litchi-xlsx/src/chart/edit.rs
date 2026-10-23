@@ -212,6 +212,111 @@ impl Patch {
         }
     }
 
+    /// The semantic payload retained by this reversible chart patch.
+    ///
+    /// Package endpoints are charged by the caller. Parser and derived-cache
+    /// allocations are outside this semantic retention budget.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        fn state_bytes(state: &State) -> usize {
+            state
+                .content_type
+                .capacity()
+                .saturating_add(state.blob.capacity())
+                .saturating_add(
+                    state
+                        .relationships
+                        .iter()
+                        .map(|relationship| {
+                            relationship
+                                .id
+                                .capacity()
+                                .saturating_add(relationship.kind.capacity())
+                                .saturating_add(relationship.target.capacity())
+                        })
+                        .sum::<usize>(),
+                )
+        }
+
+        self.deltas.iter().fold(0usize, |total, delta| {
+            total
+                .saturating_add(delta.name.as_str().len())
+                .saturating_add(delta.before.as_ref().map_or(0, state_bytes))
+                .saturating_add(delta.after.as_ref().map_or(0, state_bytes))
+        })
+    }
+
+    fn estimate_retained_bytes(
+        before: &OpcPackage,
+        after: &OpcPackage,
+        names: &BTreeSet<String>,
+    ) -> Result<usize> {
+        let mut observed = 0usize;
+        for name in names {
+            let name = PackURI::new(name.as_str()).map_err(|error| invalid(error.to_string()))?;
+            let before = before.get_part(&name).ok();
+            let after = after.get_part(&name).ok();
+            let changed = match (before, after) {
+                (Some(before), Some(after)) => {
+                    before.content_type() != after.content_type()
+                        || before.blob() != after.blob()
+                        || before.rels().len() != after.rels().len()
+                        || before.rels().iter().any(|relationship| {
+                            after
+                                .rels()
+                                .get(relationship.r_id())
+                                .is_none_or(|candidate| {
+                                    candidate.reltype() != relationship.reltype()
+                                        || candidate.target_ref() != relationship.target_ref()
+                                        || candidate.is_external() != relationship.is_external()
+                                })
+                        })
+                },
+                (None, None) => false,
+                _ => true,
+            };
+            if changed {
+                observed = observed
+                    .saturating_add(name.as_str().len())
+                    .saturating_add(before.map_or(0, |part| {
+                        part.content_type()
+                            .len()
+                            .saturating_add(part.blob_arc().capacity())
+                    }))
+                    .saturating_add(after.map_or(0, |part| {
+                        part.content_type()
+                            .len()
+                            .saturating_add(part.blob_arc().capacity())
+                    }));
+                if let Some(part) = before {
+                    observed = observed.saturating_add(
+                        part.rels()
+                            .iter()
+                            .map(|relationship| {
+                                relationship.r_id().len()
+                                    + relationship.reltype().len()
+                                    + relationship.target_ref().len()
+                            })
+                            .sum::<usize>(),
+                    );
+                }
+                if let Some(part) = after {
+                    observed = observed.saturating_add(
+                        part.rels()
+                            .iter()
+                            .map(|relationship| {
+                                relationship.r_id().len()
+                                    + relationship.reltype().len()
+                                    + relationship.target_ref().len()
+                            })
+                            .sum::<usize>(),
+                    );
+                }
+            }
+        }
+        Ok(observed)
+    }
+
     fn capture(before: &OpcPackage, after: &OpcPackage, names: &BTreeSet<String>) -> Result<Self> {
         let names = names
             .iter()
@@ -277,6 +382,12 @@ impl Commit {
         &self.patch
     }
 
+    /// The semantic payload retained by this commit's reversible patch.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.patch.retained_bytes()
+    }
+
     /// What the edit changed.
     #[must_use]
     pub const fn diagnostics(&self) -> &Diagnostics {
@@ -296,6 +407,7 @@ pub struct Edit {
     package: Package,
     staged: OpcPackage,
     touched: BTreeSet<String>,
+    max_retained_bytes: Option<usize>,
 }
 
 /// One ordinary chart frame of a worksheet drawing.
@@ -881,11 +993,17 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
     pub fn edit_charts(&self) -> Result<Edit> {
+        self.edit_charts_with_options(crate::EditOptions::default())
+    }
+
+    /// Start a chart edit with an explicit retained-patch budget.
+    pub fn edit_charts_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
         self.workbook_ref().ensure_mutation_allowed("edit_charts")?;
         Ok(Edit {
             package: self.clone(),
             staged: self.opc().clone(),
             touched: BTreeSet::new(),
+            max_retained_bytes: options.max_retained_bytes_value(),
         })
     }
 
@@ -1190,6 +1308,18 @@ impl Edit {
     ///
     /// Returns the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
+        if let Some(maximum) = self.max_retained_bytes {
+            let observed =
+                Patch::estimate_retained_bytes(self.package.opc(), &self.staged, &self.touched)?;
+            if observed > maximum {
+                return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::Memory,
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                    scope: "XLSX chart retained patch".into(),
+                }));
+            }
+        }
         let patch = Patch::capture(self.package.opc(), &self.staged, &self.touched)?;
         let diagnostics = Diagnostics {
             parts: patch.deltas.len(),
@@ -1368,6 +1498,43 @@ mod tests {
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
+    }
+
+    #[test]
+    fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
+        let package = Package::new().unwrap();
+        let xml = chart("Budget");
+
+        let mut probe = package.edit_charts().unwrap();
+        probe
+            .add(0, &Anchor::new(0, 0, 5, 10), "Budget", &xml)
+            .unwrap();
+        let required = probe.commit().unwrap().patch().retained_bytes();
+        assert!(required > 0);
+
+        let mut rejected = package
+            .edit_charts_with_options(
+                crate::EditOptions::default().with_max_retained_bytes(required - 1),
+            )
+            .unwrap();
+        rejected
+            .add(0, &Anchor::new(0, 0, 5, 10), "Budget", &xml)
+            .unwrap();
+        assert!(matches!(
+            rejected.commit(),
+            Err(Error::ResourceLimit(limit)) if limit.limit == (required - 1) as u64
+        ));
+
+        let mut exact = package
+            .edit_charts_with_options(
+                crate::EditOptions::default().with_max_retained_bytes(required),
+            )
+            .unwrap();
+        exact
+            .add(0, &Anchor::new(0, 0, 5, 10), "Budget", &xml)
+            .unwrap();
+        let commit = exact.commit().unwrap();
+        assert_eq!(commit.patch().retained_bytes(), required);
     }
 
     #[test]

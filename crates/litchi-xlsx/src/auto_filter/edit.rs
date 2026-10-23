@@ -52,8 +52,13 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
     pub fn edit_auto_filter(&self) -> Result<Edit> {
+        self.edit_auto_filter_with_options(crate::EditOptions::default())
+    }
+
+    /// Start an auto-filter edit with an explicit retained-patch budget.
+    pub fn edit_auto_filter_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
         Ok(Edit {
-            staged: Staged::new(self, "edit_auto_filter")?,
+            staged: Staged::new_with_options(self, "edit_auto_filter", options)?,
         })
     }
 
@@ -141,5 +146,36 @@ mod tests {
         assert!(edit.set_auto_filter(0, None).unwrap());
         let removed = edit.commit().unwrap().into_package();
         assert!(removed.same_content(&package).unwrap());
+    }
+
+    #[test]
+    fn retained_patch_budget_rejects_one_below_and_accepts_exact() {
+        let package = Package::new().unwrap();
+        let value = Definition::new(Some(Range::new("A1:B5").unwrap()));
+
+        let mut probe = package.edit_auto_filter().unwrap();
+        probe.set_auto_filter(0, Some(value.clone())).unwrap();
+        let required = probe.commit().unwrap().patch().retained_bytes();
+        assert!(required > 0);
+
+        let mut rejected = package
+            .edit_auto_filter_with_options(
+                crate::EditOptions::default().with_max_retained_bytes(required - 1),
+            )
+            .unwrap();
+        rejected.set_auto_filter(0, Some(value.clone())).unwrap();
+        assert!(matches!(
+            rejected.commit(),
+            Err(crate::Error::ResourceLimit(limit)) if limit.limit == (required - 1) as u64
+        ));
+
+        let mut exact = package
+            .edit_auto_filter_with_options(
+                crate::EditOptions::default().with_max_retained_bytes(required),
+            )
+            .unwrap();
+        exact.set_auto_filter(0, Some(value)).unwrap();
+        let commit = exact.commit().unwrap();
+        assert_eq!(commit.patch().retained_bytes(), required);
     }
 }

@@ -64,8 +64,13 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
     pub fn edit_data_validations(&self) -> Result<Edit> {
+        self.edit_data_validations_with_options(crate::EditOptions::default())
+    }
+
+    /// Start a data-validation edit with an explicit retained-patch budget.
+    pub fn edit_data_validations_with_options(&self, options: crate::EditOptions) -> Result<Edit> {
         Ok(Edit {
-            staged: Staged::new(self, "edit_data_validations")?,
+            staged: Staged::new_with_options(self, "edit_data_validations", options)?,
         })
     }
 

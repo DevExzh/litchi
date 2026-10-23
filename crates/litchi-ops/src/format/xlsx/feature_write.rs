@@ -49,6 +49,40 @@ use crate::target::TargetArg;
 use crate::transaction::SemanticLimits;
 use crate::value::{Color, ColorContext, Length, Scalar};
 
+/// The package and semantic patch charge returned by one native feature
+/// family. These commits all use the shared part-level patch engine, but keep
+/// their concrete commit types in their per-family modules.
+trait NativeFeatureCommit {
+    fn into_feature_parts(self) -> (xlsx::Package, bool, usize);
+}
+
+macro_rules! native_feature_commit {
+    ($commit:ty) => {
+        impl NativeFeatureCommit for $commit {
+            fn into_feature_parts(self) -> (xlsx::Package, bool, usize) {
+                let changed = self.diagnostics().changed();
+                let patch_bytes = self.patch().retained_bytes();
+                (self.into_package(), changed, patch_bytes)
+            }
+        }
+    };
+}
+
+native_feature_commit!(xlsx::workbook::comments::edit::Commit);
+native_feature_commit!(xlsx::drawing::edit::Commit);
+native_feature_commit!(xlsx::conditional_formatting::edit::Commit);
+native_feature_commit!(xlsx::data_validation::edit::Commit);
+native_feature_commit!(xlsx::auto_filter::edit::Commit);
+native_feature_commit!(xlsx::page_breaks::edit::Commit);
+
+/// Reserve both package endpoints before admitting a part-family patch. The
+/// patch editor then checks its own exact semantic payload before constructing
+/// patch-owned states; the final adapter repeats the complete charge.
+pub(super) fn part_edit_options(source: &xlsx::Package, maximum: usize) -> xlsx::EditOptions {
+    xlsx::EditOptions::default()
+        .with_max_retained_bytes(maximum.saturating_sub(source.retained_bytes().saturating_mul(2)))
+}
+
 fn error(code: Code, message: impl Into<String>) -> Error {
     Error::new(code, message.into()).with_format(FileFormat::Xlsx)
 }
@@ -226,6 +260,7 @@ impl Xlsx {
         source: xlsx::Package,
         target: xlsx::Package,
         changed: bool,
+        native_patch_bytes: usize,
         max_snapshot_bytes: usize,
     ) -> Result<Commit> {
         if changed && self.signature() == super::Signature::Signed {
@@ -243,7 +278,7 @@ impl Xlsx {
             target,
             changed,
             1,
-            0,
+            native_patch_bytes,
             max_snapshot_bytes,
         )
     }
@@ -350,9 +385,12 @@ impl Xlsx {
         };
         let sheet = node.sheet_position();
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let (target, changed) = match &feature.data {
+        let (target, changed, native_patch_bytes) = match &feature.data {
             Data::Comment(note) => {
-                let mut edit = source.edit_comments()?;
+                let mut edit = source.edit_comments_with_options(part_edit_options(
+                    &source,
+                    limits.max_snapshot_bytes(),
+                ))?;
                 edit.remove(sheet, &note.reference)?;
                 split(edit.commit()?)
             },
@@ -373,23 +411,34 @@ impl Xlsx {
                 } else {
                     ElementKind::Shape
                 };
-                let mut edit = source.edit_drawings()?;
+                let mut edit = source.edit_drawings_with_options(part_edit_options(
+                    &source,
+                    limits.max_snapshot_bytes(),
+                ))?;
                 edit.remove(sheet, kind, feature.index as usize)?;
                 let commit = edit.commit()?;
                 let changed = commit.diagnostics().changed();
-                (commit.into_package(), changed)
+                let native_patch_bytes = commit.patch().retained_bytes();
+                (commit.into_package(), changed, native_patch_bytes)
             },
             Data::Cf(_) => {
-                let mut edit = source.edit_conditional_formats()?;
+                let mut edit = source.edit_conditional_formats_with_options(part_edit_options(
+                    &source,
+                    limits.max_snapshot_bytes(),
+                ))?;
                 let mut formats = edit.formats(sheet)?;
                 remove_at(&mut formats, feature.index)?;
                 edit.set_formats(sheet, formats).map_err(authored)?;
                 let commit = edit.commit()?;
                 let changed = commit.diagnostics().changed();
-                (commit.into_package(), changed)
+                let native_patch_bytes = commit.patch().retained_bytes();
+                (commit.into_package(), changed, native_patch_bytes)
             },
             Data::Validation(_) => {
-                let mut edit = source.edit_data_validations()?;
+                let mut edit = source.edit_data_validations_with_options(part_edit_options(
+                    &source,
+                    limits.max_snapshot_bytes(),
+                ))?;
                 let mut collections = edit.validations(sheet)?;
                 let (collection, item) = locate(&collections, feature.index)?;
                 let mut validations = collections[collection].validations().to_vec();
@@ -404,14 +453,19 @@ impl Xlsx {
                 edit.set_validations(sheet, collections).map_err(authored)?;
                 let commit = edit.commit()?;
                 let changed = commit.diagnostics().changed();
-                (commit.into_package(), changed)
+                let native_patch_bytes = commit.patch().retained_bytes();
+                (commit.into_package(), changed, native_patch_bytes)
             },
             Data::Autofilter(_) => {
-                let mut edit = source.edit_auto_filter()?;
+                let mut edit = source.edit_auto_filter_with_options(part_edit_options(
+                    &source,
+                    limits.max_snapshot_bytes(),
+                ))?;
                 edit.set_auto_filter(sheet, None)?;
                 let commit = edit.commit()?;
                 let changed = commit.diagnostics().changed();
-                (commit.into_package(), changed)
+                let native_patch_bytes = commit.patch().retained_bytes();
+                (commit.into_package(), changed, native_patch_bytes)
             },
             Data::Break(_) => {
                 let mut breaks = self.breaks(sheet, feature.kind)?;
@@ -431,14 +485,14 @@ impl Xlsx {
             source,
             target,
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?))
     }
 }
 
-fn split(commit: xlsx::workbook::comments::edit::Commit) -> (xlsx::Package, bool) {
-    let changed = commit.diagnostics().changed();
-    (commit.into_package(), changed)
+fn split<C: NativeFeatureCommit>(commit: C) -> (xlsx::Package, bool, usize) {
+    commit.into_feature_parts()
 }
 
 fn remove_at<T>(items: &mut Vec<T>, index: u32) -> Result<T> {
@@ -643,7 +697,8 @@ impl Xlsx {
             },
         };
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_comments()?;
+        let mut edit = source
+            .edit_comments_with_options(part_edit_options(&source, limits.max_snapshot_bytes()))?;
         let author = author.as_deref().unwrap_or("Author");
         let runs = match runs {
             Some(runs) => Some(runs),
@@ -666,9 +721,14 @@ impl Xlsx {
                 .with_property("ref")
                 .with_suggestion("set the existing comment instead"));
         };
-        let (target, changed) = split(edit.commit()?);
-        let commit =
-            self.publish_with_limit(source, target, changed, limits.max_snapshot_bytes())?;
+        let (target, changed, native_patch_bytes) = split(edit.commit()?);
+        let commit = self.publish_with_limit(
+            source,
+            target,
+            changed,
+            native_patch_bytes,
+            limits.max_snapshot_bytes(),
+        )?;
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
@@ -711,7 +771,8 @@ impl Xlsx {
             None => None,
         };
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_comments()?;
+        let mut edit = source
+            .edit_comments_with_options(part_edit_options(&source, limits.max_snapshot_bytes()))?;
         if reference != note.reference {
             if edit
                 .comments(sheet)?
@@ -729,8 +790,14 @@ impl Xlsx {
             None => edit.set(sheet, &reference, &author, &text),
         }
         .map_err(authored)?;
-        let (target, changed) = split(edit.commit()?);
-        self.publish_with_limit(source, target, changed, limits.max_snapshot_bytes())
+        let (target, changed, native_patch_bytes) = split(edit.commit()?);
+        self.publish_with_limit(
+            source,
+            target,
+            changed,
+            native_patch_bytes,
+            limits.max_snapshot_bytes(),
+        )
     }
 }
 
@@ -991,8 +1058,9 @@ impl Xlsx {
 // Pictures and shapes
 
 /// A picture source: a base64 `data:` URI or a local file path.
-fn read_source(src: &str) -> Result<Vec<u8>> {
-    const MAXIMUM: usize = xlsx::drawing::edit::MAX_IMAGE_BYTES;
+fn read_source(src: &str, staged_limit: usize) -> Result<Vec<u8>> {
+    const NATIVE_MAXIMUM: usize = xlsx::drawing::edit::MAX_IMAGE_BYTES;
+    let maximum = staged_limit.min(NATIVE_MAXIMUM);
     if let Some(rest) = src.strip_prefix("data:") {
         let (header, payload) = rest
             .split_once(',')
@@ -1004,7 +1072,7 @@ fn read_source(src: &str) -> Result<Vec<u8>> {
             )
             .with_property("src"));
         }
-        if payload.len() / 4 * 3 > MAXIMUM {
+        if payload.len() / 4 * 3 > maximum {
             return Err(invalid("src", "the image is too large"));
         }
         use base64::Engine as _;
@@ -1015,7 +1083,7 @@ fn read_source(src: &str) -> Result<Vec<u8>> {
     let length = std::fs::metadata(src)
         .map_err(|source| Error::from(source).with_property("src"))?
         .len();
-    if length > MAXIMUM as u64 {
+    if length > maximum as u64 {
         return Err(invalid("src", "the image is too large"));
     }
     std::fs::read(src).map_err(|source| Error::from(source).with_property("src"))
@@ -1337,7 +1405,7 @@ impl Xlsx {
         let src = src.ok_or_else(|| {
             error(Code::MissingProperty, "a picture needs a src").with_property("src")
         })?;
-        let image = read_source(&src)?;
+        let image = read_source(&src, limits.max_staged_bytes())?;
         let (content_type, extension) = classify(&image).ok_or_else(|| {
             error(
                 Code::UnsupportedCapability,
@@ -1371,14 +1439,17 @@ impl Xlsx {
             flip_v,
         };
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_drawings()?;
+        let mut edit = source
+            .edit_drawings_with_options(part_edit_options(&source, limits.max_snapshot_bytes()))?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let commit = self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?;
         Ok((commit, feature_path(parent.sheet, "picture", Some(index))))
@@ -1535,14 +1606,17 @@ impl Xlsx {
         };
         let _: &Font = &spec.font;
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_drawings()?;
+        let mut edit = source
+            .edit_drawings_with_options(part_edit_options(&source, limits.max_snapshot_bytes()))?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let commit = self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?;
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
@@ -1618,7 +1692,7 @@ impl Xlsx {
                         error(Code::InvalidValue, "src names an image file or a data URI")
                             .with_property("src")
                     })?;
-                    let bytes = read_source(&src)?;
+                    let bytes = read_source(&src, limits.max_staged_bytes())?;
                     let (content_type, extension) = classify(&bytes).ok_or_else(|| {
                         error(
                             Code::UnsupportedCapability,
@@ -1646,7 +1720,8 @@ impl Xlsx {
             ElementKind::Shape
         };
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_drawings()?;
+        let mut edit = source
+            .edit_drawings_with_options(part_edit_options(&source, limits.max_snapshot_bytes()))?;
         // A `src`-only set leaves the anchor alone: no anchor rewrite.
         if image.is_none() || change != Change::default() {
             edit.set(sheet, kind, feature.index as usize, &change)
@@ -1667,10 +1742,12 @@ impl Xlsx {
         }
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )
     }
@@ -2320,7 +2397,10 @@ impl Xlsx {
             None => cf_ranges("ref", parent.reference.as_deref().unwrap_or("A1:A10"))?,
         };
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_conditional_formats()?;
+        let mut edit = source.edit_conditional_formats_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let mut formats = edit.formats(parent.sheet)?;
         let priority = formats
             .iter()
@@ -2349,10 +2429,12 @@ impl Xlsx {
         edit.set_formats(parent.sheet, formats).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let commit = self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?;
         Ok((commit, feature_path(parent.sheet, "cf", Some(index))))
@@ -2367,7 +2449,10 @@ impl Xlsx {
     ) -> Result<Commit> {
         let request = cf_request(Operation::Set, props)?;
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_conditional_formats()?;
+        let mut edit = source.edit_conditional_formats_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let mut formats = edit.formats(sheet)?;
         let format = formats
             .get_mut(feature.index as usize)
@@ -2401,10 +2486,12 @@ impl Xlsx {
         edit.set_formats(sheet, formats).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )
     }
@@ -2643,7 +2730,10 @@ impl Xlsx {
         validation.set_show_input_message(true);
         apply_validation(&mut validation, props, Operation::Add)?;
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_data_validations()?;
+        let mut edit = source.edit_data_validations_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let mut collections = edit.validations(parent.sheet)?;
         let added = rects(validation.sqref());
         if collections
@@ -2679,10 +2769,12 @@ impl Xlsx {
             .map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let commit = self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?;
         Ok((
@@ -2699,7 +2791,10 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_data_validations()?;
+        let mut edit = source.edit_data_validations_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let mut collections = edit.validations(sheet)?;
         let (collection, item) = locate(&collections, feature.index)?;
         let mut validations = collections[collection].validations().to_vec();
@@ -2724,10 +2819,12 @@ impl Xlsx {
         edit.set_validations(sheet, collections).map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )
     }
@@ -3007,15 +3104,20 @@ impl Xlsx {
         let mut definition = filter_range("range", &range)?;
         definition.columns = filter_columns(criteria)?;
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_auto_filter()?;
+        let mut edit = source.edit_auto_filter_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         edit.set_auto_filter(parent.sheet, Some(definition))
             .map_err(authored)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         let commit = self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?;
         Ok((commit, feature_path(parent.sheet, "autofilter", None)))
@@ -3028,7 +3130,10 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = source.edit_auto_filter()?;
+        let mut edit = source.edit_auto_filter_with_options(part_edit_options(
+            &source,
+            limits.max_snapshot_bytes(),
+        ))?;
         let mut definition = edit
             .auto_filter(sheet)?
             .ok_or_else(|| error(Code::PathNotFound, "the worksheet has no auto-filter"))?;
@@ -3041,10 +3146,12 @@ impl Xlsx {
         edit.set_auto_filter(sheet, Some(definition))?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
+        let native_patch_bytes = commit.patch().retained_bytes();
         self.publish_with_limit(
             source,
             commit.into_package(),
             changed,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )
     }
@@ -3097,7 +3204,8 @@ impl Xlsx {
         breaks: Vec<xlsx::page_breaks::Break>,
         max_snapshot_bytes: usize,
     ) -> Result<Commit> {
-        let mut edit = source.edit_page_breaks(sheet)?;
+        let mut edit = source
+            .edit_page_breaks_with_options(sheet, part_edit_options(&source, max_snapshot_bytes))?;
         let changed = if breaks.is_empty() {
             if kind == Kind::RowBreak {
                 edit.remove_horizontal()
@@ -3113,10 +3221,12 @@ impl Xlsx {
         };
         let committed = edit.commit()?;
         let changed = changed && committed.diagnostics().changed();
+        let native_patch_bytes = committed.patch().retained_bytes();
         self.publish_with_limit(
             source,
             committed.into_package(),
             changed,
+            native_patch_bytes,
             max_snapshot_bytes,
         )
     }

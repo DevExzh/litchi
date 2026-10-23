@@ -923,7 +923,7 @@ impl SourceBackedWorkbook {
         // catalog sheet, which materializes each corresponding part.  Count
         // only those payloads here; unrelated media and extension parts stay
         // deferred and are charged by their family editor if touched.
-        for sheet in &inner.sheets {
+        for sheet in inner.sheets.iter() {
             let part = package.part(&sheet.part_uri)?;
             endpoint = endpoint.saturating_add(
                 usize::try_from(part.declared_uncompressed_size()?).unwrap_or(usize::MAX),
@@ -953,14 +953,14 @@ impl SourceBackedWorkbook {
                 inner
                     .defined_names
                     .len()
-                    .saturating_mul(size_of::<crate::raw::DefinedName>()),
+                    .saturating_mul(size_of::<raw::DefinedName>()),
             );
 
         // The native retained census includes package metadata and
         // relationship strings even when their payloads remain deferred.
         for part in package.iter_parts() {
             endpoint = endpoint
-                .saturating_add(size_of::<litchi_opc::PartMetadata>())
+                .saturating_add(size_of::<litchi_opc::PartMetadata<'_>>())
                 .saturating_add(part.partname().as_str().len())
                 .saturating_add(part.content_type().len())
                 .saturating_add(relationship_bytes(part.rels()));
