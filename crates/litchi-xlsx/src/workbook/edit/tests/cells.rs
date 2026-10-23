@@ -1316,6 +1316,58 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
         source_bytes
     );
 
+    let shared_rich = source
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .rich_text("A1")
+        .expect("shared rich read")
+        .expect("shared rich value");
+    let mut rewrite = source.edit().expect("shared-rich rewrite edit");
+    rewrite
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set_rich_text("A1", shared_rich.clone())
+        .expect("rewrite shared rich inline");
+    let rewritten = rewrite.commit().expect("shared-rich rewrite commit");
+    assert!(!rewritten.patch().is_noop());
+    assert!(
+        part_text(rewritten.package(), "/xl/worksheets/sheet1.xml").contains(r#"t="inlineStr""#)
+    );
+    assert_eq!(
+        rewritten
+            .package()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .rich_text("A1")
+            .expect("rewritten rich read"),
+        Some(shared_rich)
+    );
+
+    let mut plain = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded shared-rich plain edit");
+    plain
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "Rich text")
+        .expect("erase shared runs");
+    let plain = plain.commit().expect("bounded shared-rich plain commit");
+    assert!(!plain.patch().is_noop());
+    assert!(
+        plain
+            .package()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .rich_text("A1")
+            .expect("plain rich read")
+            .is_none()
+    );
+
     // The inverse direction is also observable: adding a run property to
     // ordinary text must not be collapsed merely because the visible text is
     // unchanged.

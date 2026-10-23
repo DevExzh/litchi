@@ -135,16 +135,32 @@ impl FormControl<'_> {
 }
 
 impl Sheet<'_> {
-    fn source_cell(&self, address: Address) -> Result<Option<Cell>> {
+    fn source_storage(&self, address: Address) -> Result<Option<(Cell, bool, Option<usize>)>> {
         let sheet = self
             .edit
             .base
             .sheet(self.position)?
             .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
-        Ok(sheet
-            .store()?
-            .entry(address)
-            .map(|stored| stored.cell.clone()))
+        Ok(sheet.store()?.entry(address).map(|stored| {
+            (
+                stored.cell.clone(),
+                stored.inline_rich,
+                stored.shared_string,
+            )
+        }))
+    }
+
+    fn source_cell(&self, address: Address) -> Result<Option<Cell>> {
+        Ok(self.source_storage(address)?.map(|(cell, _, _)| cell))
+    }
+
+    fn source_has_rich_text(&self, address: Address) -> Result<bool> {
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        sheet.has_rich_text(address)
     }
 
     fn source_rich_text(&self, address: Address) -> Result<Option<crate::RichText>> {
@@ -724,17 +740,17 @@ impl Sheet<'_> {
         content.validate_for_write()?;
         let authored_cell = content.as_cell();
         let source = if self.edit.capture_budgeted() {
-            Some(self.source_cell(address)?)
+            self.source_storage(address)?
         } else {
             None
         };
-        let source_has_rich_text = if source
-            .as_ref()
-            .is_some_and(|source| source.as_ref() == Some(&authored_cell))
-        {
-            match self.source_rich_text(address) {
-                Ok(source) => source.is_some(),
-                Err(error) => return Err(error),
+        let source_cell = source.as_ref().map(|(cell, _, _)| cell);
+        let source_same = source_cell.is_some_and(|source| source == &authored_cell);
+        let source_has_rich_text = if source_same {
+            match source.as_ref() {
+                Some((_, true, _)) => true,
+                Some((_, false, Some(_))) => self.source_has_rich_text(address)?,
+                _ => false,
             }
         } else {
             false
@@ -743,12 +759,7 @@ impl Sheet<'_> {
         // payload.  A bounded endpoint-only allowance must accept a genuine
         // no-op, while an unbounded edit keeps its historical fast path and
         // does not perform this source census.
-        if self.edit.capture_budgeted()
-            && source
-                .as_ref()
-                .is_some_and(|source| source.as_ref() == Some(&authored_cell))
-            && !source_has_rich_text
-        {
+        if self.edit.capture_budgeted() && source_same && !source_has_rich_text {
             let mut remove_action = false;
             let mut remove_all_capture = false;
             if let Some(action) = self
@@ -810,9 +821,15 @@ impl Sheet<'_> {
     ) -> Result<&mut Self> {
         let address = at.into().resolve()?;
         text.validate_for_write()?;
-        let source_same = match self.source_rich_text(address) {
-            Ok(source) => source.as_ref().is_some_and(|source| source == &text),
-            Err(error) => return Err(error),
+        let source_same = match self.source_storage(address)? {
+            Some((_, true, _)) => match self.source_rich_text(address)? {
+                Some(source) => source == text,
+                None => false,
+            },
+            // Shared strings, including shared rich strings, must be rewritten
+            // as an inline rich payload.  Only an identical inline-rich
+            // representation is a genuine no-op.
+            Some((_, false, _)) | None => false,
         };
         if source_same {
             let mut remove_action = false;

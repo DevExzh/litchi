@@ -1823,10 +1823,10 @@ pub struct ConflictSet {
     pub(super) conflicts: Box<[Conflict]>,
 }
 
-/// Typed source-equivalence planning failure returned when two deferred edits
-/// are joined.  Resource and edit-limit failures remain inspectable instead of
-/// being flattened into a formatted string; other source failures retain their
-/// stable diagnostic text for display and logging.
+/// Fixed classification of a source-equivalence planning failure returned when
+/// two deferred edits are joined.  The original [`crate::Error`] is retained
+/// by [`JoinError`] as its error source; this enum is deliberately free of
+/// document text and therefore remains equality-comparable.
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum JoinNormalization {
@@ -1840,10 +1840,29 @@ pub enum JoinNormalization {
         maximum: u64,
     },
     /// A shared hierarchical resource budget rejected the census.
-    ResourceLimit(litchi_core::ResourceLimit),
-    /// A source, structure, or unsupported-operation error that has no
-    /// additional join-specific typed payload.
-    Source(Box<str>),
+    ResourceLimit,
+    /// The package or OPC source could not be inspected.
+    Package,
+    /// Markup-compatibility preprocessing failed.
+    MarkupCompatibility,
+    /// OOXML decoding failed.
+    Xml,
+    /// A shared dependency or drawing decoder failed.
+    Dependency,
+    /// A shared OOXML service failed.
+    Common,
+    /// A domain value or structural invariant was invalid.
+    Invalid,
+    /// A bounded allocation could not be reserved.
+    Allocation,
+    /// A typed edit was refused by workbook structure or policy.
+    Refused,
+    /// The requested operation is unsupported by this facade.
+    Unsupported,
+    /// A stale patch or signed source prevented publication.
+    Publication,
+    /// A failure outside the known source-equivalence classes.
+    Other,
 }
 
 impl fmt::Display for JoinNormalization {
@@ -1854,8 +1873,18 @@ impl fmt::Display for JoinNormalization {
                 observed,
                 maximum,
             } => write!(formatter, "{kind}: {observed} exceeds {maximum}"),
-            Self::ResourceLimit(limit) => limit.fmt(formatter),
-            Self::Source(reason) => formatter.write_str(reason),
+            Self::ResourceLimit => formatter.write_str("resource limit"),
+            Self::Package => formatter.write_str("package source error"),
+            Self::MarkupCompatibility => formatter.write_str("markup-compatibility error"),
+            Self::Xml => formatter.write_str("OOXML decoding error"),
+            Self::Dependency => formatter.write_str("source dependency error"),
+            Self::Common => formatter.write_str("shared OOXML service error"),
+            Self::Invalid => formatter.write_str("invalid source or edit state"),
+            Self::Allocation => formatter.write_str("allocation error"),
+            Self::Refused => formatter.write_str("edit refused"),
+            Self::Unsupported => formatter.write_str("unsupported operation"),
+            Self::Publication => formatter.write_str("publication error"),
+            Self::Other => formatter.write_str("source-equivalence planning error"),
         }
     }
 }
@@ -1914,6 +1943,7 @@ pub enum JoinFailure {
 pub struct JoinError {
     pub(super) failure: JoinFailure,
     pub(super) rejected: Box<Edit>,
+    pub(super) normalization_source: Option<Box<Error>>,
 }
 
 impl fmt::Debug for JoinError {
@@ -1922,6 +1952,7 @@ impl fmt::Debug for JoinError {
             .debug_struct("JoinError")
             .field("failure", &self.failure)
             .field("rejected_effects", &self.rejected.len())
+            .field("normalization_source", &self.normalization_source)
             .finish()
     }
 }
@@ -1931,6 +1962,12 @@ impl JoinError {
     #[must_use]
     pub fn failure(&self) -> &JoinFailure {
         &self.failure
+    }
+
+    /// The original typed source failure behind a normalization refusal.
+    #[must_use]
+    pub fn normalization_source(&self) -> Option<&Error> {
+        self.normalization_source.as_deref()
     }
 
     /// Overlapping effects, or `None` when the failure is not an effect conflict.
@@ -1964,6 +2001,13 @@ impl JoinError {
     pub fn into_parts(self) -> (JoinFailure, Edit) {
         (self.failure, *self.rejected)
     }
+
+    /// Recover the structured reason, its original normalization source, and
+    /// the rejected edit without flattening the source diagnostic.
+    #[must_use]
+    pub fn into_parts_with_source(self) -> (JoinFailure, Option<Box<Error>>, Edit) {
+        (self.failure, self.normalization_source, *self.rejected)
+    }
 }
 
 impl fmt::Display for JoinError {
@@ -1994,7 +2038,13 @@ impl fmt::Display for JoinError {
     }
 }
 
-impl std::error::Error for JoinError {}
+impl std::error::Error for JoinError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.normalization_source
+            .as_deref()
+            .map(|source| source as &(dyn std::error::Error + 'static))
+    }
+}
 
 /// One package-owned semantic change, including worksheet-owned satellite parts.
 #[derive(Debug, Clone, PartialEq)]

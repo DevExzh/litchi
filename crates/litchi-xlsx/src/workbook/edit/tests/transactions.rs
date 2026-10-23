@@ -605,6 +605,44 @@ fn metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser() {
 }
 
 #[test]
+fn failed_join_keeps_typed_normalization_source_and_both_edits() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut package = source.inner.package.clone();
+    let uri = source.inner.sheets[0].part_uri.clone();
+    package
+        .get_part_mut(&uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></worksheet>"#.to_vec(),
+        );
+    let malformed = crate::Package::from_opc(package).expect("catalog validation");
+    let mut left = malformed.edit().expect("left edit");
+    left.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "left")
+        .expect("left payload");
+    let mut right = malformed.edit().expect("right edit");
+    right
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("B1", "right")
+        .expect("right payload");
+
+    let error = left
+        .join(right)
+        .expect_err("malformed source refuses normalization");
+    assert!(matches!(
+        error.failure(),
+        JoinFailure::Normalization(JoinNormalization::Xml)
+    ));
+    assert!(matches!(error.normalization_source(), Some(Error::Xml(_))));
+    assert_eq!(left.len(), 1);
+    assert_eq!(error.rejected().len(), 1);
+}
+
+#[test]
 fn metadata_only_edit_with_the_existing_value_is_a_byte_no_op() {
     let source = crate::Package::new().expect("source workbook");
     let margins = test_margins();
