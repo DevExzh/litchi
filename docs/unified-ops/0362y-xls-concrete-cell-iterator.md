@@ -60,6 +60,8 @@ in both snapshots; this does not create a second baseline worktree:
 PROBE_COMMITS=(
   d8fe3bcacb0c51cf354314393f93cef0a393e157
   b03aaf1aace43fab45666dc3a1507f3da5922d5a
+  28d4a7c49f95c6947dd387b4cdea3721a15c1544
+  a9acffd972c827b5c9ad4c4084cf1bc2022470c4
 )
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235
@@ -67,7 +69,8 @@ git -C "$BASE" cherry-pick "${PROBE_COMMITS[@]}"
 git -C "$CAND" cherry-pick "${PROBE_COMMITS[@]}"
 ```
 
-The hardening commit that updates this record is copied to both snapshots as
+The two hardening commits (`28d4a7c49f` for the probe/record and
+`a9acffd972` for the quiet-host enforcement) are copied to both snapshots as
 well. The runner checks the exact hashes of the probe, corpus, library and
 runner files against this checkout, and rejects a missing cherry-pick or any
 source edit before launching a child.
