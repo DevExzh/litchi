@@ -405,6 +405,13 @@ pub(crate) fn build_rk_mulrk_corpus() -> Result<Corpus, Box<dyn std::error::Erro
     })
 }
 
+/// The deterministic native RK/MulRK archive shared by the F3 qualification
+/// probe. The probe consumes only the bytes; keeping construction here makes
+/// its workload identical to the existing numeric selectors.
+pub(crate) fn build_rk_mulrk_fixture() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    Ok(build_rk_mulrk_corpus()?.archive)
+}
+
 #[derive(Clone, Debug)]
 struct RawRecord {
     kind: u16,

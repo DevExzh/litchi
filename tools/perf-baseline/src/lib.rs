@@ -53,6 +53,7 @@ mod producer_shape;
 #[cfg(test)]
 mod security_corpus;
 mod unified_ops;
+pub mod xls_f3_qualification;
 mod xls_numeric;
 mod xlsx_attribute_fixtures;
 #[cfg(test)]
@@ -28915,6 +28916,16 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
         target_payload,
         xlsx: None,
     })
+}
+
+/// The fixed comments archive used by the native XLS numeric selectors.
+///
+/// The F3 qualification example lives outside this module so it can be copied
+/// unchanged into the pre-reopen source snapshot. Keep this narrow handoff
+/// tied to the existing corpus builder instead of duplicating its opaque CFB
+/// construction in a second harness.
+pub(crate) fn xls_f3_number_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(build_xls_comments_edit_corpus()?.archive)
 }
 
 #[derive(Clone, Debug)]
