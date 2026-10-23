@@ -2552,3 +2552,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   inventory/glossary validation and the complete assembled gate remain open.
   Source integration is not yet accepted into trunk. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, combined DOCX pass and ODF raw assembly):
+  The integration branch reaches `16ba04ff9f`. Required ODF archive, manifest
+  and raw-writer policies are assembled, including retained facade policies
+  and flat-projection XML limits. Internal ZIP scratch projections retain
+  their explicit source-ceiling distinction without widening XML policy.
+  Static review found no extra publication, source copy or scan. Combined
+  runtime and performance qualification remain required.
+
+  The assembled DOCX library passes all 1,515 tests on `d1a49d80a1`. The
+  execution-context regression now exercises the deferred publication
+  boundary directly and both restore paths; its earlier fixture and type
+  failures remain recorded. OPC/ZIP all-target/all-feature compilation passes.
+  Workspace checking stops on ODF policy getter/import and remaining consumer
+  qualifications/imports across ODF, DOCX and XLSB. Those are assigned as one
+  repair batch. Both harness compiler groups remain unreached. The prior
+  workspace formatting pass is recorded separately from these later merges.
+
+  Signed-edit review returned missing pre-capture admission across XLSX
+  feature/cell paths, XLSB lazy patch payloads, PPTX source edits and DOCX
+  facade XML captures. Shared dispatcher feature configurations and remaining
+  budgets also need repair. These leaves remain outside the assembly. The
+  semantic retention budget continues to charge native package/patch data,
+  not derived parser/cache memory; signed replacement phases retain their
+  staged charge and release discarded proofs before canonical capture.
+
+  XLS deferred-cell qualification exposed original-source freshness gaps at
+  commit, first read, output and same-owner replay. The source repair and
+  independent replay/lineage harness are under review before measurement.
+  Other compiler activity still prevents a quiet-host timing claim.
+
+  A sixth cleanup wave removed six merged, inactive source leaves without
+  force, reclaiming 31,566,664,232 checkout bytes. Eight generated files
+  totaling 6,444,308 bytes were quarantined with hashes. Branch references,
+  recreation commands, external DOCX build output, protected measurement
+  executables and evidence remain retained. Receipt `dbd343ebd1` is merged.
+
+  Native qualification, full corpus replay/dispositions, final current
+  inventory/glossary and the complete assembled gate remain open. Source
+  integration has not yet been accepted into trunk. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
