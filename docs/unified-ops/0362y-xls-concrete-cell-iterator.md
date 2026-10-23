@@ -31,19 +31,19 @@ assembly.
 
 ## F3 qualification lane (executable, not measured)
 
-The fair implementation comparison is the source snapshot at `9b1f96d6dc`
-(the concrete eager-cell iterator is already present, but the deferred
-source-backed cell reopen is not) against the source-backed-cell candidate.
-For an implementation-only comparison the candidate is `f05a395359`; the
-assembled candidate currently under qualification is the common candidate
-lineage `8acd229235` plus the separate production freshness fix
-`8d491b1e8f`. The runner requires that production commit in the candidate and
-rejects it in the historical baseline. If the assembled candidate is used, the
-receipt must retain its full source manifest hash and list the
-post-`f05a395359` XLS changes; no result may be attributed solely to F3 without
-that control. The harness source
-`tools/perf-baseline/src/xls_numeric.rs` is byte-for-byte unchanged between
-`9b1f96d6dc` and `8acd229235`.
+The fair implementation comparison is the exact source snapshot at
+`9b1f96d6dce1506dc9d0080f0696b42ba592c397` (the concrete eager-cell iterator
+is already present, but the deferred source-backed cell reopen is not) against
+an explicitly pinned candidate source ref. The default candidate ref is
+`ef6e6ea25355e56571f870a4cefd1675fdb60366`, which contains both production
+freshness fixes `8d491b1e8f` and `ef6e6ea253`. The candidate ref may be replaced
+on the command line with the final assembled commit, but the receipt must
+retain that exact ref and the required production commit ancestry. The
+historical baseline remains exactly `9b1f...`; production files are never
+cherry-picked into it. No result may be attributed solely to F3 without the
+full candidate source identity and production control. The harness source
+`tools/perf-baseline/src/xls_numeric.rs` is taken from the frozen common
+harness ref for both binaries.
 
 The existing six opt-in numeric selectors remain the source of the corpus and
 fidelity oracles:
@@ -65,55 +65,60 @@ implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. The
 shared `tools/perf-baseline/src/xls_f3_corpus.rs` module owns both canonical
 fixture builders. The isolated `tools/perf-baseline-f3` manifest reuses that
 module and the existing probe source, so it does not compile unrelated DOCX or
-PPTX baseline modules or duplicate workload construction. To regenerate the
-same probe in the already-created baseline and candidate source snapshots, use
-the same common-harness commits in both snapshots; this does not create a
-second baseline worktree:
+PPTX baseline modules or duplicate workload construction.
+
+The common harness is frozen at
+`4f6783815bb9a7b02723ed08242f14ef808e2d23`. Prepare both source snapshots at
+their exact production refs, then overlay only the allowlisted probe files
+from that frozen commit. This is a content overlay, not a cherry-pick: it
+keeps the baseline production tree at `9b1f...` and keeps the candidate
+production tree at its explicitly selected ref while making the binaries use
+one identical harness. The overlay is deterministic and auditable:
 
 ```sh
-PROBE_COMMITS=(
-  d8fe3bcacb0c51cf354314393f93cef0a393e157
-  b03aaf1aace43fab45666dc3a1507f3da5922d5a
-  28d4a7c49f95c6947dd387b4cdea3721a15c1544
-  a9acffd972c827b5c9ad4c4084cf1bc2022470c4
-  b3f2a5ad324af29bccb33e77457e13363b84005f
-  6ff38d7c12b75353f324385cf19a358f8ece4c25
-  c704276fee70773a3faa08c67c258941291bbee3
-  7f742c3558ce8d75c2478f9beea0691d228ca9da
-)
+REPO=/home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification
+HARNESS_REF=4f6783815bb9a7b02723ed08242f14ef808e2d23
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
-CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235
-git -C "$BASE" cherry-pick "${PROBE_COMMITS[@]}"
-git -C "$CAND" cherry-pick "${PROBE_COMMITS[@]}"
-git -C "$CAND" cherry-pick 8d491b1e8f084effde712651e07d460ba044cb1f
+CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253
+PROBE_PATHS=(
+  tools/perf-baseline/src/xls_f3_qualification.rs
+  tools/perf-baseline/src/xls_f3_corpus.rs
+  tools/perf-baseline/examples/xls_f3_qualification.rs
+  tools/perf-baseline/src/xls_numeric.rs
+  tools/perf-baseline/src/lib.rs
+  tools/perf-baseline-f3/Cargo.toml
+  tools/perf-baseline-f3/Cargo.lock
+  tools/perf-baseline-f3/src/lib.rs
+  tools/perf-baseline-f3/examples/xls_f3_qualification.rs
+)
+for SOURCE in "$BASE" "$CAND"; do
+  for PATH_IN_SOURCE in "${PROBE_PATHS[@]}"; do
+    mkdir -p "$SOURCE/$(dirname "$PATH_IN_SOURCE")"
+    git -C "$REPO" show "$HARNESS_REF:$PATH_IN_SOURCE" > "$SOURCE/$PATH_IN_SOURCE"
+  done
+done
 ```
 
-The hardening commits (`28d4a7c49f` for the probe/record,
-`a9acffd972` for the quiet-host enforcement, and `c704276fee` for the complete
-common probe list) are copied to both snapshots as well. The runner checks the
-exact hashes of the probe, corpus, library and runner files against this
-checkout, hashes the complete tracked source manifest (paths and blob IDs),
-and rejects a missing cherry-pick or any source edit before launching a child.
-Only the candidate additionally requires production lineage
-`8d491b1e8f084effde712651e07d460ba044cb1f`; the baseline must not contain
-that commit. A source identity records `common_lineage`,
-`production_lineage`, the candidate production commit list,
-`forbidden_production_lineage`, and `source_manifest_sha256` separately.
-
-The current probe additionally allocates its bounded publication sink before
-the route timer, and its replay oracle reopens independent equal-content
-source and target owners. The runner accepts the pinned common and candidate
-production lineages for qualification; lineage overrides are allowed only with
-`--diagnostic`, which marks the receipt unqualified. Before and after every
+The runner checks the exact frozen blob hashes for every overlay path, allows
+only those paths to be dirty or newly added, compares the production manifest
+with the selected source ref, and compares the resulting production-plus-
+overlay source manifest with its expected identity before launching a child.
+The candidate must descend from both `8d491b1e8f084effde712651e07d460ba044cb1f`
+and `ef6e6ea25355e56571f870a4cefd1675fdb60366`; the control source ref is
+fixed to `9b1f96d6dce1506dc9d0080f0696b42ba592c397`. Before and after every
 child it records the selected CPU's `/proc/stat` counters, load average,
 runnable count, and selected-CPU runnable processes. A scan is quiet only when
 no heavy process is present, one-minute load is at most 1.0, runnable count is
 at most one, and no other process is running or uninterruptibly sleeping on
 the selected CPU.
 
-If either snapshot already contains one of these commits, that cherry-pick is a
-no-op in the regeneration log and must be recorded as such. The copied source
-must remain byte-identical between the two builds.
+The provenance guard has a read-only real-checkout test and temporary Git
+fixtures for both an admitted exact overlay and rejected production/unlisted
+path changes:
+
+```sh
+python3 -m unittest -v tools/test_xls_f3_qualification_abba.py
+```
 
 The Number corpus edits `Untouched!E21`, `Number 42` to `43`; the native
 RK/MulRK corpus edits one RK and two MulRK values with fixed-width integer
@@ -168,7 +173,7 @@ The qualification receipt is expected to make this checklist auditable:
 | typed protected, macro, unsupported and wrong-family gates | probe refusal `kind`/operation/reason or exact fixed-family error |
 | freshness controls | unchanged read, stale read, stage→mutate→commit, mutate→committed-first-read, and mutate→committed-write cases |
 | source preservation | source owner writes equal the original fixture before and after each sample |
-| lineage and identities | clean source status, pinned base ancestor, distinct source tree, and exact probe-file hashes |
+| provenance and identities | exact source refs, frozen harness ref, overlay-only status, expected production manifest, expected production-plus-overlay source manifest, and exact probe-file hashes |
 | matrix coverage | six unique route/corpus cells × four unique A1/B1/B2/A2 legs; subsets require diagnostic mode |
 | timing floor | independent control/candidate calibration and every retained leg at least 250 ms |
 | resource isolation | observed child affinity/RLIMIT_AS and `/proc` load/process scans before and after every child |
@@ -184,7 +189,7 @@ the checkout, for example:
 ```text
 /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/
   source-base-9b1f96d6dc/
-  source-candidate-8acd229235/
+  source-candidate-ef6e6ea253/
   target-base-release/
   target-candidate-release/
   binaries/
@@ -206,7 +211,7 @@ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235/tools/perf-baseline-f3/Cargo.toml \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253/tools/perf-baseline-f3/Cargo.toml \
   --example xls_f3_qualification
 mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
   /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
@@ -230,15 +235,17 @@ affinity. The runner calibrates both endpoints independently, then uses the
 larger admitted batch for both sides; it rejects every leg shorter than 250 ms,
 retains every raw leg, and records process/load scans before and after each
 child. The executable runner is `tools/xls_f3_qualification_abba.py`; it fails
-closed on dirty or same source snapshots, unpinned lineage, probe identity
-mismatches, child errors, malformed or extra CSV fields, unstable output
-digests, equal control/candidate binary hashes, and any order other than
-A1/B1/B2/A2. It writes each child stdout/stderr and a JSON receipt containing
-source, binary, runner-script, host, calibration, affinity and memory-scope
-hashes. A coordinator-granted quiet CPU is represented below as `${CPU}` and
-must be fixed in the manifest. A subset requires `--diagnostic` and its receipt
-has `qualification_eligible: false`; only the default six-cell matrix is
-eligible:
+closed on source-ref mismatch, changes outside the exact overlay allowlist,
+frozen probe-hash mismatch, production-manifest mismatch, source-manifest
+mismatch, missing required production ancestry, child errors, malformed or
+extra CSV fields, unstable output digests, equal control/candidate binary
+hashes, and any order other than A1/B1/B2/A2. It writes each child
+stdout/stderr and a JSON receipt containing source refs, frozen harness ref,
+overlay and production/source manifests, binary, runner-script, host,
+calibration, affinity and memory-scope hashes. A coordinator-granted quiet CPU
+is represented below as `${CPU}` and must be fixed in the manifest. A subset
+requires `--diagnostic` and its receipt has `qualification_eligible: false`;
+only the default six-cell matrix is eligible:
 
 ```sh
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
@@ -248,20 +255,21 @@ python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_
   --control-binary "$BASE" \
   --candidate-binary "$CAND" \
   --control-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc \
-  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235 \
+  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-ef6e6ea253 \
   --output-dir "$OUT" \
   --cpu "${CPU}" \
   --memory-limit-bytes 2147483648 \
   --warmup 20 --samples 40 \
-  --control-lineage 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
-  --candidate-lineage 8acd229235e3c01c6e529f6d1f055d84b8e03de4 \
-  --candidate-production-lineage 8d491b1e8f084effde712651e07d460ba044cb1f \
-  --control-forbidden-production-lineage 8d491b1e8f084effde712651e07d460ba044cb1f
+  --harness-ref 4f6783815bb9a7b02723ed08242f14ef808e2d23 \
+  --control-source-ref 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
+  --candidate-source-ref ef6e6ea25355e56571f870a4cefd1675fdb60366 \
+  --candidate-production-commits 8d491b1e8f084effde712651e07d460ba044cb1f,ef6e6ea25355e56571f870a4cefd1675fdb60366
 ```
 
 The runner emits A1/B1/B2/A2 for each route/corpus pair, and stores its script
-hash, exact probe-file hashes, binary hashes, source hashes, CPU, memory scope,
-calibration attempts, quiet scans, raw stdout/stderr and output digest in
+hash, exact frozen overlay-file hashes, production and combined source
+manifests, binary hashes, source refs, CPU, memory scope, calibration attempts,
+quiet scans, raw stdout/stderr and output digest in
 `$OUT/xls-f3-abba-receipt.json`. The admitted common batch is measured by the
 runner itself, with both endpoint calibration legs required to reach 250 ms.
 It must not report a speedup from the old eager `ole_w5_probe`.

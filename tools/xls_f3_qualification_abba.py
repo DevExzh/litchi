@@ -44,19 +44,15 @@ DEFAULT_CALIBRATION_START_BATCH = 1
 DEFAULT_CALIBRATION_MAX_BATCH = 1 << 20
 MAX_QUIET_LOADAVG = 1.0
 MAX_QUIET_RUNNABLE = 1
-BASELINE_LINEAGE = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
-CANDIDATE_LINEAGE = "8acd229235e3c01c6e529f6d1f055d84b8e03de4"
-CANDIDATE_PRODUCTION_LINEAGE = "8d491b1e8f084effde712651e07d460ba044cb1f"
-CANDIDATE_PRODUCTION_COMMITS = (CANDIDATE_PRODUCTION_LINEAGE,)
-PROBE_COMMITS = (
-    "d8fe3bcacb0c51cf354314393f93cef0a393e157",
-    "b03aaf1aace43fab45666dc3a1507f3da5922d5a",
-    "28d4a7c49f95c6947dd387b4cdea3721a15c1544",
-    "a9acffd972c827b5c9ad4c4084cf1bc2022470c4",
-    "b3f2a5ad324af29bccb33e77457e13363b84005f",
-    "6ff38d7c12b75353f324385cf19a358f8ece4c25",
-    "c704276fee70773a3faa08c67c258941291bbee3",
-    "7f742c3558ce8d75c2478f9beea0691d228ca9da",
+BASELINE_SOURCE_REF = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
+# The harness is copied as a deterministic file overlay from this frozen
+# source commit.  The runner itself is deliberately not an overlay path, so a
+# runner change does not require a self-referential commit list.
+COMMON_HARNESS_REF = "4f6783815bb9a7b02723ed08242f14ef808e2d23"
+CANDIDATE_SOURCE_REF = "ef6e6ea25355e56571f870a4cefd1675fdb60366"
+CANDIDATE_PRODUCTION_COMMITS = (
+    "8d491b1e8f084effde712651e07d460ba044cb1f",
+    "ef6e6ea25355e56571f870a4cefd1675fdb60366",
 )
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",
@@ -65,9 +61,9 @@ PROBE_PATHS = (
     "tools/perf-baseline/src/xls_numeric.rs",
     "tools/perf-baseline/src/lib.rs",
     "tools/perf-baseline-f3/Cargo.toml",
+    "tools/perf-baseline-f3/Cargo.lock",
     "tools/perf-baseline-f3/src/lib.rs",
     "tools/perf-baseline-f3/examples/xls_f3_qualification.rs",
-    "tools/xls_f3_qualification_abba.py",
 )
 REQUIRED_COLUMNS = (
     "route",
@@ -161,6 +157,19 @@ def run_capture(command: list[str]) -> str:
     return completed.stdout.strip()
 
 
+def run_capture_bytes(command: list[str]) -> bytes:
+    try:
+        completed = subprocess.run(
+            command,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise RunnerError(f"command failed: {' '.join(command)}: {error}") from error
+    return completed.stdout
+
+
 def hash_git_diff(source: Path) -> str:
     try:
         completed = subprocess.run(
@@ -174,18 +183,60 @@ def hash_git_diff(source: Path) -> str:
     return sha256_bytes(completed.stdout)
 
 
-def hash_git_manifest(source: Path) -> str:
-    """Hash tracked source paths and blob identities, including their names."""
+def git_manifest_bytes(
+    source: Path,
+    revision: str,
+    excluded_paths: tuple[str, ...] = (),
+) -> bytes:
+    """Return a deterministic tracked-tree manifest after excluding overlays."""
     try:
         completed = subprocess.run(
-            ["git", "-C", str(source), "ls-tree", "-r", "--full-tree", "--long", "HEAD"],
+            [
+                "git",
+                "-C",
+                str(source),
+                "ls-tree",
+                "-r",
+                "--full-tree",
+                "--long",
+                revision,
+            ],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
     except (OSError, subprocess.CalledProcessError) as error:
-        raise RunnerError(f"cannot hash tracked source manifest for {source}: {error}") from error
-    return sha256_bytes(completed.stdout)
+        raise RunnerError(f"cannot read tracked source manifest for {source}: {error}") from error
+    excluded = set(excluded_paths)
+    retained: list[bytes] = []
+    for line in completed.stdout.splitlines(keepends=True):
+        try:
+            _, path_bytes = line.split(b"\t", 1)
+            relative = path_bytes.rstrip(b"\r\n").decode("utf-8", "strict")
+        except (UnicodeDecodeError, ValueError) as error:
+            raise RunnerError(f"cannot parse tracked source manifest for {source}") from error
+        if relative not in excluded:
+            retained.append(line)
+    return b"".join(retained)
+
+
+def hash_git_manifest(
+    source: Path,
+    revision: str,
+    excluded_paths: tuple[str, ...] = (),
+) -> str:
+    return sha256_bytes(git_manifest_bytes(source, revision, excluded_paths))
+
+
+def git_show_bytes(repo: Path, revision: str, relative: str) -> bytes:
+    return run_capture_bytes(["git", "-C", str(repo), "show", f"{revision}:{relative}"])
+
+
+def resolve_commit(repo: Path, revision: str) -> str:
+    resolved = run_capture(["git", "-C", str(repo), "rev-parse", f"{revision}^{{commit}}"])
+    if not re.fullmatch(r"[0-9a-f]{40}", resolved):
+        raise RunnerError(f"git did not resolve an exact commit for {revision!r}: {resolved!r}")
+    return resolved
 
 
 def require_ancestor(source: Path, ancestor: str) -> None:
@@ -197,82 +248,83 @@ def require_ancestor(source: Path, ancestor: str) -> None:
             check=False,
         )
     except OSError as error:
-        raise RunnerError(f"cannot check source lineage for {source}: {error}") from error
+        raise RunnerError(f"cannot check source production ancestry for {source}: {error}") from error
     if completed.returncode != 0:
         detail = completed.stderr.decode("utf-8", "replace").strip()
         raise RunnerError(
-            f"{source} does not descend from pinned lineage {ancestor}"
+            f"{source} does not descend from required production commit {ancestor}"
             + (f": {detail}" if detail else "")
         )
 
 
-def require_not_ancestor(source: Path, ancestor: str) -> None:
-    """Reject a source containing a production change that belongs to the candidate."""
-    try:
-        present = subprocess.run(
-            ["git", "-C", str(source), "cat-file", "-e", f"{ancestor}^{{commit}}"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-    except OSError as error:
-        raise RunnerError(f"cannot inspect source production lineage for {source}: {error}") from error
-    # A historical source may not retain the candidate commit object.  That is
-    # the expected state; only an existing ancestor is contamination.
-    if present.returncode != 0:
-        return
-    try:
-        completed = subprocess.run(
-            ["git", "-C", str(source), "merge-base", "--is-ancestor", ancestor, "HEAD"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            check=False,
-        )
-    except OSError as error:
-        raise RunnerError(f"cannot check forbidden source lineage for {source}: {error}") from error
-    if completed.returncode == 0:
-        raise RunnerError(
-            f"{source} contains forbidden candidate production lineage {ancestor}"
-        )
-    if completed.returncode != 1:
-        detail = completed.stderr.decode("utf-8", "replace").strip()
-        raise RunnerError(
-            f"cannot determine forbidden source lineage for {source}"
-            + (f": {detail}" if detail else "")
-        )
-
-
-def probe_identities(repo: Path) -> dict[str, str]:
+def probe_identities(repo: Path, harness_ref: str) -> dict[str, str]:
     identities: dict[str, str] = {}
     for relative in PROBE_PATHS:
-        identities[relative] = sha256_file(repo / relative)["sha256"]
+        identities[relative] = sha256_bytes(git_show_bytes(repo, harness_ref, relative))
     return identities
+
+
+def overlay_manifest_sha256(probe: dict[str, str]) -> str:
+    return sha256_bytes(canonical_json({"paths": probe}))
+
+
+def source_manifest_sha256(production: str, probe: dict[str, str]) -> str:
+    return sha256_bytes(
+        canonical_json(
+            {
+                "production_manifest_sha256": production,
+                "probe_sha256": probe,
+            }
+        )
+    )
+
+
+def status_paths(status: str) -> list[str]:
+    paths: list[str] = []
+    for line in status.splitlines():
+        if len(line) < 4:
+            raise RunnerError(f"malformed git status line: {line!r}")
+        path = line[3:]
+        if " -> " in path:
+            raise RunnerError(f"renamed source paths are not permitted: {line!r}")
+        paths.append(path)
+    return paths
 
 
 def source_identity(
     path: Path,
     *,
-    lineage: str,
+    source_ref: str,
+    harness_ref: str,
     expected_probe: dict[str, str],
-    required_production_lineage: str | None = None,
-    forbidden_production_lineage: str | None = None,
+    expected_production_manifest: str,
+    expected_source_manifest: str,
+    required_production_commits: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     source = path.expanduser().resolve(strict=True)
     if not source.is_dir():
         raise RunnerError(f"source snapshot is not a directory: {source}")
     revision = run_capture(["git", "-C", str(source), "rev-parse", "HEAD"])
+    resolved_source_ref = resolve_commit(source, source_ref)
+    if revision != resolved_source_ref:
+        raise RunnerError(
+            f"{source} is at {revision}, not the pinned source ref {resolved_source_ref}"
+        )
     tree = run_capture(["git", "-C", str(source), "rev-parse", "HEAD^{tree}"])
     status = run_capture(
         ["git", "-C", str(source), "status", "--porcelain=v1", "--untracked-files=all"]
     )
-    if status:
-        raise RunnerError(f"source snapshot is dirty: {source}: {status}")
-    require_ancestor(source, lineage)
-    if required_production_lineage is not None:
-        require_ancestor(source, required_production_lineage)
-    if forbidden_production_lineage is not None:
-        require_not_ancestor(source, forbidden_production_lineage)
-    actual_probe = probe_identities(source)
+    unexpected_status = sorted(set(status_paths(status)) - set(PROBE_PATHS))
+    if unexpected_status:
+        raise RunnerError(
+            f"source snapshot has changes outside the documented harness overlay: "
+            f"{source}: {', '.join(unexpected_status)}"
+        )
+    for production_commit in required_production_commits:
+        require_ancestor(source, production_commit)
+    actual_probe = {
+        relative: sha256_file(source / relative)["sha256"] for relative in PROBE_PATHS
+    }
     if actual_probe != expected_probe:
         mismatches = [
             relative
@@ -282,19 +334,36 @@ def source_identity(
         raise RunnerError(
             f"{source} has probe identity mismatches: {', '.join(mismatches)}"
         )
+    actual_production_manifest = hash_git_manifest(source, "HEAD", PROBE_PATHS)
+    if actual_production_manifest != expected_production_manifest:
+        raise RunnerError(
+            f"{source} production manifest differs from its pinned source ref: "
+            f"expected {expected_production_manifest}, got {actual_production_manifest}"
+        )
+    actual_source_manifest = source_manifest_sha256(actual_production_manifest, actual_probe)
+    if actual_source_manifest != expected_source_manifest:
+        raise RunnerError(
+            f"{source} source manifest differs from the frozen production/overlay identity: "
+            f"expected {expected_source_manifest}, got {actual_source_manifest}"
+        )
     identity = {
         "path": str(source),
         "revision": revision,
         "tree": tree,
-        "common_lineage": lineage,
-        "production_lineage": required_production_lineage,
+        "source_ref": resolved_source_ref,
+        "harness_ref": harness_ref,
         "candidate_production_commits": list(CANDIDATE_PRODUCTION_COMMITS),
-        "forbidden_production_lineage": forbidden_production_lineage,
-        "worktree_clean": True,
+        "required_production_commits": list(required_production_commits),
+        "overlay_paths": list(PROBE_PATHS),
+        "overlay_only": True,
+        "worktree_clean": not bool(status),
         "status_sha256": sha256_bytes(status.encode("utf-8")),
         "diff_sha256": hash_git_diff(source),
-        "source_manifest_sha256": hash_git_manifest(source),
-        "probe_commits": list(PROBE_COMMITS),
+        "production_manifest_sha256": actual_production_manifest,
+        "expected_production_manifest_sha256": expected_production_manifest,
+        "overlay_manifest_sha256": overlay_manifest_sha256(expected_probe),
+        "source_manifest_sha256": actual_source_manifest,
+        "expected_source_manifest_sha256": expected_source_manifest,
         "probe_sha256": actual_probe,
     }
     identity["source_sha256"] = sha256_bytes(canonical_json(identity))
@@ -552,14 +621,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate-binary", type=Path, required=True)
     parser.add_argument("--control-source", type=Path, required=True)
     parser.add_argument("--candidate-source", type=Path, required=True)
-    parser.add_argument("--control-lineage", default=BASELINE_LINEAGE)
-    parser.add_argument("--candidate-lineage", default=CANDIDATE_LINEAGE)
+    parser.add_argument("--harness-ref", default=COMMON_HARNESS_REF)
+    parser.add_argument("--control-source-ref", default=BASELINE_SOURCE_REF)
+    parser.add_argument("--candidate-source-ref", default=CANDIDATE_SOURCE_REF)
     parser.add_argument(
-        "--candidate-production-lineage", default=CANDIDATE_PRODUCTION_LINEAGE
-    )
-    parser.add_argument(
-        "--control-forbidden-production-lineage",
-        default=CANDIDATE_PRODUCTION_LINEAGE,
+        "--candidate-production-commits",
+        default=",".join(CANDIDATE_PRODUCTION_COMMITS),
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cpu", type=int, required=True)
@@ -598,6 +665,23 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
         raise RunnerError("calibration batch bounds are invalid")
     if options.timeout_seconds <= 0:
         raise RunnerError("timeout must be positive")
+    for label, value in (
+        ("harness ref", options.harness_ref),
+        ("control source ref", options.control_source_ref),
+        ("candidate source ref", options.candidate_source_ref),
+    ):
+        if not re.fullmatch(r"[0-9a-f]{40}", value):
+            raise RunnerError(f"{label} must be a full 40-character commit hash")
+    production_commits = tuple(
+        value.strip()
+        for value in options.candidate_production_commits.split(",")
+        if value.strip()
+    )
+    if not production_commits or any(
+        not re.fullmatch(r"[0-9a-f]{40}", value) for value in production_commits
+    ):
+        raise RunnerError("candidate production commits must be comma-separated full hashes")
+    options.candidate_production_commits = production_commits
     control_path = options.control_binary.expanduser().resolve(strict=True)
     candidate_path = options.candidate_binary.expanduser().resolve(strict=True)
     if control_path == candidate_path:
@@ -613,15 +697,17 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
         raise RunnerError(
             "only the complete 3-route x 2-corpus matrix qualifies; use --diagnostic for subsets"
         )
-    if not options.diagnostic and (
-        options.control_lineage != BASELINE_LINEAGE
-        or options.candidate_lineage != CANDIDATE_LINEAGE
-        or options.candidate_production_lineage != CANDIDATE_PRODUCTION_LINEAGE
-        or options.control_forbidden_production_lineage
-        != CANDIDATE_PRODUCTION_LINEAGE
-    ):
+    if not options.diagnostic and options.harness_ref != COMMON_HARNESS_REF:
         raise RunnerError(
-            "lineage overrides require --diagnostic and are explicitly unqualified"
+            "harness ref overrides require --diagnostic and are explicitly unqualified"
+        )
+    if not options.diagnostic and options.control_source_ref != BASELINE_SOURCE_REF:
+        raise RunnerError(
+            "the qualified control source must remain the pinned historical baseline"
+        )
+    if not options.diagnostic and options.candidate_production_commits != CANDIDATE_PRODUCTION_COMMITS:
+        raise RunnerError(
+            "qualified candidates must contain the pinned 8d and ef6 production commits"
         )
     return routes, corpora
 
@@ -856,18 +942,41 @@ def main() -> int:
         if control_binary["sha256"] == candidate_binary["sha256"]:
             raise RunnerError("control and candidate binaries have the same SHA-256")
         repo = Path(__file__).resolve().parent.parent
-        expected_probe = probe_identities(repo)
+        harness_ref = resolve_commit(repo, options.harness_ref)
+        expected_probe = probe_identities(repo, harness_ref)
+        expected_overlay_manifest = overlay_manifest_sha256(expected_probe)
+        expected_control_production = hash_git_manifest(
+            options.control_source.expanduser().resolve(strict=True),
+            options.control_source_ref,
+            PROBE_PATHS,
+        )
+        expected_candidate_production = hash_git_manifest(
+            options.candidate_source.expanduser().resolve(strict=True),
+            options.candidate_source_ref,
+            PROBE_PATHS,
+        )
+        expected_control_source = source_manifest_sha256(
+            expected_control_production, expected_probe
+        )
+        expected_candidate_source = source_manifest_sha256(
+            expected_candidate_production, expected_probe
+        )
         control_source = source_identity(
             options.control_source,
-            lineage=options.control_lineage,
+            source_ref=options.control_source_ref,
+            harness_ref=harness_ref,
             expected_probe=expected_probe,
-            forbidden_production_lineage=options.control_forbidden_production_lineage,
+            expected_production_manifest=expected_control_production,
+            expected_source_manifest=expected_control_source,
         )
         candidate_source = source_identity(
             options.candidate_source,
-            lineage=options.candidate_lineage,
+            source_ref=options.candidate_source_ref,
+            harness_ref=harness_ref,
             expected_probe=expected_probe,
-            required_production_lineage=options.candidate_production_lineage,
+            expected_production_manifest=expected_candidate_production,
+            expected_source_manifest=expected_candidate_source,
+            required_production_commits=options.candidate_production_commits,
         )
         if control_source["path"] == candidate_source["path"]:
             raise RunnerError("control and candidate sources must have distinct paths")
@@ -959,6 +1068,12 @@ def main() -> int:
                 "timeout_seconds": options.timeout_seconds,
             },
             "sources": {"control": control_source, "candidate": candidate_source},
+            "provenance": {
+                "harness_ref": harness_ref,
+                "overlay_manifest_sha256": expected_overlay_manifest,
+                "overlay_paths": list(PROBE_PATHS),
+                "candidate_production_commits": list(options.candidate_production_commits),
+            },
             "binaries": {"control": control_binary, "candidate": candidate_binary},
             "driver": driver,
             "host": host,
