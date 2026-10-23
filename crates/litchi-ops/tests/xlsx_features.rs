@@ -5,7 +5,8 @@
 #![cfg(feature = "xlsx")]
 
 use litchi_core::FileFormat;
-use litchi_ops::{Code, File, NewNode, OpenOptions, SourceMode, props};
+use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::{Code, EditOptions, File, NewNode, OpenOptions, SourceMode, props};
 
 fn prop(file: &File, path: &str, key: &str) -> Option<String> {
     file.get(path)
@@ -667,6 +668,93 @@ fn sheet_auto_filter_and_shape_styling() {
         assert_eq!(prop(&file, shape, "x").as_deref(), Some("10"));
         assert_eq!(prop(&file, shape, "width").as_deref(), Some("2"));
     }
+}
+
+#[test]
+fn sheet_auto_filter_snapshot_limit_covers_native_patch() {
+    let original = workbook();
+    let probe = original
+        .edit(|transaction| {
+            transaction.set("/Sheet1", props! { "autoFilter" => "A1:B5" })
+        })
+        .unwrap();
+    let charge = probe.diagnostics().snapshot_bytes();
+    assert!(charge > 0);
+
+    let strict = SemanticLimits::builder()
+        .max_snapshot_bytes(charge - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = original
+        .edit_with_options(EditOptions::new().semantic_limits(strict), |transaction| {
+            transaction.set("/Sheet1", props! { "autoFilter" => "A1:B5" })
+        })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::LimitExceeded);
+
+    let exact = SemanticLimits::builder()
+        .max_snapshot_bytes(charge)
+        .unwrap()
+        .build()
+        .unwrap();
+    let committed = original
+        .edit_with_options(EditOptions::new().semantic_limits(exact), |transaction| {
+            transaction.set("/Sheet1", props! { "autoFilter" => "A1:B5" })
+        })
+        .unwrap();
+    assert_eq!(
+        prop(committed.file(), "/Sheet1/autofilter", "range").as_deref(),
+        Some("A1:B5")
+    );
+}
+
+#[test]
+fn combined_sheet_rename_and_auto_filter_snapshot_limit_is_exact() {
+    let original = workbook();
+    let probe = original
+        .edit(|transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "Data", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap();
+    let charge = probe.diagnostics().snapshot_bytes();
+    assert!(charge > 0);
+
+    let strict = SemanticLimits::builder()
+        .max_snapshot_bytes(charge - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = original
+        .edit_with_options(EditOptions::new().semantic_limits(strict), |transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "Data", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::LimitExceeded);
+
+    let exact = SemanticLimits::builder()
+        .max_snapshot_bytes(charge)
+        .unwrap()
+        .build()
+        .unwrap();
+    let committed = original
+        .edit_with_options(EditOptions::new().semantic_limits(exact), |transaction| {
+            transaction.set(
+                "/Sheet1",
+                props! { "name" => "Data", "autoFilter" => "A1:B5" },
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        prop(committed.file(), "/Data/autofilter", "range").as_deref(),
+        Some("A1:B5")
+    );
 }
 
 #[test]

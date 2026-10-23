@@ -143,17 +143,39 @@ impl Xlsx {
         let Some(positions) = resolve_sheet_targets(self, target, limits)? else {
             return Ok(None);
         };
-        let middle = if rest.is_empty() {
-            self.clone()
+        let (middle, source, tab_patch_bytes) = if rest.is_empty() {
+            (
+                self.clone(),
+                self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?,
+                0,
+            )
         } else {
             match try_set_sheet(self, target, &rest, limits)? {
-                Some(commit) => commit.into_file(),
+                Some(commit) => {
+                    let (middle, source, _tab_target, tab_patch) = commit.into_parts();
+                    (middle, source, tab_patch.retained_bytes())
+                },
                 None => return Ok(None),
             }
         };
-        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let base = middle.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = base.edit_auto_filter()?;
+        // The part editor admits the filter against `base` (the package after
+        // any tab-property edit), while the published commit retains the
+        // original source. Reserve the exact positive source-size delta and
+        // the earlier tab patch here so the native capture cannot exceed the
+        // final original-source/target/patch charge. A shrinking intermediate
+        // owner needs no extra reservation; charging it would impose the
+        // forbidden source-plus-intermediate floor.
+        let source_delta = source
+            .retained_bytes()
+            .saturating_sub(base.retained_bytes());
+        let filter_max = limits
+            .max_snapshot_bytes()
+            .saturating_sub(tab_patch_bytes)
+            .saturating_sub(source_delta);
+        let mut edit = base.edit_auto_filter_with_options(
+            super::feature_write::part_edit_options(&base, filter_max),
+        )?;
         for position in positions {
             let value = filter
                 .as_deref()
@@ -166,7 +188,9 @@ impl Xlsx {
             edit.set_auto_filter(position, value)
                 .map_err(|error| native_property_error(error, "autoFilter"))?;
         }
-        let target = edit.commit()?.into_package();
+        let filter_commit = edit.commit()?;
+        let filter_patch_bytes = filter_commit.patch().retained_bytes();
+        let target = filter_commit.into_package();
         let changed = !source.same_content(&target).map_err(native_error)?;
         let after = if changed {
             middle.adopt_workbook(target.clone())
@@ -180,7 +204,7 @@ impl Xlsx {
             target,
             changed,
             1,
-            0,
+            tab_patch_bytes.saturating_add(filter_patch_bytes),
             limits.max_snapshot_bytes(),
         )?))
     }
