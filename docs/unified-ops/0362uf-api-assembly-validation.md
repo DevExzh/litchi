@@ -337,3 +337,10 @@ identity harness with all targets/features (33.18 seconds).
 [consumer-v24.json](results/0362uf/consumer-v24.json) retains exact commands
 and log hashes. These compilation passes do not qualify native timings.
 The complete Clippy v2 cleanup is merged separately; its rerun remains required.
+
+The third broad Clippy pass on `355cfe4141` stops after 275.42 seconds
+on XLSX, DOCX and XLSB production/test lints. The complete diagnosed batch
+is assigned for behavior-preserving repair, including enum-size rationale,
+fallible test handling and glossary item ordering.
+[clippy-workspace-v3.json](results/0362uf/clippy-workspace-v3.json) preserves
+the exact source, command and log hash. This remains a partial gate result.
