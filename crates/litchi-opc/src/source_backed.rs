@@ -3178,6 +3178,52 @@ impl EffectivePartData<'_> {
 }
 
 impl PreparedTopology {
+    /// Return exact candidate relationship/content-types member lengths without
+    /// materializing unchanged source payloads.
+    pub fn topology_metadata_lengths(&self, presentation_uri: &PackURI) -> Result<(usize, usize)> {
+        let relationships_uri = presentation_uri
+            .rels_uri()
+            .map_err(OpcError::InvalidPackUri)?;
+        let relationships = self
+            .member_length(relationships_uri.membername())
+            .or(self
+                .package
+                .declared_relationships_uncompressed_size(presentation_uri)?)
+            .ok_or_else(|| {
+                overlay_unavailable("topology plan has no presentation relationships")
+            })?;
+        let content_types = self
+            .member_length(&self.package.catalog.content_types_member)
+            .unwrap_or(self.package.declared_content_types_uncompressed_size()?);
+        Ok((
+            usize::try_from(relationships)
+                .map_err(|_| overlay_unavailable("relationship metadata length exceeds usize"))?,
+            usize::try_from(content_types)
+                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?,
+        ))
+    }
+
+    fn member_length(&self, member_name: &str) -> Option<u64> {
+        self.state
+            .changed
+            .iter()
+            .find_map(|overlay| match &overlay.target {
+                ChangedOverlayTarget::Member(name) if name.eq_ignore_ascii_case(member_name) => {
+                    Some(overlay.replacement.len() as u64)
+                },
+                _ => None,
+            })
+            .or_else(|| {
+                self.state
+                    .retained
+                    .as_ref()?
+                    .appended_metadata
+                    .iter()
+                    .find(|(name, _)| name.eq_ignore_ascii_case(member_name))
+                    .map(|(_, bytes)| bytes.len() as u64)
+            })
+    }
+
     /// Run a read-only semantic callback over the complete effective OPC
     /// catalog before any external output is accepted.
     ///
@@ -9015,6 +9061,22 @@ impl SourceBackedPackage {
             state: Arc::new(state),
             _state_reservation: reservation,
         })
+    }
+
+    /// Measure the candidate package metadata produced by a topology plan.
+    ///
+    /// This is the length-only admission seam for callers that must reserve an
+    /// exact durable wire budget before retaining any Part payload.  The
+    /// planner reads relationship and content-types metadata, but it does not
+    /// materialize unchanged Part payloads; callers therefore use it for
+    /// structural additions/removals before their charged capture phase.
+    pub fn topology_metadata_lengths(
+        &self,
+        presentation_uri: &PackURI,
+        plan: SourceTopologyPlan,
+    ) -> Result<(usize, usize)> {
+        let prepared = self.clone().prepare_topology(plan)?;
+        prepared.topology_metadata_lengths(presentation_uri)
     }
 
     /// Validate a complete prepared candidate while borrowing this package.

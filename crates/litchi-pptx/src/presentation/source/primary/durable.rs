@@ -20,6 +20,7 @@ use sha2::{Digest, Sha256};
 use std::sync::{Arc, OnceLock};
 
 const REMOVAL_MAGIC: &[u8; 8] = b"LPSX0004";
+pub(super) const REMOVAL_MARKER_BYTES: usize = REMOVAL_MAGIC.len();
 const MAGIC: &[u8; 8] = b"LPSX0002";
 const HEADER: usize = 8 + 32 + 4 + 4 + 4 + 8 + 8;
 const KEY_FIXED: usize = 4 + 4 + 4;
