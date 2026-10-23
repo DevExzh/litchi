@@ -120,7 +120,7 @@ fn open_all(archive: &[u8]) -> Vec<(&'static str, Result<(), String>)> {
             map(SourceBackedPackage::from_vec(
                 archive.to_vec(),
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None,
             )
             .map(drop)),
@@ -140,7 +140,7 @@ fn first_positional_read(archive: Vec<u8>) -> Result<(), OpcError> {
     let package = SourceBackedPackage::from_vec(
         archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )?;
     package

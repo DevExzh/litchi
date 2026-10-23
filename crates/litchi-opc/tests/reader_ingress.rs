@@ -167,7 +167,7 @@ fn document_from_source_backed(source: Vec<u8>, policy: SourceLimits) -> Vec<u8>
     let package = SourceBackedPackage::from_reader(
         ChunkedReader::new(source, 3, 2),
         policy,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("source-backed reader ingress");
@@ -221,7 +221,7 @@ fn reader_routes_report_input_limit_before_zip_validation() {
             SourceBackedPackage::from_reader(
                 ChunkedReader::new(source, 1, 0),
                 policy,
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None,
             ),
             "source-backed package must reject oversized input",
@@ -260,7 +260,7 @@ fn reader_routes_preserve_underlying_errors_before_zip_validation() {
                     kind: io::ErrorKind::BrokenPipe,
                 },
                 policy,
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None,
             ),
             "source-backed package must preserve input errors",
@@ -309,7 +309,7 @@ fn reader_routes_report_probe_errors_after_exact_limit() {
                     fail_at: source.len(),
                 },
                 policy,
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None,
             ),
             "source-backed package must report the probe error",

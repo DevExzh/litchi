@@ -120,7 +120,7 @@ fn open(deflated: bool) -> (SourceBackedPackage, Vec<u8>) {
     let package = SourceBackedPackage::from_vec(
         bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture package must open");
@@ -156,7 +156,7 @@ fn target_bytes(archive: &[u8]) -> Vec<u8> {
     SourceBackedPackage::from_vec(
         archive.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published archive must open")
@@ -740,7 +740,7 @@ fn replay_512_byte_window_handles_multi_window_source_and_payload() {
         let package = SourceBackedPackage::from_vec(
             source_archive.clone(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("multi-window fixture package must open");

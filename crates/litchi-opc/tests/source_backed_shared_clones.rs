@@ -91,7 +91,7 @@ fn open(bytes: &[u8]) -> SourceBackedPackage {
     SourceBackedPackage::from_vec(
         bytes.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture must open")

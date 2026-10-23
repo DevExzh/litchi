@@ -162,7 +162,7 @@ fn open(source: &[u8], deflated: bool, signed: bool) -> (SourceBackedPackage, Ve
     let package = SourceBackedPackage::from_vec(
         archive.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture package must open");
@@ -224,7 +224,7 @@ fn target_bytes_for(archive: &[u8], uri: &str) -> Vec<u8> {
     let package = SourceBackedPackage::from_vec(
         archive.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published archive opens");
@@ -688,7 +688,7 @@ fn binary_part_splice_skips_xml_audit_but_keeps_decoded_proofs() {
         let package = SourceBackedPackage::from_vec(
             archive,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("binary fixture must open");
@@ -984,7 +984,7 @@ fn large_binary_fragment_refuses_scoped_work_before_preparation_succeeds() {
         managed_context_with_limits(64 * 1024 * 1024, WORK_LIMIT, u64::MAX);
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1032,7 +1032,7 @@ fn large_binary_fragment_observes_managed_cancellation_between_work_chunks() {
     ));
     let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1090,7 +1090,7 @@ fn cancellation_is_observed_before_plan_and_write() {
     let (cancellation, context) = managed_context();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1109,7 +1109,7 @@ fn cancellation_is_observed_before_plan_and_write() {
     let (cancellation, context) = managed_context();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1191,7 +1191,7 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     let candidate = SourceBackedPackage::from_vec(
         candidate_archive.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("candidate package must reopen");
@@ -1216,7 +1216,7 @@ fn publication_inverse_requires_the_authenticated_candidate_artifact() {
     let other_candidate = SourceBackedPackage::from_vec(
         other_archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("second candidate package must reopen");
@@ -1305,7 +1305,7 @@ fn publication_inverse_observes_candidate_cancellation_during_write_and_flush() 
     let (cancellation, context) = managed_context();
     let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1325,7 +1325,7 @@ fn publication_inverse_observes_candidate_cancellation_during_write_and_flush() 
     let (cancellation, context) = managed_context();
     let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1349,7 +1349,7 @@ fn publication_inverse_uses_current_candidate_output_budget() {
         managed_context_with_limits(64 * 1024 * 1024, u64::MAX, 0);
     let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1374,7 +1374,7 @@ fn publication_inverse_shared_context_charges_retained_archive_once() {
     let (budget, _cancellation, context) = managed_context_with_budget();
     let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context.clone()),
@@ -1396,7 +1396,7 @@ fn publication_inverse_shared_context_charges_retained_archive_once() {
 
     let candidate = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(candidate_archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1421,7 +1421,7 @@ fn splice_memory_quotas_are_typed_and_release_after_success_or_failure() {
     let (budget, _cancellation, context) = managed_context_with_budget();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1531,7 +1531,7 @@ fn authored_fragment_transfers_one_reservation_and_publishes_reversibly() {
         let (budget, _cancellation, context) = managed_context_with_budget();
         let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(source_archive.clone())),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
             SourceReadPolicy::exact(),
             Some(context),
@@ -1590,7 +1590,7 @@ fn authored_fragment_cannot_transfer_a_foreign_package_budget() {
     let (budget, _cancellation, context) = managed_context_with_budget();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1628,7 +1628,7 @@ fn authored_fragment_transfers_between_clones_of_one_package() {
     let (budget, _cancellation, context) = managed_context_with_budget();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1691,7 +1691,7 @@ fn authored_fragment_refusals_release_memory_and_preserve_typed_limits() {
     let (budget, cancellation, context) = managed_context_with_budget();
     let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context.clone()),
@@ -1746,7 +1746,7 @@ fn authored_fragment_zero_fill_checks_cancellation_between_work_chunks() {
     ));
     let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1812,7 +1812,7 @@ fn interrupted_splice_source_retries_without_double_charging_input() {
         });
         let package = SourceBackedPackage::from_read_at(
             source.clone(),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
             SourceCacheLimits::default(),
             SourceReadPolicy::exact(),
             Some(context),
@@ -1857,7 +1857,7 @@ fn interrupted_splice_source_observes_cancellation_before_retry() {
     });
     let package = SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),

@@ -128,7 +128,7 @@ fn package_bytes(include_empty_owned_relationships: bool, include_large_part: bo
     SourceBackedPackage::from_vec(
         bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture source must be admitted");
@@ -210,7 +210,7 @@ fn publish(source: &[u8], plan: SourceTopologyPlan) -> litchi_opc::Result<Vec<u8
     let package = SourceBackedPackage::from_vec(
         source.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )?;
     let mut output = Vec::new();
@@ -337,7 +337,7 @@ fn raw_metadata_remove_reopen_and_restore_recovers_exact_xml() {
     let reopened = SourceBackedPackage::from_vec(
         removed.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -412,7 +412,7 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
     let error = SourceBackedPackage::from_vec(
         source.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -447,7 +447,7 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
     let error = SourceBackedPackage::from_vec(
         source.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -475,7 +475,7 @@ fn raw_metadata_guards_reject_stale_and_mismatched_candidates_before_output() {
     let error = SourceBackedPackage::from_vec(
         source,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -502,7 +502,7 @@ fn assert_rejected_without_output(source: &[u8], plan: SourceTopologyPlan) {
     let error = SourceBackedPackage::from_vec(
         source.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -522,7 +522,7 @@ fn assert_relationship_manifest_rejected(source: &[u8], plan: SourceTopologyPlan
     let package = SourceBackedPackage::from_vec(
         source.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -541,7 +541,7 @@ fn assert_content_types_manifest_rejected(source: &[u8], plan: SourceTopologyPla
     let package = SourceBackedPackage::from_vec(
         source.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -750,7 +750,7 @@ fn raw_metadata_restores_absent_and_present_empty_relationship_members() {
     let reopened = SourceBackedPackage::from_vec(
         with_member,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -777,7 +777,7 @@ fn raw_metadata_restores_absent_and_present_empty_relationship_members() {
     let reopened = SourceBackedPackage::from_vec(
         absent,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -883,7 +883,7 @@ fn signed_raw_metadata_noop_is_exact_but_changed_restore_is_refused() {
     let error = SourceBackedPackage::from_vec(
         source,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -912,7 +912,7 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
     let package = SourceBackedPackage::from_vec(
         source.clone(),
         part_limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -940,7 +940,7 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
     let package = SourceBackedPackage::from_vec(
         source.clone(),
         member_limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -966,7 +966,7 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
     let package = SourceBackedPackage::from_vec(
         source.clone(),
         member_limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1003,13 +1003,9 @@ fn raw_metadata_restore_obeys_member_and_aggregate_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec(
-        source,
-        member_limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .unwrap();
+    let package =
+        SourceBackedPackage::from_vec(source, member_limits, SourceCacheLimits::default(), None)
+            .unwrap();
     let mut relationship_plan = SourceTopologyPlan::new();
     relationship_plan
         .try_restore_relationships_xml(
@@ -1168,7 +1164,7 @@ fn prepared_metadata_reads_exact_source_changed_and_omitted_images() {
     let package = SourceBackedPackage::from_vec(
         source.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1258,7 +1254,7 @@ fn prepared_metadata_reads_appended_relationships_including_present_empty() {
         let prepared = SourceBackedPackage::from_vec(
             source,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -1391,7 +1387,7 @@ fn prepared_metadata_resolves_equivalent_owner_names() {
     let package = SourceBackedPackage::from_vec(
         package_bytes(true, false),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();

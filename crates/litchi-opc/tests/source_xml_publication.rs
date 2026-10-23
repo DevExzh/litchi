@@ -70,7 +70,7 @@ fn open(document: &[u8]) -> SourceBackedPackage {
     SourceBackedPackage::from_vec(
         archive_bytes(document),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture package must open")
@@ -80,7 +80,7 @@ fn open_with_limits(document: &[u8], limits: SourceLimits) -> SourceBackedPackag
     SourceBackedPackage::from_vec(
         archive_bytes(document),
         limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture package must open with limits")
@@ -171,7 +171,7 @@ fn source_xml_publication_preserves_formatted_bytes_and_emits_checked_fragment()
     let published = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published package must reopen");
@@ -211,7 +211,7 @@ fn empty_fragment_deletes_only_the_authorized_source_range() {
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -426,7 +426,7 @@ fn source_splice_rejects_reedit_and_overlapping_ranges_without_second_output() {
     let published = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("published package must reopen");
@@ -659,7 +659,7 @@ fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
         let package = SourceBackedPackage::from_vec(
             source.clone(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
@@ -677,14 +677,14 @@ fn noncompact_original_bytes_publish_and_leave_every_other_member_byte_exact() {
         let before = SourceBackedPackage::from_vec(
             source,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("source must reopen");
         let after = SourceBackedPackage::from_vec(
             output,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("published package must reopen");
@@ -730,7 +730,7 @@ fn original_bytes_keep_every_structural_doctype_encoding_and_limit_refusal() {
         let package = SourceBackedPackage::from_vec(
             archive_bytes(original),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap_or_else(|error| panic!("{label}: fixture must open: {error:?}"));
@@ -763,7 +763,7 @@ fn an_exact_no_op_still_precedes_both_audits() {
     let package = SourceBackedPackage::from_vec(
         source.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture must open");
@@ -891,7 +891,7 @@ fn logical_xml_revisions_chain_without_reopening_the_physical_source() {
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1161,7 +1161,7 @@ fn retained_candidates_chain_fork_and_restore_the_original_archive() {
     let reopened = SourceBackedPackage::from_vec(
         bytes,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1181,7 +1181,7 @@ fn retained_xml_edits_preserve_added_removed_and_relationship_topology() {
     let package = SourceBackedPackage::from_vec(
         archive_bytes_with_sibling(FORMATTED_DOCUMENT, b"<styles/>"),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1220,7 +1220,7 @@ fn retained_xml_edits_preserve_added_removed_and_relationship_topology() {
     let reopened = SourceBackedPackage::from_vec(
         bytes,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1326,7 +1326,7 @@ fn retained_xml_revisions_enforce_aggregate_limits_and_memory_admission() {
     let package = SourceBackedPackage::from_vec(
         archive_bytes(FORMATTED_DOCUMENT),
         limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1395,13 +1395,8 @@ fn retained_xml_revisions_enforce_effective_archive_byte_limits() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec(
-        bytes,
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .unwrap();
+    let package =
+        SourceBackedPackage::from_vec(bytes, limits, SourceCacheLimits::default(), None).unwrap();
     let root = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
     let first = append_candidate(&root, b"<first/>");
     assert!(matches!(

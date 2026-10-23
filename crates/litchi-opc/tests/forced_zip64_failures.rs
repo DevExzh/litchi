@@ -289,7 +289,7 @@ fn forced_zip64_metadata_limit_rejects_source_before_catalog_publication() {
     let error = match SourceBackedPackage::from_vec(
         source.to_vec(),
         limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     ) {
         Ok(_) => panic!("the one-under metadata limit must reject the fixture"),
@@ -315,13 +315,9 @@ fn forced_zip64_overlay_part_limit_rejects_before_sink_output() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec(
-        source.to_vec(),
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .unwrap();
+    let package =
+        SourceBackedPackage::from_vec(source.to_vec(), limits, SourceCacheLimits::default(), None)
+            .unwrap();
     let mut output = Vec::new();
     let error = package
         .write_part_overlay_to_stream(&mut output, &pack(TARGET_URI), REPLACEMENT.to_vec())

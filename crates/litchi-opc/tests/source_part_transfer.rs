@@ -408,7 +408,7 @@ fn write_transfer(destination: Vec<u8>, plan: SourceTopologyPlan) -> litchi_opc:
     let package = SourceBackedPackage::from_vec(
         destination,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )?;
     let mut output = Vec::new();
@@ -452,7 +452,7 @@ fn cross_source_transfer_reuses_exact_verified_store_member() {
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -469,7 +469,7 @@ fn native_poi_video_image_transfer_reuses_exact_compressed_member() {
     let source = SourceBackedPackage::from_vec(
         NATIVE_POI_VIDEO_PPTX.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -499,7 +499,7 @@ fn native_poi_video_image_transfer_reuses_exact_compressed_member() {
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -516,7 +516,7 @@ fn native_poi_slide_trailing_byte_refuses_authorized_transfer() {
     let source = SourceBackedPackage::from_vec(
         NATIVE_POI_TRAILING_BYTE_PPTX.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -543,7 +543,7 @@ fn source_revision_change_after_view_drop_refuses_before_first_sink_write() {
     let package = SourceBackedPackage::from_vec(
         destination,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -573,7 +573,7 @@ fn source_revision_change_during_destination_sink_is_typed_and_partial() {
     let package = SourceBackedPackage::from_vec(
         synthetic_destination_bytes(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -635,7 +635,7 @@ fn source_cancellation_during_destination_sink_preserves_partial_prefix() {
     let package = SourceBackedPackage::from_vec(
         synthetic_destination_bytes(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -713,7 +713,7 @@ fn source_revision_change_after_final_sink_write_is_incomplete_with_exact_prefix
     let package = SourceBackedPackage::from_vec(
         synthetic_destination_bytes(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -740,7 +740,7 @@ fn decoded_mismatch_and_corrupt_crc_are_rejected_before_publication() {
     let source = SourceBackedPackage::from_vec(
         source_bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -755,7 +755,7 @@ fn decoded_mismatch_and_corrupt_crc_are_rejected_before_publication() {
     let package = SourceBackedPackage::from_vec(
         corrupted,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -805,13 +805,9 @@ fn output_limit_is_checked_before_any_destination_output() {
         .unwrap()
         .build()
         .unwrap();
-    let package = SourceBackedPackage::from_vec(
-        destination,
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .unwrap();
+    let package =
+        SourceBackedPackage::from_vec(destination, limits, SourceCacheLimits::default(), None)
+            .unwrap();
     let mut plan = SourceTopologyPlan::new();
     add_synthetic_token(&mut plan, token).unwrap();
     let mut output = Vec::new();
@@ -863,7 +859,7 @@ fn sequential_sink_failure_reports_incomplete_output_after_partial_prefix() {
     let package = SourceBackedPackage::from_vec(
         synthetic_destination_bytes(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1022,7 +1018,7 @@ fn encrypted_store_with_zero_crc_is_refused_during_admission() {
     let error = match SourceBackedPackage::from_vec(
         source_bytes,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     ) {
         Ok(_) => panic!("encrypted source must be refused during admission"),
@@ -1037,7 +1033,7 @@ fn rooted_signature_infrastructure_is_refused_before_token_or_output() {
     let source = SourceBackedPackage::from_vec(
         source_bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1062,7 +1058,7 @@ fn rooted_signature_infrastructure_is_refused_before_token_or_output() {
     let package = SourceBackedPackage::from_vec(
         source_bytes,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1208,7 +1204,7 @@ fn combined_capture_cold_io_and_warm_cache_preserve_exact_output() {
                 let reopened = SourceBackedPackage::from_vec(
                     output.clone(),
                     SourceLimits::default(),
-                    litchi_opc::SourceCacheLimits::default(),
+                    SourceCacheLimits::default(),
                     None,
                 )
                 .unwrap();
@@ -1461,7 +1457,7 @@ fn combined_native_image_capture_preserves_compressed_member_after_source_drop()
     let reopened = SourceBackedPackage::from_vec(
         output,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
