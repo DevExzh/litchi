@@ -18,6 +18,18 @@ import tomllib
 ROOT = Path(__file__).resolve().parents[4]
 PROBE = Path(__file__).with_name('ink-probe.rs')
 ROUTES = ('forward', 'inverse', 'noop', 'forward_write', 'inverse_write', 'noop_write')
+SCHEMA = 'litchi.docx-durable-ink.qualify.v2'
+STREAM_SCHEMA = 'litchi.docx-durable-ink-stream.v1'
+VALIDATION_NAMES = (
+    'forward.docx',
+    'forward.json',
+    'inverse.docx',
+    'inverse.json',
+    'noop.docx',
+    'noop.json',
+    'source.docx',
+    'streaming.json',
+)
 
 
 def save(path, value):
@@ -41,6 +53,16 @@ def verify(row):
     assert artifact(row['path']) == row, row['path']
 
 
+def resolve_ref(ref):
+    if 'owneddoc_toggle' in ref.lower():
+        raise ValueError('the DOC body-toggle workload is not the DOCX Ink workload')
+    return subprocess.check_output(
+        ['git', 'rev-parse', '--verify', f'{ref}^{{commit}}'],
+        cwd=ROOT,
+        text=True,
+    ).strip()
+
+
 def command(directory, label, argv, cwd, env=None):
     stdout, stderr = directory / f'{label}.stdout', directory / f'{label}.stderr'
     started = time.time_ns()
@@ -56,7 +78,7 @@ def command(directory, label, argv, cwd, env=None):
 
 
 def snapshot(out, label, commit, lock):
-    commit = subprocess.check_output(['git', 'rev-parse', commit], cwd=ROOT, text=True).strip()
+    commit = resolve_ref(commit)
     source = out / f'source-{label}'
     source.mkdir()
     archive = out / f'source-{label}.tar'
@@ -88,8 +110,20 @@ def build(args):
     out = args.output
     assert not out.is_relative_to(ROOT), 'evidence must remain outside the checkout'
     out.mkdir(parents=True, exist_ok=False)
-    manifest = dict(status='building', builder=artifact(__file__), probe=artifact(PROBE),
-                    input_lock=artifact(args.lock), endpoints={})
+    base_commit, candidate_commit = resolve_ref(args.base), resolve_ref(args.candidate)
+    if base_commit == candidate_commit:
+        raise ValueError('baseline and candidate must be different committed refs')
+    manifest = dict(
+        schema=SCHEMA,
+        workload='docx-durable-ink',
+        status='building',
+        builder=artifact(__file__),
+        probe=artifact(PROBE),
+        input_lock=artifact(args.lock),
+        requested_refs={'base': args.base, 'candidate': args.candidate},
+        resolved_refs={'base': base_commit, 'candidate': candidate_commit},
+        endpoints={},
+    )
     save(out / 'build.json', manifest)
     common_lock = None
     for label, commit in (('base', args.base), ('candidate', args.candidate)):
@@ -150,7 +184,11 @@ panic = "abort"
             validation = out / f'validation-{label}-{variant}'
             rows.append(command(receipts, variant + '-validation',
                                 [str(protected), 'validate_outputs', str(validation)], project, env))
-            endpoint.setdefault('validation', {})[variant] = [artifact(p) for p in sorted(validation.iterdir())]
+            names = tuple(sorted(path.name for path in validation.iterdir()))
+            assert names == tuple(sorted(VALIDATION_NAMES)), (label, variant, names)
+            endpoint.setdefault('validation', {})[variant] = [
+                artifact(path) for path in sorted(validation.iterdir())
+            ]
             save(out / 'build.json', manifest)
         print(f'built {label}', flush=True)
     base, candidate = (manifest['endpoints'][key] for key in ('base', 'candidate'))
@@ -159,9 +197,33 @@ panic = "abort"
     assert base['lock']['sha256'] == candidate['lock']['sha256']
     for endpoint in (base, candidate):
         for variant in ('native', 'allocation'):
-            for expected, actual in zip(base['validation']['native'], endpoint['validation'][variant], strict=True):
-                assert Path(expected['path']).name == Path(actual['path']).name
-                assert (expected['bytes'], expected['sha256']) == (actual['bytes'], actual['sha256'])
+            expected = {
+                Path(row['path']).name: row for row in base['validation']['native']
+            }
+            actual = {
+                Path(row['path']).name: row for row in endpoint['validation'][variant]
+            }
+            assert set(expected) == set(actual) == set(VALIDATION_NAMES)
+            for name in VALIDATION_NAMES:
+                if name != 'streaming.json':
+                    assert (expected[name]['bytes'], expected[name]['sha256']) == (
+                        actual[name]['bytes'], actual[name]['sha256']
+                    ), (endpoint['source']['commit'], variant, name)
+            expected_stream = load(expected['streaming.json']['path'])
+            actual_stream = load(actual['streaming.json']['path'])
+            assert expected_stream['schema'] == actual_stream['schema'] == STREAM_SCHEMA
+            assert expected_stream['read_chunk'] == actual_stream['read_chunk']
+            assert expected_stream['sink_window'] == actual_stream['sink_window']
+            assert expected_stream['sink_window'] > 0
+            assert expected_stream['base_bytes'] == actual_stream['base_bytes']
+            assert expected_stream['target_bytes'] == actual_stream['target_bytes']
+            assert [
+                (row['route'], row['bytes'], row['sha256'])
+                for row in expected_stream['routes']
+            ] == [
+                (row['route'], row['bytes'], row['sha256'])
+                for row in actual_stream['routes']
+            ]
     maps = [{r['path']: (r['bytes'], r['sha256']) for r in load(e['source']['manifest']['path'])['files']}
             for e in (base, candidate)]
     shared = ('crates/litchi-core/', 'crates/litchi-opc/', 'crates/litchi-ooxml-common/', 'crates/litchi-drawingml/')
@@ -176,12 +238,20 @@ panic = "abort"
 def allocations(args):
     manifest = load(args.output / 'build.json')
     assert manifest['status'] == 'complete'
+    assert manifest['schema'] == SCHEMA
+    assert manifest['workload'] == 'docx-durable-ink'
     verify(manifest['probe'])
     verify(manifest['builder'])
     out = args.output / args.attempt
     out.mkdir(exist_ok=False)
-    result = dict(build=artifact(args.output / 'build.json'), status='running', rows=[],
-                  timing='unqualified; allocation counts only; concurrent builds permitted')
+    result = dict(
+        schema='litchi.docx-durable-ink-allocation.v1',
+        workload='docx-durable-ink',
+        build=artifact(args.output / 'build.json'),
+        status='running',
+        rows=[],
+        timing='unqualified; allocation counts only; concurrent builds permitted',
+    )
     save(out / 'manifest.json', result)
     for route in ROUTES:
         values = []
@@ -208,12 +278,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('phase', choices=('build', 'allocation'))
     parser.add_argument('output', type=Path)
-    parser.add_argument('--base', default='d0406be017')
-    parser.add_argument('--candidate', default='HEAD')
+    parser.add_argument('--base',
+                        help='committed baseline ref; resolved and recorded at execution')
+    parser.add_argument('--candidate',
+                        help='committed candidate ref; resolved and recorded at execution')
     parser.add_argument('--lock', type=Path, default=ROOT / 'Cargo.lock')
     parser.add_argument('--attempt', default='allocation-a1')
     args = parser.parse_args()
     args.output = args.output.resolve()
+    args.lock = args.lock.resolve()
+    if args.phase == 'build' and (not args.base or not args.candidate):
+        parser.error('build requires both --base and --candidate')
     (build if args.phase == 'build' else allocations)(args)
 
 

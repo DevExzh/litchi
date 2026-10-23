@@ -42,8 +42,16 @@ no-op replay, each with and without publication, on one 1,000-paragraph source.
 The exact same probe is built on both sources; the `before` feature adapts only
 the Package/Commit extraction. Fixture construction and durable wire decoding
 precede measurement. Each measured result performs its first annotation read;
-publication routes also serialize it. Untimed preflight compares six exact
-source/target/durable-wire files on native and allocation binaries. Counting
-runs and guarded native runs are separate. No timing or allocation acceptance
-is claimed until those builds and comparisons finish. The final workspace
-inventory, remaining W8 replay families and integration gate stay required.
+publication routes also serialize it. Untimed preflight now additionally
+reopens independent content-matching base and target packages, checks forward,
+inverse and no-op replay against exact package bytes, reads through a fixed
+4-KiB reader, and writes publication through a fixed-state 8-KiB digest sink.
+The stream receipt proves the bounded sink/read path without retaining output
+bytes. Native and allocation validation outputs are compared before a timing
+runner can start. Counting runs and guarded native runs are separate. No
+timing or allocation acceptance is claimed until those builds and comparisons
+finish. The qualification runner requires the final baseline and candidate
+refs at execution time, records source/probe/lock/compiler/binary digests,
+rejects stale binary paths, and keeps all raw artifacts outside the checkout.
+The final workspace inventory, remaining W8 replay families and integration
+gate stay required.
