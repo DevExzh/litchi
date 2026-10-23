@@ -76,7 +76,7 @@ impl Xlsx {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
+        let source = self.editor_for_write()?;
         // Metadata editing does not use the worksheet native editor. Admit
         // the source owner before the common property editor materializes an
         // after-image. The common planner admits the exact escaped XML patch;

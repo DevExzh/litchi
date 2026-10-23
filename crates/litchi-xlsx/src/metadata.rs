@@ -27,15 +27,108 @@
 //! # }
 //! ```
 
+use std::mem::size_of;
+
 use litchi_core::Metadata;
 use litchi_ooxml_common::custom::{self, Host};
-use litchi_ooxml_common::properties::{self, Snapshot, app};
+use litchi_ooxml_common::properties::{self, Family, Snapshot, app};
+use litchi_opc::{PartMetadata, Relationship, Relationships};
 
 pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
 
 use crate::Package;
 
 type Result<T> = std::result::Result<T, Error>;
+
+fn retained_relationship_bytes(relationship: &Relationship) -> usize {
+    size_of::<Relationship>()
+        .saturating_add(relationship.r_id().len())
+        .saturating_add(relationship.reltype().len())
+        .saturating_add(relationship.target_ref().len())
+        .saturating_add(relationship.base_uri().len())
+        .saturating_add(relationship.source_uri().map_or(0, str::len))
+}
+
+fn retained_relationships_bytes(relationships: &Relationships) -> usize {
+    size_of::<Relationships>().saturating_add(
+        relationships
+            .iter()
+            .map(retained_relationship_bytes)
+            .sum::<usize>(),
+    )
+}
+
+fn retained_part_metadata_bytes(part: PartMetadata<'_>) -> usize {
+    size_of::<PartMetadata<'_>>()
+        .saturating_add(part.partname().as_str().len())
+        .saturating_add(part.content_type().len())
+        .saturating_add(retained_relationships_bytes(part.rels()))
+}
+
+fn owner_family(
+    package: &Package,
+    snapshot: &Snapshot,
+    family: Family,
+) -> Result<properties::FamilyAdmission> {
+    let package_relationships = package.opc().rels();
+    let (present_part_bytes, present_relationship_bytes) = match snapshot.part_name(family) {
+        Some(part_name) => {
+            let part = package.opc().part_metadata(part_name).ok_or_else(|| {
+                Error::Invalid("metadata part disappeared during admission".to_owned())
+            })?;
+            let relationship = package_relationships
+                .iter()
+                .find(|relationship| {
+                    relationship
+                        .target_partname()
+                        .ok()
+                        .is_some_and(|target| target == *part_name)
+                })
+                .ok_or_else(|| {
+                    Error::Invalid("metadata relationship disappeared during admission".to_owned())
+                })?;
+            (
+                Some(retained_part_metadata_bytes(part)),
+                Some(retained_relationship_bytes(relationship)),
+            )
+        },
+        None => (None, None),
+    };
+    let new_part = snapshot.new_part_name(family);
+    let created_part_bytes = size_of::<PartMetadata<'_>>()
+        .saturating_add(new_part.as_str().len())
+        .saturating_add(family.content_type().len())
+        .saturating_add(size_of::<Relationships>());
+    let relationship_type = match family {
+        Family::Core => litchi_opc::constants::relationship_type::CORE_PROPERTIES,
+        Family::App => litchi_opc::constants::relationship_type::EXTENDED_PROPERTIES,
+        Family::Custom => litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES,
+        _ => return Err(Error::Invalid("unknown OOXML metadata family".to_owned())),
+    };
+    let created_relationship_base_bytes = size_of::<Relationship>()
+        .saturating_add(relationship_type.len())
+        .saturating_add(new_part.as_str().trim_start_matches('/').len())
+        .saturating_add(package_relationships.base_uri().len())
+        .saturating_add(package_relationships.source_uri().map_or(0, str::len));
+    Ok(properties::FamilyAdmission::new(
+        present_part_bytes,
+        present_relationship_bytes,
+        created_part_bytes,
+        created_relationship_base_bytes,
+    ))
+}
+
+fn owner_admission(package: &Package, snapshot: &Snapshot) -> Result<properties::OwnerAdmission> {
+    Ok(properties::OwnerAdmission::new(
+        package.retained_bytes(),
+        package.opc().exact_source_len().unwrap_or(0),
+        [
+            owner_family(package, snapshot, Family::Core)?,
+            owner_family(package, snapshot, Family::App)?,
+            owner_family(package, snapshot, Family::Custom)?,
+        ],
+    ))
+}
 
 /// Bounds for one metadata edit's retained exact patch.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -220,17 +313,23 @@ impl Package {
 
     /// Start a metadata edit under an explicit retained-patch ceiling.
     pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let snapshot = Snapshot::read(self.opc(), Host::Excel)?;
+        let common_options = options
+            .max_retained_bytes_value()
+            .map_or_else(properties::EditOptions::default, |maximum| {
+                properties::EditOptions::new().max_retained_bytes(maximum)
+            });
+        if options.max_retained_bytes_value().is_some() {
+            let common_options =
+                common_options.with_owner_admission(owner_admission(self, &snapshot)?);
+            return Ok(Edit {
+                package: self.clone(),
+                inner: properties::Edit::new_with_snapshot(self.opc(), snapshot, common_options),
+            });
+        }
         Ok(Edit {
             package: self.clone(),
-            inner: properties::Edit::new_with_options(
-                self.opc(),
-                Host::Excel,
-                options
-                    .max_retained_bytes_value()
-                    .map_or_else(properties::EditOptions::default, |maximum| {
-                        properties::EditOptions::new().max_retained_bytes(maximum)
-                    }),
-            )?,
+            inner: properties::Edit::new_with_snapshot(self.opc(), snapshot, common_options),
         })
     }
 
@@ -278,6 +377,13 @@ impl Package {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn title_commit(package: &Package, title: &str) -> Commit {
+        let mut edit = package.edit_metadata().unwrap();
+        edit.update(|metadata| metadata.title = Some(title.to_owned()))
+            .unwrap();
+        edit.commit().unwrap()
+    }
 
     #[test]
     fn edits_publish_a_new_snapshot_and_replay_exactly() {
@@ -346,5 +452,88 @@ mod tests {
         let replayed = source.apply_metadata(no_op.patch()).unwrap();
         assert!(replayed.patch().is_noop());
         assert!(replayed.package().same_content(&source).unwrap());
+    }
+
+    #[test]
+    fn bounded_metadata_admission_accepts_exact_shrinking_endpoint() {
+        let source = Package::new().unwrap();
+        let base = title_commit(&source, &"long title ".repeat(64)).into_package();
+        let expected = title_commit(&base, "short");
+        let required = base
+            .retained_bytes()
+            .saturating_add(expected.package().retained_bytes())
+            .saturating_add(expected.patch().retained_bytes());
+
+        let exact = base
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required))
+            .unwrap();
+        let mut exact = exact;
+        exact
+            .update(|metadata| metadata.title = Some("short".to_owned()))
+            .unwrap();
+        assert!(exact.commit().is_ok());
+
+        let mut below = base
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required - 1))
+            .unwrap();
+        below
+            .update(|metadata| metadata.title = Some("short".to_owned()))
+            .unwrap();
+        assert!(matches!(
+            below.commit(),
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == required - 1
+        ));
+    }
+
+    #[test]
+    fn bounded_metadata_admission_accepts_exact_expanding_endpoint() {
+        let source = Package::new().unwrap();
+        let base = title_commit(&source, "short").into_package();
+        let expected = title_commit(&base, &"expanded title ".repeat(64));
+        let required = base
+            .retained_bytes()
+            .saturating_add(expected.package().retained_bytes())
+            .saturating_add(expected.patch().retained_bytes());
+
+        let mut exact = base
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required))
+            .unwrap();
+        exact
+            .update(|metadata| metadata.title = Some("expanded title ".repeat(64)))
+            .unwrap();
+        assert!(exact.commit().is_ok());
+    }
+
+    #[test]
+    fn bounded_metadata_admission_charges_an_exact_noop_pair() {
+        let package = Package::new().unwrap();
+        let expected = package.edit_metadata().unwrap().commit().unwrap();
+        let required = package
+            .retained_bytes()
+            .saturating_add(expected.package().retained_bytes())
+            .saturating_add(expected.patch().retained_bytes());
+
+        let exact = package
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required))
+            .unwrap()
+            .commit();
+        assert!(exact.is_ok());
+
+        let below = package
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required - 1))
+            .unwrap()
+            .commit();
+        assert!(matches!(
+            below,
+            Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == required - 1
+        ));
     }
 }
