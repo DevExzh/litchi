@@ -220,10 +220,18 @@ fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
     Ok(OpcPackage::from_vec(bytes, SourceLimits::default())?)
 }
 
-#[cfg(not(feature = "current-xlsx-raw-opc"))]
+#[cfg(all(not(feature = "current-xlsx-raw-opc"), feature = "legacy-xlsx-raw-opc"))]
 fn open_opc(bytes: Vec<u8>) -> ProbeResult<OpcPackage> {
     Ok(OpcPackage::from_vec(bytes)?)
 }
+
+#[cfg(all(
+    not(feature = "current-xlsx-raw-opc"),
+    not(feature = "legacy-xlsx-raw-opc")
+))]
+compile_error!(
+    "select current-xlsx-raw-opc (the default) or legacy-xlsx-raw-opc for the raw OPC adapter"
+);
 
 fn open_package(bytes: &[u8]) -> ProbeResult<Package> {
     Ok(Package::from_opc(open_opc(bytes.to_vec())?)?)
