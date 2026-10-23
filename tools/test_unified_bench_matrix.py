@@ -120,7 +120,7 @@ class Committed(unittest.TestCase):
         rows, _, _, _, _ = matrix.build()
         records = {r["record"] for r in rows}
         measured = ("0359qb", "0359qc", "0359qd", "0359r", "0359ra", "0359rb",
-                    "0359rc", "0359rd", "0359re", "0362ya", "0362yb", "0362yc",
+                    "0359rc", "0359rd", "0359re", "0359qe", "0362ya", "0362yb", "0362yc",
                     "0362yd", "0362ye")
         for rec in measured:
             self.assertIn(rec, records)
@@ -131,9 +131,14 @@ class Committed(unittest.TestCase):
                       ("bytes", "Ir", "count", "instructions")]
         self.assertTrue(diagnostic)
         self.assertTrue(all(r["status"] == "no-budget" for r in diagnostic))
-        native = [r for r in measured_rows if r["record"] in ("0359qb", "0362ye")
+        native = [r for r in measured_rows if r["record"] in ("0359qb", "0359qe", "0362ye")
                   and r["status"] == "unqualified"]
         self.assertGreaterEqual(len(native), 2)
+        qe = [r for r in measured_rows if r["record"] == "0359qe"]
+        self.assertEqual(len(qe), 12)
+        self.assertEqual({r["comparison"] for r in qe}, {"candidate/baseline"})
+        self.assertTrue(all("quiet-host" in r["explanation"] or r["status"] == "no-budget"
+                            for r in qe))
         final_only = [r for r in measured_rows
                       if r["record"] == "0359re" and r["stage"] == "Heaptrack final-only"]
         self.assertEqual({r["series"].rsplit(":", 1)[-1] for r in final_only},
