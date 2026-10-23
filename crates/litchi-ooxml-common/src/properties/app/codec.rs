@@ -216,7 +216,7 @@ fn splice_len_from_layout(xml: &[u8], layout: &Layout, target: &Props) -> Result
     if appended != 0 {
         let (removed, replacement_len) = match &layout.root_end {
             RootEnd::EndTag(_) => (0, appended),
-            RootEnd::Empty(span) => (
+            RootEnd::Empty(_) => (
                 2,
                 4usize
                     .saturating_add(layout.root_name.len())

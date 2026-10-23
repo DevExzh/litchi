@@ -70,3 +70,12 @@ as a substitute for the retained-payload contract.
 Builds are temporarily held while the coordinator runs workspace rustdoc
 alone in a separate capped target. Final combined compilation and semantic
 tests follow the remaining fixes.
+
+The fourth combined check on `152eb8a53b` stops after 14.74 seconds on
+four common metadata preparation errors: a missing no-core branch, boxed
+field collection operations and an unused sizing pattern. The narrow compiler
+repair preserves the prepared values and does not resolve the outstanding
+semantic/performance returns.
+[native-check-v4.json](results/0362up/native-check-v4.json) retains the
+failure. [0362upa](0362upa-budget-review-return.md) records the required return
+work; dependent native/facade and no-feature checks were not reached.

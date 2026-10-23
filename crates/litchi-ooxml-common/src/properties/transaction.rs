@@ -863,6 +863,8 @@ impl Plan {
                     after_len,
                 })
             })
+        } else {
+            None
         }
         .transpose()?;
 
@@ -940,7 +942,7 @@ impl Plan {
             core,
             app,
             custom,
-            changed_fields: changed_fields.into_boxed_slice(),
+            changed_fields: changed_fields,
             planned_retained_bytes,
         })
     }
@@ -1089,7 +1091,7 @@ impl PreparedPlan {
 
         let families = changes.iter().map(|change| change.family).collect();
         if changes.is_empty() {
-            changed_fields.clear();
+            changed_fields = Box::new([]);
         }
         // An empty patch still has to authenticate the package it came from.
         // Keep the complete document-properties scope separate from the
