@@ -59,11 +59,7 @@ impl EditOptions {
     }
 }
 
-/// Publication diagnostics for a package-owned cell-values commit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
+pub use litchi_core::edit::Diagnostics;
 
 /// A format-neutral scalar accepted by the package-owned XLSB cell writer.
 ///
@@ -110,18 +106,6 @@ impl Scalar {
             },
             Self::Number(_) | Self::Boolean(_) | Self::Blank => Ok(()),
         }
-    }
-}
-
-impl Diagnostics {
-    const fn new(changed: bool) -> Self {
-        Self { changed }
-    }
-
-    /// Whether the commit changes the package image.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
     }
 }
 
@@ -770,53 +754,12 @@ impl Edit {
             });
         }
         let diagnostics = Diagnostics::new(!patch.is_noop());
-        Ok(Commit {
-            package,
-            patch,
-            diagnostics,
-        })
+        Ok(Commit::new(package, patch, diagnostics))
     }
 }
 
 /// The immutable package result, exact patch, and diagnostics of one edit.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Validated package that the commit would publish.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Exact whole-package patch produced by the commit.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Commit diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit and return its validated package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit and return the package and exact patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// An exact before/after package patch for one worksheet cell-values owner.
 #[derive(Debug, Clone)]
@@ -1009,11 +952,11 @@ impl Package {
     /// Returns an error for a stale patch source, a changed patch of a
     /// signed workbook, and the workbook validation errors of the result.
     pub fn apply_cell_values(&self, patch: &Patch) -> Result<Commit> {
-        Ok(Commit {
-            package: patch.apply(self)?,
-            patch: patch.clone(),
-            diagnostics: Diagnostics::new(!patch.is_noop()),
-        })
+        Ok(Commit::new(
+            patch.apply(self)?,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }
 
