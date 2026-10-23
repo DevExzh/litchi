@@ -26,6 +26,8 @@ patch/replay behavior, source provenance, owner policy, and output limits stay
 on the existing capture/commit paths.
 
 The constructor/drop regression uses the test fingerprint log to prove that
-entry and drop do not capture, while the first `slides` use does. No Cargo
+entry and drop do not capture, while the first `slides` use does. The unified
+read regression likewise constructs the edit successfully and keeps its
+malformed-tail refusal at that first fallible `slides` operation. No Cargo
 build was run in this isolated leaf; the coordinator must run the PPTX tests,
 workspace Clippy/rustdoc, the API glossary, and the full gate after merge.
