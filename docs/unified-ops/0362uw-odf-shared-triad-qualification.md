@@ -41,8 +41,10 @@ an ordered ZIP-member audit. The audit compares decompressed member hashes,
 `meta.xml` presence/content, untouched members, compression, timestamps,
 extra fields, comments, permissions and archive comments. The deterministic
 ODM output currently has one explicit `archive_member_order_and_manifest_listing`
-decision: payload bytes and stored metadata are identical by member name, but
-the two physical orders and the corresponding manifest entry orders differ.
+decision: untouched payload bytes and stored metadata are identical by member
+name. The manifest member's listing order necessarily changes its
+content/CRC/compressed size; the two physical orders and the corresponding
+manifest entry orders differ. All other member records remain exact.
 The audit proves each manifest lists its own physical order and rejects any
 other content or archive-metadata difference. In the observed pair the native
 order is `mimetype,content.xml,meta.xml,META-INF/manifest.xml` and the facade

@@ -52,6 +52,7 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                 "non_meta_content_exact": True,
                 "non_manifest_content_exact": True,
                 "non_meta_stored_metadata_exact": True,
+                "non_manifest_stored_metadata_exact": True,
                 "meta_stored_metadata_exact": True,
                 "non_manifest_archive_record_exact": True,
                 "meta_archive_record_exact": True,

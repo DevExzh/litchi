@@ -378,12 +378,18 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         raise RunnerError(f"{label}.archive_audit decision is unknown")
     for key in (
         "archive_comment_equal",
-        "non_meta_stored_metadata_exact",
         "meta_stored_metadata_exact",
+        "non_manifest_stored_metadata_exact",
         "non_manifest_content_exact",
         "non_manifest_archive_record_exact",
     ):
         _require_bool(audit, key, True, f"{label}.archive_audit")
+    _require_bool(
+        audit,
+        "non_meta_stored_metadata_exact",
+        decision != "archive_member_order_and_manifest_listing",
+        f"{label}.archive_audit",
+    )
     _require_bool(
         audit,
         "meta_archive_record_exact",
@@ -447,7 +453,11 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         if audit["decision"] == "archive_member_order_and_manifest_listing" and item["name"] == "META-INF/manifest.xml":
             expected_record = False
         _require_bool(item, "content_equal", expected_content, f"{label}.archive_audit.member")
-        _require_bool(item, "stored_metadata_equal", True, f"{label}.archive_audit.member")
+        expected_metadata = not (
+            audit["decision"] == "archive_member_order_and_manifest_listing"
+            and item["name"] == "META-INF/manifest.xml"
+        )
+        _require_bool(item, "stored_metadata_equal", expected_metadata, f"{label}.archive_audit.member")
         _require_bool(item, "archive_record_equal", expected_record, f"{label}.archive_audit.member")
     if audit["decision"] == "metadata_member_only" and differences != ["meta.xml"]:
         raise RunnerError(f"{label}.archive_audit metadata-member decision is not exact")

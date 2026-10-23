@@ -173,6 +173,7 @@ mod probe {
         let mut non_meta_content_exact = true;
         let mut non_manifest_content_exact = true;
         let mut non_meta_metadata_exact = true;
+        let mut non_manifest_metadata_exact = true;
         let mut non_manifest_record_exact = true;
         let mut meta_member_count = 0;
         let mut meta_metadata_exact = true;
@@ -229,6 +230,7 @@ mod probe {
                 }
                 non_meta_metadata_exact &= metadata_equal;
                 if leaf_member.name != "META-INF/manifest.xml" {
+                    non_manifest_metadata_exact &= metadata_equal;
                     non_manifest_record_exact &= archive_record_equal;
                 }
             }
@@ -268,6 +270,7 @@ mod probe {
         let archive_member_order_and_manifest_listing = !member_order_exact
             && manifest_content_difference
             && non_manifest_content_exact
+            && non_manifest_metadata_exact
             && non_manifest_record_exact
             && meta_record_exact
             && leaf_manifest_tracks_order
@@ -304,6 +307,7 @@ mod probe {
             "non_meta_content_exact": non_meta_content_exact,
             "non_manifest_content_exact": non_manifest_content_exact,
             "non_meta_stored_metadata_exact": non_meta_metadata_exact,
+            "non_manifest_stored_metadata_exact": non_manifest_metadata_exact,
             "meta_stored_metadata_exact": meta_metadata_exact,
             "non_manifest_archive_record_exact": non_manifest_record_exact,
             "meta_archive_record_exact": meta_record_exact,
