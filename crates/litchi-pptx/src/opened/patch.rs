@@ -377,6 +377,7 @@ pub struct Patch {
     metadata: Metadata,
     root: Option<(Vec<RelationshipState>, Vec<RelationshipState>)>,
     pub(crate) limits: Limits,
+    wire_len: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -508,9 +509,16 @@ impl Patch {
             root,
             limits,
             metadata,
+            wire_len: 0,
         };
-        patch.require_encoded_limit()?;
-        Ok(patch)
+        let wire_len = patch.encoded_len_uncached()?;
+        if wire_len > patch.limits.max_patch_bytes() {
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: patch.limits.max_patch_bytes(),
+            });
+        }
+        Ok(Self { wire_len, ..patch })
     }
 
     /// Whether this patch changes no OPC resource.
@@ -623,6 +631,7 @@ impl Patch {
                 .map(|(before, after)| (after.clone(), before.clone())),
             limits: self.limits,
             metadata: self.metadata.inverse(),
+            wire_len: self.wire_len,
         }
     }
 
@@ -928,6 +937,13 @@ impl Patch {
     }
 
     pub(crate) fn encoded_len(&self) -> Result<usize> {
+        if self.wire_len != 0 {
+            return Ok(self.wire_len);
+        }
+        self.encoded_len_uncached()
+    }
+
+    fn encoded_len_uncached(&self) -> Result<usize> {
         let mut length = MAGIC.len();
         add_len(&mut length, 4)?;
         add_len(&mut length, self.presentation_name.as_str().len())?;

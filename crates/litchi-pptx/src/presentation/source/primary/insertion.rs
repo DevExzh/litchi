@@ -32,6 +32,7 @@ pub(super) fn plan(
     package: &Package,
     position: Position,
     layout_name: &str,
+    max_patch_bytes: Option<usize>,
 ) -> Result<(
     Arc<Vec<u8>>,
     Arc<[StableSlideKey]>,
@@ -103,25 +104,6 @@ pub(super) fn plan(
             maximum: package.owner.limits.max_parts(),
         });
     }
-
-    // Identity indexes and the authored slide/root splice allocate before the
-    // prepared topology has a chance to retain its recipe. Compute a checked
-    // bound from the actual catalog and retained recipes, including every
-    // relationship field that the collision scans clone. Keep one bounded
-    // managed reservation alive through that whole candidate build.
-    let identity_bytes = insertion_workspace_bound(package, source)?;
-    let envelope = package
-        .root
-        .as_bytes()
-        .len()
-        .checked_add(metadata_bytes(
-            source,
-            package.owner.limits,
-            presentation_uri,
-        )?)
-        .and_then(|size| size.checked_add(identity_bytes))
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
-    let managed_reservation = super::topology::reserve_payload(package, envelope)?.map(Arc::new);
 
     let layout = registered_layout(source, &presentation, physical_root, layout_name)?;
 
@@ -213,6 +195,35 @@ pub(super) fn plan(
             relationships: Some(Arc::new(relationships_xml)),
         }),
     };
+    if let Some(max_patch_bytes) = max_patch_bytes {
+        let mut planned = super::topology::planned_current_changes_for_admission(package)?;
+        planned.push(super::topology::planned_change_for_admission(&change)?);
+        let dependents = super::topology::planned_current_dependents_for_admission(package);
+        super::topology::preflight_candidate_for_admission(
+            package,
+            &root,
+            order.clone(),
+            &planned,
+            &dependents,
+            max_patch_bytes,
+        )?;
+    }
+    // Identity indexes and the authored slide/root splice allocate before the
+    // prepared topology retains its recipe. Compute a checked workspace bound
+    // only after the exact retained wire has been admitted.
+    let identity_bytes = insertion_workspace_bound(package, source)?;
+    let envelope = package
+        .root
+        .as_bytes()
+        .len()
+        .checked_add(metadata_bytes(
+            source,
+            package.owner.limits,
+            presentation_uri,
+        )?)
+        .and_then(|size| size.checked_add(identity_bytes))
+        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+    let managed_reservation = super::topology::reserve_payload(package, envelope)?.map(Arc::new);
     Ok((Arc::new(root), order.into(), change, managed_reservation))
 }
 

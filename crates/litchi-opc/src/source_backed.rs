@@ -7867,6 +7867,30 @@ impl SourceBackedPackage {
         self.relationships_data_for_with_limit_and_accounting(source_uri, maximum, None)
     }
 
+    /// Return a relationship member's declared ZIP size without decoding it.
+    /// The declaration is used only for bounded wire preflight; callers that
+    /// retain the member must still use
+    /// [`Self::relationships_data_for_with_limit`] for source and payload
+    /// validation.
+    pub fn declared_relationships_uncompressed_size(
+        &self,
+        source_uri: &PackURI,
+    ) -> Result<Option<u64>> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let relationships_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let Some(entry) = self.archive.entry_id(relationships_uri.membername()) else {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            return Ok(None);
+        };
+        let declared = self.archive.metadata_for(entry)?.uncompressed_size();
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(Some(declared))
+    }
+
     fn relationships_data_for_with_limit_and_accounting(
         &self,
         source_uri: &PackURI,
@@ -7958,6 +7982,23 @@ impl SourceBackedPackage {
     /// owner, matching [`Self::relationships_data_for_with_limit`].
     pub fn content_types_data_with_limit(&self, maximum: usize) -> Result<PartData> {
         self.content_types_data_with_limit_and_accounting(maximum, None)
+    }
+
+    /// Return `[Content_Types].xml`'s declared ZIP size without decoding it.
+    /// The declaration is only a wire preflight input; publication still
+    /// validates and retains the exact member through the bounded accessor.
+    pub fn declared_content_types_uncompressed_size(&self) -> Result<u64> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let entry = self
+            .archive
+            .entry_id(&self.catalog.content_types_member)
+            .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
+        let declared = self.archive.metadata_for(entry)?.uncompressed_size();
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(declared)
     }
 
     fn content_types_data_with_limit_and_accounting(

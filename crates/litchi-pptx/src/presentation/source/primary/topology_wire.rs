@@ -104,6 +104,30 @@ pub(super) struct ImageLengths {
     pub(super) relationships: Option<usize>,
 }
 
+#[derive(Clone)]
+pub(super) struct ChangeLengths {
+    pub(super) key: StableSlideKey,
+    pub(super) content_type: String,
+    pub(super) relationship_type: String,
+    pub(super) before: Option<ImageLengths>,
+    pub(super) after: Option<ImageLengths>,
+}
+
+#[derive(Clone)]
+pub(super) struct DependentLengths {
+    pub(super) part_uri: PackURI,
+    pub(super) content_type: String,
+    pub(super) before: Option<ImageLengths>,
+    pub(super) after: Option<ImageLengths>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct StateLengths {
+    pub(super) root: usize,
+    pub(super) presentation_relationships: usize,
+    pub(super) content_types: usize,
+}
+
 impl Data {
     pub(super) fn is_noop(&self) -> bool {
         self.before == self.after && self.changes.is_empty() && self.dependents.is_empty()
@@ -240,27 +264,28 @@ impl Data {
         // callers decoding under a tighter profile get that profile in
         // `from_bytes`.
         validate_data(self, SourceLimits::default())?;
-        let mut total = HEADER_BYTES
-            .checked_add(CHECKSUM_BYTES)
-            .ok_or_else(|| invalid("wire length overflows"))?;
-        for key in self.before.order.iter().chain(self.after.order.iter()) {
-            add_len(&mut total, key_len(key)?)?;
-        }
-        add_len(&mut total, state_payload_len(&self.before)?)?;
-        add_len(&mut total, state_payload_len(&self.after)?)?;
-        for change in self.changes.iter() {
-            add_len(&mut total, change_len(change)?)?;
-        }
-        if !self.dependents.is_empty() {
-            add_len(&mut total, 4)?;
-            for dependent in self.dependents.iter() {
-                add_len(&mut total, dependent_len(dependent)?)?;
-            }
-        }
-        if total > MAX_WIRE_BYTES {
-            return Err(wire_limit());
-        }
-        Ok(total)
+        encoded_len_from_data(self)
+    }
+
+    pub(super) fn encoded_len_from_data(data: &Data) -> Result<usize> {
+        let changes = data
+            .changes
+            .iter()
+            .map(change_lengths)
+            .collect::<Result<Vec<_>>>()?;
+        let dependents = data
+            .dependents
+            .iter()
+            .map(dependent_lengths)
+            .collect::<Result<Vec<_>>>()?;
+        encoded_len_from_lengths(
+            &data.before.order,
+            &data.after.order,
+            state_lengths(&data.before),
+            state_lengths(&data.after),
+            &changes,
+            &dependents,
+        )
     }
 
     /// Compute the exact wire length after replacing one slide change.  The
@@ -276,48 +301,41 @@ impl Data {
         content_type: &str,
         relationship_type: &str,
     ) -> Result<usize> {
-        let mut total = HEADER_BYTES
-            .checked_add(CHECKSUM_BYTES)
-            .ok_or_else(|| invalid("wire length overflows"))?;
-        for order_key in self.before.order.iter().chain(self.after.order.iter()) {
-            add_len(&mut total, key_len(order_key)?)?;
-        }
-        add_len(&mut total, state_payload_len(&self.before)?)?;
-        add_len(&mut total, state_payload_len(&self.after)?)?;
+        let mut changes = self
+            .changes
+            .iter()
+            .map(change_lengths)
+            .collect::<Result<Vec<_>>>()?;
         let mut replaced = false;
-        for change in self.changes.iter() {
+        for change in &mut changes {
             if &change.key == key {
-                add_len(
-                    &mut total,
-                    change_len_from_lengths(
-                        &change.key,
-                        &change.content_type,
-                        &change.relationship_type,
-                        before,
-                        after,
-                    )?,
-                )?;
+                change.before = before;
+                change.after = after;
                 replaced = true;
-            } else {
-                add_len(&mut total, change_len(change)?)?;
             }
         }
         if !replaced {
-            add_len(
-                &mut total,
-                change_len_from_lengths(key, content_type, relationship_type, before, after)?,
-            )?;
+            changes.push(ChangeLengths {
+                key: key.clone(),
+                content_type: content_type.to_owned(),
+                relationship_type: relationship_type.to_owned(),
+                before,
+                after,
+            });
         }
-        if !self.dependents.is_empty() {
-            add_len(&mut total, 4)?;
-            for dependent in self.dependents.iter() {
-                add_len(&mut total, dependent_len(dependent)?)?;
-            }
-        }
-        if total > MAX_WIRE_BYTES {
-            return Err(wire_limit());
-        }
-        Ok(total)
+        let dependents = self
+            .dependents
+            .iter()
+            .map(dependent_lengths)
+            .collect::<Result<Vec<_>>>()?;
+        encoded_len_from_lengths(
+            &self.before.order,
+            &self.after.order,
+            state_lengths(&self.before),
+            state_lengths(&self.after),
+            &changes,
+            &dependents,
+        )
     }
 
     fn version(&self) -> Version {
@@ -327,6 +345,99 @@ impl Data {
             Version::Five
         }
     }
+}
+
+fn state_lengths(state: &State) -> StateLengths {
+    StateLengths {
+        root: state.root.len(),
+        presentation_relationships: state.presentation_relationships.len(),
+        content_types: state.content_types.len(),
+    }
+}
+
+fn change_lengths(change: &Change) -> Result<ChangeLengths> {
+    Ok(ChangeLengths {
+        key: change.key.clone(),
+        content_type: change.content_type.clone(),
+        relationship_type: change.relationship_type.clone(),
+        before: change.before.as_ref().map(image_lengths),
+        after: change.after.as_ref().map(image_lengths),
+    })
+}
+
+fn dependent_lengths(dependent: &Dependent) -> Result<DependentLengths> {
+    Ok(DependentLengths {
+        part_uri: dependent.part_uri.clone(),
+        content_type: dependent.content_type.clone(),
+        before: dependent.before.as_ref().map(image_lengths),
+        after: dependent.after.as_ref().map(image_lengths),
+    })
+}
+
+pub(super) fn encoded_len_from_lengths(
+    before_order: &[StableSlideKey],
+    after_order: &[StableSlideKey],
+    before: StateLengths,
+    after: StateLengths,
+    changes: &[ChangeLengths],
+    dependents: &[DependentLengths],
+) -> Result<usize> {
+    let mut total = HEADER_BYTES
+        .checked_add(CHECKSUM_BYTES)
+        .ok_or_else(|| invalid("wire length overflows"))?;
+    for order_key in before_order.iter().chain(after_order.iter()) {
+        add_len(&mut total, key_len(order_key)?)?;
+    }
+    let before_payload = before
+        .root
+        .checked_add(before.presentation_relationships)
+        .and_then(|length| length.checked_add(before.content_types))
+        .ok_or_else(|| invalid("state payload length overflows"))?;
+    let after_payload = after
+        .root
+        .checked_add(after.presentation_relationships)
+        .and_then(|length| length.checked_add(after.content_types))
+        .ok_or_else(|| invalid("state payload length overflows"))?;
+    add_len(&mut total, before_payload)?;
+    add_len(&mut total, after_payload)?;
+    for change in changes {
+        add_len(
+            &mut total,
+            change_len_from_lengths(
+                &change.key,
+                &change.content_type,
+                &change.relationship_type,
+                change.before,
+                change.after,
+            )?,
+        )?;
+    }
+    if !dependents.is_empty() {
+        add_len(&mut total, 4)?;
+        for dependent in dependents {
+            add_len(&mut total, dependent_len_from_lengths(dependent)?)?;
+        }
+    }
+    if total > MAX_WIRE_BYTES {
+        return Err(wire_limit());
+    }
+    Ok(total)
+}
+
+fn dependent_len_from_lengths(dependent: &DependentLengths) -> Result<usize> {
+    if dependent.part_uri.as_str().len() > u32::MAX as usize
+        || dependent.content_type.len() > u32::MAX as usize
+    {
+        return Err(invalid("dependent Part exceeds wire width"));
+    }
+    let before_len = image_lengths_len(dependent.before)?;
+    let after_len = image_lengths_len(dependent.after)?;
+    8usize
+        .checked_add(dependent.part_uri.as_str().len())
+        .and_then(|length| length.checked_add(dependent.content_type.len()))
+        .and_then(|length| length.checked_add(before_len))
+        .and_then(|length| length.checked_add(after_len))
+        .ok_or_else(|| invalid("dependent length overflows"))
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1677,6 +1788,40 @@ mod tests {
             .expect("replacement length"),
             expected
         );
+    }
+
+    #[test]
+    fn length_only_plan_includes_dependent_framing_and_checksum() {
+        let mut data = sample();
+        data.dependents = vec![Dependent {
+            part_uri: PackURI::new("/ppt/media/image1.png").expect("dependent URI"),
+            content_type: "image/png".into(),
+            before: Some(image(b"PNG-bytes", Some(b"<Relationships/>"))),
+            after: None,
+        }]
+        .into();
+        let changes = data
+            .changes
+            .iter()
+            .map(change_lengths)
+            .collect::<Result<Vec<_>>>()
+            .expect("change lengths");
+        let dependents = data
+            .dependents
+            .iter()
+            .map(dependent_lengths)
+            .collect::<Result<Vec<_>>>()
+            .expect("dependent lengths");
+        let measured = encoded_len_from_lengths(
+            &data.before.order,
+            &data.after.order,
+            state_lengths(&data.before),
+            state_lengths(&data.after),
+            &changes,
+            &dependents,
+        )
+        .expect("length-only topology plan");
+        assert_eq!(measured, data.encoded_len().expect("encoded topology wire"));
     }
 
     fn empty_transition() -> Data {

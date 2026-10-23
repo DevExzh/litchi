@@ -17,7 +17,7 @@ mod topology_wire;
 
 use std::io::Write;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::{Position, ReadAt, Reservation};
 use litchi_opc::constants::relationship_type as rt;
@@ -736,10 +736,23 @@ impl Package {
     }
 
     fn with_order(&self, root: RootPayload, order: Arc<[StableSlideKey]>) -> Result<Self> {
+        self.with_order_with_max_patch_bytes(
+            root,
+            order,
+            crate::opened::Limits::default().max_patch_bytes(),
+        )
+    }
+
+    fn with_order_with_max_patch_bytes(
+        &self,
+        root: RootPayload,
+        order: Arc<[StableSlideKey]>,
+        max_patch_bytes: usize,
+    ) -> Result<Self> {
         self.check()?;
         if self.topology.is_some() {
             let bytes = root.edited_bytes().ok_or(Error::PatchConflict)?;
-            return topology::reorder(self, bytes, order);
+            return topology::reorder(self, bytes, order, max_patch_bytes);
         }
         if order.len() != self.owner.slides.len() {
             return Err(Error::PatchConflict);
@@ -790,31 +803,42 @@ impl Package {
     /// that one move placed; it leaves its p14 section and joins its new
     /// neighbour's, as `PowerPoint` moves a slide. Without it every slide
     /// keeps its section and each section is re-sorted (record 0303).
-    fn stage_order(&self, ordered: Vec<StableSlideKey>, moved: Option<usize>) -> Result<Self> {
+    fn stage_order(
+        &self,
+        ordered: Vec<StableSlideKey>,
+        moved: Option<usize>,
+        max_patch_bytes: usize,
+        source: &Package,
+        changes: &[SourceBackedSlidePatch],
+        shape_removals: bool,
+    ) -> Result<Self> {
         self.check()?;
         let ordered: Arc<[StableSlideKey]> = ordered.into();
         if ordered == self.order {
             return Ok(self.clone());
         }
         if crate::opened::sections::present(self.root.as_bytes()) {
-            return self.stage_sectioned_order(ordered, moved);
+            return self.stage_sectioned_order(
+                ordered,
+                moved,
+                max_patch_bytes,
+                source,
+                changes,
+                shape_removals,
+            );
         }
         if self.topology.is_some() {
-            let _reservation = reserve_managed_output(
-                self.owner.package.execution_context().as_ref(),
-                self.root.as_bytes().len(),
-            )?;
             let xml = reorder_stable_bindings(
                 self.root.as_bytes(),
                 &self.order,
                 &ordered,
                 self.owner.package.execution_context().as_ref(),
             )?;
-            return topology::reorder(self, Arc::new(xml), ordered);
+            return topology::reorder(self, Arc::new(xml), ordered, max_patch_bytes);
         }
         let source_order = source_order(&self.owner)?;
         let source_xml = self.owner._presentation.source_data().as_bytes();
-        let root = if ordered.as_ref() == source_order.as_ref() {
+        let mut root = if ordered.as_ref() == source_order.as_ref() {
             RootPayload::Original(self.owner._presentation.source_data().clone())
         } else {
             validate_source_order_root(
@@ -824,25 +848,36 @@ impl Package {
                 &source_order,
                 self.owner.package.execution_context().as_ref(),
             )?;
-            let reservation = reserve_managed_output(
-                self.owner.package.execution_context().as_ref(),
-                source_xml.len(),
-            )?;
             let xml = reorder_stable_bindings(
                 source_xml,
                 &source_order,
                 &ordered,
                 self.owner.package.execution_context().as_ref(),
             )?;
-            match reservation {
+            RootPayload::Edited(Arc::new(xml))
+        };
+        self.check_local_order_patch_budget(
+            source,
+            &ordered,
+            root.as_bytes().len(),
+            changes,
+            shape_removals,
+            max_patch_bytes,
+        )?;
+        root = match root {
+            RootPayload::Edited(bytes) => match reserve_managed_output(
+                self.owner.package.execution_context().as_ref(),
+                bytes.len(),
+            )? {
                 Some(reservation) => RootPayload::ReservedEdit {
-                    bytes: Arc::new(xml),
+                    bytes,
                     _reservation: reservation,
                 },
-                None => RootPayload::Edited(Arc::new(xml)),
-            }
+                None => RootPayload::Edited(bytes),
+            },
+            root => root,
         };
-        self.with_order(root, ordered)
+        self.with_order_with_max_patch_bytes(root, ordered, max_patch_bytes)
     }
 
     /// Stage an order on a root with a p14 section list. Section membership
@@ -852,6 +887,10 @@ impl Package {
         &self,
         ordered: Arc<[StableSlideKey]>,
         moved: Option<usize>,
+        max_patch_bytes: usize,
+        source: &Package,
+        changes: &[SourceBackedSlidePatch],
+        shape_removals: bool,
     ) -> Result<Self> {
         let context = self.owner.package.execution_context();
         validate_source_order_root(
@@ -861,7 +900,6 @@ impl Package {
             &self.order,
             context.as_ref(),
         )?;
-        let reservation = reserve_managed_output(context.as_ref(), self.root.as_bytes().len())?;
         let xml = reorder_stable_bindings(
             self.root.as_bytes(),
             &self.order,
@@ -875,16 +913,66 @@ impl Package {
         };
         let xml = Arc::new(sectioned.unwrap_or(xml));
         if self.topology.is_some() {
-            return topology::reorder(self, xml, ordered);
+            return topology::reorder(self, xml, ordered, max_patch_bytes);
         }
-        let root = match reservation {
+        // The exact local durable envelope is admitted before its managed
+        // root reservation.  A rejected order therefore does not retain the
+        // newly generated root merely to discover that the patch ceiling was
+        // exceeded at commit.
+        self.check_local_order_patch_budget(
+            source,
+            &ordered,
+            xml.len(),
+            changes,
+            shape_removals,
+            max_patch_bytes,
+        )?;
+        let root = match reserve_managed_output(context.as_ref(), xml.len())? {
             Some(reservation) => RootPayload::ReservedEdit {
                 bytes: xml,
                 _reservation: reservation,
             },
             None => RootPayload::Edited(xml),
         };
-        self.with_order(root, ordered)
+        self.with_order_with_max_patch_bytes(root, ordered, max_patch_bytes)
+    }
+
+    fn check_local_order_patch_budget(
+        &self,
+        source: &Package,
+        order: &[StableSlideKey],
+        root_len: usize,
+        changes: &[SourceBackedSlidePatch],
+        shape_removals: bool,
+        max_patch_bytes: usize,
+    ) -> Result<()> {
+        let mut lengths = Vec::new();
+        lengths
+            .try_reserve_exact(changes.len())
+            .map_err(allocation)?;
+        for change in changes {
+            let key = source_key_for_position(source, change.before.position)?;
+            lengths.push((
+                key,
+                change.before.xml.as_bytes().len(),
+                change.after.xml.as_bytes().len(),
+            ));
+        }
+        let encoded = durable::local_wire_len(
+            shape_removals,
+            &source.order,
+            order,
+            source.root.as_bytes().len(),
+            root_len,
+            &lengths,
+        )?;
+        if encoded > max_patch_bytes {
+            return Err(limit(
+                "source-backed primary retained patch bytes",
+                max_patch_bytes,
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -1497,7 +1585,8 @@ impl Edit {
     pub fn insert_slide(&mut self, position: Position, layout_name: &str) -> Result<Slide> {
         self.working.check()?;
         let candidate =
-            topology::insert(&self.working, position, layout_name).map_err(insertion::map_error)?;
+            topology::insert(&self.working, position, layout_name, self.max_patch_bytes)
+                .map_err(insertion::map_error)?;
         let slide = candidate.presentation()?.slide(position)?;
         self.working = candidate;
         Ok(slide)
@@ -1526,10 +1615,20 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
+        let immutable_before = if self.working.topology.is_none() {
+            let physical = self.source.physical_position(&target_key)?;
+            Some(self.source.snapshot(physical)?)
+        } else {
+            None
+        };
+        let before_len = immutable_before
+            .as_ref()
+            .map(|before| before.xml.as_bytes().len())
+            .unwrap_or_else(|| snapshot.xml.as_bytes().len());
         let output_limit = if self.working.topology.is_some() {
             topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
         } else {
-            self.local_after_budget(&target_key, snapshot.xml.as_bytes().len())?
+            self.local_after_budget(&target_key, before_len)?
         };
         let mut edit = snapshot.edit_checked_with_max_patch_bytes(output_limit)?;
         let shape_id = edit.add_text_box(text, bounds)?;
@@ -1541,11 +1640,7 @@ impl Edit {
             ));
         }
         if self.working.topology.is_none() {
-            self.check_local_patch_budget(
-                &target_key,
-                snapshot.xml.as_bytes().len(),
-                after.xml.as_bytes().len(),
-            )?;
+            self.check_local_patch_budget(&target_key, before_len, after.xml.as_bytes().len())?;
         }
         let candidate = self
             .working
@@ -1554,8 +1649,7 @@ impl Edit {
             self.working = candidate;
             return Ok(shape_id);
         }
-        let physical = self.working.physical_position(&target_key)?;
-        let before = self.source.snapshot(physical)?;
+        let before = immutable_before.ok_or(Error::PatchConflict)?;
         let mut changes = Vec::new();
         changes
             .try_reserve_exact(self.changes.len() + 1)
@@ -1644,7 +1738,7 @@ impl Edit {
             });
         }
         let key = self.working.order[logical].clone();
-        let candidate = topology::remove(&self.working, &key)?;
+        let candidate = topology::remove(&self.working, &key, self.max_patch_bytes)?;
         self.working = candidate;
         Ok(true)
     }
@@ -1674,7 +1768,14 @@ impl Edit {
         let mut order = self.working.order.to_vec();
         let key = order.remove(from);
         order.insert(to, key);
-        let candidate = self.working.stage_order(order, Some(to))?;
+        let candidate = self.working.stage_order(
+            order,
+            Some(to),
+            self.max_patch_bytes,
+            &self.source,
+            &self.changes,
+            self.shape_removals,
+        )?;
         let changed = candidate.order != self.working.order;
         self.working = candidate;
         Ok(changed)
@@ -1703,7 +1804,14 @@ impl Edit {
         }
         let mut order = self.working.order.to_vec();
         order.swap(left, right);
-        let candidate = self.working.stage_order(order, None)?;
+        let candidate = self.working.stage_order(
+            order,
+            None,
+            self.max_patch_bytes,
+            &self.source,
+            &self.changes,
+            self.shape_removals,
+        )?;
         let changed = candidate.order != self.working.order;
         self.working = candidate;
         Ok(changed)
@@ -2111,10 +2219,20 @@ impl Edit {
             },
         )?;
         let snapshot = self.working.snapshot_logical(logical_position)?;
+        let immutable_before = if self.working.topology.is_none() {
+            let physical = self.source.physical_position(&target_key)?;
+            Some(self.source.snapshot(physical)?)
+        } else {
+            None
+        };
+        let before_len = immutable_before
+            .as_ref()
+            .map(|before| before.xml.as_bytes().len())
+            .unwrap_or_else(|| snapshot.xml.as_bytes().len());
         let output_limit = if self.working.topology.is_some() {
             topology::replacement_after_budget(&self.working, &target_key, self.max_patch_bytes)?
         } else {
-            self.local_after_budget(&target_key, snapshot.xml.as_bytes().len())?
+            self.local_after_budget(&target_key, before_len)?
         };
         let bounded_snapshot = snapshot.with_max_patch_bytes(output_limit);
         let reservation = reserve(&self.working, &bounded_snapshot)?;
@@ -2145,11 +2263,7 @@ impl Edit {
             }
         }
         if self.working.topology.is_none() {
-            self.check_local_patch_budget(
-                &target_key,
-                snapshot.xml.as_bytes().len(),
-                after.xml.as_bytes().len(),
-            )?;
+            self.check_local_patch_budget(&target_key, before_len, after.xml.as_bytes().len())?;
         }
         let candidate = self
             .working
@@ -2158,8 +2272,7 @@ impl Edit {
             self.working = candidate;
             return Ok(changed);
         }
-        let physical = self.working.physical_position(&target_key)?;
-        let before = self.source.snapshot(physical)?;
+        let before = immutable_before.ok_or(Error::PatchConflict)?;
         let mut changes = Vec::new();
         changes
             .try_reserve_exact(self.changes.len() + 1)
@@ -2266,6 +2379,7 @@ impl Edit {
             let patch = Patch {
                 shape_removals: self.shape_removals,
                 data: PatchData::Topology(Arc::new(topology_patch)),
+                encoded_len_cache: Arc::new(OnceLock::new()),
             };
             let encoded = patch.encoded_len()?;
             if encoded > max_patch_bytes {
@@ -2283,6 +2397,32 @@ impl Edit {
         let before_order = source.order.clone();
         let after_root = self.working.root.clone();
         let after_order = self.working.order.clone();
+        let mut lengths = Vec::new();
+        lengths
+            .try_reserve_exact(self.changes.len())
+            .map_err(allocation)?;
+        for change in &self.changes {
+            let key = source_key_for_position(&source, change.before.position)?;
+            lengths.push((
+                key,
+                change.before.xml.as_bytes().len(),
+                change.after.xml.as_bytes().len(),
+            ));
+        }
+        let encoded = durable::local_wire_len(
+            self.shape_removals,
+            &before_order,
+            &after_order,
+            before_root.as_bytes().len(),
+            after_root.as_bytes().len(),
+            &lengths,
+        )?;
+        if encoded > max_patch_bytes {
+            return Err(limit(
+                "source-backed primary retained patch bytes",
+                max_patch_bytes,
+            ));
+        }
         let patch = Patch {
             shape_removals: self.shape_removals,
             data: PatchData::Local {
@@ -2293,14 +2433,8 @@ impl Edit {
                 after_order,
                 changes: self.changes.into(),
             },
+            encoded_len_cache: Arc::new(OnceLock::from(encoded)),
         };
-        let encoded = patch.encoded_len()?;
-        if encoded > max_patch_bytes {
-            return Err(limit(
-                "source-backed primary retained patch bytes",
-                max_patch_bytes,
-            ));
-        }
         Ok(commit_of(self.working, patch))
     }
 }
@@ -2310,6 +2444,7 @@ impl Edit {
 pub struct Patch {
     data: PatchData,
     shape_removals: bool,
+    encoded_len_cache: Arc<OnceLock<usize>>,
 }
 #[derive(Clone)]
 enum PatchData {
@@ -2382,6 +2517,7 @@ impl Patch {
         Self {
             data,
             shape_removals: self.shape_removals,
+            encoded_len_cache: Arc::clone(&self.encoded_len_cache),
         }
     }
 }

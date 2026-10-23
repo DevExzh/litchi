@@ -10,8 +10,7 @@
 //! ZIP from which the slide Part is physically absent.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::{Position, Reservation, Resource};
 use litchi_opc::xml_splice::authored_xml_requires_source_proof;
@@ -24,7 +23,10 @@ use super::super::{
     PartBinding, RelationshipBinding, SlideBinding, SourceBackedSlideSnapshot, SourcePayload,
 };
 use super::topology_digest;
-use super::topology_wire::{Change, Data, Dependent, ImageLengths, PartImage, State};
+use super::topology_wire::{
+    Change, ChangeLengths, Data, Dependent, DependentLengths, ImageLengths, PartImage, State,
+    StateLengths,
+};
 use super::{Package, RootPayload, allocation, limit};
 use crate::presentation::order::{StableSlideKey, stable_slide_key};
 use crate::{Error, Result};
@@ -41,6 +43,7 @@ pub(super) struct Patch {
     pub(super) data: Data,
     pub(super) prepared: Option<PreparedTopology>,
     pub(super) retained: Arc<Retention>,
+    encoded_len_cache: Arc<OnceLock<usize>>,
 }
 
 impl Patch {
@@ -49,6 +52,7 @@ impl Patch {
             data,
             prepared: None,
             retained: Arc::new(Retention::default()),
+            encoded_len_cache: Arc::new(OnceLock::new()),
         }
     }
 
@@ -57,6 +61,7 @@ impl Patch {
             data: self.data.inverse(),
             prepared: self.prepared.clone(),
             retained: Arc::clone(&self.retained),
+            encoded_len_cache: Arc::clone(&self.encoded_len_cache),
         }
     }
 
@@ -64,16 +69,22 @@ impl Patch {
         self.data.is_noop()
     }
 
-    pub(super) fn encoded_len(&self) -> Result<usize> {
+    pub(super) fn check(&self) -> Result<()> {
         if let Some(prepared) = &self.prepared {
             prepared.check_source()?;
             prepared.check_execution()?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn encoded_len(&self) -> Result<usize> {
+        self.check()?;
+        if let Some(length) = self.encoded_len_cache.get() {
+            return Ok(*length);
         }
         let length = self.data.encoded_len()?;
-        if let Some(prepared) = &self.prepared {
-            prepared.check_source()?;
-            prepared.check_execution()?;
-        }
+        self.check()?;
+        let _ = self.encoded_len_cache.set(length);
         Ok(length)
     }
 
@@ -120,16 +131,169 @@ pub(super) struct Retention {
     pub(super) prepared_metadata: Vec<PreparedMetadataData>,
     pub(super) reservations: Vec<Arc<Reservation>>,
     pub(super) source_xml: Vec<litchi_opc::SourceXmlPart>,
-    /// Optional preflight charge shared while a durable topology patch is
-    /// being captured.  It counts source/relationship payload bytes before
-    /// each owned copy, so a patch that cannot fit never materializes its
-    /// complete retained image merely to discover the limit at encoding.
-    wire_budget: Option<Arc<WireBudget>>,
 }
 
-struct WireBudget {
-    used: AtomicUsize,
-    maximum: usize,
+#[derive(Clone)]
+enum SourceSpec {
+    Part(PackURI),
+    Relationships(PackURI),
+    ContentTypes,
+}
+
+#[derive(Clone)]
+enum PlannedBytes {
+    Source(PartData),
+    Declared {
+        spec: SourceSpec,
+        length: usize,
+    },
+    Length(usize),
+    Owned {
+        bytes: Arc<Vec<u8>>,
+        reservation: Option<Arc<Reservation>>,
+    },
+}
+
+impl PlannedBytes {
+    fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Source(data) => data.as_bytes(),
+            Self::Declared { .. } => &[],
+            Self::Length(_) => &[],
+            Self::Owned { bytes, .. } => bytes.as_slice(),
+        }
+    }
+
+    fn lengths(&self) -> usize {
+        match self {
+            Self::Declared { length, .. } => *length,
+            Self::Length(length) => *length,
+            _ => self.as_bytes().len(),
+        }
+    }
+
+    fn same(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Declared { spec: left, .. }, Self::Declared { spec: right, .. }) => {
+                source_spec_equal(left, right)
+            },
+            (Self::Source(left), Self::Source(right)) => left.as_bytes() == right.as_bytes(),
+            (Self::Owned { bytes: left, .. }, Self::Owned { bytes: right, .. }) => {
+                left.as_slice() == right.as_slice()
+            },
+            _ => self.as_bytes() == other.as_bytes() && self.lengths() == other.lengths(),
+        }
+    }
+}
+
+fn source_spec_equal(left: &SourceSpec, right: &SourceSpec) -> bool {
+    match (left, right) {
+        (SourceSpec::Part(left), SourceSpec::Part(right))
+        | (SourceSpec::Relationships(left), SourceSpec::Relationships(right)) => left == right,
+        (SourceSpec::ContentTypes, SourceSpec::ContentTypes) => true,
+        _ => false,
+    }
+}
+
+#[derive(Clone)]
+struct PlannedImage {
+    xml: PlannedBytes,
+    relationships: Option<PlannedBytes>,
+}
+
+impl PlannedImage {
+    fn same(&self, other: &Self) -> bool {
+        self.xml.same(&other.xml)
+            && match (&self.relationships, &other.relationships) {
+                (None, None) => true,
+                (Some(left), Some(right)) => left.same(right),
+                _ => false,
+            }
+    }
+
+    fn lengths(&self) -> ImageLengths {
+        ImageLengths {
+            xml: self.xml.lengths(),
+            relationships: self.relationships.as_ref().map(PlannedBytes::lengths),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct PlannedState {
+    root: PlannedBytes,
+    order: Arc<[StableSlideKey]>,
+    topology_digest: [u8; 32],
+    presentation_relationships: PlannedBytes,
+    content_types: PlannedBytes,
+}
+
+impl PlannedState {
+    fn lengths(&self) -> StateLengths {
+        StateLengths {
+            root: self.root.lengths(),
+            presentation_relationships: self.presentation_relationships.lengths(),
+            content_types: self.content_types.lengths(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct PlannedChange {
+    key: StableSlideKey,
+    content_type: String,
+    relationship_type: String,
+    before: Option<PlannedImage>,
+    after: Option<PlannedImage>,
+}
+
+#[derive(Clone)]
+pub(super) struct PlannedDependent {
+    part_uri: PackURI,
+    content_type: String,
+    before: Option<PlannedImage>,
+    after: Option<PlannedImage>,
+}
+
+struct PatchPlan {
+    before: PlannedState,
+    after: PlannedState,
+    changes: Vec<PlannedChange>,
+    dependents: Vec<PlannedDependent>,
+}
+
+impl PatchPlan {
+    fn encoded_len(&self) -> Result<usize> {
+        let changes = self
+            .changes
+            .iter()
+            .map(|change| ChangeLengths {
+                key: change.key.clone(),
+                content_type: change.content_type.clone(),
+                relationship_type: change.relationship_type.clone(),
+                before: change.before.as_ref().map(PlannedImage::lengths),
+                after: change.after.as_ref().map(PlannedImage::lengths),
+            })
+            .collect::<Vec<_>>();
+        let dependents = self
+            .dependents
+            .iter()
+            .map(|dependent| DependentLengths {
+                part_uri: dependent.part_uri.clone(),
+                content_type: dependent.content_type.clone(),
+                before: dependent.before.as_ref().map(PlannedImage::lengths),
+                after: dependent.after.as_ref().map(PlannedImage::lengths),
+            })
+            .collect::<Vec<_>>();
+        super::topology_wire::encoded_len_from_lengths(
+            &self.before.order,
+            &self.after.order,
+            self.before.lengths(),
+            self.after.lengths(),
+            &changes,
+            &dependents,
+        )
+    }
 }
 
 impl Revision {
@@ -234,7 +398,11 @@ impl Revision {
 /// final target from the currently staged root/order and rebuilds one prepared
 /// topology, so previous order and text edits remain part of the same atomic
 /// candidate.
-pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package> {
+pub(super) fn remove(
+    package: &Package,
+    key: &StableSlideKey,
+    max_patch_bytes: usize,
+) -> Result<Package> {
     package.check()?;
     let logical = package
         .order
@@ -249,7 +417,6 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
     }
     validate_removal_admission(package, key, false, false)?;
 
-    let _root_reservation = reserve_payload(package, package.root.as_bytes().len())?;
     let bindings = package
         .order
         .iter()
@@ -262,6 +429,42 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
     )?;
     let mut order = package.order.to_vec();
     order.remove(logical);
+    let mut planned_changes = planned_current_changes(package)?;
+    upsert_planned_change(&mut planned_changes, planned_remove_change(package, key)?);
+    let mut planned_dependents = planned_current_dependents(package);
+    for part_uri in owned_parts(package, std::slice::from_ref(&key.part_uri))?.parts() {
+        let (before, content_type) = match planned_physical_dependent(package, part_uri)? {
+            Some((image, content_type)) => (Some(image), content_type),
+            None => {
+                let existing = planned_dependents
+                    .iter()
+                    .find(|dependent| dependent.part_uri.is_equivalent_to(part_uri))
+                    .ok_or(Error::PatchConflict)?;
+                (
+                    existing.after.clone().or_else(|| existing.before.clone()),
+                    existing.content_type.clone(),
+                )
+            },
+        };
+        upsert_planned_dependent(
+            &mut planned_dependents,
+            PlannedDependent {
+                part_uri: part_uri.clone(),
+                content_type,
+                before,
+                after: None,
+            },
+        );
+    }
+    preflight_candidate(
+        package,
+        &root,
+        order.clone().into(),
+        Some(&planned_changes),
+        Some(&planned_dependents),
+        max_patch_bytes,
+    )?;
+    let _root_reservation = reserve_payload(package, root.len())?;
     let mut retained = Retention::default();
     let mut changes = current_changes(package, &mut retained)?;
     let physical = physical_image(package, key, &mut retained)?;
@@ -331,10 +534,15 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
 /// root, source-policy, and identity admission; this function composes its
 /// root/order/change with every earlier structural or slide-text revision and
 /// prepares one typed OPC candidate.
-pub(super) fn insert(package: &Package, position: Position, layout_name: &str) -> Result<Package> {
+pub(super) fn insert(
+    package: &Package,
+    position: Position,
+    layout_name: &str,
+    max_patch_bytes: usize,
+) -> Result<Package> {
     package.check()?;
     let (root, order, change, insertion_reservation) =
-        super::insertion::plan(package, position, layout_name)?;
+        super::insertion::plan(package, position, layout_name, Some(max_patch_bytes))?;
     let mut retained = Retention::default();
     if let Some(reservation) = insertion_reservation {
         retained.reservations.push(reservation);
@@ -358,15 +566,32 @@ pub(super) fn reorder(
     package: &Package,
     root: Arc<Vec<u8>>,
     order: Arc<[StableSlideKey]>,
+    max_patch_bytes: usize,
 ) -> Result<Package> {
     let revision = package.topology.as_ref().ok_or(Error::PatchConflict)?;
-    let revision = build_revision(
+    preflight_candidate(
+        package,
+        &root,
+        Arc::clone(&order),
+        None,
+        None,
+        max_patch_bytes,
+    )?;
+    let mut retained = Retention::default();
+    if let Some(reservation) = super::reserve_managed_output(
+        package.owner.package.execution_context().as_ref(),
+        root.len(),
+    )? {
+        retained.reservations.push(reservation);
+    }
+    let revision = build_revision_with_retention(
         package,
         root,
         order,
         Arc::clone(&revision.data.changes),
         Arc::clone(&revision.data.dependents),
         Some(&revision.data.after),
+        retained,
     )?;
     package_from_revision(package, revision)
 }
@@ -399,8 +624,9 @@ pub(super) fn replace_snapshot(
                     .and_then(|image| image.relationships.as_ref().map(|bytes| bytes.len())),
             )
         } else {
-            let (image_lengths, content_type, relationship_type) =
-                physical_image_lengths(package, &key)?.ok_or(Error::PatchConflict)?;
+            let (image, content_type, relationship_type) =
+                planned_physical_image(package, &key)?.ok_or(Error::PatchConflict)?;
+            let image_lengths = image.lengths();
             (
                 Some(image_lengths),
                 content_type,
@@ -426,20 +652,21 @@ pub(super) fn replace_snapshot(
         ));
     }
     let mut seed = Retention::default();
-    let relationships = match existing.as_ref().and_then(|change| change.after.as_ref()) {
-        Some(image) => image.relationships.clone(),
-        None => {
-            physical_image(package, &key, &mut seed)?
-                .ok_or(Error::PatchConflict)?
-                .0
-                .relationships
-        },
-    };
-    let (content_type, relationship_type, before) = if let Some(change) = existing {
-        (change.content_type, change.relationship_type, change.before)
+    let (content_type, relationship_type, before, relationships) = if let Some(change) = existing {
+        (
+            change.content_type,
+            change.relationship_type,
+            change.before,
+            change.after.and_then(|image| image.relationships),
+        )
     } else {
         let image = physical_image(package, &key, &mut seed)?.ok_or(Error::PatchConflict)?;
-        (image.1, image.2, Some(image.0))
+        (
+            image.1,
+            image.2,
+            Some(image.0.clone()),
+            image.0.relationships,
+        )
     };
     let xml = match snapshot.xml {
         SourcePayload::Original(data) => copy_state_bytes(package, data.as_bytes(), &mut seed)?,
@@ -472,7 +699,7 @@ pub(super) fn replace_snapshot(
         Some(&revision.data.after),
         seed,
     )?;
-    if revision.data.encoded_len()? > max_patch_bytes {
+    if super::topology_wire::encoded_len_from_data(&revision.data)? > max_patch_bytes {
         return Err(limit(
             "source-backed primary retained patch bytes",
             max_patch_bytes,
@@ -508,8 +735,9 @@ pub(super) fn replacement_after_budget(
                     .and_then(|image| image.relationships.as_ref().map(|bytes| bytes.len())),
             )
         } else {
-            let (image_lengths, content_type, relationship_type) =
-                physical_image_lengths(package, key)?.ok_or(Error::PatchConflict)?;
+            let (image, content_type, relationship_type) =
+                planned_physical_image(package, key)?.ok_or(Error::PatchConflict)?;
+            let image_lengths = image.lengths();
             (
                 Some(image_lengths),
                 content_type,
@@ -535,6 +763,683 @@ pub(super) fn replacement_after_budget(
     })
 }
 
+fn plan_patch(source: &Package, target: &Package) -> Result<PatchPlan> {
+    let source_changes = planned_current_changes(source)?;
+    let target_changes = planned_current_changes(target)?;
+    let changes = planned_diff_changes(source, target, source_changes, target_changes)?;
+    let dependents = planned_diff_dependents(source, target)?;
+    Ok(PatchPlan {
+        before: planned_state(source)?,
+        after: planned_state(target)?,
+        changes,
+        dependents,
+    })
+}
+
+fn preflight_candidate(
+    package: &Package,
+    root: &[u8],
+    order: Arc<[StableSlideKey]>,
+    candidate_changes: Option<&[PlannedChange]>,
+    candidate_dependents: Option<&[PlannedDependent]>,
+    max_patch_bytes: usize,
+) -> Result<usize> {
+    let source_changes = planned_current_changes(package)?;
+    let target_changes = match candidate_changes {
+        Some(changes) => changes.to_vec(),
+        None => source_changes.clone(),
+    };
+    let changes = planned_diff_changes(package, package, source_changes, target_changes)?;
+    let source_dependents = planned_current_dependents(package);
+    let target_dependents = match candidate_dependents {
+        Some(dependents) => dependents.to_vec(),
+        None => source_dependents.clone(),
+    };
+    let dependents =
+        planned_diff_dependents_from_entries(package, source_dependents, target_dependents)?;
+    let before = planned_state(package)?;
+    let mut after = before.clone();
+    after.root = PlannedBytes::Length(root.len());
+    after.order = order;
+    let plan = PatchPlan {
+        before,
+        after,
+        changes,
+        dependents,
+    };
+    let encoded = plan.encoded_len()?;
+    if encoded > max_patch_bytes {
+        return Err(limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        ));
+    }
+    Ok(encoded)
+}
+
+pub(super) fn planned_change_for_admission(change: &Change) -> Result<PlannedChange> {
+    planned_change(change)
+}
+
+pub(super) fn planned_current_changes_for_admission(
+    package: &Package,
+) -> Result<Vec<PlannedChange>> {
+    planned_current_changes(package)
+}
+
+pub(super) fn planned_current_dependents_for_admission(package: &Package) -> Vec<PlannedDependent> {
+    planned_current_dependents(package)
+}
+
+pub(super) fn preflight_candidate_for_admission(
+    package: &Package,
+    root: &[u8],
+    order: Arc<[StableSlideKey]>,
+    changes: &[PlannedChange],
+    dependents: &[PlannedDependent],
+    max_patch_bytes: usize,
+) -> Result<usize> {
+    preflight_candidate(
+        package,
+        root,
+        order,
+        Some(changes),
+        Some(dependents),
+        max_patch_bytes,
+    )
+}
+
+fn planned_state(package: &Package) -> Result<PlannedState> {
+    if let Some(revision) = &package.topology {
+        revision.check()?;
+        return Ok(PlannedState {
+            root: PlannedBytes::Owned {
+                bytes: Arc::clone(&revision.data.after.root),
+                reservation: None,
+            },
+            order: Arc::clone(&revision.data.after.order),
+            topology_digest: revision.data.after.topology_digest,
+            presentation_relationships: PlannedBytes::Owned {
+                bytes: Arc::clone(&revision.data.after.presentation_relationships),
+                reservation: None,
+            },
+            content_types: PlannedBytes::Owned {
+                bytes: Arc::clone(&revision.data.after.content_types),
+                reservation: None,
+            },
+        });
+    }
+    let (presentation_relationships, content_types) = planned_source_metadata(package)?;
+    Ok(PlannedState {
+        root: planned_root(&package.root),
+        order: Arc::clone(&package.order),
+        topology_digest: topology_digest::source_digest(&package.owner.package)?,
+        presentation_relationships,
+        content_types,
+    })
+}
+
+fn planned_root(root: &RootPayload) -> PlannedBytes {
+    match root {
+        RootPayload::Original(data) => PlannedBytes::Source(data.clone()),
+        RootPayload::Edited(bytes) => PlannedBytes::Owned {
+            bytes: Arc::clone(bytes),
+            reservation: None,
+        },
+        RootPayload::ReservedEdit {
+            bytes,
+            _reservation,
+        } => PlannedBytes::Owned {
+            bytes: Arc::clone(bytes),
+            reservation: Some(Arc::clone(_reservation)),
+        },
+    }
+}
+
+fn planned_source_payload(payload: &SourcePayload) -> PlannedBytes {
+    match payload {
+        SourcePayload::Original(data) => PlannedBytes::Source(data.clone()),
+        SourcePayload::Edited(bytes) => PlannedBytes::Owned {
+            bytes: Arc::clone(bytes),
+            reservation: None,
+        },
+        SourcePayload::ReservedEdit { bytes, reservation } => PlannedBytes::Owned {
+            bytes: Arc::clone(bytes),
+            reservation: Some(Arc::clone(reservation)),
+        },
+    }
+}
+
+fn declared_bytes(package: &Package, spec: SourceSpec) -> Result<PlannedBytes> {
+    let length = match &spec {
+        SourceSpec::Part(uri) => package
+            .owner
+            .package
+            .part(uri)?
+            .declared_uncompressed_size()?,
+        SourceSpec::Relationships(uri) => package
+            .owner
+            .package
+            .declared_relationships_uncompressed_size(uri)?
+            .ok_or(Error::PatchConflict)?,
+        SourceSpec::ContentTypes => package
+            .owner
+            .package
+            .declared_content_types_uncompressed_size()?,
+    };
+    declared_bytes_with_length(spec, length)
+}
+
+fn declared_bytes_with_length(spec: SourceSpec, length: u64) -> Result<PlannedBytes> {
+    let length = usize::try_from(length)
+        .map_err(|_| limit("source-backed primary retained patch bytes", usize::MAX))?;
+    Ok(PlannedBytes::Declared { spec, length })
+}
+
+fn planned_source_metadata(package: &Package) -> Result<(PlannedBytes, PlannedBytes)> {
+    let root = package.owner._presentation.source_partname();
+    Ok((
+        declared_bytes(package, SourceSpec::Relationships(root.clone()))?,
+        declared_bytes(package, SourceSpec::ContentTypes)?,
+    ))
+}
+
+fn planned_current_changes(package: &Package) -> Result<Vec<PlannedChange>> {
+    if let Some(revision) = &package.topology {
+        return revision.data.changes.iter().map(planned_change).collect();
+    }
+    let mut changes = Vec::new();
+    for snapshot in package.overlays.iter() {
+        let key = super::source_key_for_position(package, snapshot.position)?;
+        let (before, content_type, relationship_type) =
+            planned_physical_image(package, &key)?.ok_or(Error::PatchConflict)?;
+        changes.push(PlannedChange {
+            key,
+            content_type,
+            relationship_type,
+            before: Some(before.clone()),
+            after: Some(PlannedImage {
+                xml: planned_source_payload(&snapshot.xml),
+                relationships: before.relationships,
+            }),
+        });
+    }
+    Ok(changes)
+}
+
+fn planned_change(change: &Change) -> Result<PlannedChange> {
+    Ok(PlannedChange {
+        key: change.key.clone(),
+        content_type: change.content_type.clone(),
+        relationship_type: change.relationship_type.clone(),
+        before: change.before.as_ref().map(planned_image),
+        after: change.after.as_ref().map(planned_image),
+    })
+}
+
+fn planned_image(image: &PartImage) -> PlannedImage {
+    PlannedImage {
+        xml: PlannedBytes::Owned {
+            bytes: Arc::clone(&image.xml),
+            reservation: None,
+        },
+        relationships: image
+            .relationships
+            .as_ref()
+            .map(|bytes| PlannedBytes::Owned {
+                bytes: Arc::clone(bytes),
+                reservation: None,
+            }),
+    }
+}
+
+fn planned_physical_image(
+    package: &Package,
+    key: &StableSlideKey,
+) -> Result<Option<(PlannedImage, String, String)>> {
+    let Some(slide) = package.owner.slides.iter().find(|slide| {
+        stable_slide_key(
+            slide.part_uri.clone(),
+            slide.slide_id,
+            slide.binding.slide_reference_id.clone(),
+        ) == *key
+    }) else {
+        return Ok(None);
+    };
+    let relationships_length = package
+        .owner
+        .package
+        .declared_relationships_uncompressed_size(&slide.part_uri)?;
+    Ok(Some((
+        PlannedImage {
+            xml: declared_bytes(package, SourceSpec::Part(slide.part_uri.clone()))?,
+            relationships: relationships_length
+                .map(|length| {
+                    declared_bytes_with_length(
+                        SourceSpec::Relationships(slide.part_uri.clone()),
+                        length,
+                    )
+                })
+                .transpose()?,
+        },
+        slide.binding.slide.content_type.clone(),
+        slide.binding.presentation_relationship.kind.clone(),
+    )))
+}
+
+fn planned_effective_image(
+    package: &Package,
+    key: &StableSlideKey,
+) -> Result<Option<PlannedImage>> {
+    if let Some(revision) = &package.topology {
+        if let Some(change) = revision
+            .data
+            .changes
+            .iter()
+            .find(|change| &change.key == key)
+        {
+            return Ok(change.after.as_ref().map(planned_image));
+        }
+    }
+    if !package.order.iter().any(|candidate| candidate == key) {
+        return Ok(None);
+    }
+    let Some((physical, _, _)) = planned_physical_image(package, key)? else {
+        return Ok(None);
+    };
+    let Some(physical_position) = package.physical.get(key).copied() else {
+        return Ok(Some(physical));
+    };
+    if let Some(snapshot) = package
+        .overlays
+        .iter()
+        .find(|snapshot| snapshot.position == physical_position)
+    {
+        return Ok(Some(PlannedImage {
+            xml: planned_source_payload(&snapshot.xml),
+            relationships: physical.relationships,
+        }));
+    }
+    Ok(Some(physical))
+}
+
+fn planned_diff_changes(
+    source: &Package,
+    target: &Package,
+    source_changes: Vec<PlannedChange>,
+    target_changes: Vec<PlannedChange>,
+) -> Result<Vec<PlannedChange>> {
+    let mut source_map = HashMap::new();
+    let mut target_map = HashMap::new();
+    for change in source_changes {
+        source_map.insert(change.key.clone(), change);
+    }
+    for change in target_changes {
+        target_map.insert(change.key.clone(), change);
+    }
+    let mut keys = HashSet::new();
+    keys.extend(source_map.keys().cloned());
+    keys.extend(target_map.keys().cloned());
+    let mut changes = Vec::new();
+    for key in keys {
+        let source_change = source_map.get(&key);
+        let target_change = target_map.get(&key);
+        let before = match source_change {
+            Some(change) => change.after.clone(),
+            None => planned_effective_image(source, &key)?,
+        };
+        let after = match target_change {
+            Some(change) => change.after.clone(),
+            None => planned_effective_image(target, &key)?,
+        };
+        let equal = match (&before, &after) {
+            (None, None) => true,
+            (Some(left), Some(right)) => left.same(right),
+            _ => false,
+        };
+        if equal {
+            continue;
+        }
+        let metadata = target_change
+            .or(source_change)
+            .ok_or(Error::PatchConflict)?;
+        changes.push(PlannedChange {
+            key,
+            content_type: metadata.content_type.clone(),
+            relationship_type: metadata.relationship_type.clone(),
+            before,
+            after,
+        });
+    }
+    changes.sort_unstable_by(|left, right| {
+        left.key
+            .part_uri
+            .as_str()
+            .cmp(right.key.part_uri.as_str())
+            .then(left.key.slide_id.cmp(&right.key.slide_id))
+            .then(left.key.relationship_id.cmp(&right.key.relationship_id))
+    });
+    Ok(changes)
+}
+
+fn planned_current_dependents(package: &Package) -> Vec<PlannedDependent> {
+    package
+        .topology
+        .as_ref()
+        .map(|revision| {
+            revision
+                .data
+                .dependents
+                .iter()
+                .map(|dependent| PlannedDependent {
+                    part_uri: dependent.part_uri.clone(),
+                    content_type: dependent.content_type.clone(),
+                    before: dependent.before.as_ref().map(planned_image),
+                    after: dependent.after.as_ref().map(planned_image),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn planned_remove_change(package: &Package, key: &StableSlideKey) -> Result<PlannedChange> {
+    let physical = planned_physical_image(package, key)?;
+    let existing = planned_current_changes(package)?
+        .into_iter()
+        .find(|change| &change.key == key);
+    let (before, content_type, relationship_type) = match physical {
+        Some((image, content_type, relationship_type)) => {
+            (Some(image), content_type, relationship_type)
+        },
+        None => {
+            let existing = existing.ok_or(Error::PatchConflict)?;
+            (
+                existing.after.clone().or_else(|| existing.before.clone()),
+                existing.content_type,
+                existing.relationship_type,
+            )
+        },
+    };
+    Ok(PlannedChange {
+        key: key.clone(),
+        content_type,
+        relationship_type,
+        before,
+        after: None,
+    })
+}
+
+fn upsert_planned_change(changes: &mut Vec<PlannedChange>, change: PlannedChange) {
+    changes.retain(|existing| existing.key != change.key);
+    let equal = match (&change.before, &change.after) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left.same(right),
+        _ => false,
+    };
+    if !equal {
+        changes.push(change);
+    }
+    changes.sort_unstable_by(|left, right| {
+        left.key
+            .part_uri
+            .as_str()
+            .cmp(right.key.part_uri.as_str())
+            .then(left.key.slide_id.cmp(&right.key.slide_id))
+            .then(left.key.relationship_id.cmp(&right.key.relationship_id))
+    });
+}
+
+fn upsert_planned_dependent(dependents: &mut Vec<PlannedDependent>, dependent: PlannedDependent) {
+    dependents.retain(|existing| !existing.part_uri.is_equivalent_to(&dependent.part_uri));
+    let equal = match (&dependent.before, &dependent.after) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left.same(right),
+        _ => false,
+    };
+    if !equal {
+        dependents.push(dependent);
+    }
+    dependents.sort_unstable_by_key(|dependent| dependent.part_uri.as_str().to_ascii_lowercase());
+}
+
+fn planned_physical_dependent(
+    package: &Package,
+    part_uri: &PackURI,
+) -> Result<Option<(PlannedImage, String)>> {
+    let view = match package.owner.package.part(part_uri) {
+        Ok(view) => view,
+        Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(None),
+        Err(error) => return Err(Error::Opc(error)),
+    };
+    let relationships_length = package
+        .owner
+        .package
+        .declared_relationships_uncompressed_size(part_uri)?;
+    Ok(Some((
+        PlannedImage {
+            xml: declared_bytes(package, SourceSpec::Part(part_uri.clone()))?,
+            relationships: relationships_length
+                .map(|length| {
+                    declared_bytes_with_length(SourceSpec::Relationships(part_uri.clone()), length)
+                })
+                .transpose()?,
+        },
+        view.content_type().to_owned(),
+    )))
+}
+
+fn planned_effective_dependent(
+    package: &Package,
+    part_uri: &PackURI,
+) -> Result<Option<PlannedImage>> {
+    if let Some(revision) = &package.topology {
+        if let Some(dependent) = revision
+            .data
+            .dependents
+            .iter()
+            .find(|dependent| dependent.part_uri.is_equivalent_to(part_uri))
+        {
+            return Ok(dependent.after.as_ref().map(planned_image));
+        }
+    }
+    Ok(planned_physical_dependent(package, part_uri)?.map(|(image, _)| image))
+}
+
+fn planned_diff_dependents(source: &Package, target: &Package) -> Result<Vec<PlannedDependent>> {
+    let source_entries = planned_current_dependents(source);
+    let target_entries = planned_current_dependents(target);
+    planned_diff_dependents_from_entries(source, source_entries, target_entries)
+}
+
+fn planned_dependent(dependent: &Dependent) -> PlannedDependent {
+    PlannedDependent {
+        part_uri: dependent.part_uri.clone(),
+        content_type: dependent.content_type.clone(),
+        before: dependent.before.as_ref().map(planned_image),
+        after: dependent.after.as_ref().map(planned_image),
+    }
+}
+
+fn planned_diff_dependents_from_entries(
+    package: &Package,
+    source_entries: Vec<PlannedDependent>,
+    target_entries: Vec<PlannedDependent>,
+) -> Result<Vec<PlannedDependent>> {
+    let mut entries = Vec::new();
+    let mut seen = HashSet::new();
+    for entry in source_entries.iter().chain(target_entries.iter()) {
+        if !seen.insert(entry.part_uri.as_str().to_ascii_lowercase()) {
+            continue;
+        }
+        let before = planned_effective_dependent(package, &entry.part_uri)?;
+        let after = if let Some(dependent) = target_entries
+            .iter()
+            .find(|dependent| dependent.part_uri.is_equivalent_to(&entry.part_uri))
+        {
+            dependent.after.clone()
+        } else {
+            before.clone()
+        };
+        let equal = match (&before, &after) {
+            (None, None) => true,
+            (Some(left), Some(right)) => left.same(right),
+            _ => false,
+        };
+        if equal {
+            continue;
+        }
+        let metadata = target_entries
+            .iter()
+            .find(|candidate| candidate.part_uri.is_equivalent_to(&entry.part_uri))
+            .or_else(|| {
+                source_entries
+                    .iter()
+                    .find(|candidate| candidate.part_uri.is_equivalent_to(&entry.part_uri))
+            })
+            .ok_or(Error::PatchConflict)?;
+        entries.push(PlannedDependent {
+            part_uri: entry.part_uri.clone(),
+            content_type: metadata.content_type.clone(),
+            before,
+            after,
+        });
+    }
+    entries.sort_unstable_by_key(|dependent| dependent.part_uri.as_str().to_ascii_lowercase());
+    Ok(entries)
+}
+
+fn materialize_bytes(
+    package: &Package,
+    planned: &PlannedBytes,
+    retained: &mut Retention,
+    metadata: bool,
+) -> Result<Arc<Vec<u8>>> {
+    match planned {
+        PlannedBytes::Source(data) => {
+            let copied = copy_state_bytes(package, data.as_bytes(), retained)?;
+            if metadata {
+                retained.source_metadata.push(data.clone());
+            } else {
+                retained.source_parts.push(data.clone());
+            }
+            Ok(copied)
+        },
+        PlannedBytes::Declared { spec, .. } => {
+            let data = match spec {
+                SourceSpec::Part(uri) => {
+                    let data = package.owner.package.part(uri)?.data()?;
+                    retained.source_parts.push(data.clone());
+                    data
+                },
+                SourceSpec::Relationships(uri) => {
+                    let data = package
+                        .owner
+                        .package
+                        .relationships_data_for_with_limit(
+                            uri,
+                            package.owner.limits.max_relationship_xml_bytes(),
+                        )?
+                        .ok_or(Error::PatchConflict)?;
+                    retained.source_metadata.push(data.clone());
+                    data
+                },
+                SourceSpec::ContentTypes => {
+                    let data = package.owner.package.content_types_data_with_limit(
+                        package.owner.limits.max_content_types_bytes(),
+                    )?;
+                    retained.source_metadata.push(data.clone());
+                    data
+                },
+            };
+            copy_state_bytes(package, data.as_bytes(), retained)
+        },
+        PlannedBytes::Length(_) => Err(Error::PatchConflict),
+        PlannedBytes::Owned { bytes, reservation } => {
+            if let Some(reservation) = reservation {
+                retained.reservations.push(Arc::clone(reservation));
+            }
+            Ok(Arc::clone(bytes))
+        },
+    }
+}
+
+fn materialize_state(
+    package: &Package,
+    planned: &PlannedState,
+    retained: &mut Retention,
+) -> Result<State> {
+    Ok(State {
+        root: materialize_bytes(package, &planned.root, retained, false)?,
+        order: Arc::clone(&planned.order),
+        topology_digest: planned.topology_digest,
+        presentation_relationships: materialize_bytes(
+            package,
+            &planned.presentation_relationships,
+            retained,
+            true,
+        )?,
+        content_types: materialize_bytes(package, &planned.content_types, retained, true)?,
+    })
+}
+
+fn materialize_image(
+    package: &Package,
+    planned: &PlannedImage,
+    retained: &mut Retention,
+) -> Result<PartImage> {
+    Ok(PartImage {
+        xml: materialize_bytes(package, &planned.xml, retained, false)?,
+        relationships: planned
+            .relationships
+            .as_ref()
+            .map(|relationships| materialize_bytes(package, relationships, retained, true))
+            .transpose()?,
+    })
+}
+
+fn materialize_change(
+    package: &Package,
+    planned: &PlannedChange,
+    retained: &mut Retention,
+) -> Result<Change> {
+    Ok(Change {
+        key: planned.key.clone(),
+        content_type: planned.content_type.clone(),
+        relationship_type: planned.relationship_type.clone(),
+        before: planned
+            .before
+            .as_ref()
+            .map(|image| materialize_image(package, image, retained))
+            .transpose()?,
+        after: planned
+            .after
+            .as_ref()
+            .map(|image| materialize_image(package, image, retained))
+            .transpose()?,
+    })
+}
+
+fn materialize_dependent(
+    package: &Package,
+    planned: &PlannedDependent,
+    retained: &mut Retention,
+) -> Result<Dependent> {
+    Ok(Dependent {
+        part_uri: planned.part_uri.clone(),
+        content_type: planned.content_type.clone(),
+        before: planned
+            .before
+            .as_ref()
+            .map(|image| materialize_image(package, image, retained))
+            .transpose()?,
+        after: planned
+            .after
+            .as_ref()
+            .map(|image| materialize_image(package, image, retained))
+            .transpose()?,
+    })
+}
+
 /// Build a durable topology patch from the exact before/after package
 /// revisions.  The before image is the caller's effective state; the physical
 /// source image is retained in the recipe only where the target topology must
@@ -549,25 +1454,45 @@ pub(super) fn patch_from_packages(
     if !source.same_source_owner(target) {
         return Err(Error::PatchConflict);
     }
-    let wire_budget = Arc::new(WireBudget {
-        used: AtomicUsize::new(0),
-        maximum: max_patch_bytes,
-    });
-    let (before, mut retained) =
-        effective_state_with_retention_budget(source, Some(Arc::clone(&wire_budget)))?;
-    let (after, target_retained) =
-        effective_state_with_retention_budget(target, Some(Arc::clone(&wire_budget)))?;
-    merge_retention(&mut retained, target_retained);
+    let plan = plan_patch(source, target)?;
+    let encoded = plan.encoded_len()?;
+    if encoded > max_patch_bytes {
+        return Err(limit(
+            "source-backed primary retained patch bytes",
+            max_patch_bytes,
+        ));
+    }
+    let mut retained = source
+        .topology
+        .as_ref()
+        .map(|revision| (*revision.retained).clone())
+        .unwrap_or_default();
+    if let Some(revision) = &target.topology {
+        merge_retention(&mut retained, (*revision.retained).clone());
+    }
+    let before = materialize_state(source, &plan.before, &mut retained)?;
+    let after = materialize_state(target, &plan.after, &mut retained)?;
+    let changes = plan
+        .changes
+        .iter()
+        .map(|change| materialize_change(source, change, &mut retained))
+        .collect::<Result<Vec<_>>>()?;
+    let dependents = plan
+        .dependents
+        .iter()
+        .map(|dependent| materialize_dependent(source, dependent, &mut retained))
+        .collect::<Result<Vec<_>>>()?;
     validate_root_delta(source, &before, &after)?;
-    let changes = diff_changes(source, target, &mut retained)?;
-    let dependents = diff_dependents(source, target, &mut retained)?;
     let data = Data {
         before,
         after,
         changes: changes.into(),
         dependents: dependents.into(),
     };
-    if data.encoded_len()? > max_patch_bytes {
+    if !data_matches_plan(&data, &plan) {
+        return Err(Error::PatchConflict);
+    }
+    if encoded > max_patch_bytes {
         return Err(limit(
             "source-backed primary retained patch bytes",
             max_patch_bytes,
@@ -577,12 +1502,57 @@ pub(super) fn patch_from_packages(
         .topology
         .as_ref()
         .map(|revision| revision.prepared.clone());
-    retained.wire_budget = None;
     Ok(Patch {
         data,
         prepared,
         retained: Arc::new(retained),
+        encoded_len_cache: Arc::new(OnceLock::from(encoded)),
     })
+}
+
+fn data_matches_plan(data: &Data, plan: &PatchPlan) -> bool {
+    if data.before.root.len() != plan.before.root.lengths()
+        || data.before.presentation_relationships.len()
+            != plan.before.presentation_relationships.lengths()
+        || data.before.content_types.len() != plan.before.content_types.lengths()
+        || data.after.root.len() != plan.after.root.lengths()
+        || data.after.presentation_relationships.len()
+            != plan.after.presentation_relationships.lengths()
+        || data.after.content_types.len() != plan.after.content_types.lengths()
+        || data.before.order.as_ref() != plan.before.order.as_ref()
+        || data.after.order.as_ref() != plan.after.order.as_ref()
+        || data.changes.len() != plan.changes.len()
+        || data.dependents.len() != plan.dependents.len()
+    {
+        return false;
+    }
+    let images_match = |actual: Option<&PartImage>, planned: Option<&PlannedImage>| {
+        actual.zip(planned).is_some_and(|(actual, planned)| {
+            actual.xml.len() == planned.xml.lengths()
+                && actual.relationships.as_ref().map(|bytes| bytes.len())
+                    == planned.relationships.as_ref().map(PlannedBytes::lengths)
+        }) || actual.is_none() && planned.is_none()
+    };
+    data.changes
+        .iter()
+        .zip(&plan.changes)
+        .all(|(actual, planned)| {
+            actual.key == planned.key
+                && actual.content_type == planned.content_type
+                && actual.relationship_type == planned.relationship_type
+                && images_match(actual.before.as_ref(), planned.before.as_ref())
+                && images_match(actual.after.as_ref(), planned.after.as_ref())
+        })
+        && data
+            .dependents
+            .iter()
+            .zip(&plan.dependents)
+            .all(|(actual, planned)| {
+                actual.part_uri == planned.part_uri
+                    && actual.content_type == planned.content_type
+                    && images_match(actual.before.as_ref(), planned.before.as_ref())
+                    && images_match(actual.after.as_ref(), planned.after.as_ref())
+            })
 }
 
 /// Apply a v3 structural patch to a source package.  The current effective
@@ -672,23 +1642,11 @@ fn validate_root_delta(package: &Package, before: &State, after: &State) -> Resu
 }
 
 fn effective_state_with_retention(package: &Package) -> Result<(State, Retention)> {
-    effective_state_with_retention_budget(package, None)
-}
-
-fn effective_state_with_retention_budget(
-    package: &Package,
-    wire_budget: Option<Arc<WireBudget>>,
-) -> Result<(State, Retention)> {
     if let Some(revision) = &package.topology {
         revision.check()?;
-        let mut retained = (*revision.retained).clone();
-        retained.wire_budget = wire_budget;
-        return Ok((revision.data.after.clone(), retained));
+        return Ok((revision.data.after.clone(), (*revision.retained).clone()));
     }
-    let mut retained = Retention {
-        wire_budget,
-        ..Retention::default()
-    };
+    let mut retained = Retention::default();
     let (presentation_relationships, content_types) = source_metadata(package, &mut retained)?;
     retained
         .source_parts
@@ -806,10 +1764,6 @@ fn build_revision_with_retention(
             return Err(Error::PatchConflict);
         }
     }
-    // A capture preflight may borrow a transient wire budget while retaining
-    // source images.  Never carry that allocator-side cell into the
-    // immutable revision after admission succeeds.
-    retained.wire_budget = None;
     let after = State {
         topology_digest,
         root,
@@ -1689,12 +2643,14 @@ fn diff_changes(
     for key in keys {
         let source_change = source_map.get(&key);
         let target_change = target_map.get(&key);
-        let before = source_change
-            .map(|change| change.after.clone())
-            .unwrap_or(physical_image(source, &key, retained)?.map(|image| image.0));
-        let after = target_change
-            .map(|change| change.after.clone())
-            .unwrap_or(physical_image(target, &key, retained)?.map(|image| image.0));
+        let before = match source_change {
+            Some(change) => change.after.clone(),
+            None => physical_image(source, &key, retained)?.map(|image| image.0),
+        };
+        let after = match target_change {
+            Some(change) => change.after.clone(),
+            None => physical_image(target, &key, retained)?.map(|image| image.0),
+        };
         if before == after {
             continue;
         }
@@ -1790,35 +2746,6 @@ fn physical_image(
         PartImage {
             xml: copy_state_bytes(package, data.as_bytes(), retained)?,
             relationships: relationships_arc,
-        },
-        slide.binding.slide.content_type.clone(),
-        slide.binding.presentation_relationship.kind.clone(),
-    )))
-}
-
-fn physical_image_lengths(
-    package: &Package,
-    key: &StableSlideKey,
-) -> Result<Option<(ImageLengths, String, String)>> {
-    let Some(slide) = package.owner.slides.iter().find(|slide| {
-        stable_slide_key(
-            slide.part_uri.clone(),
-            slide.slide_id,
-            slide.binding.slide_reference_id.clone(),
-        ) == *key
-    }) else {
-        return Ok(None);
-    };
-    let view = package.owner.package.part(&slide.part_uri)?;
-    let data = view.data()?;
-    let relationships = package.owner.package.relationships_data_for_with_limit(
-        &slide.part_uri,
-        package.owner.limits.max_relationship_xml_bytes(),
-    )?;
-    Ok(Some((
-        ImageLengths {
-            xml: data.as_bytes().len(),
-            relationships: relationships.as_ref().map(|value| value.as_bytes().len()),
         },
         slide.binding.slide.content_type.clone(),
         slide.binding.presentation_relationship.kind.clone(),
@@ -2014,16 +2941,6 @@ fn copy_state_bytes(
     bytes: &[u8],
     retained: &mut Retention,
 ) -> Result<Arc<Vec<u8>>> {
-    if let Some(budget) = &retained.wire_budget {
-        let maximum = budget.maximum;
-        budget
-            .used
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-                used.checked_add(bytes.len())
-                    .filter(|next| *next <= maximum)
-            })
-            .map_err(|_| limit("source-backed primary retained patch bytes", maximum))?;
-    }
     if let Some(reservation) = reserve_payload(package, bytes.len())? {
         retained.reservations.push(Arc::new(reservation));
     }
