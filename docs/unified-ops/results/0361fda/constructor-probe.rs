@@ -506,7 +506,7 @@ fn validate_outputs(directory: &std::path::Path) {
         (message.type_, message.length),
         (1_001, MESSAGE_LENGTH as u32)
     );
-    assert_eq!(message.versions, [1, 0, 5]);
+    assert_eq!(message.versions.as_slice(), &[1, 0, 5]);
     std::fs::write(directory.join("message.txt"), format!("{message:?}")).unwrap();
     let info = make_info(OBJECT_ID, make_metadata_messages());
     assert_eq!(info.identifier, Some(OBJECT_ID));
