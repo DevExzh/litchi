@@ -138,9 +138,10 @@ impl<'data> File<'data> {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedImage` when the BLIP framing cannot be
-    /// encoded, or `Error::ArithmeticOverflow` when the owned data range
-    /// underflows.
+    /// Returns `Error::ImageLimitExceeded` when the retained raw or BLIP
+    /// budget no longer admits the record, `Error::MalformedImage` when the
+    /// BLIP framing cannot be encoded, or `Error::ArithmeticOverflow` when
+    /// the owned data range underflows.
     pub fn into_owned(self) -> Result<File<'static>> {
         let kind = self.kind();
         let (record, data_start, raw_limits, max_blip_bytes) = match self.source {
@@ -156,6 +157,21 @@ impl<'data> File<'data> {
                 max_blip_bytes,
             } => {
                 let raw_limits = blip.record().limits();
+                let record_len = blip.record().len();
+                if record_len > raw_limits.max_record_bytes {
+                    return Err(Error::ImageLimitExceeded {
+                        limit: ImageLimitKind::RecordBytes,
+                        observed: u64::from(record_len),
+                        maximum: u64::from(raw_limits.max_record_bytes),
+                    });
+                }
+                if record_len > max_blip_bytes {
+                    return Err(Error::ImageLimitExceeded {
+                        limit: ImageLimitKind::BlipBytes,
+                        observed: u64::from(record_len),
+                        maximum: u64::from(max_blip_bytes),
+                    });
+                }
                 let limits = Limits {
                     records: raw_limits,
                     max_blip_bytes,
@@ -210,7 +226,7 @@ pub fn store(data: &[u8], limits: Limits) -> Result<Option<Store<'_>>> {
         ..limits.record_limits()
     };
     for result in Parser::new(data, parser_limits).records() {
-        let record = result?;
+        let record = result.map_err(map_traversal_limit)?;
         visited = visited.checked_add(1).ok_or(Error::ImageLimitExceeded {
             limit: ImageLimitKind::Records,
             observed: u64::from(visited) + 1,
@@ -229,9 +245,10 @@ pub fn store(data: &[u8], limits: Limits) -> Result<Option<Store<'_>>> {
         }
         if record.is_container() {
             let container = Container::try_new(record)?;
-            for store in
-                container.find_recursive(RecordKind::BStoreContainer, limits.record_limits())?
-            {
+            let stores = container
+                .find_recursive(RecordKind::BStoreContainer, limits.record_limits())
+                .map_err(map_traversal_limit)?;
+            for store in stores {
                 set_store(&mut found, store)?;
             }
         }
@@ -437,6 +454,39 @@ fn set_store<'data>(slot: &mut Option<Record<'data>>, record: Record<'data>) -> 
     Ok(())
 }
 
+fn map_traversal_limit(error: Error) -> Error {
+    match error {
+        Error::LimitExceeded {
+            limit: crate::LimitKind::RecordBytes,
+            observed,
+            maximum,
+        } => Error::ImageLimitExceeded {
+            limit: ImageLimitKind::RecordBytes,
+            observed,
+            maximum: u64::from(maximum),
+        },
+        Error::LimitExceeded {
+            limit: crate::LimitKind::Depth,
+            observed,
+            maximum,
+        } => Error::ImageLimitExceeded {
+            limit: ImageLimitKind::Depth,
+            observed,
+            maximum: u64::from(maximum),
+        },
+        Error::LimitExceeded {
+            limit: crate::LimitKind::Records,
+            observed,
+            maximum,
+        } => Error::ImageLimitExceeded {
+            limit: ImageLimitKind::Records,
+            observed,
+            maximum: u64::from(maximum),
+        },
+        other => other,
+    }
+}
+
 fn entry_name(entry: &Entry<'_>) -> Result<Option<String>> {
     entry.name().map(super::model::Name::to_string).transpose()
 }
@@ -617,8 +667,8 @@ mod tests {
         };
         assert!(matches!(
             file.blip(),
-            Err(Error::LimitExceeded {
-                limit: crate::LimitKind::RecordBytes,
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
                 observed: 20,
                 maximum: 19,
             })
@@ -692,6 +742,26 @@ mod tests {
         let bytes = png_blip(b"png");
         let blip = Blip::parse(&bytes, Limits::default()).expect("valid PNG");
         let body_len = u32::try_from(bytes.len() - 8).expect("body length fits");
+        let raw_limited = File::new(
+            blip.clone(),
+            None,
+            0,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: body_len - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            },
+        );
+        assert!(matches!(
+            raw_limited.into_owned(),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
         let file = File::new(
             blip,
             None,
@@ -703,8 +773,10 @@ mod tests {
         );
         assert!(matches!(
             file.into_owned(),
-            Err(Error::MalformedImage {
-                reason: "owned BLIP framing could not be encoded"
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::BlipBytes,
+                observed: 20,
+                maximum: 19,
             })
         ));
     }
@@ -937,6 +1009,82 @@ mod tests {
                 limit: ImageLimitKind::Records,
                 observed: 2,
                 maximum: 1,
+            })
+        ));
+    }
+
+    fn officeart_container(kind: u16, body: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0x0f, 0, 0, 0];
+        bytes[2..4].copy_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(
+            &u32::try_from(body.len())
+                .expect("container body length fits")
+                .to_le_bytes(),
+        );
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    #[test]
+    fn store_maps_nested_record_limit_to_image_kind() {
+        let mut body = png_blip(b"one");
+        body.extend_from_slice(&png_blip(b"two"));
+        let data = officeart_container(0xf002, &body);
+        let limits = Limits {
+            records: crate::Limits {
+                max_records: 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Records,
+                maximum: 1,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn store_maps_top_level_record_limit_to_image_kind() {
+        let data = png_blip(b"one");
+        let body_len = u32::try_from(data.len() - 8).expect("body length fits");
+        let limits = Limits {
+            records: crate::Limits {
+                max_record_bytes: body_len - 1,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::RecordBytes,
+                observed: 20,
+                maximum: 19,
+            })
+        ));
+    }
+
+    #[test]
+    fn store_maps_nested_depth_limit_to_image_kind() {
+        let nested = officeart_container(0xf002, &[]);
+        let data = officeart_container(0xf002, &nested);
+        let limits = Limits {
+            records: crate::Limits {
+                max_depth: 0,
+                ..crate::Limits::default()
+            },
+            ..Limits::default()
+        };
+        assert!(matches!(
+            store(&data, limits),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::Depth,
+                maximum: 0,
+                ..
             })
         ));
     }

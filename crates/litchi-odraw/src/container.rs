@@ -118,12 +118,17 @@ impl<'data> Iterator for Children<'data> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.done {
+        if self.done || self.offset == self.data.len() {
             return (0, Some(0));
         }
         let remaining = self.data.len().saturating_sub(self.offset);
         let admitted = usize::try_from(self.limits.max_records - self.seen).unwrap_or(usize::MAX);
-        (0, Some((remaining / 8).min(admitted)))
+        // Every nonempty remainder can yield one pending framing or admission
+        // error, including a zero-record budget and a one-to-seven-byte tail.
+        // Count complete minimum-sized records, round up for that pending
+        // error, and cap by the admitted records plus that one error.
+        let wire_items = remaining.div_ceil(8);
+        (0, Some(wire_items.min(admitted.saturating_add(1))))
     }
 }
 
@@ -430,6 +435,29 @@ mod tests {
             }))
         ));
         assert!(none.next().is_none());
+    }
+
+    #[test]
+    fn child_size_hint_allows_a_pending_error() {
+        let bytes = atom(RecordKind::Sp.raw(), &[]);
+        let mut zero = Children::new(
+            &bytes,
+            Limits {
+                max_records: 0,
+                ..Limits::default()
+            },
+        );
+        assert_eq!(zero.size_hint(), (0, Some(1)));
+        assert!(zero.next().is_some_and(|result| result.is_err()));
+        assert_eq!(zero.size_hint(), (0, Some(0)));
+
+        for length in 1..8 {
+            let tail = vec![0_u8; length];
+            let mut children = Children::new(&tail, Limits::default());
+            assert_eq!(children.size_hint(), (0, Some(1)));
+            assert!(children.next().is_some_and(|result| result.is_err()));
+            assert_eq!(children.size_hint(), (0, Some(0)));
+        }
     }
 
     #[test]

@@ -2,7 +2,7 @@
 
 - Date: 2026-10-23.
 - Base: `2b42e80421`.
-- Status: source migration complete; coordinator validation is pending.
+- Status: source migration and review repair complete; coordinator validation is pending.
 
 This slice closes the remaining ODraw raw and authoring-surface gaps. The
 zero-copy `Children` iterator now admits at most `Limits::max_records` parsed
@@ -16,6 +16,14 @@ and recursive collection appends nested `BStore` files directly while checking
 the aggregate file ceiling. The change removes the temporary per-store vector
 and does not alter depth-first order, delay resolution, source bytes, or the
 retained raw/BLIP policy used by `File::blip` and `File::into_owned`.
+
+The review repair keeps `Children::size_hint` conservative when the next item
+will be a framing or admission error, including a zero-record budget and a
+one-to-seven-byte tail. Nested `image::store` traversal maps raw record,
+record-count and depth ceilings to the image-owned typed limit kind. Direct
+BLIP/store/delay ingress admits declared raw lengths before calling the generic
+record parser, and detaching a file preserves typed raw/BLIP limit failures
+instead of flattening them into malformed-image errors.
 
 Authoring drafts now live in canonical builder modules:
 `litchi_odraw::builder` owns property and shape builders, while

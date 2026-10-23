@@ -86,6 +86,50 @@ fn preserves_unknown_file_block_kinds() {
 }
 
 #[test]
+fn direct_image_parsers_classify_record_byte_admission() {
+    let blip = record(0, 0x6E0, 0xF01E, &png_body(false, b"png"));
+    let blip_body = u32::try_from(blip.len() - 8).unwrap();
+    assert!(matches!(
+        Blip::parse(
+            &blip,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: blip_body - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            }
+        ),
+        Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed,
+            maximum,
+        }) if observed == u64::from(blip_body) && maximum == u64::from(blip_body - 1)
+    ));
+
+    let child = record(0, 0, 0xF01E, &[]);
+    let store = record(0x0F, 1, 0xF001, &child);
+    let store_body = u32::try_from(store.len() - 8).unwrap();
+    assert!(matches!(
+        Store::parse(
+            &store,
+            Limits {
+                records: crate::Limits {
+                    max_record_bytes: store_body - 1,
+                    ..crate::Limits::default()
+                },
+                ..Limits::default()
+            }
+        ),
+        Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed,
+            maximum,
+        }) if observed == u64::from(store_body) && maximum == u64::from(store_body - 1)
+    ));
+}
+
+#[test]
 fn entry_admission_checks_the_complete_instance_before_resolution() {
     for instance in [255_u16, 256, 4095] {
         let mut body = vec![0; 36];

@@ -13,6 +13,28 @@ enum Family {
     Bitmap,
 }
 
+fn admit_record_header(data: &[u8], limits: Limits, check_blip: bool) -> Result<()> {
+    let Some(header) = data.get(4..8) else {
+        return Ok(());
+    };
+    let body_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+    if body_len > limits.records.max_record_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::from(body_len),
+            maximum: u64::from(limits.records.max_record_bytes),
+        });
+    }
+    if check_blip && body_len > limits.max_blip_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::BlipBytes,
+            observed: u64::from(body_len),
+            maximum: u64::from(limits.max_blip_bytes),
+        });
+    }
+    Ok(())
+}
+
 /// Parses exactly one BLIP record.
 impl<'data> Blip<'data> {
     /// Parses exactly one complete BLIP record under explicit limits.
@@ -22,6 +44,7 @@ impl<'data> Blip<'data> {
     /// Returns an error if `data` cannot be decoded as exactly one BLIP record,
     /// or if the record exceeds `limits` or fails BLIP validation.
     pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
+        admit_record_header(data, limits, true)?;
         let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
@@ -325,6 +348,7 @@ impl<'data> Store<'data> {
     /// Returns an error if `data` cannot be decoded as exactly one `BStore`
     /// container under `limits`.
     pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
+        admit_record_header(data, limits, false)?;
         let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
         if consumed != data.len() {
             return Err(Error::TrailingData { offset: consumed });
@@ -462,6 +486,7 @@ impl<'data> Delay<'data> {
                 available: self.data.len(),
             });
         }
+        admit_record_header(&self.data[start..], self.limits, false)?;
         let (record, _) = Record::parse(self.data, start, self.limits.record_limits())?;
         block(record, self.limits)
     }
