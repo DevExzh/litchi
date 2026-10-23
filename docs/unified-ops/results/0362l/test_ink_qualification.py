@@ -110,10 +110,18 @@ class DurableInkQualificationTests(unittest.TestCase):
             "crates/litchi-opc/changed.rs": (5, "c"),
             "crates/litchi-opc/new.rs": (6, "d"),
         }
-        delta = QUALIFY.source_delta(base, candidate, ("crates/litchi-opc/",))
-        self.assertEqual(delta["base_only"], ["crates/litchi-opc/old.rs"])
-        self.assertEqual(delta["candidate_only"], ["crates/litchi-opc/new.rs"])
-        self.assertEqual(delta["changed"][0]["path"], "crates/litchi-opc/changed.rs")
+        delta = QUALIFY.source_delta(base, candidate, ("crates/litchi-opc/",), "a" * 40, "b" * 40)
+        self.assertEqual(delta["base_commit"], "a" * 40)
+        self.assertEqual(delta["candidate_commit"], "b" * 40)
+        self.assertEqual(delta["base_only"], [{"path": "crates/litchi-opc/old.rs",
+                                               "base": {"bytes": 3, "sha256": "a"}}])
+        self.assertEqual(delta["candidate_only"], [{"path": "crates/litchi-opc/new.rs",
+                                                    "candidate": {"bytes": 6, "sha256": "d"}}])
+        self.assertEqual(delta["changed"][0], {
+            "path": "crates/litchi-opc/changed.rs",
+            "base": {"bytes": 4, "sha256": "b"},
+            "candidate": {"bytes": 5, "sha256": "c"},
+        })
 
 
 if __name__ == "__main__":
