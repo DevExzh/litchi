@@ -2,19 +2,19 @@
 
 - Date: 2026-10-21.
 - Base: `f5d1a64643`.
-- Status: tooling correction validated; the OLE implementation correction and
-  final integrated gate remain required.
+- Status: tooling correction and the OLE implementation correction are
+  integrated; the final integrated gate and semantic review remain required.
 - Contract: 0351 §2.3; source-backed publication additionally follows 0355a §1.
 
 Coordinator review of the pending OLE owner migration found two public
-staging methods that return rendered artifacts:
+staging methods that returned rendered artifacts:
 `object::Edit::put_stream_shared_with_rendered` and
 `put_streams_shared_with_rendered`. Their consumers can obtain output before
 `Edit::commit`. The former inventory reported neither method, and checking
 only the presence of a `commit` method did not catch this second publication
-path. The OLE wave is sent back for correction before acceptance, including
-all DOC/XLS consumers and preservation of the existing single-render path,
-failure atomicity, batches, and exact no-op behavior.
+path. Commit `39a7a2729b` removed those publication methods and migrated the
+DOC/XLS consumers to `Edit::commit().package()`/`into_package()`, preserving
+the single-render path, failure atomicity, batches, and exact no-op behavior.
 
 The glossary gate now rejects known artifact-output verbs on the `Edit` of
 a registered family with `family_methods` enabled. These include byte output,
@@ -42,8 +42,12 @@ performance claim is made.
 
 The same review sent the pending OLE wave back for content-free `Debug`
 output on its newly exposed owner/edit/patch/prepared types and the required
-non-exhaustive error enum. Those corrections are separate implementation work,
-not exceptions to the contract. The redaction audit remains the only deferral.
+non-exhaustive error enum. Those corrections are now integrated: the
+structural/content-free implementations are recorded by `1a5f56f45d`, and
+the error enum is non-exhaustive in `02c9f44c78`. The redaction audit remains
+the only deferral.
 
-W4, W4b, W5 and W8 integration, performance repairs, the remaining shared/raw
-API work, and the final full gate remain open. Nothing is pushed.
+W4 and W4b integration, the DOCX helper/raw work, signed-native replay, W8
+qualification and final replay-scope review, performance repairs, remaining
+shared/raw API work, and the final full gate remain open. W5's OLE correction
+is not an open exception. Nothing is pushed.
