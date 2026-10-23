@@ -175,7 +175,7 @@ fn malformed_package_is_a_typed_odf_error() {
     };
     let error = crate::open_bytes(bytes).expect_err("a broken package must not open");
     assert!(
-        matches!(error.leaf(), crate::error::Source::Odf(_)),
+        matches!(error.leaf(), crate::error::Source::Core(_)),
         "{error:?}"
     );
     assert_eq!(error.format(), Some(FileFormat::Odp));
