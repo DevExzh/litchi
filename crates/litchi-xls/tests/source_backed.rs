@@ -6,8 +6,8 @@ use litchi_core::{
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
-    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, cell_values::Reference,
-    raw::Reader,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
+    cell_values::Reference, raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -2138,58 +2138,76 @@ fn stale_sources_are_rejected_before_selected_reads() {
     ));
 }
 
+fn deferred_numeric_fixture() -> (
+    Arc<CountingSource>,
+    SourceBackedWorkbook,
+    usize,
+    Reference,
+    String,
+) {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut numeric = None;
+    for worksheet in workbook.worksheets().unwrap() {
+        let sheet_index = worksheet.index().unwrap();
+        let sheet_name = worksheet.name().unwrap();
+        worksheet
+            .visit_cells(|cell| {
+                if numeric.is_none() {
+                    numeric = match cell.value() {
+                        CellValue::Float(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value,
+                        )),
+                        CellValue::Int(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value as f64,
+                        )),
+                        CellValue::Empty
+                        | CellValue::Bool(_)
+                        | CellValue::DateTime(_)
+                        | CellValue::String(_)
+                        | CellValue::Error(_)
+                        | CellValue::Formula { .. } => None,
+                    };
+                }
+                Ok(())
+            })
+            .unwrap();
+        if numeric.is_some() {
+            let (index, reference, value) = numeric.take().unwrap();
+            let mut edit = workbook.edit_cells().unwrap();
+            edit.set_number(index, reference, value + 1.0).unwrap();
+            let committed = edit.commit().unwrap().into_package();
+            return (source, committed, index, reference, sheet_name);
+        }
+    }
+    panic!("Simple.xls has no numeric cell for deferred projection test");
+}
+
+fn assert_inflight_projection_source_change(
+    operation: impl FnOnce(&SourceBackedWorksheet) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let worksheet = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    // Materialize the deferred target before arming the mutation. The next
+    // projection operation's leading original-owner fence then mutates the
+    // source immediately after its observation, leaving only its trailing
+    // fence to classify the target read's composed-source failure.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&worksheet).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight mutation, got {error:?}"
+    );
+}
+
 #[test]
 fn deferred_projection_handles_keep_the_original_source_fence() {
-    fn committed_fixture() -> (
-        Arc<CountingSource>,
-        SourceBackedWorkbook,
-        usize,
-        Reference,
-        String,
-    ) {
-        let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
-        let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
-        let mut numeric = None;
-        for worksheet in workbook.worksheets().unwrap() {
-            let sheet_index = worksheet.index().unwrap();
-            let sheet_name = worksheet.name().unwrap();
-            worksheet
-                .visit_cells(|cell| {
-                    if numeric.is_none() {
-                        numeric = match cell.value() {
-                            CellValue::Float(value) => Some((
-                                sheet_index,
-                                Reference::new(cell.row(), cell.column()).unwrap(),
-                                *value,
-                            )),
-                            CellValue::Int(value) => Some((
-                                sheet_index,
-                                Reference::new(cell.row(), cell.column()).unwrap(),
-                                *value as f64,
-                            )),
-                            CellValue::Empty
-                            | CellValue::Bool(_)
-                            | CellValue::DateTime(_)
-                            | CellValue::String(_)
-                            | CellValue::Error(_)
-                            | CellValue::Formula { .. } => None,
-                        };
-                    }
-                    Ok(())
-                })
-                .unwrap();
-            if numeric.is_some() {
-                let (index, reference, value) = numeric.take().unwrap();
-                let mut edit = workbook.edit_cells().unwrap();
-                edit.set_number(index, reference, value + 1.0).unwrap();
-                let committed = edit.commit().unwrap().into_package();
-                return (source, committed, index, reference, sheet_name);
-            }
-        }
-        panic!("Simple.xls has no numeric cell for deferred projection test");
-    }
-
-    let (source, package, sheet_index, reference, sheet_name) = committed_fixture();
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
     let by_index = package.worksheet_by_index(sheet_index).unwrap().unwrap();
     let by_name = package.worksheet_by_name(&sheet_name).unwrap().unwrap();
     let from_list = package.worksheets().unwrap().into_iter().next().unwrap();
@@ -2222,6 +2240,25 @@ fn deferred_projection_handles_keep_the_original_source_fence() {
             Err(SourceBackedError::SourceChanged { .. })
         ));
     }
+}
+
+#[test]
+fn deferred_projection_promotes_inflight_source_changes_for_all_reads() {
+    assert_inflight_projection_source_change(|worksheet| worksheet.cell(0, 0).map(|_| ()));
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet.cell_with_execution(0, 0, &execution).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        worksheet.visit_cells(|_cell| Ok(())).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet
+            .visit_cells_with_execution(&execution, |_cell| Ok(()))
+            .map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| worksheet.name().map(|_| ()));
 }
 
 #[test]

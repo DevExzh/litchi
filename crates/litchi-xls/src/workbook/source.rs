@@ -2057,6 +2057,20 @@ impl SourceBackedWorksheet {
         effective_inner(&self.owner)
     }
 
+    /// Finish one projection operation with the owner that still observes the
+    /// caller's dynamic source. A deferred target is backed by a composed
+    /// source whose version error is only an I/O-shaped projection of the
+    /// original change; fence the original owner after the target operation so
+    /// that a mutation in that window is promoted to typed `SourceChanged`.
+    /// The fence runs before the operation result is returned, so freshness
+    /// keeps the same precedence as the workbook-level projection fences.
+    fn finish_projection<T>(&self, result: Result<T>) -> Result<T> {
+        if self.owner.deferred {
+            self.owner.ensure_current()?;
+        }
+        result
+    }
+
     /// Zero-based worksheet index.
     pub fn index(&self) -> Result<usize> {
         self.metadata(|sheet| sheet.worksheet_index.unwrap_or_default())
@@ -2090,7 +2104,8 @@ impl SourceBackedWorksheet {
     /// Reads one cell by zero-based row and column.
     pub fn cell(&self, row: u32, column: u32) -> Result<Option<SourceBackedCell>> {
         let owner = self.effective_owner()?;
-        query_cell(&owner, self.sheet_index, row, column, None)
+        let result = query_cell(&owner, self.sheet_index, row, column, None);
+        self.finish_projection(result)
     }
 
     /// Reads one cell by zero-based row and column with cooperative
@@ -2102,7 +2117,8 @@ impl SourceBackedWorksheet {
         execution: &ExecutionContext,
     ) -> Result<Option<SourceBackedCell>> {
         let owner = self.effective_owner()?;
-        query_cell(&owner, self.sheet_index, row, column, Some(execution))
+        let result = query_cell(&owner, self.sheet_index, row, column, Some(execution));
+        self.finish_projection(result)
     }
 
     /// Reads one cell value by zero-based row and column.
@@ -2156,7 +2172,8 @@ impl SourceBackedWorksheet {
         F: FnMut(SourceBackedCell) -> Result<()>,
     {
         let owner = self.effective_owner()?;
-        visit_worksheet_cells(&owner, self.sheet_index, None, visitor)
+        let result = visit_worksheet_cells(&owner, self.sheet_index, None, visitor);
+        self.finish_projection(result)
     }
 
     /// Reports every stored cell of this worksheet from one validated scan,
@@ -2177,7 +2194,8 @@ impl SourceBackedWorksheet {
         F: FnMut(SourceBackedCell) -> Result<()>,
     {
         let owner = self.effective_owner()?;
-        visit_worksheet_cells(&owner, self.sheet_index, Some(execution), visitor)
+        let result = visit_worksheet_cells(&owner, self.sheet_index, Some(execution), visitor);
+        self.finish_projection(result)
     }
 
     /// Reads one retained worksheet descriptor behind one trailing fence.
@@ -2190,14 +2208,19 @@ impl SourceBackedWorksheet {
     fn metadata<T>(&self, operation: impl FnOnce(&SheetEntry) -> T) -> Result<T> {
         let owner = self.effective_owner()?;
         let Some(sheet) = owner.sheets.get(self.sheet_index) else {
-            owner.ensure_current()?;
-            return Err(SourceBackedError::WorksheetNotFound(
+            let result = Err(SourceBackedError::WorksheetNotFound(
                 self.sheet_index.to_string(),
             ));
+            if !self.owner.deferred {
+                owner.ensure_current()?;
+            }
+            return self.finish_projection(result);
         };
         let value = operation(sheet);
-        owner.ensure_current()?;
-        Ok(value)
+        if !self.owner.deferred {
+            owner.ensure_current()?;
+        }
+        self.finish_projection(Ok(value))
     }
 }
 
