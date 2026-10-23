@@ -10749,6 +10749,12 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
                         continue;
                     }
                     if is_fragment_word_element(&namespace, &fragment_prefix)
+                        && !is_preserved_paragraph_marker(
+                            root_name,
+                            &namespace,
+                            element.name(),
+                            &fragment_prefix,
+                        )
                         && !(root_name == b"p"
                             && is_transaction_fragment_word_name(
                                 &namespace,
@@ -10830,6 +10836,24 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
         return Err(Refusal::ComplexRun);
     }
     Ok(TextOwner { slots, text })
+}
+
+/// Paragraph-level range markers carry identity but no visible text. They can
+/// remain byte-for-byte in place while run text slots are rewritten, so
+/// accepting them here preserves bookmarks without admitting arbitrary
+/// structural children into the text writer.
+fn is_preserved_paragraph_marker(
+    root_name: &[u8],
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    root_name == b"p"
+        && is_fragment_word_element(namespace, fragment_prefix)
+        && matches!(
+            name.local_name().as_ref(),
+            b"bookmarkStart" | b"bookmarkEnd"
+        )
 }
 
 /// Whether an element is an `mc:AlternateContent` wrapper. A transaction

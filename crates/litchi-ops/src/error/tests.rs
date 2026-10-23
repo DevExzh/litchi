@@ -372,7 +372,7 @@ fn docx_recorded_replay_conflicts_are_invalid_input() {
             "document_variables",
             "selected markup cannot be preserved",
         )),
-        Code::UnsupportedType,
+        Code::UnsupportedCapability,
     );
 }
 

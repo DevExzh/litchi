@@ -292,7 +292,10 @@ impl Docx {
             let owned = package.to_owned_package_preserving_source()?;
             return Self::from_owned_package_with_origin(owned, options, origin);
         }
-        let ooxml_limits = package.source_backed_package()?.read_limits();
+        // A committed source owner carries an effective topology.  Its
+        // physical graph is intentionally unavailable to ordinary callers,
+        // but the retained ingress policy remains valid for the new facade.
+        let ooxml_limits = package.read_limits();
         Ok(Self::with_owner(
             DocxOwner::Source(Box::new(package)),
             None,
