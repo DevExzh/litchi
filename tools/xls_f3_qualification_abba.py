@@ -49,8 +49,8 @@ BASELINE_SOURCE_REF = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
 # The harness is copied as a deterministic file overlay from this frozen
 # source commit.  The runner itself is deliberately not an overlay path, so a
 # runner change does not require a self-referential commit list.
-COMMON_HARNESS_REF = "a443967991dfbdf7529c198abf2f6d24211e87ac"
-CANDIDATE_SOURCE_REF = "a443967991dfbdf7529c198abf2f6d24211e87ac"
+COMMON_HARNESS_REF = "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76"
+CANDIDATE_SOURCE_REF = "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76"
 CANDIDATE_PRODUCTION_COMMITS = (
     "8d491b1e8f084effde712651e07d460ba044cb1f",
     "ef6e6ea25355e56571f870a4cefd1675fdb60366",
@@ -80,23 +80,25 @@ BASELINE_LEGACY_DISPOSITIONS = {
     },
     "stage_mutate_commit": {
         "source_ref": BASELINE_SOURCE_REF,
-        "disposition": "accepted stale source-backed commit",
+        "disposition": "stale commit accepted; publication was nonempty",
     },
     "same_owner_forward_replay": {
         "source_ref": BASELINE_SOURCE_REF,
-        "disposition": "accepted stale same-owner forward replay",
+        "disposition": "stale same-owner forward replay accepted; publication was nonempty",
     },
     "same_owner_inverse_replay": {
         "source_ref": BASELINE_SOURCE_REF,
-        "disposition": "accepted stale same-owner inverse replay",
+        "error": "litchi_xls::source_backed::OutputError::Package(litchi_xls::package::Error::Source(litchi_xls::SourceBackedError::SourceChanged))",
+        "disposition": "stale same-owner inverse replay accepted; publication returned SourceChanged",
     },
     "mutate_committed_first_read": {
         "source_ref": BASELINE_SOURCE_REF,
-        "disposition": "accepted stale deferred first read",
+        "error": "litchi_xls::SourceBackedError::(CellValue::Float|CellValue::DateTime)(replacement)",
+        "disposition": "stale deferred first read returned the replacement value",
     },
     "mutate_committed_write": {
         "source_ref": BASELINE_SOURCE_REF,
-        "disposition": "accepted stale committed write",
+        "disposition": "stale committed write was nonempty",
     },
 }
 PROBE_PATHS = (

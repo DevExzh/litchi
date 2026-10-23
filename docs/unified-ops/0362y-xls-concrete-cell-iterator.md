@@ -35,7 +35,7 @@ The fair implementation comparison is the exact source snapshot at
 `9b1f96d6dce1506dc9d0080f0696b42ba592c397` (the concrete eager-cell iterator
 is already present, but the deferred source-backed cell reopen is not) against
 an explicitly pinned candidate source ref. The default candidate ref is
-`a443967991dfbdf7529c198abf2f6d24211e87ac`, which contains the two production
+`0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76`, which contains the two production
 freshness fixes `8d491b1e8f` and `ef6e6ea253` plus the typed deferred-cell
 refusal, protected-source, and baseline-disposition fixes `157eb7c8d2`,
 `c7ed9d3abd`, and `a443967991`. The candidate ref may be replaced on the
@@ -70,7 +70,7 @@ module and the existing probe source, so it does not compile unrelated DOCX or
 PPTX baseline modules or duplicate workload construction.
 
 The common harness is frozen at
-`a443967991dfbdf7529c198abf2f6d24211e87ac`. Prepare both source snapshots at
+`0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76`. Prepare both source snapshots at
 their exact production refs, then overlay only the allowlisted probe files
 from that frozen commit. This is a content overlay, not a cherry-pick: it
 keeps the baseline production tree at `9b1f...` and keeps the candidate
@@ -79,9 +79,9 @@ one identical harness. The overlay is deterministic and auditable:
 
 ```sh
 REPO=/home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification
-HARNESS_REF=a443967991dfbdf7529c198abf2f6d24211e87ac
+HARNESS_REF=0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
-CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-a443967991
+CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9
 PROBE_PATHS=(
   tools/perf-baseline/src/xls_f3_qualification.rs
   tools/perf-baseline/src/xls_f3_corpus.rs
@@ -140,17 +140,20 @@ route and an optional corpus: `--implementation baseline|candidate`,
 `--route write-only|first-read|read-after-write` and
 `--corpus number|rk-mulrk|all` (default `all`). It emits one CSV header followed
 by rows with `route,corpus,sample,nanoseconds,edit_ns,set_ns,commit_ns,write_ns,read_ns,output_bytes,output_sha256,batch`.
-The pinned `9b1f...` baseline is allowed three exact historical dispositions
-only: the signed `edit_cells` object-layer `InvalidFormat`, the structural
+The pinned `9b1f...` baseline has three exact historical refusal dispositions:
+the signed `edit_cells` object-layer `InvalidFormat`, the structural
 source-backed plan's `UnsupportedFeature` text, and the RK/MulRK
 `set_number` wrong-family `UnsupportedFeature` text for the selected fixture
-coordinate. It also records the five pinned baseline freshness capabilities
-that predate the candidate fences: stage→mutate→commit, same-owner forward and
-inverse replay, mutate→committed-first-read, and mutate→committed-write are
-accepted after the source revision changes. The candidate must return the
-corresponding typed refusals. The runner passes the disposition explicitly to
-every child and records this allowlist in the receipt; no arbitrary error or
-broad `is_err()` path is accepted.
+coordinate. It also records five pinned baseline freshness dispositions that
+predate the candidate fences: stage→mutate→commit and same-owner forward and
+inverse replay return a committed owner with nonempty publication, except that
+the inverse replay's publication returns exactly
+`OutputError::Package(Error::Source(SourceChanged { .. }))`; a
+mutate→committed-first-read returns the replacement value; and
+mutate→committed-write returns nonempty publication. The
+candidate must return the corresponding typed refusals. The runner passes the
+disposition explicitly to every child and records this allowlist in the
+receipt; no arbitrary error or broad `is_err()` path is accepted.
 The probe has already added three explicit route labels over this same
 preparation:
 
@@ -207,7 +210,7 @@ the checkout, for example:
 ```text
 /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/
   source-base-9b1f96d6dc/
-  source-candidate-a443967991/
+  source-candidate-0b8f68d7e9/
   target-base-release/
   target-candidate-release/
   binaries/
@@ -229,7 +232,7 @@ CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-a443967991/tools/perf-baseline-f3/Cargo.toml \
+  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9/tools/perf-baseline-f3/Cargo.toml \
   --example xls_f3_qualification
 mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
   /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
@@ -273,14 +276,14 @@ python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_
   --control-binary "$BASE" \
   --candidate-binary "$CAND" \
   --control-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc \
-  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-a443967991 \
+  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9 \
   --output-dir "$OUT" \
   --cpu "${CPU}" \
   --memory-limit-bytes 2147483648 \
   --warmup 20 --samples 40 \
-  --harness-ref a443967991dfbdf7529c198abf2f6d24211e87ac \
+  --harness-ref 0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76 \
   --control-source-ref 9b1f96d6dce1506dc9d0080f0696b42ba592c397 \
-  --candidate-source-ref a443967991dfbdf7529c198abf2f6d24211e87ac \
+  --candidate-source-ref 0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76 \
   --candidate-production-commits 8d491b1e8f084effde712651e07d460ba044cb1f,ef6e6ea25355e56571f870a4cefd1675fdb60366,157eb7c8d250568acb9dbc83bbeb0f9e675d1ea5,c7ed9d3abdc3f9e3ee152c12129f194d82b66042,a443967991dfbdf7529c198abf2f6d24211e87ac
 ```
 
