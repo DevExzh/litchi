@@ -283,6 +283,64 @@ fn cell_text_replacement_refuses_content_it_would_drop() {
 }
 
 #[test]
+fn paragraph_text_replacement_preserves_bookmark_markers() {
+    let base = snapshot(
+        r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/><w:r><w:t>one</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>"#,
+    );
+    let mut edit = base.edit();
+    edit.replace_paragraph_text(Position::new(0), "new")
+        .unwrap();
+    let commit = commit_and_check(&base, edit);
+    let output = xml(&commit);
+    assert!(output.contains(r#"<w:bookmarkStart w:id="1" w:name="b"/>"#));
+    assert!(output.contains(r#"<w:t>new</w:t>"#));
+    assert!(output.contains(r#"<w:bookmarkEnd w:id="1"/>"#));
+}
+
+#[test]
+fn selected_paragraph_routes_replay_and_inverse_bookmarked_text() {
+    let base = snapshot(
+        r#"<w:sdt><w:sdtPr/><w:sdtContent><w:p><w:bookmarkStart w:id="10" w:name="block"/><w:r><w:t>block old</w:t></w:r><w:bookmarkEnd w:id="10"/></w:p></w:sdtContent></w:sdt><w:tbl><w:tr><w:tc><w:p><w:bookmarkStart w:id="20" w:name="cell"/><w:r><w:t>cell old</w:t></w:r><w:bookmarkEnd w:id="20"/></w:p><w:tbl><w:tr><w:tc><w:p><w:bookmarkStart w:id="30" w:name="nested"/><w:r><w:t>nested old</w:t></w:r><w:bookmarkEnd w:id="30"/></w:p></w:tc></w:tr></w:tbl></w:tc></w:tr></w:tbl>"#,
+    );
+    let controls = [Position::new(0)];
+    let table_path = [
+        TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+        TableCellAddress::new(Position::new(0), Position::new(0), Position::new(0)),
+    ];
+    let mut edit = base.edit();
+    edit.replace_block_content_control_paragraph_text(&controls, Position::new(0), "block new")
+        .unwrap()
+        .replace_table_cell_paragraph_text(
+            Position::new(0),
+            Position::new(0),
+            Position::new(0),
+            Position::new(0),
+            "cell new",
+        )
+        .unwrap()
+        .replace_nested_table_cell_paragraph_text(&table_path, Position::new(0), "nested new")
+        .unwrap();
+    let commit = commit_and_check(&base, edit);
+    let output = xml(&commit);
+    for retained in [
+        r#"<w:bookmarkStart w:id="10" w:name="block"/>"#,
+        r#"<w:t>block new</w:t>"#,
+        r#"<w:bookmarkEnd w:id="10"/>"#,
+        r#"<w:bookmarkStart w:id="20" w:name="cell"/>"#,
+        r#"<w:t>cell new</w:t>"#,
+        r#"<w:bookmarkEnd w:id="20"/>"#,
+        r#"<w:bookmarkStart w:id="30" w:name="nested"/>"#,
+        r#"<w:t>nested new</w:t>"#,
+        r#"<w:bookmarkEnd w:id="30"/>"#,
+    ] {
+        assert!(
+            output.contains(retained),
+            "missing retained XML: {retained}"
+        );
+    }
+}
+
+#[test]
 fn removals_that_would_orphan_ranges_are_refused() {
     let base = snapshot(
         r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/></w:p><w:tbl><w:tr><w:tc><w:p><w:bookmarkEnd w:id="1"/></w:p></w:tc></w:tr></w:tbl>"#,

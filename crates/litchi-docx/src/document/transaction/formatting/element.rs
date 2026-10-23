@@ -30,7 +30,8 @@ use quick_xml::reader::NsReader;
 use super::super::{
     Conformance, Edit, Error, FragmentPrefix, Operation, Refusal, Snapshot, checked_end,
     checked_slice, checked_start, is_fragment_word_element, replace_range, rewrite_text_owner,
-    scan_text_owner, select_direct_child, select_single_control_content, validate_authored_text,
+    scan_paragraph_text_owner, scan_text_owner, select_direct_child, select_single_control_content,
+    validate_authored_text,
 };
 use super::{
     BodyAnchor, BodyBlock, NewParagraph, NewRun, Removal, Result, buffer, element_len, ensure_utf8,
@@ -1296,13 +1297,23 @@ impl Edit {
         validate_authored_text(&text).map_err(refusal)?;
         let located = locate(&self.projected, path.steps())?;
         let before = self.element_bytes(located)?;
-        let owner = scan_text_owner(&before, local).map_err(refusal)?;
+        let owner = if local == b"p" {
+            scan_paragraph_text_owner(&before)
+        } else {
+            scan_text_owner(&before, local)
+        }
+        .map_err(refusal)?;
         if owner.text == text {
             return Ok(self);
         }
         let after = rewrite_text_owner(&before, &owner, &text)?;
         self.replace_element(path, &before, &Arc::new(after))?;
-        let readback = scan_text_owner(self.element_xml(path)?, local).map_err(refusal)?;
+        let readback = if local == b"p" {
+            scan_paragraph_text_owner(self.element_xml(path)?)
+        } else {
+            scan_text_owner(self.element_xml(path)?, local)
+        }
+        .map_err(refusal)?;
         if readback.text != text {
             return Err(invalid("element text replacement failed semantic readback"));
         }

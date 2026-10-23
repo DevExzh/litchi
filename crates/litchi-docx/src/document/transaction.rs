@@ -3296,7 +3296,7 @@ impl Edit {
             .xml_bytes()
             .get(paragraph_start..paragraph_end)
             .ok_or_else(|| crate::Error::InvalidFormat("paragraph range is outside XML".into()))?;
-        let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+        let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
@@ -3377,7 +3377,7 @@ impl Edit {
             .as_ref()
             .map(|admission| admission.owner_scan(paragraph.len()))
             .transpose()?;
-        let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+        let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
         })?;
@@ -3424,7 +3424,7 @@ impl Edit {
             .map(|admission| admission.owner_scan(base_paragraph.len()))
             .transpose()?;
         let base_owner =
-            scan_text_owner(base_paragraph, b"p").map_err(|reason| Error::Refused {
+            scan_paragraph_text_owner(base_paragraph).map_err(|reason| Error::Refused {
                 position: position.get(),
                 reason,
             })?;
@@ -3702,7 +3702,7 @@ impl Edit {
                 ))
             })?;
             let mut scan_admission = base_admission.owner_scan(paragraph.len())?;
-            let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+            let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
                 position: operation_position.get(),
                 reason,
             })?;
@@ -3952,7 +3952,7 @@ impl Edit {
                 paragraph_end,
                 "paragraph",
             )?;
-            let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
+            let owner = scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
                 position: replacement.position.get(),
                 reason,
             })?;
@@ -4113,10 +4113,11 @@ impl Edit {
                     ))
                 })?;
                 let mut scan = admission.owner_scan(paragraph.len())?;
-                let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
-                    position: replacement.position.get(),
-                    reason,
-                })?;
+                let owner =
+                    scan_paragraph_text_owner(paragraph).map_err(|reason| Error::Refused {
+                        position: replacement.position.get(),
+                        reason,
+                    })?;
                 scan.release_depth();
                 (owner, scan)
             };
@@ -4141,7 +4142,7 @@ impl Edit {
             })?;
             let mut base_scan = base_admission.owner_scan(base_paragraph.len())?;
             let base_owner =
-                scan_text_owner(base_paragraph, b"p").map_err(|reason| Error::Refused {
+                scan_paragraph_text_owner(base_paragraph).map_err(|reason| Error::Refused {
                     position: replacement.position.get(),
                     reason,
                 })?;
@@ -5463,7 +5464,7 @@ impl Edit {
             paragraph_end,
             "table cell paragraph",
         )?;
-        let owner = scan_text_owner(paragraph_xml, b"p").map_err(|reason| Error::Refused {
+        let owner = scan_paragraph_text_owner(paragraph_xml).map_err(|reason| Error::Refused {
             position: table.get(),
             reason,
         })?;
@@ -6537,7 +6538,12 @@ impl Edit {
         })?;
         let replacement_text_bytes = self.checked_text_total(text.len())?;
         let owner_xml = checked_slice(self.projected.xml_bytes(), start, end, "selected owner")?;
-        let owner = scan_text_owner(owner_xml, root_name).map_err(|reason| Error::Refused {
+        let owner = if root_name == b"p" {
+            scan_paragraph_text_owner(owner_xml)
+        } else {
+            scan_text_owner(owner_xml, root_name)
+        }
+        .map_err(|reason| Error::Refused {
             position: error_position,
             reason,
         })?;
@@ -10585,6 +10591,22 @@ fn revision_tag_name_replacement_at(
 }
 
 fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwner, Refusal> {
+    scan_text_owner_with_policy(xml, root_name, false)
+}
+
+/// Scan a paragraph for a text edit that retains its paragraph-level range
+/// markers. Cell replacement and other owner-removal operations deliberately
+/// use the strict scanner above because they may discard the surrounding
+/// owner and cannot silently broaden their preservation policy.
+fn scan_paragraph_text_owner(xml: &[u8]) -> std::result::Result<TextOwner, Refusal> {
+    scan_text_owner_with_policy(xml, b"p", true)
+}
+
+fn scan_text_owner_with_policy(
+    xml: &[u8],
+    root_name: &[u8],
+    preserve_paragraph_markers: bool,
+) -> std::result::Result<TextOwner, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut fragment_prefix = FragmentPrefix::Unseen;
@@ -10749,12 +10771,13 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
                         continue;
                     }
                     if is_fragment_word_element(&namespace, &fragment_prefix)
-                        && !is_preserved_paragraph_marker(
-                            root_name,
-                            &namespace,
-                            element.name(),
-                            &fragment_prefix,
-                        )
+                        && !(preserve_paragraph_markers
+                            && is_preserved_paragraph_marker(
+                                root_name,
+                                &namespace,
+                                element.name(),
+                                &fragment_prefix,
+                            ))
                         && !(root_name == b"p"
                             && is_transaction_fragment_word_name(
                                 &namespace,
@@ -12781,10 +12804,12 @@ fn selected_block_control_paragraph_text(
     paragraph: Position,
 ) -> Result<String> {
     let (start, end) = select_block_control_paragraph(snapshot, controls, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "block control paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "block control paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: controls.first().map_or(0, |position| position.get()),
@@ -12890,10 +12915,12 @@ fn selected_nested_cell_paragraph_text(
     paragraph: Position,
 ) -> Result<String> {
     let (start, end) = select_nested_cell_paragraph(snapshot, path, paragraph)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "nested table paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "nested table paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: path.first().map_or(0, |address| address.table.get()),
@@ -13169,10 +13196,12 @@ fn selected_cell_paragraph_text(
         )?;
     let start = checked_relative_start(selection.start, paragraph_range)?;
     let end = checked_relative_end(selection.start, paragraph_range)?;
-    scan_text_owner(
-        checked_slice(snapshot.xml_bytes(), start, end, "table cell paragraph")?,
-        b"p",
-    )
+    scan_paragraph_text_owner(checked_slice(
+        snapshot.xml_bytes(),
+        start,
+        end,
+        "table cell paragraph",
+    )?)
     .map(|owner| owner.text)
     .map_err(|reason| Error::Refused {
         position: table.get(),
