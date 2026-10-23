@@ -1959,8 +1959,12 @@ impl SourceBackedWorkbook {
             .map_err(crate::source_backed::workbook_error)
     }
 
-    fn ensure_current(&self) -> Result<()> {
+    pub(crate) fn ensure_current(&self) -> std::result::Result<(), SourceBackedError> {
         self.inner.ensure_current()
+    }
+
+    pub(crate) fn needs_source_fence(&self) -> bool {
+        self.inner.needs_source_fence()
     }
 
     /// Reads retained in-memory workbook metadata behind one trailing fence.
@@ -2085,6 +2089,20 @@ impl SourceInner {
     fn ensure_current(&self) -> Result<()> {
         if let Some(fence) = &self.source_fence {
             ensure_current_parts(&fence.source, &fence.cfb, fence.expected_version)?;
+            // A composed target can observe an original-source mutation as an
+            // I/O-shaped failure after the leading original check. Recheck
+            // the retained source before returning that target error so the
+            // handoff owner preserves the typed freshness contract; if the
+            // original is still current, retain the target error boundary.
+            return match ensure_current_parts(&self.source, &self.cfb, self.expected_version) {
+                Ok(()) => Ok(()),
+                Err(target_error) => {
+                    match ensure_current_parts(&fence.source, &fence.cfb, fence.expected_version) {
+                        Err(original_error) => Err(original_error),
+                        Ok(()) => Err(target_error),
+                    }
+                },
+            };
         }
         ensure_current_parts(&self.source, &self.cfb, self.expected_version)
     }

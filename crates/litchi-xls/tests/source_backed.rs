@@ -7,7 +7,9 @@ use litchi_core::{
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
     SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
-    cell_values::Reference, package::Package, raw::Reader,
+    cell_values::Reference,
+    package::{Error as PackageError, Package},
+    raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -2374,6 +2376,83 @@ fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
         source_backed.cell_value_by_index(sheet_index, reference.row(), reference.column()),
         Err(SourceBackedError::SourceChanged { .. })
     ));
+}
+
+fn assert_handoff_package_source_change(
+    operation: impl FnOnce(&Package) -> Result<(), PackageError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ),
+        "expected typed package SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn assert_handoff_source_owner_output_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook) -> Result<(), litchi_xls::source_backed::OutputError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    let workbook = package.source_workbook().unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(workbook).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            litchi_xls::source_backed::OutputError::Package(PackageError::Source(
+                SourceBackedError::SourceChanged { .. }
+            ))
+        ),
+        "expected typed source-owner SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn source_fence_temp_path(prefix: &str) -> std::path::PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    std::env::temp_dir().join(format!(
+        "{prefix}-{}-{}.xls",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+#[test]
+fn deferred_package_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_package_source_change(|package| package.source_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| package.to_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let mut output = Vec::new();
+        package.write_to(&mut output)
+    });
+    assert_handoff_package_source_change(|package| package.reader_ref().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let path = source_fence_temp_path("litchi-xls-source-fence");
+        let result = package.save(&path);
+        let _ = std::fs::remove_file(path);
+        result
+    });
+}
+
+#[test]
+fn handed_off_source_owner_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let mut output = Vec::new();
+        workbook.write_to(&mut output).map(|_| ())
+    });
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let path = source_fence_temp_path("litchi-xls-source-owner-fence");
+        let result = workbook.save(&path).map(|_| ());
+        let _ = std::fs::remove_file(path);
+        result
+    });
 }
 
 #[test]
