@@ -110,18 +110,19 @@ pub(crate) fn refusal(code: Code, message: impl Into<std::borrow::Cow<'static, s
     Error::new(code, message)
 }
 
-/// A leaf staging refusal: the caller's request, not the file, is at fault.
-/// A refusal the leaf names unsupported stays a capability gap.
+/// A leaf staging failure: the caller's request, not the file, is at fault.
+/// Authored invalid values and generic unsupported errors are recoded for the
+/// write call site; a typed refusal keeps its `RefusalKind` classification.
 pub(crate) fn staging_error(error: litchi_core::Error, format: FileFormat) -> Error {
-    let code = if matches!(
-        error,
-        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_)
-    ) {
-        Code::UnsupportedCapability
-    } else {
-        Code::InvalidValue
-    };
-    super::core_error(error, format).caused_by_argument(code)
+    match error {
+        error @ (litchi_core::Error::InvalidFormat(_) | litchi_core::Error::ParseError(_)) => {
+            super::core_error(error, format).caused_by_argument(Code::InvalidValue)
+        },
+        error @ litchi_core::Error::Unsupported(_) => {
+            super::core_error(error, format).caused_by_argument(Code::UnsupportedCapability)
+        },
+        other => super::core_error(other, format),
+    }
 }
 
 /// A leaf commit failure. The source opened, so a candidate the leaf

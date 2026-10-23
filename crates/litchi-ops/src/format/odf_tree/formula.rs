@@ -9,9 +9,8 @@ use litchi_odf_formula::{Element, NodePath, OpaqueStarMath, StarMathVersion};
 use super::tree::{count, text};
 use super::write::{
     Commit, Patch, bound, element_refusal, finish, key_refusal, refusal, required, resolve,
-    staging_error,
 };
-use super::{Flavor, OdfTree, Owner, TreeBuilder, element, writable};
+use super::{Flavor, OdfTree, Owner, TreeBuilder, element, odf_staging_error, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -192,7 +191,7 @@ pub(crate) fn set(
 ) -> Result<Commit> {
     let mut edit = package.edit();
     let mut operations = 0usize;
-    let staging = |error| staging_error(error, FileFormat::Odf);
+    let staging = |error| odf_staging_error(error, FileFormat::Odf);
     for (node, props) in groups
         .iter()
         .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
@@ -350,7 +349,7 @@ pub(crate) fn add(
         }
     }
     let tag = required(tag, "tag")?;
-    let staging = |error| staging_error(error, FileFormat::Odf);
+    let staging = |error| odf_staging_error(error, FileFormat::Odf);
     let mut element =
         Element::new(&tag).map_err(|error| staging(error).with_property("tag".to_owned()))?;
     if let Some(content) = content.filter(|content| !content.is_empty()) {
@@ -425,7 +424,7 @@ pub(crate) fn move_to(
                 (target, position)
             },
         };
-    let staging = |error| staging_error(error, FileFormat::Odf);
+    let staging = |error| odf_staging_error(error, FileFormat::Odf);
     let mut edit = package.edit();
     let element = edit
         .remove(&NodePath::new(route.clone()))
@@ -469,7 +468,7 @@ pub(crate) fn swap(
             element_at(root, &left)?.clone(),
             element_at(root, &right)?.clone(),
         );
-        let staging = |error| staging_error(error, FileFormat::Odf);
+        let staging = |error| odf_staging_error(error, FileFormat::Odf);
         edit.replace(&NodePath::new(left), second)
             .map_err(staging)?;
         edit.replace(&NodePath::new(right), first)
@@ -499,7 +498,7 @@ pub(crate) fn remove(
     let mut edit = package.edit();
     for route in routes {
         edit.remove(&NodePath::new(route))
-            .map_err(|error| staging_error(error, FileFormat::Odf))?;
+            .map_err(|error| odf_staging_error(error, FileFormat::Odf))?;
     }
     commit(file, edit, nodes.len(), limits)
 }

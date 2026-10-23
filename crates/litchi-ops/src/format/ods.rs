@@ -136,7 +136,7 @@ impl Ods {
         spreadsheet: Box<litchi_ods::SourceBackedSpreadsheet>,
         _options: &OpenOptions,
     ) -> Result<Self> {
-        spreadsheet.check_source().map_err(core_error)?;
+        spreadsheet.check_source().map_err(odf_error)?;
         Ok(Self::from_owner(
             OdsOwner::Source {
                 spreadsheet,
@@ -157,7 +157,7 @@ impl Ods {
     /// Adopts an immutable package (creation and committed edits), keeping
     /// `origin` for `File::save`.
     pub(crate) fn from_package(package: Package, origin: Option<Arc<Path>>) -> Result<Self> {
-        let workbook = package.workbook().map_err(core_error)?;
+        let workbook = package.workbook().map_err(odf_error)?;
         Ok(Self::from_owner(
             OdsOwner::Eager { package, workbook },
             origin,
@@ -232,7 +232,7 @@ impl Ods {
     pub(crate) fn check_source(&self) -> Result<()> {
         match self.owner() {
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.check_source().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.check_source().map_err(odf_error),
             _ => Ok(()),
         }
     }
@@ -253,7 +253,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.sheets()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheets().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheets().map_err(odf_error),
             OdsOwner::Flat(flat) => Ok(flat.sheets()),
         }
     }
@@ -264,7 +264,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.definitions()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.definitions().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.definitions().map_err(odf_error),
             OdsOwner::Flat(_) => Ok(&[]),
         }
     }
@@ -275,7 +275,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.content_xml()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.content_xml().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.content_xml().map_err(odf_error),
             OdsOwner::Flat(_) => Err(Error::new(
                 Code::UnsupportedCapability,
                 "flat ODS annotations are not projected into unified nodes",
@@ -299,7 +299,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.sheet_names()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_names().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_names().map_err(odf_error),
             OdsOwner::Flat(flat) => Ok(flat.sheets().iter().map(|s| s.name.clone()).collect()),
         }
     }
@@ -313,7 +313,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.sheet_count()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_count().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_count().map_err(odf_error),
             OdsOwner::Flat(flat) => Ok(flat.sheets().len()),
         }
     }
@@ -343,7 +343,7 @@ impl Ods {
             OdsOwner::Source { spreadsheet, .. } => spreadsheet.text(),
             OdsOwner::Flat(flat) => flat.text(),
         }
-        .map_err(core_error)
+        .map_err(odf_error)
     }
 
     /// Document properties from `meta.xml`, borrowed from the owner.
@@ -351,7 +351,7 @@ impl Ods {
         match self.owner() {
             OdsOwner::Eager { workbook, .. } => Ok(workbook.metadata()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source { spreadsheet, .. } => spreadsheet.metadata().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.metadata().map_err(odf_error),
             OdsOwner::Flat(flat) => Ok(flat.metadata()),
         }
     }
@@ -397,10 +397,10 @@ impl Ods {
                 package,
             } => {
                 if let Some(package) = package.get() {
-                    spreadsheet.check_source().map_err(core_error)?;
+                    spreadsheet.check_source().map_err(odf_error)?;
                     return Ok(package.clone());
                 }
-                let materialized = spreadsheet.materialize().map_err(core_error)?;
+                let materialized = spreadsheet.materialize().map_err(odf_error)?;
                 Ok(package.get_or_init(|| materialized).clone())
             },
             // A flat spreadsheet's edits start from its packaged projection

@@ -5,10 +5,8 @@ use litchi_core::FileFormat;
 use litchi_core::selector::Path;
 
 use super::tree::{length, text};
-use super::write::{
-    Commit, Patch, bound, element_refusal, finish, key_refusal, refusal, staging_error,
-};
-use super::{Flavor, Node, OdfTree, Owner, TreeBuilder, element, writable};
+use super::write::{Commit, Patch, bound, element_refusal, finish, key_refusal, refusal};
+use super::{Flavor, Node, OdfTree, Owner, TreeBuilder, element, odf_staging_error, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -218,7 +216,7 @@ pub(crate) fn set(
     let image = package.image();
     let mut edit = package.edit();
     let mut operations = 0usize;
-    let staging = |error| staging_error(error, FileFormat::Odi);
+    let staging = |error| odf_staging_error(error, FileFormat::Odi);
     for (node, props) in groups
         .iter()
         .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
@@ -313,7 +311,7 @@ pub(crate) fn set(
 
 /// A frame staging failure: the leaf's or the unified layer's.
 enum Staged {
-    Leaf(litchi_core::Error),
+    Leaf(litchi_odf_common::Error),
     Unified(crate::Error),
 }
 
