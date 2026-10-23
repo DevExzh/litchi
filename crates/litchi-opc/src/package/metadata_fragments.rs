@@ -350,6 +350,7 @@ pub(super) struct FragmentPlan<'a> {
     entry_count: usize,
     event_bound: usize,
     noop: bool,
+    limits: SourceLimits,
 }
 
 impl std::fmt::Debug for FragmentPlan<'_> {
@@ -370,6 +371,10 @@ impl<'a> FragmentPlan<'a> {
         edits: &[FragmentEdit<'a>],
         limits: SourceLimits,
     ) -> Result<Self> {
+        // A durable plan may tighten the source token's admission, but a
+        // caller-provided profile must never widen the policy that admitted
+        // the token in the first place.
+        let limits = source.limits().min(limits);
         kind.admit_edit_count(edits.len(), limits)?;
         let catalog =
             Fragments::from_bytes_with_limits(kind.clone(), Arc::clone(&source.bytes), limits)?;
@@ -581,6 +586,7 @@ impl<'a> FragmentPlan<'a> {
             entry_count,
             event_bound,
             noop: false,
+            limits,
         };
         plan.admit(limits)?;
         let mut offset = 0usize;
@@ -644,6 +650,7 @@ impl FragmentPlan<'_> {
 
     /// Revalidate the final graph and return an owned XML token plus binding.
     pub(super) fn materialize(self, limits: SourceLimits) -> Result<(OwnedXmlPart, Parsed)> {
+        let limits = self.limits.min(limits);
         self.admit(limits)?;
         let kind = &self.catalog.kind;
         if self.noop {
@@ -654,7 +661,7 @@ impl FragmentPlan<'_> {
                 limits,
             )?;
             let parsed = kind.parse(self.source.bytes(), limits)?;
-            return Ok((self.source.clone(), parsed));
+            return Ok((self.source.with_limits(limits), parsed));
         }
         let mut output = Vec::new();
         output

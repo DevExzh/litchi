@@ -36,6 +36,7 @@ pub struct ContentTypeEdit<'a> {
 pub struct ContentTypesEditPlan<'source> {
     source: &'source super::OwnedContentTypes,
     inner: crate::source_backed::content_types_plan::ContentTypesPlan<'source>,
+    limits: SourceLimits,
 }
 
 impl<'source> ContentTypesEditPlan<'source> {
@@ -67,6 +68,7 @@ impl<'source> ContentTypesEditPlan<'source> {
     /// have admitted the exact plan metrics.
     pub fn materialize(self, limits: SourceLimits) -> Result<super::OwnedContentTypes> {
         let source = self.source;
+        let limits = self.limits.min(limits);
         limits.check(
             SourceLimitKind::ContentTypesBytes,
             self.inner.final_len() as u64,
@@ -101,8 +103,12 @@ impl<'source> ContentTypesEditPlan<'source> {
                 source.bytes(),
                 limits,
             )?;
+            let binding = Arc::clone(&source.binding);
             crate::content_type::ContentTypeMap::from_xml(source.bytes(), limits)?;
-            return Ok(source.clone());
+            return Ok(super::OwnedContentTypes {
+                xml: source.xml.with_limits(limits),
+                binding,
+            });
         }
         let bytes = self.inner.materialize_public(limits)?;
         let binding = SharedArc::new(crate::content_type::ContentTypeMap::from_xml(
@@ -152,6 +158,7 @@ impl super::OwnedContentTypes {
         default_removals: &[&str],
         limits: SourceLimits,
     ) -> Result<ContentTypesEditPlan<'source>> {
+        let limits = self.xml.limits().min(limits);
         limits.check(
             SourceLimitKind::ContentTypesBytes,
             self.xml.bytes().len() as u64,
@@ -212,6 +219,7 @@ impl super::OwnedContentTypes {
         Ok(ContentTypesEditPlan {
             source: self,
             inner,
+            limits,
         })
     }
 }
@@ -324,8 +332,11 @@ pub(crate) fn without_part_overrides(
     parts: &[PackURI],
     max_output_bytes: usize,
 ) -> Result<OwnedXmlPart> {
-    let limits = SourceLimits::default();
-    let maximum = max_output_bytes.min(limits.max_content_types_bytes());
+    let limits = source.limits();
+    let maximum = max_output_bytes
+        .min(limits.max_content_types_bytes())
+        .min(usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX))
+        .min(usize::try_from(limits.max_entry_bytes()).unwrap_or(usize::MAX));
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
             "content-types source exceeds the requested output limit".into(),
@@ -472,8 +483,11 @@ pub(crate) fn preflight_part_overrides(
     overrides: &[(&PackURI, &str)],
     max_output_bytes: usize,
 ) -> Result<(usize, usize)> {
-    let limits = SourceLimits::default();
-    let maximum = max_output_bytes.min(limits.max_content_types_bytes());
+    let limits = source.limits();
+    let maximum = max_output_bytes
+        .min(limits.max_content_types_bytes())
+        .min(usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX))
+        .min(usize::try_from(limits.max_entry_bytes()).unwrap_or(usize::MAX));
     if source.bytes().len() > maximum {
         return Err(OpcError::InvalidContentTypesManifest(
             "content-types source exceeds the requested output limit".into(),
@@ -692,10 +706,11 @@ pub(crate) fn with_part_overrides(
         append_override_bytes(&mut bytes, &element_name, overrides);
     }
     bytes.extend_from_slice(&source.bytes()[range.end..]);
-    OwnedXmlPart::capture(
+    OwnedXmlPart::capture_with_limits(
         source.name.clone(),
         source.content_type.clone(),
         SharedArc::new(bytes),
+        source.limits(),
     )
 }
 
@@ -1064,6 +1079,35 @@ mod tests {
             with_part_overrides(&source, &[(&part, "application/inkml+xml")], 4096).unwrap();
         let text = std::str::from_utf8(output.bytes()).unwrap();
         assert!(text.ends_with("<!--tail--><?keep?>\n"));
+    }
+
+    #[test]
+    fn content_type_token_keeps_source_policy_for_authored_overrides() {
+        let bytes = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#;
+        let limits = SourceLimits::builder()
+            .max_content_types_bytes(bytes.len())
+            .unwrap()
+            .max_part_bytes(bytes.len() as u64)
+            .unwrap()
+            .max_entry_bytes(bytes.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let xml = OwnedXmlPart::capture_with_limits(
+            PackURI::new("/[Content_Types].xml").unwrap(),
+            "application/xml".to_owned(),
+            SharedArc::new(bytes.to_vec()),
+            limits,
+        )
+        .unwrap();
+        let binding =
+            SharedArc::new(crate::content_type::ContentTypeMap::from_xml(bytes, limits).unwrap());
+        let source = super::super::OwnedContentTypes { xml, binding };
+        let part = PackURI::new("/word/new.xml").unwrap();
+        assert!(
+            with_part_overrides(&source.xml, &[(&part, "application/xml")], usize::MAX,).is_err()
+        );
+        assert_eq!(source.xml.limits(), limits);
     }
 
     #[test]

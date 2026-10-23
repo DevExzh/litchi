@@ -124,7 +124,10 @@ impl std::fmt::Debug for ContentTypeFragmentPlan<'_> {
 impl OwnedContentTypes {
     /// Capture exact Default and Override entries for a durable metadata delta.
     pub fn fragments_with_limits(&self, limits: SourceLimits) -> Result<ContentTypeFragments> {
-        ContentTypeFragments::from_bytes_with_limits(Arc::clone(&self.xml.bytes), limits)
+        ContentTypeFragments::from_bytes_with_limits(
+            Arc::clone(&self.xml.bytes),
+            self.xml.limits().min(limits),
+        )
     }
     /// Plan exact mapping deltas while retaining unrelated destination XML.
     ///
@@ -136,6 +139,7 @@ impl OwnedContentTypes {
         edits: &[ContentTypeFragmentEdit<'a>],
         limits: SourceLimits,
     ) -> Result<ContentTypeFragmentPlan<'a>> {
+        let limits = self.xml.limits().min(limits);
         Kind::ContentTypes.admit_edit_count(edits.len(), limits)?;
         let mut inner_edits = Vec::new();
         inner_edits

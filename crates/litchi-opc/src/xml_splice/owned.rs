@@ -59,11 +59,16 @@ struct ElementBounds {
 /// [`bytes`](Self::bytes), counting a leading UTF-8 byte-order mark: slice
 /// the bytes to find the tag (change 0765; before it, the scanner compared
 /// ranges with reader positions that skip the mark).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct OwnedXmlPart {
     pub(crate) name: PackURI,
     pub(crate) content_type: String,
     pub(crate) bytes: Arc<Vec<u8>>,
+    /// The source policy that admitted these bytes.  This is metadata about
+    /// admission rather than content identity: a token captured under a
+    /// permissive profile remains content-equal to the same bytes captured
+    /// under a tighter recipient profile, which may re-admit them below.
+    pub(crate) limits: SourceLimits,
 }
 
 impl fmt::Debug for OwnedXmlPart {
@@ -75,7 +80,57 @@ impl fmt::Debug for OwnedXmlPart {
     }
 }
 
+impl PartialEq for OwnedXmlPart {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.content_type == other.content_type
+            && self.bytes == other.bytes
+    }
+}
+
+impl Eq for OwnedXmlPart {}
+
 impl OwnedXmlPart {
+    /// Return the admission policy retained by this source token.
+    pub(crate) const fn limits(&self) -> SourceLimits {
+        self.limits
+    }
+
+    /// Re-admit this exact token under a caller policy without widening the
+    /// policy that originally admitted it.  The bytes remain shared and no
+    /// parser pass is needed when the caller only tightens the profile.
+    pub(crate) fn with_limits(&self, limits: SourceLimits) -> Self {
+        let mut token = self.clone();
+        token.limits = self.limits.min(limits);
+        token
+    }
+
+    /// Whether this token's existing proof is at least as strict as the
+    /// requested recipient profile.  Content equality deliberately ignores
+    /// policy; callers with a wider token must perform a recipient preflight.
+    pub(crate) fn is_admitted_under(&self, limits: SourceLimits) -> bool {
+        self.limits.min(limits) == self.limits
+    }
+
+    /// Revalidate only when a recipient asks for a stricter profile than the
+    /// one that admitted this token.  This keeps equal-content cross-package
+    /// replay independent of producer provenance while preserving the
+    /// recipient's own byte, XML and namespace ceilings before mutation.
+    pub(crate) fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+        if self.is_admitted_under(limits) {
+            Ok(())
+        } else {
+            Self::preflight_capture_with_limits(&self.name, &self.content_type, &self.bytes, limits)
+        }
+    }
+
+    fn max_output_bytes(&self, requested: usize) -> usize {
+        requested
+            .min(MAX_OWNED_XML_BYTES)
+            .min(usize::try_from(self.limits.max_part_bytes()).unwrap_or(usize::MAX))
+            .min(usize::try_from(self.limits.max_entry_bytes()).unwrap_or(usize::MAX))
+    }
+
     pub(crate) fn check_capture_member_name(name: &PackURI, limits: SourceLimits) -> Result<()> {
         limits.check(
             crate::SourceLimitKind::ArchiveMemberNameBytes,
@@ -161,7 +216,7 @@ impl OwnedXmlPart {
         updates: &[OwnedAttributeUpdate<'_>],
         max_output_bytes: usize,
     ) -> Result<Self> {
-        let maximum = max_output_bytes.min(MAX_OWNED_XML_BYTES);
+        let maximum = self.max_output_bytes(max_output_bytes);
         if updates.len() > MAX_EDITS {
             return Err(invalid_source("too many owned XML attribute updates"));
         }
@@ -311,6 +366,7 @@ impl OwnedXmlPart {
         if size > maximum {
             return Err(invalid_source("owned XML output exceeds limit"));
         }
+        Self::check_capture_bytes(size, self.limits)?;
         if splices.is_empty() {
             return Ok(self.clone());
         }
@@ -341,11 +397,12 @@ impl OwnedXmlPart {
             cursor = splice.range.end;
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, self.limits, None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
             bytes: Arc::new(bytes),
+            limits: self.limits,
         })
     }
 
@@ -386,6 +443,7 @@ impl OwnedXmlPart {
             name,
             content_type,
             bytes,
+            limits,
         })
     }
 
@@ -444,7 +502,7 @@ impl OwnedXmlPart {
                 part: self.name.to_string(),
                 source,
             })?;
-            validate_source_xml(&self.name, element, SourceLimits::default(), None)?;
+            validate_source_xml(&self.name, element, self.limits, None)?;
         }
         let value = element.unwrap_or_default();
         let range = if append {
@@ -472,6 +530,7 @@ impl OwnedXmlPart {
         if size > MAX_OWNED_XML_BYTES {
             return Err(invalid_source("owned XML output exceeds 32 MiB"));
         }
+        Self::check_capture_bytes(size, self.limits)?;
         let mut bytes = Vec::new();
         bytes
             .try_reserve_exact(size)
@@ -490,11 +549,12 @@ impl OwnedXmlPart {
             bytes.push(b'>');
         }
         bytes.extend_from_slice(&self.bytes[range.end..]);
-        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, self.limits, None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
             bytes: Arc::new(bytes),
+            limits: self.limits,
         })
     }
 
@@ -592,6 +652,7 @@ impl OwnedXmlPart {
         if size > MAX_OWNED_XML_BYTES {
             return Err(invalid_source("owned XML output exceeds 32 MiB"));
         }
+        Self::check_capture_bytes(size, self.limits)?;
         if escaped_value
             .iter()
             .any(|b| matches!(b, b'\'' | b'"' | b'<' | b'\t' | b'\n' | b'\r'))
@@ -640,11 +701,12 @@ impl OwnedXmlPart {
         bytes.extend_from_slice(escaped_value);
         bytes.push(b'"');
         bytes.extend_from_slice(&self.bytes[insertion..]);
-        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, self.limits, None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
             bytes: Arc::new(bytes),
+            limits: self.limits,
         })
     }
 
@@ -694,6 +756,7 @@ impl OwnedXmlPart {
         if size > MAX_OWNED_XML_BYTES {
             return Err(invalid_source("owned XML output exceeds 32 MiB"));
         }
+        Self::check_capture_bytes(size, self.limits)?;
         let mut reader = NsReader::from_reader(self.bytes.as_slice());
         let mut checked = 0;
         loop {
@@ -740,11 +803,12 @@ impl OwnedXmlPart {
             cursor = range.end;
         }
         bytes.extend_from_slice(&self.bytes[cursor..]);
-        validate_source_xml(&self.name, &bytes, SourceLimits::default(), None)?;
+        validate_source_xml(&self.name, &bytes, self.limits, None)?;
         Ok(Self {
             name: self.name.clone(),
             content_type: self.content_type.clone(),
             bytes: Arc::new(bytes),
+            limits: self.limits,
         })
     }
 }
@@ -770,6 +834,20 @@ mod tests {
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
         OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+    }
+
+    fn source_with_limits(xml: &[u8], limits: SourceLimits) -> OpcPackage {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
+        writer.write_stored("part.xml", xml).unwrap();
+        OpcPackage::from_bytes_with_limits(&writer.finish_to_bytes().unwrap(), limits).unwrap()
+    }
+
+    fn bounded_xml() -> Vec<u8> {
+        let mut xml = b"<root><!--".to_vec();
+        xml.extend(std::iter::repeat_n(b'x', 160));
+        xml.extend_from_slice(b"--><old/></root>");
+        xml
     }
 
     #[test]
@@ -1518,5 +1596,75 @@ mod tests {
             Err(OpcError::SourceBackedOverlayUnavailable { reason })
                 if reason.contains("32 MiB")
         ));
+    }
+
+    #[test]
+    fn owned_xml_edits_retain_custom_admission_and_reject_before_mutation() {
+        let xml = bounded_xml();
+        let limits = SourceLimits::builder()
+            .max_part_bytes(xml.len() as u64)
+            .unwrap()
+            .max_entry_bytes(xml.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let package = source_with_limits(&xml, limits);
+        let name = PackURI::new("/part.xml").unwrap();
+        let token = package.source_xml_part(&name).unwrap();
+        assert_eq!(token.limits(), limits);
+        let before = token.bytes().to_vec();
+        assert!(token.append_element(0..6, b"<added/>").is_err());
+        assert!(
+            token
+                .update_elements(
+                    &[OwnedElementUpdate {
+                        start_tag: 0..6,
+                        edit: OwnedElementEdit::AppendChild(b"<added/>")
+                    }],
+                    usize::MAX,
+                )
+                .is_err()
+        );
+        assert_eq!(token.bytes(), before.as_slice());
+    }
+
+    #[test]
+    fn equal_content_replay_revalidates_wider_token_for_tight_recipient() {
+        let xml = bounded_xml();
+        let recipient_limits = SourceLimits::builder()
+            .max_part_bytes(xml.len() as u64)
+            .unwrap()
+            .max_entry_bytes(xml.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let producer = source(&xml);
+        let recipient = source_with_limits(&xml, recipient_limits);
+        let name = PackURI::new("/part.xml").unwrap();
+        let replacement = producer.source_xml_part(&name).unwrap();
+        let mut recipient = recipient;
+        recipient
+            .try_replace_owned_xml_part(&xml, replacement)
+            .unwrap();
+        assert_eq!(recipient.get_part(&name).unwrap().blob(), xml.as_slice());
+
+        let oversized_bytes = format!(
+            "<root><old/><larger>{}</larger></root>",
+            "x".repeat(xml.len())
+        )
+        .into_bytes();
+        let oversized = OwnedXmlPart::capture(
+            name.clone(),
+            "application/xml".to_owned(),
+            Arc::new(oversized_bytes),
+        )
+        .unwrap();
+        let mut rejected = source_with_limits(&xml, recipient_limits);
+        assert!(
+            rejected
+                .try_replace_owned_xml_part(&xml, oversized)
+                .is_err()
+        );
+        assert_eq!(rejected.get_part(&name).unwrap().blob(), xml.as_slice());
     }
 }

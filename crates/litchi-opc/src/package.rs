@@ -406,10 +406,7 @@ impl OwnedContentTypes {
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }
-        let binding = Arc::new(ContentTypeMap::from_xml(
-            &xml.bytes,
-            SourceLimits::default(),
-        )?);
+        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, xml.limits())?);
         Ok(Self { xml, binding })
     }
 
@@ -433,10 +430,7 @@ impl OwnedContentTypes {
         if std::ptr::eq(xml.bytes(), self.xml.bytes()) {
             return Ok(self.clone());
         }
-        let binding = Arc::new(ContentTypeMap::from_xml(
-            &xml.bytes,
-            SourceLimits::default(),
-        )?);
+        let binding = Arc::new(ContentTypeMap::from_xml(&xml.bytes, xml.limits())?);
         Ok(Self { xml, binding })
     }
 }
@@ -894,6 +888,7 @@ impl OpcPackage {
     /// not grant source-replacement authority. Use the retained projection
     /// first when an exact publication view is needed.
     pub fn authored_content_types_xml(&self, limits: SourceLimits) -> Result<Arc<Vec<u8>>> {
+        let limits = self.read_limits.min(limits);
         Ok(Arc::new(
             crate::pkgwriter::authored_content_types_xml_with_limits(self, limits)?,
         ))
@@ -907,6 +902,7 @@ impl OpcPackage {
         &self,
         limits: SourceLimits,
     ) -> Result<OwnedContentTypes> {
+        let limits = self.read_limits.min(limits);
         let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
         crate::OwnedXmlPart::check_capture_member_name(&name, limits)?;
         let retained = match (
@@ -967,6 +963,7 @@ impl OpcPackage {
         replacement: Arc<Vec<u8>>,
         limits: SourceLimits,
     ) -> Result<bool> {
+        let limits = self.read_limits.min(limits);
         let current = self.source_content_types_with_limits(limits)?;
         if current.bytes() != expected {
             return Err(OpcError::InvalidContentTypesManifest(
@@ -1027,6 +1024,7 @@ impl OpcPackage {
         replacement: &OwnedContentTypes,
         limits: SourceLimits,
     ) -> Result<bool> {
+        let limits = self.read_limits.min(limits);
         let current = self.source_content_types_with_limits(limits)?;
         if current.bytes() != expected {
             return Err(OpcError::InvalidContentTypesManifest(
@@ -1831,7 +1829,12 @@ impl OpcPackage {
                 "part storage differs from its visible XML".into(),
             ));
         }
-        crate::OwnedXmlPart::capture(name.clone(), part.content_type().into(), bytes)
+        crate::OwnedXmlPart::capture_with_limits(
+            name.clone(),
+            part.content_type().into(),
+            bytes,
+            self.read_limits,
+        )
     }
 
     /// Replace one exact expected XML source with a validated provenance token.
@@ -1854,6 +1857,10 @@ impl OpcPackage {
                 "stale owned XML part replacement".into(),
             ));
         }
+        // A token may have been captured under a broader producer profile.
+        // Re-admit it under this package's retained profile before installing
+        // provenance; content equality alone must never widen the recipient.
+        replacement.preflight_under(self.read_limits)?;
         // These bytes are recorded as the part's source provenance below, and
         // provenance exempts a payload from the writer's publication audit
         // (change 0665). They came from the caller, so audit them now, before
@@ -1903,6 +1910,7 @@ impl OpcPackage {
         if self.requires_signature_edit_policy() {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
+        source.preflight_under(self.read_limits)?;
         let mut part = crate::BlobPart::new_shared(source.name, source.content_type, source.bytes);
         // The part is recorded as source provenance below, and provenance
         // exempts a payload from the writer's publication audit (change
@@ -2239,7 +2247,8 @@ impl OpcPackage {
         replacement_relationships: &OwnedRelationships,
         mut parts: Vec<Box<dyn Part + Send + Sync>>,
     ) -> Result<()> {
-        let current_content_types = self.source_content_types_with_limits(self.read_limits)?;
+        let limits = self.read_limits;
+        let current_content_types = self.source_content_types_with_limits(limits)?;
         if current_content_types.bytes() != expected_content_types {
             return Err(OpcError::InvalidContentTypesManifest(
                 "stale content-types source replacement".to_owned(),
@@ -2268,10 +2277,29 @@ impl OpcPackage {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
 
-        let replacement_relationships_parsed = PackageReader::parse_owned_relationships(
-            replacement_relationships.bytes(),
-            replacement_relationships.owner(),
-        )?;
+        // A source token's retained binding proves only its producer policy.
+        // Re-admit both replacement members under this recipient before any
+        // graph validation or package mutation.  The XML preflight covers
+        // generic member/part ceilings; the typed parses cover their own
+        // mapping, event and relationship dimensions.
+        replacement_content_types.xml.preflight_under(limits)?;
+        let replacement_content_types_binding = Arc::new(ContentTypeMap::from_xml(
+            replacement_content_types.bytes(),
+            limits,
+        )?);
+        if replacement_content_types_binding.as_ref() != replacement_content_types.binding.as_ref()
+        {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-types replacement binding does not match its XML".to_owned(),
+            ));
+        }
+        replacement_relationships.xml.preflight_under(limits)?;
+        let replacement_relationships_parsed =
+            PackageReader::parse_owned_relationships_with_limits(
+                replacement_relationships.bytes(),
+                replacement_relationships.owner(),
+                limits,
+            )?;
         let replacement_relationship_binding =
             RelationshipBinding::from_relationships(&replacement_relationships_parsed)?;
         if !replacement_relationships.member_present()
@@ -2291,8 +2319,7 @@ impl OpcPackage {
         for part in &parts {
             let name = part.partname();
             self.validate_new_part_name(name)?;
-            let declared = replacement_content_types
-                .binding
+            let declared = replacement_content_types_binding
                 .lookup(name)
                 .ok_or_else(|| OpcError::ContentTypeNotFound(name.to_string()))?;
             if declared.as_str() != part.content_type() {
@@ -2311,8 +2338,7 @@ impl OpcPackage {
             }
         }
         for part in self.parts.values() {
-            let declared = replacement_content_types
-                .binding
+            let declared = replacement_content_types_binding
                 .lookup(part.partname())
                 .ok_or_else(|| OpcError::ContentTypeNotFound(part.partname().to_string()))?;
             if declared.as_str() != part.content_type() {
@@ -2372,7 +2398,7 @@ impl OpcPackage {
             verified_metadata_token(
                 &replacement_content_types.xml.name,
                 Arc::clone(&replacement_content_types.xml.bytes),
-                self.read_limits.max_content_types_bytes(),
+                limits.max_content_types_bytes(),
             )?;
         }
         if replacement_relationships.member_present()
@@ -2385,7 +2411,7 @@ impl OpcPackage {
             verified_metadata_token(
                 &member,
                 replacement_relationships.bytes_arc(),
-                self.read_limits.max_relationship_xml_bytes(),
+                limits.max_relationship_xml_bytes(),
             )?;
         }
         self.source_xml_parts
@@ -2442,7 +2468,7 @@ impl OpcPackage {
                 .remove(replacement_relationships.owner());
         }
         self.source_content_types_xml = Some(Arc::clone(&replacement_content_types.xml.bytes));
-        self.source_content_types = Some(Arc::clone(&replacement_content_types.binding));
+        self.source_content_types = Some(replacement_content_types_binding);
         Ok(())
     }
 
@@ -4642,15 +4668,12 @@ mod tests {
             .unwrap();
         let package = OpcPackage::from_vec_with_limits(archive, explicit).unwrap();
 
-        assert!(matches!(
-            package.source_content_types(),
-            Err(OpcError::Limit {
-                kind: crate::SourceLimitKind::ContentTypesBytes,
-                ..
-            })
-        ));
+        // The compatibility wrapper inherits the owner's admitted policy;
+        // it must not silently widen to the process default or reject a
+        // source that was explicitly admitted at ingress.
         let captured = package.source_content_types_with_limits(explicit).unwrap();
         assert_eq!(captured.bytes(), content_types.as_slice());
+        assert_eq!(package.source_content_types().unwrap(), captured);
 
         let saved = crate::PackageWriter::to_bytes(&package).unwrap();
         let saved_archive = soapberry_zip::office::ArchiveReader::new(&saved).unwrap();
@@ -4800,6 +4823,63 @@ mod tests {
                 .source_relationships(&owner)
                 .unwrap()
                 .member_present()
+        );
+    }
+
+    #[test]
+    fn batch_source_tokens_re_admit_broad_metadata_under_recipient_limits() {
+        let archive = create_minimal_docx();
+        let producer = OpcPackage::from_bytes(&archive).unwrap();
+        let root = PackURI::new(PACKAGE_URI).unwrap();
+        let broad_content_types = producer.source_content_types().unwrap();
+        let expected_relationships = producer.source_relationships(&root).unwrap();
+        let broad_relationships = expected_relationships
+            .with_relationship(
+                "urn:test:large",
+                &format!("https://example.test/{}", "x".repeat(4096)),
+                "rId-large",
+                crate::TargetMode::External,
+                usize::MAX,
+            )
+            .unwrap();
+        let largest_existing_relationship = producer
+            .source_relationships_xml
+            .values()
+            .map(|source| source.bytes.len())
+            .max()
+            .unwrap();
+        let recipient_limits = SourceLimits::builder()
+            .max_relationship_xml_bytes(largest_existing_relationship)
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut recipient = OpcPackage::from_bytes_with_limits(&archive, recipient_limits).unwrap();
+        let expected_content_types = recipient.source_content_types().unwrap();
+        let current_relationships = recipient.source_relationships(&root).unwrap();
+        let before = crate::PackageWriter::to_bytes(&recipient).unwrap();
+
+        let error = recipient
+            .try_add_parts_with_source_tokens(
+                expected_content_types.bytes(),
+                &broad_content_types,
+                current_relationships.bytes(),
+                &broad_relationships,
+                Vec::new(),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            OpcError::Limit {
+                kind: crate::SourceLimitKind::RelationshipXmlBytes,
+                observed,
+                maximum,
+            } if observed == broad_relationships.bytes().len() as u64
+                && maximum == largest_existing_relationship as u64
+        ));
+        assert_eq!(crate::PackageWriter::to_bytes(&recipient).unwrap(), before);
+        assert_eq!(
+            recipient.source_relationships(&root).unwrap(),
+            current_relationships
         );
     }
 
