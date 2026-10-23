@@ -164,9 +164,10 @@ impl Package {
         &self,
         patch: &crate::cell_values::structure::Patch,
     ) -> Result<crate::cell_values::structure::Commit> {
-        Ok(crate::cell_values::structure::Commit::published(
+        Ok(crate::cell_values::structure::Commit::new(
             patch.apply_to_package(self)?,
             patch.clone(),
+            litchi_core::edit::Diagnostics::new(!patch.is_noop()),
         ))
     }
 

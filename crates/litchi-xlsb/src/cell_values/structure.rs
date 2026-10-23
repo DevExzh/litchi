@@ -1476,14 +1476,8 @@ impl Edit {
             raw_limits: self.base.raw_limits_value(),
         };
         let _bounded_encoding = patch.to_bytes(self.limits)?;
-        let diagnostics = Diagnostics {
-            changed: !patch.is_noop(),
-        };
-        Ok(Commit {
-            package,
-            patch,
-            diagnostics,
-        })
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(package, patch, diagnostics))
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
@@ -1548,72 +1542,9 @@ impl Edit {
 }
 
 /// A validated workbook transaction ready for atomic publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    package: crate::Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
-/// Content-free summary of a committed structural transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the exact canonical package image changed.
-    ///
-    /// A staged operation can leave the image unchanged; an inverse patch can
-    /// change it without retaining forward operations.
-    #[must_use]
-    pub const fn changed(self) -> bool {
-        self.changed
-    }
-}
-
-impl Commit {
-    pub(crate) fn published(package: crate::Package, patch: Patch) -> Self {
-        let diagnostics = Diagnostics {
-            changed: !patch.is_noop(),
-        };
-        Self {
-            package,
-            patch,
-            diagnostics,
-        }
-    }
-
-    /// Validated package produced by this transaction.
-    #[must_use]
-    pub const fn package(&self) -> &crate::Package {
-        &self.package
-    }
-
-    /// Consume the commit and retain its package.
-    #[must_use]
-    pub fn into_package(self) -> crate::Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and durable patch.
-    #[must_use]
-    pub fn into_parts(self) -> (crate::Package, Patch) {
-        (self.package, self.patch)
-    }
-
-    /// Summary computed from the validated package images at commit time.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Exact-source durable patch carried by this commit.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
+pub use litchi_core::edit::Diagnostics;
 
 /// An exact before/after workbook patch with semantic replay operations.
 #[derive(Debug, Clone)]

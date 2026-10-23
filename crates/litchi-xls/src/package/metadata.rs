@@ -137,19 +137,7 @@ impl From<litchi_ole_common::Error> for Error {
 /// A metadata transaction result.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// What a metadata commit did.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the committed package differs from its source.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
+pub use litchi_core::edit::Diagnostics;
 
 /// An exact-source, reversible metadata patch.
 #[derive(Clone, PartialEq, Eq)]
@@ -197,55 +185,8 @@ impl Patch {
     }
 }
 
-/// A published metadata transaction.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("patch", &self.patch)
-            .field("diagnostics", &self.diagnostics)
-            .finish_non_exhaustive()
-    }
-}
-
-impl Commit {
-    /// The published package.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// The reversible patch from the source package.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit did.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume the commit into its package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// Consume the commit into its package and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
+/// A published metadata transaction with the shared commit triad.
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
@@ -333,13 +274,12 @@ impl Edit {
         } else {
             republish(&base, after.to_vec())?
         };
-        Ok(Commit {
+        let changed = before != after;
+        Ok(Commit::new(
             package,
-            diagnostics: Diagnostics {
-                changed: before != after,
-            },
-            patch: Patch { before, after },
-        })
+            Patch { before, after },
+            Diagnostics::new(changed),
+        ))
     }
 }
 
@@ -371,11 +311,11 @@ impl Package {
         } else {
             self.clone()
         };
-        Ok(Commit {
+        Ok(Commit::new(
             package,
-            diagnostics: Diagnostics { changed },
-            patch: patch.clone(),
-        })
+            patch.clone(),
+            Diagnostics::new(changed),
+        ))
     }
 }
 
@@ -388,14 +328,14 @@ fn protected(error: crate::Error) -> Error {
 
 fn unchanged(base: Package) -> Result<Commit> {
     let bytes: Arc<[u8]> = Arc::from(base.to_bytes()?);
-    Ok(Commit {
-        package: base,
-        diagnostics: Diagnostics { changed: false },
-        patch: Patch {
+    Ok(Commit::new(
+        base,
+        Patch {
             before: Arc::clone(&bytes),
             after: bytes,
         },
-    })
+        Diagnostics::new(false),
+    ))
 }
 
 /// Admit edited bytes under the source package's retained policy.
