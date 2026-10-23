@@ -35,7 +35,8 @@ The fair implementation comparison is the source snapshot at `9b1f96d6dc`
 (the concrete eager-cell iterator is already present, but the deferred
 source-backed cell reopen is not) against the source-backed-cell candidate.
 For an implementation-only comparison the candidate is `f05a395359`; the
-assembled candidate currently under qualification is `8acd229235`. If the
+assembled candidate currently under qualification is `8acd229235` plus the
+deferred-source freshness fix `8d491b1e8f`. If the
 assembled candidate is used, the receipt must retain its full source hash and
 list the post-`f05a395359` XLS changes; no result may be attributed solely to
 F3 without that control. The harness source
@@ -70,6 +71,8 @@ PROBE_COMMITS=(
   b03aaf1aace43fab45666dc3a1507f3da5922d5a
   28d4a7c49f95c6947dd387b4cdea3721a15c1544
   a9acffd972c827b5c9ad4c4084cf1bc2022470c4
+  b3f2a5ad324af29bccb33e77457e13363b84005f
+  6ff38d7c12b75353f324385cf19a358f8ece4c25
 )
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235

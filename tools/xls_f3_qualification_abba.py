@@ -49,6 +49,10 @@ CANDIDATE_LINEAGE = "8acd229235e3c01c6e529f6d1f055d84b8e03de4"
 PROBE_COMMITS = (
     "d8fe3bcacb0c51cf354314393f93cef0a393e157",
     "b03aaf1aace43fab45666dc3a1507f3da5922d5a",
+    "28d4a7c49f95c6947dd387b4cdea3721a15c1544",
+    "a9acffd972c827b5c9ad4c4084cf1bc2022470c4",
+    "b3f2a5ad324af29bccb33e77457e13363b84005f",
+    "6ff38d7c12b75353f324385cf19a358f8ece4c25",
 )
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",
