@@ -859,7 +859,7 @@ fn page_rename_preserves_unrelated_existing_duplicate_names() {
 }
 
 #[test]
-fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
+fn joined_payload_effects_cover_forged_cross_sub_edit_writes() {
     let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let (forged_replacement, _) =
@@ -896,10 +896,10 @@ fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
     let mut retry = source.edit();
     assert!(retry.join(recovered).is_err());
 
-    let mut one_edit = source.edit();
-    one_edit.set_page_name(0, "Duplicate once").unwrap();
-    let mut duplicate_wire: serde_json::Value = serde_json::from_slice(
-        &one_edit
+    let mut first_edit = source.edit();
+    first_edit.set_page_name(0, "Duplicate once").unwrap();
+    let first_wire: serde_json::Value = serde_json::from_slice(
+        &first_edit
             .commit()
             .unwrap()
             .patch()
@@ -909,11 +909,24 @@ fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
             .unwrap(),
     )
     .unwrap();
-    let operation = duplicate_wire["operations"][0].clone();
-    duplicate_wire["operations"]
-        .as_array_mut()
-        .unwrap()
-        .push(operation);
+    let mut second_edit = source.edit();
+    second_edit.set_page_name(0, "Duplicate twice").unwrap();
+    let second_wire: serde_json::Value = serde_json::from_slice(
+        &second_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let first_operation = first_wire["operations"][0].clone();
+    let second_operation = second_wire["operations"][0].clone();
+    let mut duplicate_wire = first_wire;
+    duplicate_wire["operations"] =
+        serde_json::Value::Array(vec![first_operation, second_operation]);
     let duplicate =
         edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&duplicate_wire).unwrap())
             .unwrap();
@@ -933,8 +946,53 @@ fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
         )
         .unwrap();
     let mut duplicate_owner = source.edit();
-    let error = match duplicate_owner.join(duplicate_plan) {
-        Ok(_) => panic!("concealed semantic duplicate was accepted"),
+    duplicate_owner.join(duplicate_plan).unwrap();
+    let duplicate_commit = duplicate_owner.commit().unwrap();
+    assert_eq!(
+        duplicate_commit.package().pages()[0].name(),
+        Some("Duplicate twice")
+    );
+    assert!(duplicate_commit.diagnostics().changed());
+
+    let mut first_edit = source.edit();
+    first_edit.set_page_name(0, "First cross-sub-edit").unwrap();
+    let first = first_edit.commit().unwrap();
+    let mut second_edit = source.edit();
+    second_edit
+        .set_page_name(0, "Second cross-sub-edit")
+        .unwrap();
+    let second = second_edit.commit().unwrap();
+    let mut forged_cross_sub_edit = source.joined_edits(limits);
+    let lineage = forged_cross_sub_edit.lineage().clone();
+    forged_cross_sub_edit
+        .join(
+            edit::SubEdit::new(
+                lineage.clone(),
+                limits,
+                "actual-page-zero",
+                Vec::<String>::new(),
+                vec!["page/0#page.name.set".to_owned()],
+                first.patch().durable().unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    forged_cross_sub_edit
+        .join(
+            edit::SubEdit::new(
+                lineage,
+                limits,
+                "forged-page-one",
+                Vec::<String>::new(),
+                vec!["page/1#page.name.set".to_owned()],
+                second.patch().durable().unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut cross_owner = source.edit();
+    let error = match cross_owner.join(forged_cross_sub_edit) {
+        Ok(_) => panic!("concealed cross-sub-edit semantic overlap was accepted"),
         Err(error) => error,
     };
     assert!(matches!(
@@ -942,7 +1000,7 @@ fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
         Error::Refused(refusal)
             if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
     ));
-    assert!(!duplicate_owner.commit().unwrap().diagnostics().changed());
+    assert!(!cross_owner.commit().unwrap().diagnostics().changed());
 }
 
 #[test]

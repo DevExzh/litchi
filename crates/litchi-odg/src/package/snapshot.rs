@@ -6310,29 +6310,26 @@ fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str)
 }
 
 fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
+    let mut accepted = BTreeSet::new();
     for sub_edit in joined.sub_edits() {
         let declared = sub_edit
             .effects()
             .writes()
             .map(str::to_owned)
             .collect::<BTreeSet<_>>();
-        let mut actual = BTreeSet::new();
-        for effect in sub_edit
+        let actual = sub_edit
             .payload()
             .operations()
             .iter()
             .flat_map(durable_effect_keys)
-        {
-            if !actual.insert(effect.clone()) && effect != "package" {
-                return Err(joined_refusal(
-                    "ODG joined payload repeats a semantic write",
-                ));
-            }
-        }
-        if actual != declared {
+            .collect::<BTreeSet<_>>();
+        if !actual.is_subset(&declared) {
             return Err(joined_refusal(
                 "ODG joined payload effects do not match declarations",
             ));
+        }
+        if actual.iter().any(|effect| !accepted.insert(effect.clone())) {
+            return Err(joined_refusal("ODG joined payload effects overlap"));
         }
     }
     Ok(())
