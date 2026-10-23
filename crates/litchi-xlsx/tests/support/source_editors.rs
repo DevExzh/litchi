@@ -17,8 +17,8 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{OpcPackage, SourceBackedPackage, SourceCacheLimits, SourceLimits};
+use litchi_core::ReadAt;
+use litchi_opc::{OpcPackage, SourceBackedPackage};
 use litchi_xlsx::cell_values::{self, MultiSnapshot, SheetChange, Snapshot};
 use litchi_xlsx::{OpenOptions, Result, Selector, SourceBackedWorkbook, row_visibility};
 
@@ -42,62 +42,11 @@ impl SourceBackedEditor {
         Self::with(source, OpenOptions::new())
     }
 
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::with(source, OpenOptions::new().source_limits(limits))
-    }
-
-    pub fn from_read_at_with_cache_limits(
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        cache: SourceCacheLimits,
+        options: OpenOptions,
     ) -> Result<Self> {
-        Self::with(source, OpenOptions::new().cache_limits(cache))
-    }
-
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::with(
-            source,
-            OpenOptions::new().source_limits(limits).cache_limits(cache),
-        )
-    }
-
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::with(
-            source,
-            OpenOptions::new()
-                .source_limits(limits)
-                .execution_context(context),
-        )
-    }
-
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::with(
-            source,
-            OpenOptions::new()
-                .source_limits(limits)
-                .cache_limits(cache)
-                .execution_context(context),
-        )
+        Self::with(source, options)
     }
 
     #[cfg(any(unix, windows))]
@@ -113,76 +62,13 @@ impl SourceBackedEditor {
     }
 
     #[cfg(any(unix, windows))]
-    fn open_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
         Ok(Self {
             workbook: SourceBackedWorkbook::open_with_options(path, options)?,
         })
     }
 
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::open_options(path, OpenOptions::new().source_limits(limits))
-    }
-
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::open_options(path, OpenOptions::new().cache_limits(cache))
-    }
-
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::open_options(
-            path,
-            OpenOptions::new().source_limits(limits).cache_limits(cache),
-        )
-    }
-
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::open_options(
-            path,
-            OpenOptions::new()
-                .source_limits(limits)
-                .execution_context(context),
-        )
-    }
-
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::open_options(
-            path,
-            OpenOptions::new()
-                .source_limits(limits)
-                .cache_limits(cache)
-                .execution_context(context),
-        )
-    }
-
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
         Ok(Self {
             workbook: SourceBackedWorkbook::from_source_backed_package(package)?,
@@ -250,43 +136,12 @@ impl RowVisibilityEditor {
         })
     }
 
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Ok(Self {
-            inner: SourceBackedEditor::from_read_at_with_limits(source, limits)?,
-        })
-    }
-
-    pub fn from_read_at_with_execution_context(
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
+        options: OpenOptions,
     ) -> Result<Self> {
         Ok(Self {
-            inner: SourceBackedEditor::from_read_at_with_execution_context(
-                source, limits, context,
-            )?,
-        })
-    }
-
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner:
-                SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source, limits, cache, context,
-                )?,
+            inner: SourceBackedEditor::from_read_at_with_options(source, options)?,
         })
     }
 

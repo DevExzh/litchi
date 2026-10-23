@@ -204,10 +204,11 @@ fn path_managed_editor_releases_payload_budget_after_drop() {
     let workbook_bytes = part_bytes(&bytes, "/xl/workbook.xml").len() as u64;
     let sheet_bytes = part_bytes(&bytes, FIRST).len() as u64;
     let (budget, context) = managed_context(workbook_bytes + sheet_bytes + 1024);
-    let editor = SourceBackedEditor::from_path_with_execution_context(
+    let editor = SourceBackedEditor::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     // Only the workbook catalog is pinned at open.
@@ -345,28 +346,39 @@ fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     .unwrap();
 
     SourceBackedEditor::open(file.path()).unwrap();
-    SourceBackedEditor::open_with_limits(file.path(), SourceLimits::default()).unwrap();
-    SourceBackedEditor::open_with_cache_limits(file.path(), cache).unwrap();
-    SourceBackedEditor::open_with_limits_and_cache_limits(
+    SourceBackedEditor::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        cache,
+        litchi_xlsx::OpenOptions::new().source_limits(SourceLimits::default()),
+    )
+    .unwrap();
+    SourceBackedEditor::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new().cache_limits(cache),
+    )
+    .unwrap();
+    SourceBackedEditor::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache),
     )
     .unwrap();
 
     let (_budget, context) = managed_context(1 << 20);
-    SourceBackedEditor::from_path_with_limits_and_execution_context(
+    SourceBackedEditor::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let (_budget, context) = managed_context(1 << 20);
-    SourceBackedEditor::open_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedEditor::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        cache,
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(context),
     )
     .unwrap();
 }

@@ -951,10 +951,11 @@ fn source_scalar_stale_version_and_cancellation_leave_output_empty() {
     ));
     assert!(output.is_empty(), "stale refusal wrote output bytes");
 
-    let canceled = Editor::from_read_at_with_execution_context(
+    let canceled = Editor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        SourceLimits::default(),
-        canceled_context(),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(canceled_context()),
     );
     assert!(canceled.is_err(), "canceled source editor was admitted");
 }
@@ -1187,10 +1188,11 @@ fn source_scalar_composes_two_fields_on_one_control_without_losing_the_first_ove
 fn source_commit_rechecks_cancellation_after_snapshot() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let (context, cancellation) = live_context();
-    let editor = Editor::from_read_at_with_execution_context(
+    let editor = Editor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("open managed source scalar editor");
     let mut edit = editor
@@ -1226,10 +1228,11 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let (probe_budget, _probe_cancellation, probe_context) =
         managed_scalar_context(u64::MAX, u64::MAX);
-    let probe_editor = Editor::from_read_at_with_execution_context(
+    let probe_editor = Editor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source.clone())),
-        SourceLimits::default(),
-        probe_context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(probe_context),
     )
     .expect("open probe managed scalar editor");
     let probe_warmup = probe_editor
@@ -1281,10 +1284,11 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     assert_eq!(scalar_resource_usage(&probe_budget), [0, 0]);
 
     let (budget, _cancellation, context) = managed_scalar_context(probe_limit[0], probe_limit[1]);
-    let editor = Editor::from_read_at_with_execution_context(
+    let editor = Editor::from_read_at_with_options(
         Arc::new(VersionedSource::new(source)),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("open finite managed scalar editor");
     let warmup = editor.snapshot("Sheet1").expect("warm finite source cache");
@@ -2057,18 +2061,12 @@ impl Editor {
         })
     }
 
-    fn from_read_at_with_execution_context(
+    fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
+        options: litchi_xlsx::OpenOptions,
     ) -> litchi_xlsx::Result<Self> {
         Ok(Self {
-            workbook: SourceBackedWorkbook::from_read_at_with_options(
-                source,
-                litchi_xlsx::OpenOptions::new()
-                    .source_limits(limits)
-                    .execution_context(context),
-            )?,
+            workbook: SourceBackedWorkbook::from_read_at_with_options(source, options)?,
             limits: None,
         })
     }
