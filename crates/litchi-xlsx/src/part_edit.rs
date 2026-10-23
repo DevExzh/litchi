@@ -452,6 +452,7 @@ impl PartPatch {
 
         let mut observed = 0usize;
         let mut changed_names = BTreeSet::new();
+        let mut changes_types = false;
         let mut add_delta = |name: &PackURI,
                              before_part: Option<&dyn Part>,
                              after_part: Option<&dyn Part>|
@@ -465,6 +466,15 @@ impl PartPatch {
             };
             if changed {
                 changed_names.insert(name.as_str().to_owned());
+                if match (before_part, after_part) {
+                    (Some(before_part), Some(after_part)) => {
+                        before_part.content_type() != after_part.content_type()
+                    },
+                    (None, None) => false,
+                    _ => true,
+                } {
+                    changes_types = true;
+                }
                 observed = observed
                     .saturating_add(name.as_str().len())
                     .saturating_add(
@@ -509,6 +519,7 @@ impl PartPatch {
                 )?;
             }
         }
+        drop(add_delta);
 
         let root = PackURI::new("/").map_err(|error| invalid(error.to_string()))?;
         if !before.same_retained_relationships(after, &root)?
@@ -533,16 +544,27 @@ impl PartPatch {
                 .saturating_add(relationship_image_bytes(after, &root)?);
         }
 
-        if !before.same_retained_content_types(after)? {
-            let before_bytes = before
-                .retained_content_types_xml()?
-                .map_or(0, |bytes| bytes.capacity());
-            let after_bytes = after
-                .retained_content_types_xml()?
-                .map_or(0, |bytes| bytes.capacity());
-            observed = observed
-                .saturating_add(before_bytes)
-                .saturating_add(after_bytes);
+        // Mirror `with_manifests`: differing provenance alone does not retain
+        // a manifest pair when the old image already matches the resulting
+        // publication view. Charge only buffers the actual patch retains.
+        if changes_types || !before.same_retained_content_types(after)? {
+            let before_image = ContentTypesImage::new(before)?;
+            if changes_types || !before_image.matches_view(after)? {
+                let after_image = ContentTypesImage::new(after)?;
+                observed = observed
+                    .saturating_add(
+                        before_image
+                            .retained
+                            .as_ref()
+                            .map_or(0, |bytes| bytes.capacity()),
+                    )
+                    .saturating_add(
+                        after_image
+                            .retained
+                            .as_ref()
+                            .map_or(0, |bytes| bytes.capacity()),
+                    );
+            }
         }
         Ok(RetainedEstimate {
             bytes: observed,
@@ -994,8 +1016,15 @@ impl Staged {
                 PartPatch::estimate_retained_bytes(source.opc(), &staged, &self.touched, self.all)?;
             // Build the exact target owner once, before patch capture, so the
             // admission charge covers the real source and target endpoints
-            // rather than assuming the edit preserves package size.
-            let target = source.derive(staged.clone())?;
+            // rather than assuming the edit preserves package size. A zero
+            // retained-patch estimate is the no-op path: keep the original
+            // owner so its retained source image is charged exactly as the
+            // package returned below.
+            let target = if estimate.bytes == 0 {
+                source.clone()
+            } else {
+                source.derive(staged.clone())?
+            };
             let source_bytes = source.retained_bytes();
             let target_bytes = target.retained_bytes();
             let observed = source_bytes
