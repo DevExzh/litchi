@@ -7,8 +7,8 @@ use super::PackURI;
 use super::{
     ContextCheckedSink, Counted, OpcError, OutputBudgetedSink, Result,
     SOURCE_PUBLICATION_CHUNK_BYTES, SourceArtifact, SourceArtifactFingerprint, SourceBackedPackage,
-    SourceCheckedSink, SourceSnapshot, map_execution_error, map_io_error, overlay_unavailable,
-    read_source_at_with_context,
+    SourceCheckedSink, SourceSnapshot, finish_source_publication, map_execution_error,
+    map_io_error, overlay_unavailable, read_source_at_with_context,
 };
 use crate::limits::{SourceLimitKind, SourceLimits};
 use crate::pkgreader::PackageReader;
@@ -110,7 +110,7 @@ fn build_admission_part_lookup(
                 .map_err(map_execution_error)
         })
         .transpose()?;
-    let mut by_folded_name = HashMap::new();
+    let mut by_folded_name: HashMap<String, usize> = HashMap::new();
     by_folded_name
         .try_reserve(catalog.parts.len())
         .map_err(|source| OpcError::Allocation {
@@ -171,7 +171,10 @@ fn build_admission_physical_lookup(
                 .map_err(map_execution_error)
         })
         .transpose()?;
-    let mut by_folded_name = HashMap::new();
+    let mut by_folded_name: HashMap<
+        String,
+        (soapberry_zip::office::EntryId, usize),
+    > = HashMap::new();
     by_folded_name
         .try_reserve(archive.len())
         .map_err(|source| OpcError::Allocation {
@@ -477,7 +480,7 @@ fn admit_preservation_member_names(
     for entry in archive.preservation_entries() {
         limits.check(
             SourceLimitKind::ArchiveMemberNameBytes,
-            entry.raw_name_len() as u64,
+            entry.raw_name_len(),
             limits.max_archive_member_name_bytes(),
         )?;
     }
@@ -577,9 +580,10 @@ fn with_secondary<E>(
     primary: ArtifactStreamError<E>,
     secondary: Option<ArtifactStreamError<E>>,
 ) -> ArtifactStreamError<E> {
-    secondary.map_or(primary, |secondary| {
-        ArtifactStreamError::incomplete(0, primary, Some(secondary))
-    })
+    match secondary {
+        Some(secondary) => ArtifactStreamError::incomplete(0, primary, Some(secondary)),
+        None => primary,
+    }
 }
 
 impl<E> fmt::Debug for ArtifactStreamError<E> {
@@ -1037,7 +1041,7 @@ impl Write for ArtifactTargetSink<'_, '_> {
     }
 }
 
-struct GuardedArtifactSink<'guard, 'sink, G> {
+struct GuardedArtifactSink<'guard, 'sink, G: ArtifactStreamGuard> {
     inner: &'sink mut dyn Write,
     guard: &'guard G,
     failure: Option<G::Error>,
@@ -1647,7 +1651,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
     /// members remains exact; generated compressed sizes are deliberately
     /// checked by the writer's generated-entry admission hook before that
     /// hook exposes a publication plan.
-    pub(crate) fn admit_prepared_topology(
+    pub(super) fn admit_prepared_topology(
         &self,
         package: &SourceBackedPackage,
         state: &super::PreparedTopologyState,
@@ -2061,7 +2065,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
     /// physical member set.  This path has no prepared effective catalog, so
     /// it derives the final scalar gauges from source metadata plus the
     /// replacement bytes and reparses changed relationship XML before output.
-    pub(crate) fn admit_changed_overlays(
+    pub(super) fn admit_changed_overlays(
         &self,
         package: &SourceBackedPackage,
         replacements: &[super::ChangedOverlay],
@@ -2606,7 +2610,7 @@ pub(crate) fn write_exact_snapshot_with_policy<W: Write>(
     finish_source_publication(result, source, written)
 }
 
-fn reserve_policy_workspace(context: Option<&ExecutionContext>) -> Result<Option<super::Reservation>> {
+fn reserve_policy_workspace(context: Option<&ExecutionContext>) -> Result<Option<Reservation>> {
     let Some(context) = context else {
         return Ok(None);
     };
@@ -3280,7 +3284,7 @@ mod tests {
     )]
 
     use super::*;
-    use super::super::SourceCacheLimits;
+    use super::super::{PolicyAppendedEntry, SourceCacheLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 

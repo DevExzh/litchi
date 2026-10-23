@@ -258,7 +258,7 @@ fn open(source: Arc<VersionedSource>) -> SourceBackedPackage {
 
 fn open_with_limits(
     source: Arc<VersionedSource>,
-    limits: litchi_opc::SourceLimits,
+    limits: SourceLimits,
 ) -> litchi_opc::Result<SourceBackedPackage> {
     SourceBackedPackage::from_read_at(
         source,
@@ -345,7 +345,7 @@ fn relationship_limits(
     member_limit: usize,
     total_limit: usize,
     event_limit: usize,
-) -> litchi_opc::SourceLimits {
+) -> SourceLimits {
     let package_relationships = zip_member(source, PACKAGE_REL_MEMBER);
     let expected_relationships = zip_member(expected, DOCUMENT_REL_MEMBER);
     assert_eq!(expected_relationships.len(), member_limit);
@@ -358,7 +358,7 @@ fn relationship_limits(
             + relationship_event_count(&expected_relationships),
         event_limit
     );
-    litchi_opc::SourceLimits::builder()
+    SourceLimits::builder()
         .max_relationship_xml_bytes(member_limit)
         .unwrap()
         .max_total_relationship_xml_bytes(total_limit)
@@ -397,7 +397,7 @@ fn remove_noncanonical_plan() -> SourceTopologyPlan {
 
 fn publish_relationship_plan(
     source: &[u8],
-    limits: litchi_opc::SourceLimits,
+    limits: SourceLimits,
     plan: SourceTopologyPlan,
 ) -> litchi_opc::Result<Vec<u8>> {
     let package = open_with_limits(Arc::new(VersionedSource::new(source.to_vec())), limits)?;
@@ -431,7 +431,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
     let cases = [
         (
             "per-member bytes",
-            litchi_opc::SourceLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member - 1)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total)
@@ -444,7 +444,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
         ),
         (
             "aggregate relationship bytes",
-            litchi_opc::SourceLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total - 1)
@@ -457,7 +457,7 @@ fn assert_relationship_limit_boundaries(source: &[u8], plan: fn() -> SourceTopol
         ),
         (
             "aggregate relationship events",
-            litchi_opc::SourceLimits::builder()
+            SourceLimits::builder()
                 .max_relationship_xml_bytes(exact_member)
                 .unwrap()
                 .max_total_relationship_xml_bytes(exact_total)
@@ -495,7 +495,7 @@ fn assert_relationship_removal_subtracts_source_usage(
     let source_total_limit = package_relationships.len() + document_relationships.len();
     let source_event_limit = relationship_event_count(&package_relationships)
         + relationship_event_count(&document_relationships);
-    let exact_limits = litchi_opc::SourceLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_relationship_xml_bytes(source_member_limit)
         .unwrap()
         .max_total_relationship_xml_bytes(source_total_limit)
@@ -515,7 +515,7 @@ fn assert_relationship_removal_subtracts_source_usage(
     // One-under caps are rejected at source admission, before a topology
     // candidate exists. This keeps the exact-cap success above distinct from
     // an ingress refusal caused by an actually-too-small source budget.
-    let under_member = litchi_opc::SourceLimits::builder()
+    let under_member = SourceLimits::builder()
         .max_relationship_xml_bytes(source_member_limit - 1)
         .unwrap()
         .build()
@@ -535,7 +535,7 @@ fn assert_relationship_removal_subtracts_source_usage(
         }
     ));
 
-    let under_total = litchi_opc::SourceLimits::builder()
+    let under_total = SourceLimits::builder()
         .max_total_relationship_xml_bytes(source_total_limit - 1)
         .unwrap()
         .build()
@@ -757,7 +757,7 @@ fn removed_part_is_absent_from_effective_content_type_lookup() {
 
 #[test]
 fn effective_relationship_graph_cap_rejects_one_new_internal_target_before_candidate() {
-    let limits = litchi_opc::SourceLimits::builder()
+    let limits = SourceLimits::builder()
         .max_relationship_graph_nodes(2)
         .unwrap()
         .build()
@@ -789,7 +789,7 @@ fn effective_relationship_graph_cap_rejects_one_new_internal_target_before_candi
 #[test]
 fn shrinking_effective_candidate_is_accepted_at_exact_source_caps() {
     let source = source_bytes();
-    let limits = litchi_opc::SourceLimits::builder()
+    let limits = SourceLimits::builder()
         .max_parts(2)
         .unwrap()
         .max_total_part_bytes((b"<before/>".len() + b"<untouched source='yes'/>".len()) as u64)
@@ -847,7 +847,7 @@ fn shrinking_effective_candidate_is_accepted_at_exact_source_caps() {
 fn content_types_byte_cap_refuses_new_mapping_before_candidate() {
     let source = source_bytes();
     let content_types_bytes = zip_member(&source, "[Content_Types].xml");
-    let limits = litchi_opc::SourceLimits::builder()
+    let limits = SourceLimits::builder()
         .max_content_types_bytes(content_types_bytes.len())
         .unwrap()
         .build()
@@ -944,7 +944,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
         .unwrap();
         plan
     };
-    let exact_limits = litchi_opc::SourceLimits::builder()
+    let exact_limits = SourceLimits::builder()
         .max_aggregate_bytes(exact_total)
         .unwrap()
         .build()
@@ -952,7 +952,7 @@ fn combined_content_types_and_relationship_growth_obeys_exact_archive_total_cap(
     let exact_output = publish_relationship_plan(&source, exact_limits, make_plan()).unwrap();
     assert_eq!(archive_uncompressed_total(&exact_output), exact_total);
 
-    let under_limits = litchi_opc::SourceLimits::builder()
+    let under_limits = SourceLimits::builder()
         .max_aggregate_bytes(exact_total - 1)
         .unwrap()
         .build()
