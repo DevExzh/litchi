@@ -2356,6 +2356,63 @@ fn canonical_write_matches_its_checked_plan() {
 }
 
 #[test]
+fn raw_write_admits_generated_xml_shape_limits() {
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        1,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let error = raw::write(&Catalog::new(), Conformance::Transitional, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary XML token limit exceeded"),
+        "{error}"
+    );
+}
+
+#[test]
+fn raw_put_admits_generated_xml_shape_before_staging() {
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        1,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let mut package = package();
+    let graph = raw::Graph::new(Catalog::new(), Conformance::Transitional);
+    let error = raw::put(&mut package, &graph, &limits)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary XML attribute limit exceeded"),
+        "{error}"
+    );
+    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
+}
+
+#[test]
 fn aggregate_auxiliary_payload_limit_rejects_before_mutation() {
     let mut package = package();
     let payload = Arc::new(vec![0u8; MAX]);

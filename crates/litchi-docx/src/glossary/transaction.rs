@@ -14,7 +14,7 @@
 
 use super::codec::read_with_limits;
 use super::codec::{
-    invalid, name_key_with_limits, plan_write_with_limits, validate_authored_name,
+    WritePlan, invalid, name_key_with_limits, plan_write_with_limits, validate_authored_name,
     validate_entry_limits, validate_physical_part, write_with_limits,
 };
 use super::graph::{
@@ -606,7 +606,10 @@ impl Transaction {
         {
             graph.root_xml = None;
         }
-        check_usage(graph_usage(&graph, &self.limits)?, &self.limits)?;
+        check_usage(
+            graph_usage_with_plan(&graph, &self.limits, Some(&plan))?,
+            &self.limits,
+        )?;
         self.draft = Some(graph);
         Ok(result)
     }
@@ -754,6 +757,14 @@ struct EmptyGraphSeed {
 }
 
 fn graph_usage(graph: &raw::Graph, limits: &super::Limits) -> Result<GraphUsage> {
+    graph_usage_with_plan(graph, limits, None)
+}
+
+fn graph_usage_with_plan(
+    graph: &raw::Graph,
+    limits: &super::Limits,
+    root_plan: Option<&WritePlan>,
+) -> Result<GraphUsage> {
     let mut usage = GraphUsage {
         metadata: graph.root_name.len(),
         relationships: graph.rels.len(),
@@ -762,10 +773,13 @@ fn graph_usage(graph: &raw::Graph, limits: &super::Limits) -> Result<GraphUsage>
     };
     add_usage_metadata(&mut usage.metadata, &graph.root_name)?;
     add_usage_metadata(&mut usage.metadata, CT)?;
-    let root_bytes = graph.root_xml().map_or_else(
-        || plan_write_with_limits(&graph.catalog, graph.conformance, limits).map(|plan| plan.bytes),
-        |xml| Ok(xml.len()),
-    )?;
+    let root_bytes = if let Some(xml) = graph.root_xml() {
+        xml.len()
+    } else if let Some(plan) = root_plan {
+        plan.bytes
+    } else {
+        plan_write_with_limits(&graph.catalog, graph.conformance, limits)?.bytes
+    };
     add_usage_bytes(&mut usage.bytes, root_bytes)?;
     for value in [
         graph.owner_main.as_deref(),

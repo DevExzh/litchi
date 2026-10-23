@@ -89,7 +89,9 @@ pub(in crate::glossary) fn write_with_limits(
 ) -> Result<Vec<u8>> {
     validate_catalog_limits(value, limits)?;
     let plan = plan_write_with_limits(value, conformance, limits)?;
-    write_plan_with_limits(value, conformance, &plan, limits)
+    let xml = write_plan_with_limits(value, conformance, &plan, limits)?;
+    super::graph::raw::admit_xml(&xml, limits)?;
+    Ok(xml)
 }
 
 pub(in crate::glossary) fn write_plan_with_limits(
