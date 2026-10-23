@@ -221,7 +221,7 @@ impl SourceBackedWorkbook {
                     "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
                 )));
             }
-            selected.push(own_selector(selector));
+            selected.push(own_selector(selector)?);
         }
         if selected.is_empty() {
             return Err(invalid("multi-sheet value edits require one worksheet"));

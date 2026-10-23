@@ -216,11 +216,12 @@ impl<S> LazySource<S> {
 /// XLSX currently has no stable-identity selector variant (`Id` is
 /// `Infallible`), but matching it explicitly keeps this helper correct if the
 /// alias gains one in a future API revision.
-pub(crate) fn own_selector(selector: Selector<'_>) -> Selector<'static> {
+pub(crate) fn own_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
     match selector {
-        CoreSelector::Name(name) => CoreSelector::Name(Cow::Owned(name.into_owned())),
-        CoreSelector::Position(position) => CoreSelector::Position(position),
+        CoreSelector::Name(name) => Ok(CoreSelector::Name(Cow::Owned(name.into_owned()))),
+        CoreSelector::Position(position) => Ok(CoreSelector::Position(position)),
         CoreSelector::Id(never) => match never {},
+        _ => Err(Error::UnsupportedSelector),
     }
 }
 

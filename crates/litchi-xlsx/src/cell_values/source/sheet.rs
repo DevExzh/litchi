@@ -172,7 +172,7 @@ impl SourceBackedWorkbook {
         self.check_execution()?;
         Ok(Edit {
             source: LazySource::new(self.clone()),
-            selector: own_selector(selector.into()),
+            selector: own_selector(selector.into())?,
             staged,
         })
     }

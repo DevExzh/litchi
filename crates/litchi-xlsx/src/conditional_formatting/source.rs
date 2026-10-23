@@ -92,7 +92,7 @@ impl SourceBackedWorkbook {
     /// operation, or commit that needs the selected worksheet.
     pub fn edit_conditional_formats<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
         self.check_execution()?;
-        Ok(Edit::new(self.clone(), own_selector(selector.into())))
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
     }
 
     /// Replay a conditional-formatting patch onto this workbook.

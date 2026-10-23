@@ -90,7 +90,7 @@ impl SourceBackedWorkbook {
     /// operation, or commit that needs the selected worksheet.
     pub fn edit_page_setup<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
         self.check_execution()?;
-        Ok(Edit::new(self.clone(), own_selector(selector.into())))
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
     }
 
     /// Replay a page-setup patch onto this workbook.
