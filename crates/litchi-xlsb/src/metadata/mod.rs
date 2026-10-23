@@ -41,13 +41,64 @@ pub mod source;
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// The native retained-snapshot policy of one metadata edit.
+///
+/// The default leaves the package's native metadata policy unconstrained;
+/// facade callers select the transaction's remaining semantic budget here,
+/// before the edit is committed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    max_snapshot_bytes: Option<usize>,
+}
+
+impl EditOptions {
+    /// Bound the exact before/after property payload retained by this edit.
+    #[must_use]
+    pub const fn max_snapshot_bytes(mut self, maximum: usize) -> Self {
+        self.max_snapshot_bytes = Some(maximum);
+        self
+    }
+
+    /// The configured retained-snapshot ceiling, if any.
+    #[must_use]
+    pub const fn max_snapshot_bytes_value(self) -> Option<usize> {
+        self.max_snapshot_bytes
+    }
+}
+
+fn retained_patch_bytes(patch: &Patch) -> usize {
+    patch.changes().iter().fold(0usize, |bytes, change| {
+        bytes
+            .saturating_add(change.part_name().as_str().len())
+            .saturating_add(change.before().map_or(0, <[u8]>::len))
+            .saturating_add(change.after().map_or(0, <[u8]>::len))
+    })
+}
+
+fn enforce_snapshot_limit(patch: &Patch, options: EditOptions) -> Result<()> {
+    let Some(maximum) = options.max_snapshot_bytes_value() else {
+        return Ok(());
+    };
+    let retained = retained_patch_bytes(patch);
+    if retained > maximum {
+        return Err(Error::Limit {
+            kind: LimitKind::XmlBytes,
+            observed: retained,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
 /// A staged metadata edit of one [`Package`].
 ///
 /// Dropping the edit discards it.
 #[derive(Debug, Clone)]
 pub struct Edit {
     source: Package,
-    inner: properties::Edit,
+    inner: properties::Plan,
+    options: EditOptions,
 }
 
 impl Edit {
@@ -111,13 +162,20 @@ impl Edit {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.inner.commit()?;
-        let diagnostics = commit.diagnostics().clone();
-        let (candidate, patch) = commit.into_parts();
+        let Self {
+            source,
+            inner,
+            options,
+        } = self;
+        let (_snapshot, patch, diagnostics) = inner.finish()?;
+        enforce_snapshot_limit(&patch, options)?;
         let package = if patch.is_noop() {
-            self.source
+            patch.check(source.opc_package())?;
+            source
         } else {
-            self.source
+            let mut candidate = source.opc_package().clone();
+            patch.apply(&mut candidate)?;
+            source
                 .reparse_candidate_retaining_projection(candidate)
                 .map_err(|error| Error::Invalid(error.to_string()))?
         };
@@ -198,9 +256,16 @@ impl Package {
     ///
     /// Returns the strict graph errors of the property families.
     pub fn edit_metadata(&self) -> Result<Edit> {
+        self.edit_metadata_with_options(EditOptions::default())
+    }
+
+    /// Start a metadata edit with an explicit retained-snapshot ceiling.
+    pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let snapshot = self.metadata_snapshot()?;
         Ok(Edit {
             source: self.clone(),
-            inner: properties::Edit::new(self.opc_package(), Host::Excel)?,
+            inner: snapshot.plan(),
+            options,
         })
     }
 
@@ -259,5 +324,17 @@ mod tests {
             .unwrap()
             .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
+    }
+
+    #[test]
+    fn retained_snapshot_limit_is_checked_before_candidate_publication() {
+        let package = Package::new().unwrap();
+        let mut edit = package
+            .edit_metadata_with_options(EditOptions::default().max_snapshot_bytes(1))
+            .unwrap();
+        edit.update(|metadata| metadata.title = Some("Budget".to_owned()))
+            .unwrap();
+        assert!(matches!(edit.commit(), Err(Error::Limit { .. })));
+        assert_eq!(package.metadata().unwrap(), Metadata::default());
     }
 }

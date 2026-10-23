@@ -286,6 +286,12 @@ impl Xlsb {
         }
         let (package, native, retained) = if signed {
             let staged_retained = commit.retained_bytes();
+            // The staged candidate is a private probe for a signed
+            // cancellation.  Drop its package and native proof before
+            // rebuilding the original-owner identity patch so the peak is
+            // represented by the explicit max below, not by two live
+            // endpoint graphs hidden behind that max.
+            drop(commit);
             let (package, native, canonical_retained) =
                 C::canonical_identity(self, max_snapshot_bytes)?;
             let retained = staged_retained.max(canonical_retained);

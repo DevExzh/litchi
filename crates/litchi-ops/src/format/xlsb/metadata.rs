@@ -87,9 +87,14 @@ fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize,
 fn patch_retained_bytes(patch: &xlsb::metadata::Patch) -> usize {
     patch.changes().iter().fold(0usize, |bytes, change| {
         bytes
+            .saturating_add(change.part_name().as_str().len())
             .saturating_add(change.before().map_or(0, |value| value.len()))
             .saturating_add(change.after().map_or(0, |value| value.len()))
     })
+}
+
+fn native_options(maximum: usize) -> xlsb::metadata::EditOptions {
+    xlsb::metadata::EditOptions::default().max_snapshot_bytes(maximum)
 }
 
 fn native(error: xlsb::metadata::Error) -> crate::Error {
@@ -147,7 +152,7 @@ impl Xlsb {
         // (record 0281).
         let editor = self.editor_for_write()?;
         let (target, patch, metadata) = commit(
-            editor.edit_metadata(),
+            editor.edit_metadata_with_options(native_options(limits.max_snapshot_bytes())),
             |value| assignments.apply(value),
             Some(assignments),
         )?;
@@ -159,16 +164,19 @@ impl Xlsb {
         } else {
             (patch_retained_bytes(&patch), 0)
         };
+        let staged_noop = patch.is_noop();
         drop(editor);
         let (target, patch, retained) =
-            if patch.is_noop() && self.signature() == super::Signature::Signed {
+            if staged_noop && self.signature() == super::Signature::Signed {
                 // The writable probe strips signature parts. Rebuild the genuine
                 // native metadata identity patch over the retained signed package
                 // before publishing the leaf; the staged charge remains part of
                 // the peak even though that probe is discarded.
+                drop(target);
+                drop(patch);
                 let original = self.original_package_for_noop()?;
                 let (target, patch) = original
-                    .edit_metadata()
+                    .edit_metadata_with_options(native_options(limits.max_snapshot_bytes()))
                     .map_err(native)?
                     .commit()
                     .map_err(native)?
@@ -217,7 +225,10 @@ impl Xlsb {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         self.check_source_for_replay()?;
-        let mut edit = source.workbook().edit_metadata().map_err(native)?;
+        let mut edit = source
+            .workbook()
+            .edit_metadata_with_options(native_options(limits.max_snapshot_bytes()))
+            .map_err(native)?;
         edit.update(|value| assignments.apply(value))
             .map_err(native)?;
         if assignments.has_custom() {

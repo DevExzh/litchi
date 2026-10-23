@@ -149,6 +149,13 @@ pub trait Part: PartClone + Send + Sync {
         PayloadHandle(PartPayload::ready(self.blob_arc()))
     }
 
+    /// Return the payload size from retained storage metadata without
+    /// decoding a deferred source member.
+    #[doc(hidden)]
+    fn retained_payload_size(&self) -> Result<usize> {
+        self.payload_handle().payload().declared_size()
+    }
+
     /// Whether this part is one of this crate's own part types, [`BlobPart`]
     /// or [`XmlPart`], whose observable behavior is fixed by its bytes,
     /// content type and relationships.
@@ -736,6 +743,17 @@ impl<'part> PartMetadata<'part> {
     #[must_use]
     pub fn payload_is_decoded(&self) -> bool {
         self.part.decoded_blob().is_some()
+    }
+
+    /// Return the payload size available from retained metadata.
+    ///
+    /// For a deferred source part this reads the ZIP central-directory
+    /// declaration and does not inflate the member. The declaration is only
+    /// a planning value; the normal payload access path still validates the
+    /// actual bytes.
+    #[doc(hidden)]
+    pub fn payload_size_hint(&self) -> Result<usize> {
+        self.part.retained_payload_size()
     }
 }
 

@@ -25,7 +25,7 @@
 //! package-level families) expose the ADR 0034 transaction shape through
 //! [`family!`].
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -521,6 +521,91 @@ impl Manifests {
     }
 }
 
+/// The semantic retained buffers of a native patch.
+///
+/// The patch keeps images, relationship data and publication-manifest proof,
+/// not Rust container capacity or parser caches.  The semantic budget charges
+/// each before/after endpoint, even when package clones share an allocation;
+/// duplicate views of one endpoint (for example a relationship image and its
+/// state) are accounted only once.
+#[derive(Debug, Default)]
+struct RetainedAccounting {
+    bytes: usize,
+}
+
+impl RetainedAccounting {
+    fn add_bytes(&mut self, bytes: usize) {
+        self.bytes = self.bytes.saturating_add(bytes);
+    }
+
+    fn add_str(&mut self, value: &str) {
+        self.add_bytes(value.len());
+    }
+
+    fn add_arc(&mut self, bytes: &Arc<Vec<u8>>) {
+        self.add_bytes(bytes.len());
+    }
+
+    fn add_storage(&mut self, bytes: usize) {
+        self.add_bytes(bytes);
+    }
+
+    fn add_relationship_state(&mut self, state: &RelationshipState) {
+        if let Some(bytes) = &state.xml {
+            self.add_arc(bytes);
+        }
+        for relationship in &state.entries {
+            self.add_str(&relationship.id);
+            self.add_str(&relationship.kind);
+            self.add_str(&relationship.target);
+        }
+    }
+
+    fn add_state(&mut self, state: &State) {
+        self.add_str(&state.content_type);
+        self.add_arc(&state.blob);
+        self.add_relationship_state(&state.relationships);
+    }
+
+    fn add_metadata_state(
+        &mut self,
+        package: &OpcPackage,
+        name: &PackURI,
+        metadata: litchi_opc::PartMetadata<'_>,
+    ) -> Result<()> {
+        self.add_str(metadata.content_type());
+        self.add_storage(metadata.payload_size_hint()?);
+        self.add_relationship_state(&RelationshipState::read(package, name, metadata.rels())?);
+        Ok(())
+    }
+
+    fn add_content_types(&mut self, image: &ContentTypesImage) {
+        // `bytes` and `publication` can be two views of the same endpoint
+        // allocation.  Count that endpoint once, while separate before and
+        // after images are charged independently by their callers.
+        let mut endpoint_allocations = HashSet::new();
+        for xml in [&image.bytes, &image.publication] {
+            if let ContentTypesXml::Retained(bytes) = xml {
+                if endpoint_allocations.insert(Arc::as_ptr(bytes) as usize) {
+                    self.add_arc(bytes);
+                }
+            }
+        }
+        if image.exact_canonical.is_some() {
+            self.add_bytes(32);
+        }
+    }
+
+    fn add_manifests(&mut self, manifests: &Manifests) {
+        if let Some(content_types) = &manifests.content_types {
+            self.add_content_types(content_types);
+        }
+        for relationship in &manifests.relationships {
+            self.add_str(relationship.owner.as_str());
+        }
+    }
+}
+
 /// The exact, reversible part-level change of one staged edit: the changed
 /// parts and, when they changed, the package-level relationships, with the
 /// publication manifests of both sides.
@@ -593,40 +678,146 @@ impl PartPatch {
         }
     }
 
-    /// The bytes the patch retains: every before and after payload.
+    /// The semantic bytes the patch retains: endpoint payloads, relationship
+    /// proof and publication-manifest images.
     pub(crate) fn retained_bytes(&self) -> usize {
-        self.deltas.iter().fold(0usize, |total, delta| {
-            let size = |state: &Option<State>| state.as_ref().map_or(0, |state| state.blob.len());
-            total
-                .saturating_add(size(&delta.before))
-                .saturating_add(size(&delta.after))
-        })
+        let mut accounting = RetainedAccounting::default();
+        for delta in &self.deltas {
+            accounting.add_str(delta.name.as_str());
+            if let Some(state) = &delta.before {
+                accounting.add_state(state);
+            }
+            if let Some(state) = &delta.after {
+                accounting.add_state(state);
+            }
+        }
+        if let Some((before, after)) = &self.root {
+            accounting.add_relationship_state(before);
+            accounting.add_relationship_state(after);
+        }
+        if let Some(manifests) = &self.manifests {
+            let (before, after) = manifests.get();
+            accounting.add_manifests(before);
+            accounting.add_manifests(after);
+        }
+        accounting.bytes
     }
 
-    /// Calculate the exact payload charge for the named part states before
-    /// retaining any patch deltas.
+    /// Calculate the semantic charge for the named part states from package
+    /// metadata before retaining or inflating any deferred payload.
     fn retained_bytes_for_names(
         before: &OpcPackage,
         after: &OpcPackage,
         names: &[PackURI],
     ) -> Result<(usize, usize)> {
-        names
-            .iter()
-            .try_fold((0usize, 0usize), |(total, changed), name| {
-                let before = State::of(before, name)?;
-                let after = State::of(after, name)?;
-                if before == after {
-                    return Ok((total, changed));
+        let changed_parts = after.changed_parts(before);
+        let mut accounting = RetainedAccounting::default();
+        let mut changed = 0usize;
+        for name in names {
+            let typed_changed = changed_parts
+                .binary_search_by(|current| current.as_str().cmp(name.as_str()))
+                .is_ok();
+            let lexical_changed = !before.same_retained_relationships(after, name)?;
+            if !typed_changed && !lexical_changed {
+                continue;
+            }
+            changed = changed.saturating_add(1);
+            accounting.add_str(name.as_str());
+            let before_metadata = before.part_metadata(name);
+            let after_metadata = after.part_metadata(name);
+            if let Some(metadata) = before_metadata {
+                accounting.add_metadata_state(before, name, metadata)?;
+            }
+            if let Some(metadata) = after_metadata {
+                accounting.add_metadata_state(after, name, metadata)?;
+            }
+
+            // A relationship image is retained for each non-payload-only
+            // endpoint.  Count its owner string here, before the payloads are
+            // inflated, so the admission check covers the complete semantic
+            // proof rather than only the part blobs.
+            let relationship_changed = match (before_metadata, after_metadata) {
+                (Some(left), Some(right)) => {
+                    left.content_type() != right.content_type()
+                        || !relationships_equal(left.rels(), right.rels())
+                        || !before.same_retained_relationships(after, name)?
+                },
+                _ => true,
+            };
+            if relationship_changed {
+                let before_member = before_metadata
+                    .map(|metadata| RelationshipState::read(before, name, metadata.rels()))
+                    .transpose()?
+                    .is_some_and(|state| state.member_present);
+                let after_member = after_metadata
+                    .map(|metadata| RelationshipState::read(after, name, metadata.rels()))
+                    .transpose()?
+                    .is_some_and(|state| state.member_present);
+                if before_member {
+                    accounting.add_str(name.as_str());
                 }
-                let size =
-                    |state: &Option<State>| state.as_ref().map_or(0, |state| state.blob.len());
-                Ok((
-                    total
-                        .saturating_add(size(&before))
-                        .saturating_add(size(&after)),
-                    changed.saturating_add(1),
-                ))
-            })
+                if after_member {
+                    accounting.add_str(name.as_str());
+                }
+            }
+        }
+
+        // Root relationships and the content-types image are manifest proof,
+        // not part payloads.  They are metadata-only to inspect, so account
+        // them before any State::of call can inflate a source member.
+        if let Some((root_before, root_after)) = Self::root(before, after)? {
+            accounting.add_relationship_state(&root_before);
+            accounting.add_relationship_state(&root_after);
+            accounting.add_str("/");
+            accounting.add_str("/");
+        }
+        if Self::content_types_changed_metadata(before, after, names)? {
+            let mut before_image = Self::content_types_image(before)?;
+            let mut after_image = Self::content_types_image(after)?;
+            let source_changed =
+                before.content_types_source_bytes() != after.content_types_source_bytes();
+            let explicit = source_changed && (before_image.source || after_image.source);
+            before_image.explicit = explicit;
+            after_image.explicit = explicit;
+            if !explicit {
+                before_image.bytes = before_image.publication.clone();
+                after_image.bytes = after_image.publication.clone();
+            }
+            accounting.add_content_types(&before_image);
+            accounting.add_content_types(&after_image);
+        }
+        Ok((accounting.bytes, changed))
+    }
+
+    /// The content-types graph can be classified without reading any part
+    /// payload.  This mirrors [`Self::content_types_changed`] for the
+    /// metadata-only admission pass.
+    fn content_types_changed_metadata(
+        before: &OpcPackage,
+        after: &OpcPackage,
+        names: &[PackURI],
+    ) -> Result<bool> {
+        let source_changed = match (
+            before.content_types_source_bytes(),
+            after.content_types_source_bytes(),
+        ) {
+            (None, None) => false,
+            (Some(left), Some(right)) => {
+                !(Arc::ptr_eq(&left, &right) || left.as_slice() == right.as_slice())
+            },
+            (Some(_), None) | (None, Some(_)) => true,
+        };
+        if source_changed {
+            return Ok(true);
+        }
+        for name in names {
+            match (before.part_metadata(name), after.part_metadata(name)) {
+                (Some(left), Some(right)) if left.content_type() == right.content_type() => {},
+                (Some(_), Some(_)) | (Some(_), None) | (None, Some(_)) => return Ok(true),
+                (None, None) => {},
+            }
+        }
+        Ok(false)
     }
 
     fn enforce_retained_limit(retained: usize, maximum: Option<usize>) -> Result<()> {
@@ -845,12 +1036,14 @@ impl PartPatch {
             }
         }
         let content_types_changed = Self::content_types_changed(before, after, &deltas);
-        Self {
+        let patch = Self {
             deltas,
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(before, after, content_types_changed)
+        .with_manifests(before, after, content_types_changed)?;
+        Self::enforce_retained_limit(patch.retained_bytes(), max_snapshot_bytes)?;
+        Ok(patch)
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -929,12 +1122,14 @@ impl PartPatch {
         }
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
         let content_types_changed = Self::content_types_changed(before, after, &deltas);
-        Self {
+        let patch = Self {
             deltas,
             root: Self::root(before, after)?,
             manifests: None,
         }
-        .with_manifests(before, after, content_types_changed)
+        .with_manifests(before, after, content_types_changed)?;
+        Self::enforce_retained_limit(patch.retained_bytes(), max_snapshot_bytes)?;
+        Ok(patch)
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
