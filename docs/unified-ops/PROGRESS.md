@@ -2395,3 +2395,40 @@ See [0063](0063-source-pptx-modern-comments.md).
   preservation, performance returns, corpus dispositions, final inventory and
   glossary, and the complete assembled gate remain open. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, required-policy assembly and second cleanup):
+  The integration assembly reaches `b170204d17`. The eighth workspace
+  diagnostic pass finished with exit 101 after 439.95 seconds; record 0362uf
+  preserves its exact source, log hash and failure. Record 0362uj fixes the
+  remaining mixed core/ODF consumer boundaries, ODS test imports and XLSX
+  test calls without weakening assertions. The ninth locked workspace and
+  harness check is running on the assembled source; no pass is inferred.
+
+  Reviewed token-policy and required OPC constructor migrations are merged.
+  Conflict resolution retains owner/recipient limit intersections, atomic
+  content-type and relationship admission, tightened no-op relationship
+  validation, and XLSX source/cache/package/facade execution policies. The
+  raw aggregate reader and private fragment helper use the canonical names.
+  ZIP admission now reuses final prepared bytes before publication, preserves
+  scheduled preparation, and performs metadata scans only on policy paths.
+  A metadata iterator covers directory records without enlarging the retained
+  ordinary index. These changes still require combined runtime validation.
+
+  The XLSX lifecycle harness now fails on fidelity violations and has an
+  explicit source-version adapter for required OPC ingress. Current source
+  history probes contain only current APIs; the historical e63 probes have
+  pinned external source and overlay reproduction instructions. Measurements
+  against the final assembly remain required.
+
+  A second cleanup wave removed four clean, inactive merged leaves without
+  forcing, totaling 6,484,524,650 bytes of checkout contents. Branch refs and
+  exact recreation commands remain recorded in the cleanup receipt. Dirty
+  trees, measurement artifacts and protected executables were retained.
+
+  Independent review continues to return incomplete selected-limit and
+  preallocation paths in DOCX glossary helpers, generic streamed-publication
+  admission, and signed native no-op budget handling. Those branches remain
+  outside this assembly pending repair. The iWork constructor and ODP lifecycle
+  performance returns, native qualification, corpus dispositions, final
+  inventory/glossary, and full assembled gate remain open. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
