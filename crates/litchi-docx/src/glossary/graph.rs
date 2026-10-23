@@ -26,7 +26,7 @@
 
 use super::codec::{
     Content, Node, bounded, invalid, plan_write_with_limits, read_with_limits, valid_ncname,
-    validate_catalog_limits, validate_physical_part, validate_raw_part, write_plan_with_limits,
+    validate_catalog_limits, validate_physical_part, write_plan_with_limits,
 };
 use super::model::{Catalog, Conformance};
 use super::package::Owner;
@@ -324,7 +324,7 @@ pub mod raw {
         content_type: &str,
         data_bytes: usize,
         limits: &Limits,
-    ) -> Result<()> {
+    ) -> Result<super::PackURI> {
         if name.len() > limits.name_bytes() {
             return Err(Error::GlossaryLimit {
                 kind: crate::glossary::LimitKind::StringBytes,
@@ -361,7 +361,13 @@ pub mod raw {
                 maximum: limits.metadata_bytes(),
             });
         }
-        super::validate_raw_part(name, content_type, data_bytes)
+        let uri = super::validate_physical_part(name, content_type, data_bytes)?;
+        if uri.as_str() == "/word/glossary/document.xml" {
+            return Err(super::invalid(
+                "glossary auxiliary part conflicts with the default root",
+            ));
+        }
+        Ok(uri)
     }
 
     pub(in crate::glossary) fn admit_relationships(
@@ -732,8 +738,7 @@ fn admit_graph_ledger(
             source,
         })?;
     for part in &graph.parts {
-        raw::admit_part(&part.name, &part.content_type, part.data().len(), limits)?;
-        let part_uri = validate_physical_part(&part.name, &part.content_type, part.data().len())?;
+        let part_uri = raw::admit_part(&part.name, &part.content_type, part.data().len(), limits)?;
         if part_uri == root_uri {
             return Err(invalid(format!(
                 "glossary auxiliary part '{}' conflicts with the root",
