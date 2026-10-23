@@ -417,6 +417,26 @@ lifecycle remains a returned performance regression at 1.1426x, 1.4910x,
 1.4285x and 1.3263x of base; the correctness repair does not qualify or waive
 that cost.
 
+The matched attribution run uses the measured f448 candidate and its direct
+parent (`57c2ff52...` / `f44804d2...`), with candidate binary
+`9a3f63c7...` and base binary `d3ff541f...`. The additional `MessageInfo::new`
+Callgrind route is 169.0040 Ir/op on base and 277.0043 on candidate, a
+108.0003 Ir/op admission cost per message. The direct raw-constructor deltas
+are exactly `34 + 21*N` Ir/op at 1, 8, 32 and 128 messages. The raw end-to-end
+route assembles the public records and calls the constructor; it does not
+encode in the timed loop. The default raw fast path therefore performs the
+required public-field shape and length scan without a duplicate encoded-length
+calculation.
+
+The matched allocation probe uses base binary `df765b19...` and candidate
+binary `2fc130c3...`, with 100 iterations per row. Across 80 reduced output
+rows covering raw, raw end-to-end, collection, `push_new`, and full object
+serialization routes, peak bytes, allocated bytes and allocation calls are
+identical between endpoints, and every checksum and serialized hash matches.
+The Callgrind and allocation manifests are recorded in the v22 receipt; the
+captures remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+
 The consumer audit found no production raw `Vec<MessageInfo>` constructor call
 that can become `push_new`: `ArchiveObject::new` already uses its internal
 single-pass conventional constructor, while the external core-type sample
