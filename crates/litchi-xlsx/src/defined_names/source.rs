@@ -133,6 +133,12 @@ impl Edit {
     }
 
     fn resolve_before(&self) -> Result<&Snapshot> {
+        // A committed workbook keeps its original owner until the first
+        // source-backed read materializes the deferred output. Resolve that
+        // owner before taking the shared catalog proof: otherwise a pending
+        // defined-name commit would pair its new workbook XML with the base
+        // owner's names and reject the exact output as a catalog mismatch.
+        self.source.workbook().edit_package()?;
         let shared_catalog = self.source.workbook().shared_catalog_proof();
         self.source.resolve(|package| {
             Snapshot::load_source_backed_with_names(
