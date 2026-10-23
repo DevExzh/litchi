@@ -531,3 +531,46 @@ ledger, and `push_new` creates the fixed vector itself. Thus the private
 certificate path did not accept a mutated version; the guard repairs the
 public raw-Vec validation path and preserves mutated values by sending them
 through complete admission.
+
+## Default raw-constructor path fast bound (`bd011f99a8`)
+
+The source-level attribution returned two fixed-constructor costs and one
+per-record cost. The default `FieldPath` and minimal `FieldInfo` shapes have
+only one caller-controlled dimension: path metadata count. At the hard
+default ceilings, that count also proves the derived packed header, neutral
+memory, field and nesting budgets. Commit `bd011f99a8` uses that proof only
+for the default profile and only within the metadata ceiling; strict profiles
+and over-bound inputs retain the former checked path and its error precedence.
+
+The exact matched Callgrind rows changed from +46.0012 to +26.0012 Ir/op for
+`field_path`, and from +129.9979 to +80.9992 Ir/op for `field_info`. The
+`message_info` delta remains +106.0000 Ir/op: its allocator-enabled probe
+still records one 12-byte fallible versions allocation per operation. The
+raw `archive_info` validation must inspect every current public record and is
+unchanged at +242.9990 Ir/op for the eight-message fixture.
+
+Dynamic exact-count Callgrind separates the raw archive delta into a fixed
+and per-message component:
+
+| Messages | Base Ir/op | Candidate Ir/op | Absolute delta |
+|---:|---:|---:|---:|
+| 0 | 51.0061 | 87.0050 | 35.9989 |
+| 1 | 51.0061 | 113.0050 | 61.9989 |
+| 8 | 51.0061 | 295.0040 | 243.9979 |
+| 32 | 51.0050 | 919.0066 | 868.0016 |
+| 128 | 51.0046 | 3,415.0025 | 3,363.9979 |
+
+Within measurement noise this is `36 + 26*N` Ir/op. Debug-symbol Callgrind
+attributes 1 Ir/message to the exact versions comparison, 6 to the eight
+current shape fields and 5 to the message-length ceiling; the remaining
+roughly 14 Ir/message is loop and ownership work. The public `Vec` can be
+mutated before ownership transfer, so these checks cannot be replaced by the
+private collection certificate. The reduced receipt is
+[`constructor-ceb87-pathfast.json`](results/0361fd/constructor-ceb87-pathfast.json).
+
+The rebuilt allocator probe covered all 15 routes with stable ABBA counters
+and matching output hashes. Candidate allocation counts remain identical on
+the path, field, message and archive-info routes; object, parse, validation
+and encoding routes retain their earlier lower candidate totals. This is
+Callgrind/allocation evidence only. Native timing remains pending a verified
+quiet host.
