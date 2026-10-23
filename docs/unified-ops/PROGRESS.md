@@ -2939,3 +2939,41 @@ See [0063](0063-source-pptx-modern-comments.md).
   the full 53-check gate, all 68 final inventory captures and dispositions,
   corpus replay, glossary closure and native qualification remain open.
   Only comprehensive redaction audit 22 is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, composed Clippy and thirteenth cleanup):
+  Main integration reaches `5ee8387c2c`. Complete all-target/all-feature
+  workspace Clippy with warnings denied passes on clean source
+  `8225b82dde7bac272e9e77789a78751ae07aaa2a`, after the six v24 consumer
+  lint sites were migrated in `0bed2f0710`. The run completed in 199.602
+  seconds with a 4.40 GB external target. Record 0362us and the reduced
+  v25 receipt retain the source, command, lock and external log identity.
+  This is a composed workspace pass, not the complete final 53-check gate.
+
+  The reviewed proposal-only replay registration helper is merged at
+  `8225b82dde`. It checks concrete/default aliases before resolving declared
+  generic bindings, including reordered parameters; every proposed row
+  still needs nominal result and owner proofs. It never changes or accepts
+  policy. The glossary and final-inventory tool suites pass 60 tests. Fresh
+  all-68 rustdoc capture, policy registration and row dispositions remain
+  required after the remaining source correction.
+
+  ODG's replacement of the three owner apply_joined plan-publication methods
+  remains returned for correction. Source `15f677ed52` and receipt
+  `c5e14c8d7f` pass 48 focused tests and strict checks, but independent review
+  still finds replacement-segment name validation, intermediate replacement
+  policy, and projected/inherited style-dependency gaps. The worker is
+  preserving ordered operations within one sub-edit while fixing conflicts
+  between independent work; a broad mixed-operation capability ban is not
+  accepted. No ODG joined migration has been merged into main integration.
+
+  Thirteenth cleanup removes five more verified clean, inactive, merged
+  source leaves without force. Their apparent checkout size totals
+  19,028,805,424 bytes. All branch refs remain; ten generated files totaling
+  739,055 bytes are hash-quarantined with restore instructions. The
+  coordinator independently verified file identities, ancestry and removed
+  path absence. Receipt `db36955293` records the operation. Targets, native
+  binaries, measurements and incomplete checkouts remain protected.
+
+  Source integration remains staging. Final inventory/glossary closure,
+  the full gate, corpus replay and native qualification remain required.
+  Comprehensive redaction audit 22 is the only deferral. Nothing is pushed.
