@@ -236,3 +236,17 @@ scopes, and a now-unused private DOCX stream helper. `7b6a9cf4bc` repairs the
 complete batch and removes that dead helper without a lint allowance.
 [consumer-v16.json](results/0362uf/consumer-v16.json) records both commands;
 neither harness group was reached.
+
+The seventeenth pass on `70d64634c9` confirms all 506 ZIP library tests and
+the focused OPC/ZIP all-target check pass. The workspace check then fails
+after 434.80 seconds on retained-policy call sites in PPTX/XLSB, private
+`const` getters over Arc-backed owners, and further test scopes/constructors.
+`27d9541e46` migrates the whole batch, retaining recipient OOXML limits and
+source/cache/execution options. [consumer-v17.json](results/0362uf/consumer-v17.json)
+preserves the three completed commands; the two harness groups were not reached.
+
+The eight Python tooling unittest modules pass all 1,340 tests on
+`828d9473da`, including the corrected benchmark matrix and retained-header
+boundary checks. [python-assembly-v2.json](results/0362uf/python-assembly-v2.json)
+records the source and full log hash. Standalone boundary/rustdoc gates and
+combined Rust validation remain required.

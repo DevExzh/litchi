@@ -1,0 +1,26 @@
+{
+  "source": "828d9473da9c3815d3e7397201079768797d453d",
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "-m",
+        "unittest",
+        "tools.test_check_api_glossary",
+        "tools.test_officecli_corpus",
+        "tools.test_officecli_capability_delta",
+        "tools.test_no_3rdparty_references",
+        "tools.test_check_crate_boundaries",
+        "tools.test_non_iwork_gate",
+        "tools.test_unified_bench_matrix",
+        "tools.test_check_iwork_leaf_public_api"
+      ],
+      "exit": 0,
+      "seconds": 34.9139240580007,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v2/check-0.log",
+      "bytes": 633568,
+      "sha256": "43b44b0888dbbc8a4f2bcb66183d40574b2615fcd7a67b816ad6891272eb93fd"
+    }
+  ],
+  "note": "Eight tooling unittest modules: 1340 passed. This does not establish the standalone full crate-boundary or rustdoc profile gates."
+}
