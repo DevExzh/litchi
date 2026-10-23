@@ -288,10 +288,6 @@ impl Xlsb {
 
 /// Split a leaf commit of any family into what [`Xlsb::publish`] needs.
 macro_rules! publish {
-    ($file:expr, $commit:expr) => {{
-        let commit = $commit;
-        $file.publish(commit, 1, usize::MAX)
-    }};
     ($file:expr, $commit:expr, $limits:expr) => {{
         let commit = $commit;
         $file.publish(commit, 1, $limits.max_snapshot_bytes())
@@ -508,6 +504,7 @@ impl Xlsb {
         kind: Kind,
         implied: Option<&'static str>,
         node: &NewNode<'_>,
+        max_snapshot_bytes: usize,
     ) -> Result<(Commit, Path<'static>)> {
         if !matches!(node.placement(), None | Some(NodePlacement::End)) {
             return Err(error(
@@ -525,14 +522,16 @@ impl Xlsb {
             ));
         }
         match kind {
-            Kind::Comment => self.add_comment(&parent, node.props()),
-            Kind::Hyperlink => self.add_hyperlink(&parent, node.props()),
-            Kind::Picture => self.add_picture(&parent, node.props()),
-            Kind::Shape => self.add_shape(&parent, node.props()),
-            Kind::Cf => self.add_cf(&parent, implied, node.props()),
-            Kind::DataValidation => self.add_validation(&parent, node.props()),
-            Kind::Autofilter => self.add_autofilter(&parent, node.props()),
-            Kind::RowBreak | Kind::ColBreak => self.add_break(&parent, kind, node.props()),
+            Kind::Comment => self.add_comment(&parent, node.props(), max_snapshot_bytes),
+            Kind::Hyperlink => self.add_hyperlink(&parent, node.props(), max_snapshot_bytes),
+            Kind::Picture => self.add_picture(&parent, node.props(), max_snapshot_bytes),
+            Kind::Shape => self.add_shape(&parent, node.props(), max_snapshot_bytes),
+            Kind::Cf => self.add_cf(&parent, implied, node.props(), max_snapshot_bytes),
+            Kind::DataValidation => self.add_validation(&parent, node.props(), max_snapshot_bytes),
+            Kind::Autofilter => self.add_autofilter(&parent, node.props(), max_snapshot_bytes),
+            Kind::RowBreak | Kind::ColBreak => {
+                self.add_break(&parent, kind, node.props(), max_snapshot_bytes)
+            },
             _ => Err(error(
                 Code::UnsupportedElement,
                 "this element kind cannot be added to an XLSB worksheet",
@@ -657,7 +656,12 @@ fn check_cell(key: &'static str, reference: &str) -> Result<Cell> {
 }
 
 impl Xlsb {
-    fn add_comment(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
+    fn add_comment(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        max_snapshot_bytes: usize,
+    ) -> Result<(Commit, Path<'static>)> {
         let mut reference = None;
         let mut author = None;
         let mut text = None;
@@ -695,7 +699,7 @@ impl Xlsb {
                 .with_property("ref")
                 .with_suggestion("set the existing comment instead"));
         };
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "comment", Some(index))))
     }
 
@@ -796,7 +800,12 @@ fn hyperlink(
 }
 
 impl Xlsb {
-    fn add_hyperlink(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
+    fn add_hyperlink(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        max_snapshot_bytes: usize,
+    ) -> Result<(Commit, Path<'static>)> {
         let mut reference = parent.reference.clone();
         let mut location = None;
         let mut url = None;
@@ -836,7 +845,7 @@ impl Xlsb {
             },
             None => edit.add(parent.sheet, link).map_err(authored)?,
         };
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "hyperlink", Some(index))))
     }
 
@@ -1186,7 +1195,12 @@ impl Xlsb {
         Ok(self.features_of(sheet, kind)?.len())
     }
 
-    fn add_picture(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
+    fn add_picture(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        max_snapshot_bytes: usize,
+    ) -> Result<(Commit, Path<'static>)> {
         let mut src = None;
         let mut name = None;
         let mut description = None;
@@ -1269,11 +1283,16 @@ impl Xlsb {
         let editor = self.editor_for_write()?;
         let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "picture", Some(index))))
     }
 
-    fn add_shape(&self, parent: &Parent, props: &Props<'_>) -> Result<(Commit, Path<'static>)> {
+    fn add_shape(
+        &self,
+        parent: &Parent,
+        props: &Props<'_>,
+        max_snapshot_bytes: usize,
+    ) -> Result<(Commit, Path<'static>)> {
         let mut spec = ShapeSpec::new(
             Placement::TwoCell {
                 from: Marker::cell(1, 1),
@@ -1421,7 +1440,7 @@ impl Xlsb {
         let editor = self.editor_for_write()?;
         let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "shape", Some(index))))
     }
 
@@ -2244,6 +2263,7 @@ impl Xlsb {
         parent: &Parent,
         implied: Option<&'static str>,
         props: &Props<'_>,
+        max_snapshot_bytes: usize,
     ) -> Result<(Commit, Path<'static>)> {
         let mut request = cf_request(Operation::Add, props)?;
         let kind = match (
@@ -2301,7 +2321,7 @@ impl Xlsb {
         let mut format = Formatting::new(ranges);
         format.add_rule(rule);
         let index = edit.add(parent.sheet, format).map_err(authored)?;
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "cf", Some(index))))
     }
 
@@ -2529,6 +2549,7 @@ impl Xlsb {
         &self,
         parent: &Parent,
         props: &Props<'_>,
+        max_snapshot_bytes: usize,
     ) -> Result<(Commit, Path<'static>)> {
         let reference = props.iter().any(|(key, _)| {
             ["ref", "sqref", "range"]
@@ -2565,7 +2586,7 @@ impl Xlsb {
             .with_property("ref"));
         }
         let index = edit.add(parent.sheet, validation).map_err(authored)?;
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((
             commit,
             feature_path(parent.sheet, "dataValidation", Some(index)),
@@ -2626,6 +2647,7 @@ impl Xlsb {
         &self,
         parent: &Parent,
         props: &Props<'_>,
+        max_snapshot_bytes: usize,
     ) -> Result<(Commit, Path<'static>)> {
         let mut range = parent.reference.clone();
         for (key, _, arg) in admit(&features::AUTOFILTER_TABLE, Operation::Add, props)? {
@@ -2639,7 +2661,7 @@ impl Xlsb {
         let mut edit = editor.edit_auto_filter().map_err(native)?;
         edit.set_auto_filter(parent.sheet, Some(filter))
             .map_err(authored)?;
-        let commit = publish!(self, edit.commit().map_err(native)?)?;
+        let commit = self.publish(edit.commit().map_err(native)?, 1, max_snapshot_bytes)?;
         Ok((commit, feature_path(parent.sheet, "autofilter", None)))
     }
 
@@ -2785,6 +2807,7 @@ impl Xlsb {
         parent: &Parent,
         kind: Kind,
         props: &Props<'_>,
+        max_snapshot_bytes: usize,
     ) -> Result<(Commit, Path<'static>)> {
         let item = Self::break_spec(kind, None, props, Operation::Add)?;
         let mut breaks = self.breaks(parent.sheet, kind)?;
@@ -2796,7 +2819,7 @@ impl Xlsb {
         }
         let index = breaks.partition_point(|held| held.id < item.id);
         breaks.insert(index, item);
-        let commit = self.publish_breaks(parent.sheet, kind, breaks, usize::MAX)?;
+        let commit = self.publish_breaks(parent.sheet, kind, breaks, max_snapshot_bytes)?;
         Ok((
             commit,
             feature_path(parent.sheet, features::step_name(kind), Some(index)),

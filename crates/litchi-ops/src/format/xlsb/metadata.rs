@@ -66,7 +66,8 @@ impl Images {
 
 /// Retain the expensive full-package charge only for a signed probe, whose
 /// private candidate is about to be replaced by a canonical identity patch.
-/// Unsigned metadata history keeps its endpoint images lazy and uncharged.
+/// Unsigned metadata history charges the changed property payloads directly;
+/// its endpoint images remain lazy and are not serialized for accounting.
 fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize, usize)> {
     if file.signature() != super::Signature::Signed {
         return Ok((0, 0));
@@ -86,8 +87,8 @@ fn staged_retained_bytes(file: &Xlsb, package: &xlsb::Package) -> Result<(usize,
 fn patch_retained_bytes(patch: &xlsb::metadata::Patch) -> usize {
     patch.changes().iter().fold(0usize, |bytes, change| {
         bytes
-            .saturating_add(change.before().map_or(0, <[u8]>::len))
-            .saturating_add(change.after().map_or(0, <[u8]>::len))
+            .saturating_add(change.before().map_or(0, |value| value.len()))
+            .saturating_add(change.after().map_or(0, |value| value.len()))
     })
 }
 

@@ -467,7 +467,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
     if matches!(parent.element(), Kind::Sheet | Kind::Cell | Kind::Range)
         && let Some((kind, implied)) = super::feature_write::feature_kind(node.kind(), node.props())
     {
-        return file.add_feature(&parent, kind, implied, &node);
+        return file.add_feature(&parent, kind, implied, &node, limits.max_snapshot_bytes());
     }
     if parent.element() != Kind::Workbook {
         return Err(Error::new(

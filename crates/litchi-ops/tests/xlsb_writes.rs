@@ -315,6 +315,42 @@ fn signed_xlsb_routes_preserve_exact_bytes_until_explicit_unsign() {
 }
 
 #[test]
+fn signed_coalesced_cell_cancellation_keeps_a_positive_snapshot_peak() {
+    let bytes = signed_fixture();
+
+    for eager in [false, true] {
+        let signed = open_owner(&bytes, eager);
+        let canonical = signed
+            .edit(|edit| edit.set("/sheet[1]/A1", props! { "value" => "source" }))
+            .expect("commit the signed canonical identity patch");
+        let canonical_charge = canonical.diagnostics().snapshot_bytes();
+        assert!(
+            canonical_charge > 0,
+            "signed identity patches retain native bytes"
+        );
+
+        let cancelled = signed
+            .edit(|edit| {
+                edit.set(
+                    "/sheet[1]/A1",
+                    props! { "value" => "transient native value" },
+                )?;
+                edit.set("/sheet[1]/A1", props! { "value" => "source" })?;
+                Ok::<_, litchi_ops::Error>(())
+            })
+            .expect("commit the signed cancellation");
+        assert!(!cancelled.diagnostics().changed());
+        assert_eq!(cancelled.diagnostics().operations(), 2);
+        assert!(cancelled.patch().is_noop());
+        assert!(
+            cancelled.diagnostics().snapshot_bytes() >= canonical_charge,
+            "a coalesced cancellation must retain at least its canonical identity charge"
+        );
+        assert_eq!(cancelled.file().to_bytes().unwrap(), bytes);
+    }
+}
+
+#[test]
 fn worksheet_name_transactions_replay_inverse_and_collapse_noops() {
     let bytes = fixture();
 

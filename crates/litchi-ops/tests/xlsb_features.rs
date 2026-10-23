@@ -36,6 +36,20 @@ fn workbook() -> File {
 
 #[test]
 fn unsigned_feature_snapshot_charge_is_enforced() {
+    let probe = workbook()
+        .edit(|edit| {
+            edit.add(
+                "/Sheet1",
+                NewNode::new("comment")
+                    .prop("ref", "A1")
+                    .prop("text", "measured"),
+            )
+        })
+        .expect("feature probe");
+    assert!(
+        probe.diagnostics().snapshot_bytes() > 0,
+        "feature commits must report their retained native patch"
+    );
     let limits = SemanticLimits::builder()
         .max_snapshot_bytes(1)
         .expect("snapshot limit")

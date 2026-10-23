@@ -445,6 +445,13 @@ fn unsigned_metadata_snapshot_charge_is_enforced() {
         .build()
         .expect("semantic limits");
     for file in owners(&fixture()) {
+        let probe = file
+            .edit(|edit| edit.set("/metadata", props! { "title" => "measured" }))
+            .expect("metadata probe");
+        assert!(
+            probe.diagnostics().snapshot_bytes() > 0,
+            "metadata commits must report their retained property payloads"
+        );
         let error = file
             .edit_with_options(EditOptions::new().semantic_limits(limits), |edit| {
                 edit.set("/metadata", props! { "title" => "bounded" })
