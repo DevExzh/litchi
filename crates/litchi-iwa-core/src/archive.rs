@@ -1465,6 +1465,13 @@ fn check_constructor_header(
 #[inline]
 fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
     let metadata_items = path.path.len();
+    if limits.is_default_profile() && metadata_items <= Limits::MAX_METADATA_ITEMS {
+        // Under the default hard ceilings, this metadata bound also proves
+        // the derived path header, neutral memory, field and nesting bounds:
+        // one million u32 components occupy at most five million packed
+        // bytes, below the 16 MiB header and 64 MiB memory budgets.
+        return Ok(());
+    }
     let header_length = admitted_path_header_length(path, false, limits)?;
     let header_fields = usize::from(!path.path.is_empty());
     let header_memory = field_path_memory(path)?;
@@ -1518,6 +1525,12 @@ fn check_minimal_field_info_constructor(path: &FieldPath, limits: Limits) -> Res
         .len()
         .checked_add(1)
         .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+    if limits.is_default_profile() && metadata_items <= Limits::MAX_METADATA_ITEMS {
+        // The nested FieldPath adds only one fixed metadata item and one
+        // length-delimited wrapper; the same default ceilings proved above
+        // therefore cover the minimal FieldInfo shape as well.
+        return Ok(());
+    }
     let header_length = admitted_path_header_length(path, true, limits)?;
     let header_fields = 1 + usize::from(!path.path.is_empty());
     let header_memory = checked_memory_add(size_of::<FieldInfo>(), field_path_bytes(path)?)?;
