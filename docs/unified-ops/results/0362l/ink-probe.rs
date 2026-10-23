@@ -67,11 +67,12 @@ impl DigestSink {
     }
 
     fn finish(self) -> StreamEvidence {
+        let hash = self.digest.finalize();
         StreamEvidence {
             bytes: self.bytes,
             writes: self.writes,
             max_write: self.max_write,
-            sha256: digest(self.digest.finalize().as_slice()),
+            sha256: hex_digest(hash.as_slice()),
         }
     }
 }
@@ -292,11 +293,12 @@ impl Fixture {
         }
     }
 }
+fn hex_digest(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
 fn digest(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    hex_digest(Sha256::digest(bytes).as_slice())
 }
 fn validate_outputs(out: &Path) {
     std::fs::create_dir_all(out).unwrap();
