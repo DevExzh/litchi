@@ -330,6 +330,26 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     };
     require_commit_source_changed(error, "stage/mutate/commit")?;
 
+    // A mutation after a deferred commit must also be caught when the first
+    // semantic read asks effective_inner to materialize the composed target.
+    let source = Arc::new(VersionedSource::new(&fixture.archive));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
+    let mut edit = workbook.edit_cells()?;
+    stage(&mut edit, fixture)?;
+    let commit = edit.commit()?;
+    source.mutate();
+    let error = match commit.package().cell_value_by_index(
+        specification.sheet_index,
+        u32::from(specification.reference.row()),
+        u32::from(specification.reference.column()),
+    ) {
+        Ok(_) => return Err("XLS F3 stale deferred source was read".into()),
+        Err(error) => error,
+    };
+    if !matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) {
+        return Err(format!("XLS F3 deferred read returned the wrong error: {error:?}").into());
+    }
+
     // A committed deferred owner must retain the original source freshness
     // fence through publication as well.
     let source = Arc::new(VersionedSource::new(&fixture.archive));

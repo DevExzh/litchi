@@ -149,7 +149,7 @@ The qualification receipt is expected to make this checklist auditable:
 | review item | executable evidence |
 | --- | --- |
 | typed protected, macro, unsupported and wrong-family gates | probe refusal `kind`/operation/reason or exact fixed-family error |
-| freshness controls | unchanged read, stale read, stage→mutate→commit, and mutate→committed-write cases |
+| freshness controls | unchanged read, stale read, stage→mutate→commit, mutate→committed-first-read, and mutate→committed-write cases |
 | source preservation | source owner writes equal the original fixture before and after each sample |
 | lineage and identities | clean source status, pinned base ancestor, distinct source tree, and exact probe-file hashes |
 | matrix coverage | six unique route/corpus cells × four unique A1/B1/B2/A2 legs; subsets require diagnostic mode |
