@@ -99,11 +99,9 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook's sheet table cannot be read.
     pub fn edit_sheet_visibility(&self) -> Result<Edit> {
-        let package = self
-            .staging_package()
-            .map_err(|error| {
-                crate::source_backed::protected_edit_error(error, "edit sheet visibility")
-            })?;
+        let package = self.staging_package().map_err(|error| {
+            crate::source_backed::protected_edit_error(error, "edit sheet visibility")
+        })?;
         let inner = package.edit_sheet_visibility().map_err(|error| {
             crate::source_backed::protected_edit_error(error, "edit sheet visibility")
         })?;

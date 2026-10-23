@@ -64,3 +64,10 @@ The focused a58 receipts were retained outside the repository:
 
 No build artifacts or binaries are committed. Native/performance review and
 coordinator acceptance remain pending.
+
+The coordinator verified the three log hashes and retained durable copies
+with the same filenames under
+`/home/zhuhe/code/litchi-worktrees/.coord/xlsx-normalization-final-a58/`.
+These mirrors preserve the receipts independently of the temporary directory.
+The source correction passed independent scoped review and is composed in
+the diagnostic integration; final performance and complete gates remain open.

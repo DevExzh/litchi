@@ -674,9 +674,7 @@ fn sheet_auto_filter_and_shape_styling() {
 fn sheet_auto_filter_snapshot_limit_covers_native_patch() {
     let original = workbook();
     let probe = original
-        .edit(|transaction| {
-            transaction.set("/Sheet1", props! { "autoFilter" => "A1:B5" })
-        })
+        .edit(|transaction| transaction.set("/Sheet1", props! { "autoFilter" => "A1:B5" }))
         .unwrap();
     let charge = probe.diagnostics().snapshot_bytes();
     assert!(charge > 0);
@@ -800,12 +798,7 @@ fn combined_sheet_rename_expanding_and_auto_filter_snapshot_limit_is_exact() {
         })
         .unwrap();
     assert_eq!(
-        prop(
-            committed.file(),
-            "/FilteredDataSheet/autofilter",
-            "range"
-        )
-        .as_deref(),
+        prop(committed.file(), "/FilteredDataSheet/autofilter", "range").as_deref(),
         Some("A1:B5")
     );
 }

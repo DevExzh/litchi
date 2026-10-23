@@ -26,10 +26,12 @@ fn archive_manifest_xml_obeys_the_selected_raw_xml_policy() {
     let narrow = XmlStreamLimits::new(1_060, 256, 4_000_000, 1_000_000, 64 * 1024)
         .expect("test XML policy is finite");
     assert!(archive.read_manifest_xml(narrow).is_err());
-    assert!(!archive
-        .read_manifest_xml(XmlStreamLimits::default())
-        .expect("default raw XML policy admits fixture")
-        .is_empty());
+    assert!(
+        !archive
+            .read_manifest_xml(XmlStreamLimits::default())
+            .expect("default raw XML policy admits fixture")
+            .is_empty()
+    );
 }
 
 #[test]

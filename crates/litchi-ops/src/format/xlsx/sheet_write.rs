@@ -197,9 +197,7 @@ impl Xlsx {
         // keeps its own repeated source/target endpoints. `from_metadata`
         // already charges the final source and target, so pass only the peak
         // excess as its discarded native payload.
-        let peak_proof = final_endpoints
-            .max(tab_proof_bytes)
-            .max(filter_proof);
+        let peak_proof = final_endpoints.max(tab_proof_bytes).max(filter_proof);
         let native_patch_bytes = peak_proof.saturating_sub(final_endpoints);
         let changed = !source.same_content(&target).map_err(native_error)?;
         let after = if changed {
