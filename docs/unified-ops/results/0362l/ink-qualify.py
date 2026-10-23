@@ -107,6 +107,25 @@ def registry(lock):
                   key=lambda p: (p['name'], p['version'], p['source']))
 
 
+def source_delta(base, candidate, prefixes, base_commit, candidate_commit):
+    """Return a complete, ref-bound delta for selected source prefixes."""
+    selected = lambda path: path.startswith(tuple(prefixes))
+    paths = sorted({path for path in set(base) | set(candidate) if selected(path)})
+    base_only, candidate_only, changed = [], [], []
+    for path in paths:
+        before, after = base.get(path), candidate.get(path)
+        if before is None:
+            candidate_only.append(dict(path=path, candidate=dict(bytes=after[0], sha256=after[1])))
+        elif after is None:
+            base_only.append(dict(path=path, base=dict(bytes=before[0], sha256=before[1])))
+        elif before != after:
+            changed.append(dict(path=path, base=dict(bytes=before[0], sha256=before[1]),
+                                candidate=dict(bytes=after[0], sha256=after[1])))
+    return dict(base_commit=base_commit, candidate_commit=candidate_commit,
+                prefixes=list(prefixes), base_only=base_only,
+                candidate_only=candidate_only, changed=changed)
+
+
 def build(args):
     out = args.output
     assert not out.is_relative_to(ROOT), 'evidence must remain outside the checkout'
@@ -123,12 +142,25 @@ def build(args):
         input_lock=artifact(args.lock),
         requested_refs={'base': args.base, 'candidate': args.candidate},
         resolved_refs={'base': base_commit, 'candidate': candidate_commit},
+        comparison='integrated-route',
         endpoints={},
     )
     save(out / 'build.json', manifest)
-    common_lock = None
+    snapshots = {}
     for label, commit in (('base', base_commit), ('candidate', candidate_commit)):
-        source, provenance = snapshot(out, label, commit, args.lock)
+        snapshots[label] = snapshot(out, label, commit, args.lock)
+    maps = [{r['path']: (r['bytes'], r['sha256'])
+             for r in load(snapshots[label][1]['manifest']['path'])['files']}
+            for label in ('base', 'candidate')]
+    shared = ('crates/litchi-core/', 'crates/litchi-opc/', 'crates/litchi-ooxml-common/', 'crates/litchi-drawingml/')
+    manifest['shared_source_delta'] = source_delta(
+        maps[0], maps[1], shared,
+        snapshots['base'][1]['commit'], snapshots['candidate'][1]['commit'])
+    # Persist the ref-bound source comparison before compiling either endpoint.
+    save(out / 'build.json', manifest)
+    common_lock = None
+    for label in ('base', 'candidate'):
+        source, provenance = snapshots[label]
         project = out / f'project-{label}'
         (project / 'src').mkdir(parents=True)
         shutil.copyfile(PROBE, project / 'src/main.rs')
@@ -225,11 +257,6 @@ panic = "abort"
                 (row['route'], row['bytes'], row['sha256'])
                 for row in actual_stream['routes']
             ]
-    maps = [{r['path']: (r['bytes'], r['sha256']) for r in load(e['source']['manifest']['path'])['files']}
-            for e in (base, candidate)]
-    shared = ('crates/litchi-core/', 'crates/litchi-opc/', 'crates/litchi-ooxml-common/', 'crates/litchi-drawingml/')
-    assert {k: v for k, v in maps[0].items() if k.startswith(shared)} == {
-        k: v for k, v in maps[1].items() if k.startswith(shared)}
     verify(manifest['builder'])
     verify(manifest['probe'])
     manifest['status'] = 'complete'

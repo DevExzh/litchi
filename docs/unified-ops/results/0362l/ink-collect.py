@@ -12,6 +12,13 @@ METRICS = ("allocations", "allocated", "retained", "peak")
 QUALIFY_SCHEMA = "litchi.docx-durable-ink.qualify.v2"
 ABBA_SCHEMA = "litchi.docx-durable-ink-abba.v2"
 STREAM_SCHEMA = "litchi.docx-durable-ink-stream.v1"
+COMPARISON = "integrated-route"
+SHARED_PREFIXES = (
+    "crates/litchi-core/",
+    "crates/litchi-opc/",
+    "crates/litchi-ooxml-common/",
+    "crates/litchi-drawingml/",
+)
 VALIDATION_NAMES = {
     "forward.docx",
     "forward.json",
@@ -57,6 +64,34 @@ def validate_build_refs(build):
         assert endpoint["source"]["commit"] == build["resolved_refs"][label]
 
 
+def source_delta(base, candidate, prefixes, base_commit, candidate_commit):
+    selected = lambda path: path.startswith(tuple(prefixes))
+    paths = sorted({path for path in set(base) | set(candidate) if selected(path)})
+    base_only, candidate_only, changed = [], [], []
+    for path in paths:
+        before, after = base.get(path), candidate.get(path)
+        if before is None:
+            candidate_only.append(dict(path=path, candidate=dict(bytes=after[0], sha256=after[1])))
+        elif after is None:
+            base_only.append(dict(path=path, base=dict(bytes=before[0], sha256=before[1])))
+        elif before != after:
+            changed.append(dict(path=path, base=dict(bytes=before[0], sha256=before[1]),
+                                candidate=dict(bytes=after[0], sha256=after[1])))
+    return dict(base_commit=base_commit, candidate_commit=candidate_commit,
+                prefixes=list(prefixes), base_only=base_only,
+                candidate_only=candidate_only, changed=changed)
+
+
+def validate_shared_source_delta(build, source_maps):
+    assert build["comparison"] == COMPARISON
+    expected = source_delta(
+        source_maps["base"], source_maps["candidate"], SHARED_PREFIXES,
+        build["endpoints"]["base"]["source"]["commit"],
+        build["endpoints"]["candidate"]["source"]["commit"],
+    )
+    assert build["shared_source_delta"] == expected
+
+
 def validate_calibration_case(case, target_ns, minimum_ns):
     """Independently validate calibration and accepted ABBA sample bounds."""
     assert case["calibrations"]
@@ -88,7 +123,7 @@ def collect_build(directory):
     validate_build_refs(build)
     for key in ("builder", "probe", "input_lock"):
         verify(build[key])
-    source_maps = []
+    source_maps = {}
     for label, endpoint in build["endpoints"].items():
         for key in ("project_manifest", "project_source", "lock"):
             verify(endpoint[key])
@@ -103,8 +138,8 @@ def collect_build(directory):
         for row in source["files"]:
             actual = artifact(directory / f"source-{label}" / row["path"])
             assert (actual["bytes"], actual["sha256"]) == (row["bytes"], row["sha256"]), row
-            mapping[row["path"]] = row["sha256"]
-        source_maps.append(mapping)
+            mapping[row["path"]] = (row["bytes"], row["sha256"])
+        source_maps[label] = mapping
         for row in endpoint["commands"]:
             command(row)
         for row in endpoint["binaries"].values():
@@ -147,9 +182,7 @@ def collect_build(directory):
                 base_stream = current_stream
             else:
                 assert current_stream == base_stream
-    shared = ("crates/litchi-core/", "crates/litchi-opc/", "crates/litchi-ooxml-common/", "crates/litchi-drawingml/")
-    assert {k: v for k, v in source_maps[0].items() if k.startswith(shared)} == {
-        k: v for k, v in source_maps[1].items() if k.startswith(shared)}
+    validate_shared_source_delta(build, source_maps)
     return dict(receipt=artifact(path), **build)
 
 

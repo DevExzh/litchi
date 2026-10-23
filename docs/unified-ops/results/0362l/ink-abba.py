@@ -18,6 +18,7 @@ CASES = ("forward", "inverse", "noop", "forward_write", "inverse_write", "noop_w
 ROOT = Path(__file__).resolve().parents[4]
 QUALIFY_SCHEMA = "litchi.docx-durable-ink.qualify.v2"
 ABBA_SCHEMA = "litchi.docx-durable-ink-abba.v2"
+COMPARISON = "integrated-route"
 
 
 def artifact(path):
@@ -47,6 +48,10 @@ def verify_build(path):
     build = load(path)
     assert build["schema"] == QUALIFY_SCHEMA
     assert build["workload"] == "docx-durable-ink"
+    assert build["comparison"] == COMPARISON
+    delta = build["shared_source_delta"]
+    assert delta["base_commit"] == build["resolved_refs"]["base"]
+    assert delta["candidate_commit"] == build["resolved_refs"]["candidate"]
     assert build["status"] == "complete"
     for key in ("builder", "probe", "input_lock"):
         verify(build[key])
