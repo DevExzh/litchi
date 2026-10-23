@@ -4,8 +4,10 @@
 //! lifecycle.  Every timed iteration creates a fresh positional source from
 //! the frozen fixture bytes, then measures only the requested ODP operation:
 //! opening, semantic reading, unchanged writing, appending, or
-//! content-matching replay.  The `verify` mode is untimed and must pass before
-//! the external ABBA runner is allowed to collect timings.
+//! content-matching replay.  Replay is a candidate-only correctness route;
+//! the external ABBA runner times only the four routes shared with the
+//! pre-Patch baseline.  The `verify` mode is untimed and must pass before the
+//! runner is allowed to collect timings.
 
 #![forbid(unsafe_code)]
 

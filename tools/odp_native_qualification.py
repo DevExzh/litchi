@@ -37,7 +37,17 @@ import zipfile
 INPUT_SCHEMA = "litchi.odp.native-qualification.input.v1"
 REPORT_SCHEMA = "litchi.odp.native-qualification.v1"
 PROBE_SCHEMA = "litchi.odp.native-qualification.probe.v1"
-ROUTES = ("open", "read", "write", "append", "replay")
+LEGACY_PROBE_SCHEMA = "litchi.odp.native-qualification.legacy-probe.v1"
+LEGACY_PROFILE = "legacy-e4a-plan"
+CURRENT_PROFILE = "current-commit-patch"
+PROBE_PROFILES = {
+    LEGACY_PROFILE: LEGACY_PROBE_SCHEMA,
+    CURRENT_PROFILE: PROBE_SCHEMA,
+}
+# These are the only routes whose owner lifecycle and publication result are
+# shared by the pinned pre-Patch baseline and the current candidate.  Replay
+# remains a candidate-only correctness proof and is never a timed route.
+ROUTES = ("open", "read", "write", "append")
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
 ROLE_TO_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
@@ -79,6 +89,7 @@ class Endpoint:
     requested_ref: str
     binary: Path
     target_dir: Path
+    profile: str
 
 
 @dataclass(frozen=True)
@@ -204,12 +215,18 @@ def load_manifest(path: Path) -> InputManifest:
 
     def endpoint(name: str) -> Endpoint:
         endpoint_value = _object(value.get(name), f"manifest.{name}")
+        profile = _string(endpoint_value.get("profile"), f"manifest.{name}.profile")
+        if profile not in PROBE_PROFILES:
+            raise RunFailure(
+                f"manifest.{name}.profile must be one of {sorted(PROBE_PROFILES)}"
+            )
         return Endpoint(
             name=name,
             root=_path(endpoint_value.get("root"), f"manifest.{name}.root", base),
             requested_ref=_string(endpoint_value.get("ref"), f"manifest.{name}.ref"),
             binary=_path(endpoint_value.get("binary"), f"manifest.{name}.binary", base),
             target_dir=_path(endpoint_value.get("target_dir"), f"manifest.{name}.target_dir", base),
+            profile=profile,
         )
 
     protocol_value = _object(value.get("protocol"), "manifest.protocol")
@@ -563,6 +580,7 @@ def run_child(
     target_ns: int | None = None,
     tmp_dir: Path,
     guard: dict[str, Any] | None = None,
+    expected_schema: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     command = _probe_command(
         endpoint,
@@ -590,18 +608,29 @@ def run_child(
             check=False,
         )
     except (OSError, subprocess.SubprocessError) as error:
-        raise RunFailure(f"{endpoint.name}/{mode}/{route}: child launch failed: {error}") from error
+        raise RunFailure(
+            f"{endpoint.endpoint.name}/{mode}/{route}: child launch failed: {error}"
+        ) from error
     wall_ns = time.monotonic_ns() - started
     if completed.returncode != 0:
         stderr = completed.stderr.decode("utf-8", errors="replace")[:16_384]
         raise RunFailure(
-            f"{endpoint.name}/{mode}/{route}: child exited {completed.returncode}: {stderr}"
+            f"{endpoint.endpoint.name}/{mode}/{route}: child exited {completed.returncode}: {stderr}"
         )
-    report = _parse_child_json(completed.stdout, f"{endpoint.name}/{mode}/{route}")
-    if report.get("schema") != PROBE_SCHEMA:
-        raise RunFailure(f"{endpoint.name}/{mode}/{route}: probe schema mismatch")
+    report = _parse_child_json(
+        completed.stdout, f"{endpoint.endpoint.name}/{mode}/{route}"
+    )
+    if expected_schema is None:
+        expected_schema = PROBE_PROFILES[endpoint.endpoint.profile]
+    if report.get("schema") != expected_schema:
+        raise RunFailure(
+            f"{endpoint.endpoint.name}/{mode}/{route}: probe schema mismatch; "
+            f"expected {expected_schema!r}, observed {report.get('schema')!r}"
+        )
     event = {
-        "endpoint": endpoint.name,
+        "endpoint": endpoint.endpoint.name,
+        "profile": endpoint.endpoint.profile,
+        "probe_schema": expected_schema,
         "mode": mode,
         "route": route,
         "command": command,
@@ -825,9 +854,124 @@ def validate_correctness_report(
     return outputs
 
 
-def _route_proofs(correctness: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    outputs = _object(correctness.get("outputs"), "correctness.outputs")
-    read = _object(correctness.get("read"), "correctness.read")
+def validate_legacy_correctness_report(
+    report: Mapping[str, Any],
+    fixture: Fixture,
+    fixture_identity: Mapping[str, Any],
+    label: str,
+) -> dict[str, Any]:
+    """Validate the pre-Patch e4a adapter without claiming candidate proofs."""
+
+    if report.get("schema") != LEGACY_PROBE_SCHEMA or report.get("mode") != "verify":
+        raise RunFailure(f"{label}: invalid legacy correctness report identity")
+    fixture_report = _digest_object(report.get("fixture"), f"{label}.fixture")
+    expected_fixture = {"bytes": fixture.bytes, "sha256": fixture.sha256}
+    if fixture_report != expected_fixture:
+        raise RunFailure(f"{label}: probe fixture identity differs from manifest")
+    content_report = _digest_object(
+        _object(report.get("fixture"), f"{label}.fixture").get("content"),
+        f"{label}.fixture.content",
+    )
+    expected_content = _digest_object(fixture_identity.get("content"), f"{label}.fixture.content")
+    if content_report != expected_content:
+        raise RunFailure(f"{label}: probe content.xml identity differs from the fixture")
+
+    expected_capabilities = {
+        "patch_replay": False,
+        "inverse_replay": False,
+        "scoped_replay": False,
+        "timed_routes": list(ROUTES),
+        "replay_scope": "independent_plan_not_patch",
+    }
+    capabilities = _object(report.get("capabilities"), f"{label}.capabilities")
+    if capabilities != expected_capabilities:
+        raise RunFailure(
+            f"{label}: legacy capability boundary is incomplete or claims Patch replay"
+        )
+
+    checks = _object(report.get("checks"), f"{label}.checks")
+    expected_checks = {
+        "no_op_exact_source",
+        "read_semantics",
+        "append_changed",
+        "patch_source_matches_fixture",
+        "append_output_changed",
+        "independent_plan_repeat_exact",
+    }
+    if set(checks) != expected_checks or any(value is not True for value in checks.values()):
+        raise RunFailure(f"{label}: legacy correctness checks are incomplete or false")
+
+    patch_value = _object(report.get("patch"), f"{label}.patch")
+    if set(patch_value) != {
+        "is_noop",
+        "source_content_sha256",
+        "target_content_sha256",
+    }:
+        raise RunFailure(f"{label}: legacy patch proof fields are incomplete")
+    if patch_value["is_noop"] is not False:
+        raise RunFailure(f"{label}: legacy append plan unexpectedly reports noop")
+    patch = {
+        "is_noop": False,
+        "source_content_sha256": _digest(
+            patch_value["source_content_sha256"],
+            f"{label}.patch.source_content_sha256",
+        ),
+        "target_content_sha256": _digest(
+            patch_value["target_content_sha256"],
+            f"{label}.patch.target_content_sha256",
+        ),
+    }
+    if patch["source_content_sha256"] != expected_content["sha256"]:
+        raise RunFailure(f"{label}: legacy plan source hash differs from fixture content.xml")
+    if patch["source_content_sha256"] == patch["target_content_sha256"]:
+        raise RunFailure(f"{label}: legacy plan content proof did not change")
+
+    read_value = _object(report.get("read"), f"{label}.read")
+    slide_count = _positive_int(read_value.get("slide_count"), f"{label}.read.slide_count")
+    if not read_value.get("first_slide_present") is True:
+        raise RunFailure(f"{label}: legacy read route reported no first slide")
+    read = {
+        "slide_count": slide_count,
+        "first_slide_present": True,
+        "text_bytes": _nonnegative_int(read_value.get("text_bytes"), f"{label}.read.text_bytes"),
+        "text_sha256": _digest(read_value.get("text_sha256"), f"{label}.read.text_sha256"),
+    }
+
+    outputs_value = _object(report.get("outputs"), f"{label}.outputs")
+    expected_outputs = {"source", "no_op", "append", "independent_append"}
+    if set(outputs_value) != expected_outputs:
+        raise RunFailure(f"{label}: legacy output digest set differs from the contract")
+    outputs = {
+        name: _digest_object(value, f"{label}.outputs.{name}")
+        for name, value in outputs_value.items()
+    }
+    if outputs["source"] != expected_fixture:
+        raise RunFailure(f"{label}: legacy source output digest differs from the fixture")
+    if outputs["no_op"] != outputs["source"]:
+        raise RunFailure(f"{label}: legacy no-op output is not the exact source")
+    if outputs["append"] == outputs["source"]:
+        raise RunFailure(f"{label}: legacy appended output is identical to the source")
+    if outputs["independent_append"] != outputs["append"]:
+        raise RunFailure(f"{label}: independent legacy plan output differs from append output")
+    return {
+        "profile": LEGACY_PROFILE,
+        "schema": LEGACY_PROBE_SCHEMA,
+        "capabilities": capabilities,
+        "outputs": outputs,
+        "read": read,
+        "patch": patch,
+    }
+
+
+def _route_proofs(
+    correctness: Mapping[str, Any], endpoint_name: str
+) -> dict[str, dict[str, Any]]:
+    endpoints = _object(correctness.get("endpoints"), "correctness.endpoints")
+    endpoint = _object(
+        endpoints.get(endpoint_name), f"correctness.endpoints.{endpoint_name}"
+    )
+    outputs = _object(endpoint.get("outputs"), f"correctness.{endpoint_name}.outputs")
+    read = _object(endpoint.get("read"), f"correctness.{endpoint_name}.read")
     return {
         "open": {"kind": "open", "source": outputs["source"]},
         "read": {
@@ -840,7 +984,6 @@ def _route_proofs(correctness: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
         },
         "write": {"kind": "package", "output": outputs["no_op"]},
         "append": {"kind": "package", "output": outputs["append"]},
-        "replay": {"kind": "package", "output": outputs["content_matching_replay"]},
     }
 
 
@@ -978,6 +1121,16 @@ def _runtime_identity(manifest: InputManifest, out_dir: Path) -> dict[str, Any]:
         raise RunFailure("baseline and candidate roots must be distinct")
     baseline = resolve_endpoint(manifest.baseline, roots)
     candidate = resolve_endpoint(manifest.candidate, roots)
+    if baseline.endpoint.profile != LEGACY_PROFILE:
+        raise RunFailure(
+            f"baseline.profile must be {LEGACY_PROFILE!r}; "
+            f"observed {baseline.endpoint.profile!r}"
+        )
+    if candidate.endpoint.profile != CURRENT_PROFILE:
+        raise RunFailure(
+            f"candidate.profile must be {CURRENT_PROFILE!r}; "
+            f"observed {candidate.endpoint.profile!r}"
+        )
     if baseline.resolved_ref == candidate.resolved_ref:
         raise RunFailure("baseline and candidate refs resolve to the same commit")
     return {
@@ -986,6 +1139,7 @@ def _runtime_identity(manifest: InputManifest, out_dir: Path) -> dict[str, Any]:
             "root": str(baseline.endpoint.root),
             "requested_ref": baseline.endpoint.requested_ref,
             "resolved_ref": baseline.resolved_ref,
+            "profile": baseline.endpoint.profile,
             "binary": binary_identity(baseline.endpoint.binary),
             "target_dir": str(baseline.endpoint.target_dir),
         },
@@ -993,6 +1147,7 @@ def _runtime_identity(manifest: InputManifest, out_dir: Path) -> dict[str, Any]:
             "root": str(candidate.endpoint.root),
             "requested_ref": candidate.endpoint.requested_ref,
             "resolved_ref": candidate.resolved_ref,
+            "profile": candidate.endpoint.profile,
             "binary": binary_identity(candidate.endpoint.binary),
             "target_dir": str(candidate.endpoint.target_dir),
         },
@@ -1006,6 +1161,8 @@ def _endpoint_metadata(endpoint: ResolvedEndpoint) -> dict[str, Any]:
         "requested_ref": endpoint.endpoint.requested_ref,
         "resolved_ref": endpoint.resolved_ref,
         "head": endpoint.resolved_ref,
+        "profile": endpoint.endpoint.profile,
+        "probe_schema": PROBE_PROFILES[endpoint.endpoint.profile],
         "binary": {
             "path": str(endpoint.endpoint.binary),
             "bytes": endpoint.binary_bytes,
@@ -1022,53 +1179,98 @@ def _run_correctness(
     out_dir: Path,
     tmp_dir: Path,
 ) -> dict[str, Any]:
-    outputs: dict[str, dict[str, dict[str, Any]]] = {}
-    read_receipts: dict[str, dict[str, Any]] = {}
-    patch_receipts: dict[str, dict[str, Any]] = {}
-    scoped_receipts: dict[str, dict[str, Any]] = {}
+    endpoint_records: dict[str, dict[str, Any]] = {}
     events = []
     for name in ("baseline", "candidate"):
         # Correctness-only is an untimed proof preflight.  It may run while
         # unrelated host work is present; strict quiet-host guards remain in
         # calibration and ABBA timing below.
-        report, event = run_child(endpoints[name], manifest, "verify", tmp_dir=tmp_dir)
-        outputs[name] = validate_correctness_report(
-            report,
-            manifest.fixture,
-            fixture_identity,
-            f"correctness.{name}",
+        profile = endpoints[name].endpoint.profile
+        expected_schema = PROBE_PROFILES[profile]
+        report, event = run_child(
+            endpoints[name],
+            manifest,
+            "verify",
+            tmp_dir=tmp_dir,
+            expected_schema=expected_schema,
         )
-        read = _object(report["read"], f"correctness.{name}.read")
-        patch = _object(report["patch"], f"correctness.{name}.patch")
-        read_receipts[name] = {
-            "slide_count": read["slide_count"],
-            "first_slide_present": read["first_slide_present"],
-            "text_bytes": read["text_bytes"],
-            "text_sha256": read["text_sha256"],
-        }
-        patch_receipts[name] = {
-            "is_noop": patch["is_noop"],
-            "source_content_sha256": patch["source_content_sha256"],
-            "target_content_sha256": patch["target_content_sha256"],
-        }
-        scoped_receipts[name] = _scoped_replay_receipt(
-            report, f"correctness.{name}"
-        )
+        if name == "baseline":
+            record = validate_legacy_correctness_report(
+                report,
+                manifest.fixture,
+                fixture_identity,
+                f"correctness.{name}",
+            )
+        else:
+            outputs = validate_correctness_report(
+                report,
+                manifest.fixture,
+                fixture_identity,
+                f"correctness.{name}",
+            )
+            read = _object(report["read"], f"correctness.{name}.read")
+            patch = _object(report["patch"], f"correctness.{name}.patch")
+            record = {
+                "profile": CURRENT_PROFILE,
+                "schema": PROBE_SCHEMA,
+                "capabilities": {
+                    "patch_replay": True,
+                    "inverse_replay": True,
+                    "scoped_replay": True,
+                    "timed_routes": list(ROUTES),
+                    "replay_scope": "content_matching_patch",
+                },
+                "outputs": outputs,
+                "read": {
+                    "slide_count": read["slide_count"],
+                    "first_slide_present": read["first_slide_present"],
+                    "text_bytes": read["text_bytes"],
+                    "text_sha256": read["text_sha256"],
+                },
+                "patch": {
+                    "is_noop": patch["is_noop"],
+                    "source_content_sha256": patch["source_content_sha256"],
+                    "target_content_sha256": patch["target_content_sha256"],
+                },
+                "scoped_replay": _scoped_replay_receipt(
+                    report, f"correctness.{name}"
+                ),
+            }
+        if record["profile"] != profile or record["schema"] != expected_schema:
+            raise RunFailure(f"correctness.{name}: report capability profile mismatch")
+        endpoint_records[name] = record
         events.append(event)
         _write_json(out_dir / f"correctness-{name}.json", report)
-    if outputs["baseline"] != outputs["candidate"]:
-        raise RunFailure("baseline and candidate correctness output digests differ")
-    if read_receipts["baseline"] != read_receipts["candidate"]:
+
+    baseline = endpoint_records["baseline"]
+    candidate = endpoint_records["candidate"]
+    common_output_names = ("source", "no_op", "append")
+    common_outputs = {
+        name: baseline["outputs"][name] for name in common_output_names
+    }
+    if any(
+        baseline["outputs"][name] != candidate["outputs"][name]
+        for name in common_output_names
+    ):
+        raise RunFailure("baseline and candidate common output digests differ")
+    if baseline["read"] != candidate["read"]:
         raise RunFailure("baseline and candidate read receipts differ")
-    if patch_receipts["baseline"] != patch_receipts["candidate"]:
+    if baseline["patch"] != candidate["patch"]:
         raise RunFailure("baseline and candidate patch receipts differ")
-    if scoped_receipts["baseline"] != scoped_receipts["candidate"]:
-        raise RunFailure("baseline and candidate scoped replay receipts differ")
     return {
-        "outputs": outputs["baseline"],
-        "read": read_receipts["baseline"],
-        "patch": patch_receipts["baseline"],
-        "scoped_replay": scoped_receipts["baseline"],
+        "endpoints": endpoint_records,
+        "common": {
+            "outputs": common_outputs,
+            "read": baseline["read"],
+            "patch": baseline["patch"],
+        },
+        # Keep the candidate's richer proof at the top level for report
+        # readers; timing consumes the endpoint records so it cannot mistake
+        # a candidate-only replay for a baseline capability.
+        "outputs": candidate["outputs"],
+        "read": candidate["read"],
+        "patch": candidate["patch"],
+        "scoped_replay": candidate["scoped_replay"],
         "events": events,
     }
 
@@ -1086,10 +1288,14 @@ def _run_timing(
     )
     if identity_before_timing["fixture"] != fixture_identity:
         raise RunFailure("fixture identity changed before calibration")
-    proofs = _route_proofs(correctness)
+    proofs = {
+        name: _route_proofs(correctness, name)
+        for name in ("baseline", "candidate")
+    }
     calibration: dict[str, dict[str, int]] = {"baseline": {}, "candidate": {}}
     calibration_events = []
     for name in ("baseline", "candidate"):
+        expected_schema = PROBE_PROFILES[endpoints[name].endpoint.profile]
         for route in ROUTES:
             guard = quiet_guard(manifest.protocol, f"calibration-{name}-{route}")
             report, event = run_child(
@@ -1100,12 +1306,13 @@ def _run_timing(
                 target_ns=manifest.protocol.target_ns,
                 tmp_dir=tmp_dir,
                 guard=guard,
+                expected_schema=expected_schema,
             )
             calibration[name][route] = validate_calibration(
                 report,
                 route,
                 manifest.protocol,
-                proofs[route],
+                proofs[name][route],
                 f"calibration.{name}.{route}",
             )
             event["guard"] = guard
@@ -1134,6 +1341,7 @@ def _run_timing(
             for role in ABBA_ORDER:
                 endpoint_name = ROLE_TO_ENDPOINT[role]
                 endpoint = endpoints[endpoint_name]
+                expected_schema = PROBE_PROFILES[endpoint.endpoint.profile]
                 leg_guard = quiet_guard(manifest.protocol, f"{route}-{role}-block-{block}")
                 report, event = run_child(
                     endpoint,
@@ -1145,13 +1353,14 @@ def _run_timing(
                     warmups=manifest.protocol.warmups,
                     tmp_dir=tmp_dir,
                     guard=leg_guard,
+                    expected_schema=expected_schema,
                 )
                 per_op_ns, output_bytes = validate_timed(
                     report,
                     route,
                     calibration[endpoint_name][route],
                     manifest.protocol,
-                    proofs[route],
+                    proofs[endpoint_name][route],
                     f"timed.{route}.{role}.{block}",
                 )
                 after_leg_guard = quiet_guard(
@@ -1203,6 +1412,7 @@ def _run_timing(
         raise RunFailure("fixture identity changed during ABBA")
     return {
         "calibration": calibration,
+        "proofs": proofs,
         "routes": routes,
         "identity": {
             "before_calibration": identity_before_timing,
@@ -1291,12 +1501,16 @@ def main(argv: list[str] | None = None) -> int:
                     "baseline": {
                         "root": str(manifest.baseline.root),
                         "requested_ref": manifest.baseline.requested_ref,
+                        "profile": manifest.baseline.profile,
+                        "probe_schema": PROBE_PROFILES[manifest.baseline.profile],
                         "binary": str(manifest.baseline.binary),
                         "target_dir": str(manifest.baseline.target_dir),
                     },
                     "candidate": {
                         "root": str(manifest.candidate.root),
                         "requested_ref": manifest.candidate.requested_ref,
+                        "profile": manifest.candidate.profile,
+                        "probe_schema": PROBE_PROFILES[manifest.candidate.profile],
                         "binary": str(manifest.candidate.binary),
                         "target_dir": str(manifest.candidate.target_dir),
                     },
@@ -1400,6 +1614,7 @@ def main(argv: list[str] | None = None) -> int:
             },
             "correctness": correctness,
             "calibration": timing["calibration"],
+            "timing_proofs": timing["proofs"],
             "routes": timing["routes"],
             "identity": timing["identity"],
             "started_unix_ns": time.time_ns(),

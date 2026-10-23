@@ -90,6 +90,48 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
     }
 
 
+def legacy_correctness_report(fixture: bytes) -> dict[str, object]:
+    source = digest(fixture)
+    append = digest(fixture + b"-append")
+    return {
+        "schema": RUNNER.LEGACY_PROBE_SCHEMA,
+        "mode": "verify",
+        "capabilities": {
+            "patch_replay": False,
+            "inverse_replay": False,
+            "scoped_replay": False,
+            "timed_routes": list(RUNNER.ROUTES),
+            "replay_scope": "independent_plan_not_patch",
+        },
+        "fixture": {**source, "content": source},
+        "checks": {
+            "no_op_exact_source": True,
+            "read_semantics": True,
+            "append_changed": True,
+            "patch_source_matches_fixture": True,
+            "append_output_changed": True,
+            "independent_plan_repeat_exact": True,
+        },
+        "read": {
+            "slide_count": 2,
+            "first_slide_present": True,
+            "text_bytes": len(fixture),
+            "text_sha256": source["sha256"],
+        },
+        "patch": {
+            "is_noop": False,
+            "source_content_sha256": source["sha256"],
+            "target_content_sha256": append["sha256"],
+        },
+        "outputs": {
+            "source": source,
+            "no_op": source,
+            "append": append,
+            "independent_append": append,
+        },
+    }
+
+
 class OdpNativeQualificationTests(unittest.TestCase):
     def test_correctness_only_mode_is_mutually_exclusive_with_plan(self) -> None:
         parsed = RUNNER.parse_args(
@@ -141,12 +183,14 @@ class OdpNativeQualificationTests(unittest.TestCase):
                 "baseline": {
                     "root": str(source_a),
                     "ref": "frozen-baseline-ref",
+                    "profile": RUNNER.LEGACY_PROFILE,
                     "binary": str(target_a / "probe"),
                     "target_dir": str(target_a),
                 },
                 "candidate": {
                     "root": str(source_b),
                     "ref": "frozen-candidate-ref",
+                    "profile": RUNNER.CURRENT_PROFILE,
                     "binary": str(target_b / "probe"),
                     "target_dir": str(target_b),
                 },
@@ -165,6 +209,8 @@ class OdpNativeQualificationTests(unittest.TestCase):
             parsed = RUNNER.load_manifest(manifest)
             self.assertEqual(parsed.baseline.requested_ref, "frozen-baseline-ref")
             self.assertEqual(parsed.candidate.requested_ref, "frozen-candidate-ref")
+            self.assertEqual(parsed.baseline.profile, RUNNER.LEGACY_PROFILE)
+            self.assertEqual(parsed.candidate.profile, RUNNER.CURRENT_PROFILE)
             self.assertEqual(parsed.fixture.provenance, "controlled fixture manifest")
             self.assertEqual(parsed.protocol.target_ns, 100_000_000)
 
@@ -257,6 +303,39 @@ class OdpNativeQualificationTests(unittest.TestCase):
                 "candidate",
             )
 
+    def test_legacy_report_has_separate_capability_boundary_and_no_replay_timing(self) -> None:
+        fixture = b"fixture"
+        report = legacy_correctness_report(fixture)
+        record = RUNNER.validate_legacy_correctness_report(
+            report,
+            RUNNER.Fixture(
+                path=Path("fixture.odp"),
+                bytes=len(fixture),
+                sha256=hashlib.sha256(fixture).hexdigest(),
+                provenance="test",
+            ),
+            {"content": digest(fixture)},
+            "baseline",
+        )
+        self.assertEqual(record["profile"], RUNNER.LEGACY_PROFILE)
+        self.assertFalse(record["capabilities"]["patch_replay"])
+        self.assertEqual(record["capabilities"]["timed_routes"], list(RUNNER.ROUTES))
+        self.assertNotIn("replay", RUNNER.ROUTES)
+        broken = json.loads(json.dumps(report))
+        broken["capabilities"]["patch_replay"] = True
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_legacy_correctness_report(
+                broken,
+                RUNNER.Fixture(
+                    path=Path("fixture.odp"),
+                    bytes=len(fixture),
+                    sha256=hashlib.sha256(fixture).hexdigest(),
+                    provenance="test",
+                ),
+                {"content": digest(fixture)},
+                "baseline",
+            )
+
     def test_calibration_and_timing_reject_short_or_unbounded_reports(self) -> None:
         protocol = RUNNER.Protocol(
             cpu=0,
@@ -335,6 +414,7 @@ class OdpNativeQualificationTests(unittest.TestCase):
                 requested_ref="frozen-ref",
                 binary=binary,
                 target_dir=target,
+                profile=RUNNER.LEGACY_PROFILE,
             )
             with mock.patch.object(
                 RUNNER,
@@ -352,7 +432,9 @@ class OdpNativeQualificationTests(unittest.TestCase):
             binary = target / "probe"
             binary.write_bytes(b"before")
             binary.chmod(0o755)
-            endpoint = RUNNER.Endpoint("baseline", root, "frozen-ref", binary, target)
+            endpoint = RUNNER.Endpoint(
+                "baseline", root, "frozen-ref", binary, target, RUNNER.LEGACY_PROFILE
+            )
             resolved = RUNNER.ResolvedEndpoint(
                 endpoint,
                 "a" * 40,
