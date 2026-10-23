@@ -24,7 +24,10 @@ use crate::raw::worksheet::edit::{
 use crate::row::{HeightAt, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
-use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
+use crate::style::cell_format::{self, Format};
+use crate::style::{
+    AlignmentChange, BorderChange, BorderEdge, FillChange, FontChange, ProtectionChange,
+};
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
@@ -163,6 +166,18 @@ impl Sheet<'_> {
             .store()?
             .entry(address)
             .and_then(|stored| stored.style))
+    }
+
+    fn source_format(&self, address: Address) -> Result<Option<Format>> {
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        sheet
+            .style(address)?
+            .map(|style| style.format())
+            .transpose()
     }
 
     fn has_pending_style(&self, address: Address) -> bool {
@@ -362,22 +377,58 @@ impl Sheet<'_> {
             .name
             .as_str();
         ensure_merge_area(sheet, range)?;
+        // Resolve the projected merge state before taking a finite snapshot
+        // reservation. Re-adding an already-present range is a semantic
+        // no-op, while an identical pending add is a duplicate request; both
+        // must avoid charging a second structural capture.
+        let data = self
+            .edit
+            .base
+            .inner
+            .sheets
+            .get(self.position)
+            .cloned()
+            .ok_or_else(|| invalid("merged-range target disappeared"))?;
+        let source_sheet = Worksheet {
+            owner: Arc::clone(&self.edit.base.inner),
+            data,
+            policy: None,
+        };
+        let base_merges = source_sheet.store()?.merge_ranges().to_vec();
+        let intents = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .map_or(&[][..], |actions| actions.merges.as_slice());
+        let projected = pending_merge(&base_merges, intents, range.start());
+        if projected == Some(range) {
+            if base_merges.contains(&range) {
+                let keep_structural_capture =
+                    if let Some(actions) = self.edit.sheets.get_mut(&self.position) {
+                        actions.merges.retain(|intent| intent.range() != range);
+                        actions
+                            .merges
+                            .iter()
+                            .any(|intent| intent.range().start() == range.start())
+                    } else {
+                        false
+                    };
+                if !keep_structural_capture {
+                    self.edit.release_cell_capture_facet(
+                        self.position,
+                        range.start(),
+                        CaptureFacet::Structural,
+                    );
+                }
+            }
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             range.start(),
             CaptureFacet::Structural,
             0,
         )?;
-        let duplicate = self
-            .edit
-            .sheets
-            .get(&self.position)
-            .and_then(|actions| actions.merges.last())
-            .is_some_and(|intent| *intent == MergeIntent::Add(range));
-        if duplicate {
-            self.edit.rollback_cell_capture(capture);
-            return Ok(self);
-        }
         let reserve = self
             .edit
             .sheets
@@ -510,6 +561,20 @@ impl Sheet<'_> {
         } else {
             None
         };
+        let source_has_rich_text = if source
+            .as_ref()
+            .is_some_and(|source| source.as_ref() == Some(&authored_cell))
+        {
+            match self.source_rich_text(address) {
+                Ok(source) => source.is_some(),
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            }
+        } else {
+            false
+        };
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
@@ -519,6 +584,7 @@ impl Sheet<'_> {
         if source
             .as_ref()
             .is_some_and(|source| source.as_ref() == Some(&authored_cell))
+            && !source_has_rich_text
         {
             let remove_action = self
                 .edit
@@ -1099,6 +1165,22 @@ impl Sheet<'_> {
             .cloned();
         let mut merged = previous.clone().unwrap_or_default();
         merged.merge(change);
+        if self.edit.capture_budgeted()
+            && font_change_matches_source(
+                &merged,
+                self.source_format(address)?.as_ref().and_then(Format::font),
+            )
+        {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .fonts
+                .remove(&address);
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Font);
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1141,6 +1223,24 @@ impl Sheet<'_> {
             .copied();
         let mut merged = previous.unwrap_or_default();
         merged.merge(change);
+        if self.edit.capture_budgeted()
+            && alignment_change_matches_source(
+                &merged,
+                self.source_format(address)?
+                    .as_ref()
+                    .and_then(Format::alignment),
+            )
+        {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .alignments
+                .remove(&address);
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Alignment);
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1199,6 +1299,19 @@ impl Sheet<'_> {
             .cloned();
         let mut merged = previous.clone().unwrap_or_else(BorderChange::new);
         merged.merge(change);
+        if self.edit.capture_budgeted()
+            && border_change_matches_source(
+                &merged,
+                self.source_format(address)?
+                    .as_ref()
+                    .and_then(Format::border),
+            )
+        {
+            self.edit.discard_border(self.position, address)?;
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Border);
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1275,6 +1388,17 @@ impl Sheet<'_> {
             .cloned();
         let mut merged = previous.clone().unwrap_or_else(FillChange::new);
         merged.merge(change);
+        if self.edit.capture_budgeted()
+            && fill_change_matches_source(
+                &merged,
+                self.source_format(address)?.as_ref().and_then(Format::fill),
+            )
+        {
+            self.edit.discard_fill(self.position, address)?;
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Fill);
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1314,6 +1438,24 @@ impl Sheet<'_> {
             .copied();
         let mut merged = previous.unwrap_or_default();
         merged.merge(change);
+        if self.edit.capture_budgeted()
+            && protection_change_matches_source(
+                &merged,
+                self.source_format(address)?
+                    .as_ref()
+                    .and_then(Format::protection),
+            )
+        {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .protections
+                .remove(&address);
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::Protection);
+            return Ok(self);
+        }
         let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
@@ -1348,6 +1490,24 @@ impl Sheet<'_> {
             .and_then(|actions| actions.quote_prefixes.get(&address))
             .is_some_and(|current| *current == value)
         {
+            return Ok(self);
+        }
+        if self.edit.capture_budgeted()
+            && quote_prefix_matches_source(
+                value,
+                self.source_format(address)?
+                    .as_ref()
+                    .map(Format::quote_prefix),
+            )
+        {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .quote_prefixes
+                .remove(&address);
+            self.edit
+                .release_cell_capture_facet(self.position, address, CaptureFacet::QuotePrefix);
             return Ok(self);
         }
         self.edit.preflight_cell_capture_with_facet(
@@ -1396,6 +1556,27 @@ impl Sheet<'_> {
             .and_then(|actions| actions.number_formats.get(&address))
             .is_some_and(|current| *current == code)
         {
+            return Ok(self);
+        }
+        if self.edit.capture_budgeted()
+            && number_format_matches_source(
+                code.as_deref(),
+                self.source_format(address)?
+                    .as_ref()
+                    .and_then(|format| format.number_format().code()),
+            )
+        {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .number_formats
+                .remove(&address);
+            self.edit.release_cell_capture_facet(
+                self.position,
+                address,
+                CaptureFacet::NumberFormat,
+            );
             return Ok(self);
         }
         self.edit.preflight_cell_capture_with_facet(
@@ -1537,6 +1718,258 @@ impl Sheet<'_> {
             .insert(address, Action::Remove);
         Ok(self)
     }
+}
+
+fn requested_matches<T: PartialEq>(requested: Option<Option<T>>, current: Option<T>) -> bool {
+    requested.is_none_or(|requested| requested == current)
+}
+
+fn font_color_matches(requested: &crate::style::FontColor, current: cell_format::Color) -> bool {
+    let kind_matches = match (requested.kind(), current) {
+        (crate::style::FontColorKind::Default, cell_format::Color::Default { .. }) => true,
+        (crate::style::FontColorKind::Rgb(requested), cell_format::Color::Rgb { value, .. }) => {
+            requested == value
+        },
+        (
+            crate::style::FontColorKind::Theme(requested),
+            cell_format::Color::Theme { index, .. },
+        ) => requested == index,
+        (
+            crate::style::FontColorKind::Indexed(requested),
+            cell_format::Color::Indexed { index, .. },
+        ) => requested == index,
+        (
+            crate::style::FontColorKind::Auto(requested),
+            cell_format::Color::Auto { enabled, .. },
+        ) => requested == enabled,
+        _ => false,
+    };
+    kind_matches && requested.tint() == current.tint()
+}
+
+fn font_change_matches_source(change: &FontChange, source: Option<&cell_format::Font>) -> bool {
+    let name = source.and_then(cell_format::Font::name);
+    let color = source.and_then(cell_format::Font::color);
+    let requested_color_matches = change
+        .color_change()
+        .is_none_or(|requested| match requested {
+            None => color.is_none(),
+            Some(requested) => color.is_some_and(|current| font_color_matches(requested, current)),
+        });
+    requested_matches(
+        change.bold_change(),
+        source.and_then(cell_format::Font::bold),
+    ) && requested_matches(
+        change.italic_change(),
+        source.and_then(cell_format::Font::italic),
+    ) && requested_matches(
+        change.strike_change(),
+        source.and_then(cell_format::Font::strike),
+    ) && requested_matches(
+        change.condense_change(),
+        source.and_then(cell_format::Font::condense),
+    ) && requested_matches(
+        change.extend_change(),
+        source.and_then(cell_format::Font::extend),
+    ) && requested_matches(
+        change.outline_change(),
+        source.and_then(cell_format::Font::outline),
+    ) && requested_matches(
+        change.shadow_change(),
+        source.and_then(cell_format::Font::shadow),
+    ) && requested_matches(
+        change.underline_change(),
+        source.and_then(cell_format::Font::underline),
+    ) && requested_color_matches
+        && change
+            .name_change()
+            .is_none_or(|requested| requested == name)
+        && requested_matches(
+            change.size_change(),
+            source.and_then(cell_format::Font::size),
+        )
+        && requested_matches(
+            change.script_change(),
+            source.and_then(cell_format::Font::script),
+        )
+        && requested_matches(
+            change.family_change(),
+            source.and_then(cell_format::Font::family),
+        )
+        && requested_matches(
+            change.charset_change(),
+            source.and_then(cell_format::Font::charset),
+        )
+        && requested_matches(
+            change.scheme_change(),
+            source.and_then(cell_format::Font::scheme),
+        )
+}
+
+fn alignment_change_matches_source(
+    change: &AlignmentChange,
+    source: Option<&cell_format::Alignment>,
+) -> bool {
+    requested_matches(
+        change.horizontal_change(),
+        source.and_then(|alignment| alignment.horizontal),
+    ) && requested_matches(
+        change.vertical_change(),
+        source.and_then(|alignment| alignment.vertical),
+    ) && requested_matches(
+        change.text_rotation_change(),
+        source.and_then(|alignment| alignment.text_rotation),
+    ) && authored_alignment_bool_matches(change.wrap_text_change(), source, |alignment| {
+        alignment.wrap_text
+    }) && requested_matches(
+        change.indent_change(),
+        source.and_then(|alignment| alignment.indent),
+    ) && requested_matches(
+        change.relative_indent_change(),
+        source.and_then(|alignment| alignment.relative_indent),
+    ) && requested_matches(
+        change.justify_last_line_change(),
+        source.and_then(|alignment| alignment.justify_last_line),
+    ) && authored_alignment_bool_matches(change.shrink_to_fit_change(), source, |alignment| {
+        alignment.shrink_to_fit
+    }) && requested_matches(
+        change.reading_order_change(),
+        source.and_then(|alignment| alignment.reading_order),
+    )
+}
+
+fn authored_alignment_bool_matches(
+    requested: Option<Option<bool>>,
+    source: Option<&cell_format::Alignment>,
+    value: impl Fn(&cell_format::Alignment) -> bool,
+) -> bool {
+    match requested {
+        None => true,
+        Some(None) => source.is_none_or(|alignment| !value(alignment)),
+        Some(Some(true)) => source.is_some_and(value),
+        // `Format` exposes the value of a boolean, not whether its XML
+        // attribute was absent or explicitly false. Keep an authored false
+        // request so source fidelity is never collapsed by ambiguity.
+        Some(Some(false)) => false,
+    }
+}
+
+fn source_border_side<'a>(
+    source: Option<&'a cell_format::Border>,
+    edge: BorderEdge,
+) -> Option<&'a cell_format::Side> {
+    let source = source?;
+    match edge {
+        BorderEdge::Start => source.start.as_ref(),
+        BorderEdge::End => source.end.as_ref(),
+        BorderEdge::Left => source.left.as_ref(),
+        BorderEdge::Right => source.right.as_ref(),
+        BorderEdge::Top => source.top.as_ref(),
+        BorderEdge::Bottom => source.bottom.as_ref(),
+        BorderEdge::Diagonal => source
+            .diagonal
+            .as_ref()
+            .and_then(|diagonal| diagonal.side()),
+        BorderEdge::Vertical => source.vertical.as_ref(),
+        BorderEdge::Horizontal => source.horizontal.as_ref(),
+    }
+}
+
+fn border_side_matches(
+    change: &crate::style::BorderSideChange,
+    source: Option<&cell_format::Side>,
+) -> bool {
+    let whole_matches = change
+        .whole_change()
+        .is_none_or(|requested| match requested {
+            None => source.is_none(),
+            Some(requested) => source == Some(requested),
+        });
+    let line_matches = requested_matches(change.line_change(), source.map(|side| side.line));
+    let color_matches =
+        requested_matches(change.color_change(), source.and_then(|side| side.color));
+    whole_matches && line_matches && color_matches
+}
+
+fn border_change_matches_source(
+    change: &BorderChange,
+    source: Option<&cell_format::Border>,
+) -> bool {
+    [
+        BorderEdge::Start,
+        BorderEdge::End,
+        BorderEdge::Left,
+        BorderEdge::Right,
+        BorderEdge::Top,
+        BorderEdge::Bottom,
+        BorderEdge::Diagonal,
+        BorderEdge::Vertical,
+        BorderEdge::Horizontal,
+    ]
+    .into_iter()
+    .all(|edge| {
+        change
+            .side_change(edge)
+            .is_none_or(|side| border_side_matches(side, source_border_side(source, edge)))
+    }) && requested_matches(
+        change.diagonal_up_change(),
+        source
+            .and_then(|border| border.diagonal.as_ref().and_then(|diagonal| diagonal.dir()))
+            .map(|direction| direction.is_up()),
+    ) && requested_matches(
+        change.diagonal_down_change(),
+        source
+            .and_then(|border| border.diagonal.as_ref().and_then(|diagonal| diagonal.dir()))
+            .map(|direction| direction.is_down()),
+    ) && requested_matches(
+        change.outline_change(),
+        source.and_then(|border| border.outline),
+    )
+}
+
+fn fill_change_matches_source(change: &FillChange, source: Option<&cell_format::Fill>) -> bool {
+    if let Some(replacement) = change.replacement() {
+        return source == Some(replacement);
+    }
+    let pattern = source
+        .and_then(cell_format::Fill::pattern)
+        .and_then(|fill| fill.pattern());
+    let foreground = source
+        .and_then(cell_format::Fill::pattern)
+        .and_then(|fill| fill.foreground());
+    let background = source
+        .and_then(cell_format::Fill::pattern)
+        .and_then(|fill| fill.background());
+    requested_matches(change.pattern_change(), pattern)
+        && requested_matches(change.foreground_change(), foreground)
+        && requested_matches(change.background_change(), background)
+}
+
+fn protection_change_matches_source(
+    change: &ProtectionChange,
+    source: Option<cell_format::Protection>,
+) -> bool {
+    requested_matches(
+        change.locked_change(),
+        source.and_then(|protection| protection.locked()),
+    ) && requested_matches(
+        change.hidden_change(),
+        source.and_then(|protection| protection.hidden()),
+    )
+}
+
+fn quote_prefix_matches_source(requested: Option<bool>, source: Option<bool>) -> bool {
+    match requested {
+        None => source != Some(true),
+        Some(true) => source == Some(true),
+        // `Format::quote_prefix` reports only an enabled flag, so an absent
+        // and an explicit false attribute cannot be distinguished here.
+        Some(false) => false,
+    }
+}
+
+fn number_format_matches_source(requested: Option<&str>, source: Option<&str>) -> bool {
+    requested == source
 }
 
 /// Borrowed editor for one worksheet being created by this transaction.
