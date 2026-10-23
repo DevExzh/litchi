@@ -31,6 +31,9 @@ use litchi_numbers_wire::{
 
 use super::table_cell_pop_up_menu::{Path, TransactionBudget};
 
+type BudgetError = super::table_cell_pop_up_menu::Error;
+type BudgetLimitKind = super::table_cell_pop_up_menu::LimitKind;
+
 const TABLE_MODEL_TYPE: u32 = 6_001;
 const TILE_TYPE: u32 = 6_002;
 const TABLE_DATA_LIST_TYPE: u32 = 6_005;
@@ -263,13 +266,19 @@ struct NativePopUpTransition {
 }
 
 /// Native graph failure. The facade maps this to its content-redacted error
-/// enum; no native payload is included in the error value.
+/// enum. Limit payloads stay attached until that boundary so the public
+/// error reports the resource and exact observed/maximum values that caused
+/// the refusal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativePopUpError {
     InvalidSource,
     UnsupportedDependency,
     Allocation,
-    Limit,
+    Limit {
+        kind: BudgetLimitKind,
+        observed: u64,
+        maximum: u64,
+    },
     Codec,
     Archive,
 }
@@ -280,7 +289,7 @@ impl fmt::Display for NativePopUpError {
             Self::InvalidSource => "invalid Pop-Up Menu native source",
             Self::UnsupportedDependency => "unsupported Pop-Up Menu native dependency",
             Self::Allocation => "Pop-Up Menu native allocation failed",
-            Self::Limit => "Pop-Up Menu native limit exceeded",
+            Self::Limit { .. } => "Pop-Up Menu native limit exceeded",
             Self::Codec => "Pop-Up Menu native codec rejected the source",
             Self::Archive => "Pop-Up Menu native archive rewrite failed",
         })
@@ -291,9 +300,121 @@ impl std::error::Error for NativePopUpError {}
 
 pub(super) type Result<T> = std::result::Result<T, NativePopUpError>;
 
+fn map_budget_error(error: BudgetError) -> NativePopUpError {
+    match error {
+        BudgetError::Limit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => NativePopUpError::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        BudgetError::Allocation { .. } => NativePopUpError::Allocation,
+        _ => NativePopUpError::InvalidSource,
+    }
+}
+
+fn as_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+fn native_limit(kind: BudgetLimitKind, observed: usize, maximum: usize) -> NativePopUpError {
+    NativePopUpError::Limit {
+        kind,
+        observed: as_u64(observed),
+        maximum: as_u64(maximum),
+    }
+}
+
+fn native_limit_u32(kind: BudgetLimitKind, observed: u32, maximum: u32) -> NativePopUpError {
+    NativePopUpError::Limit {
+        kind,
+        observed: u64::from(observed),
+        maximum: u64::from(maximum),
+    }
+}
+
+fn map_storage_codec_error(error: storage_codec::DecodeError) -> NativePopUpError {
+    match error.resource_limit() {
+        Some(storage_codec::DecodeLimit::Bytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::References { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadReferences, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Text { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireTextBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Fields { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireFields, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Work { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireWork, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            native_limit_u32(BudgetLimitKind::WireNesting, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => {
+            native_limit(BudgetLimitKind::RetainedBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Allocation { .. }) => NativePopUpError::Allocation,
+        Some(_) => NativePopUpError::Codec,
+        None => NativePopUpError::Codec,
+    }
+}
+
+fn map_popup_codec_error(error: popup_codec::DecodeError) -> NativePopUpError {
+    match error.resource_limit() {
+        Some(popup_codec::DecodeLimit::InputBytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireBytes, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::OutputBytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Fields { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireFields, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Work { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireWork, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            native_limit_u32(BudgetLimitKind::WireNesting, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::References { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadReferences, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Items { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadItems, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Text { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireTextBytes, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Retained { observed, maximum }) => {
+            native_limit(BudgetLimitKind::RetainedBytes, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Scratch { observed, maximum }) => {
+            native_limit(BudgetLimitKind::ScratchBytes, observed, maximum)
+        },
+        Some(popup_codec::DecodeLimit::Allocation { .. }) => NativePopUpError::Allocation,
+        Some(_) => NativePopUpError::Codec,
+        None => NativePopUpError::Codec,
+    }
+}
+
 fn map_archive_constructor_error(error: litchi_iwa_core::Error) -> NativePopUpError {
     match error {
-        litchi_iwa_core::Error::Limit { .. } => NativePopUpError::Limit,
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => NativePopUpError::Limit {
+            kind: super::table_cell_pop_up_menu::map_core_limit_kind(kind),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
         litchi_iwa_core::Error::Allocation { .. } => NativePopUpError::Allocation,
         _ => NativePopUpError::Archive,
     }
@@ -326,7 +447,7 @@ fn rewrite_native_popup_menu_transition(
         .sum::<usize>();
     budget
         .charge_archive(source, decoded_bytes, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     validate_unique_route(source, input.model_identifier)?;
     validate_unique_route(source, input.tile_identifier)?;
     validate_unique_route(source, input.control_table_identifier)?;
@@ -346,18 +467,18 @@ fn rewrite_native_popup_menu_transition(
     let model_options = budget.residual_storage_options(model_payload);
     let (model, model_report) =
         storage_codec::decode_table_model_with_report(model_payload, model_options)
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_storage_codec_error)?;
     budget
         .charge_storage_decode_report(model_report, true, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let (store, store_report) = storage_codec::decode_data_store_with_report(
         model.base_data_store(),
         budget.residual_storage_options(model.base_data_store()),
     )
-    .map_err(|_| NativePopUpError::Codec)?;
+    .map_err(map_storage_codec_error)?;
     budget
         .charge_storage_decode_report(store_report, true, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     if store
         .control_cell_spec_table()
         .map(|reference| reference.identifier())
@@ -472,16 +593,16 @@ fn rewrite_native_popup_menu_transition(
     let maximum_archive_bytes = input.limits.max_archive_bytes();
     let maximum_compressed_bytes =
         SnappyStream::maximum_compressed_len(maximum_archive_bytes, input.snappy_limits)
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_archive_constructor_error)?;
     budget
         .charge_allocations(12, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     budget
         .charge_transaction_work(
             maximum_archive_bytes.saturating_add(maximum_compressed_bytes),
             input.path,
         )
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
 
     let mut candidate = source.clone();
     let mut added = Vec::new();
@@ -566,7 +687,7 @@ fn rewrite_native_popup_menu_transition(
                 }],
                 input.limits,
             )
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
             candidate
                 .objects
                 .try_reserve_exact(1)
@@ -679,7 +800,7 @@ pub(super) fn rewrite_native_popup_menu(
     let archive_bytes = transition
         .candidate
         .to_bytes(input.limits)
-        .map_err(|_| NativePopUpError::Archive)?;
+        .map_err(map_archive_constructor_error)?;
     let member_edits =
         NativeControlOutput::single(input.component_index, input.member_name, archive_bytes)?;
     let changed_members = member_edits.member_names().map(str::to_owned).collect();
@@ -733,10 +854,10 @@ pub(super) fn rewrite_native_popup_menu_multi(
         .ok_or(NativePopUpError::InvalidSource)?;
     budget
         .charge_allocations(merge_allocation_count, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     budget
         .charge_scratch_bytes(source_payload_bytes, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let (working, ownership) = merge_popup_members(&input, budget)?;
     let placement = input
         .members
@@ -839,10 +960,10 @@ pub(super) fn existing_popup_model_identifiers_multi(
         .ok_or(NativePopUpError::InvalidSource)?;
     budget
         .charge_allocations(merge_allocation_count, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     budget
         .charge_scratch_bytes(source_payload_bytes, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let (working, _) = merge_popup_members(&input, budget)?;
     let placement = input
         .members
@@ -1017,7 +1138,7 @@ fn merge_popup_members(
     let sort_work = sorted_index_work(ownership.len())?;
     budget
         .charge_transaction_work(sort_work, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     ownership.sort_and_reject_duplicates()?;
     Ok((working, ownership))
 }
@@ -1051,12 +1172,12 @@ fn split_popup_candidate(
     // and sort work are explicitly part of the transaction budget.
     budget
         .charge_allocations(candidate.objects.len(), input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut candidate_index = NativeObjectIndex::with_capacity(candidate.objects.len())?;
     let ownership_lookup_work = binary_search_work(ownership.len(), candidate.objects.len())?;
     budget
         .charge_transaction_work(ownership_lookup_work, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     for object in &candidate.objects {
         let identifier = object
             .archive_info
@@ -1078,7 +1199,7 @@ fn split_popup_candidate(
     let sort_work = sorted_index_work(candidate_index.len())?;
     budget
         .charge_transaction_work(sort_work, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     candidate_index.sort_and_reject_duplicates()?;
     let candidate_lookup_work = candidate_index
         .len()
@@ -1090,7 +1211,7 @@ fn split_popup_candidate(
             binary_search_work(candidate_index.len(), candidate_lookup_work)?,
             input.path,
         )
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     for object in &candidate.objects {
         let identifier = object
             .archive_info
@@ -1124,7 +1245,7 @@ fn split_popup_candidate(
             )?,
             input.path,
         )
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     for entry in ownership.iter() {
         let identifier = entry.identifier;
         let member_index = entry.member_index;
@@ -1200,10 +1321,10 @@ fn split_popup_candidate(
                 let source_len = source
                     .archive
                     .encoded_len(input.limits)
-                    .map_err(|_| NativePopUpError::Archive)?;
+                    .map_err(map_archive_constructor_error)?;
                 let candidate_len = candidate
                     .encoded_len(input.limits)
-                    .map_err(|_| NativePopUpError::Archive)?;
+                    .map_err(map_archive_constructor_error)?;
                 total
                     .checked_add(source_len)
                     .and_then(|value| value.checked_add(candidate_len))
@@ -1211,13 +1332,13 @@ fn split_popup_candidate(
             })?;
     budget
         .charge_allocations(comparison_allocations, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     budget
         .charge_scratch_bytes(comparison_bytes, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     budget
         .charge_transaction_work(comparison_bytes, input.path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(input.members.len())
@@ -1264,14 +1385,14 @@ fn split_popup_candidate(
         // the source/candidate scratch and work charges.
         let expected_candidate_len = per_member[member_index]
             .encoded_len(input.limits)
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
         let expected_source_len = member
             .archive
             .encoded_len(input.limits)
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
         let bytes = per_member[member_index]
             .to_bytes(input.limits)
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
         if bytes.len() != expected_candidate_len {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1284,7 +1405,7 @@ fn split_popup_candidate(
         let source_bytes = member
             .archive
             .to_bytes(input.limits)
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
         if source_bytes.len() != expected_source_len {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1333,7 +1454,7 @@ pub(super) fn existing_popup_model_identifiers(
             &popup.messages[message_index].data,
             budget.residual_popup_options(&popup.messages[message_index].data),
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
         budget
             .charge_wire_bytes(report.input_bytes(), path)
             .and_then(|_| budget.charge_wire_fields(report.fields(), path))
@@ -1345,7 +1466,7 @@ pub(super) fn existing_popup_model_identifiers(
             .and_then(|_| budget.charge_allocations(report.allocations(), path))
             .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), path))
             .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), path))
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
     }
     Ok(identifiers)
 }
@@ -1387,12 +1508,12 @@ fn prepare_desired_state(
     }
     let popup_options = popup_options_for_items(desired.items);
     let prepared = popup_codec::prepare_popup_menu_model_write(desired.items, popup_options)
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
     let requirements = prepared.execution_requirements();
     charge_popup_write_requirements(budget, requirements, Path::Package)?;
     let canonical = prepared
         .execute(popup_codec::RewriteExecutionLimits::exact(requirements))
-        .map_err(|_| NativePopUpError::Codec)?
+        .map_err(map_popup_codec_error)?
         .into_bytes();
     let mut popup_identifier = None;
     let mut new_popup_payload = None;
@@ -1421,7 +1542,7 @@ fn prepare_desired_state(
             &message.data,
             budget.residual_popup_options(&message.data),
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
         budget
             .charge_wire_bytes(report.input_bytes(), Path::Package)
             .and_then(|_| budget.charge_wire_fields(report.fields(), Path::Package))
@@ -1433,7 +1554,7 @@ fn prepare_desired_state(
             .and_then(|_| budget.charge_allocations(report.allocations(), Path::Package))
             .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), Path::Package))
             .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), Path::Package))
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
         if snapshot
             .items()
             .map(|item| item.value())
@@ -1466,7 +1587,7 @@ fn prepare_desired_state(
             &entry.payload,
             budget.residual_popup_options(&entry.payload),
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
         budget
             .charge_wire_bytes(report.input_bytes(), Path::Package)
             .and_then(|_| budget.charge_wire_fields(report.fields(), Path::Package))
@@ -1478,7 +1599,7 @@ fn prepare_desired_state(
             .and_then(|_| budget.charge_allocations(report.allocations(), Path::Package))
             .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), Path::Package))
             .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), Path::Package))
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
         if let control_codec::CellSpecSnapshot::Popup(snapshot) = snapshot
             && snapshot.popup_model().identifier() == popup_identifier
             && snapshot.starts_with_first() == desired.starts_with_first
@@ -1526,7 +1647,7 @@ fn validate_control_list_payloads(
             &entry.payload,
             budget.residual_popup_options(&entry.payload),
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
         budget
             .charge_wire_bytes(report.input_bytes(), path)
             .and_then(|_| budget.charge_wire_fields(report.fields(), path))
@@ -1538,7 +1659,7 @@ fn validate_control_list_payloads(
             .and_then(|_| budget.charge_allocations(report.allocations(), path))
             .and_then(|_| budget.charge_scratch_bytes(report.scratch_bytes(), path))
             .and_then(|_| budget.charge_retained_bytes(report.retained_bytes(), path))
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
     }
     Ok(())
 }
@@ -1615,10 +1736,10 @@ fn census_bnc_references(
             budget.residual_storage_options(&message.data),
             &mut visitor,
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_storage_codec_error)?;
         budget
             .charge_storage_decode_report(report, true, path)
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
         if visitor.failed {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1783,7 +1904,7 @@ fn inspect_old_state(
         &entry.payload,
         popup_options_for_bytes(&entry.payload),
     )
-    .map_err(|_| NativePopUpError::Codec)?;
+    .map_err(map_popup_codec_error)?;
     if spec.interaction_type() != 7
         || spec.popup_model().identifier() == 0
         || spec.starts_with_first() && spec.popup_model().identifier() == 0
@@ -1797,7 +1918,7 @@ fn inspect_old_state(
         &popup.messages[popup_message].data,
         popup_options_for_bytes(&popup.messages[popup_message].data),
     )
-    .map_err(|_| NativePopUpError::Codec)?;
+    .map_err(map_popup_codec_error)?;
     Ok(Some(OldState {
         format_key,
         control_key,
@@ -1989,12 +2110,12 @@ fn rewrite_control_list(
                 // solely because it grows an empty list.
                 popup_options_for_capacity(source.len().saturating_add(16)),
             )
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_popup_codec_error)?;
             let requirements = prepared.execution_requirements();
             charge_popup_write_requirements(budget, requirements, path)?;
             let spec = prepared
                 .execute(popup_codec::RewriteExecutionLimits::exact(requirements))
-                .map_err(|_| NativePopUpError::Codec)?
+                .map_err(map_popup_codec_error)?
                 .into_bytes();
             output = apply_list_mutation_with_budget(
                 &output,
@@ -2025,7 +2146,7 @@ fn apply_list_mutation_with_budget(
     };
     let options = budget.residual_storage_rewrite_options(source);
     let plan = storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_storage_codec_error)?;
     let preparation = plan.prepare_report();
     // The prepared requirements already aggregate source, payload, result,
     // and verification fields/work.  Charge only source-only byte classes
@@ -2035,7 +2156,7 @@ fn apply_list_mutation_with_budget(
         .charge_wire_bytes(preparation.source_bytes(), path)
         .and_then(|_| budget.charge_wire_reference_bytes(preparation.reference_bytes(), path))
         .and_then(|_| budget.charge_wire_text_bytes(preparation.text_bytes(), path))
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let requirements = plan.requirements();
     budget
         .charge_wire_fields(requirements.fields(), path)
@@ -2046,10 +2167,10 @@ fn apply_list_mutation_with_budget(
         .and_then(|_| budget.charge_retained_bytes(requirements.retained_bytes(), path))
         .and_then(|_| budget.charge_allocations(requirements.allocations(), path))
         .and_then(|_| budget.charge_transaction_work(requirements.output_bytes(), path))
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let (bytes, report) = plan
         .execute(requirements.exact_limits())
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_storage_codec_error)?;
     if report.output_bytes() != requirements.output_bytes()
         || report.fields() != requirements.fields()
         || report.work_bytes() != requirements.work_bytes()
@@ -2082,7 +2203,7 @@ fn charge_popup_write_requirements(
         .and_then(|_| budget.charge_scratch_bytes(requirements.scratch_bytes(), path))
         .and_then(|_| budget.charge_retained_bytes(requirements.retained_bytes(), path))
         .and_then(|_| budget.charge_transaction_work(requirements.output_bytes(), path))
-        .map_err(|_| NativePopUpError::Limit)
+        .map_err(map_budget_error)
 }
 
 fn table_data_list_type(
@@ -2091,7 +2212,7 @@ fn table_data_list_type(
 ) -> Result<Option<i32>> {
     storage_codec::decode_table_data_list_type_with_report(source, options)
         .map(|(snapshot, _)| Some(snapshot.list_type()))
-        .map_err(|_| NativePopUpError::Codec)
+        .map_err(map_storage_codec_error)
 }
 
 fn advance_table_data_list_next_id(source: &[u8], appended_key: u32) -> Result<Vec<u8>> {
@@ -2171,7 +2292,7 @@ fn decode_list_entries_with_report(
     let mut visitor = ListVisitor::default();
     let (list, report) =
         storage_codec::decode_table_data_list_with_visitor(source, options, &mut visitor)
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_storage_codec_error)?;
     if list.list_type() != LIST_CONTROL_CELL_SPEC
         && list.list_type() != LIST_FORMAT
         && list.list_type() != LIST_STRING
@@ -2257,17 +2378,17 @@ fn unique_list_message<'source>(
         // unselected envelopes are charged only for this small route scan.
         let (snapshot, root_report) =
             storage_codec::decode_table_data_list_type_with_report(&message.data, options)
-                .map_err(|_| NativePopUpError::Codec)?;
+                .map_err(map_storage_codec_error)?;
         if snapshot.list_type() != list_type {
             budget
                 .charge_storage_decode_report(root_report, true, path)
-                .map_err(|_| NativePopUpError::Limit)?;
+                .map_err(map_budget_error)?;
             continue;
         }
         let (_, report) = decode_list_entries_with_report(&message.data, options)?;
         budget
             .charge_storage_decode_report(report, true, path)
-            .map_err(|_| NativePopUpError::Limit)?;
+            .map_err(map_budget_error)?;
         if selected.is_some() {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -2331,10 +2452,10 @@ fn tile_identifier(
     let mut visitor = TileReferenceVisitor::default();
     let (storage, report) =
         storage_codec::decode_tile_storage_with_visitor(source, options, &mut visitor)
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_storage_codec_error)?;
     budget
         .charge_storage_decode_report(report, true, path)
-        .map_err(|_| NativePopUpError::Limit)?;
+        .map_err(map_budget_error)?;
     let tile_size = storage.tile_size().ok_or(NativePopUpError::InvalidSource)?;
     let tile_id = row / tile_size.max(1);
     let mut matches = visitor
@@ -2430,17 +2551,34 @@ fn bnc_options(source: &[u8]) -> PopUpMenuRewriteOptions {
 fn map_bnc_error(error: PopUpMenuRewriteError) -> NativePopUpError {
     match error {
         PopUpMenuRewriteError::InvalidFormat(_) => NativePopUpError::InvalidSource,
-        PopUpMenuRewriteError::InputBytes { .. }
-        | PopUpMenuRewriteError::OutputBytes { .. }
-        | PopUpMenuRewriteError::Fields { .. }
-        | PopUpMenuRewriteError::Work { .. }
-        | PopUpMenuRewriteError::Nesting { .. }
-        | PopUpMenuRewriteError::References { .. }
-        | PopUpMenuRewriteError::RetainedBytes { .. }
-        | PopUpMenuRewriteError::ScratchBytes { .. } => NativePopUpError::Limit,
-        PopUpMenuRewriteError::Allocations { .. } | PopUpMenuRewriteError::Allocation { .. } => {
-            NativePopUpError::Allocation
+        PopUpMenuRewriteError::InputBytes { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireBytes, observed, maximum)
         },
+        PopUpMenuRewriteError::OutputBytes { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum)
+        },
+        PopUpMenuRewriteError::Fields { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireFields, observed, maximum)
+        },
+        PopUpMenuRewriteError::Work { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireWork, observed, maximum)
+        },
+        PopUpMenuRewriteError::Nesting { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireNesting, observed, maximum)
+        },
+        PopUpMenuRewriteError::References { observed, maximum } => {
+            native_limit(BudgetLimitKind::PayloadReferences, observed, maximum)
+        },
+        PopUpMenuRewriteError::RetainedBytes { observed, maximum } => {
+            native_limit(BudgetLimitKind::RetainedBytes, observed, maximum)
+        },
+        PopUpMenuRewriteError::ScratchBytes { observed, maximum } => {
+            native_limit(BudgetLimitKind::ScratchBytes, observed, maximum)
+        },
+        PopUpMenuRewriteError::Allocations { observed, maximum } => {
+            native_limit(BudgetLimitKind::Allocations, observed, maximum)
+        },
+        PopUpMenuRewriteError::Allocation { .. } => NativePopUpError::Allocation,
     }
 }
 
@@ -2468,7 +2606,7 @@ pub(super) fn replace_message_preserving_header(
             },
             limits,
         )
-        .map_err(|_| NativePopUpError::Archive)?;
+        .map_err(map_archive_constructor_error)?;
     Ok(())
 }
 
@@ -2537,7 +2675,7 @@ pub(super) fn replace_control_message_with_transition(
                 payload,
                 popup_options_for_bytes(payload),
             )
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_popup_codec_error)?;
             if entry.ref_count == 0 {
                 return Err(NativePopUpError::InvalidSource);
             }
@@ -2564,7 +2702,7 @@ pub(super) fn replace_control_message_with_transition(
                 payload,
                 popup_options_for_bytes(payload),
             )
-            .map_err(|_| NativePopUpError::Codec)?;
+            .map_err(map_popup_codec_error)?;
             if entry.ref_count == 0 {
                 return Err(NativePopUpError::InvalidSource);
             }
@@ -2769,7 +2907,7 @@ pub(super) fn replace_control_message_with_transition(
             transition,
             limits,
         )
-        .map_err(|_| NativePopUpError::Archive)?;
+        .map_err(map_archive_constructor_error)?;
     // Remove control FieldInfo records for entries that no longer exist.  The
     // transition above has already validated and rewritten every retained
     // path, so this cleanup cannot shift an index used by the transition.
@@ -2811,7 +2949,7 @@ fn popup_references_from_list(source: &[u8]) -> Result<Vec<u64>> {
             &entry.payload,
             popup_options_for_bytes(&entry.payload),
         )
-        .map_err(|_| NativePopUpError::Codec)?;
+        .map_err(map_popup_codec_error)?;
         if let control_codec::CellSpecSnapshot::Popup(spec) = spec {
             let identifier = spec.popup_model().identifier();
             if identifier == 0 {
@@ -2859,7 +2997,7 @@ pub(super) fn archive_has_popup_reference(archive: &Archive, identifier: u64) ->
                     &entry.payload,
                     popup_options_for_bytes(&entry.payload),
                 )
-                .map_err(|_| NativePopUpError::Codec)?;
+                .map_err(map_popup_codec_error)?;
                 if let control_codec::CellSpecSnapshot::Popup(spec) = spec
                     && spec.popup_model().identifier() == identifier
                 {
@@ -2891,7 +3029,7 @@ pub(super) fn archive_has_popup_reference_strict(
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,
             )
-            .map_err(|_| NativePopUpError::Archive)?;
+            .map_err(map_archive_constructor_error)?;
     }
     // ArchiveInfo does not carry the embedded CellSpec payloads of known
     // control-list objects.  Include that strict native census as well, so a
@@ -3322,7 +3460,44 @@ fn patch_row_buffer(
 
 #[cfg(test)]
 mod tests {
-    use super::{NativeObjectIndex, NativeObjectIndexEntry, NativePopUpError, sorted_index_work};
+    use super::{
+        BudgetError, BudgetLimitKind, NativeObjectIndex, NativeObjectIndexEntry, NativePopUpError,
+        Path, PopUpMenuRewriteError, map_bnc_error, map_budget_error, sorted_index_work,
+    };
+
+    #[test]
+    fn native_limit_mapping_keeps_budget_payload() {
+        let error = map_budget_error(BudgetError::Limit {
+            kind: BudgetLimitKind::WireWork,
+            observed: 37,
+            maximum: 19,
+            path: Path::Package,
+        });
+        assert_eq!(
+            error,
+            NativePopUpError::Limit {
+                kind: BudgetLimitKind::WireWork,
+                observed: 37,
+                maximum: 19,
+            }
+        );
+    }
+
+    #[test]
+    fn native_bnc_limit_mapping_keeps_output_payload() {
+        let error = map_bnc_error(PopUpMenuRewriteError::OutputBytes {
+            observed: 41,
+            maximum: 23,
+        });
+        assert_eq!(
+            error,
+            NativePopUpError::Limit {
+                kind: BudgetLimitKind::WireOutputBytes,
+                observed: 41,
+                maximum: 23,
+            }
+        );
+    }
 
     #[test]
     fn native_object_index_handles_adversarial_order_and_duplicate() {

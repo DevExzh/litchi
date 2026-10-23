@@ -232,7 +232,7 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error
     }
 }
 
-const fn map_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> LimitKind {
+pub(super) const fn map_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> LimitKind {
     match kind {
         litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
         litchi_iwa_core::LimitKind::Messages | litchi_iwa_core::LimitKind::MessagesPerObject => {
@@ -1863,10 +1863,14 @@ fn map_native_error(error: popup_native::NativePopUpError, path: Path) -> Error 
             Error::Refused(Refusal::UnsupportedDependency { path })
         },
         popup_native::NativePopUpError::Allocation => Error::Allocation { amount: 1, path },
-        popup_native::NativePopUpError::Limit => Error::Limit {
-            kind: LimitKind::WireWork,
-            observed: 1,
-            maximum: 0,
+        popup_native::NativePopUpError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed,
+            maximum,
             path,
         },
         popup_native::NativePopUpError::InvalidSource
@@ -3738,7 +3742,28 @@ impl storage_codec::StorageVisitor for ListCollector {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, LimitKind, Path, map_core_error};
+    use super::{Error, LimitKind, Path, map_core_error, map_native_error};
+
+    #[test]
+    fn native_limit_payload_reaches_public_error() {
+        let error = map_native_error(
+            super::super::table_cell_pop_up_menu_native::NativePopUpError::Limit {
+                kind: LimitKind::WireWork,
+                observed: 31,
+                maximum: 13,
+            },
+            Path::Package,
+        );
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: 31,
+                maximum: 13,
+                path: Path::Package,
+            }
+        );
+    }
 
     #[test]
     fn bounded_snappy_failures_keep_typed_resource_kinds() {
