@@ -239,6 +239,41 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
 }
 
 #[test]
+fn inverse_restores_its_owner_but_refuses_an_equal_foreign_redacted_artifact() {
+    let original = fixture(
+        one_document(),
+        vec![link("rFirst", "https://remove.invalid/")],
+        false,
+        false,
+    );
+    let package = open(original.clone());
+    let commit = package
+        .edit_external_hyperlink_redaction(&["https://remove.invalid/"])
+        .unwrap()
+        .commit()
+        .unwrap();
+    let inverse = commit.patch().inverse();
+
+    let restored = commit
+        .package()
+        .apply_external_hyperlink_redaction(&inverse)
+        .expect("the inverse must restore its retained owner");
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, original);
+
+    let mut redacted = Vec::new();
+    commit.package().write_to(&mut redacted).unwrap();
+    let foreign = open(redacted);
+    assert!(matches!(
+        foreign.apply_external_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+                && refusal.operation() == "external_hyperlink_redaction"
+    ));
+}
+
+#[test]
 fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
     let bytes = fixture(
         format!(r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:hyperlink r:id="rOne"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#).into_bytes(),

@@ -463,6 +463,16 @@ pub(crate) trait Change: Clone + Send + Sync + 'static {
     type Error: From<Error>;
     /// Whether the change leaves the package unchanged.
     fn is_noop(&self) -> bool;
+    /// Whether a detached record may restore an independently opened package
+    /// whose complete content matches the recorded before artifact.
+    ///
+    /// The exact retained owner pair is handled by the `same_owner` proof
+    /// before this capability is consulted. Families whose record is
+    /// forward-only can therefore keep their own inverse on its retained
+    /// owner while refusing the detached-record fallback.
+    fn allows_foreign_restore(&self) -> bool {
+        true
+    }
     /// The change that restores the before state.
     #[must_use]
     fn inverse(&self) -> Self;
@@ -517,8 +527,9 @@ macro_rules! source_family {
                     "exact before and after state of what it changed. Replay it with the ",
                     "family's `Package::apply_*` onto a package holding the before state; ",
                     "[`Patch::inverse`] restores it. The inverse of a commit applied to that ",
-                    "commit's own package restores the exact source artifact; a family that ",
-                    "is forward-only may refuse an inverse on another package."
+                    "commit's own package restores the exact source artifact. An exact retained ",
+                    "owner pair is checked before the detached-record fallback; a family that ",
+                    "is forward-only may refuse that fallback on another package."
                 )]
         #[derive(Clone)]
         pub struct Patch {
@@ -582,9 +593,11 @@ macro_rules! source_family {
             // retain the source freshness fence that the publishing path
             // would otherwise perform before it can share an owner.
             package.check_source()?;
-            // The package that writes exactly the patch's before artifact (a
-            // share of it, or a reopened copy of its bytes) gets the exact
-            // after package: an inverse restores the original artifact.
+            // An exact retained owner pair gets the exact after package: an
+            // inverse restores the original artifact without the detached
+            // record path. An independently opened package may use the
+            // content-matching fallback only when the change explicitly
+            // permits foreign restoration.
             if let Some((before, after)) = &patch.restore {
                 let same_semantic_limits = package.semantic_limits() == before.semantic_limits();
                 // same_owner is the package-local provenance proof. Package
@@ -604,7 +617,12 @@ macro_rules! source_family {
                         ($report)(&patch.change),
                     ));
                 }
-                if same_semantic_limits && package.same_artifact(before)? {
+                if same_semantic_limits
+                    && crate::source_backed::deferred::Change::allows_foreign_restore(
+                        &patch.change,
+                    )
+                    && package.same_artifact(before)?
+                {
                     return Ok(Commit::new(
                         package.restored(after)?,
                         patch.clone(),
