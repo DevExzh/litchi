@@ -313,3 +313,11 @@ XLSX/filesystem `OpenOptions` name collision. These consumers must preserve
 the same workload and fidelity checks under the canonical API. The isolated
 XLSX harness group is not reached.
 [consumer-v23.json](results/0362uf/consumer-v23.json) records both outcomes.
+
+The first assembled Clippy pass on `00367b644c` stops on two ODF metadata
+writer `io_other_error` diagnostics. Replacing the constructors with
+`io::Error::other` retains the same typed limit/allocation payloads.
+[clippy-assembly-v1.json](results/0362uf/clippy-assembly-v1.json) records this
+partial gate, including the source/lock hashes and capped target. The safe
+runner preserves targets and only releases completed, hashed debug test
+executables; this single Clippy attempt is not the full 53-check gate.

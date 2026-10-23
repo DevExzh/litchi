@@ -84,22 +84,16 @@ impl Write for BoundedMetadataWriter {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let observed = self.bytes.len().saturating_add(bytes.len());
         if observed > self.maximum {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                MetadataOutputLimit {
-                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
-                    maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
-                },
-            ));
+            return Err(io::Error::other(MetadataOutputLimit {
+                observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
+            }));
         }
         self.bytes.try_reserve(bytes.len()).map_err(|source| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                Error::Allocation {
-                    resource: METADATA_OUTPUT_SCOPE,
-                    source,
-                },
-            )
+            io::Error::other(Error::Allocation {
+                resource: METADATA_OUTPUT_SCOPE,
+                source,
+            })
         })?;
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
