@@ -745,7 +745,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Font,
             change.retained_bytes(),
         )?;
         self.edit
@@ -777,7 +777,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Alignment,
             change.retained_bytes(),
         )?;
         self.edit
@@ -825,7 +825,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Border,
             change.retained_bytes(),
         )?;
         self.edit.stage_border(self.position, address, change)?;
@@ -886,7 +886,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Fill,
             change.retained_bytes(),
         )?;
         self.edit.stage_fill(self.position, address, change)?;
@@ -910,7 +910,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Protection,
             change.retained_bytes(),
         )?;
         self.edit
@@ -935,7 +935,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::QuotePrefix,
             size_of::<Option<bool>>(),
         )?;
         self.edit
@@ -974,7 +974,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::NumberFormat,
             size_of::<Option<Arc<str>>>()
                 .saturating_add(code.as_ref().map_or(0, |value| value.len())),
         )?;

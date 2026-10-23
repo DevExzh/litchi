@@ -349,8 +349,9 @@ pub(super) struct CaptureBudget {
     maximum: usize,
     base_reserved: usize,
     reserved: usize,
-    /// Retained bytes for the worksheet-before image. A worksheet is charged
-    /// once, when the first semantic action for it is admitted.
+    /// Retained bytes for the worksheet-before image and its one changed-part
+    /// descriptor. A worksheet is charged once, when the first semantic
+    /// action for it is admitted.
     worksheets: BTreeMap<usize, usize>,
     /// Retained bytes for the final semantic cell deltas. The key is the
     /// worksheet position and address, so replacing a payload releases its
@@ -366,8 +367,16 @@ pub(super) struct CaptureBudget {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct CellCapture {
     payload: usize,
-    style: usize,
+    style_effect: usize,
+    font: usize,
+    alignment: usize,
+    fill: usize,
+    border: usize,
+    protection: usize,
+    quote_prefix: usize,
+    number_format: usize,
     structural: usize,
+    relationship: usize,
     remove: usize,
     active: bool,
 }
@@ -378,10 +387,17 @@ impl CellCapture {
             return 0;
         }
         size_of::<Change>()
-            .saturating_add(size_of::<PartChange>())
             .saturating_add(self.payload)
-            .saturating_add(self.style)
+            .saturating_add(self.style_effect)
+            .saturating_add(self.font)
+            .saturating_add(self.alignment)
+            .saturating_add(self.fill)
+            .saturating_add(self.border)
+            .saturating_add(self.protection)
+            .saturating_add(self.quote_prefix)
+            .saturating_add(self.number_format)
             .saturating_add(self.structural)
+            .saturating_add(self.relationship)
             .saturating_add(self.remove)
     }
 
@@ -393,15 +409,58 @@ impl CellCapture {
                 self.remove = 0;
             },
             CaptureFacet::Style => {
-                self.style = self.style.saturating_add(authored_bytes);
+                self.style_effect = authored_bytes;
+                self.font = 0;
+                self.alignment = 0;
+                self.fill = 0;
+                self.border = 0;
+                self.protection = 0;
+                self.quote_prefix = 0;
+                self.number_format = 0;
+                self.remove = 0;
+            },
+            CaptureFacet::Font => {
+                self.font = self.font.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::Alignment => {
+                self.alignment = self.alignment.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::Fill => {
+                self.fill = self.fill.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::Border => {
+                self.border = self.border.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::Protection => {
+                self.protection = self.protection.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::QuotePrefix => {
+                self.quote_prefix = self.quote_prefix.max(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::NumberFormat => {
+                self.number_format = self.number_format.max(authored_bytes);
                 self.remove = 0;
             },
             CaptureFacet::Structural => {
                 self.structural = self.structural.saturating_add(authored_bytes)
             },
+            CaptureFacet::Relationship => self.relationship = authored_bytes,
             CaptureFacet::Remove => {
                 self.payload = 0;
-                self.style = 0;
+                self.style_effect = 0;
+                self.font = 0;
+                self.alignment = 0;
+                self.fill = 0;
+                self.border = 0;
+                self.protection = 0;
+                self.quote_prefix = 0;
+                self.number_format = 0;
                 self.remove = authored_bytes;
             },
         }
@@ -412,7 +471,15 @@ impl CellCapture {
 pub(super) enum CaptureFacet {
     Payload,
     Style,
+    Font,
+    Alignment,
+    Fill,
+    Border,
+    Protection,
+    QuotePrefix,
+    NumberFormat,
     Structural,
+    Relationship,
     Remove,
 }
 
@@ -477,7 +544,11 @@ impl CaptureBudget {
             .saturating_add(added_cells);
     }
 
-    fn joined(&self, other: &Self) -> std::result::Result<Self, (usize, usize)> {
+    fn joined(
+        &self,
+        other: &Self,
+        added_offset: usize,
+    ) -> std::result::Result<Self, (usize, usize)> {
         let mut joined = self.clone();
         joined.maximum = self.maximum.min(other.maximum);
         for (position, bytes) in &other.worksheets {
@@ -493,28 +564,54 @@ impl CaptureBudget {
                 .entry(*key)
                 .and_modify(|current| {
                     current.payload = current.payload.saturating_add(capture.payload);
-                    current.style = current.style.saturating_add(capture.style);
+                    current.style_effect =
+                        current.style_effect.saturating_add(capture.style_effect);
+                    current.font = current.font.saturating_add(capture.font);
+                    current.alignment = current.alignment.saturating_add(capture.alignment);
+                    current.fill = current.fill.saturating_add(capture.fill);
+                    current.border = current.border.saturating_add(capture.border);
+                    current.protection = current.protection.saturating_add(capture.protection);
+                    current.quote_prefix =
+                        current.quote_prefix.saturating_add(capture.quote_prefix);
+                    current.number_format =
+                        current.number_format.saturating_add(capture.number_format);
                     current.structural = current.structural.saturating_add(capture.structural);
+                    current.relationship =
+                        current.relationship.saturating_add(capture.relationship);
                     current.remove = current.remove.saturating_add(capture.remove);
                     current.active |= capture.active;
                 })
                 .or_insert(*capture);
         }
         for (index, bytes) in &other.added_sheets {
+            let index = (*index).saturating_add(added_offset);
             joined
                 .added_sheets
-                .entry(*index)
+                .entry(index)
                 .and_modify(|current| *current = (*current).max(*bytes))
                 .or_insert(*bytes);
         }
         for (key, capture) in &other.added_cells {
+            let key = (key.0.saturating_add(added_offset), key.1);
             joined
                 .added_cells
-                .entry(*key)
+                .entry(key)
                 .and_modify(|current| {
                     current.payload = current.payload.saturating_add(capture.payload);
-                    current.style = current.style.saturating_add(capture.style);
+                    current.style_effect =
+                        current.style_effect.saturating_add(capture.style_effect);
+                    current.font = current.font.saturating_add(capture.font);
+                    current.alignment = current.alignment.saturating_add(capture.alignment);
+                    current.fill = current.fill.saturating_add(capture.fill);
+                    current.border = current.border.saturating_add(capture.border);
+                    current.protection = current.protection.saturating_add(capture.protection);
+                    current.quote_prefix =
+                        current.quote_prefix.saturating_add(capture.quote_prefix);
+                    current.number_format =
+                        current.number_format.saturating_add(capture.number_format);
                     current.structural = current.structural.saturating_add(capture.structural);
+                    current.relationship =
+                        current.relationship.saturating_add(capture.relationship);
                     current.remove = current.remove.saturating_add(capture.remove);
                     current.active |= capture.active;
                 })
@@ -551,7 +648,7 @@ impl CaptureBudget {
         let previous = self.cells.get(&key).copied();
         let worksheet_previous = self.worksheets.get(&position).copied();
         let worksheet_next = if worksheet_previous.is_none() {
-            worksheet_bytes
+            worksheet_bytes.saturating_add(size_of::<PartChange>())
         } else {
             worksheet_previous.unwrap_or(0)
         };
@@ -1979,8 +2076,9 @@ impl Edit {
             });
         }
 
+        let added_offset = self.added.len();
         let joined_capture_budget = match (&self.capture_budget, &other.capture_budget) {
-            (Some(left), Some(right)) => match left.joined(right) {
+            (Some(left), Some(right)) => match left.joined(right, added_offset) {
                 Ok(joined) => Some(joined),
                 Err((observed, maximum)) => {
                     return Err(JoinError {
@@ -1991,6 +2089,10 @@ impl Edit {
                     });
                 },
             },
+            // An unbounded edit has no pre-admission ledger for its already
+            // staged native captures. Retain the bounded side so the final
+            // exact patch check still rejects the combined result if those
+            // captures exceed its ceiling.
             (Some(left), None) => Some(left.clone()),
             (None, Some(right)) => Some(right.clone()),
             (None, None) => None,
@@ -2059,7 +2161,6 @@ impl Edit {
                 rejected: Box::new(other),
             });
         }
-        let added_offset = self.added.len();
         if self.panes.is_none() {
             self.panes = other.panes;
         }
@@ -4344,7 +4445,7 @@ impl Edit {
             self.preflight_cell_capture_with_facet(
                 position,
                 address,
-                CaptureFacet::Structural,
+                CaptureFacet::Relationship,
                 authored_bytes,
             )?;
             self.sheets
@@ -4391,7 +4492,7 @@ impl Edit {
             self.preflight_cell_capture_with_facet(
                 position,
                 address,
-                CaptureFacet::Structural,
+                CaptureFacet::Relationship,
                 reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
             )?;
             self.sheets

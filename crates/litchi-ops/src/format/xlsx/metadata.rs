@@ -26,6 +26,7 @@ pub(super) fn commit(
     workbook: &xlsx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
+    max_patch_bytes: Option<usize>,
 ) -> Result<(xlsx::Package, Metadata, bool, usize)> {
     let mut edit = workbook.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
@@ -35,7 +36,12 @@ pub(super) fn commit(
     }
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
-    let commit = edit.commit().map_err(native)?;
+    let commit = match max_patch_bytes {
+        Some(maximum) => edit
+            .commit_with_options(xlsx::metadata::CommitOptions::new().max_retained_bytes(maximum))
+            .map_err(native)?,
+        None => edit.commit().map_err(native)?,
+    };
     let patch_bytes = commit.patch().retained_bytes();
     let changed = commit.diagnostics().changed();
     let after = commit.into_package();
@@ -69,28 +75,28 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        // Metadata editing does not use the worksheet native editor, so an
-        // empty native probe cannot account for the property editor's before /
-        // after scope. Reserve both immutable package owners, a bounded patch
-        // payload (the source endpoint is the conservative upper bound for a
-        // property-part before/after pair), the admitted request, and one
-        // complete metadata patch descriptor before the property editor
-        // materializes any document-property part.
+        // Metadata editing does not use the worksheet native editor. Reserve
+        // both immutable package owners before the common property editor
+        // materializes any after-image. The shared planner then counts the
+        // exact escaped XML lengths and patch descriptors under the remaining
+        // caller budget.
         let endpoint = source.retained_bytes();
-        let observed = endpoint
-            .saturating_mul(3)
-            .saturating_add(assignments.retained_bytes())
-            .saturating_add(std::mem::size_of::<xlsx::metadata::Patch>());
-        if observed > limits.max_snapshot_bytes() {
+        let endpoint_bytes = endpoint.saturating_mul(2);
+        if endpoint_bytes > limits.max_snapshot_bytes() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,
-                observed,
+                observed: endpoint_bytes,
                 maximum: limits.max_snapshot_bytes(),
             }
             .into());
         }
-        let (target, metadata, changed, native_patch_bytes) =
-            commit(&source, |value| assignments.apply(value), Some(assignments))?;
+        let remaining_patch_bytes = limits.max_snapshot_bytes().saturating_sub(endpoint_bytes);
+        let (target, metadata, changed, native_patch_bytes) = commit(
+            &source,
+            |value| assignments.apply(value),
+            Some(assignments),
+            Some(remaining_patch_bytes),
+        )?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)
         } else {
@@ -130,7 +136,8 @@ impl Xlsx {
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
 pub(super) fn create(workbook: xlsx::Package, metadata: &Metadata) -> Result<Xlsx> {
-    let (workbook, metadata, _, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
+    let (workbook, metadata, _, _) =
+        commit(&workbook, |value| *value = metadata.clone(), None, None)?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }
 
