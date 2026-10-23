@@ -34,11 +34,17 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
 import time
 from typing import Any, Iterable, Mapping
+
+try:
+    import resource
+except ImportError:  # pragma: no cover - the qualification host is POSIX.
+    resource = None  # type: ignore[assignment]
 
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -76,6 +82,10 @@ START_COUNTS = {"constructor": 1_000, "owner": 10}
 TARGET_NS = 500_000_000
 MINIMUM_NS = 150_000_000
 MAX_ITERATIONS = 1_000_000_000
+FIXED_BLOCKS = 5
+FIXED_WARMUPS = 2
+FIXED_GROWTH = 1.2
+FIXED_TIMEOUT_S = 120.0
 SCHEMA = "litchi.iwa.native-qualification.v1"
 OWNER_FIXTURES = (
     "basic.numbers",
@@ -84,6 +94,8 @@ OWNER_FIXTURES = (
     "footnote-fixture.pages",
     "basic.pages",
 )
+FIXTURE_PROVENANCE = HERE / "fixture-provenance.json"
+FIXTURE_GENERATOR = HERE / "generate_footnote_fixture.py"
 
 
 class QualificationError(RuntimeError):
@@ -162,6 +174,57 @@ def outside_checkout(path: Path) -> Path:
     return resolved
 
 
+def _tracked_identity(spec: Mapping[str, Any], label: str) -> dict[str, Any]:
+    relative = spec.get("path")
+    if not isinstance(relative, str) or Path(relative).is_absolute():
+        raise QualificationError(f"tracked fixture provenance has no relative path: {label}")
+    path = (ROOT / relative).resolve()
+    if not path.is_relative_to(ROOT) or "3rdparty" in path.parts:
+        raise QualificationError(f"tracked fixture provenance escapes the repository: {label}")
+    actual = artifact(path)
+    expected = {
+        "path": str(path),
+        "bytes": spec.get("bytes"),
+        "sha256": spec.get("sha256"),
+    }
+    if actual != expected:
+        raise QualificationError(f"tracked fixture provenance changed: {label}")
+    return actual
+
+
+def _fixture_provenance() -> dict[str, Any]:
+    provenance = load_json(FIXTURE_PROVENANCE)
+    if provenance.get("schema") != "litchi.iwa.owner-fixtures.provenance.v1":
+        raise QualificationError("tracked owner fixture provenance has the wrong schema")
+    rows = provenance.get("files")
+    if not isinstance(rows, dict) or set(rows) != set(OWNER_FIXTURES):
+        raise QualificationError("tracked owner fixture provenance has the wrong workload set")
+    for name in OWNER_FIXTURES:
+        spec = rows[name]
+        if not isinstance(spec, Mapping):
+            raise QualificationError(f"tracked owner fixture provenance is malformed: {name}")
+        if name == "footnote-fixture.pages":
+            generator = spec.get("generator")
+            source = spec.get("source")
+            if not isinstance(generator, Mapping) or not isinstance(source, Mapping):
+                raise QualificationError("footnote fixture provenance lacks generator and source")
+            generator_path = (ROOT / str(generator.get("path", ""))).resolve()
+            if generator_path != FIXTURE_GENERATOR.resolve():
+                raise QualificationError("footnote fixture uses an unapproved generator")
+            generator_identity = artifact(generator_path)
+            expected_generator = {
+                "path": str(generator_path),
+                "bytes": generator.get("bytes"),
+                "sha256": generator.get("sha256"),
+            }
+            if generator_identity != expected_generator:
+                raise QualificationError("footnote fixture generator changed")
+            _tracked_identity(source, name)
+        else:
+            _tracked_identity(spec, name)
+    return provenance
+
+
 def fixture_identity(path: Path) -> dict[str, Any]:
     """Verify an external owner fixture set and its immutable manifest."""
 
@@ -172,9 +235,13 @@ def fixture_identity(path: Path) -> dict[str, Any]:
     manifest = load_json(manifest_path)
     if manifest.get("schema") != "litchi.iwa.owner-fixtures.v1":
         raise QualificationError("owner fixture manifest has the wrong schema")
+    provenance_identity = artifact(FIXTURE_PROVENANCE)
+    if manifest.get("provenance") != provenance_identity:
+        raise QualificationError("owner fixture manifest is not bound to tracked provenance")
+    provenance = _fixture_provenance()
     declared = manifest.get("files")
     if not isinstance(declared, dict) or set(declared) != set(OWNER_FIXTURES):
-        raise QualificationError("owner fixture manifest does not declare exactly the four workloads")
+        raise QualificationError("owner fixture manifest does not declare exactly the five workload files")
     identities = {}
     for name in OWNER_FIXTURES:
         row = declared[name]
@@ -184,8 +251,70 @@ def fixture_identity(path: Path) -> dict[str, Any]:
         if Path(row.get("path", "")).resolve() != expected_path.resolve():
             raise QualificationError(f"owner fixture path is not rooted in the fixture directory: {name}")
         verify_artifact(row)
+        spec = provenance["files"][name]
+        if name == "footnote-fixture.pages":
+            generator = spec["generator"]
+            source = spec["source"]
+            expected_generated = {
+                "generator": artifact(FIXTURE_GENERATOR),
+                "source": _tracked_identity(source, name),
+                "method": spec.get("method"),
+            }
+            if row.get("generated") != expected_generated:
+                raise QualificationError("footnote fixture output is not tied to its generator")
+            if generator.get("path") != str(FIXTURE_GENERATOR.relative_to(ROOT)):
+                raise QualificationError("footnote fixture generator provenance is malformed")
+        else:
+            expected_source = _tracked_identity(spec, name)
+            if row.get("source") != expected_source:
+                raise QualificationError(f"fixture {name} is not tied to its tracked source")
         identities[name] = row
-    return {"manifest": artifact(manifest_path), "files": identities}
+    return {
+        "manifest": artifact(manifest_path),
+        "provenance": provenance_identity,
+        "files": identities,
+    }
+
+
+def prepare_fixtures(path: Path) -> None:
+    """Materialize and manifest the external owner workload set."""
+
+    directory = new_external_directory(path)
+    provenance = _fixture_provenance()
+    tracked = provenance["files"]
+    sources = {
+        "basic.numbers": ROOT / tracked["basic.numbers"]["path"],
+        "media-replacement-native.key": ROOT / tracked["media-replacement-native.key"]["path"],
+        "tone.wav": ROOT / tracked["tone.wav"]["path"],
+        "basic.pages": ROOT / tracked["basic.pages"]["path"],
+    }
+    for name, source in sources.items():
+        shutil.copyfile(source, directory / name)
+    subprocess.run(
+        [sys.executable, str(FIXTURE_GENERATOR), "--output", str(directory / "footnote-fixture.pages")],
+        check=True,
+    )
+    files: dict[str, Any] = {}
+    for name in OWNER_FIXTURES:
+        row: dict[str, Any] = artifact(directory / name)
+        if name == "footnote-fixture.pages":
+            row["generated"] = {
+                "generator": artifact(FIXTURE_GENERATOR),
+                "source": artifact(sources["basic.pages"]),
+                "method": tracked[name]["method"],
+            }
+        else:
+            row["source"] = artifact(sources[name])
+        files[name] = row
+    save_json(
+        directory / "manifest.json",
+        {
+            "schema": "litchi.iwa.owner-fixtures.v1",
+            "provenance": artifact(FIXTURE_PROVENANCE),
+            "files": files,
+        },
+    )
+    fixture_identity(directory)
 
 
 def new_external_directory(path: Path) -> Path:
@@ -220,10 +349,27 @@ def run_command(
         "stdout": artifact(stdout),
         "stderr": artifact(stderr),
     }
-    save_json(directory / f"{label}.receipt.json", receipt)
+    receipt_path = directory / f"{label}.receipt.json"
+    save_json(receipt_path, receipt)
+    receipt["receipt"] = artifact(receipt_path)
     if completed.returncode:
         raise QualificationError(f"{label} failed; see {stderr}")
     return receipt
+
+
+def verify_command_receipt(row: Mapping[str, Any]) -> None:
+    """Verify a retained command's streams, receipt, and successful status."""
+
+    if row.get("exit_code") != 0:
+        raise QualificationError("retained command receipt is not successful")
+    for key in ("stdout", "stderr", "receipt"):
+        verify_artifact(row[key])
+    saved = load_json(Path(row["receipt"]["path"]))
+    if saved.get("exit_code") != row["exit_code"]:
+        raise QualificationError("retained command receipt status changed")
+    for key in ("command", "cwd", "started_ns", "finished_ns", "stdout", "stderr"):
+        if saved.get(key) != row.get(key):
+            raise QualificationError(f"retained command receipt field changed: {key}")
 
 
 def git_revision(ref: str) -> str:
@@ -439,6 +585,11 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
                 raise QualificationError(f"source snapshot changed: {label}/{row['path']}")
         for key in ("project_manifest", "project_source", "lock"):
             verify_artifact(endpoint[key])
+        commands = endpoint.get("commands")
+        if not isinstance(commands, list) or not commands:
+            raise QualificationError(f"missing retained command receipts: {label}")
+        for command in commands:
+            verify_command_receipt(command)
         for key in ("native", "allocation"):
             verify_artifact(endpoint["binaries"][key])
     base = data["endpoints"]["base"]
@@ -450,6 +601,15 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
         raise QualificationError("matched endpoints use different Cargo.lock files")
     base_files = {row["path"]: row["sha256"] for row in load_json(Path(base["source"]["manifest"]["path"]))["files"]}
     candidate_files = {row["path"]: row["sha256"] for row in load_json(Path(candidate["source"]["manifest"]["path"]))["files"]}
+    _verify_source_sets(base_files, candidate_files, family)
+    return data
+
+
+def _verify_source_sets(
+    base_files: Mapping[str, str], candidate_files: Mapping[str, str], family: str
+) -> None:
+    """Allow changes only in the format family and reject unapproved additions."""
+
     excluded = {
         "constructor": ("crates/litchi-iwa-core/",),
         "owner": (
@@ -463,7 +623,10 @@ def load_build(output: Path, family: str) -> dict[str, Any]:
             raise QualificationError(f"candidate source is missing {path}")
         if not path.startswith(excluded) and candidate_files[path] != digest:
             raise QualificationError(f"unmatched shared source changed: {path}")
-    return data
+    extras = set(candidate_files) - set(base_files)
+    unapproved = sorted(path for path in extras if not path.startswith(excluded))
+    if unapproved:
+        raise QualificationError(f"candidate added unapproved shared source: {unapproved[0]}")
 
 
 def _validation_command(family: str, binary: Path, fixtures: Path | None, destination: Path) -> list[str]:
@@ -493,7 +656,7 @@ def validate(args: argparse.Namespace) -> None:
             endpoint = build["endpoints"][label]
             destination = validation_root / f"{label}-{variant}"
             destination.mkdir()
-            run_command(
+            receipt = run_command(
                 destination,
                 "probe",
                 _validation_command(family, Path(endpoint["binaries"][variant]["path"]), fixtures, destination),
@@ -504,7 +667,11 @@ def validate(args: argparse.Namespace) -> None:
             expected_schema = f"litchi.iwa.{family}.validation.v1"
             if value.get("schema") != expected_schema or value.get("status") != "ok":
                 raise QualificationError(f"invalid {label}/{variant} validation report")
-            rows[label][variant] = {"report": artifact(report), "value": value}
+            rows[label][variant] = {
+                "report": artifact(report),
+                "receipt": receipt["receipt"],
+                "value": value,
+            }
     for variant in ("native", "allocation"):
         if rows["base"][variant]["value"] != rows["candidate"][variant]["value"]:
             raise QualificationError(f"baseline/candidate {variant} correctness differs")
@@ -530,6 +697,12 @@ def load_validation(output: Path, family: str, build: Mapping[str, Any]) -> dict
         for variant in ("native", "allocation"):
             row = data["endpoints"][label][variant]
             verify_artifact(row["report"])
+            verify_command_receipt(
+                {
+                    **load_json(Path(row["receipt"]["path"])),
+                    "receipt": row["receipt"],
+                }
+            )
             expected = f"litchi.iwa.{family}.validation.v1"
             if row["value"].get("schema") != expected or row["value"].get("status") != "ok":
                 raise QualificationError("malformed correctness validation value")
@@ -639,7 +812,7 @@ def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict
             "replay_matches_changed",
             "inverse_matches_source",
             "noop_is_noop",
-            "noop_matches_source",
+            "noop_matches_expected",
         ):
             if correctness.get(key) is not True:
                 raise QualificationError(f"owner probe correctness field {key} is false")
@@ -647,6 +820,36 @@ def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict
         if correctness.get("roundtrip") is not True or value.get("output_matches_source") is not True:
             raise QualificationError("constructor probe did not prove exact roundtrip")
     return value
+
+
+def _child_limits(timeout_s: float):
+    if resource is None:
+        return None
+
+    def configure() -> None:
+        cpu_seconds = max(1, math.ceil(timeout_s))
+        resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
+        file_bytes = 64 * 1024 * 1024
+        resource.setrlimit(resource.RLIMIT_FSIZE, (file_bytes, file_bytes))
+
+    return configure
+
+
+def _terminate_child(child: subprocess.Popen[bytes]) -> int:
+    """Terminate a timed child process group and leave no unbounded wait."""
+
+    try:
+        os.killpg(child.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        return child.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(child.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return child.wait(timeout=2.0)
 
 
 def invoke(
@@ -659,7 +862,10 @@ def invoke(
     cpu: int,
     fixtures: Path | None,
     expected_binary: Mapping[str, Any],
+    timeout_s: float = FIXED_TIMEOUT_S,
 ) -> dict[str, Any]:
+    if not math.isfinite(timeout_s) or timeout_s <= 0:
+        raise QualificationError("timed child timeout must be finite and positive")
     verify_artifact(expected_binary)
     host_snapshot(output, f"{label}-before")
     stdout = output / f"{label}.stdout"
@@ -671,20 +877,38 @@ def invoke(
         command.append(str(fixtures))
     started = time.time_ns()
     overlap: str | None = None
+    timed_out = False
+    deadline = time.monotonic() + timeout_s
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        child = subprocess.Popen(command, stdout=out, stderr=err)
+        child = subprocess.Popen(
+            command,
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            preexec_fn=_child_limits(timeout_s),
+        )
         checks = 0
         while True:
             try:
-                status = child.wait(timeout=0.1)
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                    overlap = f"timed child exceeded {timeout_s:g}s"
+                    status = _terminate_child(child)
+                    break
+                status = child.wait(timeout=min(0.1, remaining))
                 break
             except subprocess.TimeoutExpired:
+                if time.monotonic() >= deadline:
+                    timed_out = True
+                    overlap = f"timed child exceeded {timeout_s:g}s"
+                    status = _terminate_child(child)
+                    break
                 try:
                     host_snapshot(output, f"{label}-during-{checks:04d}", child.pid)
                 except QualificationError as error:
                     overlap = str(error)
-                    child.terminate()
-                    status = child.wait()
+                    status = _terminate_child(child)
                     break
                 checks += 1
         if checks == 0:
@@ -698,24 +922,37 @@ def invoke(
         "finished_ns": time.time_ns(),
         "exit_code": status,
         "overlap": overlap,
+        "timed_out": timed_out,
+        "timeout_s": timeout_s,
         "binary": artifact(binary),
         "stdout": artifact(stdout),
         "stderr": artifact(stderr),
     }
-    save_json(output / f"{label}.receipt.json", receipt)
+    receipt_path = output / f"{label}.receipt.json"
+    save_json(receipt_path, receipt)
     try:
         host_snapshot(output, f"{label}-after")
     except QualificationError as error:
         overlap = overlap or str(error)
         receipt["overlap"] = overlap
-        save_json(output / f"{label}.receipt.json", receipt)
+        save_json(receipt_path, receipt)
     if status or overlap:
         raise QualificationError(f"invalid timing attempt {label}; see {output}")
     try:
         value = load_json(stdout)
     except QualificationError as error:
         raise QualificationError(f"probe stdout is not strict JSON for {label}") from error
-    return _strict_probe_value(value, family, route, count)
+    value = _strict_probe_value(value, family, route, count)
+    value["_receipt"] = {
+        "receipt": artifact(receipt_path),
+        "binary": receipt["binary"],
+        "stdout": receipt["stdout"],
+        "stderr": receipt["stderr"],
+        "exit_code": receipt["exit_code"],
+        "overlap": receipt["overlap"],
+        "timed_out": receipt["timed_out"],
+    }
+    return value
 
 
 def _ratios_equal(values: list[dict[str, Any]]) -> None:
@@ -726,18 +963,66 @@ def _ratios_equal(values: list[dict[str, Any]]) -> None:
         raise QualificationError("ABBA semantic or output identities disagree")
 
 
+def _protocol(args: argparse.Namespace, family: str, routes: tuple[str, ...]) -> dict[str, Any]:
+    return {
+        "start_count": args.start_count,
+        "blocks": args.blocks,
+        "warmups": args.warmups,
+        "target_ns": args.target_ns,
+        "minimum_ns": args.minimum_ns,
+        "growth": args.growth,
+        "max_iterations": args.max_iterations,
+        "timeout_s": args.timeout_s,
+        "routes": list(routes),
+        "family": family,
+    }
+
+
+def _fixed_protocol(protocol: Mapping[str, Any], family: str) -> bool:
+    expected = {
+        "start_count": START_COUNTS[family],
+        "blocks": FIXED_BLOCKS,
+        "warmups": FIXED_WARMUPS,
+        "target_ns": TARGET_NS,
+        "minimum_ns": MINIMUM_NS,
+        "growth": FIXED_GROWTH,
+        "max_iterations": MAX_ITERATIONS,
+        "timeout_s": FIXED_TIMEOUT_S,
+        "routes": list(ROUTES[family]),
+        "family": family,
+    }
+    return dict(protocol) == expected
+
+
+def _verify_timing_receipt(value: Mapping[str, Any]) -> None:
+    receipt = value.get("_receipt")
+    if not isinstance(receipt, Mapping):
+        raise QualificationError("timing value did not retain its command receipt")
+    verify_command_receipt(
+        {
+            **load_json(Path(receipt["receipt"]["path"])),
+            "receipt": receipt["receipt"],
+        }
+    )
+    verify_artifact(receipt["binary"])
+    if receipt.get("exit_code") != 0 or receipt.get("overlap") is not None:
+        raise QualificationError("retained timing receipt is not successful")
+    if receipt.get("timed_out") is not False:
+        raise QualificationError("retained timing receipt exceeded its bound")
+
+
 def run_native(args: argparse.Namespace) -> None:
     family = require_family(args.family)
     output = outside_checkout(args.output)
     build = load_build(output, family)
-    load_validation(output, family, build)
+    validation = load_validation(output, family, build)
     fixtures = outside_checkout(args.fixtures) if args.fixtures is not None else None
     fixture_manifest = None
     if family == "owner" and fixtures is None:
         raise QualificationError("owner timing requires --fixtures")
     if fixtures is not None:
         fixture_manifest = fixture_identity(fixtures)
-        validation_fixtures = load_validation(output, family, build).get("fixtures")
+        validation_fixtures = validation.get("fixtures")
         if validation_fixtures != fixture_manifest:
             raise QualificationError("timing fixtures do not match correctness-validation fixtures")
     try:
@@ -746,7 +1031,17 @@ def run_native(args: argparse.Namespace) -> None:
         raise QualificationError("cannot prove CPU affinity on this host") from error
     if args.cpu not in affinity:
         raise QualificationError(f"CPU {args.cpu} is outside the runner affinity {sorted(affinity)}")
-    if args.blocks <= 0 or args.warmups < 0 or args.target_ns <= 0 or args.minimum_ns <= 0:
+    if (
+        args.blocks <= 0
+        or args.warmups < 0
+        or args.target_ns <= 0
+        or args.minimum_ns <= 0
+        or args.start_count <= 0
+        or args.max_iterations <= 0
+        or not math.isfinite(args.growth)
+        or not math.isfinite(args.timeout_s)
+        or args.timeout_s <= 0
+    ):
         raise QualificationError("timing parameters must be positive")
     if args.minimum_ns > args.target_ns or args.growth <= 1.0:
         raise QualificationError("minimum leg cannot exceed calibration target")
@@ -763,17 +1058,31 @@ def run_native(args: argparse.Namespace) -> None:
             raise QualificationError(f"invalid or duplicate route selection: {sorted(unknown)}")
     else:
         routes = ROUTES[family]
+    protocol = _protocol(args, family, routes)
+    diagnostic = bool(getattr(args, "diagnostic", False))
+    protocol_exact = _fixed_protocol(protocol, family)
+    if not protocol_exact and not diagnostic:
+        raise QualificationError(
+            "non-fixed blocks/warmups/calibration/minimum protocol or route subset requires --diagnostic"
+        )
     attempt = new_external_directory(output / args.attempt)
     manifest: dict[str, Any] = {
         "schema": SCHEMA,
         "family": family,
         "status": "running",
         "qualified": False,
+        "acceptance_eligible": protocol_exact and not diagnostic,
+        "diagnostic": diagnostic,
         "build": artifact(output / "build.json"),
         "validation": artifact(output / "validation.json"),
         "runner": artifact(Path(__file__)),
         "probe": artifact(PROBES[family]),
+        "sources": {
+            label: build["endpoints"][label]["source"] for label in ("base", "candidate")
+        },
         "binaries": native,
+        "fixtures": fixture_manifest,
+        "protocol": protocol,
         "cpu": args.cpu,
         "target_ns": args.target_ns,
         "minimum_ns": args.minimum_ns,
@@ -800,8 +1109,10 @@ def run_native(args: argparse.Namespace) -> None:
                         args.cpu,
                         fixtures,
                         native[side],
+                        args.timeout_s,
                     )
                     values.append(value)
+                _ratios_equal(values)
                 calibrations.append({"count": count, "values": values})
                 fastest = min(value["ns"] for value in values)
                 if fastest >= args.target_ns:
@@ -810,9 +1121,19 @@ def run_native(args: argparse.Namespace) -> None:
                 if next_count > args.max_iterations:
                     raise QualificationError(f"calibration exceeds iteration ceiling for {route}")
                 count = next_count
+            case: dict[str, Any] = {
+                "route": route,
+                "count": count,
+                "calibrations": calibrations,
+                "warmups": [],
+                "blocks": [],
+            }
+            manifest["cases"].append(case)
+            save_json(attempt / "manifest.json", manifest)
             for warmup in range(args.warmups):
+                values = []
                 for side in "AB":
-                    invoke(
+                    value = invoke(
                         attempt,
                         family,
                         f"{route}-warm-{warmup}-{side}",
@@ -822,10 +1143,12 @@ def run_native(args: argparse.Namespace) -> None:
                         args.cpu,
                         fixtures,
                         native[side],
+                        args.timeout_s,
                     )
-            case: dict[str, Any] = {"route": route, "count": count, "calibrations": calibrations, "blocks": []}
-            manifest["cases"].append(case)
-            save_json(attempt / "manifest.json", manifest)
+                    values.append(value)
+                _ratios_equal(values)
+                case["warmups"].append({"index": warmup, "values": values})
+                save_json(attempt / "manifest.json", manifest)
             for block in range(args.blocks):
                 legs = []
                 for index, side in enumerate("ABBA"):
@@ -839,6 +1162,7 @@ def run_native(args: argparse.Namespace) -> None:
                         args.cpu,
                         fixtures,
                         native[side],
+                        args.timeout_s,
                     )
                     if value["ns"] < args.minimum_ns:
                         raise QualificationError(f"sample below minimum for {route} block {block}")
@@ -851,10 +1175,42 @@ def run_native(args: argparse.Namespace) -> None:
             case["median_ratio"] = sorted(block["ratio"] for block in case["blocks"])[len(case["blocks"]) // 2]
             save_json(attempt / "manifest.json", manifest)
         host_snapshot(attempt, "final")
+        # Re-open every retained identity after timing.  A qualified result
+        # must still point at the exact runner, probe, source snapshots,
+        # validation receipts, and fixture manifest that were admitted before
+        # the first leg; checking only protected binaries is insufficient.
+        final_build = load_build(output, family)
+        final_validation = load_validation(output, family, final_build)
+        if artifact(Path(__file__)) != manifest["runner"]:
+            raise QualificationError("qualification runner changed during timing")
+        if artifact(PROBES[family]) != manifest["probe"]:
+            raise QualificationError("qualification probe changed during timing")
+        if artifact(output / "build.json") != manifest["build"]:
+            raise QualificationError("build manifest changed during timing")
+        if artifact(output / "validation.json") != manifest["validation"]:
+            raise QualificationError("validation manifest changed during timing")
+        for label in ("base", "candidate"):
+            if final_build["endpoints"][label]["source"] != manifest["sources"][label]:
+                raise QualificationError(f"{label} source identity changed during timing")
+        if family == "owner":
+            if fixtures is None or fixture_identity(fixtures) != manifest["fixtures"]:
+                raise QualificationError("owner fixture identity changed during timing")
+            if final_validation.get("fixtures") != manifest["fixtures"]:
+                raise QualificationError("validation fixture identity changed during timing")
+        for case in manifest["cases"]:
+            for calibration in case["calibrations"]:
+                for value in calibration["values"]:
+                    _verify_timing_receipt(value)
+            for warmup in case["warmups"]:
+                for value in warmup["values"]:
+                    _verify_timing_receipt(value)
+            for block in case["blocks"]:
+                for leg in block["legs"]:
+                    _verify_timing_receipt(leg["value"])
         for side, row in native.items():
             if artifact(Path(row["path"])) != row:
                 raise QualificationError(f"protected {side} binary changed during timing")
-        manifest["qualified"] = set(routes) == set(ROUTES[family])
+        manifest["qualified"] = bool(manifest["acceptance_eligible"] and protocol_exact)
         manifest["status"] = "complete"
         save_json(attempt / "manifest.json", manifest)
     except Exception as error:
@@ -874,7 +1230,6 @@ def parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--base", required=True)
     build_parser.add_argument("--candidate", required=True)
     build_parser.add_argument("--lock", type=Path, default=ROOT / "Cargo.lock")
-    build_parser.add_argument("--fixtures", type=Path)
     validate_parser = sub.add_parser("validate", parents=[common])
     validate_parser.add_argument("--fixtures", type=Path)
     run_parser = sub.add_parser("run", parents=[common])
@@ -887,8 +1242,16 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--minimum-ns", type=int, default=MINIMUM_NS)
     run_parser.add_argument("--start-count", type=int)
     run_parser.add_argument("--max-iterations", type=int, default=MAX_ITERATIONS)
-    run_parser.add_argument("--growth", type=float, default=1.2)
+    run_parser.add_argument("--growth", type=float, default=FIXED_GROWTH)
+    run_parser.add_argument("--timeout-s", type=float, default=FIXED_TIMEOUT_S)
+    run_parser.add_argument(
+        "--diagnostic",
+        action="store_true",
+        help="run a non-fixed route/protocol subset without producing an acceptance result",
+    )
     run_parser.add_argument("--routes", nargs="*")
+    prepare_parser = sub.add_parser("prepare-fixtures")
+    prepare_parser.add_argument("output", type=Path)
     return command
 
 
@@ -899,6 +1262,8 @@ def main(argv: list[str] | None = None) -> int:
             build(args)
         elif args.phase == "validate":
             validate(args)
+        elif args.phase == "prepare-fixtures":
+            prepare_fixtures(args.output)
         else:
             if args.start_count is None:
                 args.start_count = START_COUNTS[args.family]

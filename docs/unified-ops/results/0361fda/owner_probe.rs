@@ -69,7 +69,7 @@ struct Correctness {
     replay_matches_changed: bool,
     inverse_matches_source: bool,
     noop_is_noop: bool,
-    noop_matches_source: bool,
+    noop_matches_expected: bool,
 }
 
 impl Correctness {
@@ -85,14 +85,14 @@ impl Correctness {
         );
         assert!(self.noop_is_noop, "owner no-op patch was not marked no-op");
         assert!(
-            self.noop_matches_source,
-            "owner no-op did not preserve source bytes"
+            self.noop_matches_expected,
+            "owner no-op did not preserve the expected package bytes"
         );
     }
 
     fn json(&self) -> String {
         format!(
-            "{{\"source_sha256\":\"{}\",\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\",\"changed_differs\":{},\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_source\":{}}}",
+            "{{\"source_sha256\":\"{}\",\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\",\"changed_differs\":{},\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{}}}",
             self.source_sha256,
             self.changed_sha256,
             self.replay_sha256,
@@ -102,7 +102,7 @@ impl Correctness {
             self.replay_matches_changed,
             self.inverse_matches_source,
             self.noop_is_noop,
-            self.noop_matches_source,
+            self.noop_matches_expected,
         )
     }
 }
@@ -148,7 +148,7 @@ fn numbers_correctness(
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop: noop.patch().is_noop(),
-        noop_matches_source: noop_bytes == source,
+        noop_matches_expected: noop_bytes == source,
     }
 }
 
@@ -202,7 +202,7 @@ fn keynote_correctness(
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop: noop.patch().is_noop(),
-        noop_matches_source: noop_bytes == source,
+        noop_matches_expected: noop_bytes == source,
     }
 }
 
@@ -231,7 +231,17 @@ fn pages_footnote_correctness(source: &[u8], package: &litchi_pages::Package) ->
         .apply_body_footnote(&inverse_patch)
         .unwrap();
     let inverse_bytes = write_pages(inverse.package());
-    let (noop_is_noop, noop_bytes) = pages_section_noop(package);
+    // Exercise the same body-footnote family for the no-op check. The
+    // insertion above creates a note at `position`; reopening that exact
+    // anchor and committing without edits must preserve the changed package.
+    let noop = commit
+        .package()
+        .edit_body_footnote(litchi_pages::footnote::body::Selector::at(position))
+        .unwrap()
+        .commit()
+        .unwrap();
+    let noop_is_noop = noop.patch().is_noop();
+    let noop_bytes = write_pages(noop.package());
     Correctness {
         source_sha256: sha256(source),
         changed_sha256: sha256(&changed_bytes),
@@ -242,7 +252,7 @@ fn pages_footnote_correctness(source: &[u8], package: &litchi_pages::Package) ->
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop,
-        noop_matches_source: noop_bytes == source,
+        noop_matches_expected: noop_bytes == changed_bytes,
     }
 }
 
@@ -275,7 +285,7 @@ fn pages_section_correctness(source: &[u8], package: &litchi_pages::Package) -> 
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop,
-        noop_matches_source: noop_bytes == source,
+        noop_matches_expected: noop_bytes == source,
     }
 }
 
@@ -320,13 +330,13 @@ fn print_report(
 ) {
     assert_eq!(sha256(output), correctness.changed_sha256);
     println!(
-        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_source\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
+        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
         output.len(),
         correctness.changed_sha256,
         correctness.replay_matches_changed,
         correctness.inverse_matches_source,
         correctness.noop_is_noop,
-        correctness.noop_matches_source,
+        correctness.noop_matches_expected,
         correctness.changed_sha256,
         correctness.replay_sha256,
         correctness.inverse_sha256,

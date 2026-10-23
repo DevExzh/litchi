@@ -1,0 +1,38 @@
+{
+  "files": {
+    "basic.numbers": {
+      "bytes": 136357,
+      "path": "test-data/iwork/numbers/basic.numbers",
+      "sha256": "f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693"
+    },
+    "basic.pages": {
+      "bytes": 96417,
+      "path": "test-data/iwork/pages/basic.pages",
+      "sha256": "21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42"
+    },
+    "footnote-fixture.pages": {
+      "generator": {
+        "bytes": 1388,
+        "path": "docs/unified-ops/results/0361fda/generate_footnote_fixture.py",
+        "sha256": "516e4f771ce140bff0d53ce49481d54f79df0fe0ced046f4a2c243d40707f5b4"
+      },
+      "method": "copy-tracked-pages-fixture",
+      "source": {
+        "bytes": 96417,
+        "path": "test-data/iwork/pages/basic.pages",
+        "sha256": "21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42"
+      }
+    },
+    "media-replacement-native.key": {
+      "bytes": 752060,
+      "path": "test-data/iwork/keynote/media-replacement-native.key",
+      "sha256": "f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d"
+    },
+    "tone.wav": {
+      "bytes": 192044,
+      "path": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+      "sha256": "27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a"
+    }
+  },
+  "schema": "litchi.iwa.owner-fixtures.provenance.v1"
+}

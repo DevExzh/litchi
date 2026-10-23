@@ -32,7 +32,7 @@ def _fake_probe(path: Path, *, owner: bool, valid: bool = True) -> None:
             "replay_matches_changed": valid,
             "inverse_matches_source": valid,
             "noop_is_noop": valid,
-            "noop_matches_source": valid,
+            "noop_matches_expected": valid,
         }
         body = {
             "schema": "litchi.iwa.owner.probe.v2",
@@ -93,20 +93,51 @@ class NativeQualificationTests(unittest.TestCase):
             RUNNER.outside_checkout(RUNNER.ROOT / "docs/unified-ops/results/0361fda")
 
     def test_owner_fixture_manifest_is_content_bound(self) -> None:
-        files = {}
-        for name in RUNNER.OWNER_FIXTURES:
-            path = self.directory / name
-            path.write_bytes(name.encode("utf-8"))
-            files[name] = RUNNER.artifact(path)
-        RUNNER.save_json(
-            self.directory / "manifest.json",
-            {"schema": "litchi.iwa.owner-fixtures.v1", "files": files},
-        )
-        identity = RUNNER.fixture_identity(self.directory)
-        self.assertEqual(set(identity["files"]), set(RUNNER.OWNER_FIXTURES))
-        (self.directory / "tone.wav").write_bytes(b"changed")
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.fixture_identity(self.directory)
+        fixture_dir = self.directory / "fixtures"
+        RUNNER.prepare_fixtures(fixture_dir)
+        identity = RUNNER.fixture_identity(fixture_dir)
+        self.assertEqual(set(identity["files"]), set(RUNNER.OWNER_FIXTURES))
+        (fixture_dir / "tone.wav").write_bytes(b"changed")
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.fixture_identity(fixture_dir)
+
+    def test_fixed_protocol_rejects_weakening_without_diagnostic(self) -> None:
+        args = type(
+            "Args",
+            (),
+            {
+                "start_count": RUNNER.START_COUNTS["constructor"],
+                "blocks": RUNNER.FIXED_BLOCKS - 1,
+                "warmups": RUNNER.FIXED_WARMUPS,
+                "target_ns": RUNNER.TARGET_NS,
+                "minimum_ns": RUNNER.MINIMUM_NS,
+                "growth": RUNNER.FIXED_GROWTH,
+                "max_iterations": RUNNER.MAX_ITERATIONS,
+                "timeout_s": RUNNER.FIXED_TIMEOUT_S,
+            },
+        )()
+        protocol = RUNNER._protocol(args, "constructor", RUNNER.ROUTES["constructor"])
+        self.assertFalse(RUNNER._fixed_protocol(protocol, "constructor"))
+        args.blocks = RUNNER.FIXED_BLOCKS
+        self.assertTrue(RUNNER._fixed_protocol(protocol | {"blocks": RUNNER.FIXED_BLOCKS}, "constructor"))
+
+    def test_unapproved_candidate_source_addition_is_rejected(self) -> None:
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER._verify_source_sets(
+                {"shared.rs": "a"},
+                {"shared.rs": "a", "unapproved.txt": "b"},
+                "constructor",
+            )
+        RUNNER._verify_source_sets(
+            {"crates/litchi-iwa-core/old.rs": "a"},
+            {
+                "crates/litchi-iwa-core/old.rs": "b",
+                "crates/litchi-iwa-core/new.rs": "c",
+            },
+            "constructor",
+        )
 
     def test_duplicate_json_keys_are_rejected(self) -> None:
         path = self.directory / "duplicate.json"
@@ -144,7 +175,7 @@ class NativeQualificationTests(unittest.TestCase):
                 "replay_matches_changed": True,
                 "inverse_matches_source": True,
                 "noop_is_noop": True,
-                "noop_matches_source": True,
+                "noop_matches_expected": True,
             },
         }
         self.assertIs(RUNNER._strict_probe_value(value, "owner", "numbers_headers", 3), value)
@@ -190,6 +221,32 @@ class NativeQualificationTests(unittest.TestCase):
                     self.directory,
                     expected,
                 )
+
+    def test_invoke_enforces_timed_child_bound(self) -> None:
+        binary = self.directory / "slow_probe.py"
+        binary.write_text(
+            "#!/usr/bin/env python3\nimport time\ntime.sleep(1)\n",
+            encoding="utf-8",
+        )
+        binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
+        expected = RUNNER.artifact(binary)
+        with mock.patch.object(RUNNER, "host_snapshot"):
+            with self.assertRaises(RUNNER.QualificationError):
+                RUNNER.invoke(
+                    self.directory,
+                    "constructor",
+                    "timeout",
+                    binary,
+                    "field_path",
+                    1,
+                    min(RUNNER.os.sched_getaffinity(0)),
+                    None,
+                    expected,
+                    timeout_s=0.05,
+                )
+        receipt = RUNNER.load_json(self.directory / "timeout.receipt.json")
+        self.assertTrue(receipt["timed_out"])
+        self.assertEqual(receipt["timeout_s"], 0.05)
 
     def test_abba_identity_check_rejects_mismatched_outputs(self) -> None:
         values = [

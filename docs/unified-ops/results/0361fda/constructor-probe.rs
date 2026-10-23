@@ -237,6 +237,52 @@ fn encode(archive: &Archive) -> Vec<u8> {
         .expect("archive fixture must encode")
 }
 
+fn exact_header_boundary() -> (usize, usize, usize) {
+    // Find the smallest admissible header-byte budget for the same object
+    // used by the constructor routes.  The returned tuple is the accepted
+    // budget, the observed size reported by the one-below refusal, and that
+    // refusal's maximum.  Keeping the exact accepted budget in the report
+    // makes baseline/candidate boundary equivalence an explicit validation
+    // value rather than an inference from a generic rejection.
+    let upper = make_archive_bytes().len();
+    for accepted in 1..=upper {
+        let profile = limits()
+            .with_header_bytes(accepted)
+            .expect("header boundary profile is valid");
+        match ArchiveObject::new(OBJECT_ID, make_messages(), profile) {
+            Ok(_) => {
+                assert!(accepted > 1, "fixture unexpectedly fits one header byte");
+                let below = accepted - 1;
+                let refusal = ArchiveObject::new(
+                    OBJECT_ID,
+                    make_messages(),
+                    limits()
+                        .with_header_bytes(below)
+                        .expect("one-below profile is valid"),
+                )
+                .expect_err("one byte below the boundary must refuse");
+                let (observed, maximum) = match refusal {
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::HeaderBytes,
+                        observed,
+                        maximum,
+                    } => (observed, maximum),
+                    other => panic!("unexpected one-below header rejection: {other:?}"),
+                };
+                assert_eq!(maximum, below);
+                assert!(observed > maximum);
+                return (accepted, observed, maximum);
+            },
+            Err(litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::HeaderBytes,
+                ..
+            }) => {},
+            Err(other) => panic!("unexpected header-boundary result: {other:?}"),
+        }
+    }
+    panic!("archive object has no admissible header-byte boundary");
+}
+
 fn validate(archive: &Archive) {
     archive
         .validate(limits())
@@ -444,25 +490,11 @@ fn validate_outputs(directory: &std::path::Path) {
     assert_eq!(retained.to_bytes(limits()).unwrap(), retained_source);
     std::fs::write(directory.join("retained-source.iwa"), &retained_source).unwrap();
     std::fs::write(directory.join("retained-encoded.iwa"), retained_output).unwrap();
-    let rejected = ArchiveObject::new(
-        OBJECT_ID,
-        make_messages(),
-        limits().with_header_bytes(1).unwrap(),
-    )
-    .unwrap_err();
-    let (rejected_kind, rejected_observed, rejected_maximum) = match rejected {
-        litchi_iwa_core::Error::Limit {
-            kind: litchi_iwa_core::LimitKind::HeaderBytes,
-            observed,
-            maximum,
-        } => ("HeaderBytes", observed, maximum),
-        other => panic!("unexpected tight-header rejection: {other:?}"),
-    };
-    assert!(rejected_observed > rejected_maximum);
+    let (header_boundary, rejected_observed, rejected_maximum) = exact_header_boundary();
     let source_digest = digest(&bytes);
     let retained_digest = digest(&retained_source);
     let report = format!(
-        "{{\"schema\":\"litchi.iwa.constructor.validation.v1\",\"status\":\"ok\",\"source_sha256\":\"{source_digest}\",\"encoded_sha256\":\"{source_digest}\",\"source_bytes\":{},\"encoded_bytes\":{},\"roundtrip_equal\":true,\"retained_source_sha256\":\"{retained_digest}\",\"retained_encoded_sha256\":\"{retained_digest}\",\"retained_roundtrip_equal\":true,\"rejection\":{{\"kind\":\"{rejected_kind}\",\"observed\":{rejected_observed},\"maximum\":{rejected_maximum}}}}}\n",
+        "{{\"schema\":\"litchi.iwa.constructor.validation.v1\",\"status\":\"ok\",\"source_sha256\":\"{source_digest}\",\"encoded_sha256\":\"{source_digest}\",\"source_bytes\":{},\"encoded_bytes\":{},\"roundtrip_equal\":true,\"retained_source_sha256\":\"{retained_digest}\",\"retained_encoded_sha256\":\"{retained_digest}\",\"retained_roundtrip_equal\":true,\"header_boundary\":{{\"kind\":\"HeaderBytes\",\"accepted\":{header_boundary},\"below\":{{\"observed\":{rejected_observed},\"maximum\":{rejected_maximum}}}}}}}\n",
         bytes.len(),
         bytes.len(),
     );

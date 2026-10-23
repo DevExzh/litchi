@@ -9,17 +9,22 @@ insertion, and Pages section-name replacement.
 The probes do all semantic and byte checks before starting their timed loops:
 
 - constructor routes prove canonical and retained-header round trips and
-  report the exact typed tight-header rejection;
-- owner routes prove changed output, replay, inverse, and exact no-op output;
+  report an accepted header limit plus the exact typed one-below rejection;
+- owner routes prove changed output, replay, inverse, and an exact no-op in the
+  same edit family (including the inserted body footnote);
 - every timed result carries source/output SHA-256 identities and a semantic
   checksum.
 
 `iwa_native_qualification.py` snapshots both source commits, freezes the
 shared source and lockfile identities, records toolchain and binary hashes,
 requires native and allocation validation for both endpoints, and then runs
-calibrated five-block ABBA. A build/profiler/benchmark process seen before,
-during, or after a leg aborts the attempt; no contaminated block is retained
-as qualified timing.
+the fixed five-block ABBA protocol (two warmups, 500 ms calibration target,
+150 ms sample minimum, and a 120 s child bound). A build/profiler/benchmark
+process seen before, during, or after a leg aborts the attempt; no
+contaminated block is retained as qualified timing. Calibration and warmup
+legs are checked for the same cross-side source/output/checksum identities as
+measured blocks. A route subset or changed protocol must be passed with
+`--diagnostic`; it is recorded but can never set `qualified`.
 
 All generated projects, binaries, receipts, raw output, and timing evidence
 must live outside this checkout. The owner fixture directory must contain
@@ -35,9 +40,30 @@ basic.pages
 ```
 
 It must also contain `manifest.json` with schema
-`litchi.iwa.owner-fixtures.v1` and an absolute, SHA-256/byte-count artifact
-row for each of the five files. The runner checks those identities before
-validation and again before timing.
+`litchi.iwa.owner-fixtures.v1`, a `provenance` artifact row for
+[`fixture-provenance.json`](fixture-provenance.json), and an absolute,
+SHA-256/byte-count artifact row for each of the five files. The four native
+rows carry a `source` identity matching the tracked provenance; the generated
+`footnote-fixture.pages` row carries `generated` identities for the tracked
+Pages input and [`generate_footnote_fixture.py`](generate_footnote_fixture.py).
+The generator writes only outside the checkout, for example:
+
+```sh
+python3 docs/unified-ops/results/0361fda/generate_footnote_fixture.py \
+  --output /outside/iwa-fixtures/footnote-fixture.pages
+```
+
+To copy all tracked inputs and write the checked manifest in one step, use:
+
+```sh
+python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py \
+  prepare-fixtures /outside/iwa-fixtures
+```
+
+The runner checks those identities before validation and again before timing,
+and retains/rechecks every build and validation command receipt plus both
+source snapshots. `build --fixtures` is intentionally not accepted: fixtures
+are an input to validation and timing, never a hidden build dependency.
 
 Run the Python unit tests without Cargo:
 
