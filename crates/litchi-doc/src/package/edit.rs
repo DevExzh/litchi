@@ -1039,7 +1039,9 @@ impl Package {
 
 #[cfg(test)]
 mod tests {
-    use super::{Diagnostics, Edit, EditOptions, Error, LimitKind};
+    #[cfg(feature = "performance-diagnostics")]
+    use super::Edit;
+    use super::{Diagnostics, EditOptions, Error, LimitKind};
     use crate::Builder;
     use crate::body_text::{self, TextTarget, TransactionLimits};
     use crate::parts::fib::FileInformationBlock;
