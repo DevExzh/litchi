@@ -119,3 +119,14 @@ This closes both the exact native/coalescer budget failure and empty
 the commands, source, log and debug executable hashes. Shared cell
 normalization remains returned; these passes do not constitute final
 combined runtime, full-gate or performance acceptance.
+
+## DOCX, PPTX and ODF runtime correction
+
+Focused all-feature facade validation passes on `59637bd50c`, including
+DOCX module/error cases, malformed inputs, exact signed DOCX paragraph
+no-ops and cancellation, and exact signed PPTX shape no-ops and cancellation.
+The DOCX correction uses one authoritative bookmark-aware scan and retains
+typed structural/limit errors; effective owners keep their physical source
+policy. This is a focused runtime pass, not complete composition acceptance.
+[docx-pptx-odf-runtime-v14.json](results/0362up/docx-pptx-odf-runtime-v14.json)
+retains exact source, commands, test summary and external artifact hashes.
