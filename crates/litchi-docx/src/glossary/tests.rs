@@ -1888,7 +1888,7 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
         "urn:unrelated"
     );
     mark_signed(&mut destination);
-    assert!(!raw::put(&mut destination, &graph, &Limits::default()).unwrap());
+    assert!(!raw::put(&mut destination, &restored, &Limits::default()).unwrap());
     assert!(destination.is_signed());
     let mut bytes = Vec::new();
     destination.write_to(&mut bytes).unwrap();
@@ -1900,6 +1900,44 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
             .owner_main_part(),
         Some("/custom/main.xml")
     );
+}
+
+#[test]
+fn raw_transfer_rebases_authored_owner_identity_even_when_content_matches() {
+    let mut source = package();
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Owner identity")).unwrap();
+    raw::put(
+        &mut source,
+        &raw::Graph::new(catalog, Conformance::Transitional),
+        &Limits::default(),
+    )
+    .unwrap();
+    let graph = raw::load(&source, &Limits::default()).unwrap().unwrap();
+    let owner_id = graph.owner_relationship_id().unwrap().to_owned();
+
+    let mut destination = package();
+    raw::put(&mut destination, &graph, &Limits::default()).unwrap();
+    let main = destination.main_document_part().unwrap().partname().clone();
+    let relationship = destination
+        .get_part(&main)
+        .unwrap()
+        .rels()
+        .get(&owner_id)
+        .unwrap();
+    let kind = relationship.reltype().to_owned();
+    let target = relationship.target_ref().to_owned();
+    let relationships = destination.get_part_mut(&main).unwrap().rels_mut();
+    relationships.remove(&owner_id);
+    relationships.add_relationship(kind, target, "rIdDifferentOwner".to_owned(), false);
+
+    assert!(raw::put(&mut destination, &graph, &Limits::default()).unwrap());
+    let restored = raw::load(&destination, &Limits::default())
+        .unwrap()
+        .unwrap();
+    assert_eq!(restored.catalog, graph.catalog);
+    assert_eq!(restored.root_name(), graph.root_name());
+    assert_eq!(restored.owner_relationship_id(), Some(owner_id.as_str()));
 }
 
 #[test]

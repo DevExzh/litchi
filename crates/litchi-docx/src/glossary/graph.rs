@@ -1054,11 +1054,27 @@ fn graph_matches_catalog_inner(
     expected_root_xml: Option<&Arc<Vec<u8>>>,
     owner_identity: Option<(&str, &str, &str)>,
 ) -> Result<bool> {
-    let owner_matches = owner_identity.is_none_or(|(owner_main, owner_id, owner_target)| {
-        actual.owner_main.as_deref() == Some(owner_main)
-            && actual.owner_id.as_deref() == Some(owner_id)
-            && actual.owner_target.as_deref() == Some(owner_target)
-    });
+    let owner_matches = match owner_identity {
+        Some((owner_main, owner_id, owner_target)) => {
+            actual.owner_main.as_deref() == Some(owner_main)
+                && actual.owner_id.as_deref() == Some(owner_id)
+                && actual.owner_target.as_deref() == Some(owner_target)
+        },
+        None => {
+            expected
+                .owner_main
+                .as_ref()
+                .is_none_or(|value| actual.owner_main.as_ref() == Some(value))
+                && expected
+                    .owner_id
+                    .as_ref()
+                    .is_none_or(|value| actual.owner_id.as_ref() == Some(value))
+                && expected
+                    .owner_target
+                    .as_ref()
+                    .is_none_or(|value| actual.owner_target.as_ref() == Some(value))
+        },
+    };
     Ok(actual.catalog == *expected_catalog
         && actual.conformance == expected.conformance
         && actual.root_name == expected.root_name
