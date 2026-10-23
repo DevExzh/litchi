@@ -1,0 +1,60 @@
+{
+  "source": "8acd229235e3c01c6e529f6d1f055d84b8e03de4",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-opc",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 26.492506452999805,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/artifact-stream-semantic-v2/check-0.log",
+      "bytes": 184173,
+      "sha256": "09ded3330387a24bde320cc6bd1daa60e899f8457616ea3bf2d71ed47e56c48a",
+      "target_bytes_before": 18588335821,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/litchi_opc-c2255f1aaca05df0",
+          "bytes": 28334976,
+          "sha256": "cc7fdc5cb19b19487ba53ef18c22cface55af8228523bfcd64008a0cdc4fcd66"
+        }
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "soapberry-zip",
+        "--lib"
+      ],
+      "exit": 101,
+      "seconds": 20.84922141700008,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/artifact-stream-semantic-v2/check-1.log",
+      "bytes": 117188,
+      "sha256": "a7ed430baf16e1e3f70635c84699ce0b65e483914ebeea9179310ed63e6b1ad1",
+      "target_bytes_before": 18588335821,
+      "completed_test_executables_pruned": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/debug/deps/soapberry_zip-f876441eaf8a3063",
+          "bytes": 18195616,
+          "sha256": "699c11c93f9ea93ba89e142582c44df80017bc4809c66148329c79761b41341a"
+        }
+      ]
+    }
+  ],
+  "note": "OPC714passed;ZIP505passed1failed in ZIP64/commentfixture. Test-only correction30b9024f90 preserves production and assertions; rerunrequired."
+}

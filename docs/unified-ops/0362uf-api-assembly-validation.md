@@ -219,3 +219,20 @@ Capability-delta and corpus manifest checks pass; this does not establish
 full corpus replay or performance acceptance.
 [python-assembly-v1.json](results/0362uf/python-assembly-v1.json) preserves all
 five command outcomes. Repairs and assembled reruns remain required.
+
+The second runtime pass on `8acd229235` passes all 714 OPC library tests.
+ZIP reaches 505 passing tests and one failure in the synthetic ZIP64/comment
+geometry case. Its fixture helper had assumed a single central record and
+inserted file-comment bytes at the directory end, corrupting a two-record
+directory. `30b9024f90` inserts at the first record's actual end and adjusts the
+relocated EOCD size; all production code and geometry assertions are retained.
+[artifact-stream-semantic-v2.json](results/0362uf/artifact-stream-semantic-v2.json)
+preserves both outcomes. ZIP requires a focused rerun.
+
+The sixteenth consumer attempt on `ff86f4a1c0` passes the focused OPC/ZIP
+check. Workspace checking ends with exit 101 after 178.13 seconds on 31
+redundant XLSB policy qualifications, missing policy imports in XLSX/PPTX
+scopes, and a now-unused private DOCX stream helper. `7b6a9cf4bc` repairs the
+complete batch and removes that dead helper without a lint allowance.
+[consumer-v16.json](results/0362uf/consumer-v16.json) records both commands;
+neither harness group was reached.
