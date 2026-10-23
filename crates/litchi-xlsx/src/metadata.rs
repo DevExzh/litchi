@@ -34,6 +34,11 @@ use litchi_ooxml_common::custom::{self, Host};
 use litchi_ooxml_common::properties::{self, Family, Snapshot, app};
 use litchi_opc::{PartMetadata, Relationship, Relationships};
 
+const STRICT_CORE_PROPERTIES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/package/relationships/metadata/core-properties";
+const STRICT_EXTENDED_PROPERTIES_RELATIONSHIP: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/extendedProperties";
+
 pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
 
 use crate::Package;
@@ -65,6 +70,25 @@ fn retained_part_metadata_bytes(part: PartMetadata<'_>) -> usize {
         .saturating_add(retained_relationships_bytes(part.rels()))
 }
 
+fn is_family_relationship(family: Family, relationship_type: &str) -> bool {
+    match family {
+        Family::Core => matches!(
+            relationship_type,
+            litchi_opc::constants::relationship_type::CORE_PROPERTIES
+                | STRICT_CORE_PROPERTIES_RELATIONSHIP
+        ),
+        Family::App => matches!(
+            relationship_type,
+            litchi_opc::constants::relationship_type::EXTENDED_PROPERTIES
+                | STRICT_EXTENDED_PROPERTIES_RELATIONSHIP
+        ),
+        Family::Custom => {
+            relationship_type == litchi_opc::constants::relationship_type::CUSTOM_PROPERTIES
+        },
+        _ => false,
+    }
+}
+
 fn owner_family(
     package: &Package,
     snapshot: &Snapshot,
@@ -76,17 +100,18 @@ fn owner_family(
             let part = package.opc().part_metadata(part_name).ok_or_else(|| {
                 Error::Invalid("metadata part disappeared during admission".to_owned())
             })?;
-            let relationship = package_relationships
-                .iter()
-                .find(|relationship| {
-                    relationship
-                        .target_partname()
-                        .ok()
-                        .is_some_and(|target| target == *part_name)
-                })
-                .ok_or_else(|| {
-                    Error::Invalid("metadata relationship disappeared during admission".to_owned())
-                })?;
+            let relationship = match snapshot.relationship_id(family) {
+                Some(relationship_id) => package_relationships.get(relationship_id),
+                None => package_relationships.iter().find(|relationship| {
+                    is_family_relationship(family, relationship.reltype())
+                        && relationship.target_partname().ok().is_some_and(|target| {
+                            target.as_str().eq_ignore_ascii_case(part_name.as_str())
+                        })
+                }),
+            }
+            .ok_or_else(|| {
+                Error::Invalid("metadata relationship disappeared during admission".to_owned())
+            })?;
             (
                 Some(retained_part_metadata_bytes(part)),
                 Some(retained_relationship_bytes(relationship)),
@@ -385,6 +410,24 @@ mod tests {
         edit.commit().unwrap()
     }
 
+    fn case_spelled_core_target() -> Package {
+        let source = title_commit(&Package::new().unwrap(), "source").into_package();
+        let mut opc = source.opc().clone();
+        let relationship_id = opc
+            .rels()
+            .iter()
+            .find(|relationship| {
+                relationship.reltype() == litchi_opc::constants::relationship_type::CORE_PROPERTIES
+            })
+            .expect("core-properties relationship")
+            .r_id()
+            .to_owned();
+        opc.rels_mut()
+            .retarget(&relationship_id, "docProps/CORE.xml".to_owned())
+            .unwrap();
+        Package::from_opc(opc).unwrap()
+    }
+
     #[test]
     fn edits_publish_a_new_snapshot_and_replay_exactly() {
         let package = Package::new().unwrap();
@@ -535,5 +578,65 @@ mod tests {
                 maximum,
             }) if observed > maximum && maximum == required - 1
         ));
+    }
+
+    #[test]
+    fn bounded_admission_preserves_case_spelled_core_relationships() {
+        let base = case_spelled_core_target();
+        assert_eq!(
+            base.opc()
+                .rels()
+                .iter()
+                .find(|relationship| {
+                    relationship.reltype()
+                        == litchi_opc::constants::relationship_type::CORE_PROPERTIES
+                })
+                .expect("core-properties relationship")
+                .target_ref(),
+            "docProps/CORE.xml"
+        );
+
+        let unbounded = title_commit(&base, "unbounded");
+        assert_eq!(
+            unbounded
+                .package()
+                .opc()
+                .rels()
+                .iter()
+                .find(|relationship| {
+                    relationship.reltype()
+                        == litchi_opc::constants::relationship_type::CORE_PROPERTIES
+                })
+                .expect("core-properties relationship")
+                .target_ref(),
+            "docProps/CORE.xml"
+        );
+
+        let expected = title_commit(&base, "bounded");
+        let required = base
+            .retained_bytes()
+            .saturating_add(expected.package().retained_bytes())
+            .saturating_add(expected.patch().retained_bytes());
+        let mut bounded = base
+            .edit_metadata_with_options(EditOptions::new().max_retained_bytes(required))
+            .unwrap();
+        bounded
+            .update(|metadata| metadata.title = Some("bounded".to_owned()))
+            .unwrap();
+        let bounded = bounded.commit().unwrap();
+        assert_eq!(
+            bounded
+                .package()
+                .opc()
+                .rels()
+                .iter()
+                .find(|relationship| {
+                    relationship.reltype()
+                        == litchi_opc::constants::relationship_type::CORE_PROPERTIES
+                })
+                .expect("core-properties relationship")
+                .target_ref(),
+            "docProps/CORE.xml"
+        );
     }
 }

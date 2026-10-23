@@ -484,6 +484,16 @@ impl Snapshot {
             .map(|present| &present.part)
     }
 
+    /// The package-level relationship selecting `family`, when present.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn relationship_id(&self, family: Family) -> Option<&str> {
+        self.family(family)
+            .present
+            .as_ref()
+            .map(|present| present.relationship_id.as_str())
+    }
+
     /// The part name selected if `family` is created by a later edit.
     #[must_use]
     pub fn new_part_name(&self, family: Family) -> &PackURI {
