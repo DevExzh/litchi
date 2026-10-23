@@ -116,6 +116,51 @@ class Committed(unittest.TestCase):
                     "0327", "0328", "0329", "0330", "0333", "0335", "0336", "0338", "0342"):
             self.assertIn(rec, records)
 
+    def test_assembled_performance_receipts_contribute_diagnostic_rows(self):
+        rows, _, _, _, _ = matrix.build()
+        records = {r["record"] for r in rows}
+        measured = ("0359qb", "0359qc", "0359qd", "0359r", "0359ra", "0359rb",
+                    "0359rc", "0359rd", "0359re", "0362ya", "0362yb", "0362yc",
+                    "0362yd", "0362ye")
+        for rec in measured:
+            self.assertIn(rec, records)
+        measured_rows = [r for r in rows if r["record"] in measured]
+        self.assertTrue(all(r["source"].startswith(f"parsed:{r['record']}/")
+                            and r["stage"] for r in measured_rows))
+        diagnostic = [r for r in measured_rows if r["unit"] in
+                      ("bytes", "Ir", "count", "instructions")]
+        self.assertTrue(diagnostic)
+        self.assertTrue(all(r["status"] == "no-budget" for r in diagnostic))
+        native = [r for r in measured_rows if r["record"] in ("0359qb", "0362ye")
+                  and r["status"] == "unqualified"]
+        self.assertGreaterEqual(len(native), 2)
+        final_only = [r for r in measured_rows
+                      if r["record"] == "0359re" and r["stage"] == "Heaptrack final-only"]
+        self.assertEqual({r["series"].rsplit(":", 1)[-1] for r in final_only},
+                         {"temporary", "peak_heap", "leaked"})
+        self.assertTrue(all(r["leaf"] is None and r["ratio"] is None
+                            and r["unified"] is not None for r in final_only))
+
+    def test_summary_total_matches_its_eight_counter_header(self):
+        rows, conflicts, agreements, cur, _ = matrix.build()
+        text = matrix.outputs(rows, conflicts, agreements, cur)[matrix.OUT_MD]
+        lines = text.splitlines()
+        header = ("| format | rows | parsed | curated | meets | miss (open) | "
+                  "miss (superseded) | unqualified | no-budget |")
+        header_index = lines.index(header)
+        total = next(line for line in lines[header_index + 2:] if line.startswith("| **all** |"))
+        cells = [cell.strip() for cell in total.strip("|").split("|")]
+        self.assertEqual(len(cells), 9)
+        expected = [len(rows),
+                    sum(r["source"].startswith("parsed") for r in rows),
+                    sum(r["source"].startswith("curated") for r in rows),
+                    sum(r["status"] == "meets" for r in rows),
+                    sum(r["status"] == "miss" for r in rows),
+                    sum(r["status"].startswith("miss (") for r in rows),
+                    sum(r["status"] == "unqualified" for r in rows),
+                    sum(r["status"] == "no-budget" for r in rows)]
+        self.assertEqual([int(cell.strip("*")) for cell in cells[1:]], expected)
+
     def test_the_two_audit_misses_have_follow_ups(self):
         rows, _, _, _, _ = matrix.build()
         wanted = {("0327", "sheet_features:xls"), ("0327", "sheet_features:ods"),

@@ -4,7 +4,7 @@
 The matrix collects every paired measurement recorded by the unified
 operations records from 0249 on (`docs/unified-ops/02[4-9]*.md`, `03*.md`)
 into one table: format x operation x scenario/size -> leaf, unified, ratio, budget,
-status (meets / miss / no-budget, or "miss (superseded by NNNN)"), record,
+status (meets / miss / no-budget / unqualified, or "miss (superseded by NNNN)"), record,
 source and, for every miss, the explanation or follow-up the record gives.
 
 Two sources are merged:
@@ -3181,6 +3181,398 @@ def p0359b():
     return out
 
 
+def metric_row(record, fmt, op, scenario, size, before, after, unit, series,
+               path, stage, comparison, explanation, verdict=None):
+    """Add a measured diagnostic pair without treating it as a budget claim.
+
+    The later W5 and W8 receipts contain useful allocator and instruction
+    comparisons, but most deliberately do not contain a quiet native
+    qualification.  Keeping these pairs in the matrix makes the measurement
+    phase and metric explicit while ``NONE`` keeps the matrix from turning a
+    diagnostic ratio into an acceptance decision.
+    """
+    ratios = [] if before in (None, 0) or after is None else [after / before]
+    r = row(record, fmt, op, scenario, size, before, after, ratios, NONE,
+            series, src([path]), stage=stage, comparison=comparison, unit=unit,
+            explanation=explanation)
+    if verdict:
+        r["verdict"] = verdict
+    return r
+
+
+DIAGNOSTIC_NOTE = (
+    "Deterministic diagnostic evidence only; it does not replace a quiet-host "
+    "native A-B-B-A qualification or make a performance-acceptance claim."
+)
+
+
+def _metric_name(value):
+    return re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+
+
+def _doc_toggle_rows(record, path):
+    d = load_json(path)
+    out = []
+    callgrind = d.get("callgrind", {})
+    for item in callgrind.get("rows", []):
+        name = item["operation"]
+        phases = []
+        if "before_ir" in item:
+            phases.append(("original", item["before_ir"], item["after_ir"],
+                           "after/original"))
+        else:
+            phases.append(("original", item.get("original_ir"), item.get("candidate_ir"),
+                           "candidate/original"))
+            if item.get("previous_after_ir") is not None:
+                phases.append(("previous after", item["previous_after_ir"],
+                               item["candidate_ir"], "candidate/previous-after"))
+        for phase, before, after, comparison in phases:
+            if before is None or after is None:
+                continue
+            out.append(metric_row(
+                record, "doc", "set", f"body toggle: {name}", "one toggle",
+                before, after, "Ir", f"doc_body_toggle:{_metric_name(name)}:{phase}:ir",
+                path, f"Callgrind Ir ({phase})", comparison,
+                f"{DIAGNOSTIC_NOTE} Native status is {d.get('native', {}).get('status', 'not reported')}."))
+    massif = d.get("massif", {})
+    if "before" in massif:
+        phases = [("original", massif["before"].get("peak_total_bytes"),
+                   massif["after"].get("peak_total_bytes"), "after/original")]
+    else:
+        ratios = massif.get("ratios", {})
+        candidate = massif.get("candidate", {}).get("peak_total_bytes")
+        phases = [("original", None, candidate, "candidate/original"),
+                  ("previous after", None, candidate, "candidate/previous-after")]
+        # The compact candidate receipt gives the ratios but not the original
+        # byte value.  Keep those ratios as ratios rather than manufacturing a
+        # byte pair below.
+        for phase, ratio_key in (("original", "candidate_over_original_total"),
+                                 ("previous after", "candidate_over_previous_after_total")):
+            if ratio_key in ratios:
+                out.append(metric_row(
+                    record, "doc", "set", "body toggle: ordinary route peak", "one toggle",
+                    1.0, ratios[ratio_key], "ratio",
+                    f"doc_body_toggle:ordinary:{phase}:massif", path,
+                    f"Massif peak ratio ({phase})", "candidate/original" if phase == "original" else "candidate/previous-after",
+                    f"{DIAGNOSTIC_NOTE} The receipt reports the byte values and this ratio; native qualification remains open."))
+        phases = []
+    for phase, before, after, comparison in phases:
+        if before is None or after is None:
+            continue
+        out.append(metric_row(
+            record, "doc", "set", "body toggle: ordinary route peak", "one toggle",
+            before, after, "bytes", f"doc_body_toggle:ordinary:{phase}:massif",
+            path, f"Massif peak ({phase})", comparison,
+            f"{DIAGNOSTIC_NOTE} The measured heap phase is retained; no native timing claim is made."))
+    if record == "0359qb":
+        native = d.get("native", {})
+        for block in native.get("blocks", []):
+            a = block.get("a_average_us")
+            b = block.get("b_average_us")
+            if a is None or b is None:
+                continue
+            out.append(metric_row(
+                record, "doc", "set", "body toggle: native diagnostic route", "one toggle",
+                a, b, "µs", f"doc_body_toggle:native:{block['id']}", path,
+                f"Native B/A ({block['id']}, rejected)", "B/A (native diagnostic)",
+                "The native block is explicitly diagnostic_rejected because the host was busy; its ratio is retained without acceptance.",
+                verdict="unqualified"))
+    return out
+
+
+@needs("0359qb")
+def p0359qb():
+    return _doc_toggle_rows("0359qb", RES / "0359qb" / "qualification.json")
+
+
+@needs("0359qc")
+def p0359qc():
+    return _doc_toggle_rows("0359qc", RES / "0359qc" / "qualification.json")
+
+
+@needs("0359qd")
+def p0359qd():
+    return _doc_toggle_rows("0359qd", RES / "0359qd" / "qualification.json")
+
+
+@needs("0359r")
+def p0359r():
+    path = RES / "0359r" / "validation.json"
+    d = load_json(path)
+    out = []
+    for name, values in d.get("layout", {}).items():
+        for metric, index, unit in (("size", 0, "bytes"), ("alignment", 1, "bytes")):
+            out.append(metric_row(
+                "0359r", "rtf", "edit", f"packed refusal layout: {name}", "",
+                values["normal"][index], values["packed"][index], unit,
+                f"refusal_layout:{_metric_name(name)}:{metric}", path,
+                f"Packed experiment ({metric})", "packed/normal",
+                "The packed representation was a rejected temporary experiment; no implementation was landed and no native timing was qualified."))
+    assembly = d["assembly"]
+    for metric, unit in (("bytes", "bytes"), ("instructions", "instructions")):
+        out.append(metric_row(
+            "0359r", "rtf", "edit", "set_text_underline packed body", "",
+            assembly["normal"][metric], assembly["packed"][metric], unit,
+            f"refusal_assembly:set_text_underline:{metric}", path,
+            f"Packed experiment ({metric})", "packed/normal",
+            "Static assembly rejected the packed experiment: it grew the refusal producer and changed its alignment."))
+    cold = d["validation"]["cold_constructor_experiment"]
+    for metric, unit in (("bytes", "bytes"), ("instructions", "instructions")):
+        out.append(metric_row(
+            "0359r", "rtf", "edit", "set_text_underline cold refusal constructor", "",
+            cold[f"normal_set_text_underline"][metric], cold[f"cold_set_text_underline"][metric], unit,
+            f"refusal_assembly:cold_constructor:{metric}", path,
+            f"Cold constructor experiment ({metric})", "cold/normal",
+            "The cold-constructor experiment was reverted; static evidence is retained as a rejection, not as a native result."))
+    return out
+
+
+@needs("0359ra")
+def p0359ra():
+    path = RES / "0359ra" / "callgrind-summary.json"
+    d = load_json(path)
+    out = []
+    for name, before, after in [("whole profile", d["profile"]["before_ir"], d["profile"]["after_ir"])] + [
+            (item["name"], item["before_ir"], item["after_ir"])
+            for item in d["profile"].get("function_costs", [])]:
+        out.append(metric_row(
+            "0359ra", "rtf", "edit", f"refusal contract: {name}", "34-sample probe",
+            before, after, "Ir", f"refusal_contract:{_metric_name(name)}:callgrind",
+            path, "Callgrind before/after", "after/before (deterministic diagnostic)",
+            "Callgrind measurement only; record 0359ra does not qualify the native timing result or accept an implementation."))
+    return out
+
+
+@needs("0359rb")
+def p0359rb():
+    path = RES / "0359rb" / "callgrind-summary.json"
+    d = load_json(path)
+    out = []
+    def add(scope, name, before, after, stage):
+        out.append(metric_row(
+            "0359rb", "rtf", "edit", f"{scope}: {name}", "34-sample probe",
+            before, after, "Ir", f"rtf_fast_path:{scope}:{_metric_name(name)}",
+            path, stage, "fast/current (deterministic diagnostic)",
+            "The candidate remains native-unqualified; direct instruction controls are retained without a timing or acceptance claim."))
+    for name in ("whole_ir", "set_text_underline_ir"):
+        add("refusal route", name, d["refusal_route"]["current"][name],
+            d["refusal_route"]["fast"][name], "Refusal route Callgrind")
+    for name, values in d["normal_route_direct_ir"].items():
+        add("normal route", name, values["current"], values["fast"], "Normal-route direct Ir")
+    for phase in ("cold", "warm"):
+        values = d["successful_route_controls"][phase]
+        add(f"successful {phase} control", "whole_ir", values[f"whole_ir_current"],
+            values["whole_ir_fast"], f"Successful {phase} control Callgrind")
+    return out
+
+
+@needs("0359rc")
+def p0359rc():
+    path = RES / "0359rc" / "callgrind-summary.json"
+    d = load_json(path)
+    out = []
+    def add(scope, name, before, after, stage):
+        if not isinstance(before, (int, float)) or not isinstance(after, (int, float)):
+            return
+        out.append(metric_row(
+            "0359rc", "rtf", "edit", f"{scope}: {name}", "34-sample probe",
+            before, after, "Ir", f"rtf_attribution:{scope}:{_metric_name(name)}",
+            path, stage, "candidate/current (deterministic diagnostic)",
+            "Call-inclusive attribution is diagnostic; the candidate remains unaccepted pending isolated native timing and heaptrack."))
+    for scope, block_name, stage, keys in (("cold successful route", "cold_success_inclusive", "Cold Callgrind", ("whole_ir", "main_ir", "main_to_parse_internal", "main_to_success", "success_to_commit_staged", "tree_parse_internal", "parser_parse", "raw_vec_finish_grow")),
+                                            ("warm successful route", "warm_success_inclusive", "Warm Callgrind", ("whole_ir", "main_ir", "main_to_success", "success_to_commit_staged")),
+                                            ("refusal route", "refusal_inclusive", "Refusal Callgrind", ("whole_ir", "main_ir", "set_text_underline", "commit_staged"))):
+        block = d[block_name]
+        for name in keys:
+            add(scope, name, block["current"][name], block["candidate"][name], stage)
+    for name, values in d["normal_direct_ir"].items():
+        add("normal direct control", name, values["current"], values["candidate"], "Normal direct control")
+    return out
+
+
+def _median_value(value):
+    return med(value) if isinstance(value, list) else value
+
+
+def _odp_reference_rows(record, path, candidate, reference, comparison):
+    out = []
+    routes = [route for route in candidate if route in reference]
+    op_for = {"open": "open", "open_first_slide": "open", "open_first_text": "open",
+              "first_slide": "get", "repeat_slide": "get", "first_text": "get",
+              "repeat_text": "get", "write_text": "save", "repeat_write_text": "save",
+              "unchanged_write": "save", "append_commit_write": "add", "replay": "replay",
+              "replay_write": "replay"}
+    for route in routes:
+        for metric in ("peak", "allocated"):
+            before = _median_value(reference[route].get(metric))
+            after = _median_value(candidate[route].get(metric))
+            out.append(metric_row(
+                record, "odp", op_for.get(route, "read"), f"source owner {route}", "2,000 slides",
+                before, after, "bytes", f"odp_source_owner:{route}:{metric}:{comparison}", path,
+                f"Allocator {metric}", comparison,
+                f"{DIAGNOSTIC_NOTE} The source-owner comparison is retained for attribution; native timing remains open."))
+    return out
+
+
+@needs("0362ya")
+def p0362ya():
+    path = RES / "0362ya" / "validation.json"
+    d = load_json(path)
+    return _odp_reference_rows("0362ya", path, d["allocation_probe"]["candidate"],
+                               d["allocation_probe"]["eager_arc_string_reference"],
+                               "candidate/eager reference")
+
+
+@needs("0362yb")
+def p0362yb():
+    path = RES / "0362yb" / "validation.json"
+    d = load_json(path)
+    return _odp_reference_rows("0362yb", path, d["allocator_probe"],
+                               d["paired_eager_arc_string_reference"],
+                               "streamed/eager reference")
+
+
+@needs("0362yc")
+def p0362yc():
+    path = RES / "0362yc" / "validation.json"
+    d = load_json(path)
+    return _odp_reference_rows("0362yc", path, d["allocator_probe"],
+                               d["paired_eager_arc_string_reference"],
+                               "corrected/eager reference")
+
+
+@needs("0362yd")
+def p0362yd():
+    path = RES / "0362yd" / "validation.json"
+    d = load_json(path)
+    out = []
+    op_for = {"open": "open", "first_slide": "get", "repeat_slide": "get",
+              "first_text": "get", "repeat_text": "get", "write_text": "save",
+              "repeat_write_text": "save", "unchanged_write": "save",
+              "append_commit_write": "add", "replay": "replay"}
+    for item in d.get("rows", []):
+        route = item["route"]
+        for metric in ("peak", "allocated"):
+            out.append(metric_row(
+                "0362yd", "odp", op_for.get(route, "read"), f"matched source owner {route}", "2,000 slides",
+                item["before"][metric], item["after"][metric], "bytes",
+                f"odp_matched_owner:{route}:{metric}", path, f"Allocator {metric}",
+                "after/before", f"{DIAGNOSTIC_NOTE} Output equivalence passed; native timing was not run."))
+        ir = item.get("instruction_references", {})
+        out.append(metric_row(
+            "0362yd", "odp", op_for.get(route, "read"), f"matched source owner {route}", "2,000 slides",
+            ir.get("before"), ir.get("after"), "Ir", f"odp_matched_owner:{route}:ir", path,
+            "Callgrind Ir", "after/before", f"{DIAGNOSTIC_NOTE} Instruction evidence is diagnostic, not native acceptance."))
+    return out
+
+
+def _markdown_table(path, header_prefix):
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith(header_prefix):
+            j = i + 2
+            rows = []
+            while j < len(lines) and lines[j].startswith("|"):
+                cells = [cell.strip() for cell in lines[j].strip("|").split("|")]
+                if cells and cells[0] != "":
+                    rows.append(cells)
+                j += 1
+            return rows
+    return []
+
+
+@needs("0362ye")
+def p0362ye():
+    path = RES / "0362ye" / "allocator-fixed-probe.md"
+    out = []
+    op_for = {"open": "open", "first_slide": "get", "repeat_slide": "get",
+              "first_text": "get", "repeat_text": "get", "write_text": "save",
+              "repeat_write_text": "save", "unchanged_write": "save",
+              "append_commit_write": "add", "replay": "replay"}
+    for cells in _markdown_table(path, "| route | e4a baseline peak"):
+        route = cells[0].strip("`")
+        peak_before, allocated_before = (int(value) for value in cells[1].split("/"))
+        peak_after, allocated_after = (int(value) for value in cells[2].split("/"))
+        for metric, before, after in (("peak", peak_before, peak_after),
+                                      ("allocated", allocated_before, allocated_after)):
+            out.append(metric_row(
+                "0362ye", "odp", op_for.get(route, "read"), f"fixed admission {route}", "2,000 slides",
+                before, after, "bytes", f"odp_fixed_admission:{route}:{metric}", path,
+                f"Allocator {metric}", "candidate/baseline", f"{DIAGNOSTIC_NOTE} This is allocator evidence; native timing remains pending."))
+    for cells in _markdown_table(path, "| route | baseline Ir"):
+        route = cells[0].strip("`")
+        before, after = (int(cells[i].replace(",", "")) for i in (1, 2))
+        out.append(metric_row(
+            "0362ye", "odp", op_for.get(route, "read"), f"fixed admission {route}", "2,000 slides",
+            before, after, "Ir", f"odp_fixed_admission:{route}:ir", path,
+            "Callgrind Ir", "candidate/baseline", f"{DIAGNOSTIC_NOTE} Route-local instructions are diagnostic only."))
+    for cells in _markdown_table(path, "| route | candidate / baseline"):
+        route = cells[0].strip("`")
+        ratio = float(cells[1].rstrip("×"))
+        out.append(metric_row(
+            "0362ye", "odp", op_for.get(route, "read"), f"fixed admission {route}", "2,000 slides",
+            1.0, ratio, "ratio", f"odp_fixed_admission:{route}:native", path,
+            "Native ABBA (diagnostic, rejected)", "candidate/baseline (native diagnostic)",
+            "The pinned ABBA was explicitly diagnostic only under host load; it is not a quiet-host native qualification.",
+            verdict="unqualified"))
+    return out
+
+
+@needs("0359rd")
+def p0359rd():
+    path = RES / "0359rd" / "qualification-summary.json"
+    d = load_json(path)
+    out = []
+    heap = d["heaptrack"]
+    for left, right, scope, comparison in (("original", "candidate", "original/candidate heap", "candidate/original"),
+                                            ("current", "candidate", "current/candidate heap", "candidate/current")):
+        for metric, unit in (("allocations", "count"), ("temporary", "count"),
+                             ("peak_heap", "bytes"), ("leaked", "bytes")):
+            out.append(metric_row(
+                "0359rd", "rtf", "replay", f"{scope}: {metric}", "34-sample probe",
+                _median_value(heap[left][metric]), _median_value(heap[right][metric]), unit,
+                f"rtf_replay_heap:{left}:{right}:{metric}", path, "Heaptrack diagnostic",
+                comparison, "Heap attribution was collected under host contamination and is explicitly rejected for native qualification."))
+    return out
+
+
+@needs("0359re")
+def p0359re():
+    path = RES / "0359re" / "qualification-summary.json"
+    d = load_json(path)
+    out = []
+    heap = d["heaptrack"]
+    for metric, unit in (("allocations", "count"), ("temporary", "count"),
+                         ("peak_heap", "bytes"), ("leaked", "bytes")):
+        if metric == "allocations":
+            before, after = (_median_value(heap["original_allocations"]),
+                             _median_value(heap["final_allocations"]))
+            comparison, stage = "final/original", "Heaptrack paired"
+            explanation = "Final-source allocation attribution is retained; compiler activity rejected it for native qualification."
+        else:
+            # The compact receipt does not label the temporary/peak/leaked
+            # vectors by leg.  Keep the reported final absolute value, rather
+            # than manufacturing a ratio against the same aggregate.
+            before, after = None, _median_value(heap[metric])
+            comparison, stage = "final absolute", "Heaptrack final-only"
+            explanation = "Final-source heaptrack value only; the receipt has no labelled original counterpart, so no ratio or native qualification is inferred."
+        out.append(metric_row(
+            "0359re", "rtf", "replay", f"final shared replay storage: {metric}", "34-sample probe",
+            before, after, unit, f"rtf_replay_shared:{metric}", path, stage,
+            comparison, explanation))
+    cg = d["callgrind"]
+    for name, before, after in (("whole profile", med(cg["original_ir"]), med(cg["final_ir"])),
+                                ("Package::apply", cg["old_api_package_apply_inclusive_ir"], cg["final_package_apply_inclusive_ir"]),
+                                ("Commit::new", cg["old_api_commit_new_ir"], cg["final_commit_new_ir"]),
+                                ("Commit drop", cg["old_api_commit_drop_ir"], cg["final_commit_drop_ir"]),
+                                ("Arc drop", cg["old_api_arc_drop_ir"], cg["final_arc_drop_ir"])):
+        out.append(metric_row(
+            "0359re", "rtf", "replay", f"final shared replay storage: {name}", "34-sample probe",
+            before, after, "Ir", f"rtf_replay_shared:{_metric_name(name)}:ir", path,
+            "Callgrind diagnostic", "final/original", "Final-source instruction attribution is diagnostic and does not replace native timing."))
+    return out
+
+
 PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259,
            p0260, p0261, p0262, p0264, p0266, p0267, p0268, p0269, p0270, p0271,
            p0273, p0274, p0275, p0276, p0277, p0278, p0279, p0280, p0281, p0282,
@@ -3190,7 +3582,8 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
-           p0359, p0359a, p0359b, p0360b, p0361, p0361a, p0362]
+           p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
+           p0359rd, p0359re, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye]
 
 
 
@@ -3451,9 +3844,9 @@ def to_md(rows, conflicts, agreements, cur):
     fmts = sorted({r["format"] for r in rows})
     a("## Summary")
     a("")
-    a("| format | rows | parsed | curated | meets | miss (open) | miss (superseded) | no-budget |")
-    a("|---|---:|---:|---:|---:|---:|---:|---:|")
-    tot = [0] * 7
+    a("| format | rows | parsed | curated | meets | miss (open) | miss (superseded) | unqualified | no-budget |")
+    a("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    tot = [0] * 8
     for f in fmts:
         fr = [r for r in rows if r["format"] == f]
         c = [len(fr),
@@ -3462,6 +3855,7 @@ def to_md(rows, conflicts, agreements, cur):
              sum(r["status"] == "meets" for r in fr),
              sum(r["status"] == "miss" for r in fr),
              sum(r["status"].startswith("miss (") for r in fr),
+             sum(r["status"] == "unqualified" for r in fr),
              sum(r["status"] == "no-budget" for r in fr)]
         tot = [x + y for x, y in zip(tot, c)]
         a(f"| {f} | " + " | ".join(str(x) for x in c) + " |")
