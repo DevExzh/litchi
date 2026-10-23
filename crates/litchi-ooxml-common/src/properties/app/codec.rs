@@ -196,17 +196,6 @@ pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Re
     Ok(output)
 }
 
-/// Plan the exact byte length of a lossless application-properties splice.
-///
-/// This walks the already-decoded layout and validates the same lexical
-/// values as [`splice`], but it never builds replacement strings or an output
-/// buffer. The metadata transaction uses this before it admits the retained
-/// after-image of a property part.
-pub(crate) fn splice_len(xml: &[u8], target: &Props) -> Result<Option<usize>> {
-    let layout = scan(xml)?;
-    splice_len_from_layout(xml, &layout, target)
-}
-
 fn splice_len_from_layout(xml: &[u8], layout: &Layout, target: &Props) -> Result<Option<usize>> {
     if layout.props == *target {
         return Ok(None);

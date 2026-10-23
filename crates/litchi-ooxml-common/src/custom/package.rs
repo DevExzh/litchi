@@ -68,11 +68,6 @@ impl Props {
         codec::decode_tolerant(bytes, part_name.as_str())?.admit_for(Some(part_name), host)
     }
 
-    /// Encode this collection as the custom-properties part writes it.
-    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
-        codec::encode(self)
-    }
-
     /// Skip and record the reserved properties of another host, then
     /// validate the host's own reserved properties ([`Self::read_for`]).
     fn admit_for(self, part_name: Option<&PackURI>, host: Host) -> Result<Self> {
