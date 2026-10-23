@@ -344,21 +344,76 @@ pub struct Edit {
     capture_budget: Option<CaptureBudget>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct CaptureBudget {
     maximum: usize,
+    base_reserved: usize,
     reserved: usize,
     /// Retained bytes for the worksheet-before image. A worksheet is charged
     /// once, when the first semantic action for it is admitted.
     worksheets: BTreeMap<usize, usize>,
     /// Retained bytes for the final semantic cell deltas. The key is the
-    /// worksheet position and address, so replacing an action releases the
-    /// old estimate instead of charging every intermediate action.
-    cells: BTreeMap<(usize, Address), usize>,
+    /// worksheet position and address, so replacing a payload releases its
+    /// old estimate while orthogonal style/structural facets remain charged
+    /// alongside the final action.
+    cells: BTreeMap<(usize, Address), CellCapture>,
     /// Retained bytes for each newly-created worksheet's final change.
     added_sheets: BTreeMap<usize, usize>,
     /// Retained bytes for the final cell deltas on newly-created worksheets.
-    added_cells: BTreeMap<(usize, Address), usize>,
+    added_cells: BTreeMap<(usize, Address), CellCapture>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct CellCapture {
+    payload: usize,
+    style: usize,
+    structural: usize,
+    remove: usize,
+    active: bool,
+}
+
+impl CellCapture {
+    fn retained_bytes(self) -> usize {
+        if !self.active {
+            return 0;
+        }
+        size_of::<Change>()
+            .saturating_add(size_of::<PartChange>())
+            .saturating_add(self.payload)
+            .saturating_add(self.style)
+            .saturating_add(self.structural)
+            .saturating_add(self.remove)
+    }
+
+    fn apply(&mut self, facet: CaptureFacet, authored_bytes: usize) {
+        self.active = true;
+        match facet {
+            CaptureFacet::Payload => {
+                self.payload = authored_bytes;
+                self.remove = 0;
+            },
+            CaptureFacet::Style => {
+                self.style = self.style.saturating_add(authored_bytes);
+                self.remove = 0;
+            },
+            CaptureFacet::Structural => {
+                self.structural = self.structural.saturating_add(authored_bytes)
+            },
+            CaptureFacet::Remove => {
+                self.payload = 0;
+                self.style = 0;
+                self.remove = authored_bytes;
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CaptureFacet {
+    Payload,
+    Style,
+    Structural,
+    Remove,
 }
 
 impl CaptureBudget {
@@ -371,6 +426,7 @@ impl CaptureBudget {
         // commit and used to make this preflight reject valid edits.
         Self {
             maximum,
+            base_reserved: endpoint.saturating_mul(2),
             reserved: endpoint.saturating_mul(2),
             worksheets: BTreeMap::new(),
             cells: BTreeMap::new(),
@@ -392,11 +448,103 @@ impl CaptureBudget {
         Ok(())
     }
 
+    fn recompute_reserved(&mut self) {
+        let cells = self
+            .cells
+            .values()
+            .map(|capture| capture.retained_bytes())
+            .fold(0usize, usize::saturating_add);
+        let added_cells = self
+            .added_cells
+            .values()
+            .map(|capture| capture.retained_bytes())
+            .fold(0usize, usize::saturating_add);
+        let worksheets = self
+            .worksheets
+            .values()
+            .copied()
+            .fold(0usize, usize::saturating_add);
+        let added_sheets = self
+            .added_sheets
+            .values()
+            .copied()
+            .fold(0usize, usize::saturating_add);
+        self.reserved = self
+            .base_reserved
+            .saturating_add(worksheets)
+            .saturating_add(cells)
+            .saturating_add(added_sheets)
+            .saturating_add(added_cells);
+    }
+
+    fn joined(&self, other: &Self) -> std::result::Result<Self, (usize, usize)> {
+        let mut joined = self.clone();
+        joined.maximum = self.maximum.min(other.maximum);
+        for (position, bytes) in &other.worksheets {
+            joined
+                .worksheets
+                .entry(*position)
+                .and_modify(|current| *current = (*current).max(*bytes))
+                .or_insert(*bytes);
+        }
+        for (key, capture) in &other.cells {
+            joined
+                .cells
+                .entry(*key)
+                .and_modify(|current| {
+                    current.payload = current.payload.saturating_add(capture.payload);
+                    current.style = current.style.saturating_add(capture.style);
+                    current.structural = current.structural.saturating_add(capture.structural);
+                    current.remove = current.remove.saturating_add(capture.remove);
+                    current.active |= capture.active;
+                })
+                .or_insert(*capture);
+        }
+        for (index, bytes) in &other.added_sheets {
+            joined
+                .added_sheets
+                .entry(*index)
+                .and_modify(|current| *current = (*current).max(*bytes))
+                .or_insert(*bytes);
+        }
+        for (key, capture) in &other.added_cells {
+            joined
+                .added_cells
+                .entry(*key)
+                .and_modify(|current| {
+                    current.payload = current.payload.saturating_add(capture.payload);
+                    current.style = current.style.saturating_add(capture.style);
+                    current.structural = current.structural.saturating_add(capture.structural);
+                    current.remove = current.remove.saturating_add(capture.remove);
+                    current.active |= capture.active;
+                })
+                .or_insert(*capture);
+        }
+        joined.recompute_reserved();
+        if joined.reserved > joined.maximum {
+            return Err((joined.reserved, joined.maximum));
+        }
+        Ok(joined)
+    }
+
+    fn check_patch(&self, patch: &Patch) -> Result<()> {
+        let observed = patch.retained_bytes();
+        if observed > self.maximum {
+            return Err(Error::Limit {
+                kind: super::super::LimitKind::SnapshotBytes.into(),
+                observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
+            });
+        }
+        Ok(())
+    }
+
     fn admit_cell(
         &mut self,
         position: usize,
         address: Address,
         worksheet_bytes: usize,
+        facet: CaptureFacet,
         authored_bytes: usize,
     ) -> Result<CaptureReservation> {
         let key = (position, address);
@@ -407,16 +555,12 @@ impl CaptureBudget {
         } else {
             worksheet_previous.unwrap_or(0)
         };
-        // One semantic Change and one changed-part descriptor are retained by
-        // the final patch. Authored payloads are replaced by their final value
-        // for a coordinate, rather than accumulating for every staged call.
-        let next = size_of::<Change>()
-            .saturating_add(size_of::<PartChange>())
-            .saturating_add(authored_bytes);
+        let mut next = previous.unwrap_or_default();
+        next.apply(facet, authored_bytes);
         let old_total = previous
-            .unwrap_or(0)
+            .map_or(0, CellCapture::retained_bytes)
             .saturating_add(worksheet_previous.unwrap_or(0));
-        let new_total = next.saturating_add(worksheet_next);
+        let new_total = next.retained_bytes().saturating_add(worksheet_next);
         self.replace(old_total, new_total)?;
         self.cells.insert(key, next);
         if worksheet_previous.is_none() {
@@ -450,14 +594,17 @@ impl CaptureBudget {
         &mut self,
         index: usize,
         address: Address,
+        facet: CaptureFacet,
         authored_bytes: usize,
     ) -> Result<()> {
         let key = (index, address);
-        let previous = self.added_cells.get(&key).copied().unwrap_or(0);
-        let next = size_of::<Change>()
-            .saturating_add(size_of::<PartChange>())
-            .saturating_add(authored_bytes);
-        self.replace(previous, next)?;
+        let previous = self.added_cells.get(&key).copied();
+        let mut next = previous.unwrap_or_default();
+        next.apply(facet, authored_bytes);
+        self.replace(
+            previous.map_or(0, CellCapture::retained_bytes),
+            next.retained_bytes(),
+        )?;
         self.added_cells.insert(key, next);
         Ok(())
     }
@@ -469,9 +616,9 @@ impl CaptureBudget {
 #[derive(Debug)]
 pub(super) struct CaptureReservation {
     key: (usize, Address),
-    previous: Option<usize>,
+    previous: Option<CellCapture>,
     worksheet_previous: Option<usize>,
-    next: usize,
+    next: CellCapture,
     worksheet_next: usize,
     active: bool,
 }
@@ -526,12 +673,27 @@ impl Edit {
         address: Address,
         authored_bytes: usize,
     ) -> Result<CaptureReservation> {
+        self.preflight_cell_capture_with_facet(
+            position,
+            address,
+            CaptureFacet::Payload,
+            authored_bytes,
+        )
+    }
+
+    pub(crate) fn preflight_cell_capture_with_facet(
+        &mut self,
+        position: usize,
+        address: Address,
+        facet: CaptureFacet,
+        authored_bytes: usize,
+    ) -> Result<CaptureReservation> {
         if self.capture_budget.is_none() {
             return Ok(CaptureReservation {
                 key: (position, address),
                 previous: None,
                 worksheet_previous: None,
-                next: 0,
+                next: CellCapture::default(),
                 worksheet_next: 0,
                 active: false,
             });
@@ -570,7 +732,7 @@ impl Edit {
         self.capture_budget
             .as_mut()
             .expect("capture budget checked above")
-            .admit_cell(position, address, worksheet_bytes, authored_bytes)
+            .admit_cell(position, address, worksheet_bytes, facet, authored_bytes)
     }
 
     /// Admit a cell's native before-image before a caller reads the projected
@@ -601,10 +763,13 @@ impl Edit {
         {
             return;
         }
-        let current = reservation.next.saturating_add(reservation.worksheet_next);
+        let current = reservation
+            .next
+            .retained_bytes()
+            .saturating_add(reservation.worksheet_next);
         let previous = reservation
             .previous
-            .unwrap_or(0)
+            .map_or(0, CellCapture::retained_bytes)
             .saturating_add(reservation.worksheet_previous.unwrap_or(0));
         budget.reserved = budget
             .reserved
@@ -1814,6 +1979,23 @@ impl Edit {
             });
         }
 
+        let joined_capture_budget = match (&self.capture_budget, &other.capture_budget) {
+            (Some(left), Some(right)) => match left.joined(right) {
+                Ok(joined) => Some(joined),
+                Err((observed, maximum)) => {
+                    return Err(JoinError {
+                        failure: JoinFailure::ResourceLimit(snapshot_join_resource_limit(
+                            observed, maximum,
+                        )),
+                        rejected: Box::new(other),
+                    });
+                },
+            },
+            (Some(left), None) => Some(left.clone()),
+            (None, Some(right)) => Some(right.clone()),
+            (None, None) => None,
+        };
+
         let other_cross_workbook_scalar = other.cross_workbook_scalar;
         let Some(combined_svg_intents) = self
             .svg_lifecycle
@@ -2058,6 +2240,7 @@ impl Edit {
         self.added.extend(other.added);
         self.removed.extend(other.removed);
         self.cross_workbook_scalar |= other_cross_workbook_scalar;
+        self.capture_budget = joined_capture_budget;
         Ok(self)
     }
 
@@ -2068,19 +2251,29 @@ impl Edit {
     /// with [`Error::Signed`].
     pub fn commit(self) -> Result<Commit> {
         if self.is_empty() {
+            let budget = self.capture_budget.clone();
             let source = self.base.clone();
-            return Ok(Commit {
+            let commit = Commit {
                 package: crate::Package::from_workbook(self.base),
                 patch: Patch {
                     source: Some(source.clone()),
                     target: Some(source),
                     ..Patch::default()
                 },
-            });
+            };
+            if let Some(budget) = budget.as_ref() {
+                budget.check_patch(&commit.patch)?;
+            }
+            return Ok(commit);
         }
         codec::ensure_unsigned(&self.base)?;
         if !self.removed.is_empty() {
-            return package::commit_removals(self);
+            let budget = self.capture_budget.clone();
+            let commit = package::commit_removals(self)?;
+            if let Some(budget) = budget.as_ref() {
+                budget.check_patch(&commit.patch)?;
+            }
+            return Ok(commit);
         }
         let Self {
             base,
@@ -2098,7 +2291,7 @@ impl Edit {
             svg_projected_owners: _,
             svg_staged_payload_bytes: _,
             svg_base_part_bytes,
-            ..
+            capture_budget,
         } = self;
         let has_svg_lifecycle = !svg_intents.is_empty();
         ensure_defined_name_edit_is_composable(
@@ -3791,14 +3984,18 @@ impl Edit {
             && web_patch.is_none()
         {
             let source = base.clone();
-            return Ok(Commit {
+            let commit = Commit {
                 package: crate::Package::from_workbook(base),
                 patch: Patch {
                     source: Some(source.clone()),
                     target: Some(source),
                     ..Patch::default()
                 },
-            });
+            };
+            if let Some(budget) = capture_budget.as_ref() {
+                budget.check_patch(&commit.patch)?;
+            }
+            return Ok(commit);
         }
         let mut package = base.inner.package.clone();
         for change in &relationship_changes {
@@ -3928,7 +4125,7 @@ impl Edit {
         // source; matching only the two changed payloads is insufficient.
         let authority = (cross_workbook_scalar || !form_control_validations.is_empty())
             .then(|| PatchAuthority::new(base.clone(), workbook.clone()));
-        Ok(Commit {
+        let commit = Commit {
             package: crate::Package::from_workbook(workbook.clone()),
             patch: Patch {
                 changes: changes.into_boxed_slice(),
@@ -3946,7 +4143,11 @@ impl Edit {
                 svg_read_guards,
                 svg_final_guards,
             },
-        })
+        };
+        if let Some(budget) = capture_budget.as_ref() {
+            budget.check_patch(&commit.patch)?;
+        }
+        Ok(commit)
     }
 
     fn add_placed<T>(&mut self, name: T, placement: Placement) -> Result<NewSheet<'_>>
@@ -4140,7 +4341,12 @@ impl Edit {
                 + hyperlink.display().map_or(0, str::len)
                 + hyperlink.tooltip().map_or(0, str::len)
                 + size_of::<crate::hyperlinks::Hyperlink>();
-            self.preflight_cell_capture(position, address, authored_bytes)?;
+            self.preflight_cell_capture_with_facet(
+                position,
+                address,
+                CaptureFacet::Structural,
+                authored_bytes,
+            )?;
             self.sheets
                 .entry(position)
                 .or_default()
@@ -4182,9 +4388,10 @@ impl Edit {
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            self.preflight_cell_capture(
+            self.preflight_cell_capture_with_facet(
                 position,
                 address,
+                CaptureFacet::Structural,
                 reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
             )?;
             self.sheets
@@ -4903,6 +5110,15 @@ fn style_join_resource_limit(observed: u64, maximum: usize) -> litchi_core::Reso
         observed,
         limit: u64::try_from(maximum).unwrap_or(u64::MAX),
         scope: Arc::from("worksheet style staged bytes"),
+    }
+}
+
+fn snapshot_join_resource_limit(observed: usize, maximum: usize) -> litchi_core::ResourceLimit {
+    litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::Memory,
+        observed: u64::try_from(observed).unwrap_or(u64::MAX),
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: Arc::from("worksheet snapshot bytes"),
     }
 }
 

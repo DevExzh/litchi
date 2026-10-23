@@ -65,6 +65,83 @@ fn primary_edit_capture_budget_replaces_repeated_cell_payload() {
         .expect("replacement keeps only final payload charge");
 }
 
+#[test]
+fn primary_edit_capture_budget_merges_payload_and_style_facets() {
+    let source = crate::Package::new().expect("source workbook");
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let content = crate::Content::from("authored payload");
+    let font = crate::style::FontChange::new().bold(Some(true));
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(content.retained_bytes())
+        .saturating_add(font.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("base capture fits the budget");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.set("A1", content).expect("payload facet fits");
+    sheet
+        .font("A1", &font)
+        .expect("style facet joins the retained payload");
+}
+
+#[test]
+fn joined_edits_merge_capture_ledgers_and_reject_over_budget_results() {
+    let source = crate::Package::new().expect("source workbook");
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let content = crate::Content::from("joined payload");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(content.retained_bytes());
+    let mut left = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("left base capture fits");
+    left.sheet("Sheet1")
+        .expect("left lookup")
+        .expect("left sheet")
+        .set("A1", content.clone())
+        .expect("left payload fits");
+    let mut right = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("right base capture fits");
+    right
+        .sheet("Sheet1")
+        .expect("right lookup")
+        .expect("right sheet")
+        .set("C3", content)
+        .expect("right payload fits");
+
+    let error = left
+        .join(right)
+        .expect_err("joined payloads exceed the shared cap");
+    assert!(matches!(error.failure(), JoinFailure::ResourceLimit(_)));
+}
+
 fn strict_unknown_worksheet() -> crate::Package {
     let source = crate::Package::new().expect("source workbook");
     let mut package = source.inner.package.clone();

@@ -655,7 +655,8 @@ impl RichText {
     /// lexical run properties that are copied into the pending cell action;
     /// allocator capacity is deliberately not folded into the package/cache
     /// census.
-    pub(crate) fn retained_bytes(&self) -> usize {
+    #[doc(hidden)]
+    pub fn retained_bytes(&self) -> usize {
         self.runs.iter().fold(size_of::<Self>(), |bytes, run| {
             let properties = run.properties.as_deref().map_or(0, |items| {
                 items

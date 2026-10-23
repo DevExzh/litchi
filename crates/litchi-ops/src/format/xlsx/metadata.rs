@@ -15,7 +15,7 @@ use crate::format::metadata::{self, Assignments};
 use crate::options::OpenOptions;
 use crate::props::Props;
 use crate::target::TargetArg;
-use crate::transaction::SemanticLimits;
+use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 
 fn native(error: xlsx::metadata::Error) -> crate::Error {
     metadata::native_error(error, FileFormat::Xlsx)
@@ -69,13 +69,26 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        // Admit the native endpoint pair before the metadata editor starts
-        // decoding and retaining document-property parts. The final metadata
-        // patch is charged again by `from_metadata` with its exact payload;
-        // this guard closes the pre-commit allocation window.
-        let _native_capture =
-            super::write::edit_with_snapshot_limit(&source, limits.max_snapshot_bytes())?;
-        drop(_native_capture);
+        // Metadata editing does not use the worksheet native editor, so an
+        // empty native probe cannot account for the property editor's before /
+        // after scope. Reserve both immutable package owners, a bounded patch
+        // payload (the source endpoint is the conservative upper bound for a
+        // property-part before/after pair), the admitted request, and one
+        // complete metadata patch descriptor before the property editor
+        // materializes any document-property part.
+        let endpoint = source.retained_bytes();
+        let observed = endpoint
+            .saturating_mul(3)
+            .saturating_add(assignments.retained_bytes())
+            .saturating_add(std::mem::size_of::<xlsx::metadata::Patch>());
+        if observed > limits.max_snapshot_bytes() {
+            return Err(TransactionError::Limit {
+                kind: LimitKind::SnapshotBytes,
+                observed,
+                maximum: limits.max_snapshot_bytes(),
+            }
+            .into());
+        }
         let (target, metadata, changed, native_patch_bytes) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {

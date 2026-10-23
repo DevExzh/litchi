@@ -837,7 +837,7 @@ fn operation_payload_bytes(operation: &CellOperation) -> usize {
             _ => 0,
         },
         CellOperation::Set(xlsx::cell::Content::Formula(formula)) => formula.text().len(),
-        CellOperation::Rich(rich) => rich.runs().iter().map(|run| run.text().len()).sum(),
+        CellOperation::Rich(rich) => rich.retained_bytes(),
         // Retyping first projects the existing cell state before it can lower
         // the converted value. Reserve a semantic cell slot before that
         // source read; the concrete setter replaces this coarse charge with
@@ -3123,6 +3123,10 @@ pub(crate) mod coalesce {
         target: CellTarget,
         operation: CellOperation,
         staged_bytes: usize,
+        /// The package promoted while resolving the first plan for a run.
+        /// The coordinator hands this owner to `Run::new` so the same source
+        /// is not promoted a second time before native staging begins.
+        promoted_source: Option<xlsx::Package>,
     }
 
     impl Plan {
@@ -3132,6 +3136,10 @@ pub(crate) mod coalesce {
 
         fn key(&self) -> CellTarget {
             self.target
+        }
+
+        pub(crate) fn take_promoted_source(&mut self) -> Option<xlsx::Package> {
+            self.promoted_source.take()
         }
     }
 
@@ -3266,7 +3274,7 @@ pub(crate) mod coalesce {
                 // Mutation already requires native promotion. Resolve
                 // against that owner so a retained source does not stream
                 // the worksheet again for each command in this run.
-                let prepared = match &self.0.owner {
+                let promoted = match &self.0.owner {
                     super::super::XlsxOwner::Source(_) if self.signature() == Signature::Signed => {
                         Some(self.adopt_workbook(
                             self.editor_for_write_with_snapshot_limit(remaining_snapshot)?,
@@ -3277,7 +3285,7 @@ pub(crate) mod coalesce {
                     ),
                     _ => None,
                 };
-                let resolved = prepared.as_ref().unwrap_or(self);
+                let resolved = promoted.as_ref().unwrap_or(self);
                 let node = crate::path::resolve::get(&super::super::Nav::new(resolved), path)?;
                 let Some((sheet, address)) = node.write_cell_target() else {
                     return Ok(None);
@@ -3287,6 +3295,12 @@ pub(crate) mod coalesce {
                     target: CellTarget { sheet, address },
                     operation,
                     staged_bytes,
+                    promoted_source: promoted.map(|owner| match &owner.0.owner {
+                        super::super::XlsxOwner::Eager(package) => package.clone(),
+                        super::super::XlsxOwner::Source(_) => {
+                            unreachable!("a promoted XLSX plan must own its package")
+                        },
+                    }),
                 }))
             })();
             let freshness = self.check_source_for_replay();
@@ -3300,12 +3314,15 @@ pub(crate) mod coalesce {
             base: &Xlsx,
             limits: &SemanticLimits,
             remaining_snapshot: usize,
+            promoted_source: Option<xlsx::Package>,
         ) -> Result<Self> {
             base.check_source_for_replay()?;
-            let source = if base.signature() == Signature::Signed {
-                base.editor_for_write_with_snapshot_limit(remaining_snapshot)?
-            } else {
-                base.editor_with_snapshot_limit(remaining_snapshot)?
+            let source = match promoted_source {
+                Some(source) => source,
+                None if base.signature() == Signature::Signed => {
+                    base.editor_for_write_with_snapshot_limit(remaining_snapshot)?
+                },
+                None => base.editor_with_snapshot_limit(remaining_snapshot)?,
             };
             let edit = source
                 .edit_with_options(
