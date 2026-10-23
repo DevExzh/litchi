@@ -39,7 +39,7 @@ The isolated target was
 | `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `.coord/odg-joined-v4/y-final-clippy.log` | 162 bytes | `d62823c17e4c55a83207940903cf2908c652ff3628990b8fafdac5af9b90fac5` |
 | `cargo test --offline --locked --all-features -p litchi-odg -j 1` | `.coord/odg-joined-v4/x-full-suite.log` | 18746 bytes | `40ef24f598952523fa82a4f58b24c8e4ac9095f1e878bcec58aa535defe8f839` |
 
-The full suite passed 23 library tests, 178 integration tests, and 1
+The full suite passed 23 library tests, 155 integration tests, and 1
 doctest (179 total).  The focused lazy unit receipt was also successful
 (`x-lazy-unit.log`, 506 bytes, SHA-256
 `efe7eb3b221eaddf94fa64786a8dac00195e112d9e54dd4857c18e71e90f3081`).
