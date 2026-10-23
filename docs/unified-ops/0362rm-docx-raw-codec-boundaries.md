@@ -88,31 +88,38 @@ are intentionally not tracked.
 | Glossary focus | `e2c7bf5808b12262a8d1640a44060fe82dabf135` / `c86d4f5d01c9c9c68fbecceb5734d1a0c8d11896` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 56 passed | 5,268 bytes / `a068fd70b38a9710cc90437733abc144ff396f7492a2a374901101429ebf3a82` |
 | DOCX library | `e2c7bf5808b12262a8d1640a44060fe82dabf135` / `c86d4f5d01c9c9c68fbecceb5734d1a0c8d11896` | `cargo test -p litchi-docx --lib -- --test-threads=1` | 0 | 1,488 passed | 133,098 bytes / `1806f5df52d0402ed73549c27cbb648e45f14b70caf88fd0e8c380702c6dba88` |
 | Glossary focus (generated-root preflight) | `e43e9a8e9a7557b455962fa23773ecb0c669ab36` / `af46fd46d8c02f3df315049d77105a42862da22a` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 58 passed | 5,477 bytes / `fcc7dd3b6a3dae4575ccdc8169f481456dfc588363cec7b671667d2937fcb338` |
+| Glossary focus (prepared admission reuse) | `3b3a7c66fbfa8b5364bfa9578ea60079d9a6ea62` / `f2564573ba96a3393ccd10e265f6eda27ea9001c` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 59 passed | 5,507 bytes / `64a7533b1a24093c68ea2c27b89e9c35422815b09aa00d470f2e8fff467d0ba0` |
 
-The three bounded runs used `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH`,
+The four bounded runs used `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH`,
 `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-docx-p0/target`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`,
 `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
 `RUST_TEST_THREADS=1`, `LITCHI_MEM_MAX=20G`, and an external `TMPDIR`.
 The earlier focused run used `TMPDIR=/tmp/litchi-docx-glossary-e2c7bf5808`,
 the generated-root preflight focused run used
-`TMPDIR=/tmp/litchi-docx-glossary-final-preflight`, and the library run used
-`TMPDIR=/tmp/litchi-docx-lib-e2c7bf5808`.
+`TMPDIR=/tmp/litchi-docx-glossary-final-preflight`, the prepared-admission
+focused run used `TMPDIR=/tmp/litchi-docx-glossary-prepared3`, and the library
+run used `TMPDIR=/tmp/litchi-docx-lib-e2c7bf5808`.
 The earlier focused log is
 `glossary-56.cargo.log`
 (`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-56.cargo.log`);
 the generated-root preflight focused log is
 `glossary-58-e43e9a8e9.cargo.log`
 (`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-58-e43e9a8e9.cargo.log`),
+the prepared-admission focused log is
+`glossary-59-3b3a7c66fb.cargo.log`
+(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-59-3b3a7c66fb.cargo.log`),
 and the library log is
 `docx-lib-1488.cargo.log`
 (`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/docx-lib-1488.cargo.log`).
-The final target directory measured 2,195,130,862 bytes (2.1G).
+The final target directory measured 2,195,145,046 bytes (2.1G).
 
-The generated-root preflight rerun used source `e43e9a8e9a` and covers the
-shape-admission and write-plan reuse changes. The full-library receipt remains
-at `e2c7bf5808`; the full library was not rerun after this focused change.
-No source changes were made after the focused rerun. All copied logs remain
-available for historical comparison in the same evidence directory.
+The generated-root preflight rerun used source `e43e9a8e9a`; the prepared-
+admission rerun at `3b3a7c66fb` covers the incoming-catalog preflight,
+transaction preparation, and admitted-read reuse changes. The full-library
+receipt remains at `e2c7bf5808`; the full library was not rerun after these
+focused changes. No source changes were made after the prepared-admission
+rerun. All copied logs remain available for historical comparison in the same
+evidence directory.
 
 No executable, fixture, or large performance artifact is part of this record.
