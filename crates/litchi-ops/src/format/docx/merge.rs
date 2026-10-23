@@ -34,7 +34,7 @@ fn merge_inner(
     options: &Options,
     limits: &SemanticLimits,
 ) -> Result<(Option<Commit>, Summary)> {
-    let editor = owning_editor(file)?;
+    let editor = owning_editor(file)?.with_snapshot_budget(limits.max_snapshot_bytes())?;
     let WorkEdit::Eager(mut edit) = WorkEdit::from(editor)? else {
         return Err(Error::new(
             Code::InternalError,

@@ -14,6 +14,7 @@ use super::{
     admit_assignments, admit_targets,
 };
 use crate::registry::Operation;
+use crate::transaction::SemanticLimits;
 use crate::{Code, Error, Props, Result, TargetArg};
 
 pub(crate) struct Plan {
@@ -39,6 +40,7 @@ struct Item {
 pub(crate) struct Run {
     base: Docx,
     edit: WorkEdit,
+    snapshot_budget: usize,
     items: Vec<Item>,
     last_target: Option<(Box<str>, Target)>,
     /// Transaction positions of the body paragraphs whose text this run
@@ -152,19 +154,24 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
 
 impl Run {
     pub(crate) fn new(base: &Docx) -> Result<Self> {
+        Self::new_with_snapshot_budget(base, SemanticLimits::default().max_snapshot_bytes())
+    }
+
+    /// Start a formatting run with the caller's remaining semantic snapshot
+    /// budget already attached to the native edit.  Formatting is coalesced
+    /// before commit, so admitting only the final pair would let an
+    /// intermediate `Snapshot` escape the facade's retention ceiling.
+    pub(crate) fn new_with_snapshot_budget(base: &Docx, snapshot_budget: usize) -> Result<Self> {
+        let editor = if base.signature() == crate::format::signature::Signature::Signed {
+            base.edit_for_write()?
+        } else {
+            base.edit()?
+        }
+        .with_snapshot_budget(snapshot_budget)?;
         Ok(Self {
             base: base.clone(),
-            // The transaction owner may be signed.  `edit_for_write` keeps
-            // that source-backed writer private while allowing the native
-            // patch to prove a cancellation; the outer transaction still
-            // rejects every nonempty final change.
-            edit: WorkEdit::from(
-                if base.signature() == crate::format::signature::Signature::Signed {
-                    base.edit_for_write()?
-                } else {
-                    base.edit()?
-                },
-            )?,
+            edit: WorkEdit::from(editor)?,
+            snapshot_budget,
             items: Vec::new(),
             last_target: None,
             texted: BTreeSet::new(),
@@ -275,7 +282,11 @@ impl Run {
     }
     pub(crate) fn commit(self) -> Result<(Docx, Commit)> {
         let Self {
-            base, edit, items, ..
+            base,
+            edit,
+            snapshot_budget,
+            items,
+            ..
         } = self;
         let authored_operations = items.len();
         let result = base.owner().finish(edit.commit(&base));
@@ -288,9 +299,13 @@ impl Run {
                 // Replace that operation-bearing patch with a fresh empty
                 // edit over the original signed owner, so the leaf history,
                 // inverse and unified facade all carry the same canonical
-                // no-op endpoint.  The staged commit remains the validation
-                // proof; only its no-op patch is discarded.
-                let mut empty = WorkEdit::from(base.edit_for_write()?)?.commit(&base)?;
+                // no-op endpoint.  The staged commit has validated the operations; release its
+                // proof before constructing the canonical replacement.
+                drop(commit);
+                let editor = base
+                    .edit_for_write()?
+                    .with_snapshot_budget(snapshot_budget)?;
+                let mut empty = WorkEdit::from(editor)?.commit(&base)?;
                 empty.operations = authored_operations;
                 Ok((base, empty))
             },
@@ -298,20 +313,28 @@ impl Run {
                 commit.operations = authored_operations;
                 Ok((base, commit))
             },
-            Err(error) => Err(locate_failure(&base, &items, error)),
+            Err(error) => Err(locate_failure(&base, &items, error, snapshot_budget)),
         }
     }
 }
 
 fn replay(base: &Docx, items: &[Item]) -> Result<Commit> {
+    replay_with_snapshot_budget(base, items, SemanticLimits::default().max_snapshot_bytes())
+}
+
+fn replay_with_snapshot_budget(
+    base: &Docx,
+    items: &[Item],
+    snapshot_budget: usize,
+) -> Result<Commit> {
     let result = (|| {
-        let mut edit = WorkEdit::from(
-            if base.signature() == crate::format::signature::Signature::Signed {
-                base.edit_for_write()?
-            } else {
-                base.edit()?
-            },
-        )?;
+        let editor = if base.signature() == crate::format::signature::Signature::Signed {
+            base.edit_for_write()?
+        } else {
+            base.edit()?
+        }
+        .with_snapshot_budget(snapshot_budget)?;
+        let mut edit = WorkEdit::from(editor)?;
         for item in items {
             item.plan
                 .stage(&mut edit)
@@ -325,7 +348,9 @@ fn replay(base: &Docx, items: &[Item]) -> Result<Commit> {
 /// Error-path-only bisection. Each probe owns a new native editor; successful
 /// prefixes become the exact base of later probes. Resource/source failures
 /// describe the run and are never retried as smaller operations.
-fn locate_failure(base: &Docx, items: &[Item], error: Error) -> Error {
+fn locate_failure(base: &Docx, items: &[Item], error: Error, snapshot_budget: usize) -> Error {
+    let mut replay =
+        |base: &Docx, items: &[Item]| replay_with_snapshot_budget(base, items, snapshot_budget);
     locate_with(base, items, error, &mut replay)
 }
 
@@ -436,5 +461,17 @@ mod tests {
             &mut replay,
         );
         assert_eq!(error.item(), Some(10));
+    }
+
+    #[test]
+    fn failure_probes_keep_the_run_snapshot_budget() {
+        let (base, items) = fixture();
+        let run = Run::new(&base).unwrap();
+        let budget = run.snapshot_bytes().saturating_sub(1);
+        let error = match replay_with_snapshot_budget(&base, &items, budget) {
+            Ok(_) => panic!("an over-budget replay probe was admitted"),
+            Err(error) => error,
+        };
+        assert_eq!(error.code(), Code::LimitExceeded);
     }
 }

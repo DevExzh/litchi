@@ -6,6 +6,7 @@ use super::{Commit, Docx, WorkEdit};
 use crate::format::docx::DocxOwner;
 use crate::path::IntoPath;
 use crate::props::{Key, PropValue};
+use crate::transaction::SemanticLimits;
 use crate::{File, IntoTarget, NewNode, OpenOptions, Placement, SourceMode, props};
 
 const XML: &str = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>FIRST_PRIVATE</w:t></w:r><w:r><w:t>tail</w:t></w:r></w:p><!--between--><w:p><w:r><w:t>second</w:t></w:r></w:p><w:sectPr/></w:body></w:document>"#;
@@ -496,6 +497,30 @@ fn fanout_write_proofs_load_at_most_one_body_per_admission() {
             BODY_LOADS.with(|loads| assert_eq!(loads.get(), loads_expected));
         }
     }
+}
+
+#[test]
+fn find_main_story_admits_the_snapshot_budget_before_rewrite() {
+    let original = open(true);
+    let source_bytes = xml(&original).len();
+    let replacement = "X".repeat(source_bytes);
+    let props = crate::Props::from_props([
+        (Key::from("find"), "FIRST_PRIVATE".into()),
+        (Key::from("replace"), replacement.as_str().into()),
+    ])
+    .unwrap();
+    let spec = crate::find::Spec::admit(&props).unwrap();
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(source_bytes.saturating_mul(2).saturating_sub(1))
+        .unwrap()
+        .build()
+        .unwrap();
+    let target = "/body".into_target().unwrap();
+    let error = match original.find_replace(&target, &spec, &limits) {
+        Ok(_) => panic!("an over-budget find rewrite was admitted"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), crate::Code::LimitExceeded);
 }
 
 /// The direct `/body/p[N]` text route of `File::set` (record 0305) publishes

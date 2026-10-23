@@ -181,6 +181,25 @@ impl fmt::Debug for DocxEditor {
     }
 }
 
+impl DocxEditor {
+    /// Attach the unified transaction's remaining main-document snapshot
+    /// budget to the native edit before any operation can retain a projected
+    /// XML snapshot. Unsigned owners are converted to their owning edit here,
+    /// preserving the existing explicit signature-removal route.
+    pub(crate) fn with_snapshot_budget(self, maximum: usize) -> Result<Self> {
+        match self {
+            Self::Edit(edit) => Ok(Self::Edit(Box::new(edit.with_snapshot_budget(maximum)))),
+            Self::Source(edit) => Ok(Self::Source(Box::new(edit.with_snapshot_budget(maximum)))),
+            Self::Unsigned(package) => Ok(Self::Edit(Box::new(
+                package
+                    .edit()
+                    .map_err(Error::from)?
+                    .with_snapshot_budget(maximum),
+            ))),
+        }
+    }
+}
+
 /// The two owner states of a DOCX handle (record 0003 §2.3).
 #[allow(
     clippy::large_enum_variant,

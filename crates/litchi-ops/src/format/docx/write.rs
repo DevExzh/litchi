@@ -26,6 +26,7 @@ use crate::error::{Code, Error, Result};
 use crate::props::{IntoProps, Key, PropValue, Props};
 use crate::registry::{Entry, Operation, Table};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 
 /// Evaluate `$body` against whichever owner's leaf edit `$work` holds.
 macro_rules! both {
@@ -166,11 +167,23 @@ impl Docx {
         target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
     ) -> Result<Commit> {
+        self.set_with_limits(target, props, &SemanticLimits::default())
+    }
+
+    /// Apply one setter under a caller-selected remaining native snapshot
+    /// budget. The budget is attached to the leaf edit before any projected
+    /// main-document XML can be retained.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: &TargetArg<'p>,
+        props: impl IntoProps<'v>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         // The final source fence belongs outside the whole operation.  This
         // makes a source revision win over every failure path too: target
         // resolution, property admission, leaf staging, and commit errors
         // cannot leak a stale leaf error after the input changed.
-        let result = self.set_inner(target, props, false);
+        let result = self.set_inner(target, props, false, limits.max_snapshot_bytes());
         self.owner().finish(result)
     }
 
@@ -179,9 +192,20 @@ impl Docx {
     /// returns instead of travelling up the call chain, and a direct body
     /// paragraph's text skips the generic resolver (record 0305).
     pub(crate) fn set_file(&self, target: &TargetArg<'_>, props: Props<'_>) -> Result<Self> {
+        self.set_file_with_limits(target, props, &SemanticLimits::default())
+    }
+
+    pub(crate) fn set_file_with_limits(
+        &self,
+        target: &TargetArg<'_>,
+        props: Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Self> {
         let result = match self.direct_paragraph(target, &props) {
-            Some(position) => self.set_paragraph_text(position, &props),
-            None => self.set_inner(target, props, false),
+            Some(position) => {
+                self.set_paragraph_text(position, &props, limits.max_snapshot_bytes())
+            },
+            None => self.set_inner(target, props, false, limits.max_snapshot_bytes()),
         };
         self.owner().finish(result)
     }
@@ -230,8 +254,15 @@ impl Docx {
     /// `text` value: the editor first (including the signed exact-no-op
     /// exception), the same property admission, then the paragraph text
     /// replacement.
-    fn set_paragraph_text(&self, position: Position, props: &Props<'_>) -> Result<Self> {
-        let editor = self.edit_for_write()?;
+    fn set_paragraph_text(
+        &self,
+        position: Position,
+        props: &Props<'_>,
+        snapshot_budget: usize,
+    ) -> Result<Self> {
+        let editor = self
+            .edit_for_write()?
+            .with_snapshot_budget(snapshot_budget)?;
         let assignments = admit_assignments(TargetKind::Paragraph, props)?;
         let target = Target {
             selection: Selection::Body(WriteSelection::Paragraph(position)),
@@ -249,7 +280,17 @@ impl Docx {
         target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
     ) -> Result<Commit> {
-        self.owner().finish(self.set_inner(target, props, true))
+        self.set_command_with_limits(target, props, &SemanticLimits::default())
+    }
+
+    pub(crate) fn set_command_with_limits<'p, 'v>(
+        &self,
+        target: &TargetArg<'p>,
+        props: impl IntoProps<'v>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        self.owner()
+            .finish(self.set_inner(target, props, true, limits.max_snapshot_bytes()))
     }
 
     fn set_inner<'p, 'v, O: Publish>(
@@ -257,6 +298,7 @@ impl Docx {
         target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
         command_text: bool,
+        snapshot_budget: usize,
     ) -> Result<O> {
         // Build the editor first. Besides preserving the signed exact-no-op
         // exception and refusing read-only handles, this makes an empty
@@ -269,13 +311,15 @@ impl Docx {
         {
             let props = Props::from_props(props)?;
             if Self::is_metadata_set(target, &props) {
-                return O::metadata(self, &props);
+                return O::metadata(self, &props, snapshot_budget);
             }
             Ok(props)
         } else {
             Err(props)
         };
-        let editor = self.edit_for_write()?;
+        let editor = self
+            .edit_for_write()?
+            .with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(target)?;
         let props = match props {
             Ok(props) => props,
@@ -498,7 +542,8 @@ impl Docx {
     /// owner is materialized once; the committed handle is eager.
     pub(super) fn eager_editor(&self, editor: DocxEditor) -> Result<DocxEditor> {
         match editor {
-            DocxEditor::Source(_) => {
+            DocxEditor::Source(source_edit) => {
+                let snapshot_budget = source_edit.snapshot_budget();
                 let super::DocxOwner::Source(package) = self.owner() else {
                     return Err(Error::new(
                         Code::InternalError,
@@ -506,7 +551,11 @@ impl Docx {
                     ));
                 };
                 let owned = self.promoted(package)?;
-                Ok(DocxEditor::Edit(Box::new(owned.edit()?)))
+                let edit = owned.edit()?;
+                Ok(DocxEditor::Edit(Box::new(match snapshot_budget {
+                    Some(maximum) => edit.with_snapshot_budget(maximum),
+                    None => edit,
+                })))
             },
             editor => Ok(editor),
         }
@@ -578,7 +627,7 @@ pub(super) trait Publish: Sized {
     fn from_commit(commit: Commit) -> Self;
 
     /// A core-properties set on `source` (record 0338).
-    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self>;
+    fn metadata(source: &Docx, props: &Props<'_>, snapshot_budget: usize) -> Result<Self>;
 }
 
 impl Publish for Commit {
@@ -590,8 +639,8 @@ impl Publish for Commit {
         commit
     }
 
-    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self> {
-        source.set_metadata(props)
+    fn metadata(source: &Docx, props: &Props<'_>, snapshot_budget: usize) -> Result<Self> {
+        source.set_metadata(props, snapshot_budget)
     }
 }
 
@@ -604,7 +653,7 @@ impl Publish for Docx {
         commit.into_file()
     }
 
-    fn metadata(source: &Docx, props: &Props<'_>) -> Result<Self> {
+    fn metadata(source: &Docx, props: &Props<'_>, _snapshot_budget: usize) -> Result<Self> {
         source.set_metadata_file(props)
     }
 }

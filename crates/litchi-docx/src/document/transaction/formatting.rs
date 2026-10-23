@@ -1416,7 +1416,7 @@ impl Edit {
         let replacement_text_bytes = self.checked_text_total(recorded_bytes)?;
         ensure_utf8(replacement)?;
         let xml = replace_range(self.projected.xml_bytes(), start, end, replacement)?;
-        let candidate = self.projected.with_spliced_paragraphs_under(
+        let candidate = self.projected_with_splices_under(
             xml,
             &[ParagraphSplice {
                 start,

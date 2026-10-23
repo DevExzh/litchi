@@ -1027,13 +1027,9 @@ impl Edit {
                     replacement: replacement.as_slice(),
                 })
                 .collect();
-            self.projected.with_spliced_paragraphs_under(
-                xml,
-                &splices,
-                SplicePolicy::BoundedGrowth,
-            )?
+            self.projected_with_splices_under(xml, &splices, SplicePolicy::BoundedGrowth)?
         } else {
-            self.projected.with_rewritten_xml(xml)?
+            self.projected_with_xml(xml)?
         };
         for (block, _, after) in &replaced {
             let located = match block.step {

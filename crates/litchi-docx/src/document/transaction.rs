@@ -2012,6 +2012,7 @@ impl Snapshot {
             operation_string_admission: None,
             compaction: CompactionPolicy::default(),
             raw_limits: None,
+            snapshot_budget: None,
         }
     }
 
@@ -2991,6 +2992,11 @@ pub struct Edit {
     operation_string_admission: Option<Arc<StringAdmission>>,
     compaction: CompactionPolicy,
     raw_limits: Option<crate::document::raw::Limits>,
+    /// Optional unified-transaction ceiling for the retained main-document
+    /// before/after XML pair.  The facade supplies the transaction's
+    /// remaining snapshot budget here; the native edit rejects a prospective
+    /// projection before it becomes a retained `Snapshot`.
+    snapshot_budget: Option<usize>,
 }
 
 impl Edit {
@@ -3040,9 +3046,11 @@ impl Edit {
     /// Discard staged operations and restore the admitted source tree.
     pub fn reset(&mut self) {
         let limits = self.raw_limits;
+        let snapshot_budget = self.snapshot_budget;
         let source = self.base.clone();
         *self = source.edit();
         self.raw_limits = limits;
+        self.snapshot_budget = snapshot_budget;
     }
 
     /// Return a reversible patch for the currently staged tree.
@@ -3070,15 +3078,46 @@ impl Edit {
                 maximum,
             });
         }
-        let snapshot = patch.apply(self.projected())?;
+        if !self.projected.same_source(patch.source()) {
+            return Err(Error::PatchConflict);
+        }
+        let projected_bytes = if patch.is_noop() {
+            self.projected.xml_bytes().len()
+        } else {
+            patch.target().xml_bytes().len()
+        };
+        self.admit_snapshot_xml(projected_bytes)?;
+        // The source comparison above authenticates the patch once.  Reuse
+        // that proof while retaining the budget check before the target
+        // snapshot is cloned; calling the public replay entry point here
+        // would scan distinct-but-equal source allocations a second time.
+        let snapshot = patch.apply_verified(self.projected());
         crate::document::raw::validate_xml(snapshot.xml_bytes(), limits)?;
-        snapshot.edit().with_raw_limits(limits)
+        let mut edit = snapshot.edit().with_raw_limits(limits)?;
+        if let Some(maximum) = self.snapshot_budget {
+            edit = edit.with_snapshot_budget(maximum);
+        }
+        Ok(edit)
     }
 
     pub(crate) fn with_raw_limits(mut self, limits: crate::document::raw::Limits) -> Result<Self> {
         limits.validate()?;
         self.raw_limits = Some(limits);
         Ok(self)
+    }
+
+    /// Bound the semantic before/after XML pair retained by this edit.
+    ///
+    /// This is an internal bridge for the unified facade. It does not alter
+    /// the raw document policy or the leaf's parser/resource ceilings.
+    pub(crate) fn with_snapshot_budget(mut self, maximum: usize) -> Self {
+        self.snapshot_budget = Some(maximum);
+        self
+    }
+
+    /// The unified facade budget currently attached to this edit.
+    pub(crate) const fn snapshot_budget(&self) -> Option<usize> {
+        self.snapshot_budget
     }
 
     /// Borrow the immutable source snapshot.
@@ -3194,6 +3233,7 @@ impl Edit {
             operation_string_admission,
             compaction: self.compaction,
             raw_limits: self.raw_limits,
+            snapshot_budget: self.snapshot_budget,
         })
     }
 
@@ -3266,7 +3306,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_spliced_paragraphs(
+        let candidate = self.projected_with_splices(
             xml,
             &[ParagraphSplice {
                 start: paragraph_start,
@@ -3826,6 +3866,7 @@ impl Edit {
             }
         }
         let candidate_source = publication.finish().map_err(crate::Error::from)?;
+        self.admit_snapshot_xml(candidate_source.len())?;
         let candidate =
             Snapshot::from_source_xml_with_identity(candidate_source, identity, context)?;
         for plan in &plans {
@@ -3946,7 +3987,7 @@ impl Edit {
                 }),
         );
         let xml = replace_ranges(candidate.projected.xml_bytes(), &ranges)?;
-        let projected = candidate.projected.with_spliced_paragraphs(xml, &splices)?;
+        let projected = candidate.projected_with_splices(xml, &splices)?;
         for operation in &candidate.operations[first_operation..] {
             let Operation::ReplaceParagraphText {
                 position, after, ..
@@ -4403,7 +4444,7 @@ impl Edit {
             hyperlink_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_hyperlink_text(&candidate, paragraph, hyperlink)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -4581,7 +4622,7 @@ impl Edit {
         }
         let after = rewrite_literal_text_node(before, &text)?;
         let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, &after)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let candidate_paragraph_range = candidate.range(paragraph)?;
         let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
         let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
@@ -4725,7 +4766,7 @@ impl Edit {
         }
         let replacement_text_bytes = self.checked_text_total(after.len())?;
         let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, &after)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let candidate_paragraph_range = candidate.range(paragraph)?;
         let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
         let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
@@ -4862,7 +4903,7 @@ impl Edit {
         if before == text {
             return Ok(self);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -5018,7 +5059,7 @@ impl Edit {
         if paragraph_after == paragraph_xml {
             return Ok(self);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             paragraph_start,
             paragraph_end,
@@ -5082,7 +5123,7 @@ impl Edit {
             return Ok(self);
         }
         let replacement = rewrite_text_owner(content_xml, &owner, &text)?;
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             content.0,
             content.1,
@@ -5353,7 +5394,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_cell_text(&candidate, table, row, cell)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -5431,7 +5472,7 @@ impl Edit {
             paragraph_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_cell_paragraph_text(&candidate, table, row, cell, paragraph)?;
         if actual != text {
             return Err(crate::Error::InvalidFormat(
@@ -5603,7 +5644,7 @@ impl Edit {
         };
         let paragraph = try_plain_paragraph(self.projected.conformance, &text)?;
         let xml = replace_range(self.projected.xml_bytes(), offset, offset, &paragraph)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let readback = candidate
             .paragraph(position)
             .ok_or(Error::OutOfBounds {
@@ -6052,7 +6093,7 @@ impl Edit {
         if !forward_match && !reverse_match {
             return Err(Error::SemanticPrecondition);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -6089,7 +6130,7 @@ impl Edit {
             return Err(Error::SemanticPrecondition);
         }
         let xml = replace_range(self.projected.xml_bytes(), start, end, &[])?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         if candidate.paragraph_count().checked_add(1) != Some(self.projected.paragraph_count()) {
             return Err(crate::Error::InvalidFormat(
                 "document paragraph removal failed semantic readback".into(),
@@ -6127,7 +6168,7 @@ impl Edit {
         } else {
             checked_start(self.range(position)?, "paragraph")?
         };
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             offset,
             offset,
@@ -6170,12 +6211,8 @@ impl Edit {
         if source != xml.as_slice() {
             return Err(Error::SemanticPrecondition);
         }
-        let candidate = self.projected.with_rewritten_xml(replace_range(
-            self.projected.xml_bytes(),
-            start,
-            end,
-            &[],
-        )?)?;
+        let candidate =
+            self.projected_with_xml(replace_range(self.projected.xml_bytes(), start, end, &[])?)?;
         self.operations.push(Operation::RemoveTransferredParagraph {
             position,
             xml: Arc::clone(xml),
@@ -6243,7 +6280,7 @@ impl Edit {
             owner_end,
             &replacement,
         )?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let actual = selected_direct_paragraph_owner_text(
             &candidate, paragraph, owner, child_name, missing,
         )?;
@@ -6333,7 +6370,7 @@ impl Edit {
         })?;
         let replacement_text_bytes = self.checked_text_total(after_text.len())?;
         let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, after)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         self.operations.push(Operation::ReplaceRunTextNode {
             paragraph,
             run,
@@ -6424,7 +6461,7 @@ impl Edit {
         )?;
         let replacement_text_bytes = self.checked_text_total(after.len())?;
         let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, after)?;
-        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate = self.projected_with_xml(xml)?;
         let candidate_paragraph_range = candidate.range(paragraph)?;
         let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
         let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
@@ -6503,7 +6540,7 @@ impl Edit {
             return Ok(self);
         }
         let replacement = rewrite_text_owner(owner_xml, &owner, &text)?;
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             start,
             end,
@@ -6528,6 +6565,12 @@ impl Edit {
     ///
     /// Reserved for commit-time document validation failures.
     pub(crate) fn commit(self) -> Result<Commit> {
+        // Admit the retained pair before any commit-only validation or
+        // publication work.  Mutation paths perform the same check before
+        // constructing a candidate snapshot; this closes the no-op path and
+        // protects callers that stage through a native helper which only
+        // discovers its final projection at commit time.
+        self.admit_snapshot_xml(self.projected.xml_bytes().len())?;
         if let Some(limits) = self.raw_limits {
             crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
         }
@@ -6571,11 +6614,17 @@ impl Edit {
         } else {
             match self.compaction {
                 CompactionPolicy::PreserveUnmodified => {
-                    commit_preserving_unmodified(&self.base, &self.projected)?
+                    commit_preserving_unmodified(&self.base, &self.projected, self.snapshot_budget)?
                 },
-                CompactionPolicy::WholeDocument => compact_whole_document(&self.projected)?,
+                CompactionPolicy::WholeDocument => {
+                    compact_whole_document(&self.base, &self.projected, self.snapshot_budget)?
+                },
             }
         };
+        // PreserveUnmodified and WholeDocument can compact a projection at
+        // publication time.  Charge the bytes that the commit actually
+        // retains, not only the pre-compaction candidate.
+        self.admit_snapshot_xml(projected.xml_bytes().len())?;
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
         }
@@ -6605,6 +6654,45 @@ impl Edit {
 
     fn range(&self, position: Position) -> Result<Range> {
         self.projected.range(position)
+    }
+
+    fn admit_snapshot_xml(&self, projected_bytes: usize) -> Result<()> {
+        let Some(maximum) = self.snapshot_budget else {
+            return Ok(());
+        };
+        let observed = self.base.xml_bytes().len().saturating_add(projected_bytes);
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            });
+        }
+        Ok(())
+    }
+
+    fn projected_with_xml(&self, xml: Vec<u8>) -> Result<Snapshot> {
+        self.admit_snapshot_xml(xml.len())?;
+        self.projected.with_rewritten_xml(xml)
+    }
+
+    fn projected_with_splices(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+    ) -> Result<Snapshot> {
+        self.projected_with_splices_under(xml, splices, SplicePolicy::SameShape)
+    }
+
+    fn projected_with_splices_under(
+        &self,
+        xml: Vec<u8>,
+        splices: &[ParagraphSplice<'_>],
+        policy: SplicePolicy,
+    ) -> Result<Snapshot> {
+        self.admit_snapshot_xml(xml.len())?;
+        self.projected
+            .with_spliced_paragraphs_under(xml, splices, policy)
     }
 
     fn reserve_operation(&mut self) -> Result<()> {
@@ -6926,11 +7014,18 @@ impl Patch {
         if !source.same_source(&self.before) {
             return Err(Error::PatchConflict);
         }
-        Ok(if !self.is_noop() {
+        Ok(self.apply_verified(source))
+    }
+
+    /// Apply after the caller has authenticated `source` against `before`.
+    /// Keeping this path private makes the single-comparison precondition
+    /// explicit for budgeted native replay without weakening the public API.
+    fn apply_verified(&self, source: &Snapshot) -> Snapshot {
+        if !self.is_noop() {
             self.after.clone()
         } else {
             source.clone()
-        })
+        }
     }
 
     /// Reuse the retained target when `bytes` are already the exact,
@@ -7394,8 +7489,12 @@ fn publication_accepts_preserved_xml(xml: &[u8]) -> bool {
 /// ([`crate::source_backed::Package::apply`]), for the snapshots bound to a
 /// source identity, which hands it to the OPC overlay in place of that
 /// overlay's own audit of the replacement (record 0311).
-fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
-    let compacted = compact_changed_paragraphs(base, projected);
+fn commit_preserving_unmodified(
+    base: &Snapshot,
+    projected: &Snapshot,
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
+    let compacted = compact_changed_paragraphs(base, projected, snapshot_budget);
     let replacement = compacted
         .as_ref()
         .ok()
@@ -7421,7 +7520,7 @@ fn commit_preserving_unmodified(base: &Snapshot, projected: &Snapshot) -> Result
         (None, None) => (publication_accepts_preserved_xml(base.xml_bytes()), None),
     };
     if !source_publishes {
-        return compact_whole_document(projected);
+        return compact_whole_document(base, projected, snapshot_budget);
     }
     let candidate = compacted?;
     Ok(match proof {
@@ -7469,11 +7568,16 @@ fn base_pair_audit(
 /// [`CompactionPolicy::WholeDocument`] opt-in, and the preserving policy's
 /// fallback when the source cannot publish preserved — byte for byte what
 /// every committed edit published before the policy existed.
-fn compact_whole_document(projected: &Snapshot) -> Result<Snapshot> {
+fn compact_whole_document(
+    base: &Snapshot,
+    projected: &Snapshot,
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
     let source = std::str::from_utf8(projected.xml_bytes()).map_err(|error| {
         crate::Error::InvalidFormat(format!("changed main-document XML is not UTF-8: {error}"))
     })?;
     let compact = compact_changed_document_preserving_bom(source)?;
+    admit_snapshot_pair(snapshot_budget, base.xml_bytes().len(), compact.len())?;
     projected.with_rewritten_xml(compact.into_bytes())
 }
 
@@ -7522,7 +7626,11 @@ const XML_SPACE_ATTRIBUTE: &[u8] = b"xml:space";
 ///
 /// Declining is never a refusal: it publishes the bytes the edit produced,
 /// which is what this policy promises for everything it does not compact.
-fn compact_changed_paragraphs(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
+fn compact_changed_paragraphs(
+    base: &Snapshot,
+    projected: &Snapshot,
+    snapshot_budget: Option<usize>,
+) -> Result<Snapshot> {
     if base.paragraphs.len() != projected.paragraphs.len() || inherits_xml_space(projected) {
         return Ok(projected.clone());
     }
@@ -7565,6 +7673,7 @@ fn compact_changed_paragraphs(base: &Snapshot, projected: &Snapshot) -> Result<S
         return Ok(projected.clone());
     }
     let xml = replace_ranges(source, &replacements)?;
+    admit_snapshot_pair(snapshot_budget, base.xml_bytes().len(), xml.len())?;
     let mut splices = Vec::new();
     splices
         .try_reserve_exact(replacements.len())
@@ -7582,6 +7691,25 @@ fn compact_changed_paragraphs(base: &Snapshot, projected: &Snapshot) -> Result<S
             }),
     );
     projected.with_spliced_paragraphs(xml, &splices)
+}
+
+fn admit_snapshot_pair(
+    snapshot_budget: Option<usize>,
+    base_bytes: usize,
+    projected_bytes: usize,
+) -> Result<()> {
+    let Some(maximum) = snapshot_budget else {
+        return Ok(());
+    };
+    let observed = base_bytes.saturating_add(projected_bytes);
+    if observed > maximum {
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ProjectedXmlBytes,
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
 }
 
 /// Borrow one body-child range out of the bytes that carry it.
@@ -14243,6 +14371,75 @@ mod tests {
         let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
         assert_eq!(restored.xml_bytes(), source.xml_bytes());
         assert!(commit.patch().apply(&restored).is_ok());
+    }
+
+    #[test]
+    fn snapshot_budget_admits_exact_xml_pair_and_rejects_before_capture() {
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+
+        // Derive the exact charge once without a budget, then exercise both
+        // sides of the boundary with fresh native edits.  The rejected edit
+        // must still hold the original projection: no candidate snapshot is
+        // retained before the typed limit is reported.
+        let mut probe = source.edit();
+        probe
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+            .unwrap();
+        let exact = source
+            .xml_bytes()
+            .len()
+            .checked_add(probe.projected().xml_bytes().len())
+            .unwrap();
+
+        let mut admitted = source.edit().with_snapshot_budget(exact);
+        admitted
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+            .unwrap();
+        assert!(admitted.commit().is_ok());
+
+        let mut refused = source.edit().with_snapshot_budget(exact - 1);
+        let error = match refused
+            .replace_paragraph_text(Position::new(0), "a substantially longer replacement")
+        {
+            Ok(_) => panic!("the over-budget projection was admitted"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            } if observed == exact && maximum == exact - 1
+        ));
+        assert_eq!(refused.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn snapshot_budget_checks_an_exact_noop_pair_at_commit() {
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+        let pair = source.xml_bytes().len().checked_mul(2).unwrap();
+
+        let mut exact = source.edit().with_snapshot_budget(pair);
+        exact
+            .replace_paragraph_text(Position::new(0), "before")
+            .unwrap();
+        assert!(exact.commit().is_ok());
+
+        let mut short = source.edit().with_snapshot_budget(pair - 1);
+        short
+            .replace_paragraph_text(Position::new(0), "before")
+            .unwrap();
+        assert!(matches!(
+            short.commit(),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ProjectedXmlBytes,
+                observed,
+                maximum,
+            }) if observed == pair && maximum == pair - 1
+        ));
     }
 
     #[test]
