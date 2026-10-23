@@ -392,3 +392,15 @@ It finishes in 316.00 seconds with an empty diagnostic log; the target is
 source, unchanged lock hashes and runner provenance. This resolves the
 documentation failure on the assembled source. It is one passing gate step,
 not the complete 53-check acceptance gate or native qualification.
+
+## Workspace Clippy and Numbers limit validation
+
+The broad all-target/all-feature Clippy check passes on `c3a9a0cef4`
+with warnings denied (213.64 seconds). The immediately following Numbers
+library run passes 488 tests, with four existing ignored cases
+(92.33 seconds including compilation). This validates the typed native limit
+observations and repaired test import in the current assembly.
+[clippy-workspace-v5.json](results/0362uf/clippy-workspace-v5.json) records
+both commands and exact source/log hashes. The preceding failed fourth
+Clippy run is retained separately. Budget proposals are still on the
+diagnostic branch; these successes are not the final combined 53-check gate.
