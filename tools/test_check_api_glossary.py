@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from tools import check_api_glossary as gate
 from tools import api_debt_inventory as inventory
+from tools import propose_api_result_rules as proposals
 
 
 SOURCE = r'''
@@ -142,11 +143,13 @@ pub fn open_with_options() {}
 pub struct MutableDraft;
 pub mod returns {
     pub struct Package;
+    pub struct OtherPackage;
     pub struct Other;
     pub struct Patch;
     pub struct Error;
     pub struct Triad<P>(pub P);
     pub type Commit<P = Package> = Triad<P>;
+    pub type CommitAlias<P = Package> = Commit<P>;
     pub type Result<T, E = Error> = std::result::Result<T, E>;
     pub type Swapped<E, T> = Result<T, E>;
     pub type OwnerAlias = Package;
@@ -154,6 +157,7 @@ pub mod returns {
     pub mod fake { pub struct Result<T>(pub T); pub struct Commit; }
     impl Package {
         pub fn apply(&self, _: &Patch) -> Result<Commit> { Ok(Triad(Package)) }
+        pub fn apply_alias(&self, _: &Patch) -> Result<CommitAlias<Self>> { Ok(Triad(Package)) }
         pub fn apply_bad(&self, _: &Patch) -> Result<Self> { Ok(Package) }
         pub fn apply_other_patch(&self, _: &Other) -> Result<Commit> { Ok(Triad(Package)) }
         pub fn apply_other_owner(&self, _: &Patch) -> Result<Commit<Other>> { Ok(Triad(Other)) }
@@ -166,6 +170,9 @@ pub mod returns {
         pub fn fake_result(&self) -> fake::Result<Commit> { fake::Result(Triad(Package)) }
         pub fn fake_commit(&self) -> Result<fake::Commit> { Ok(fake::Commit) }
     }
+    impl OtherPackage {
+        pub fn apply_alias_other(&self, _: &Patch) -> Result<CommitAlias<Self>> { Ok(Triad(OtherPackage)) }
+    }
     impl<P> Triad<P> {
         pub fn again(self) -> Result<Self> { Ok(self) }
         pub fn package(&self) -> &P { &self.0 }
@@ -173,6 +180,28 @@ pub mod returns {
         pub fn patch(&self) -> &Patch { &Patch }
         pub fn diagnostics(&self) -> &() { &() }
         pub fn into_parts(self) -> (P, Patch) { (self.0, Patch) }
+    }
+}
+pub mod core_alias {
+    pub struct Package;
+    pub struct Patch;
+    pub struct Error;
+    pub type Commit = litchi_core::edit::Commit<Package, Patch>;
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+    impl Package {
+        pub fn apply(&self, _: &Patch) -> Result<Commit> { todo!() }
+    }
+}
+pub mod core_alias_mapped {
+    pub struct Package;
+    pub struct Patch;
+    pub struct OtherPackage;
+    pub struct OtherPatch;
+    pub struct Error;
+    pub type Commit<A = Patch, B = Package> = litchi_core::edit::Commit<B, A>;
+    pub type Result<T, E = Error> = std::result::Result<T, E>;
+    impl OtherPackage {
+        pub fn apply(&self, _: &OtherPatch) -> Result<Commit<OtherPatch, Self>> { todo!() }
     }
 }
 pub mod durable {
@@ -387,6 +416,121 @@ class RustdocTests(unittest.TestCase):
             "method": "fixture::returns::Package::apply_other_patch",
             "ok": "fixture::returns::Commit",
         }])), [])
+
+    def test_replay_rule_proposals_prove_owner_and_commit_identity(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=["fixture::returns::Package"],
+        ))
+        candidates = {row["method"]: row for row in result["candidates"]}
+        unresolved = {row["method"]: row["reason"] for row in result["unresolved"]}
+        self.assertEqual(candidates["fixture::returns::Package::apply"]["ok"],
+                         "fixture::returns::Commit")
+        self.assertNotIn("type_args", candidates["fixture::returns::Package::apply"])
+        self.assertEqual(candidates["fixture::returns::Package::apply_alias"]["ok"],
+                         "fixture::returns::Commit")
+        self.assertNotIn("type_args", candidates["fixture::returns::Package::apply_alias"])
+        self.assertEqual(candidates["fixture::returns::Package::apply_other_patch"]["ok"],
+                         "fixture::returns::Commit")
+        self.assertEqual(unresolved["fixture::returns::Package::apply_other_owner"],
+                         "wrong-owner")
+        self.assertEqual(unresolved["fixture::returns::Package::apply_bad"],
+                         "non-commit-result")
+
+    def test_replay_rule_proposals_map_alias_generics_in_declared_order(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=[
+                "fixture::returns::Package",
+                "fixture::returns::OtherPackage",
+            ],
+        ))
+        candidates = {row["method"]: row for row in result["candidates"]}
+        self.assertEqual(candidates["fixture::returns::OtherPackage::apply_alias_other"], {
+            "method": "fixture::returns::OtherPackage::apply_alias_other",
+            "ok": "fixture::returns::Commit",
+            "type_args": ["fixture::returns::OtherPackage"],
+        })
+
+    def test_replay_rule_proposals_prefer_zero_parameter_core_alias(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=["fixture::core_alias::Package"],
+        ))
+        candidates = {row["method"]: row for row in result["candidates"]}
+        row = candidates["fixture::core_alias::Package::apply"]
+        self.assertEqual(row["method"], "fixture::core_alias::Package::apply")
+        self.assertEqual(row["ok"], "fixture::core_alias::Commit")
+        self.assertNotIn("type_args", row)
+        self.assertIn("litchi_core::edit::Commit", row["alternatives"])
+
+    def test_replay_rule_proposals_follow_reordered_alias_parameters(self):
+        result = proposals.propose(self.document, profile(
+            immutable_owners=["fixture::core_alias_mapped::OtherPackage"],
+        ))
+        row = {item["method"]: item for item in result["candidates"]}[
+            "fixture::core_alias_mapped::OtherPackage::apply"
+        ]
+        self.assertEqual(row["ok"], "fixture::core_alias_mapped::Commit")
+        self.assertEqual(row["type_args"], [
+            "fixture::core_alias_mapped::OtherPatch",
+            "fixture::core_alias_mapped::OtherPackage",
+        ])
+
+    def test_replay_rule_proposals_fail_closed_for_missing_return_identity(self):
+        document = copy.deepcopy(self.document)
+        surface = gate.Surface(document, "fixture")
+        method_id = next(
+            item_id for path, item_id in surface.item_ids.items()
+            if path == ("fixture", "returns", "Package", "apply")
+        )
+        commit_id = surface.item_ids[("fixture", "returns", "Commit")]
+
+        def replace(value):
+            if isinstance(value, dict):
+                resolved = value.get("resolved_path")
+                if (isinstance(resolved, dict)
+                        and str(resolved.get("id")) == str(commit_id)):
+                    resolved["id"] = "missing-commit-id"
+                    return True
+                return any(replace(child) for child in value.values())
+            if isinstance(value, list):
+                return any(replace(child) for child in value)
+            return False
+
+        self.assertTrue(replace(document["index"][method_id]))
+        result = proposals.propose(document, profile(
+            immutable_owners=["fixture::returns::Package"],
+        ))
+        self.assertIn({
+            "method": "fixture::returns::Package::apply",
+            "reason": "missing-identity",
+        }, result["unresolved"])
+
+    def test_replay_rule_proposals_preserve_existing_rules_and_cli_is_read_only(self):
+        rule = {
+            "method": "fixture::returns::Package::apply",
+            "ok": "fixture::returns::Commit",
+        }
+        checked = profile(
+            immutable_owners=["fixture::returns::Package"],
+            result_methods=[rule],
+        )
+        result = proposals.propose(self.document, checked)
+        self.assertIn(rule["method"], result["existing"])
+        self.assertNotIn(rule["method"], {row["method"] for row in result["candidates"]})
+        self.assertNotIn(rule["method"], {row["method"] for row in result["unresolved"]})
+
+        policy_path = self.directory / "proposal-policy.json"
+        policy_path.write_text(json.dumps({"version": 1, "profiles": [
+            {**checked, "id": "fixture", "package": "fixture"},
+        ]}), encoding="utf-8")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(proposals.main([
+                "--json", str(self.json_path), "--profile", "fixture",
+                "--policy", str(policy_path),
+            ]), 0)
+        parsed = json.loads(output.getvalue())
+        self.assertIn("candidates", parsed)
+        self.assertIn("unresolved", parsed)
 
     def test_scope_is_segment_based_and_preserves_domain_id(self):
         failures = self.check("Id", scope="fixture::Selector")
