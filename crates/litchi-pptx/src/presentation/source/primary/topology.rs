@@ -712,7 +712,7 @@ pub(super) fn replace_snapshot(
         Some(&revision.data.after),
         seed,
     )?;
-    if super::topology_wire::encoded_len_from_data(&revision.data)? > max_patch_bytes {
+    if revision.data.encoded_len_from_data()? > max_patch_bytes {
         return Err(limit(
             "source-backed primary retained patch bytes",
             max_patch_bytes,

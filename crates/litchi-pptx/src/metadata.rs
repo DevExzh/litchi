@@ -145,12 +145,9 @@ impl Edit<'_> {
     }
 
     /// Compute and publish the patch under an exact retained-byte ceiling.
-    /// The complete before/after family payloads are sized before the package
-    /// candidate is cloned or the patch is applied, so a refused edit does
-    /// not publish a partially materialized metadata revision.
     pub fn commit_with_options(self, options: EditOptions) -> Result<Commit> {
-        let (_snapshot, patch, diagnostics) = self.inner.finish()?;
-        let retained = patch.retained_bytes();
+        let committed = self.inner.commit()?;
+        let retained = committed.patch().retained_bytes();
         if retained > options.max_patch_bytes_value() {
             return Err(Error::Limit {
                 kind: LimitKind::XmlBytes,
@@ -158,13 +155,14 @@ impl Edit<'_> {
                 maximum: options.max_patch_bytes_value(),
             });
         }
+        let patch = committed.patch().clone();
+        let diagnostics = committed.diagnostics().clone();
         // An exact no-op publishes the source graph itself.
         let package = if patch.is_noop() {
             patch.check(self.package.opc.as_ref())?;
             self.package.duplicate()
         } else {
-            let mut opc = (*self.package.opc).clone();
-            patch.apply(&mut opc)?;
+            let (opc, _) = committed.into_parts();
             self.package.with_metadata_opc(opc)
         };
         Ok(Commit::new(package, patch, diagnostics))

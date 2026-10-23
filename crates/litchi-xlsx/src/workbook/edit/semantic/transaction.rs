@@ -783,7 +783,6 @@ impl Edit {
         } else {
             budget.worksheets.remove(&reservation.key.0);
         }
-        reservation.active = false;
     }
 
     /// Take, once, the base census the SVG lifecycle planner checks at commit.

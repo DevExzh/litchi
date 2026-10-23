@@ -264,7 +264,7 @@ impl Data {
         // callers decoding under a tighter profile get that profile in
         // `from_bytes`.
         validate_data(self, SourceLimits::default())?;
-        encoded_len_from_data(self)
+        Self::encoded_len_from_data(self)
     }
 
     pub(super) fn encoded_len_from_data(data: &Data) -> Result<usize> {

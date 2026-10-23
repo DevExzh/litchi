@@ -412,7 +412,7 @@ impl PartPatch {
             // bounded by existing graph metadata and avoids both a second
             // source copy and an archive-size-based false refusal.
             Ok(package
-                .plan_source_relationships_with_limits(owner, package.read_limits())?
+                .plan_source_relationships(owner, package.read_limits())?
                 .final_len())
         }
 

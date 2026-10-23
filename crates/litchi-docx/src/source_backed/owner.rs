@@ -288,7 +288,8 @@ impl Package {
             let main = topology.main_document_part().map_err(Error::from)?;
             validate_document_main_content_type(main.content_type())?;
             if let Some(options) = edit_options {
-                options.admit_source_bytes(main.declared_uncompressed_size()?)?;
+                options
+                    .admit_source_bytes(main.declared_uncompressed_size().map_err(Error::from)?)?;
             }
             let name = main.partname().clone();
             let lineage = topology.physical_source_lineage();

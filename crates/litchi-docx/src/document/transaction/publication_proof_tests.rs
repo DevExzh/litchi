@@ -13,9 +13,9 @@ use super::*;
 /// route it chose.
 fn historical_route(base: &Snapshot, projected: &Snapshot) -> Result<Snapshot> {
     if publication_accepts_preserved_xml(base.xml_bytes()) {
-        compact_changed_paragraphs(base, projected)
+        compact_changed_paragraphs(base, projected, None)
     } else {
-        compact_whole_document(projected)
+        compact_whole_document(base, projected, None)
     }
 }
 
@@ -29,7 +29,7 @@ fn outcome(result: &Result<Snapshot>) -> String {
 /// Compare the route with the historical one for one projection, and check
 /// the proof invariant.
 fn assert_route(base: &Snapshot, projected: &Snapshot) -> Option<bool> {
-    let committed = commit_preserving_unmodified(base, projected);
+    let committed = commit_preserving_unmodified(base, projected, None);
     let historical = historical_route(base, projected);
     assert_eq!(
         outcome(&committed),
@@ -281,7 +281,7 @@ fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
     edit.replace_paragraph_text(Position::new(3), "edited")
         .unwrap();
     let projected = edit.projected().clone();
-    let committed = commit_preserving_unmodified(&base, &projected).unwrap();
+    let committed = commit_preserving_unmodified(&base, &projected, None).unwrap();
     assert!(committed.publication_proof().is_some());
     assert_eq!(
         committed.xml_bytes(),
@@ -291,7 +291,7 @@ fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
     let mut edit = plain.edit();
     edit.replace_paragraph_text(Position::new(3), "edited")
         .unwrap();
-    let proven = commit_preserving_unmodified(&plain, edit.projected()).unwrap();
+    let proven = commit_preserving_unmodified(&plain, edit.projected(), None).unwrap();
     assert!(proven.publication_proof().is_some());
     assert_eq!(proven.xml_bytes(), committed.xml_bytes());
 }
