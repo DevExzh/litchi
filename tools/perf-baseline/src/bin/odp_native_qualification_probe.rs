@@ -87,7 +87,7 @@ impl Args {
             let argument = argument
                 .into_string()
                 .map_err(|_| format!("{program:?}: arguments must be UTF-8"))?;
-            let value = |name: &str| {
+            let mut value = |name: &str| {
                 args.next()
                     .ok_or_else(|| format!("{program:?}: {name} requires a value"))
                     .and_then(|value| {
@@ -113,7 +113,7 @@ impl Args {
                 "--max-iterations" => {
                     max_iterations = parse_positive(&value("--max-iterations")?, "max-iterations")?
                 },
-                "--help" | "-h" => return Err(usage(&program)),
+                "--help" | "-h" => return Err(usage(&program.to_string_lossy())),
                 other => return Err(format!("{program:?}: unknown argument {other:?}")),
             }
         }
@@ -282,13 +282,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
-    let mut archive = ArchiveReader::new(fixture)?;
+    let archive = ArchiveReader::new(fixture)?;
     let content = archive.read("content.xml")?;
     Ok(Digest::from_bytes(&content))
 }
 
 fn member_digest(bytes: &[u8], name: &str) -> Result<Digest, Box<dyn Error>> {
-    let mut archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes)?;
     let member = archive.read(name)?;
     Ok(Digest::from_bytes(&member))
 }
@@ -296,17 +296,18 @@ fn member_digest(bytes: &[u8], name: &str) -> Result<Digest, Box<dyn Error>> {
 fn scoped_recipient_fixture(
     fixture: &[u8],
 ) -> Result<(Vec<u8>, String, Option<Digest>), Box<dyn Error>> {
-    let mut reader = ArchiveReader::new(fixture)?;
+    let reader = ArchiveReader::new(fixture)?;
     let mut names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names.retain(|name| !name.ends_with('/'));
     let target = names
         .iter()
-        .find(|name| name.as_str() == "META-INF/manifest.xml")
-        .or_else(|| names.iter().find(|name| name.as_str() == "styles.xml"))
+        .find(|name| name.as_str() == "styles.xml")
         .or_else(|| {
-            names
-                .iter()
-                .find(|name| name.as_str() != "mimetype" && name.as_str() != "content.xml")
+            names.iter().find(|name| {
+                name.as_str() != "mimetype"
+                    && name.as_str() != "content.xml"
+                    && name.as_str() != "META-INF/manifest.xml"
+            })
         })
         .cloned()
         .unwrap_or_else(|| SCOPED_REPLAY_FALLBACK_MEMBER.to_owned());
@@ -651,10 +652,14 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     let output_owner = owner(&append)?;
     let inverse = output_owner.apply_tail_append(&patch.inverse())?;
     let inverse_digest = write_owner(inverse.package())?;
+    let inverse_content_digest =
+        member_digest(&write_owner_bytes(inverse.package())?, "content.xml")?;
 
     let changed = append_commit(&presentation, "Qualification different title", body)?;
+    let changed_bytes = write_owner_bytes(changed.package())?;
+    let changed_recipient = owner(&changed_bytes)?;
     let changed_recipient_refused = matches!(
-        changed.package().apply_tail_append(patch),
+        changed_recipient.apply_tail_append(patch),
         Err(litchi_odp::tail_append::Error::PatchConflict { .. })
     );
 
@@ -674,6 +679,7 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     let scoped_inverse_preserves_unrelated_member =
         scoped_inverse_member == scoped_recipient_member;
     let scoped_inverse_restores_content_scope = scoped_inverse_content == content_digest;
+    let inverse_content_exact_source = inverse_content_digest == content_digest;
     let checks = json!({
         "no_op_exact_source": no_op_exact_source,
         "read_semantics": slide_count > 0 && first_slide_present,
@@ -688,7 +694,7 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
         "scoped_inverse_restores_content_scope": scoped_inverse_restores_content_scope,
         "same_owner_replay_exact": same_owner_digest == append_digest,
         "content_matching_forward_exact": matching_digest == append_digest,
-        "inverse_exact_source": inverse_digest == source_digest,
+        "inverse_content_exact_source": inverse_content_exact_source,
         "changed_recipient_refused": changed_recipient_refused,
     });
     if checks
@@ -744,6 +750,7 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
             "same_owner_replay": same_owner_digest.json(),
             "content_matching_replay": matching_digest.json(),
             "inverse": inverse_digest.json(),
+            "inverse_content": inverse_content_digest.json(),
         },
     }))
 }

@@ -50,7 +50,7 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "scoped_inverse_restores_content_scope": True,
             "same_owner_replay_exact": True,
             "content_matching_forward_exact": True,
-            "inverse_exact_source": True,
+            "inverse_content_exact_source": True,
             "changed_recipient_refused": True,
         },
         "read": {
@@ -83,11 +83,29 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "same_owner_replay": append,
             "content_matching_replay": append,
             "inverse": source,
+            "inverse_content": source,
         },
     }
 
 
 class OdpNativeQualificationTests(unittest.TestCase):
+    def test_correctness_only_mode_is_mutually_exclusive_with_plan(self) -> None:
+        parsed = RUNNER.parse_args(
+            ["--manifest", "input.json", "--out-dir", "run", "--correctness-only"]
+        )
+        self.assertTrue(parsed.correctness_only)
+        with self.assertRaises(SystemExit):
+            RUNNER.parse_args(
+                [
+                    "--manifest",
+                    "input.json",
+                    "--out-dir",
+                    "run",
+                    "--plan",
+                    "--correctness-only",
+                ]
+            )
+
     def test_manifest_duplicate_keys_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manifest = Path(directory) / "input.json"
@@ -190,7 +208,7 @@ class OdpNativeQualificationTests(unittest.TestCase):
             {"content": digest(fixture)},
             "candidate",
         )
-        self.assertEqual(outputs["source"], outputs["inverse"])
+        self.assertEqual(outputs["source"], outputs["inverse_content"])
         broken = json.loads(json.dumps(report))
         broken["checks"]["content_matching_forward_exact"] = False
         with self.assertRaises(RUNNER.RunFailure):

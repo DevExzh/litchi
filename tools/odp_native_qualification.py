@@ -751,7 +751,7 @@ def validate_correctness_report(
         "scoped_inverse_restores_content_scope",
         "same_owner_replay_exact",
         "content_matching_forward_exact",
-        "inverse_exact_source",
+        "inverse_content_exact_source",
         "changed_recipient_refused",
     }
     if set(checks) != expected_checks or any(value is not True for value in checks.values()):
@@ -784,6 +784,7 @@ def validate_correctness_report(
         "same_owner_replay",
         "content_matching_replay",
         "inverse",
+        "inverse_content",
     }
     if set(outputs_value) != expected_outputs:
         raise RunFailure(f"{label}: output digest set differs from the contract")
@@ -793,8 +794,10 @@ def validate_correctness_report(
     }
     if outputs["source"] != {"bytes": fixture.bytes, "sha256": fixture.sha256}:
         raise RunFailure(f"{label}: source output digest differs from the fixture")
-    if outputs["no_op"] != outputs["source"] or outputs["inverse"] != outputs["source"]:
-        raise RunFailure(f"{label}: no-op or inverse output is not the exact source")
+    if outputs["no_op"] != outputs["source"]:
+        raise RunFailure(f"{label}: no-op output is not the exact source")
+    if outputs["inverse_content"] != expected_content:
+        raise RunFailure(f"{label}: inverse replay did not restore content.xml")
     if outputs["append"] == outputs["source"]:
         raise RunFailure(f"{label}: appended output is identical to the source")
     for name in ("same_owner_replay", "content_matching_replay"):
@@ -1021,8 +1024,9 @@ def _run_correctness(
     scoped_receipts: dict[str, dict[str, Any]] = {}
     events = []
     for name in ("baseline", "candidate"):
+        guard = quiet_guard(manifest.protocol, f"correctness-{name}")
         report, event = run_child(
-            endpoints[name], manifest, "verify", tmp_dir=tmp_dir
+            endpoints[name], manifest, "verify", tmp_dir=tmp_dir, guard=guard
         )
         outputs[name] = validate_correctness_report(
             report,
@@ -1221,10 +1225,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--plan",
         action="store_true",
         help="validate the manifest shape and write a plan without touching binaries or timing",
+    )
+    mode.add_argument(
+        "--correctness-only",
+        action="store_true",
+        help="run the untimed correctness preflight and skip calibration and native timing",
     )
     return parser.parse_args(argv)
 
@@ -1306,9 +1316,51 @@ def main(argv: list[str] | None = None) -> int:
         endpoints = runtime["endpoints"]
         tmp_dir = out_dir / "tmp"
         tmp_dir.mkdir()
+        identity_before_correctness = None
+        if args.correctness_only:
+            identity_before_correctness = _revalidate_run_identity(
+                manifest, endpoints, "before_correctness"
+            )
+            if identity_before_correctness["fixture"] != runtime["fixture"]:
+                raise RunFailure("fixture identity changed before correctness preflight")
         correctness = _run_correctness(
             manifest, endpoints, runtime["fixture"], out_dir, tmp_dir
         )
+        if args.correctness_only:
+            identity_after_correctness = _revalidate_run_identity(
+                manifest, endpoints, "after_correctness"
+            )
+            if identity_after_correctness["fixture"] != runtime["fixture"]:
+                raise RunFailure("fixture identity changed during correctness preflight")
+            report = {
+                "schema": REPORT_SCHEMA,
+                "status": "correctness_only",
+                "claim_scope": "untimed correctness preflight only; no calibration or native timing claim",
+                "manifest": str(manifest.path),
+                "fixture": runtime["fixture"],
+                "baseline": _endpoint_metadata(endpoints["baseline"]),
+                "candidate": _endpoint_metadata(endpoints["candidate"]),
+                "protocol": {
+                    "cpu": manifest.protocol.cpu,
+                    "max_load": manifest.protocol.max_load,
+                    "max_iterations": manifest.protocol.max_iterations,
+                    "timeout_s": manifest.protocol.timeout_s,
+                },
+                "environment": {
+                    "platform": platform.platform(),
+                    "python": platform.python_version(),
+                    "logical_cpus": os.cpu_count(),
+                    "runner_affinity": sorted(os.sched_getaffinity(0)),
+                },
+                "correctness": correctness,
+                "identity": {
+                    "before_correctness": identity_before_correctness,
+                    "after_correctness": identity_after_correctness,
+                },
+                "started_unix_ns": time.time_ns(),
+            }
+            _write_json(out_dir / "report.json", report)
+            return 0
         timing = _run_timing(
             manifest,
             endpoints,

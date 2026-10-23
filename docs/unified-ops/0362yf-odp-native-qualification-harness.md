@@ -24,13 +24,15 @@ sample count all come from command-line arguments. The routes are:
 source/no-op bytes, semantic reading, append change, the patch's source
 `content.xml` hash against an independently read fixture member, appended
 output change, same-owner replay, equal-content cross-copy replay, inverse
-restoration, and refusal of a changed recipient. It also generates a
-deterministic recipient with identical `content.xml` and one changed unrelated
-archive member, then checks that forward and inverse replay preserve that
-member while restoring only the content scope. Every output is reported as a
-byte count and SHA-256 digest. Calibration and timed reports carry a route
-proof matching this preflight, so timing validation does not rely on output
-length alone.
+`content.xml` restoration, and refusal of a changed recipient. An inverse
+publication may have different ZIP entry metadata because the replayed member
+is newly published; the proof therefore compares the content scope and keeps
+the opaque members separate. It also generates a deterministic recipient with
+identical `content.xml` and one changed unrelated archive member, then checks
+that forward and inverse replay preserve that member while restoring only the
+content scope. Every output is reported as a byte count and SHA-256 digest.
+Calibration and timed reports carry a route proof matching this preflight, so
+timing validation does not rely on output length alone.
 
 `--mode calibrate` doubles the per-child operation batch until a caller-set
 target duration is reached, with a finite maximum. `--mode timed` performs
@@ -82,6 +84,11 @@ python3 tools/odp_native_qualification.py \
   --out-dir /external/odp-qualification/run
 ```
 
+For a quiet-host correctness receipt without calibration or native timing, use
+the same frozen manifest with `--correctness-only`. It writes the same
+endpoint-level correctness reports and a `report.json` whose claim scope is
+explicitly untimed.
+
 The manifest is intentionally frozen at execution time. Its fixture
 `provenance` field must identify the tracked test-data source or externally
 approved fixture source; the runner records that text beside the verified
@@ -94,10 +101,12 @@ The runner's standard-library contract tests pass:
 
 ```text
 python3 -m py_compile tools/odp_native_qualification.py tools/test_odp_native_qualification.py
-python3 -m unittest tools/test_odp_native_qualification.py  # 13 tests
+python3 -m unittest tools/test_odp_native_qualification.py  # 14 tests
 ```
 
 No Cargo/build/timing slot was used for this source-only harness commit. A
 quiet-host execution against the owner's selected frozen refs remains the
 qualification step; its external artifacts must be reviewed for exact output
-digests before any timing ratio is accepted.
+digests before any timing ratio is accepted. The correctness-only mode is
+available to validate those proofs while timing remains intentionally
+disabled.
