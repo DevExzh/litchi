@@ -16,6 +16,7 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::encoded_len;
 pub use model::{Props, Value};
 pub(crate) use package::{inspect_graph, inspect_source_graph};
 pub use reserved::Host;

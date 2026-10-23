@@ -66,6 +66,124 @@ fn primary_edit_capture_budget_replaces_repeated_cell_payload() {
 }
 
 #[test]
+fn canceled_payload_and_absent_remove_release_capture() {
+    let empty = crate::Package::new().expect("source workbook");
+    let mut install = empty.edit().expect("install edit");
+    install
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "base")
+        .expect("base value");
+    let source = install.commit().expect("install commit").into_package();
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let payload = crate::Content::from("after cancellation");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("base capture fits");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    sheet.set("A1", "temporary").expect("temporary value");
+    sheet.set("A1", "base").expect("value back to source");
+    sheet.remove("B1").expect("absent remove is a no-op");
+    sheet
+        .set("C1", payload)
+        .expect("canceled entries released their capture");
+}
+
+#[test]
+fn mixed_bounded_and_unbounded_join_admits_staged_capture() {
+    let source = crate::Package::new().expect("source workbook");
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let content = crate::Content::from("mixed join payload");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(content.retained_bytes().saturating_mul(2));
+    let mut bounded = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("bounded edit");
+    bounded
+        .sheet("Sheet1")
+        .expect("bounded lookup")
+        .expect("bounded sheet")
+        .set("A1", content.clone())
+        .expect("bounded payload");
+    let mut unbounded = source.edit().expect("unbounded edit");
+    unbounded
+        .sheet("Sheet1")
+        .expect("unbounded lookup")
+        .expect("unbounded sheet")
+        .set("C1", content)
+        .expect("unbounded payload");
+    bounded
+        .join(unbounded)
+        .expect("mixed join admits both ledgers");
+}
+
+#[test]
+fn failed_first_cell_capture_rolls_back_worksheet_descriptor() {
+    let source = crate::Package::new().expect("source workbook");
+    let sheet = &source.inner.sheets[0];
+    let worksheet_bytes = source
+        .inner
+        .package
+        .get_part(&sheet.part_uri)
+        .expect("worksheet part")
+        .blob()
+        .len();
+    let payload = crate::Content::from("after rollback");
+    let maximum = source
+        .retained_bytes()
+        .saturating_mul(2)
+        .saturating_add(worksheet_bytes)
+        .saturating_add(size_of::<crate::workbook::edit::Change>())
+        .saturating_add(size_of::<crate::workbook::edit::model::PartChange>())
+        .saturating_add(payload.retained_bytes());
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(maximum))
+        .expect("base capture fits the budget");
+    let mut sheet = edit
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    assert!(
+        sheet
+            .set_cached("A1", Value::Number(Number::new("7").expect("number")))
+            .is_err()
+    );
+    sheet
+        .set("B1", payload)
+        .expect("the failed first capture released its worksheet and cell charge");
+}
+
+#[test]
 fn primary_edit_capture_budget_merges_payload_and_style_facets() {
     let source = crate::Package::new().expect("source workbook");
     let sheet = &source.inner.sheets[0];

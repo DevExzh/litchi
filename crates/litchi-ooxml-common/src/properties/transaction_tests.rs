@@ -69,6 +69,42 @@ fn snapshot_projects_core_and_app_fields_into_one_metadata() {
 }
 
 #[test]
+fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| {
+        metadata.title = Some("A & <property> \r\n B".to_owned());
+    })
+    .unwrap();
+    let expected = edit.clone().commit().unwrap().patch().retained_bytes();
+
+    let committed = Edit::new_with_retained_limit(&package, Host::Word, Some(expected))
+        .and_then(|mut edit| {
+            edit.update_metadata(|metadata| {
+                metadata.title = Some("A & <property> \r\n B".to_owned());
+            })?;
+            edit.commit()
+        })
+        .unwrap();
+    assert_eq!(committed.patch().retained_bytes(), expected);
+
+    let mut under =
+        Edit::new_with_retained_limit(&package, Host::Word, Some(expected - 1)).unwrap();
+    under
+        .update_metadata(|metadata| {
+            metadata.title = Some("A & <property> \r\n B".to_owned());
+        })
+        .unwrap();
+    assert!(matches!(
+        under.commit(),
+        Err(Error::Limit {
+            kind: super::LimitKind::RetainedBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     let mut package = OpcPackage::new();
     let core = Core {

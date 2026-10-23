@@ -656,11 +656,31 @@ impl Edit {
             // PPT planner needs the post-flush snapshot remainder before it
             // captures its native before image.
             self.flush_pending()?;
-            let limits = self.limits;
-            let remaining_snapshot = limits
+            #[cfg(feature = "ppt")]
+            let remaining_snapshot = self
+                .limits
                 .max_snapshot_bytes()
                 .saturating_sub(self.snapshot_bytes);
-            let operation_limits = limits.with_snapshot_budget(remaining_snapshot);
+            #[cfg(any(
+                feature = "doc",
+                feature = "odp",
+                feature = "docx",
+                feature = "xlsx",
+                feature = "xlsb",
+                feature = "xls",
+                feature = "ppt",
+                feature = "pptx",
+                feature = "rtf",
+                feature = "ods",
+                feature = "odt",
+                odf_objects,
+                feature = "iwork-adapter"
+            ))]
+            let operation_limits = self.limits.with_snapshot_budget(
+                self.limits
+                    .max_snapshot_bytes()
+                    .saturating_sub(self.snapshot_bytes),
+            );
             self.execute(|file| match file {
                 #[cfg(feature = "doc")]
                 File::Doc(handle) => wrap_doc(
@@ -781,6 +801,21 @@ impl Edit {
         // admission.
         self.check()?;
         self.flush_pending()?;
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let operation_limits = self.limits.with_snapshot_budget(
             self.limits
                 .max_snapshot_bytes()
@@ -924,6 +959,21 @@ impl Edit {
         // outer limit.
         self.check()?;
         self.flush_pending()?;
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let operation_limits = self.limits.with_snapshot_budget(
             self.limits
                 .max_snapshot_bytes()
@@ -1096,9 +1146,23 @@ impl Edit {
             // here so the leaf sees the post-flush snapshot remainder while
             // it preflights its native before image.
             self.flush_pending()?;
-            let limits = self.limits;
-            let operation_limits = limits.with_snapshot_budget(
-                limits
+            #[cfg(any(
+                feature = "doc",
+                feature = "odp",
+                feature = "docx",
+                feature = "xlsx",
+                feature = "xlsb",
+                feature = "xls",
+                feature = "ppt",
+                feature = "pptx",
+                feature = "rtf",
+                feature = "ods",
+                feature = "odt",
+                odf_objects,
+                feature = "iwork-adapter"
+            ))]
+            let operation_limits = self.limits.with_snapshot_budget(
+                self.limits
                     .max_snapshot_bytes()
                     .saturating_sub(self.snapshot_bytes),
             );
@@ -1385,10 +1449,40 @@ impl Edit {
     ) -> Result<()> {
         self.check()?;
         self.flush_pending()?;
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let remaining_snapshot = self
             .limits
             .max_snapshot_bytes()
             .saturating_sub(self.snapshot_bytes);
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -1537,10 +1631,40 @@ impl Edit {
     pub fn swap<'p, 'q>(&mut self, _a: impl IntoPath<'p>, _b: impl IntoPath<'q>) -> Result<()> {
         self.check()?;
         self.flush_pending()?;
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let remaining_snapshot = self
             .limits
             .max_snapshot_bytes()
             .saturating_sub(self.snapshot_bytes);
+        #[cfg(any(
+            feature = "doc",
+            feature = "odp",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "pptx",
+            feature = "rtf",
+            feature = "ods",
+            feature = "odt",
+            odf_objects,
+            feature = "iwork-adapter"
+        ))]
         let operation_limits = self.limits.with_snapshot_budget(remaining_snapshot);
         self.execute(|file| match file {
             #[cfg(feature = "docx")]

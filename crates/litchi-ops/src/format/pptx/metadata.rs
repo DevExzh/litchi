@@ -32,7 +32,11 @@ fn commit(
     custom: Option<&Assignments>,
     max_patch_bytes: usize,
 ) -> Result<(pptx::Package, pptx::metadata::Patch, Metadata)> {
-    let mut edit = package.edit_metadata().map_err(native)?;
+    let mut edit = package
+        .edit_metadata_with_options(
+            pptx::metadata::EditOptions::default().max_retained_bytes(max_patch_bytes),
+        )
+        .map_err(native)?;
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
         let props = assignments.apply_custom(edit.custom_props(), FileFormat::Pptx)?;
@@ -40,12 +44,7 @@ fn commit(
     }
     // The staged value is the committed one; no second read of the parts.
     let metadata = edit.metadata().map_err(native)?;
-    let (after, patch) = edit
-        .commit_with_options(
-            pptx::metadata::EditOptions::default().max_patch_bytes(max_patch_bytes),
-        )
-        .map_err(native)?
-        .into_parts();
+    let (after, patch) = edit.commit().map_err(native)?.into_parts();
     Ok((after, patch, metadata))
 }
 

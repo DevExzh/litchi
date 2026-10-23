@@ -77,6 +77,9 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     if layout.props == *target {
         return Ok(None);
     }
+    let output_len = splice_len_from_layout(xml, &layout, target)?.ok_or_else(|| {
+        Error::Invalid("changed application-properties edit became a no-op".to_owned())
+    })?;
     let prefix = qualified_prefix(&layout.root_name);
     let mut edits: Vec<(Range<usize>, Vec<u8>)> = Vec::new();
     let mut appended = Vec::new();
@@ -132,7 +135,7 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
         }
     }
     edits.sort_by_key(|(range, _)| (range.start, range.end));
-    let mut output = Vec::with_capacity(xml.len().saturating_add(256));
+    let mut output = Vec::with_capacity(output_len);
     let mut cursor = 0;
     for (range, replacement) in edits {
         if range.start < cursor || range.end > xml.len() {
@@ -145,6 +148,7 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
         cursor = range.end;
     }
     output.extend_from_slice(&xml[cursor..]);
+    output.shrink_to_fit();
     if output.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
             kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
@@ -160,6 +164,84 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     Ok(Some(output))
 }
 
+/// Plan the exact byte length of a lossless application-properties splice.
+///
+/// This walks the already-decoded layout and validates the same lexical
+/// values as [`splice`], but it never builds replacement strings or an output
+/// buffer. The metadata transaction uses this before it admits the retained
+/// after-image of a property part.
+pub(crate) fn splice_len(xml: &[u8], target: &Props) -> Result<Option<usize>> {
+    let layout = scan(xml)?;
+    splice_len_from_layout(xml, &layout, target)
+}
+
+fn splice_len_from_layout(xml: &[u8], layout: &Layout, target: &Props) -> Result<Option<usize>> {
+    if layout.props == *target {
+        return Ok(None);
+    }
+    let prefix = qualified_prefix(&layout.root_name);
+    let mut output_len = xml.len();
+    let mut appended = 0usize;
+    for field in Field::ALL {
+        let before = field.get(&layout.props);
+        let after = field.get(target);
+        if before == after {
+            continue;
+        }
+        let element = layout
+            .elements
+            .iter()
+            .find(|element| element.field == field);
+        match (element, after) {
+            (Some(element), None) => {
+                output_len = replace_len(output_len, element.span.len(), 0)?;
+            },
+            (Some(element), Some(value)) => {
+                let text_len = lexical_len(field, value)?;
+                let replacement_len = match &element.content {
+                    Some(_) => text_len,
+                    None => 4usize
+                        .saturating_add(element.name.len())
+                        .saturating_add(text_len),
+                };
+                let removed = element.content.as_ref().map_or(2, |content| content.len());
+                output_len = replace_len(output_len, removed, replacement_len)?;
+            },
+            (None, Some(value)) => {
+                appended = appended.saturating_add(element_len(prefix, field, value)?);
+            },
+            (None, None) => {},
+        }
+    }
+    if appended != 0 {
+        let (removed, replacement_len) = match &layout.root_end {
+            RootEnd::EndTag(_) => (0, appended),
+            RootEnd::Empty(span) => (
+                2,
+                4usize
+                    .saturating_add(layout.root_name.len())
+                    .saturating_add(appended),
+            ),
+        };
+        output_len = replace_len(output_len, removed, replacement_len)?;
+    }
+    if output_len > MAX_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: output_len,
+        });
+    }
+    Ok(Some(output_len))
+}
+
+fn replace_len(current: usize, removed: usize, added: usize) -> Result<usize> {
+    current
+        .checked_sub(removed)
+        .and_then(|value| value.checked_add(added))
+        .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))
+}
+
 /// Encode a new Transitional part holding `props`, elements in schema order.
 ///
 /// # Errors
@@ -167,7 +249,8 @@ pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
 /// Returns [`Error::Invalid`] when a text value holds a character XML 1.0
 /// cannot carry, and [`Error::Limit`] when a bound is exceeded.
 pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
-    let mut xml = Vec::with_capacity(512);
+    let encoded_len = encode_new_len(props)?;
+    let mut xml = Vec::with_capacity(encoded_len);
     xml.extend_from_slice(XML_DECLARATION.as_bytes());
     xml.extend_from_slice(b"<Properties xmlns=\"");
     xml.extend_from_slice(NAMESPACE.as_bytes());
@@ -194,7 +277,49 @@ pub(crate) fn encode_new(props: &Props) -> Result<Vec<u8>> {
             observed: xml.len(),
         });
     }
+    xml.shrink_to_fit();
     Ok(xml)
+}
+
+/// Plan the exact byte length of a new application-properties part without
+/// allocating its XML payload.
+pub(crate) fn encode_new_len(props: &Props) -> Result<usize> {
+    let mut length = XML_DECLARATION.len();
+    length = length
+        .saturating_add(b"<Properties xmlns=\"".len())
+        .saturating_add(NAMESPACE.len())
+        .saturating_add(b"\" xmlns:vt=\"".len())
+        .saturating_add(super::VT_NAMESPACE.len())
+        .saturating_add(1);
+    let children = Field::ALL
+        .iter()
+        .filter_map(|field| field.get(props).map(|value| (*field, value)))
+        .try_fold(0usize, |total, (field, value)| {
+            total
+                .checked_add(element_len(&[], field, value)?)
+                .ok_or_else(|| {
+                    Error::Invalid("extended-properties encoded size overflow".to_owned())
+                })
+        })?;
+    length = if children == 0 {
+        length
+            .checked_add(2)
+            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+    } else {
+        length
+            .checked_add(1)
+            .and_then(|value| value.checked_add(children))
+            .and_then(|value| value.checked_add(b"</Properties>".len()))
+            .ok_or_else(|| Error::Invalid("extended-properties encoded size overflow".to_owned()))?
+    };
+    if length > MAX_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: length,
+        });
+    }
+    Ok(length)
 }
 
 fn qualified_prefix(name: &[u8]) -> &[u8] {
@@ -225,6 +350,22 @@ fn push_element(output: &mut Vec<u8>, prefix: &[u8], field: Field, value: Value<
     qualified(output);
     output.push(b'>');
     Ok(())
+}
+
+fn element_len(prefix: &[u8], field: Field, value: Value<'_>) -> Result<usize> {
+    let qualified_len = prefix
+        .len()
+        .saturating_add(usize::from(!prefix.is_empty()))
+        .saturating_add(field.local_name().len());
+    let text_len = lexical_len(field, value)?;
+    if text_len == 0 {
+        Ok(qualified_len.saturating_add(3))
+    } else {
+        Ok(qualified_len
+            .saturating_mul(2)
+            .saturating_add(text_len)
+            .saturating_add(5))
+    }
 }
 
 /// The escaped lexical form of one value.
@@ -261,6 +402,45 @@ fn lexical(field: Field, value: Value<'_>) -> Result<String> {
         },
         Value::Int(value) => Ok(value.to_string()),
         Value::Bool(value) => Ok(if value { "true" } else { "false" }.to_owned()),
+    }
+}
+
+fn lexical_len(field: Field, value: Value<'_>) -> Result<usize> {
+    match value {
+        Value::Text(text) => {
+            if text.len() > MAX_TEXT_BYTES {
+                return Err(Error::Limit {
+                    kind: crate::LimitKind::ExtendedPropertyTextBytes,
+                    maximum: MAX_TEXT_BYTES,
+                    observed: text.len(),
+                });
+            }
+            let mut length = 0usize;
+            for character in text.chars() {
+                if !is_xml_char(character) {
+                    return Err(Error::Invalid(format!(
+                        "extended property {} contains XML 1.0-forbidden character U+{:04X}",
+                        field.local_name(),
+                        u32::from(character)
+                    )));
+                }
+                length = length
+                    .checked_add(match character {
+                        '&' => 5,
+                        '<' | '>' => 4,
+                        '\r' => 5,
+                        other => other.len_utf8(),
+                    })
+                    .ok_or_else(|| Error::Limit {
+                        kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+                        maximum: MAX_XML_BYTES,
+                        observed: usize::MAX,
+                    })?;
+            }
+            Ok(length)
+        },
+        Value::Int(value) => Ok(value.to_string().len()),
+        Value::Bool(value) => Ok(if value { 4 } else { 5 }),
     }
 }
 

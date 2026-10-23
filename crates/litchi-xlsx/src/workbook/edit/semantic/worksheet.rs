@@ -42,7 +42,7 @@ use super::super::{
 use super::super::{codec, package};
 
 use super::layout::{Column, Defaults, Row};
-use super::transaction::{CaptureBudget, CaptureFacet, Edit};
+use super::transaction::{AddedCaptureReservation, CaptureBudget, CaptureFacet, Edit};
 
 /// Transaction-scoped state editor for any workbook sheet tab.
 #[derive(Debug)]
@@ -132,6 +132,59 @@ impl FormControl<'_> {
 }
 
 impl Sheet<'_> {
+    fn source_cell(&self, address: Address) -> Result<Option<Cell>> {
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        Ok(sheet
+            .store()?
+            .entry(address)
+            .map(|stored| stored.cell.clone()))
+    }
+
+    fn source_style(&self, address: Address) -> Result<Option<u32>> {
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        Ok(sheet
+            .store()?
+            .entry(address)
+            .and_then(|stored| stored.style))
+    }
+
+    fn has_pending_style(&self, address: Address) -> bool {
+        self.edit.sheets.get(&self.position).is_some_and(|actions| {
+            actions.fonts.contains_key(&address)
+                || actions.alignments.contains_key(&address)
+                || actions.fills.contains_key(&address)
+                || actions.borders.contains_key(&address)
+                || actions.protections.contains_key(&address)
+                || actions.quote_prefixes.contains_key(&address)
+                || actions.number_formats.contains_key(&address)
+                || actions
+                    .cells
+                    .get(&address)
+                    .is_some_and(|action| matches!(action, Action::Update { style: Some(_), .. }))
+        })
+    }
+
+    fn has_pending_cell_effect(&self, address: Address) -> bool {
+        self.edit.sheets.get(&self.position).is_some_and(|actions| {
+            actions.cells.contains_key(&address)
+                || actions.fonts.contains_key(&address)
+                || actions.alignments.contains_key(&address)
+                || actions.fills.contains_key(&address)
+                || actions.borders.contains_key(&address)
+                || actions.protections.contains_key(&address)
+                || actions.quote_prefixes.contains_key(&address)
+                || actions.number_formats.contains_key(&address)
+        })
+    }
+
     /// Stage one selector-first scalar on an existing form control.
     pub fn set_form_control_scalar<'a>(
         &mut self,
@@ -300,17 +353,39 @@ impl Sheet<'_> {
             .name
             .as_str();
         ensure_merge_area(sheet, range)?;
-        self.edit.preflight_cell_capture_with_facet(
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             range.start(),
             CaptureFacet::Structural,
             0,
         )?;
-        let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
-        intents
-            .try_reserve(1)
-            .map_err(|source| allocation("merged-range edit plan", source))?;
-        intents.push(MergeIntent::Add(range));
+        let duplicate = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.merges.last())
+            .is_some_and(|intent| *intent == MergeIntent::Add(range));
+        if duplicate {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
+        let reserve = self
+            .edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .merges
+            .try_reserve(1);
+        if let Err(source) = reserve {
+            self.edit.rollback_cell_capture(capture);
+            return Err(allocation("merged-range edit plan", source));
+        }
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .merges
+            .push(MergeIntent::Add(range));
         Ok(self)
     }
 
@@ -361,11 +436,44 @@ impl Sheet<'_> {
             self.edit.rollback_cell_capture(capture);
             return Ok(self);
         };
-        let intents = &mut self.edit.sheets.entry(self.position).or_default().merges;
-        intents
-            .try_reserve(1)
-            .map_err(|source| allocation("merged-range edit plan", source))?;
-        intents.push(MergeIntent::Remove(range));
+        let cancel_add = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.merges.last())
+            .is_some_and(|intent| *intent == MergeIntent::Add(range));
+        if cancel_add {
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .merges
+                .pop();
+            self.edit.rollback_cell_capture(capture);
+            self.edit.release_cell_capture_facet(
+                self.position,
+                range.start(),
+                CaptureFacet::Structural,
+            );
+            return Ok(self);
+        }
+        let reserve = self
+            .edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .merges
+            .try_reserve(1);
+        if let Err(source) = reserve {
+            self.edit.rollback_cell_capture(capture);
+            return Err(allocation("merged-range edit plan", source));
+        }
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .merges
+            .push(MergeIntent::Remove(range));
         Ok(self)
     }
 
@@ -378,13 +486,50 @@ impl Sheet<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
-        self.edit
-            .preflight_cell_capture(self.position, address, content.retained_bytes())?;
+        let authored_cell = content.as_cell();
+        let capture =
+            self.edit
+                .preflight_cell_capture(self.position, address, content.retained_bytes())?;
+        let source = if self.edit.capture_budgeted() {
+            match self.source_cell(address) {
+                Ok(source) => Some(source),
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            }
+        } else {
+            None
+        };
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
+        }
+        if source.as_ref().is_some_and(|source| source.as_ref() == Some(&authored_cell)) {
+            let remove_action = self
+                .edit
+                .sheets
+                .get(&self.position)
+                .and_then(|actions| actions.cells.get(&address))
+                .is_some_and(|action| {
+                    matches!(
+                        action,
+                        Action::Update {
+                            payload: Some(Payload::Set(value)),
+                            style: None,
+                        } if value.as_cell() == authored_cell
+                    )
+                });
+            if remove_action {
+                self.edit
+                    .sheets
+                    .get_mut(&self.position)
+                    .and_then(|actions| actions.cells.remove(&address));
+                self.edit
+                    .release_cell_capture_facet(self.position, address, CaptureFacet::Payload);
+            }
         }
         Ok(self)
     }
@@ -506,8 +651,24 @@ impl Sheet<'_> {
     /// local style, metadata, comments, and unknown non-payload children.
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.edit
-            .preflight_cell_capture(self.position, address, size_of::<Content>())?;
+        let capture =
+            self.edit
+                .preflight_cell_capture(self.position, address, size_of::<Content>())?;
+        let source_exists = if self.edit.capture_budgeted() {
+            match self.source_cell(address) {
+                Ok(source) => source.is_some(),
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            }
+        } else {
+            true
+        };
+        if !source_exists && !self.has_pending_cell_effect(address) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
         let actions = self.edit.actions(self.position);
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
@@ -629,17 +790,37 @@ impl Sheet<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
-        self.edit.preflight_cell_capture_with_facet(
+        let had_pending_style = self.has_pending_style(address);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Style,
             size_of::<StyleEffect>(),
         )?;
+        if self.edit.capture_budgeted() && !had_pending_style {
+            let source_style = match self.source_style(address) {
+                Ok(style) => style,
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            };
+            if source_style == Some(style.raw()) {
+                self.edit.rollback_cell_capture(capture);
+                return Ok(self);
+            }
+        }
         // An explicit shared-style assignment is the later, complete style
         // operation. It supersedes any deferred property-level style request
         // staged for the same cell.
-        self.edit.discard_fill(self.position, address)?;
-        self.edit.discard_border(self.position, address)?;
+        if let Err(error) = self.edit.discard_fill(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
+        if let Err(error) = self.edit.discard_border(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
         self.edit
             .sheets
             .entry(self.position)
@@ -685,14 +866,34 @@ impl Sheet<'_> {
     /// A missing cell remains missing and resolves as a no-op at commit.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.edit.preflight_cell_capture_with_facet(
+        let had_pending_style = self.has_pending_style(address);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Style,
             size_of::<StyleEffect>(),
         )?;
-        self.edit.discard_fill(self.position, address)?;
-        self.edit.discard_border(self.position, address)?;
+        if self.edit.capture_budgeted() && !had_pending_style {
+            let source_style = match self.source_style(address) {
+                Ok(style) => style,
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            };
+            if source_style.is_none() {
+                self.edit.rollback_cell_capture(capture);
+                return Ok(self);
+            }
+        }
+        if let Err(error) = self.edit.discard_fill(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
+        if let Err(error) = self.edit.discard_border(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
         self.edit
             .sheets
             .entry(self.position)
@@ -729,6 +930,39 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_style(StyleEffect::Reset),
         }
+        let source_missing = if self.edit.capture_budgeted() {
+            match self.source_cell(address) {
+                Ok(source) => source.is_none(),
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            }
+        } else {
+            false
+        };
+        let cancel_missing_style = source_missing
+            && self
+                .edit
+                .sheets
+                .get(&self.position)
+                .and_then(|actions| actions.cells.get(&address))
+                .is_some_and(|action| {
+                    matches!(
+                        action,
+                        Action::Update {
+                            payload: None,
+                            style: Some(StyleEffect::Reset),
+                        }
+                    )
+                });
+        if cancel_missing_style {
+            self.edit
+                .sheets
+                .get_mut(&self.position)
+                .and_then(|actions| actions.cells.remove(&address));
+            self.edit.release_cell_capture_all(self.position, address);
+        }
         Ok(self)
     }
 
@@ -745,7 +979,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Font,
             change.retained_bytes(),
         )?;
         self.edit
@@ -777,7 +1011,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Alignment,
             change.retained_bytes(),
         )?;
         self.edit
@@ -822,13 +1056,24 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        self.edit.preflight_cell_capture_with_facet(
+        let mut merged = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.borders.get(&address))
+            .cloned()
+            .unwrap_or_else(BorderChange::new);
+        merged.merge(change);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
-            change.retained_bytes(),
+            CaptureFacet::Border,
+            merged.retained_bytes(),
         )?;
-        self.edit.stage_border(self.position, address, change)?;
+        if let Err(error) = self.edit.stage_border(self.position, address, change) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
         Ok(self)
     }
 
@@ -883,13 +1128,24 @@ impl Sheet<'_> {
         if change.is_empty() {
             return Ok(self);
         }
-        self.edit.preflight_cell_capture_with_facet(
+        let mut merged = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.fills.get(&address))
+            .cloned()
+            .unwrap_or_else(FillChange::new);
+        merged.merge(change);
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
-            change.retained_bytes(),
+            CaptureFacet::Fill,
+            merged.retained_bytes(),
         )?;
-        self.edit.stage_fill(self.position, address, change)?;
+        if let Err(error) = self.edit.stage_fill(self.position, address, change) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
         Ok(self)
     }
 
@@ -910,7 +1166,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::Protection,
             change.retained_bytes(),
         )?;
         self.edit
@@ -935,7 +1191,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::QuotePrefix,
             size_of::<Option<bool>>(),
         )?;
         self.edit
@@ -974,7 +1230,7 @@ impl Sheet<'_> {
         self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
-            CaptureFacet::Style,
+            CaptureFacet::NumberFormat,
             size_of::<Option<Arc<str>>>()
                 .saturating_add(code.as_ref().map_or(0, |value| value.len())),
         )?;
@@ -990,14 +1246,91 @@ impl Sheet<'_> {
     /// Remove the cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.edit.preflight_cell_capture_with_facet(
+        let capture = self.edit.preflight_cell_capture_with_facet(
             self.position,
             address,
             CaptureFacet::Remove,
             size_of::<Action>(),
         )?;
-        self.edit.discard_fill(self.position, address)?;
-        self.edit.discard_border(self.position, address)?;
+        let source_exists = if self.edit.capture_budgeted() {
+            match self.source_cell(address) {
+                Ok(source) => source.is_some(),
+                Err(error) => {
+                    self.edit.rollback_cell_capture(capture);
+                    return Err(error);
+                },
+            }
+        } else {
+            true
+        };
+        let pending_remove = self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.cells.get(&address))
+            .is_some_and(|action| matches!(action, Action::Remove));
+        if pending_remove || (!source_exists && !self.has_pending_cell_effect(address)) {
+            self.edit.rollback_cell_capture(capture);
+            return Ok(self);
+        }
+        if !source_exists {
+            let cleanup = (|| -> Result<()> {
+                self.edit.discard_fill(self.position, address)?;
+                self.edit.discard_border(self.position, address)?;
+                Ok(())
+            })();
+            if let Err(error) = cleanup {
+                self.edit.rollback_cell_capture(capture);
+                return Err(error);
+            }
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .cells
+                .remove(&address);
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .fonts
+                .remove(&address);
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .alignments
+                .remove(&address);
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .protections
+                .remove(&address);
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .quote_prefixes
+                .remove(&address);
+            self.edit
+                .sheets
+                .entry(self.position)
+                .or_default()
+                .number_formats
+                .remove(&address);
+            self.edit.rollback_cell_capture(capture);
+            self.edit.release_cell_capture_all(self.position, address);
+            return Ok(self);
+        }
+        if let Err(error) = self.edit.discard_fill(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
+        if let Err(error) = self.edit.discard_border(self.position, address) {
+            self.edit.rollback_cell_capture(capture);
+            return Err(error);
+        }
         self.edit
             .sheets
             .entry(self.position)
@@ -1054,11 +1387,23 @@ impl NewSheet<'_> {
         address: Address,
         facet: CaptureFacet,
         authored_bytes: usize,
-    ) -> Result<()> {
+    ) -> Result<AddedCaptureReservation> {
         if let Some(budget) = self.capture_budget.as_mut() {
-            budget.charge_new_sheet_cell(self.index, address, facet, authored_bytes)?;
+            return budget.charge_new_sheet_cell(self.index, address, facet, authored_bytes);
         }
-        Ok(())
+        Ok(AddedCaptureReservation::inactive())
+    }
+
+    fn rollback_capture(&mut self, reservation: AddedCaptureReservation) {
+        if let Some(budget) = self.capture_budget.as_mut() {
+            budget.rollback_added_cell(reservation);
+        }
+    }
+
+    fn release_capture(&mut self, address: Address) {
+        if let Some(budget) = self.capture_budget.as_mut() {
+            budget.release_added_cell(self.index, address);
+        }
     }
 
     /// Current checked zero-based projected position.
@@ -1167,12 +1512,21 @@ impl NewSheet<'_> {
     pub fn merge<'b>(&mut self, area: impl Into<Area<'b>>) -> Result<&mut Self> {
         let range = area.into().resolve()?;
         ensure_merge_area(self.added.name.as_str(), range)?;
-        self.preflight_capture(range.start(), CaptureFacet::Structural, 0)?;
-        self.added
+        let capture = self.preflight_capture(range.start(), CaptureFacet::Structural, 0)?;
+        if self
+            .added
             .actions
             .merges
-            .try_reserve(1)
-            .map_err(|source| allocation("new-sheet merged-range plan", source))?;
+            .last()
+            .is_some_and(|intent| *intent == MergeIntent::Add(range))
+        {
+            self.rollback_capture(capture);
+            return Ok(self);
+        }
+        if let Err(source) = self.added.actions.merges.try_reserve(1) {
+            self.rollback_capture(capture);
+            return Err(allocation("new-sheet merged-range plan", source));
+        }
         self.added.actions.merges.push(MergeIntent::Add(range));
         Ok(self)
     }
@@ -1183,12 +1537,22 @@ impl NewSheet<'_> {
         let Some(range) = pending_merge(&[], &self.added.actions.merges, address) else {
             return Ok(self);
         };
-        self.preflight_capture(range.start(), CaptureFacet::Structural, 0)?;
-        self.added
+        let capture = self.preflight_capture(range.start(), CaptureFacet::Structural, 0)?;
+        if self
+            .added
             .actions
             .merges
-            .try_reserve(1)
-            .map_err(|source| allocation("new-sheet merged-range plan", source))?;
+            .last()
+            .is_some_and(|intent| *intent == MergeIntent::Add(range))
+        {
+            self.added.actions.merges.pop();
+            self.rollback_capture(capture);
+            return Ok(self);
+        }
+        if let Err(source) = self.added.actions.merges.try_reserve(1) {
+            self.rollback_capture(capture);
+            return Err(allocation("new-sheet merged-range plan", source));
+        }
         self.added.actions.merges.push(MergeIntent::Remove(range));
         Ok(self)
     }
@@ -1262,12 +1626,27 @@ impl NewSheet<'_> {
     /// Remove an explicit local style reference from the pending cell.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.preflight_capture(address, CaptureFacet::Style, size_of::<StyleEffect>())?;
+        if !self.added.actions.cells.contains_key(&address) {
+            return Ok(self);
+        }
+        let capture =
+            self.preflight_capture(address, CaptureFacet::Style, size_of::<StyleEffect>())?;
         match self.added.actions.cells.entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::reset_style());
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_style(StyleEffect::Reset),
+        }
+        if matches!(
+            self.added.actions.cells.get(&address),
+            Some(Action::Update {
+                payload: None,
+                style: Some(StyleEffect::Reset),
+            })
+        ) {
+            self.added.actions.cells.remove(&address);
+            self.rollback_capture(capture);
+            self.release_capture(address);
         }
         Ok(self)
     }
@@ -1275,8 +1654,17 @@ impl NewSheet<'_> {
     /// Remove the pending cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
-        self.preflight_capture(address, CaptureFacet::Remove, size_of::<Action>())?;
-        self.added.actions.cells.insert(address, Action::Remove);
+        if !self.added.actions.cells.contains_key(&address) {
+            return Ok(self);
+        }
+        let capture = self.preflight_capture(address, CaptureFacet::Remove, size_of::<Action>())?;
+        if matches!(self.added.actions.cells.get(&address), Some(Action::Remove)) {
+            self.rollback_capture(capture);
+            return Ok(self);
+        }
+        self.added.actions.cells.remove(&address);
+        self.rollback_capture(capture);
+        self.release_capture(address);
         Ok(self)
     }
 }

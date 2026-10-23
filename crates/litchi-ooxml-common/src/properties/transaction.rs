@@ -69,6 +69,9 @@ pub enum LimitKind {
     /// Package relationship identifiers or part names available for a new
     /// family part.
     Names,
+    /// Retained bytes of the complete property patch, including its before
+    /// and after part payloads. This is checked before the patch is built.
+    RetainedBytes,
 }
 
 /// Why a metadata read, edit or patch failed.
@@ -444,11 +447,22 @@ impl Snapshot {
     /// Start a detached [`Plan`] of a change of this snapshot.
     #[must_use]
     pub fn plan(&self) -> Plan {
+        self.plan_with_retained_limit(None)
+    }
+
+    /// Start a detached plan with an optional retained-patch admission limit.
+    ///
+    /// The limit is retained by the plan, so [`Plan::finish`] performs its
+    /// exact pre-capture admission before it materializes any replacement
+    /// property payload.
+    #[must_use]
+    pub fn plan_with_retained_limit(&self, maximum: Option<usize>) -> Plan {
         Plan {
             base: self.clone(),
             metadata: None,
             app: None,
             custom: None,
+            max_retained_bytes: maximum,
         }
     }
 
@@ -644,10 +658,10 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
             let (relationship_id, part, relationship_type, relationship_target, before, after) =
                 match &state.present {
                     Some(present) => (
-                        present.relationship_id.clone(),
-                        present.part.clone(),
-                        present.relationship_type.clone(),
-                        present.relationship_target.clone(),
+                        retained_string(&present.relationship_id),
+                        exact_part(&present.part)?,
+                        retained_string(&present.relationship_type),
+                        retained_string(&present.relationship_target),
                         Some(Arc::clone(&present.bytes)),
                         Some(Arc::clone(&present.bytes)),
                     ),
@@ -655,14 +669,14 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
                         // Keep distinct diagnostic placeholders. Replay
                         // authenticates absence without requiring these IDs
                         // to remain free on the recipient.
-                        next_relationship_id(&relationship_ids)?,
-                        state.new_part.clone(),
-                        match family {
-                            Family::Core => rt::CORE_PROPERTIES.to_owned(),
-                            Family::App => rt::EXTENDED_PROPERTIES.to_owned(),
-                            Family::Custom => rt::CUSTOM_PROPERTIES.to_owned(),
-                        },
-                        state.new_part.as_str().trim_start_matches('/').to_owned(),
+                        retained_string(&next_relationship_id(&relationship_ids)?),
+                        exact_part(&state.new_part)?,
+                        retained_string(match family {
+                            Family::Core => rt::CORE_PROPERTIES,
+                            Family::App => rt::EXTENDED_PROPERTIES,
+                            Family::Custom => rt::CUSTOM_PROPERTIES,
+                        }),
+                        retained_string(state.new_part.as_str().trim_start_matches('/')),
                         None,
                         None,
                     ),
@@ -703,6 +717,7 @@ pub struct Plan {
     metadata: Option<Metadata>,
     app: Option<Option<app::Props>>,
     custom: Option<custom::Props>,
+    max_retained_bytes: Option<usize>,
 }
 
 impl Plan {
@@ -780,32 +795,24 @@ impl Plan {
         self
     }
 
-    /// Compute the exact patch of the staged values: the read view after
-    /// it, the patch and what changed. Nothing is published; the owner
-    /// checks and publishes the patch over its source.
+    /// Prepare the exact family targets and retained-byte charge.
     ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Unsupported`] for a changed field no OOXML family
-    /// stores; [`Error::Invalid`] for a core or custom part that holds
-    /// content its writer cannot carry, a value outside its lexical space,
-    /// or removing a part another relationship targets; and
-    /// [`Error::Limit`] for an exceeded bound.
-    pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
+    /// This is deliberately a single pass over the decoded source values.
+    /// The resulting prepared targets and lengths are consumed by
+    /// [`PreparedPlan::finish`], so admission does not decode, splice-plan or
+    /// otherwise rescan the same property families a second time.
+    fn prepare(self) -> Result<PreparedPlan> {
         let Self {
             base,
             metadata,
             app: staged_app,
             custom,
+            max_retained_bytes: _,
         } = self;
-        let mut after = base.clone();
-        let mut changes = Vec::new();
-        let mut changed_fields = Vec::new();
-
-        let (core_target, app_target) = match metadata {
+        let (core_metadata, app_target, changed_fields) = match metadata {
             Some(target) => {
                 let before = base.metadata()?;
-                changed_fields = before.changed_fields(&target).collect();
+                let changed_fields: Vec<_> = before.changed_fields(&target).collect();
                 if let Some(field) = changed_fields.iter().copied().find(|field| {
                     !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
                 }) {
@@ -826,13 +833,13 @@ impl Plan {
                 } else {
                     staged_app
                 };
-                (core_changed.then_some(target), app_target)
+                (core_changed.then_some(target), app_target, changed_fields)
             },
-            None => (None, staged_app),
+            None => (None, staged_app, Vec::new()),
         };
 
-        if let Some(target) = core_target {
-            let after_bytes = match &base.core.present {
+        let core = if let Some(target) = core_metadata {
+            let (current, dialect) = match &base.core.present {
                 Some(present) => {
                     let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
                         Error::Invalid(format!("invalid UTF-8 in core properties: {error}"))
@@ -844,81 +851,239 @@ impl Plan {
                                 .to_owned(),
                         ));
                     }
-                    let merged = Core::merged(Some(&current), &target)?;
-                    if merged == current {
-                        None
-                    } else {
-                        Some((super::write::encode(&merged, dialect)?.into_bytes(), merged))
-                    }
+                    (current, dialect)
                 },
-                None => {
-                    let merged = Core::merged(None, &target)?;
-                    Some((
-                        super::write::encode(&merged, Dialect::Transitional)?.into_bytes(),
-                        merged,
-                    ))
-                },
+                None => (Core::default(), Dialect::Transitional),
             };
-            if let Some((bytes, merged)) = after_bytes
-                && let Some(change) = stage_change(
-                    &mut after,
-                    Family::Core,
-                    false,
-                    Some(bytes),
-                    Dialect::Transitional.relationship_type(),
-                )?
-            {
+            let merged = Core::merged(base.core.present.as_ref().map(|_| &current), &target)?;
+            (merged != current).then(|| {
+                super::write::encoded_len(&merged, dialect).map(|after_len| PreparedCore {
+                    target: merged,
+                    dialect,
+                    after_len,
+                })
+            })
+        }
+        .transpose()?;
+
+        let app = if let Some(target) = app_target {
+            let current = base.app_props()?;
+            if target == current {
+                None
+            } else {
+                let after_len = match (&base.app.present, &target) {
+                    (Some(present), Some(props)) => app::splice_len(&present.bytes, props)?,
+                    (None, Some(props)) => Some(app::encode_new_len(props)?),
+                    (_, None) => None,
+                };
+                Some(PreparedApp { target, after_len })
+            }
+        } else {
+            None
+        };
+
+        let custom = custom
+            .filter(|target| !target.same_values(&base.custom_value))
+            .map(|target| {
+                target.validate_for(base.host)?;
+                if !base.custom_value.tolerance_report().is_clean() {
+                    return Err(Error::Invalid(
+                        "the custom properties were repaired when they were read; rewriting them would drop the properties that were skipped"
+                            .to_owned(),
+                    ));
+                }
+                let after_len = (!target.is_empty())
+                    .then(|| custom::encoded_len(&target))
+                    .transpose()?;
+                Ok(PreparedCustom { target, after_len })
+            })
+            .transpose()?;
+
+        let mut relationship_ids = base.relationship_ids.clone();
+        let mut retained_changes = 0usize;
+        let mut changed = false;
+        if let Some(core) = &core {
+            retained_changes = retained_changes.saturating_add(planned_change_bytes(
+                &base,
+                Family::Core,
+                Some(core.after_len),
+                &mut relationship_ids,
+            )?);
+            changed = true;
+        }
+        if let Some(app) = &app {
+            retained_changes = retained_changes.saturating_add(planned_change_bytes(
+                &base,
+                Family::App,
+                app.after_len,
+                &mut relationship_ids,
+            )?);
+            changed = true;
+        }
+        if let Some(custom) = &custom {
+            retained_changes = retained_changes.saturating_add(planned_change_bytes(
+                &base,
+                Family::Custom,
+                custom.after_len,
+                &mut relationship_ids,
+            )?);
+            changed = true;
+        }
+        let planned_retained_bytes = if changed {
+            size_of::<Patch>().saturating_add(retained_changes)
+        } else {
+            let scope = planned_scope_bytes(&base)?;
+            size_of::<Patch>().saturating_add(scope.saturating_mul(2))
+        };
+        Ok(PreparedPlan {
+            base,
+            core,
+            app,
+            custom,
+            changed_fields: changed_fields.into_boxed_slice(),
+            planned_retained_bytes,
+        })
+    }
+
+    /// Compute the exact patch of the staged values: the read view after
+    /// it, the patch and what changed. Nothing is published; the owner
+    /// checks and publishes the patch over its source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] for a changed field no OOXML family
+    /// stores; [`Error::Invalid`] for a core or custom part that holds
+    /// content its writer cannot carry, a value outside its lexical space,
+    /// or removing a part another relationship targets; and
+    /// [`Error::Limit`] for an exceeded bound.
+    pub fn finish(self) -> Result<(Snapshot, Patch, Diagnostics)> {
+        let maximum = self.max_retained_bytes;
+        let prepared = self.prepare()?;
+        if let Some(maximum) = maximum
+            && prepared.planned_retained_bytes > maximum
+        {
+            return Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed: prepared.planned_retained_bytes,
+                maximum,
+            });
+        }
+        let result = prepared.finish_prepared();
+        if let Ok((_, patch, _)) = &result
+            && let Some(maximum) = maximum
+            && patch.retained_bytes() > maximum
+        {
+            return Err(Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed: patch.retained_bytes(),
+                maximum,
+            });
+        }
+        result
+    }
+}
+
+fn retained_string(value: &str) -> String {
+    let mut retained = String::with_capacity(value.len());
+    retained.push_str(value);
+    retained.shrink_to_fit();
+    retained
+}
+
+fn exact_part(part: &PackURI) -> Result<PackURI> {
+    PackURI::new(retained_string(part.as_str())).map_err(Error::Invalid)
+}
+
+#[derive(Debug)]
+struct PreparedPlan {
+    base: Snapshot,
+    core: Option<PreparedCore>,
+    app: Option<PreparedApp>,
+    custom: Option<PreparedCustom>,
+    changed_fields: Box<[Field]>,
+    planned_retained_bytes: usize,
+}
+
+#[derive(Debug)]
+struct PreparedCore {
+    target: Core,
+    dialect: Dialect,
+    after_len: usize,
+}
+
+#[derive(Debug)]
+struct PreparedApp {
+    target: Option<app::Props>,
+    after_len: Option<usize>,
+}
+
+#[derive(Debug)]
+struct PreparedCustom {
+    target: custom::Props,
+    after_len: Option<usize>,
+}
+
+impl PreparedPlan {
+    fn finish_prepared(self) -> Result<(Snapshot, Patch, Diagnostics)> {
+        let Self {
+            base,
+            core,
+            app,
+            custom,
+            mut changed_fields,
+            ..
+        } = self;
+        let mut after = base.clone();
+        let mut changes = Vec::new();
+        if let Some(core) = core {
+            let merged = core.target;
+            let bytes = super::write::encode(&merged, core.dialect)?.into_bytes();
+            if let Some(change) = stage_change(
+                &mut after,
+                Family::Core,
+                false,
+                Some(bytes),
+                core.dialect.relationship_type(),
+            )? {
                 changes.push(change);
-                after.core_dialect = after.core_dialect.or(Some(Dialect::Transitional));
+                after.core_dialect = after.core_dialect.or(Some(core.dialect));
                 after.core_value = Some(merged);
                 after.core_report = ToleranceReport::default();
             }
         }
 
-        if let Some(target) = app_target {
-            let current = base.app_props()?;
-            if target != current {
-                let after_bytes = match (&base.app.present, &target) {
-                    (Some(present), Some(props)) => app::splice(&present.bytes, props)?,
-                    (None, Some(props)) => Some(app::encode_new(props)?),
-                    (_, None) => None,
-                };
-                if let Some(change) = stage_change(
-                    &mut after,
-                    Family::App,
-                    target.is_none(),
-                    after_bytes,
-                    rt::EXTENDED_PROPERTIES,
-                )? {
-                    changes.push(change);
-                }
+        if let Some(app) = app {
+            let after_bytes = match (&base.app.present, &app.target) {
+                (Some(present), Some(props)) => app::splice(&present.bytes, props)?,
+                (None, Some(props)) => Some(app::encode_new(props)?),
+                (_, None) => None,
+            };
+            if let Some(change) = stage_change(
+                &mut after,
+                Family::App,
+                app.target.is_none(),
+                after_bytes,
+                rt::EXTENDED_PROPERTIES,
+            )? {
+                changes.push(change);
             }
         }
 
-        if let Some(target) = custom
-            && !target.same_values(&base.custom_value)
-        {
-            target.validate_for(base.host)?;
-            if !base.custom_value.tolerance_report().is_clean() {
-                return Err(Error::Invalid(
-                    "the custom properties were repaired when they were read; rewriting them would drop the properties that were skipped"
-                        .to_owned(),
-                ));
-            }
-            let after_bytes = if target.is_empty() {
+        if let Some(custom) = custom {
+            let after_bytes = if custom.target.is_empty() {
                 None
             } else {
-                Some(target.encode()?)
+                Some(custom.target.encode()?)
             };
             if let Some(change) = stage_change(
                 &mut after,
                 Family::Custom,
-                target.is_empty(),
+                custom.target.is_empty(),
                 after_bytes,
                 rt::CUSTOM_PROPERTIES,
             )? {
                 changes.push(change);
-                after.custom_value = target;
+                after.custom_value = custom.target;
             }
         }
 
@@ -950,6 +1115,85 @@ impl Plan {
     }
 }
 
+fn planned_change_bytes(
+    snapshot: &Snapshot,
+    family: Family,
+    after_len: Option<usize>,
+    relationship_ids: &mut BTreeSet<String>,
+) -> Result<usize> {
+    let state = snapshot.family(family);
+    let (part_len, relationship_id_len, relationship_type_len, relationship_target_len, before_len) =
+        match &state.present {
+            Some(present) => (
+                present.part.as_str().len(),
+                retained_string(&present.relationship_id).capacity(),
+                retained_string(&present.relationship_type).capacity(),
+                retained_string(&present.relationship_target).capacity(),
+                present.bytes.capacity(),
+            ),
+            None => {
+                let relationship_id = retained_string(&next_relationship_id(relationship_ids)?);
+                relationship_ids.insert(relationship_id.clone());
+                let relationship_target =
+                    retained_string(state.new_part.as_str().trim_start_matches('/'));
+                let relationship_type = retained_string(match family {
+                    Family::Core => rt::CORE_PROPERTIES,
+                    Family::App => rt::EXTENDED_PROPERTIES,
+                    Family::Custom => rt::CUSTOM_PROPERTIES,
+                });
+                (
+                    state.new_part.as_str().len(),
+                    relationship_id.capacity(),
+                    relationship_type.capacity(),
+                    relationship_target.capacity(),
+                    0,
+                )
+            },
+        };
+    Ok(size_of::<Change>()
+        .saturating_add(part_len)
+        .saturating_add(relationship_id_len)
+        .saturating_add(relationship_type_len)
+        .saturating_add(relationship_target_len)
+        .saturating_add(before_len)
+        .saturating_add(after_len.unwrap_or(0)))
+}
+
+fn planned_scope_bytes(snapshot: &Snapshot) -> Result<usize> {
+    let mut relationship_ids = snapshot.relationship_ids.clone();
+    let mut total = 0usize;
+    for family in [Family::Core, Family::App, Family::Custom] {
+        let state = snapshot.family(family);
+        let bytes = match &state.present {
+            Some(present) => size_of::<Change>()
+                .saturating_add(present.part.as_str().len())
+                .saturating_add(retained_string(&present.relationship_id).capacity())
+                .saturating_add(retained_string(&present.relationship_type).capacity())
+                .saturating_add(retained_string(&present.relationship_target).capacity())
+                .saturating_add(present.bytes.capacity().saturating_mul(2)),
+            None => {
+                let relationship_id =
+                    retained_string(&next_relationship_id(&mut relationship_ids)?);
+                relationship_ids.insert(relationship_id.clone());
+                let relationship_type = retained_string(match family {
+                    Family::Core => rt::CORE_PROPERTIES,
+                    Family::App => rt::EXTENDED_PROPERTIES,
+                    Family::Custom => rt::CUSTOM_PROPERTIES,
+                });
+                let relationship_target =
+                    retained_string(state.new_part.as_str().trim_start_matches('/'));
+                size_of::<Change>()
+                    .saturating_add(state.new_part.as_str().len())
+                    .saturating_add(relationship_id.capacity())
+                    .saturating_add(relationship_type.capacity())
+                    .saturating_add(relationship_target.capacity())
+            },
+        };
+        total = total.saturating_add(bytes);
+    }
+    Ok(total)
+}
+
 /// A staged edit of an owning package's document properties.
 ///
 /// The edit shares the source package (an [`OpcPackage`] clone shares every
@@ -974,10 +1218,21 @@ impl Edit {
     ///
     /// The errors of [`Snapshot::read`].
     pub fn new(package: &OpcPackage, host: Host) -> Result<Self> {
+        Self::new_with_retained_limit(package, host, None)
+    }
+
+    /// Capture `package` and retain an optional exact patch ceiling in the
+    /// edit's plan. The normal [`Edit::commit`] path then performs admission
+    /// before it materializes any replacement property payload.
+    pub fn new_with_retained_limit(
+        package: &OpcPackage,
+        host: Host,
+        maximum: Option<usize>,
+    ) -> Result<Self> {
         let snapshot = Snapshot::read(package, host)?;
         Ok(Self {
             package: package.clone(),
-            plan: snapshot.plan(),
+            plan: snapshot.plan_with_retained_limit(maximum),
         })
     }
 
@@ -1049,7 +1304,8 @@ impl Edit {
 
     /// Discard every staged change, keeping the edit.
     pub fn reset(&mut self) {
-        self.plan = self.plan.base.plan();
+        let maximum = self.plan.max_retained_bytes;
+        self.plan = self.plan.base.plan_with_retained_limit(maximum);
     }
 
     /// Compute the exact patch of the staged values and publish it as a new
@@ -1094,14 +1350,14 @@ fn stage_change(
             }
             after.relationship_ids.remove(&present.relationship_id);
             let slot = after.family_mut(family);
-            slot.new_part = present.part.clone();
+            slot.new_part = exact_part(&present.part)?;
             slot.present = None;
             Change {
                 family,
-                part: present.part,
-                relationship_id: present.relationship_id,
-                relationship_type: present.relationship_type,
-                relationship_target: present.relationship_target,
+                part: exact_part(&present.part)?,
+                relationship_id: retained_string(&present.relationship_id),
+                relationship_type: retained_string(&present.relationship_type),
+                relationship_target: retained_string(&present.relationship_target),
                 before: Some(present.bytes),
                 after: None,
                 free_relationship_id: false,
@@ -1118,23 +1374,23 @@ fn stage_change(
             }
             Change {
                 family,
-                part: present.part,
-                relationship_id: present.relationship_id,
-                relationship_type: present.relationship_type,
-                relationship_target: present.relationship_target,
+                part: exact_part(&present.part)?,
+                relationship_id: retained_string(&present.relationship_id),
+                relationship_type: retained_string(&present.relationship_type),
+                relationship_target: retained_string(&present.relationship_target),
                 before: Some(present.bytes),
                 after: Some(bytes),
                 free_relationship_id: false,
             }
         },
         (None, false, Some(bytes)) => {
-            let relationship_id = next_relationship_id(&after.relationship_ids)?;
+            let relationship_id = retained_string(&next_relationship_id(&after.relationship_ids)?);
             after.relationship_ids.insert(relationship_id.clone());
-            let part = state.new_part;
+            let part = exact_part(&state.new_part)?;
             let bytes = Arc::new(bytes);
             let present = Present {
-                relationship_type: new_relationship_type.to_owned(),
-                relationship_target: part.as_str().trim_start_matches('/').to_owned(),
+                relationship_type: retained_string(new_relationship_type),
+                relationship_target: retained_string(part.as_str().trim_start_matches('/')),
                 bytes: Arc::clone(&bytes),
                 part: part.clone(),
                 relationship_id: relationship_id.clone(),

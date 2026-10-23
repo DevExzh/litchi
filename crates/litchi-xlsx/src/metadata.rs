@@ -37,6 +37,34 @@ use crate::Package;
 
 type Result<T> = std::result::Result<T, Error>;
 
+/// Bounds for one metadata edit's retained exact patch.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    max_retained_bytes: Option<usize>,
+}
+
+impl EditOptions {
+    /// Creates an unbounded metadata edit.
+    pub const fn new() -> Self {
+        Self {
+            max_retained_bytes: None,
+        }
+    }
+
+    /// Sets the exact retained-patch ceiling for this edit.
+    pub const fn max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = Some(maximum);
+        self
+    }
+
+    /// Returns the selected retained-patch ceiling.
+    #[must_use]
+    pub const fn max_retained_bytes_value(self) -> Option<usize> {
+        self.max_retained_bytes
+    }
+}
+
 /// A staged metadata edit of one [`Package`].
 ///
 /// Dropping the edit discards it.
@@ -187,9 +215,18 @@ impl Package {
     ///
     /// Returns the strict graph errors of the property families.
     pub fn edit_metadata(&self) -> Result<Edit> {
+        self.edit_metadata_with_options(EditOptions::default())
+    }
+
+    /// Start a metadata edit under an explicit retained-patch ceiling.
+    pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
         Ok(Edit {
             package: self.clone(),
-            inner: properties::Edit::new(self.opc(), Host::Excel)?,
+            inner: properties::Edit::new_with_retained_limit(
+                self.opc(),
+                Host::Excel,
+                options.max_retained_bytes_value(),
+            )?,
         })
     }
 

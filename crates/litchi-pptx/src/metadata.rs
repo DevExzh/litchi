@@ -44,37 +44,30 @@ use crate::Package;
 type Result<T> = std::result::Result<T, Error>;
 
 /// Bounds for one metadata edit's retained exact patch.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[must_use]
 pub struct EditOptions {
-    max_patch_bytes: usize,
+    max_retained_bytes: Option<usize>,
 }
 
 impl EditOptions {
-    /// The native default retained-patch ceiling.
+    /// Creates an unbounded metadata edit.
     pub const fn new() -> Self {
         Self {
-            max_patch_bytes: crate::opened::Limits::DEFAULT.max_patch_bytes(),
+            max_retained_bytes: None,
         }
     }
 
-    /// Set the exact retained-patch ceiling for this edit.
-    #[must_use]
-    pub const fn max_patch_bytes(mut self, maximum: usize) -> Self {
-        self.max_patch_bytes = maximum;
+    /// Sets the exact retained-patch ceiling for this edit.
+    pub const fn max_retained_bytes(mut self, maximum: usize) -> Self {
+        self.max_retained_bytes = Some(maximum);
         self
     }
 
-    /// The selected retained-patch ceiling.
+    /// Returns the selected retained-patch ceiling.
     #[must_use]
-    pub const fn max_patch_bytes_value(self) -> usize {
-        self.max_patch_bytes
-    }
-}
-
-impl Default for EditOptions {
-    fn default() -> Self {
-        Self::new()
+    pub const fn max_retained_bytes_value(self) -> Option<usize> {
+        self.max_retained_bytes
     }
 }
 
@@ -141,28 +134,13 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        self.commit_with_options(EditOptions::default())
-    }
-
-    /// Compute and publish the patch under an exact retained-byte ceiling.
-    pub fn commit_with_options(self, options: EditOptions) -> Result<Commit> {
-        let committed = self.inner.commit()?;
-        let retained = committed.patch().retained_bytes();
-        if retained > options.max_patch_bytes_value() {
-            return Err(Error::Limit {
-                kind: LimitKind::XmlBytes,
-                observed: retained,
-                maximum: options.max_patch_bytes_value(),
-            });
-        }
-        let patch = committed.patch().clone();
-        let diagnostics = committed.diagnostics().clone();
+        let commit = self.inner.commit()?;
+        let diagnostics = commit.diagnostics().clone();
+        let (opc, patch) = commit.into_parts();
         // An exact no-op publishes the source graph itself.
         let package = if patch.is_noop() {
-            patch.check(self.package.opc.as_ref())?;
             self.package.duplicate()
         } else {
-            let (opc, _) = committed.into_parts();
             self.package.with_metadata_opc(opc)
         };
         Ok(Commit::new(package, patch, diagnostics))
@@ -202,9 +180,18 @@ impl Package {
     /// Returns the strict graph errors of the property families, and refuses
     /// a package with pending authoring state.
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
+        self.edit_metadata_with_options(EditOptions::default())
+    }
+
+    /// Start a metadata edit under an explicit retained-patch ceiling.
+    pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit<'_>> {
         Ok(Edit {
             package: self,
-            inner: properties::Edit::new(&self.opc, Host::PowerPoint)?,
+            inner: properties::Edit::new_with_retained_limit(
+                &self.opc,
+                Host::PowerPoint,
+                options.max_retained_bytes_value(),
+            )?,
         })
     }
 
@@ -314,13 +301,15 @@ mod tests {
     #[test]
     fn retained_patch_limit_is_checked_before_metadata_publication() {
         let package = Package::new().unwrap();
-        let mut edit = package.edit_metadata().unwrap();
+        let mut edit = package
+            .edit_metadata_with_options(EditOptions::default().max_retained_bytes(1))
+            .unwrap();
         edit.update(|metadata| metadata.title = Some("bounded metadata".to_owned()))
             .unwrap();
         assert!(matches!(
-            edit.commit_with_options(EditOptions::default().max_patch_bytes(1)),
+            edit.commit(),
             Err(Error::Limit {
-                kind: LimitKind::XmlBytes,
+                kind: LimitKind::RetainedBytes,
                 observed,
                 maximum: 1,
             }) if observed > 1
