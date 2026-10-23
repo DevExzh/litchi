@@ -2552,6 +2552,68 @@ impl Patch {
             PatchData::Topology(data) => data.is_noop(),
         }
     }
+
+    fn encoded_len(&self) -> Result<usize> {
+        if let PatchData::Local { source, .. } = &self.data {
+            source.check()?;
+        }
+        if let PatchData::Topology(data) = &self.data {
+            data.check()?;
+        }
+        if let Some(length) = self.encoded_len_cache.get() {
+            return Ok(*length);
+        }
+        let length = match &self.data {
+            PatchData::Local {
+                source,
+                before_root,
+                before_order,
+                after_root,
+                after_order,
+                changes,
+            } => {
+                let mut lengths = Vec::new();
+                lengths
+                    .try_reserve_exact(changes.len())
+                    .map_err(allocation)?;
+                for change in changes.iter() {
+                    let key = source_key_for_position(source, change.before.position)?;
+                    lengths.push((
+                        key,
+                        change.before.xml.as_bytes().len(),
+                        change.after.xml.as_bytes().len(),
+                    ));
+                }
+                durable::local_wire_len(
+                    self.shape_removals,
+                    before_order,
+                    after_order,
+                    before_root.as_bytes().len(),
+                    after_root.as_bytes().len(),
+                    &lengths,
+                )?
+            },
+            PatchData::Durable(data) => data
+                .encoded_len()?
+                .checked_add(if self.shape_removals {
+                    durable::REMOVAL_MARKER_BYTES
+                } else {
+                    0
+                })
+                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+            PatchData::Topology(data) => data
+                .encoded_len()?
+                .checked_add(if self.shape_removals {
+                    durable::REMOVAL_MARKER_BYTES
+                } else {
+                    0
+                })
+                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+        };
+        let _ = self.encoded_len_cache.set(length);
+        Ok(length)
+    }
+
     /// Reverse the root/order and selected slides’ exact before/after states.
     pub fn inverse(&self) -> Self {
         let data = match &self.data {
