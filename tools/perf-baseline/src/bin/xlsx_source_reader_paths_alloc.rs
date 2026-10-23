@@ -6,8 +6,6 @@
 //! JSON is paired by the coordinator against the pre-W4 owner and the W4
 //! owner. This is allocator evidence, not a latency or RSS measurement.
 
-#![allow(unexpected_cfgs)]
-
 #[path = "support/counting_allocator.rs"]
 mod allocator;
 
@@ -31,15 +29,6 @@ const MAIN_PART: &str = "/xl/workbook.xml";
 const SHEET_PART: &str = "/xl/worksheets/sheet1.xml";
 const STYLES_PART: &str = "/xl/styles.xml";
 
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-const API_VARIANT: &str = "pre-w4-source-reader";
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 const API_VARIANT: &str = "w4-source-reader-lazy-cache";
 
 #[derive(Debug, Clone, Copy)]

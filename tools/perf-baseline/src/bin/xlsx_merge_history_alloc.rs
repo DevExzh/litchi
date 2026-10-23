@@ -1,13 +1,11 @@
 //! Paired allocator evidence for retained source-backed merge history.
 //!
 //! The measured interval keeps every committed patch alive while it performs
-//! the same forward and inverse replay sequence for each patch.  The binary
-//! has one canonical source file so the pre-W4 checkout can be built from it
-//! with the `legacy-xlsx-source-history` feature; only the owner API adapter is
-//! selected by that feature.  This keeps the history length, fixture, replay
-//! oracles and allocator counters identical across the two revisions.
-
-#![allow(unexpected_cfgs)]
+//! the same forward and inverse replay sequence for each patch.  The current
+//! binary measures the W4 deferred source-backed owner.  The pre-W4 comparison
+//! is kept as an exact external overlay on the pinned e63 checkout; it is not
+//! a feature branch in this current workspace.  Both workflows retain the
+//! same fixture, replay oracles and allocator counters.
 
 #[path = "support/counting_allocator.rs"]
 mod allocator;
@@ -96,15 +94,6 @@ struct AllocationDelta {
     peak_live_bytes_after: u64,
 }
 
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-const API_VARIANT: &str = "pre-w4-workbook-source-merge";
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 const API_VARIANT: &str = "w4-deferred-source-workbook";
 
 fn main() -> AnyResult<()> {
@@ -197,21 +186,8 @@ struct StepChecks {
     patch: Patch,
 }
 
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 type Patch = litchi_xlsx::merge::source::Patch;
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-type Patch = litchi_xlsx::workbook::SourceBackedMergePatch;
 
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn run_history(
     iterations: usize,
     warmups: usize,
@@ -243,10 +219,6 @@ fn run_history(
     Ok(patches)
 }
 
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn run_merge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner
         .edit_merges("Sheet1")?
@@ -257,10 +229,6 @@ fn run_merge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepCh
     Ok(StepChecks { patch })
 }
 
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn run_unmerge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner
         .edit_merges("Sheet1")?
@@ -271,76 +239,6 @@ fn run_unmerge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<Step
     Ok(StepChecks { patch })
 }
 
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn run_history(
-    iterations: usize,
-    warmups: usize,
-    merge_fixture: &[u8],
-    unmerge_fixture: &[u8],
-) -> AnyResult<Vec<Patch>> {
-    use litchi_xlsx::workbook::SourceBackedMergeEditor;
-
-    let merge_owner =
-        SourceBackedMergeEditor::from_read_at(Arc::new(OwnedSource::new(merge_fixture.to_vec())))?;
-    let unmerge_owner = SourceBackedMergeEditor::from_read_at(Arc::new(OwnedSource::new(
-        unmerge_fixture.to_vec(),
-    )))?;
-    for step in 0..warmups {
-        if step % 2 == 0 {
-            run_merge_step(&merge_owner)?;
-        } else {
-            run_unmerge_step(&unmerge_owner)?;
-        }
-    }
-    let mut patches = Vec::with_capacity(iterations);
-    for step in 0..iterations {
-        let checks = if step % 2 == 0 {
-            run_merge_step(&merge_owner)?
-        } else {
-            run_unmerge_step(&unmerge_owner)?
-        };
-        patches.push(checks.patch);
-    }
-    Ok(patches)
-}
-
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn run_merge_step(owner: &litchi_xlsx::workbook::SourceBackedMergeEditor) -> AnyResult<StepChecks> {
-    let mut edit = owner
-        .edit("Sheet1")?
-        .ok_or("merge fixture worksheet disappeared")?;
-    edit.merge("A1:B2")?;
-    let commit = edit.commit()?;
-    let patch = commit.patch().clone();
-    Ok(StepChecks { patch })
-}
-
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn run_unmerge_step(
-    owner: &litchi_xlsx::workbook::SourceBackedMergeEditor,
-) -> AnyResult<StepChecks> {
-    let mut edit = owner
-        .edit("Sheet1")?
-        .ok_or("unmerge fixture worksheet disappeared")?;
-    edit.unmerge("B2")?;
-    let commit = edit.commit()?;
-    let patch = commit.patch().clone();
-    Ok(StepChecks { patch })
-}
-
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn verify_history(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -381,53 +279,6 @@ fn verify_history(
     Ok((replay_checks, inverse_checks))
 }
 
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn verify_history(
-    patches: &[Patch],
-    merge_fixture: &[u8],
-    unmerge_fixture: &[u8],
-) -> AnyResult<(usize, usize)> {
-    let mut replay_checks = 0usize;
-    let mut inverse_checks = 0usize;
-    for (step, patch) in patches.iter().enumerate() {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-        let mut replay_package =
-            OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
-        patch.apply(&mut replay_package)?;
-        let replayed = PackageWriter::to_bytes(&replay_package)?;
-        if replayed == fixture {
-            return Err(format!("step {step} exact forward replay was a no-op").into());
-        }
-        replay_checks = replay_checks
-            .checked_add(1)
-            .ok_or("replay check counter overflow")?;
-        let mut inverse_package =
-            OpcPackage::from_bytes(&replayed, litchi_opc::SourceLimits::default())?;
-        patch
-            .inverse()
-            .apply_materialized(&mut inverse_package, 64 * 1024)?;
-        let restored = PackageWriter::to_bytes(&inverse_package)?;
-        if restored != fixture {
-            return Err(format!("step {step} exact inverse replay changed bytes").into());
-        }
-        inverse_checks = inverse_checks
-            .checked_add(1)
-            .ok_or("inverse check counter overflow")?;
-    }
-    Ok((replay_checks, inverse_checks))
-}
-
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn run_common_replay(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -691,274 +542,6 @@ fn run_common_replay(
     ))
 }
 
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn run_common_replay(
-    patches: &[Patch],
-    merge_fixture: &[u8],
-    unmerge_fixture: &[u8],
-) -> AnyResult<(
-    usize,
-    usize,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-    AllocationDelta,
-)> {
-    let merge_recipient =
-        OpcPackage::from_bytes(merge_fixture, litchi_opc::SourceLimits::default())?;
-    let unmerge_recipient =
-        OpcPackage::from_bytes(unmerge_fixture, litchi_opc::SourceLimits::default())?;
-    let mut merge_forward_package = merge_recipient.clone();
-    patches[0].apply(&mut merge_forward_package)?;
-    let merge_forward = PackageWriter::to_bytes(&merge_forward_package)?;
-    let merge_forward_recipient = merge_forward_package.clone();
-    let unmerge_forward = if let Some(patch) = patches.get(1) {
-        let mut package = unmerge_recipient.clone();
-        patch.apply(&mut package)?;
-        let output = PackageWriter::to_bytes(&package)?;
-        Some((output, package))
-    } else {
-        None
-    };
-
-    let mut merge_inverse_recipient = merge_forward_package.clone();
-    patches[0]
-        .inverse()
-        .apply_materialized(&mut merge_inverse_recipient, 64 * 1024)?;
-    let unmerge_inverse_recipient = if let Some((_, recipient)) = unmerge_forward.as_ref() {
-        let mut package = recipient.clone();
-        patches[1]
-            .inverse()
-            .apply_materialized(&mut package, 64 * 1024)?;
-        Some(package)
-    } else {
-        None
-    };
-
-    let apply_before = allocation_metrics::snapshot();
-    for (step, patch) in patches.iter().enumerate() {
-        let mut recipient = if step % 2 == 0 {
-            merge_recipient.clone()
-        } else {
-            unmerge_recipient.clone()
-        };
-        patch.apply(&mut recipient)?;
-    }
-    let apply_forward_after = allocation_metrics::snapshot();
-    for (step, patch) in patches.iter().enumerate() {
-        let mut recipient = if step % 2 == 0 {
-            merge_forward_recipient.clone()
-        } else {
-            unmerge_forward
-                .as_ref()
-                .ok_or("missing unmerge forward package")?
-                .1
-                .clone()
-        };
-        patch
-            .inverse()
-            .apply_materialized(&mut recipient, 64 * 1024)?;
-    }
-    let apply_after = allocation_metrics::snapshot();
-    let apply_allocator = allocation_delta(
-        apply_before,
-        apply_after,
-        "common_replay_apply_without_publication",
-    )?;
-    let apply_forward_allocator = allocation_delta(
-        apply_before,
-        apply_forward_after,
-        "common_replay_apply_forward_without_publication",
-    )?;
-    let apply_inverse_allocator = allocation_delta(
-        apply_forward_after,
-        apply_after,
-        "common_replay_apply_inverse_without_publication",
-    )?;
-
-    let publication_before = allocation_metrics::snapshot();
-    let mut publication_replay_checks = 0usize;
-    let mut publication_inverse_checks = 0usize;
-    let publication_forward_before = allocation_metrics::snapshot();
-    for (step, _) in patches.iter().enumerate() {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-        let expected_forward = if step % 2 == 0 {
-            &merge_forward
-        } else {
-            &unmerge_forward
-                .as_ref()
-                .ok_or("missing unmerge forward package")?
-                .0
-        };
-        let forward = if step % 2 == 0 {
-            PackageWriter::to_bytes(&merge_forward_package)?
-        } else {
-            let package = unmerge_forward
-                .as_ref()
-                .ok_or("missing unmerge forward package")?
-                .1
-                .clone();
-            PackageWriter::to_bytes(&package)?
-        };
-        if forward.as_slice() != expected_forward.as_slice() || forward == fixture {
-            return Err(format!(
-                "step {step} common publication forward changed bytes unexpectedly"
-            )
-            .into());
-        }
-        publication_replay_checks = publication_replay_checks
-            .checked_add(1)
-            .ok_or("common publication replay check counter overflow")?;
-    }
-    let publication_forward_after = allocation_metrics::snapshot();
-    let publication_inverse_before = allocation_metrics::snapshot();
-    for (step, _) in patches.iter().enumerate() {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-
-        let restored = if step % 2 == 0 {
-            PackageWriter::to_bytes(&merge_inverse_recipient)?
-        } else {
-            PackageWriter::to_bytes(
-                unmerge_inverse_recipient
-                    .as_ref()
-                    .ok_or("missing unmerge inverse package")?,
-            )?
-        };
-        if restored != fixture {
-            return Err(format!(
-                "step {step} common publication inverse changed bytes unexpectedly"
-            )
-            .into());
-        }
-        publication_inverse_checks = publication_inverse_checks
-            .checked_add(1)
-            .ok_or("common publication inverse check counter overflow")?;
-    }
-    let publication_inverse_after = allocation_metrics::snapshot();
-    let publication_after = allocation_metrics::snapshot();
-    if publication_replay_checks != patches.len() || publication_inverse_checks != patches.len() {
-        return Err("common publication checks did not cover every patch".into());
-    }
-    let publication_allocator = allocation_delta(
-        publication_before,
-        publication_after,
-        "common_replay_publication_without_apply",
-    )?;
-    let publication_forward_allocator = allocation_delta(
-        publication_forward_before,
-        publication_forward_after,
-        "common_replay_publication_forward",
-    )?;
-    let publication_inverse_allocator = allocation_delta(
-        publication_inverse_before,
-        publication_inverse_after,
-        "common_replay_publication_inverse",
-    )?;
-
-    let before = allocation_metrics::snapshot();
-    let mut replay_checks = 0usize;
-    let mut inverse_checks = 0usize;
-    let forward_before = allocation_metrics::snapshot();
-    for (step, patch) in patches.iter().enumerate() {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-        let expected_forward = if step % 2 == 0 {
-            &merge_forward
-        } else {
-            &unmerge_forward
-                .as_ref()
-                .ok_or("missing unmerge forward package")?
-                .0
-        };
-        let mut recipient = if step % 2 == 0 {
-            merge_recipient.clone()
-        } else {
-            unmerge_recipient.clone()
-        };
-        patch.apply(&mut recipient)?;
-        let forward = PackageWriter::to_bytes(&recipient)?;
-        if forward.as_slice() != expected_forward.as_slice() || forward == fixture {
-            return Err(
-                format!("step {step} common forward replay changed bytes unexpectedly").into(),
-            );
-        }
-        replay_checks = replay_checks
-            .checked_add(1)
-            .ok_or("common replay check counter overflow")?;
-    }
-    let forward_after = allocation_metrics::snapshot();
-    let inverse_before = allocation_metrics::snapshot();
-    for (step, patch) in patches.iter().enumerate() {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-
-        let mut inverse_recipient = if step % 2 == 0 {
-            merge_forward_recipient.clone()
-        } else {
-            unmerge_forward
-                .as_ref()
-                .ok_or("missing unmerge forward package")?
-                .1
-                .clone()
-        };
-        patch
-            .inverse()
-            .apply_materialized(&mut inverse_recipient, 64 * 1024)?;
-        let restored = PackageWriter::to_bytes(&inverse_recipient)?;
-        if restored != fixture {
-            return Err(format!("step {step} common inverse replay changed bytes").into());
-        }
-        inverse_checks = inverse_checks
-            .checked_add(1)
-            .ok_or("common inverse check counter overflow")?;
-    }
-    let inverse_after = allocation_metrics::snapshot();
-    let after = allocation_metrics::snapshot();
-    let common_forward_allocator =
-        allocation_delta(forward_before, forward_after, "common_replay_forward")?;
-    let common_inverse_allocator =
-        allocation_delta(inverse_before, inverse_after, "common_replay_inverse")?;
-    Ok((
-        replay_checks,
-        inverse_checks,
-        allocation_delta(before, after, "common_replay_without_owner_admission")?,
-        apply_allocator,
-        apply_forward_allocator,
-        apply_inverse_allocator,
-        publication_allocator,
-        common_forward_allocator,
-        common_inverse_allocator,
-        publication_forward_allocator,
-        publication_inverse_allocator,
-    ))
-}
-
-#[cfg(not(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-)))]
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,
@@ -990,47 +573,6 @@ fn run_source_owner_admission(
     }
     let after = allocation_metrics::snapshot();
     allocation_delta(before, after, "source_owner_admission_with_selected_edit")
-}
-
-#[cfg(all(
-    feature = "legacy-xlsx-source-history",
-    not(feature = "current-xlsx-source-history")
-))]
-fn run_source_owner_admission(
-    iterations: usize,
-    warmups: usize,
-    merge_fixture: &[u8],
-    unmerge_fixture: &[u8],
-) -> AnyResult<AllocationDelta> {
-    use litchi_xlsx::workbook::SourceBackedMergeEditor;
-
-    for step in 0..warmups {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-        let editor =
-            SourceBackedMergeEditor::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
-        let _snapshot = editor.snapshot("Sheet1")?;
-    }
-    let before = allocation_metrics::snapshot();
-    for step in 0..iterations {
-        let fixture = if step % 2 == 0 {
-            merge_fixture
-        } else {
-            unmerge_fixture
-        };
-        let editor =
-            SourceBackedMergeEditor::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
-        let _snapshot = editor.snapshot("Sheet1")?;
-    }
-    let after = allocation_metrics::snapshot();
-    allocation_delta(
-        before,
-        after,
-        "source_owner_admission_with_selected_snapshot",
-    )
 }
 
 fn fixtures() -> AnyResult<(Vec<u8>, Vec<u8>)> {

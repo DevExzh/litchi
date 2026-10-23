@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [features]
-default = ["current-api", "current-xlsx-source-history"]
+default = ["current-api"]
 current-api = ["current-owner-api", "current-property-api"]
 # The paired W5 driver can compare the owner and property-set migrations
 # independently.  `current-api` keeps the normal candidate invocation terse;
@@ -22,11 +22,9 @@ ordinary-save-process-metrics = []
 w5-counting-allocator = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]
-# The current XLSX adapter wins under --all-features. Historical baselines
-# select only legacy-xlsx-source-history with --no-default-features; see
-# unified-xlsx-source-history/README.md for the pinned build workflow.
-current-xlsx-source-history = []
-legacy-xlsx-source-history = []
+# Historical XLSX source-history measurements are built from the exact e63
+# checkout and its recorded overlay; the current manifest intentionally has no
+# legacy compatibility feature. See unified-xlsx-source-history/README.md.
 # The paired OLE probe is built against either migration boundary when these
 # flags are enabled on the recorded baseline checkout with
 # `--no-default-features`.  `--all-features` gives current API branches
