@@ -34,7 +34,9 @@ use litchi_iwa_protos::{
 use litchi_numbers_wire::BncCell;
 
 use super::{
-    table_cell_pop_up_menu::{Path as BudgetPath, TransactionBudget},
+    table_cell_pop_up_menu::{
+        Error as BudgetError, LimitKind as BudgetLimitKind, Path as BudgetPath, TransactionBudget,
+    },
     table_cell_pop_up_menu_native as popup_native,
 };
 
@@ -204,14 +206,19 @@ pub(super) struct NativeReplyOutput {
     pub(super) reports: NativeReplyReports,
 }
 
-/// Native graph failure.  The public facade maps this to its redacted error
-/// vocabulary and never exposes payload bytes through this enum.
+/// Native graph failure. The public facade maps this to its redacted error
+/// vocabulary. Limit payloads remain attached until that boundary so a
+/// refusal retains its exact resource and observed/maximum values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NativeReplyError {
     InvalidSource,
     UnsupportedDependency,
     Allocation,
-    Limit,
+    Limit {
+        kind: BudgetLimitKind,
+        observed: u64,
+        maximum: u64,
+    },
     Codec,
     Archive,
 }
@@ -222,7 +229,7 @@ impl fmt::Display for NativeReplyError {
             Self::InvalidSource => "invalid comment-reply native source",
             Self::UnsupportedDependency => "unsupported comment-reply native dependency",
             Self::Allocation => "comment-reply native allocation failed",
-            Self::Limit => "comment-reply native limit exceeded",
+            Self::Limit { .. } => "comment-reply native limit exceeded",
             Self::Codec => "comment-reply codec rejected the source",
             Self::Archive => "comment-reply archive rewrite failed",
         })
@@ -233,9 +240,162 @@ impl std::error::Error for NativeReplyError {}
 
 type Result<T> = std::result::Result<T, NativeReplyError>;
 
+fn map_budget_error(error: BudgetError) -> NativeReplyError {
+    match error {
+        BudgetError::Limit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => NativeReplyError::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        BudgetError::Allocation { .. } => NativeReplyError::Allocation,
+        _ => NativeReplyError::InvalidSource,
+    }
+}
+
+fn as_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+fn native_limit(kind: BudgetLimitKind, observed: usize, maximum: usize) -> NativeReplyError {
+    NativeReplyError::Limit {
+        kind,
+        observed: as_u64(observed),
+        maximum: as_u64(maximum),
+    }
+}
+
+fn native_limit_u32(kind: BudgetLimitKind, observed: u32, maximum: u32) -> NativeReplyError {
+    NativeReplyError::Limit {
+        kind,
+        observed: u64::from(observed),
+        maximum: u64::from(maximum),
+    }
+}
+
+fn map_storage_codec_error(error: storage_codec::DecodeError) -> NativeReplyError {
+    match error.resource_limit() {
+        Some(storage_codec::DecodeLimit::Bytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::References { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadReferences, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Text { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireTextBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Fields { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireFields, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Work { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireWork, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            native_limit_u32(BudgetLimitKind::WireNesting, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Retained { observed, maximum }) => {
+            native_limit(BudgetLimitKind::RetainedBytes, observed, maximum)
+        },
+        Some(storage_codec::DecodeLimit::Allocation { .. }) => NativeReplyError::Allocation,
+        Some(_) => NativeReplyError::Codec,
+        None => NativeReplyError::Codec,
+    }
+}
+
+fn map_comment_codec_error(error: comment_storage_codec::DecodeError) -> NativeReplyError {
+    match error.resource_limit() {
+        Some(comment_storage_codec::DecodeLimit::Bytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireBytes, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::References { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadReferences, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Replies { observed, maximum }) => {
+            native_limit(BudgetLimitKind::PayloadItems, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireReferenceBytes, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Text { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireTextBytes, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Fields { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireFields, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Work { observed, maximum }) => {
+            native_limit(BudgetLimitKind::WireWork, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Nesting { observed, maximum }) => {
+            native_limit_u32(BudgetLimitKind::WireNesting, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Allocations { observed, maximum }) => {
+            native_limit(BudgetLimitKind::Allocations, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Scratch { observed, maximum }) => {
+            native_limit(BudgetLimitKind::ScratchBytes, observed, maximum)
+        },
+        Some(comment_storage_codec::DecodeLimit::Retained { observed, maximum }) => {
+            native_limit(BudgetLimitKind::RetainedBytes, observed, maximum)
+        },
+        Some(_) => NativeReplyError::Codec,
+        None => NativeReplyError::Codec,
+    }
+}
+
+fn map_bnc_cell_error(error: litchi_numbers_wire::Error) -> NativeReplyError {
+    match error {
+        litchi_numbers_wire::Error::OutputLimitExceeded { observed, maximum } => {
+            native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum)
+        },
+        litchi_numbers_wire::Error::Allocation { .. } => NativeReplyError::Allocation,
+        litchi_numbers_wire::Error::InvalidFormat(_)
+        | litchi_numbers_wire::Error::ParseError(_) => NativeReplyError::Codec,
+    }
+}
+
+const fn map_reply_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> BudgetLimitKind {
+    match kind {
+        litchi_iwa_core::LimitKind::Objects => BudgetLimitKind::PayloadObjects,
+        litchi_iwa_core::LimitKind::Messages | litchi_iwa_core::LimitKind::MessagesPerObject => {
+            BudgetLimitKind::PayloadMessages
+        },
+        litchi_iwa_core::LimitKind::HeaderFields | litchi_iwa_core::LimitKind::MetadataItems => {
+            BudgetLimitKind::WireFields
+        },
+        litchi_iwa_core::LimitKind::HeaderNesting => BudgetLimitKind::WireNesting,
+        litchi_iwa_core::LimitKind::SnappyFrames => BudgetLimitKind::PayloadItems,
+        litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+            BudgetLimitKind::CompressedBytes
+        },
+        litchi_iwa_core::LimitKind::ArchiveBytes
+        | litchi_iwa_core::LimitKind::ObjectBytes
+        | litchi_iwa_core::LimitKind::MessageBytes
+        | litchi_iwa_core::LimitKind::HeaderBytes
+        | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+        | litchi_iwa_core::LimitKind::SnappyChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyStreamBytes => BudgetLimitKind::PayloadBytes,
+    }
+}
+
 fn map_constructor_error(error: litchi_iwa_core::Error) -> NativeReplyError {
     match error {
-        litchi_iwa_core::Error::Limit { .. } => NativeReplyError::Limit,
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => NativeReplyError::Limit {
+            kind: map_reply_core_limit_kind(kind),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
         litchi_iwa_core::Error::Allocation { .. } => NativeReplyError::Allocation,
         _ => NativeReplyError::InvalidSource,
     }
@@ -248,7 +408,24 @@ fn map_popup_native_error(error: popup_native::NativePopUpError) -> NativeReplyE
             NativeReplyError::UnsupportedDependency
         },
         popup_native::NativePopUpError::Allocation => NativeReplyError::Allocation,
-        popup_native::NativePopUpError::Limit => NativeReplyError::Limit,
+        popup_native::NativePopUpError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => NativeReplyError::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        popup_native::NativePopUpError::CoreLimit {
+            kind,
+            observed,
+            maximum,
+        } => NativeReplyError::Limit {
+            kind: map_reply_core_limit_kind(kind),
+            observed,
+            maximum,
+        },
         popup_native::NativePopUpError::Codec => NativeReplyError::Codec,
         popup_native::NativePopUpError::Archive => NativeReplyError::Archive,
     }
@@ -355,7 +532,7 @@ impl IdIndex {
             .charge_allocations(1, path)
             .and_then(|_| budget.charge_scratch_bytes(scratch, path))
             .and_then(|_| budget.charge_transaction_work(capacity, path))
-            .map_err(|_| NativeReplyError::Limit)?;
+            .map_err(map_budget_error)?;
         Self::try_with_capacity(capacity)
     }
 
@@ -393,7 +570,7 @@ fn reserved_id_set(
         .charge_allocations(1, path)
         .and_then(|_| budget.charge_scratch_bytes(scratch, path))
         .and_then(|_| budget.charge_transaction_work(capacity, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut identifiers = HashSet::new();
     identifiers
         .try_reserve(capacity)
@@ -649,7 +826,7 @@ fn charge_comment_report(
         .and_then(|_| budget.charge_payload_references(report.references(), path))
         .and_then(|_| budget.charge_wire_reference_bytes(report.reference_bytes(), path))
         .and_then(|_| budget.charge_wire_text_bytes(report.text_bytes(), path))
-        .map_err(|_| NativeReplyError::Limit)
+        .map_err(map_budget_error)
 }
 
 fn charge_storage_removal_report(
@@ -664,7 +841,7 @@ fn charge_storage_removal_report(
         .and_then(|_| budget.charge_storage_decode_report(report.verification(), true, path))
         .and_then(|_| budget.charge_output(report.output_bytes(), path))
         .and_then(|_| budget.charge_transaction_work(report.rewrite_work_bytes(), path))
-        .map_err(|_| NativeReplyError::Limit)
+        .map_err(map_budget_error)
 }
 
 fn decode_list(
@@ -679,10 +856,10 @@ fn decode_list(
         storage_options(budget, source),
         &mut probe,
     )
-    .map_err(|_| NativeReplyError::Codec)?;
+    .map_err(map_storage_codec_error)?;
     budget
         .charge_storage_decode_report(report, true, path)
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     if probe.invalid {
         return Err(NativeReplyError::InvalidSource);
     }
@@ -737,7 +914,7 @@ fn collect_comment_lists(
         .charge_allocations(message_count.saturating_add(4), path)
         .and_then(|_| budget.charge_scratch_bytes(payload_bytes, path))
         .and_then(|_| budget.charge_transaction_work(payload_bytes, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut lists = Vec::new();
     for object in &archive.objects {
         let object_identifier = object
@@ -753,10 +930,10 @@ fn collect_comment_lists(
                     &message.data,
                     storage_options(budget, &message.data),
                 )
-                .map_err(|_| NativeReplyError::Codec)?;
+                .map_err(map_storage_codec_error)?;
             budget
                 .charge_storage_decode_report(list_type_report, true, path)
-                .map_err(|_| NativeReplyError::Limit)?;
+                .map_err(map_budget_error)?;
             let list_type = list_type_snapshot.list_type();
             if list_type != COMMENT_LIST_TYPE {
                 continue;
@@ -920,14 +1097,14 @@ fn decode_storage<'a>(
         .charge_allocations(2, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(reply_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(reply_capacity, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut probe = ReplyProbe::with_capacity(reply_capacity)?;
     let (snapshot, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
         payload,
         comment_options(payload, limits),
         &mut probe,
     )
-    .map_err(|_| NativeReplyError::Codec)?;
+    .map_err(map_comment_codec_error)?;
     charge_comment_report(budget, report, BUDGET_PATH)?;
     if probe.allocation_failed {
         return Err(NativeReplyError::Allocation);
@@ -985,7 +1162,7 @@ impl StorageReferenceAggregate {
             .charge_allocations(1, path)
             .and_then(|_| budget.charge_scratch_bytes(set_scratch, path))
             .and_then(|_| budget.charge_transaction_work(capacity, path))
-            .map_err(|_| NativeReplyError::Limit)?;
+            .map_err(map_budget_error)?;
         let vector_scratch = capacity
             .checked_mul(size_of::<u64>())
             .ok_or(NativeReplyError::InvalidSource)?;
@@ -993,7 +1170,7 @@ impl StorageReferenceAggregate {
             .charge_allocations(1, path)
             .and_then(|_| budget.charge_scratch_bytes(vector_scratch, path))
             .and_then(|_| budget.charge_transaction_work(capacity, path))
-            .map_err(|_| NativeReplyError::Limit)?;
+            .map_err(map_budget_error)?;
         Self::try_from_parts(author_identifier, reply_identifiers)
     }
 
@@ -1065,7 +1242,7 @@ fn collect_storage_facts(
         )
         .and_then(|_| budget.charge_scratch_bytes(payload_bytes, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(payload_bytes, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let uuid_scratch = storage_objects
         .checked_mul(2)
         .and_then(|count| count.checked_mul(size_of::<u64>()))
@@ -1074,7 +1251,7 @@ fn collect_storage_facts(
         .charge_allocations(1, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(uuid_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(storage_objects, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut facts = Vec::new();
     let mut uuids = HashSet::new();
     uuids
@@ -1258,9 +1435,7 @@ fn validate_archive_headers(
                 return Err(NativeReplyError::InvalidSource);
             }
         }
-        object
-            .validate(limits)
-            .map_err(|_| NativeReplyError::Archive)?;
+        object.validate(limits).map_err(map_constructor_error)?;
     }
     Ok(identifiers)
 }
@@ -1327,7 +1502,7 @@ fn preflight_archive(
         .and_then(|_| budget.charge_allocations(allocations, path))
         .and_then(|_| budget.charge_scratch_bytes(scratch, path))
         .and_then(|_| budget.charge_transaction_work(decoded_bytes, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     Ok(decoded_bytes)
 }
 
@@ -1359,7 +1534,7 @@ fn collect_bnc_counts(
         .charge_allocations(tile_count.saturating_add(2), path)
         .and_then(|_| budget.charge_scratch_bytes(tile_bytes, path))
         .and_then(|_| budget.charge_transaction_work(tile_bytes, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut counts = Vec::new();
     for object in &archive.objects {
         let mut tile_indices = object
@@ -1379,10 +1554,10 @@ fn collect_bnc_counts(
             storage_options(budget, &tile.data),
             &mut visitor,
         )
-        .map_err(|_| NativeReplyError::Codec)?;
+        .map_err(map_storage_codec_error)?;
         budget
             .charge_storage_decode_report(report, true, path)
-            .map_err(|_| NativeReplyError::Limit)?;
+            .map_err(map_budget_error)?;
         if visitor.invalid {
             return Err(NativeReplyError::InvalidSource);
         }
@@ -1424,7 +1599,7 @@ fn validate_list_refcounts(
         .and_then(|_| budget.charge_scratch_bytes(count_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(capacity, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(counts.len(), BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut seen_keys = HashSet::new();
     seen_keys
         .try_reserve(capacity)
@@ -1713,7 +1888,7 @@ fn validate_uuid_inputs(
         .charge_allocations(1, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(uuid_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(facts.len(), BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut uuids = HashSet::new();
     uuids
         .try_reserve(facts.len())
@@ -2028,7 +2203,7 @@ fn replace_with_reference_transition(
             transition,
             limits,
         )
-        .map_err(|_| NativeReplyError::Archive)?;
+        .map_err(map_constructor_error)?;
     Ok(())
 }
 
@@ -2117,7 +2292,7 @@ fn rewrite_comment_list(
         .charge_allocations(4, path)
         .and_then(|_| budget.charge_scratch_bytes(rewrite_scratch, path))
         .and_then(|_| budget.charge_transaction_work(rewrite_scratch, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let options = storage_options(budget, source);
     let reduced = if old_ref_count == 1 {
         let (reduced, report) = storage_codec::remove_table_data_list_entry_with_report(
@@ -2125,7 +2300,7 @@ fn rewrite_comment_list(
             storage_codec::TableDataListEntryRemoval::new(old_key, 1, old_identifier),
             options,
         )
-        .map_err(|_| NativeReplyError::Codec)?;
+        .map_err(map_storage_codec_error)?;
         charge_storage_removal_report(budget, report, path)?;
         reduced
     } else {
@@ -2140,7 +2315,7 @@ fn rewrite_comment_list(
         );
         let prepared =
             storage_codec::prepare_table_data_list_entry_rewrite(source, mutation, options)
-                .map_err(|_| NativeReplyError::Codec)?;
+                .map_err(map_storage_codec_error)?;
         let requirements = prepared.requirements();
         budget
             .charge_storage_decode_report(requirements.source(), true, path)
@@ -2153,10 +2328,10 @@ fn rewrite_comment_list(
             .and_then(|_| budget.charge_retained_bytes(requirements.retained_bytes(), path))
             .and_then(|_| budget.charge_output(requirements.output_bytes(), path))
             .and_then(|_| budget.charge_transaction_work(requirements.output_bytes(), path))
-            .map_err(|_| NativeReplyError::Limit)?;
+            .map_err(map_budget_error)?;
         prepared
             .execute(requirements.exact_limits())
-            .map_err(|_| NativeReplyError::Codec)?
+            .map_err(map_storage_codec_error)?
             .0
     };
     let appended = append_comment_entry(&reduced, new_key, new_identifier)?;
@@ -2166,7 +2341,11 @@ fn rewrite_comment_list(
     let output = patch_varint_field(&appended, 2, true, Some(u64::from(next)))
         .map_err(|_| NativeReplyError::InvalidSource)?;
     if output.len() > limits.max_message_bytes() {
-        return Err(NativeReplyError::Limit);
+        return Err(native_limit(
+            BudgetLimitKind::WireOutputBytes,
+            output.len(),
+            limits.max_message_bytes(),
+        ));
     }
     Ok(output)
 }
@@ -2226,7 +2405,7 @@ fn archive_reference_presence(
         .charge_allocations(1, path)
         .and_then(|_| budget.charge_scratch_bytes(scratch, path))
         .and_then(|_| budget.charge_transaction_work(work, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut search = Search {
         first_identifier,
         second_identifier,
@@ -2241,7 +2420,7 @@ fn archive_reference_presence(
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,
             )
-            .map_err(|_| NativeReplyError::Archive)?;
+            .map_err(map_constructor_error)?;
     }
     Ok((
         search.first_found,
@@ -2282,7 +2461,7 @@ fn validate_known_archive_metadata(
         .charge_allocations(1, path)
         .and_then(|_| budget.charge_scratch_bytes(scratch, path))
         .and_then(|_| budget.charge_transaction_work(work, path))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut probe = MetadataProbe;
     for object in &archive.objects {
         object
@@ -2291,7 +2470,7 @@ fn validate_known_archive_metadata(
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 limits,
             )
-            .map_err(|_| NativeReplyError::Archive)?;
+            .map_err(map_constructor_error)?;
     }
     Ok(())
 }
@@ -2447,7 +2626,12 @@ pub(super) fn rewrite_native_comment_reply(
         .text()
         .is_some_and(|text| text.len() > request.limits.max_message_bytes())
     {
-        return Err(NativeReplyError::Limit);
+        let text_bytes = request.operation.text().map_or(0, |text| text.len());
+        return Err(native_limit(
+            BudgetLimitKind::WireTextBytes,
+            text_bytes,
+            request.limits.max_message_bytes(),
+        ));
     }
 
     // Prepare the root reply-reference rewrite before cloning any candidate.
@@ -2460,7 +2644,7 @@ pub(super) fn rewrite_native_comment_reply(
     budget
         .charge_allocations(2, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(reply_id_scratch, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut before_reply_ids = fallible_u64_vec(root_fact.reply_identifiers.len())?;
     before_reply_ids.extend_from_slice(&root_fact.reply_identifiers);
     let ordinal = request.operation.ordinal();
@@ -2538,13 +2722,13 @@ pub(super) fn rewrite_native_comment_reply(
         .charge_allocations(3, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(root_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_transaction_work(root_payload.len(), BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let prepared_root = comment_storage_codec::prepare_comment_storage_reply_rewrite(
         root_payload,
         root_rewrite,
         root_options,
     )
-    .map_err(|_| NativeReplyError::Codec)?;
+    .map_err(map_comment_codec_error)?;
     let root_requirements = prepared_root.execution_requirements();
     budget
         .charge_allocations(root_requirements.allocations, BUDGET_PATH)
@@ -2573,10 +2757,10 @@ pub(super) fn rewrite_native_comment_reply(
                 BUDGET_PATH,
             )
         })
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let root_rewritten = prepared_root
         .execute(root_requirements.exact_limits())
-        .map_err(|_| NativeReplyError::Codec)?
+        .map_err(map_comment_codec_error)?
         .into_bytes();
     let root_rewritten = patch_storage_uuid(&root_rewritten, request.new_root)?;
     let reply_field_mutation = match request.operation {
@@ -2618,7 +2802,7 @@ pub(super) fn rewrite_native_comment_reply(
         .charge_allocations(1, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(candidate_clone_scratch, BUDGET_PATH))
         .and_then(|_| budget.charge_retained_bytes(decoded_bytes, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut candidate = source.clone();
     let root_source_object = source
         .objects
@@ -2631,7 +2815,7 @@ pub(super) fn rewrite_native_comment_reply(
     budget
         .charge_allocations(6, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(root_payload.len(), BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut root_archive = Archive::new();
     root_archive
         .objects
@@ -2766,7 +2950,7 @@ pub(super) fn rewrite_native_comment_reply(
     budget
         .charge_allocations(2, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(list_ref_scratch, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let before_list_refs = selected
         .entries
         .iter()
@@ -2844,7 +3028,7 @@ pub(super) fn rewrite_native_comment_reply(
     cell.set_comment_identifier(Some(new_key));
     let target_cell = cell
         .try_encode_with_limit(request.limits.max_message_bytes())
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_bnc_cell_error)?;
     let rewritten_tile = popup_native::patch_tile_cell(
         tile_payload,
         request.tile_row,
@@ -2877,7 +3061,7 @@ pub(super) fn rewrite_native_comment_reply(
     if old_root_can_cull {
         candidate
             .remove_object_checked(root_identifier, request.limits)
-            .map_err(|_| NativeReplyError::Archive)?;
+            .map_err(map_constructor_error)?;
     }
     if let Some(old_reply) = old_reply_identifier {
         let old_reply_still_referenced = if old_root_can_cull {
@@ -2888,7 +3072,7 @@ pub(super) fn rewrite_native_comment_reply(
         if !old_reply_still_referenced {
             candidate
                 .remove_object_checked(old_reply, request.limits)
-                .map_err(|_| NativeReplyError::Archive)?;
+                .map_err(map_constructor_error)?;
         }
     }
 
@@ -2908,7 +3092,7 @@ pub(super) fn rewrite_native_comment_reply(
     budget
         .charge_allocations(2, BUDGET_PATH)
         .and_then(|_| budget.charge_scratch_bytes(changed_scratch, BUDGET_PATH))
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut changed = vec![
         request.tile.identifier,
         request.list.identifier,
@@ -2945,10 +3129,10 @@ pub(super) fn rewrite_native_comment_reply(
     // output/scratch envelope before requesting either Vec.
     let candidate_encoded_len = candidate
         .encoded_len(request.limits)
-        .map_err(|_| NativeReplyError::Archive)?;
+        .map_err(map_constructor_error)?;
     let source_encoded_len = source
         .encoded_len(request.limits)
-        .map_err(|_| NativeReplyError::Archive)?;
+        .map_err(map_constructor_error)?;
     let serialization_scratch = candidate_encoded_len
         .checked_add(source_encoded_len)
         .ok_or(NativeReplyError::InvalidSource)?;
@@ -2963,16 +3147,16 @@ pub(super) fn rewrite_native_comment_reply(
                 BUDGET_PATH,
             )
         })
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let member_bytes = candidate
         .to_bytes(request.limits)
-        .map_err(|_| NativeReplyError::Archive)?;
+        .map_err(map_constructor_error)?;
     if member_bytes.len() > candidate_encoded_len {
         return Err(NativeReplyError::Archive);
     }
     let source_bytes = source
         .to_bytes(request.limits)
-        .map_err(|_| NativeReplyError::Archive)?;
+        .map_err(map_constructor_error)?;
     if source_bytes.len() > source_encoded_len {
         return Err(NativeReplyError::Archive);
     }
@@ -2981,7 +3165,7 @@ pub(super) fn rewrite_native_comment_reply(
         .to_owned();
     budget
         .charge_allocations(6, BUDGET_PATH)
-        .map_err(|_| NativeReplyError::Limit)?;
+        .map_err(map_budget_error)?;
     let mut member_edits = Vec::new();
     member_edits
         .try_reserve_exact(1)
@@ -3078,7 +3262,85 @@ pub(super) fn rewrite_native_comment_reply(
 
 #[cfg(test)]
 mod tests {
-    use super::{IdIndex, NativeReplyError, ReplyProbe, StorageReferenceAggregate};
+    use super::{
+        BudgetError, BudgetLimitKind, BudgetPath, IdIndex, NativeReplyError, ReplyProbe,
+        StorageReferenceAggregate, map_bnc_cell_error, map_budget_error, map_constructor_error,
+        map_popup_native_error,
+    };
+
+    #[test]
+    fn reply_core_limits_preserve_axis_provenance_and_counts() {
+        for (kind, expected) in [
+            (
+                litchi_iwa_core::LimitKind::HeaderFields,
+                BudgetLimitKind::WireFields,
+            ),
+            (
+                litchi_iwa_core::LimitKind::MetadataItems,
+                BudgetLimitKind::WireFields,
+            ),
+            (
+                litchi_iwa_core::LimitKind::HeaderNesting,
+                BudgetLimitKind::WireNesting,
+            ),
+        ] {
+            let direct = map_constructor_error(litchi_iwa_core::Error::Limit {
+                kind,
+                observed: 43,
+                maximum: 17,
+            });
+            assert_eq!(
+                direct,
+                NativeReplyError::Limit {
+                    kind: expected,
+                    observed: 43,
+                    maximum: 17,
+                }
+            );
+            let forwarded = map_popup_native_error(
+                super::table_cell_pop_up_menu_native::NativePopUpError::CoreLimit {
+                    kind,
+                    observed: 43,
+                    maximum: 17,
+                },
+            );
+            assert_eq!(forwarded, direct);
+        }
+    }
+
+    #[test]
+    fn native_limit_mapping_keeps_budget_payload() {
+        let error = map_budget_error(BudgetError::Limit {
+            kind: BudgetLimitKind::WireTextBytes,
+            observed: 29,
+            maximum: 11,
+            path: BudgetPath::Package,
+        });
+        assert_eq!(
+            error,
+            NativeReplyError::Limit {
+                kind: BudgetLimitKind::WireTextBytes,
+                observed: 29,
+                maximum: 11,
+            }
+        );
+    }
+
+    #[test]
+    fn native_bnc_limit_mapping_keeps_output_payload() {
+        let error = map_bnc_cell_error(litchi_numbers_wire::Error::OutputLimitExceeded {
+            observed: 43,
+            maximum: 17,
+        });
+        assert_eq!(
+            error,
+            NativeReplyError::Limit {
+                kind: BudgetLimitKind::WireOutputBytes,
+                observed: 43,
+                maximum: 17,
+            }
+        );
+    }
 
     #[test]
     fn reply_probe_handles_reverse_adversarial_order_and_duplicate() {
