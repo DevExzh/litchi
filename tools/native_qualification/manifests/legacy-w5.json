@@ -8,8 +8,8 @@
   "validators": [
     {
       "id": "historical-analyze",
-      "script": "$W5_ANALYZER",
-      "argv": ["python3", "$W5_ANALYZER", "{output_dir}"],
+      "script": "{source_root}/tools/native_qualification/w5_analyzer_adapter.py",
+      "argv": ["python3", "{source_root}/tools/native_qualification/w5_analyzer_adapter.py", "$W5_ANALYZER", "{output_dir}"],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],
       "require_stdout": true

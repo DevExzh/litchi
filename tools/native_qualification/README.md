@@ -41,7 +41,10 @@ python3 tools/native_qualification_runner.py \
 
 Use the analogous `W5_BEFORE_SOURCE`, `W5_AFTER_SOURCE`, and
 `W5_TARGET_ROOT` variables for `legacy-w5.json`, and set `W5_ANALYZER` to the
-record-0359a `analyze.py`.  The W5 probes synthesize their inputs, so that
+record-0359a `analyze.py`.  The manifest runs the tracked adapter from the
+candidate source: it executes that analyzer, parses its JSON stdout against
+the W5 analysis schema, and writes the unchanged analysis under the qualified
+`summary.json` envelope.  The W5 probes synthesize their inputs, so that
 manifest has no fixture path.
 
 Build commands are executed directly, never through a shell.  The runner
@@ -73,9 +76,15 @@ It identifies the actual executable/comm/cwd; a Python command containing the
 word `cargo` is not treated as a compiler.  Failed events and logs remain on
 disk and the failed receipt is written before the command returns nonzero.
 
+The build phase requires a completely fresh empty output directory.  The
+ABBA phase accepts only the exact build handoff (`commands/`, the build event
+journal, and the build receipt), so stale `source-*`/`ops-*` files cannot be
+picked up by a historical analyzer glob.
+
 The receipts are orchestration evidence only.  They do not assert correctness
 or performance.  The manifests route probe/sheet/source/ops stdout to the
 historical `probe-*`, `sheet-*`, `source-*`, and `ops-*` filenames, retain CRUD
 JSON under its historical name, and run the real lane `analyze.py` as a
-fail-closed validator producing `summary.json`.  A nonempty stdout stream
-alone is never accepted.
+fail-closed validator producing `summary.json`; W5's adapter preserves the
+analyzer's full parsed result in its `analysis` field.  A nonempty stdout
+stream alone is never accepted.

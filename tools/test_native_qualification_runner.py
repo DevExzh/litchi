@@ -19,6 +19,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_qualification_runner as runner  # noqa: E402
+from native_qualification import w5_analyzer_adapter as w5_adapter  # noqa: E402
 
 
 class NativeQualificationRunnerTests(unittest.TestCase):
@@ -205,6 +206,69 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(env["LITCHI_MEM_MAX"], "20G")
             self.assertNotIn("CARGO_HOME", env)
             self.assertNotIn("CARGO_CONFIG", env)
+
+    def test_build_output_must_be_fresh(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-stale-") as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            (output / "source-before-1.json").write_text("stale", encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "fresh empty"):
+                runner.SafeRunner(
+                    {
+                        "lane": "w5-legacy",
+                        "output_dir": str(output),
+                        "legs": {},
+                    },
+                    ROOT / "tools/native_qualification_runner.py",
+                    "build",
+                    None,
+                )
+
+    def test_build_handoff_rejects_stale_analyzer_inputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-handoff-") as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            (output / "source-before-1.json").write_text("stale", encoding="utf-8")
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(output),
+                    "legs": {},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "abba",
+                None,
+            )
+            with self.assertRaisesRegex(runner.RunnerError, "stale entries"):
+                safe._validate_build_handoff(set())
+
+    def test_w5_adapter_preserves_valid_analysis_in_qualified_summary(self) -> None:
+        analysis = {
+            "source": [{"scenario": "doc/source_set", "before_us": 1.0, "after_us": 2.0, "ratio": 2.0}],
+            "ops": [{"scenario": "xls/get", "before_us": 3.0, "after_us": 4.0, "ratio": 1.333}],
+            "doc_batch1k_unified_over_leaf": {},
+            "max_rss_kb": {},
+        }
+        self.assertEqual(w5_adapter.validate_analysis(analysis), analysis)
+        with self.assertRaisesRegex(w5_adapter.AdapterError, "missing required"):
+            w5_adapter.validate_analysis({"source": []})
+        with tempfile.TemporaryDirectory(prefix="native-qual-adapter-") as directory:
+            root = Path(directory)
+            analyzer = root / "analyze.py"
+            output = root / "output"
+            output.mkdir()
+            analyzer.write_text(
+                "import json\n"
+                f"print(json.dumps({analysis!r}))\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(w5_adapter.main([str(analyzer), str(output)]), 0)
+            qualified = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(qualified["schema"], w5_adapter.SUMMARY_SCHEMA)
+            self.assertEqual(qualified["lane"], "w5-legacy")
+            self.assertEqual(qualified["analysis"], analysis)
 
     def test_symlink_artifact_is_never_hashed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-link-") as directory:

@@ -653,6 +653,17 @@ class SafeRunner:
         self.output = _resolve_path(str(manifest["output_dir"]))
         if self.output.is_symlink():
             raise RunnerError(f"output_dir may not be a symlink: {self.output}")
+        if self.output.exists() and not self.output.is_dir():
+            raise RunnerError(f"output_dir is not a directory: {self.output}")
+        if self.phase == "build" and self.output.exists():
+            try:
+                existing = list(self.output.iterdir())
+            except OSError as error:
+                raise RunnerError(f"cannot inspect build output_dir: {self.output}: {error}") from error
+            if existing:
+                raise RunnerError(
+                    f"build output_dir must be a fresh empty directory; choose a new path: {self.output}"
+                )
         self.output.mkdir(parents=True, exist_ok=True)
         self.command_dir = self.output / "commands"
         if self.command_dir.is_symlink():
@@ -1121,6 +1132,30 @@ class SafeRunner:
         self._validate_build_receipt(receipt)
         return receipt
 
+    def _validate_build_handoff(self, expected_command_logs: set[str]) -> None:
+        """Reject anything a historical analyzer could mistake for a run."""
+
+        allowed_top_level = {
+            self.command_dir,
+            self.output / "events-build.jsonl",
+            self.output / "build-receipt.json",
+        }
+        actual_top_level = {entry for entry in self.output.iterdir()}
+        if actual_top_level != allowed_top_level:
+            raise RunnerError(
+                "build-to-ABBA output handoff contains unexpected or stale entries: "
+                f"{sorted(str(path) for path in actual_top_level ^ allowed_top_level)}"
+            )
+        if self.command_dir.is_symlink() or not self.command_dir.is_dir():
+            raise RunnerError("build command-log directory is missing or symlinked")
+        actual_command_logs = {entry for entry in self.command_dir.iterdir()}
+        expected_command_log_paths = {Path(path) for path in expected_command_logs}
+        if actual_command_logs != expected_command_log_paths:
+            raise RunnerError(
+                "build command-log handoff contains unexpected or stale entries: "
+                f"{sorted(str(path) for path in actual_command_logs ^ expected_command_log_paths)}"
+            )
+
     def _validate_build_receipt(self, receipt: Mapping[str, Any]) -> None:
         if (
             receipt.get("status") != "passed"
@@ -1198,6 +1233,7 @@ class SafeRunner:
         if not isinstance(identities, dict):
             raise RunnerError("build receipt identities are missing")
         seen_log_paths: set[str] = set()
+        expected_command_logs: set[str] = set()
         for event, (event_id, leg, expectation) in zip(events, expected_events):
             if not isinstance(event, dict) or event.get("schema") != SCHEMA:
                 raise RunnerError(f"invalid build event for {event_id}")
@@ -1272,7 +1308,11 @@ class SafeRunner:
                 if not isinstance(stream, dict):
                     raise RunnerError(f"missing {stream_name} receipt for {event_id}")
                 stream_path = _resolve_path(str(stream.get("path", "")))
-                if not _under(stream_path, self.output) or stream_path.is_symlink() or not stream_path.is_file():
+                if (
+                    not _under(stream_path, self.command_dir)
+                    or stream_path.is_symlink()
+                    or not stream_path.is_file()
+                ):
                     raise RunnerError(f"invalid {stream_name} path for {event_id}")
                 if str(stream_path) in seen_log_paths:
                     raise RunnerError(f"build log path is reused for {event_id}: {stream_path}")
@@ -1280,6 +1320,8 @@ class SafeRunner:
                 if stream_hash != stream.get("sha256") or stream_bytes != stream.get("bytes"):
                     raise RunnerError(f"{stream_name} hash mismatch for {event_id}")
                 seen_log_paths.add(str(stream_path))
+                expected_command_logs.add(str(stream_path))
+        self._validate_build_handoff(expected_command_logs)
         for leg in ("before", "after"):
             current = self._identity(leg)
             recorded = identities.get(leg)
