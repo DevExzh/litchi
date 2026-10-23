@@ -18907,6 +18907,12 @@
         "litchi_pages::Package",
         "litchi_pages::Document"
       ],
+      "result_methods": [
+        {
+          "method": "litchi_pages::Package::apply_metadata",
+          "ok": "litchi_pages::metadata::Commit"
+        }
+      ],
       "family_methods": true
     },
     {
