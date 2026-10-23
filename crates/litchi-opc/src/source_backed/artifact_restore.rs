@@ -73,12 +73,25 @@ struct AdmissionPartLookup {
     _memory: Option<Reservation>,
 }
 
+struct AdmissionRelationshipLookup<'a> {
+    by_folded_name: HashMap<String, &'a super::Relationships>,
+    _memory: Option<Reservation>,
+}
+
 fn build_admission_part_lookup(
     source: &SourceSnapshot,
     catalog: &super::AdmittedCatalog,
 ) -> Result<AdmissionPartLookup> {
     let mut name_bytes = 0_u64;
-    for part in &catalog.parts {
+    for (index, part) in catalog.parts.iter().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
+        }
         name_bytes = name_bytes
             .checked_add(part.partname.as_str().len() as u64)
             .ok_or_else(|| overlay_unavailable("catalog Part name bytes overflow"))?;
@@ -105,6 +118,14 @@ fn build_admission_part_lookup(
             source,
         })?;
     for (index, part) in catalog.parts.iter().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
+        }
         let folded = super::folded_part_name(&part.partname)?;
         if by_folded_name.insert(folded, index).is_some() {
             return Err(overlay_unavailable(
@@ -160,6 +181,11 @@ fn build_admission_physical_lookup(
     for (index, (entry_id, name)) in archive.file_entries().enumerate() {
         if index & 0xff == 0 {
             source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
         }
         let folded = super::folded_ascii_name(
             name,
@@ -379,8 +405,37 @@ fn parse_relationship_xml(
 }
 
 fn folded_relationship_lookup<'a>(
+    source: &SourceSnapshot,
     relationships: &'a HashMap<PackURI, super::Relationships>,
-) -> Result<HashMap<String, &'a super::Relationships>> {
+) -> Result<AdmissionRelationshipLookup<'a>> {
+    let mut name_bytes = 0_u64;
+    for (index, (owner, _)) in relationships.iter().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
+        }
+        name_bytes = name_bytes
+            .checked_add(owner.as_str().len() as u64)
+            .ok_or_else(|| overlay_unavailable("relationship owner name bytes overflow"))?;
+    }
+    let relationship_count = relationships.len() as u64;
+    let memory_bound = name_bytes
+        .checked_mul(2)
+        .and_then(|bytes| bytes.checked_add(relationship_count.checked_mul(96)?))
+        .ok_or_else(|| overlay_unavailable("relationship owner lookup memory overflows"))?;
+    let memory = source
+        .context
+        .as_ref()
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, memory_bound)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
     let mut lookup = HashMap::new();
     lookup
         .try_reserve(relationships.len())
@@ -388,7 +443,15 @@ fn folded_relationship_lookup<'a>(
             resource: "source-backed OPC folded relationship owner lookup",
             source,
         })?;
-    for (owner, value) in relationships {
+    for (index, (owner, value)) in relationships.iter().enumerate() {
+        if index & 0xff == 0 {
+            source.ensure_current()?;
+            source
+                .context
+                .as_ref()
+                .map(|context| context.check().map_err(map_execution_error))
+                .transpose()?;
+        }
         let folded = super::folded_ascii_name(
             owner.as_str(),
             "source-backed OPC folded relationship owner",
@@ -399,7 +462,10 @@ fn folded_relationship_lookup<'a>(
             ));
         }
     }
-    Ok(lookup)
+    Ok(AdmissionRelationshipLookup {
+        by_folded_name: lookup,
+        _memory: memory,
+    })
 }
 
 fn admit_preservation_member_names(
@@ -1439,7 +1505,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits.max_total_relationships() as u64,
         )?;
         let admitted_relationships_by_owner =
-            folded_relationship_lookup(&admitted_relationships)?;
+            folded_relationship_lookup(view.source, &admitted_relationships)?;
 
         // Count the reachable relationship graph from the bounded, recipient-
         // admitted XML map. Keeping orphan owners in this map is important:
@@ -1448,43 +1514,18 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
         // back to the source catalog only.
         let mut graph = HashSet::new();
         let mut work = Vec::new();
-        for relationship in view.catalog.package_relationships.iter() {
-            if !relationship.is_external() {
-                let target = relationship.target_partname()?;
-                if graph.insert(target.clone()) {
-                    let count = u64::try_from(graph.len())
-                        .map_err(|_| overlay_unavailable("recipient graph node count exceeds u64"))?;
-                    limits.check(
-                        SourceLimitKind::RelationshipGraphNodes,
-                        count,
-                        limits.max_relationship_graph_nodes() as u64,
-                    )?;
-                    work.push(target);
-                }
-            }
-        }
+        enqueue_graph_targets(
+            &view.catalog.package_relationships,
+            &mut graph,
+            &mut work,
+            limits,
+        )?;
         while let Some(owner) = work.pop() {
-            let folded = super::folded_ascii_name(
-                owner.as_str(),
-                "source-backed OPC folded relationship graph owner",
-            )?;
-            if let Some(relationships) = admitted_relationships_by_owner.get(&folded) {
-                for relationship in relationships.iter() {
-                    if !relationship.is_external() {
-                        let target = relationship.target_partname()?;
-                        if graph.insert(target.clone()) {
-                            let count = u64::try_from(graph.len()).map_err(|_| {
-                                overlay_unavailable("recipient graph node count exceeds u64")
-                            })?;
-                            limits.check(
-                                SourceLimitKind::RelationshipGraphNodes,
-                                count,
-                                limits.max_relationship_graph_nodes() as u64,
-                            )?;
-                            work.push(target);
-                        }
-                    }
-                }
+            if let Some(relationships) = admitted_relationships_by_owner
+                .by_folded_name
+                .get(&owner)
+            {
+                enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
         Ok(())
@@ -1964,7 +2005,7 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits.max_total_relationship_xml_events() as u64,
         )?;
         let admitted_relationships_by_owner =
-            folded_relationship_lookup(&admitted_relationships)?;
+            folded_relationship_lookup(&package.source, &admitted_relationships)?;
 
         // Traverse the effective graph, checking before each new target is
         // retained so the admission itself cannot grow beyond the recipient
@@ -1978,11 +2019,10 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             limits,
         )?;
         while let Some(owner) = work.pop() {
-            let folded = super::folded_ascii_name(
-                owner.as_str(),
-                "source-backed OPC folded relationship graph owner",
-            )?;
-            if let Some(relationships) = admitted_relationships_by_owner.get(&folded) {
+            if let Some(relationships) = admitted_relationships_by_owner
+                .by_folded_name
+                .get(&owner)
+            {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
@@ -2315,7 +2355,8 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             relationship_total,
             limits.max_total_relationships() as u64,
         )?;
-        let relationship_map_by_owner = folded_relationship_lookup(&relationship_map)?;
+        let relationship_map_by_owner =
+            folded_relationship_lookup(&package.source, &relationship_map)?;
 
         let root_owner =
             PackURI::new(super::PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
@@ -2323,18 +2364,14 @@ impl<'recipient> ArtifactStreamPolicy<'recipient> {
             root_owner.as_str(),
             "source-backed OPC folded relationship graph owner",
         )?;
-        let Some(root) = relationship_map_by_owner.get(&root_key) else {
+        let Some(root) = relationship_map_by_owner.by_folded_name.get(&root_key) else {
             return Ok(());
         };
         let mut graph = HashSet::new();
         let mut work = Vec::new();
         enqueue_graph_targets(root, &mut graph, &mut work, limits)?;
         while let Some(owner) = work.pop() {
-            let folded = super::folded_ascii_name(
-                owner.as_str(),
-                "source-backed OPC folded relationship graph owner",
-            )?;
-            if let Some(relationships) = relationship_map_by_owner.get(&folded) {
+            if let Some(relationships) = relationship_map_by_owner.by_folded_name.get(&owner) {
                 enqueue_graph_targets(relationships, &mut graph, &mut work, limits)?;
             }
         }
@@ -2390,8 +2427,8 @@ fn check_relationships(
 
 fn enqueue_graph_targets(
     relationships: &super::Relationships,
-    graph: &mut HashSet<PackURI>,
-    work: &mut Vec<PackURI>,
+    graph: &mut HashSet<String>,
+    work: &mut Vec<String>,
     limits: SourceLimits,
 ) -> Result<()> {
     for relationship in relationships.iter() {
@@ -2399,7 +2436,8 @@ fn enqueue_graph_targets(
             continue;
         }
         let target = relationship.target_partname()?;
-        if graph.insert(target.clone()) {
+        let folded = super::folded_part_name(&target)?;
+        if graph.insert(folded.clone()) {
             let count = u64::try_from(graph.len())
                 .map_err(|_| overlay_unavailable("recipient graph node count exceeds u64"))?;
             limits.check(
@@ -2407,7 +2445,7 @@ fn enqueue_graph_targets(
                 count,
                 limits.max_relationship_graph_nodes() as u64,
             )?;
-            work.push(target);
+            work.push(folded);
         }
     }
     Ok(())
