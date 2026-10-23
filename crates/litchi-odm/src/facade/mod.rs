@@ -416,9 +416,11 @@ impl Package {
                 "the package is not the patch source",
             ));
         }
-        Ok(crate::transaction::Commit::replayed(
-            patch.apply(self)?,
+        let package = patch.apply(self)?;
+        Ok(crate::transaction::Commit::new(
+            package,
             patch.clone(),
+            litchi_core::edit::Diagnostics::new(!patch.is_noop()),
         ))
     }
 

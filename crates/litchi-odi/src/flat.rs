@@ -36,6 +36,8 @@ use std::{io::Read, ops::Range, path::Path, sync::Arc};
 
 /// Whether a commit changed the image bytes.
 pub use litchi_core::edit::Diagnostics;
+/// A committed flat image: the published image, patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Image, Patch>;
 /// The family error: typed limits and refusals plus the common-core payload.
 pub use litchi_odf_common::Error;
 /// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
@@ -387,11 +389,11 @@ impl Image {
                 "the image is not the patch source",
             ));
         }
-        Ok(Commit {
-            package: patch.target.clone(),
-            diagnostics: Diagnostics::new(!patch.is_noop()),
-            patch: patch.clone(),
-        })
+        Ok(Commit::new(
+            patch.target.clone(),
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 
     /// Returns the inert frames in source order.
@@ -854,16 +856,17 @@ impl Edit {
 
     pub(crate) fn commit_core(mut self) -> Result<Commit> {
         if self.changes.is_empty() && self.metadata.is_none() {
-            return Ok(Commit {
-                package: self.source.clone(),
-                patch: Patch {
-                    source: self.source.clone(),
-                    target: self.source,
-                    changes: Vec::new(),
-                    metadata_change: None,
-                },
-                diagnostics: Diagnostics::UNCHANGED,
-            });
+            let patch = Patch {
+                source: self.source.clone(),
+                target: self.source,
+                changes: Vec::new(),
+                metadata_change: None,
+            };
+            return Ok(Commit::new(
+                patch.source.clone(),
+                patch,
+                Diagnostics::UNCHANGED,
+            ));
         }
         self.changes.sort_unstable_by_key(|change| change.frame);
         let declared = root_prefix_bindings(self.source.as_bytes());
@@ -971,16 +974,16 @@ impl Edit {
             return Err(invalid("flat ODI metadata edit failed semantic readback"));
         }
         let changed = self.source.as_bytes() != snapshot.as_bytes();
-        Ok(Commit {
-            package: snapshot.clone(),
-            patch: Patch {
+        Ok(Commit::new(
+            snapshot.clone(),
+            Patch {
                 source: self.source,
                 target: snapshot,
                 changes: self.changes,
                 metadata_change,
             },
-            diagnostics: Diagnostics::new(changed),
-        })
+            Diagnostics::new(changed),
+        ))
     }
 
     fn frame(&self, index: usize) -> Result<&Frame> {
@@ -1043,57 +1046,6 @@ impl Edit {
     }
 }
 
-/// A validated flat publication: the published image, its reversible patch
-/// and its diagnostics.
-pub struct Commit {
-    package: Image,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Returns the published immutable image.
-    #[must_use]
-    pub const fn package(&self) -> &Image {
-        &self.package
-    }
-
-    /// Returns the exact-source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Whether the published image differs from its source.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-
-    /// Returns the exact source image accepted by this commit.
-    #[must_use]
-    pub const fn source(&self) -> &Image {
-        &self.patch.source
-    }
-
-    /// Builds a deterministic semantic patch under explicit limits.
-    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
-        crate::SemanticPatch::from_flat_commit(self, policy)
-    }
-
-    /// Consumes this commit into its published image.
-    #[must_use]
-    pub fn into_package(self) -> Image {
-        self.package
-    }
-
-    /// Consumes this commit into its published image and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Image, Patch) {
-        (self.package, self.patch)
-    }
-}
-
 /// A source-checked reversible flat ODI metadata patch.
 #[derive(Clone, Debug)]
 pub struct Patch {
@@ -1138,6 +1090,11 @@ impl Patch {
     #[must_use]
     pub const fn metadata_change(&self) -> Option<&crate::MetadataChange> {
         self.metadata_change.as_ref()
+    }
+
+    /// Builds a deterministic semantic patch under explicit limits.
+    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
+        crate::SemanticPatch::from_flat_patch(self, policy)
     }
 
     /// Returns the patch that restores the exact source snapshot.

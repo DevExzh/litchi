@@ -94,7 +94,10 @@ fn retained_frame_image_and_style_semantics_share_the_durable_wire() {
     assert_eq!(frame.actuate(), Some("onLoad"));
     assert_eq!(frame.copy_of(), Some("OtherFrame"));
 
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     assert_eq!(patch.operations().len(), 11);
     let package_source = package();
     let transfer = patch.plan_package(&package_source);
@@ -280,7 +283,10 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     edit.set_x(0, Some("5cm".into())).unwrap();
     edit.set_image_map(0, Some(map())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
     assert!(
         patch
@@ -451,7 +457,10 @@ fn flat_transfer_reports_dependencies_it_cannot_supply() {
         .unwrap();
     edit.set_style_name(0, Some("absent-style".into())).unwrap();
     let commit = edit.commit().unwrap();
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     let destination = package();
     let plan = patch.plan_package(&destination);
 
@@ -481,14 +490,20 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
         .set_style_name(0, Some("joined-style".into()))
         .unwrap();
     let style = style_edit.commit().unwrap();
-    let style_patch = style.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let style_patch = style
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
     let mut layer_edit = source.edit();
     layer_edit
         .set_layer(0, Some("joined-layer".into()))
         .unwrap();
     let layer = layer_edit.commit().unwrap();
-    let layer_patch = layer.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let layer_patch = layer
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
 
     let joined = style_patch.join(&layer_patch);
     assert!(joined.is_conflict_free());
@@ -512,6 +527,7 @@ fn compatible_join_and_divergent_three_way_plans_are_non_mutating() {
         .unwrap();
     let competing = competing_edit.commit().unwrap();
     let competing_patch = competing
+        .patch()
         .semantic_patch(&SecurityPolicy::default())
         .unwrap();
     let conflict = style_patch.join(&competing_patch);
@@ -620,7 +636,10 @@ fn flat_metadata_patch_preserves_opaque_nodes_and_transfers_to_package() {
     let commit = edit.commit().unwrap();
     let xml = std::str::from_utf8(commit.package().as_bytes()).unwrap();
     assert!(xml.contains("opaque"));
-    let patch = commit.semantic_patch(&SecurityPolicy::default()).unwrap();
+    let patch = commit
+        .patch()
+        .semantic_patch(&SecurityPolicy::default())
+        .unwrap();
     assert_eq!(patch.operations().len(), 2);
 
     let package = package();
@@ -684,11 +703,13 @@ fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
     let external_commit = external_edit.commit().unwrap();
     assert!(
         external_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::strict())
             .is_err()
     );
     assert!(
         external_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_operations(0))
             .is_err()
     );
@@ -698,16 +719,19 @@ fn hostile_policy_and_lossless_boundaries_refuse_before_publication() {
     let map_commit = map_edit.commit().unwrap();
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::strict())
             .is_err()
     );
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_map_areas(1))
             .is_err()
     );
     assert!(
         map_commit
+            .patch()
             .semantic_patch(&SecurityPolicy::default().with_patch_bytes(1))
             .is_err()
     );

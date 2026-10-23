@@ -20,7 +20,7 @@ pub trait CommittedTransition<T: HistoryArtifact> {
 
 impl CommittedTransition<Package> for Commit {
     fn source(&self) -> &Package {
-        Self::source(self)
+        self.patch().source()
     }
 
     fn target(&self) -> &Package {
@@ -30,7 +30,7 @@ impl CommittedTransition<Package> for Commit {
 
 impl CommittedTransition<crate::flat::Image> for crate::flat::Commit {
     fn source(&self) -> &crate::flat::Image {
-        self.source()
+        self.patch().source()
     }
 
     fn target(&self) -> &crate::flat::Image {
