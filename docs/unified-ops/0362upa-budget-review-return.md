@@ -110,3 +110,14 @@ original physical provenance from effective publication while preserving
 exact output and untouched payload fidelity. DOCX was not reached after
 the runner stopped. [xlsb-docx-runtime-v15.json](results/0362up/xlsb-docx-runtime-v15.json)
 retains the complete failure receipt.
+
+## DOCX shared-scanner fidelity return
+
+The full all-feature DOCX library on `0fcc45dae0` passes 1,516 tests and
+fails one: `cell_text_replacement_refuses_content_it_would_drop` now admits
+a bookmarked cell paragraph. The paragraph scan change must be audited
+across all callers: text-slot replacement preserves bookmarks, whereas a
+cell-content replacement may discard them. Preserve the existing fidelity
+refusal or prove marker preservation; the failing assertion is not waived.
+[docx-runtime-v16.json](results/0362up/docx-runtime-v16.json) retains the
+complete source, command, test summary and external log identity.
