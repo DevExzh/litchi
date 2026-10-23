@@ -360,6 +360,31 @@ fn map_bnc_cell_error(error: litchi_numbers_wire::Error) -> NativeReplyError {
     }
 }
 
+const fn map_reply_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> BudgetLimitKind {
+    match kind {
+        litchi_iwa_core::LimitKind::Objects => BudgetLimitKind::PayloadObjects,
+        litchi_iwa_core::LimitKind::Messages | litchi_iwa_core::LimitKind::MessagesPerObject => {
+            BudgetLimitKind::PayloadMessages
+        },
+        litchi_iwa_core::LimitKind::HeaderFields | litchi_iwa_core::LimitKind::MetadataItems => {
+            BudgetLimitKind::WireFields
+        },
+        litchi_iwa_core::LimitKind::HeaderNesting => BudgetLimitKind::WireNesting,
+        litchi_iwa_core::LimitKind::SnappyFrames => BudgetLimitKind::PayloadItems,
+        litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+            BudgetLimitKind::CompressedBytes
+        },
+        litchi_iwa_core::LimitKind::ArchiveBytes
+        | litchi_iwa_core::LimitKind::ObjectBytes
+        | litchi_iwa_core::LimitKind::MessageBytes
+        | litchi_iwa_core::LimitKind::HeaderBytes
+        | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+        | litchi_iwa_core::LimitKind::SnappyChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyStreamBytes => BudgetLimitKind::PayloadBytes,
+    }
+}
+
 fn map_constructor_error(error: litchi_iwa_core::Error) -> NativeReplyError {
     match error {
         litchi_iwa_core::Error::Limit {
@@ -367,7 +392,7 @@ fn map_constructor_error(error: litchi_iwa_core::Error) -> NativeReplyError {
             observed,
             maximum,
         } => NativeReplyError::Limit {
-            kind: super::table_cell_pop_up_menu::map_core_limit_kind(kind),
+            kind: map_reply_core_limit_kind(kind),
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         },
@@ -389,6 +414,15 @@ fn map_popup_native_error(error: popup_native::NativePopUpError) -> NativeReplyE
             maximum,
         } => NativeReplyError::Limit {
             kind,
+            observed,
+            maximum,
+        },
+        popup_native::NativePopUpError::CoreLimit {
+            kind,
+            observed,
+            maximum,
+        } => NativeReplyError::Limit {
+            kind: map_reply_core_limit_kind(kind),
             observed,
             maximum,
         },
@@ -3230,8 +3264,49 @@ pub(super) fn rewrite_native_comment_reply(
 mod tests {
     use super::{
         BudgetError, BudgetLimitKind, BudgetPath, IdIndex, NativeReplyError, ReplyProbe,
-        StorageReferenceAggregate, map_bnc_cell_error, map_budget_error,
+        StorageReferenceAggregate, map_bnc_cell_error, map_budget_error, map_constructor_error,
+        map_popup_native_error,
     };
+
+    #[test]
+    fn reply_core_limits_preserve_axis_provenance_and_counts() {
+        for (kind, expected) in [
+            (
+                litchi_iwa_core::LimitKind::HeaderFields,
+                BudgetLimitKind::WireFields,
+            ),
+            (
+                litchi_iwa_core::LimitKind::MetadataItems,
+                BudgetLimitKind::WireFields,
+            ),
+            (
+                litchi_iwa_core::LimitKind::HeaderNesting,
+                BudgetLimitKind::WireNesting,
+            ),
+        ] {
+            let direct = map_constructor_error(litchi_iwa_core::Error::Limit {
+                kind,
+                observed: 43,
+                maximum: 17,
+            });
+            assert_eq!(
+                direct,
+                NativeReplyError::Limit {
+                    kind: expected,
+                    observed: 43,
+                    maximum: 17,
+                }
+            );
+            let forwarded = map_popup_native_error(
+                super::table_cell_pop_up_menu_native::NativePopUpError::CoreLimit {
+                    kind,
+                    observed: 43,
+                    maximum: 17,
+                },
+            );
+            assert_eq!(forwarded, direct);
+        }
+    }
 
     #[test]
     fn native_limit_mapping_keeps_budget_payload() {

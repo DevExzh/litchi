@@ -1915,6 +1915,38 @@ mod tests {
     }
 
     #[test]
+    fn native_core_limit_axes_reach_public_error() {
+        for (kind, expected) in [
+            (
+                crate::package::table_cell_pop_up_menu::LimitKind::WireFields,
+                LimitKind::Fields,
+            ),
+            (
+                crate::package::table_cell_pop_up_menu::LimitKind::WireNesting,
+                LimitKind::Nesting,
+            ),
+        ] {
+            let error = map_native_error(
+                crate::package::comments_reply_native::NativeReplyError::Limit {
+                    kind,
+                    observed: 53,
+                    maximum: 31,
+                },
+                Path::Package,
+            );
+            assert_eq!(
+                error,
+                Error::Limit {
+                    kind: expected,
+                    observed: 53,
+                    maximum: 31,
+                    path: Path::Package,
+                }
+            );
+        }
+    }
+
+    #[test]
     fn changed_direct_apply_requires_exact_physical_provenance() {
         assert_eq!(
             require_exact_apply_source(false),

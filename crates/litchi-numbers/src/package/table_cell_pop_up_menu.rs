@@ -1873,6 +1873,16 @@ fn map_native_error(error: popup_native::NativePopUpError, path: Path) -> Error 
             maximum,
             path,
         },
+        popup_native::NativePopUpError::CoreLimit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_core_limit_kind(kind),
+            observed,
+            maximum,
+            path,
+        },
         popup_native::NativePopUpError::InvalidSource
         | popup_native::NativePopUpError::Codec
         | popup_native::NativePopUpError::Archive => Error::InvalidSource { path },

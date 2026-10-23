@@ -279,6 +279,15 @@ pub(super) enum NativePopUpError {
         observed: u64,
         maximum: u64,
     },
+    /// A physical archive limit retained in the core vocabulary until the
+    /// package owner selects its family-specific public axis.  Keeping this
+    /// provenance separate matters when the same native helper is forwarded
+    /// by the comment-reply owner.
+    CoreLimit {
+        kind: litchi_iwa_core::LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
     Codec,
     Archive,
 }
@@ -289,7 +298,7 @@ impl fmt::Display for NativePopUpError {
             Self::InvalidSource => "invalid Pop-Up Menu native source",
             Self::UnsupportedDependency => "unsupported Pop-Up Menu native dependency",
             Self::Allocation => "Pop-Up Menu native allocation failed",
-            Self::Limit { .. } => "Pop-Up Menu native limit exceeded",
+            Self::Limit { .. } | Self::CoreLimit { .. } => "Pop-Up Menu native limit exceeded",
             Self::Codec => "Pop-Up Menu native codec rejected the source",
             Self::Archive => "Pop-Up Menu native archive rewrite failed",
         })
@@ -410,8 +419,8 @@ fn map_archive_constructor_error(error: litchi_iwa_core::Error) -> NativePopUpEr
             kind,
             observed,
             maximum,
-        } => NativePopUpError::Limit {
-            kind: super::table_cell_pop_up_menu::map_core_limit_kind(kind),
+        } => NativePopUpError::CoreLimit {
+            kind,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         },
