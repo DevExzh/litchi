@@ -1327,10 +1327,7 @@ fn same_text_rich_run_property_change_is_not_collapsed_as_a_noop() {
         .expect("rich target read")
         .expect("rich target");
     assert_eq!(target.text(), "same");
-    assert_eq!(
-        target.runs()[0].font().expect("target font").italic(),
-        Some(true)
-    );
+    assert!(target.runs()[0].font().expect("target font").italic);
 
     let replayed = source.apply(committed.patch()).expect("replay rich edit");
     assert_eq!(

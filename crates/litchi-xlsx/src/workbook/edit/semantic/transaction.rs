@@ -943,7 +943,6 @@ impl CaptureBudget {
         } else {
             self.added_cells.remove(&reservation.key);
         }
-        reservation.active = false;
     }
 
     pub(super) fn release_added_cell(&mut self, index: usize, address: Address) {
@@ -5854,11 +5853,7 @@ fn worksheet_capture_bytes(base: &Workbook, position: usize) -> Result<usize> {
         .get(position)
         .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
     match base.inner.package.part_metadata(&sheet.part_uri) {
-        Some(metadata) if metadata.payload_is_decoded() => {
-            Ok(base.inner.package.get_part(&sheet.part_uri)?.blob().len())
-        },
-        Some(metadata) => usize::try_from(metadata.declared_uncompressed_size()?)
-            .map_err(|error| invalid(format!("worksheet source length exceeds usize: {error}"))),
+        Some(metadata) => Ok(metadata.payload_len()?),
         None => Err(invalid("worksheet capture part disappeared")),
     }
 }

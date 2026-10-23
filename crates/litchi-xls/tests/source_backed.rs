@@ -2333,7 +2333,7 @@ fn deferred_workbook_facade_promotes_inflight_source_changes() {
             )
             .map(|_| ())
     });
-    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+    assert_inflight_workbook_source_change(|workbook, sheet, _reference, _name| {
         workbook.worksheet_by_index(sheet).map(|_| ())
     });
     assert_inflight_workbook_source_change(|workbook, _sheet, _reference, name| {
