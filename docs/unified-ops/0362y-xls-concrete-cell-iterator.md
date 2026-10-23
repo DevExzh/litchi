@@ -144,10 +144,13 @@ The pinned `9b1f...` baseline is allowed three exact historical dispositions
 only: the signed `edit_cells` object-layer `InvalidFormat`, the structural
 source-backed plan's `UnsupportedFeature` text, and the RK/MulRK
 `set_number` wrong-family `UnsupportedFeature` text for the selected fixture
-coordinate. The candidate must return the corresponding typed refusals. The
-runner passes the disposition explicitly to every child and records this
-allowlist in the receipt; no arbitrary error or broad `is_err()` path is
-accepted.
+coordinate. It also records the five pinned baseline freshness capabilities
+that predate the candidate fences: stage→mutate→commit, same-owner forward and
+inverse replay, mutate→committed-first-read, and mutate→committed-write are
+accepted after the source revision changes. The candidate must return the
+corresponding typed refusals. The runner passes the disposition explicitly to
+every child and records this allowlist in the receipt; no arbitrary error or
+broad `is_err()` path is accepted.
 The probe has already added three explicit route labels over this same
 preparation:
 

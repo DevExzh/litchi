@@ -78,6 +78,26 @@ BASELINE_LEGACY_DISPOSITIONS = {
         "error": "litchi_xls::Error::UnsupportedFeature",
         "message_template": "cell ({row}, {column}) is not encoded as a standalone BIFF8 Number record",
     },
+    "stage_mutate_commit": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "disposition": "accepted stale source-backed commit",
+    },
+    "same_owner_forward_replay": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "disposition": "accepted stale same-owner forward replay",
+    },
+    "same_owner_inverse_replay": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "disposition": "accepted stale same-owner inverse replay",
+    },
+    "mutate_committed_first_read": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "disposition": "accepted stale deferred first read",
+    },
+    "mutate_committed_write": {
+        "source_ref": BASELINE_SOURCE_REF,
+        "disposition": "accepted stale committed write",
+    },
 }
 PROBE_PATHS = (
     "tools/perf-baseline/src/xls_f3_qualification.rs",

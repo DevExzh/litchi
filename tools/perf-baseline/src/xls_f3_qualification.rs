@@ -296,7 +296,7 @@ fn source_workbook(
     ))?)
 }
 
-fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
+fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) -> Result<()> {
     let specification = fixture
         .edits
         .first()
@@ -345,11 +345,21 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     let mut edit = workbook.edit_cells()?;
     stage(&mut edit, fixture)?;
     source.mutate();
-    let error = match edit.commit() {
+    match edit.commit() {
+        Ok(commit) if implementation == Implementation::Baseline => {
+            require_nonempty_output(write_package(commit.package())?, "stage/mutate/commit")?;
+        },
         Ok(_) => return Err("XLS F3 stale source was accepted at commit".into()),
-        Err(error) => error,
-    };
-    require_commit_source_changed(error, "stage/mutate/commit")?;
+        Err(error) if implementation == Implementation::Candidate => {
+            require_commit_source_changed(error, "stage/mutate/commit")?;
+        },
+        Err(error) => {
+            return Err(format!(
+                "XLS F3 baseline stage/mutate/commit disposition changed: {error:?}"
+            )
+            .into());
+        },
+    }
 
     // Replay must not let Arc identity bypass the original-source fence.  The
     // forward patch's before-owner is this same workbook, so mutating its
@@ -358,21 +368,47 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     let workbook = SourceBackedWorkbook::from_read_at(source.clone())?;
     let commit = commit_fixture(&workbook, fixture)?;
     source.mutate();
-    let error = match workbook.apply_cells(commit.patch()) {
+    match workbook.apply_cells(commit.patch()) {
+        Ok(replayed) if implementation == Implementation::Baseline => {
+            require_nonempty_output(
+                write_package(replayed.package())?,
+                "same-owner forward replay",
+            )?;
+        },
         Ok(_) => return Err("XLS F3 stale same-owner forward replay was accepted".into()),
-        Err(error) => error,
-    };
-    require_commit_source_changed(error, "same-owner forward replay")?;
+        Err(error) if implementation == Implementation::Candidate => {
+            require_commit_source_changed(error, "same-owner forward replay")?;
+        },
+        Err(error) => {
+            return Err(format!(
+                "XLS F3 baseline same-owner forward replay disposition changed: {error:?}"
+            )
+            .into());
+        },
+    }
 
     // The inverse patch's before-owner is the committed package.  Keep the
     // recipient identical to that owner so this covers the inverse fast path,
     // not only the independent-content replay route.
     let inverse = commit.patch().inverse();
-    let error = match commit.package().apply_cells(&inverse) {
+    match commit.package().apply_cells(&inverse) {
+        Ok(restored) if implementation == Implementation::Baseline => {
+            require_nonempty_output(
+                write_package(restored.package())?,
+                "same-owner inverse replay",
+            )?;
+        },
         Ok(_) => return Err("XLS F3 stale same-owner inverse replay was accepted".into()),
-        Err(error) => error,
-    };
-    require_commit_source_changed(error, "same-owner inverse replay")?;
+        Err(error) if implementation == Implementation::Candidate => {
+            require_commit_source_changed(error, "same-owner inverse replay")?;
+        },
+        Err(error) => {
+            return Err(format!(
+                "XLS F3 baseline same-owner inverse replay disposition changed: {error:?}"
+            )
+            .into());
+        },
+    }
 
     // A mutation after a deferred commit must also be caught when the first
     // semantic read asks effective_inner to materialize the composed target.
@@ -382,16 +418,28 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     stage(&mut edit, fixture)?;
     let commit = edit.commit()?;
     source.mutate();
-    let error = match commit.package().cell_value_by_index(
+    match commit.package().cell_value_by_index(
         specification.sheet_index,
         u32::from(specification.reference.row()),
         u32::from(specification.reference.column()),
     ) {
+        Ok(Some(CellValue::Float(value) | CellValue::DateTime(value)))
+            if implementation == Implementation::Baseline
+                && value.to_bits() == specification.replacement.to_bits() => {},
         Ok(_) => return Err("XLS F3 stale deferred source was read".into()),
-        Err(error) => error,
-    };
-    if !matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) {
-        return Err(format!("XLS F3 deferred read returned the wrong error: {error:?}").into());
+        Err(error) if implementation == Implementation::Candidate => {
+            if !matches!(error, litchi_xls::SourceBackedError::SourceChanged { .. }) {
+                return Err(
+                    format!("XLS F3 deferred read returned the wrong error: {error:?}").into(),
+                );
+            }
+        },
+        Err(error) => {
+            return Err(
+                format!("XLS F3 baseline deferred-read disposition changed: {error:?}").into(),
+            );
+        },
+        Ok(None) => return Err("XLS F3 stale deferred source lost its selected cell".into()),
     }
 
     // A committed deferred owner must retain the original source freshness
@@ -403,11 +451,28 @@ fn verify_source_freshness(fixture: &Fixture) -> Result<()> {
     let commit = edit.commit()?;
     source.mutate();
     let mut output = Vec::new();
-    let error = match commit.package().write_to(&mut output) {
+    match commit.package().write_to(&mut output) {
+        Ok(_) if implementation == Implementation::Baseline => {
+            require_nonempty_output(output, "mutate/committed-write")?;
+        },
         Ok(_) => return Err("XLS F3 stale committed source was published".into()),
-        Err(error) => error,
-    };
-    require_output_source_changed(error, "mutate/committed-write")?;
+        Err(error) if implementation == Implementation::Candidate => {
+            require_output_source_changed(error, "mutate/committed-write")?;
+        },
+        Err(error) => {
+            return Err(format!(
+                "XLS F3 baseline mutate/committed-write disposition changed: {error:?}"
+            )
+            .into());
+        },
+    }
+    Ok(())
+}
+
+fn require_nonempty_output(output: Vec<u8>, label: &str) -> Result<()> {
+    if output.is_empty() {
+        return Err(format!("XLS F3 baseline {label} accepted with empty output").into());
+    }
     Ok(())
 }
 
@@ -1525,7 +1590,7 @@ where
     // These are invariant gates. They run once before any warmup or measured
     // sample and therefore never enter route timing.
     for fixture in &fixtures {
-        verify_source_freshness(fixture)?;
+        verify_source_freshness(fixture, options.implementation)?;
         verify_noop_and_unsupported(fixture, options.implementation)?;
         verify_security_fixtures(fixture, options.implementation)?;
     }
