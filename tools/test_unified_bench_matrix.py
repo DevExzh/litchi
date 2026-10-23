@@ -116,6 +116,17 @@ class Committed(unittest.TestCase):
                     "0327", "0328", "0329", "0330", "0333", "0335", "0336", "0338", "0342"):
             self.assertIn(rec, records)
 
+    def test_assembled_performance_receipts_contribute_diagnostic_rows(self):
+        rows, _, _, _, _ = matrix.build()
+        records = {r["record"] for r in rows}
+        for rec in ("0359qb", "0359qc", "0359qd", "0359r", "0359ra", "0359rb",
+                    "0359rc", "0359rd", "0359re", "0362ya", "0362yb", "0362yc",
+                    "0362yd", "0362ye"):
+            self.assertIn(rec, records)
+        native = [r for r in rows if r["record"] in ("0359qb", "0362ye")
+                  and r["status"] == "unqualified"]
+        self.assertGreaterEqual(len(native), 2)
+
     def test_the_two_audit_misses_have_follow_ups(self):
         rows, _, _, _, _ = matrix.build()
         wanted = {("0327", "sheet_features:xls"), ("0327", "sheet_features:ods"),

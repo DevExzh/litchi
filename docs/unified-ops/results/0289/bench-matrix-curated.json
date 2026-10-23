@@ -2982,6 +2982,38 @@
   {
    "record": "0362hda",
    "reason": "ODF flat output admission correctness follow-up with an untimed flat qualification probe, source and allocation receipts; native timing remains open and no performance acceptance is claimed."
+  },
+  {
+   "record": "0362uc",
+   "reason": "Combined legacy/ODF integration receipt: compilation, consumer integration and semantic-test command results only. It records no paired timing or allocation measurement; the native performance qualifications it leaves open are represented by their own records."
+  },
+  {
+   "record": "0362ud",
+   "reason": "Combined DOCX/DOC/facade validation receipt with test, Clippy and performance-harness command checks only. It contains no paired timing or allocation measurement and makes no native-performance claim."
+  },
+  {
+   "record": "0362ue",
+   "reason": "Legacy replay assembly validation receipt: failed and corrected test/compile groups and resource-stop metadata only. It contains no paired timing or allocation measurement and explicitly leaves performance qualification open."
+  },
+  {
+   "record": "0362uf",
+   "reason": "Raw API assembly consumer diagnostics: successive compile/preflight receipts, including failures and stopped-before-command attempts, with no benchmark or allocation pair. This is validation-only evidence and makes no performance acceptance claim."
+  },
+  {
+   "record": "0362ug",
+   "reason": "ODF facade error-consumer source repair receipt. It records source-only changes and formatter/diff validation; Cargo and performance qualification were intentionally deferred, so no paired measurement exists."
+  },
+  {
+   "record": "0362uh",
+   "reason": "ODF native-consumer error migration is a source-only repair receipt with formatter and diff checks; Cargo and native performance qualification were intentionally not run, so it contributes no measured pair."
+  },
+  {
+   "record": "0362y",
+   "reason": "Mixed XLS iterator/source-owner repair receipt: the committed JSON contains only validation checks and a deferred native-measurement marker. Its ODP allocation/performance measurements are separately recorded in 0362ya, 0362yb, 0362yc, 0362yd and 0362ye; this receipt itself has no paired numeric measurement."
+  },
+  {
+   "record": "0362z",
+   "reason": "DOCX SVG family validation and coordinator-integration receipts: focused tests, Clippy, rustdoc/profile hashes and source/replay correctness only. The record explicitly makes no benchmark or native timing claim."
   }
  ]
 }
