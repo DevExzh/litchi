@@ -449,8 +449,6 @@ pub mod raw {
         owner_id: &str,
         owner_target: &str,
     ) -> Result<()> {
-        super::validate_catalog_limits(&graph.catalog, limits)?;
-        admit_catalog(&graph.catalog, limits)?;
         super::admit_graph_ledger(
             graph,
             limits,
