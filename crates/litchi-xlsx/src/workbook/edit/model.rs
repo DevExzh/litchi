@@ -2040,7 +2040,10 @@ impl fmt::Display for JoinError {
 
 impl std::error::Error for JoinError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        self.normalization_source.as_deref().map(|source| source)
+        self.normalization_source.as_deref().map(|source| {
+            let source: &(dyn std::error::Error + 'static) = source;
+            source
+        })
     }
 }
 
