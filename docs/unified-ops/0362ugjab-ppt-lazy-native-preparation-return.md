@@ -136,3 +136,61 @@ The only permitted next execution is one normal release build per endpoint
 followed by the probe's `--mode verify` correctness invocation through the
 existing fail-closed runner. Allocator builds, calibration, timing, ABBA and
 performance disposition remain pending and are not claimed here.
+
+## Final probe-fix build and correctness preflight
+
+The probe correction was committed as `416f57cd7a` in the reviewed source
+packet. It changes absent optional patch endpoints in a no-op proof from the
+boolean `false` to JSON `null`; the validator requires the distinction and
+the source probe hash below binds the exact corrected file. The final
+candidate adapter was built at temporary commit
+`5067a9eac047ce40fc714c16af7bcfa100a229af` (tree
+`cb99f0c28121626e1e110ed803674ee2021c5c73`), which is the local-lock
+migration `fb262b0bbf5160534ca5e87c63727df823a794bc` plus that probe fix.
+The final preparation receipt is retained outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-5067a9eac0.json`
+(12,580 bytes; SHA-256
+`0bbb366e920949da8f212b7a0bb2ad1c4499054cd810f5b64605078f58e573a9`).
+It binds the baseline ref/tree and the candidate ref/tree above, the
+baseline lock (57,158 bytes; SHA-256
+`4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184`), the
+candidate lock (57,206 bytes; SHA-256
+`6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39`), the
+five compile fixtures, the sparse pre-state, and the complete overlay.
+
+The three probe source identities in that receipt are:
+
+```text
+tools/perf-baseline/src/ppt_lazy_native.rs          24,586  68d77fad390dc681ed248b2348b26f319d2e646d1f0b006796ecd89c49cae62e
+tools/perf-baseline/src/bin/ppt_lazy_native.rs        146  04df53920b036911e9002df152b9e07b1e0392ac6a1a545b285807108d808d12
+tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs  203  661e94115adc418de1c25ee6dd5481e4399e43eee26e011a49d1fb9d1ce56201
+```
+
+With the repository memory-capped Cargo shim, `LITCHI_MEM_MAX=20G`, one
+build job, `CARGO_INCREMENTAL=0`, offline and locked resolution, both
+endpoints completed the recorded release build command:
+
+```text
+cargo build --release --offline --locked \
+  --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native
+```
+
+The build used rustc 1.95.0 (commit
+`59807616e1fa2540724bfbac14d7976d7e4a386b`, LLVM 22.1.2), and separate
+external targets below the 20-GB ceiling. The retained identities are:
+
+| endpoint | binary (bytes; SHA-256) | build log (bytes; SHA-256) | target bytes |
+| --- | --- | --- | ---: |
+| baseline | 12,130,968; `ad031ccabb073b3a719f0985088f43ee2ab9a295c9e52594a70841d8e2090a1f` | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/baseline-8779-r4-probe-fix-build.log` (579; `8c584eefe62f7a91620aa6167fdbe62e18abee0e26a9200049ae6a1a3ffa3e20`) | 1,314,509,577 |
+| candidate | 12,289,336; `a62114de50bc25eaf4ba5682c632940efe3a97a1d7140dcb323105c4b1981a61` | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/candidate-5067-r2-probe-fix-build.log` (224; `bd6898ccea415c2a13310fea6fe119868092b866a1d73db9e9e8190fd5a39d78`) | 1,317,080,259 |
+
+The normal binaries were then invoked separately with exactly
+`--mode verify`. Both exited 0. Their 12,094-byte reports are retained at
+`verify-baseline-8779-r4-probe-fix.json` and
+`verify-candidate-5067-r2-probe-fix.json` beside the targets; both have SHA-256
+`2daa5587982ac38c4a4068adc03a9c91798a4c98ce95b050e541069ed276d07c`.
+The fail-closed Python validator accepted both reports: each proves all 28
+routes over the four reviewed fixtures, and the validated correctness
+structures are equal. This is a correctness-only preflight. It makes no
+allocator, calibration, timing, ABBA, or performance-acceptance claim; those
+remain pending a separate quiet-host authorization.
