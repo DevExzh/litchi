@@ -164,6 +164,7 @@ impl SortCondition {
 
 /// Invalid combination of fields in a sort condition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     MissingDifferentialFormat(SortBy),
     UnexpectedDifferentialFormat,

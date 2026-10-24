@@ -2448,6 +2448,7 @@ impl Classify for litchi_ppt::text_edit::Error {
             Self::Refused(refusal) => refusal.kind().classify(),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
+            _ => Class::of(Code::CorruptFile),
         }
     }
 }

@@ -7,6 +7,7 @@ pub const MAX_ITEM_BYTES: usize = 4 * 1_024;
 
 /// Errors returned by checked Pop-Up Menu construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// A menu contains no choices.
     Empty,

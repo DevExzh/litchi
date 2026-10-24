@@ -705,6 +705,7 @@ fn map_cryptoapi_header_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::MalformedFilePass("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -714,6 +715,7 @@ fn map_cryptoapi_runtime_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::InvalidData("CryptoAPI RC4 error".to_string()),
     }
 }
 
@@ -732,6 +734,7 @@ fn map_legacy_header_error(error: legacy_rc4::Error) -> Error {
         legacy_rc4::Error::StreamRangeOverflow => {
             Error::MalformedFilePass("legacy RC4 stream range overflow".to_string())
         },
+        _ => Error::MalformedFilePass("legacy RC4 error".to_string()),
     }
 }
 
@@ -747,6 +750,7 @@ fn map_legacy_runtime_error(error: legacy_rc4::Error) -> Error {
         legacy_rc4::Error::InvalidBlockSize { .. } | legacy_rc4::Error::StreamRangeOverflow => {
             Error::InvalidData(error.to_string())
         },
+        _ => Error::InvalidData("legacy RC4 error".to_string()),
     }
 }
 

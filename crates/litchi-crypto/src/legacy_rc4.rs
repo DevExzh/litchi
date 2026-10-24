@@ -26,6 +26,7 @@ const MAX_PASSWORD_UNITS: usize = 255;
 
 /// A malformed legacy RC4 header or an invalid bounded operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The input does not satisfy the fixed legacy RC4 grammar.
     Malformed(String),

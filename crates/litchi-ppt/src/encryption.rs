@@ -741,6 +741,7 @@ fn map_crypto_error(error: CryptoError) -> Error {
         CryptoError::UnsupportedAlgorithm => {
             Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
         },
+        _ => Error::MalformedEncryptionHeader("CryptoAPI RC4 error".to_string()),
     }
 }
 

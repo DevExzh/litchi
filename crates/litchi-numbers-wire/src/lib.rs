@@ -187,6 +187,7 @@ const FIELD_COUNT: usize = FIELD_LAYOUT.len();
 pub const MAX_OWNED_BNC_PARSE_ALLOCATIONS: usize = FIELD_COUNT * 2 + 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     InvalidFormat(String),
     ParseError(String),

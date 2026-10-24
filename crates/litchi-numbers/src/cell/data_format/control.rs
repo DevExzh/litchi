@@ -36,6 +36,7 @@ const DEFAULT_INCREMENT: f64 = 1.0;
 
 /// Errors returned by checked numeric-control range construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// At least one range component is not finite.
     NonFinite,

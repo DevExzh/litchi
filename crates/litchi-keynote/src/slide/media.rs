@@ -226,6 +226,7 @@ pub mod playback {
 
     /// Validation failures for Keynote media playback values.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+    #[non_exhaustive]
     pub enum Error {
         /// The supplied volume was NaN or infinite.
         #[error("media volume must be finite")]

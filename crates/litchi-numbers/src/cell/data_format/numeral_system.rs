@@ -8,6 +8,7 @@ const MAXIMUM_PLACES: u8 = 32;
 
 /// Errors returned by checked numeral-system constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The base is outside the supported range.
     BaseOutOfRange { value: u8, minimum: u8, maximum: u8 },

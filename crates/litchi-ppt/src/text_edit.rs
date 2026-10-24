@@ -224,6 +224,7 @@ impl Refusal {
 
 /// Error returned by the focused text-edit transaction.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The package could not be opened, parsed, or republished.
     Package(PackageError),

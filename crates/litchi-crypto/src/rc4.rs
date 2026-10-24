@@ -28,6 +28,7 @@ bitflags! {
 
 /// A malformed or unsupported RC4 `CryptoAPI` header or operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Malformed(String),
     UnsupportedVersion { major: u16, minor: u16 },
