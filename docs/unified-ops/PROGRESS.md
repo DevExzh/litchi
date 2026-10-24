@@ -4349,3 +4349,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   The gate continues its ops chunks with bounded retention and healthy
   guards. Isolated documentation, corpus replay and native performance
   acceptance remain open; only audit 22 is deferred and nothing is pushed.
+
+- Coordinator gate return (2026-10-24):
+  The 9781 ordinary-gate retry stops at ops chunk 36 after thirty-six completed
+  chunks pass. `pptx_batch_equivalence` finds a real signed-package mismatch:
+  the batch returns `DocumentProtected` at item zero, while applying that
+  item's missing-notes path individually returns `PathNotFound`. The failure
+  is preserved and assigned for a correctness repair; equivalence must not be
+  weakened to accept it.
+
+  A separate outer-runner cleanup error incorrectly identifies the runner
+  itself as a remaining owned child. That failure is also retained and sent
+  back for repair with a regression. The endpoint has no remaining owned
+  processes; its target and quarantine remain intact, and no retry is started.
+  A fresh isolated documentation selection is prepared pending the runner
+  assessment. Candidate performance execution remains held while the affected
+  source and required receipt rebinding are determined.
