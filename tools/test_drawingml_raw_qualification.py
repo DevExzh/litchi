@@ -137,12 +137,32 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("production_preflight", source)
         self.assertIn("PreparedValue", source)
         self.assertIn("semantic_changed_differs", source)
+        self.assertIn("generated_fixture_parts", source)
+        self.assertIn("output_limit_attempt", source)
+        self.assertIn("partial_output_allowed", source)
+        self.assertIn("changed_output_exact", source)
+        self.assertIn("source_edit_serialize", source)
+        self.assertIn("read(xml,scope,limits)", source)
         self.assertIn("write_contextual_to", source)
         self.assertIn("read_svg_contextual_value", source)
         self.assertNotIn("source_readback_sha256", source)
         self.assertNotIn("changed_readback_sha256", source)
         self.assertNotIn("FormattingSink", source)
         self.assertNotIn("lane adapter is not supplied until the final source freeze", source)
+
+    def test_generated_fixture_identity_binds_all_three_byte_roles(self) -> None:
+        parts = [
+            {
+                "part_id": "chart",
+                "source_sha256": "a" * 64,
+                "changed_sha256": "b" * 64,
+                "malformed_sha256": "c" * 64,
+            }
+        ]
+        identity = validator._generated_fixture_identity(parts)
+        self.assertEqual(identity, validator._generated_fixture_identity(parts))
+        changed = [dict(parts[0], malformed_sha256="d" * 64)]
+        self.assertNotEqual(identity, validator._generated_fixture_identity(changed))
 
     def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:
         import hashlib

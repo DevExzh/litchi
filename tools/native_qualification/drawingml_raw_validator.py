@@ -155,6 +155,16 @@ def _owner_fixture_identity(
     ).hexdigest()
 
 
+def _generated_fixture_identity(parts: list[Mapping[str, Any]]) -> str:
+    payload = "drawingml-generated-fixture-v1\0"
+    for part in parts:
+        payload += (
+            f"{part['part_id']}\0{part['source_sha256']}\0"
+            f"{part['changed_sha256']}\0{part['malformed_sha256']}\0"
+        )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
 def _refusal(value: Any, kind: str, path: Path, label: str) -> None:
     _expect(isinstance(value, dict), f"{path}: {label} refusal is missing")
     _expect(value.get("kind") == kind, f"{path}: {label} refusal kind differs")
@@ -243,6 +253,27 @@ def _validate_rows(
     _expect(
         report.get("fixture_lane_identity_sha256") == expected_fixture_lane_identity,
         f"{path}: fixture lane identity differs",
+    )
+    generated_parts = report.get("generated_fixture_parts")
+    _expect(
+        isinstance(generated_parts, list) and generated_parts,
+        f"{path}: generated fixture receipt is missing",
+    )
+    generated_seen: set[str] = set()
+    for generated in generated_parts:
+        _expect(isinstance(generated, dict), f"{path}: generated fixture part is not an object")
+        part_id = generated.get("part_id")
+        _expect(
+            isinstance(part_id, str) and part_id and part_id not in generated_seen,
+            f"{path}: generated fixture part identity is missing or duplicated",
+        )
+        generated_seen.add(part_id)
+        for key in ("source_sha256", "changed_sha256", "malformed_sha256"):
+            _expect(_is_hash(generated.get(key)), f"{path}: generated fixture {key} is missing")
+    _expect(
+        _is_hash(report.get("generated_fixture_sha256"))
+        and report["generated_fixture_sha256"] == _generated_fixture_identity(generated_parts),
+        f"{path}: generated fixture identity is not bound to its parts",
     )
     capabilities = report.get("capabilities")
     _expect(
@@ -369,7 +400,8 @@ def _validate_rows(
         _expect(
             receipt["fidelity_mode"] == expected_mode
             and receipt.get("source_preserving_expected") == (expected_mode == "source_exact")
-            and isinstance(receipt.get("source_output_exact"), bool),
+            and isinstance(receipt.get("source_output_exact"), bool)
+            and isinstance(receipt.get("changed_output_exact"), bool),
             f"{path}: raw fidelity source-preservation receipt is missing",
         )
         _expect(
@@ -385,6 +417,11 @@ def _validate_rows(
                 receipt["source_output_exact"] is True
                 and receipt["source_output_sha256"] == receipt["source_sha256"],
                 f"{path}: promised source-preserving route changed bytes",
+            )
+            _expect(
+                receipt["changed_output_exact"] is True
+                and receipt["changed_output_sha256"] == receipt["changed_sha256"],
+                f"{path}: promised changed source-preserving route changed bytes",
             )
         _expect(
             receipt.get("fixture_identity_sha256")
@@ -601,9 +638,11 @@ def _validate_rows(
         elif operation == "preflight_refusal":
             _expect(
                 row.get("typed_refusal_checked") is True
-                and details.get("preflight_zero_writes") is True
-                and details.get("sink_writes") == 0,
-                f"{path}: preflight wrote before refusal",
+                and isinstance(details.get("preflight_zero_writes"), bool)
+                and details.get("preflight_writes_within_limit") is True
+                and isinstance(details.get("sink_writes"), int)
+                and details["sink_writes"] >= 0,
+                f"{path}: preflight receipt is incomplete",
             )
             parts = details.get("parts")
             _expect(isinstance(parts, list) and parts, f"{path}: preflight part receipts are missing")
@@ -648,52 +687,73 @@ def _validate_rows(
                             and production_refusal["observed"] > production_refusal["limit"],
                             f"{path}: production boundary lacks typed limit details",
                         )
-                if sink_supported:
-                    preflight = part.get("preflight")
+                preflight = part.get("preflight")
+                _expect(
+                    preflight in {"typed_output_limit", "not_applicable"},
+                    f"{path}: preflight lacks a production route declaration",
+                )
+                if preflight == "typed_output_limit":
                     _expect(
-                        preflight in {"typed_output_limit", "not_applicable"},
-                        f"{path}: sink-backed preflight lacks a production route declaration",
+                        isinstance(part.get("preflight_bytes"), int)
+                        and part["preflight_bytes"] > 1
+                        and part.get("output_limit") == part["preflight_bytes"] - 1
+                        and isinstance(part.get("observed_output"), int)
+                        and part["observed_output"] > part["output_limit"]
+                        and isinstance(part.get("partial_output_allowed"), bool)
+                        and isinstance(part.get("partial_output_bytes"), int)
+                        and part["partial_output_bytes"] >= 0
+                        and part.get("partial_output_within_limit") is True,
+                        f"{path}: typed output preflight is not bound to measured output",
                     )
-                    _expect(
-                        part.get("sink_writes") == 0,
-                        f"{path}: preflight part wrote before admission/refusal",
-                    )
-                    if preflight == "typed_output_limit":
+                    _refusal(part.get("sink_refusal"), "limit", path, "preflight output")
+                    if part["partial_output_allowed"]:
                         _expect(
-                            isinstance(part.get("preflight_bytes"), int)
-                            and part["preflight_bytes"] > 0
-                            and part.get("output_limit") == part["preflight_bytes"] - 1
-                            and part.get("observed_output") == part["preflight_bytes"],
-                            f"{path}: typed output preflight is not bound to measured output",
+                            part_id == "chart"
+                            and sink_supported
+                            and part["partial_output_bytes"] <= part["output_limit"],
+                            f"{path}: only chart may report bounded partial output",
                         )
-                        _refusal(part.get("sink_refusal"), "limit", path, "preflight output")
                     else:
                         _expect(
-                            isinstance(part.get("reason"), str) and part["reason"],
-                            f"{path}: N/A sink preflight lacks its production reason",
+                            part["partial_output_bytes"] == 0
+                            and part.get("sink_writes") == 0,
+                            f"{path}: non-chart preflight wrote before refusal",
                         )
-                        for key in (
-                            "preflight_bytes",
-                            "sink_limit",
-                            "output_limit",
-                            "observed_output",
-                            "sink_refusal",
-                        ):
-                            _expect(
-                                key not in part,
-                                f"{path}: N/A sink preflight carries synthetic {key} evidence",
-                            )
+                    expected_scope = (
+                        "source_edit_serialize"
+                        if part_id in {"diagram-data-model", "theme-family-part"}
+                        else "contextual_typed_writer"
+                        if part_id == "svg-blip"
+                        else "typed_writer"
+                    )
+                    _expect(
+                        part.get("operation_scope") == expected_scope,
+                        f"{path}: preflight operation scope is inaccurate",
+                    )
                 else:
                     _expect(
-                        part.get("sink_writes") == 0
-                        and "preflight_bytes" not in part
-                        and "sink_limit" not in part
-                        and "preflight" not in part
-                        and "reason" not in part
-                        and "output_limit" not in part
-                        and "observed_output" not in part
-                        and "sink_refusal" not in part,
-                        f"{path}: non-sink route carries synthetic preflight evidence",
+                        isinstance(part.get("reason"), str) and part["reason"],
+                        f"{path}: N/A preflight lacks its production reason",
+                    )
+                    for key in (
+                        "preflight_bytes",
+                        "sink_limit",
+                        "output_limit",
+                        "observed_output",
+                        "sink_refusal",
+                        "partial_output_allowed",
+                        "partial_output_bytes",
+                        "partial_output_within_limit",
+                        "operation_scope",
+                    ):
+                        _expect(
+                            key not in part,
+                            f"{path}: N/A preflight carries synthetic {key} evidence",
+                        )
+                if not sink_supported:
+                    _expect(
+                        part.get("sink_writes") == 0,
+                        f"{path}: non-sink route reported sink writes",
                     )
             _expect(seen == raw_routes, f"{path}: preflight does not cover every raw part")
         elif operation == "malformed_refusal":
@@ -955,6 +1015,7 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
         raise ValidationError(f"fixture descriptor cannot provide lane root: {error}") from error
     fixture_lane_identity = _fixture_lane_identity(arguments.lane, fixture_data)
     reports: list[dict[str, Any]] = []
+    qualified_reports: list[tuple[Path, Mapping[str, Any]]] = []
     unavailable = False
     for mode, prefix in (("normal", "dml-native"), ("allocator", "dml-allocator")):
         for index, path in enumerate(_ordered_outputs(output_dir, prefix)):
@@ -970,6 +1031,7 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
             _expect(report.get("fixture_bytes") == fixture_bytes, f"{path}: fixture byte count differs")
             status = _validate_rows(report, path, fixture_lane_identity)
             if status == "qualified":
+                qualified_reports.append((path, report))
                 _expect(report.get("fixture_sha256") == fixture_hash, f"{path}: fixture SHA-256 differs")
                 _expect(report.get("fixture_root_sha256") == hashlib.sha256(fixture_root.encode()).hexdigest(), f"{path}: fixture root identity differs")
                 _expect(isinstance(report.get("fixture_mutation"), str) and report["fixture_mutation"], f"{path}: fixture mutation receipt is missing")
@@ -1045,6 +1107,15 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
                         and allocator_metrics.get("source_revision") == resource_metrics.get("source_revision"),
                         f"{path}: allocator and process RSS receipts differ",
                     )
+    if qualified_reports:
+        expected_generated_identity = qualified_reports[0][1]["generated_fixture_sha256"]
+        expected_generated_parts = qualified_reports[0][1]["generated_fixture_parts"]
+        for path, report in qualified_reports[1:]:
+            _expect(
+                report.get("generated_fixture_sha256") == expected_generated_identity
+                and report.get("generated_fixture_parts") == expected_generated_parts,
+                f"{path}: generated source/changed/malformed fixtures differ across paired legs",
+            )
     return {
         "schema": SUMMARY_SCHEMA,
         "lane": arguments.lane,

@@ -11,18 +11,26 @@ The probe now:
 - parses each source and changed fixture into a typed `PreparedValue` before
   timed writer rows; `entry_read` times only the reader, `vec_write` times only
   the writer, and shared-reader rows time only the shared reader;
+- freezes source, changed, and malformed generated-fixture hashes before the
+  first warmup and compares that receipt across every paired baseline and
+  candidate leg;
 - compares typed semantic models after a write, retaining exact-source checks
   only for formatcode2, SVG blips, theme-family values/parts, and the strict
-  InkML action profile; the image blip lane is explicitly scanner-only;
+  InkML action profile (for both source and changed fixtures); the image blip
+  lane is explicitly scanner-only;
 - uses the production SVG contextual writer for its output-limit preflight,
-  with an unbounded observation sink. Vec/String-only routes are explicitly
-  N/A for the bounded-sink capability rather than receiving a synthetic cap;
+  with an unbounded observation sink. Every current typed output limit,
+  including Vec/String routes, receives an actual refusal check; chart's
+  bounded partial output is reported and checked against its cap. Diagram and
+  Theme Family part rows are named source-edit-and-serialize operations;
 - passes the current typed limits through the `drawingml-raw-current`,
   `drawingml-theme-family-current`, and `drawingml-ink-limits-current`
   feature gates while preserving the historical one-argument baseline APIs.
 
 The validator and source test are updated to require semantic receipts,
-typed preflight declarations, and outside-clock fidelity evidence. No
+typed output-preflight declarations, frozen fixture identities, and
+outside-clock fidelity evidence. Text-body evidence names its actual
+`read(xml, scope, limits)` entry. No
 benchmark output or large evidence is committed by this record; the
 coordinator must run the locked paired normal and allocator suites on the
 assembled candidate before accepting performance claims.

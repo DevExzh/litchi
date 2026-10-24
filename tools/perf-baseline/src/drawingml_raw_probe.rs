@@ -277,7 +277,7 @@ fn raw_route_evidence(kind: PartKind) -> &'static str {
             "crates/litchi-drawingml/src/diagram/edit.rs:Outline::read,set_text,set_drawing_reference"
         },
         PartKind::TextBody => {
-            "crates/litchi-drawingml/src/text/body/reader.rs:read_with_options;writer"
+            "crates/litchi-drawingml/src/text/body/reader.rs:read(xml,scope,limits);writer"
         },
         PartKind::SvgBlip => "crates/litchi-drawingml/src/svg_blip.rs:read,write,write_to",
         PartKind::Model3d => "crates/litchi-drawingml/src/model3d/codec/xml.rs:read,write,write_to",
@@ -381,6 +381,12 @@ struct PreparedPart {
     id: &'static str,
     source: PreparedValue,
     changed: PreparedValue,
+    /// The contextual SVG value is prepared once before timing.  It is kept
+    /// separate from the standalone value used by the ordinary Vec writer so
+    /// the production preflight and its detail receipt exercise the same
+    /// contextual object.
+    contextual_changed: Option<dml::svg_blip::SvgBlip>,
+    contextual_changed_output_bytes: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -437,6 +443,7 @@ struct RawFidelityReceipt {
     changed_output_differs: bool,
     source_preserving_expected: bool,
     source_output_exact: bool,
+    changed_output_exact: bool,
     fidelity_mode: &'static str,
     source_semantic_sha256: String,
     source_output_semantic_sha256: String,
@@ -445,6 +452,21 @@ struct RawFidelityReceipt {
     source_semantic_equal: bool,
     changed_semantic_equal: bool,
     semantic_changed_differs: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct GeneratedFixturePart {
+    part_id: &'static str,
+    source_sha256: String,
+    changed_sha256: String,
+    malformed_sha256: String,
+}
+
+#[derive(Debug)]
+struct OutputLimitAttempt {
+    refusal: RefusalReceipt,
+    sink: Option<SinkReceipt>,
+    partial_output_allowed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -573,6 +595,8 @@ struct Report {
     fixture_root_sha256: String,
     fixture_mutation: String,
     fixture_lane_identity_sha256: String,
+    generated_fixture_sha256: String,
+    generated_fixture_parts: Vec<GeneratedFixturePart>,
     capabilities: Vec<CapabilityReceipt>,
     raw_fidelity: Vec<RawFidelityReceipt>,
     theme_family_mutations: Vec<ThemeFamilyMutationReceipt>,
@@ -1703,6 +1727,469 @@ fn write_prepared_vec(
     Ok(output)
 }
 
+/// Output admission is a separate capability from a caller-provided sink.
+/// Several DrawingML codecs only expose a Vec/String writer, but still take a
+/// typed output budget and must be exercised at that boundary.  SVG retains
+/// its historical bounded writer in the baseline; the other current raw
+/// limits are enabled by their respective source fences.
+fn output_limit_supported(kind: PartKind) -> bool {
+    match kind {
+        PartKind::SvgBlip => true,
+        PartKind::Chart
+        | PartKind::FormatCode
+        | PartKind::Diagram
+        | PartKind::TextBody
+        | PartKind::Model3d
+        | PartKind::Theme
+        | PartKind::Geometry
+        | PartKind::Color
+        | PartKind::Transform => cfg!(feature = "drawingml-raw-current"),
+        PartKind::ThemeFamily | PartKind::ThemeFamilyPart => {
+            cfg!(feature = "drawingml-theme-family-current")
+        },
+        PartKind::InkActions => cfg!(any(
+            feature = "drawingml-raw-current",
+            feature = "drawingml-ink-limits-current"
+        )),
+        PartKind::Blip => false,
+    }
+}
+
+fn text_body_payload_bytes(bytes: &[u8]) -> Result<usize, ProbeFailure> {
+    const PREFIX: &[u8] =
+        b"<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">";
+    const SUFFIX: &[u8] = b"</a:txBody>";
+    let payload = bytes
+        .strip_prefix(PREFIX)
+        .and_then(|bytes| bytes.strip_suffix(SUFFIX))
+        .ok_or_else(|| fail("text-body fixture is not wrapped by the probe host"))?;
+    Ok(payload.len())
+}
+
+fn output_payload_bytes(
+    part: &Part,
+    prepared: &PreparedPart,
+) -> Result<usize, ProbeFailure> {
+    match part.kind {
+        PartKind::TextBody => text_body_payload_bytes(&part.changed),
+        PartKind::SvgBlip => prepared
+            .contextual_changed_output_bytes
+            .ok_or_else(|| fail("SVG contextual output was not prepared before timing")),
+        _ => Ok(part.changed.len()),
+    }
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_chart_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::chart::Chart,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    dml::chart::writer::write(writer, value, &dml::chart::Limits::new(maximum))
+        .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_chart_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::chart::Chart,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("chart output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_format_code_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::chart::extension::formatcode2::Element,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    let defaults = dml::chart::extension::formatcode2::Limits::DEFAULT;
+    let limits = dml::chart::extension::formatcode2::Limits::new(
+        defaults.max_xml_bytes,
+        defaults.max_value_bytes,
+        defaults.max_attributes,
+        defaults.max_nodes,
+        defaults.max_depth,
+        defaults.max_namespace_bytes,
+        maximum,
+    );
+    dml::chart::extension::formatcode2::write_to(writer, value, &limits)
+        .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_format_code_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::chart::extension::formatcode2::Element,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("formatcode2 output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn diagram_limits_with_output(maximum: usize) -> dml::diagram::Limits {
+    let defaults = dml::diagram::Limits::DEFAULT;
+    dml::diagram::Limits::new(
+        defaults.input_bytes_value(),
+        maximum,
+        defaults.xml_nodes_value(),
+        defaults.xml_depth_value(),
+        defaults.points_value(),
+        defaults.connections_value(),
+        defaults.data_text_bytes_value(),
+        defaults.nodes_value(),
+        defaults.node_depth_value(),
+        defaults.node_text_bytes_value(),
+    )
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_diagram_value_limited(
+    source: &[u8],
+    outline: &dml::diagram::edit::Outline,
+    maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    let entry = outline
+        .entries
+        .first()
+        .ok_or_else(|| fail("diagram data model has no content entry"))?;
+    let limits = diagram_limits_with_output(maximum);
+    let output = dml::diagram::edit::set_text(source, &entry.id, &entry.text, &limits)
+        .map_err(|error| classify(error, maximum.saturating_add(1)))?;
+    dml::diagram::edit::set_drawing_reference(
+        &output,
+        outline.drawing_relationship.as_deref(),
+        &limits,
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_diagram_value_limited(
+    _source: &[u8],
+    _outline: &dml::diagram::edit::Outline,
+    _maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    Err(fail("diagram output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_text_value_limited(
+    value: &dml::text::body::Body,
+    maximum: usize,
+) -> Result<String, ProbeFailure> {
+    let mut output = String::new();
+    dml::text::body::writer::write(
+        &mut output,
+        value,
+        dml::text::body::writer::Limits::new(maximum),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))?;
+    Ok(output)
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_text_value_limited(
+    _value: &dml::text::body::Body,
+    _maximum: usize,
+) -> Result<String, ProbeFailure> {
+    Err(fail("text-body output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_model3d_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::model3d::Metadata,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    let defaults = dml::model3d::codec::Limits::DEFAULT;
+    dml::model3d::codec::write_to(
+        writer,
+        value,
+        dml::model3d::codec::Limits::new(
+            defaults.max_xml_bytes,
+            defaults.max_fragment_bytes,
+            maximum,
+        ),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_model3d_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::model3d::Metadata,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("model3d output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_theme_value_limited(
+    value: &dml::theme::Theme,
+    maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    dml::theme::codec::encode_part(
+        &value.name,
+        &value.colors,
+        &value.fonts,
+        dml::theme::codec::Limits::new(maximum),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_theme_value_limited(
+    _value: &dml::theme::Theme,
+    _maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    Err(fail("theme output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-theme-family-current")]
+fn write_family_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::theme::family::Family,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    dml::theme::family::write_to(
+        writer,
+        value,
+        dml::theme::family::Limits::new(maximum),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-theme-family-current"))]
+fn write_family_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::theme::family::Family,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("theme-family output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-theme-family-current")]
+fn write_theme_family_part_limited(
+    snapshot: &dml::theme::family::part::Snapshot,
+    maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    let family = snapshot
+        .family()
+        .ok_or_else(|| fail("theme family part has no direct family owner"))?;
+    snapshot
+        .replace_family(family, dml::theme::family::part::Limits::new(maximum))
+        .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-theme-family-current"))]
+fn write_theme_family_part_limited(
+    _snapshot: &dml::theme::family::part::Snapshot,
+    _maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    Err(fail(
+        "theme-family-part output limits are unavailable in the historical API",
+    ))
+}
+
+#[cfg(any(
+    feature = "drawingml-raw-current",
+    feature = "drawingml-ink-limits-current"
+))]
+fn write_ink_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::ink::actions::Profile,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    let defaults = dml::ink::actions::Limits::DEFAULT;
+    dml::ink::actions::write_profile_to(
+        writer,
+        value,
+        dml::ink::actions::Limits::new(defaults.max_source_bytes, maximum),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(any(
+    feature = "drawingml-raw-current",
+    feature = "drawingml-ink-limits-current"
+)))]
+fn write_ink_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::ink::actions::Profile,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("InkML output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_geometry_value_limited(
+    value: &dml::geometry::CustomGeometry,
+    maximum: usize,
+) -> Result<String, ProbeFailure> {
+    let mut output = String::new();
+    let mut limits = dml::geometry::Limits::DEFAULT;
+    limits.max_output_bytes = maximum;
+    dml::geometry::writer::write_custom_geometry(&mut output, value, &limits)
+        .map_err(|error| classify(error, maximum.saturating_add(1)))?;
+    Ok(output)
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_geometry_value_limited(
+    _value: &dml::geometry::CustomGeometry,
+    _maximum: usize,
+) -> Result<String, ProbeFailure> {
+    Err(fail("geometry output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_color_value_limited(
+    value: &dml::color::Value,
+    maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    let defaults = dml::color::Limits::DEFAULT;
+    dml::color::write(
+        value,
+        &dml::color::Limits::new(
+            maximum,
+            defaults.max_depth,
+            defaults.max_nodes,
+            defaults.max_transforms,
+        ),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_color_value_limited(
+    _value: &dml::color::Value,
+    _maximum: usize,
+) -> Result<Vec<u8>, ProbeFailure> {
+    Err(fail("color output limits are unavailable in the historical API"))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn write_transform_value_limited<W: Write>(
+    writer: &mut W,
+    value: &dml::transform::Transform,
+    maximum: usize,
+) -> Result<(), ProbeFailure> {
+    let defaults = dml::transform::codec::Limits::DEFAULT;
+    dml::transform::codec::write_to(
+        writer,
+        value,
+        &dml::transform::codec::Limits::new(maximum, defaults.max_nodes),
+    )
+    .map_err(|error| classify(error, maximum.saturating_add(1)))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_transform_value_limited<W: Write>(
+    _writer: &mut W,
+    _value: &dml::transform::Transform,
+    _maximum: usize,
+) -> Result<(), ProbeFailure> {
+    Err(fail("transform output limits are unavailable in the historical API"))
+}
+
+fn output_limit_attempt(
+    part: &Part,
+    prepared: &PreparedPart,
+    maximum: usize,
+    timed: bool,
+) -> Result<OutputLimitAttempt, ProbeFailure> {
+    let mut sink = if timed {
+        CountingSink::timed(usize::MAX)
+    } else {
+        CountingSink::new(usize::MAX)
+    };
+    let result = match (part.kind, &prepared.changed) {
+        (PartKind::Chart, PreparedValue::Chart(value)) => {
+            write_chart_value_limited(&mut sink, value, maximum)
+        },
+        (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
+            write_format_code_value_limited(&mut sink, value, maximum)
+        },
+        (
+            PartKind::Diagram,
+            PreparedValue::Diagram { source, outline },
+        ) => write_diagram_value_limited(source, outline, maximum).map(|_| ()),
+        (PartKind::TextBody, PreparedValue::TextBody(value)) => {
+            write_text_value_limited(value, maximum).map(|_| ())
+        },
+        (PartKind::SvgBlip, _) => {
+            let value = prepared
+                .contextual_changed
+                .as_ref()
+                .ok_or_else(|| fail("SVG contextual value was not prepared"))?;
+            write_svg_contextual_limited(&mut sink, value, maximum)
+        },
+        (PartKind::Model3d, PreparedValue::Model3d(value)) => {
+            write_model3d_value_limited(&mut sink, value, maximum)
+        },
+        (PartKind::Theme, PreparedValue::Theme(value)) => {
+            write_theme_value_limited(value, maximum).map(|_| ())
+        },
+        (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
+            write_family_value_limited(&mut sink, value, maximum)
+        },
+        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(value)) => {
+            write_theme_family_part_limited(value, maximum).map(|_| ())
+        },
+        (PartKind::InkActions, PreparedValue::InkActions(value)) => {
+            write_ink_value_limited(&mut sink, value, maximum)
+        },
+        (PartKind::Geometry, PreparedValue::Geometry(value)) => {
+            write_geometry_value_limited(value, maximum).map(|_| ())
+        },
+        (PartKind::Color, PreparedValue::Color(value)) => {
+            write_color_value_limited(value, maximum).map(|_| ())
+        },
+        (PartKind::Transform, PreparedValue::Transform(value)) => {
+            write_transform_value_limited(&mut sink, value, maximum)
+        },
+        (PartKind::Blip, _) => return Err(fail("image blip has no typed output writer")),
+        _ => return Err(fail("prepared raw value kind mismatch")),
+    };
+    let error = result
+        .expect_err("typed output-cap preflight unexpectedly accepted the selected cap");
+    let refusal = error
+        .refusal
+        .ok_or_else(|| fail(format!("{} output cap lacked a typed refusal", part.id)))?;
+    if refusal.kind != "limit" {
+        return Err(fail(format!(
+            "{} output cap returned {} instead of limit",
+            part.id, refusal.kind
+        )));
+    }
+    let partial_output_allowed = part.kind == PartKind::Chart;
+    if partial_output_allowed {
+        if sink.bytes > maximum {
+            return Err(fail(format!(
+                "{} bounded partial output exceeded its cap",
+                part.id
+            )));
+        }
+    } else if sink.writes != 0 || sink.bytes != 0 {
+        return Err(fail(format!(
+            "{} output preflight wrote before refusal",
+            part.id
+        )));
+    }
+    let sink = if supports_production_sink(part.kind) && !timed {
+        Some(write_receipt(sink))
+    } else {
+        None
+    };
+    Ok(OutputLimitAttempt {
+        refusal,
+        sink,
+        partial_output_allowed,
+    })
+}
+
 struct CountingSink {
     cap: usize,
     bytes: usize,
@@ -1791,6 +2278,33 @@ fn fixture_part_identity(
         )
         .as_bytes(),
     )
+}
+
+fn build_generated_fixture_parts(case: &LaneCase) -> Vec<GeneratedFixturePart> {
+    case.parts
+        .iter()
+        .map(|part| GeneratedFixturePart {
+            part_id: part.id,
+            source_sha256: sha256(&part.source),
+            changed_sha256: sha256(&part.changed),
+            malformed_sha256: sha256(&part.malformed),
+        })
+        .collect()
+}
+
+fn generated_fixture_identity(parts: &[GeneratedFixturePart]) -> String {
+    let mut identity = String::from("drawingml-generated-fixture-v1\0");
+    for part in parts {
+        identity.push_str(part.part_id);
+        identity.push('\0');
+        identity.push_str(&part.source_sha256);
+        identity.push('\0');
+        identity.push_str(&part.changed_sha256);
+        identity.push('\0');
+        identity.push_str(&part.malformed_sha256);
+        identity.push('\0');
+    }
+    sha256(identity.as_bytes())
 }
 
 fn malformed_fragment(part_id: &str, seed: &str) -> Vec<u8> {
@@ -2192,10 +2706,22 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
     let prepared = parts
         .iter()
         .map(|part| {
+            let contextual_changed = if part.kind == PartKind::SvgBlip {
+                Some(read_svg_contextual_value(&part.changed)?)
+            } else {
+                None
+            };
+            let contextual_changed_output_bytes = contextual_changed
+                .as_ref()
+                .map(write_svg_contextual_default)
+                .transpose()?
+                .map(|output| output.len());
             Ok(PreparedPart {
                 id: part.id,
                 source: prepare_value(part.kind, &part.source)?,
                 changed: prepare_value(part.kind, &part.changed)?,
+                contextual_changed,
+                contextual_changed_output_bytes,
             })
         })
         .collect::<Result<Vec<_>, ProbeFailure>>()?;
@@ -2834,6 +3360,13 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                     part.id
                 )));
             }
+            let changed_output_exact = changed_output == part.changed;
+            if source_preserving_expected && !changed_output_exact {
+                return Err(fail(format!(
+                    "{} changed source changed under a promised source-preserving route",
+                    part.id
+                )));
+            }
             let source_sha256 = sha256(&part.source);
             let changed_sha256 = sha256(&part.changed);
             let malformed_sha256 = sha256(&part.malformed);
@@ -2854,6 +3387,7 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                 changed_output_differs: source_output != changed_output,
                 source_preserving_expected,
                 source_output_exact: source_output == part.source,
+                changed_output_exact,
                 fidelity_mode: semantic_mode(part.kind),
                 source_semantic_sha256: sha256(source_semantic.as_bytes()),
                 source_output_semantic_sha256: sha256(source_output_semantic.as_bytes()),
@@ -3349,6 +3883,8 @@ fn theme_family_mutations(
 fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
     let mut parts = Vec::with_capacity(case.parts.len());
     let mut total_sink_writes = 0usize;
+    let mut total_partial_output = 0usize;
+    let mut all_partial_outputs_within_limit = true;
     for part in &case.parts {
         let boundary = boundary_kind(part.kind);
         let production_refusal = if boundary != "none" {
@@ -3376,85 +3912,70 @@ fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
         } else {
             None
         };
-        if !supports_production_sink(part.kind) {
-            parts.push(serde_json::json!({
-                "part_id": part.id,
-                "boundary": boundary,
-                "production_refusal": production_refusal,
-                "sink_supported": false,
-                "sink_writes": 0,
-            }));
-            continue;
-        }
         let prepared = case
             .prepared
             .iter()
             .find(|value| value.id == part.id)
             .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-        if part.kind != PartKind::SvgBlip {
+        if !output_limit_supported(part.kind) {
             parts.push(serde_json::json!({
                 "part_id": part.id,
                 "boundary": boundary,
                 "production_refusal": production_refusal,
-                "sink_supported": true,
+                "sink_supported": supports_production_sink(part.kind),
                 "preflight": "not_applicable",
-                "reason": "the codec exposes a sink but no caller-selected output preflight",
+                "reason": "this source endpoint has no caller-selected output cap",
                 "sink_writes": 0,
             }));
             continue;
         }
-        // Use the contextual production reader for this preflight receipt.  A
-        // host embedding the fragment owns the inherited namespace scope;
-        // the empty scope models a standalone root while still exercising the
-        // same contextual writer and its complete-output admission check.
-        let contextual = read_svg_contextual_value(&part.changed)?;
-        let value = &contextual;
-        let PreparedValue::SvgBlip(_) = &prepared.changed else {
-            return Err(fail("prepared SVG value has the wrong kind"));
-        };
-        let full_output = write_svg_contextual_default(value)?;
-        if full_output.is_empty() {
-            return Err(fail(format!("{} preflight output was empty", part.id)));
+        let preflight_bytes = output_payload_bytes(part, prepared)?;
+        if preflight_bytes <= 1 {
+            return Err(fail(format!(
+                "{} output fixture is too small for a strict cap",
+                part.id
+            )));
         }
-        // The cap is passed to the production SVG codec.  The sink is
-        // deliberately unbounded: it observes writes but never supplies the
-        // refusal boundary itself.
-        let mut sink = CountingSink::new(usize::MAX);
-        let error = write_svg_contextual_limited(
-            &mut sink,
-            value,
-            full_output.len().saturating_sub(1),
-        )
-        .expect_err("SVG production preflight must refuse before its first write");
-        let refusal = error
-            .refusal
-            .ok_or_else(|| fail(format!("{} preflight lacked a typed sink refusal", part.id)))?;
-        if sink.writes != 0 {
-            return Err(fail(format!("{} preflight wrote before refusal", part.id)));
-        }
-        total_sink_writes = total_sink_writes.saturating_add(sink.writes);
+        let output_limit = preflight_bytes - 1;
+        let attempt = output_limit_attempt(part, prepared, output_limit, false)?;
+        let sink_writes = attempt.sink.as_ref().map_or(0, |sink| sink.writes);
+        let partial_output_bytes = attempt.sink.as_ref().map_or(0, |sink| sink.bytes);
+        total_sink_writes = total_sink_writes.saturating_add(sink_writes);
+        total_partial_output = total_partial_output.saturating_add(partial_output_bytes);
+        all_partial_outputs_within_limit &= partial_output_bytes <= output_limit;
         parts.push(serde_json::json!({
             "part_id": part.id,
             "boundary": boundary,
             "production_refusal": production_refusal,
-            "sink_supported": true,
+            "sink_supported": supports_production_sink(part.kind),
             "preflight": "typed_output_limit",
-            "preflight_bytes": full_output.len(),
-            "sink_writes": sink.writes,
-            "output_limit": full_output.len() - 1,
-            "observed_output": full_output.len(),
-            "sink_refusal": refusal,
+            "preflight_bytes": preflight_bytes,
+            "sink_writes": sink_writes,
+            "output_limit": output_limit,
+            "observed_output": attempt.refusal.observed,
+            "sink_refusal": attempt.refusal,
+            "partial_output_allowed": attempt.partial_output_allowed,
+            "partial_output_bytes": partial_output_bytes,
+            "partial_output_within_limit": partial_output_bytes <= output_limit,
+            "operation_scope": match part.kind {
+                PartKind::Diagram | PartKind::ThemeFamilyPart => "source_edit_serialize",
+                PartKind::SvgBlip => "contextual_typed_writer",
+                _ => "typed_writer",
+            },
         }));
     }
     Ok(serde_json::json!({
         "preflight_zero_writes": total_sink_writes == 0,
+        "preflight_writes_within_limit": all_partial_outputs_within_limit,
+        "preflight_partial_output_bytes": total_partial_output,
         "sink_writes": total_sink_writes,
         "parts": parts,
     }))
 }
 
 /// Execute only production boundary calls during a timed preflight row.
-/// Receipt construction and output-cap experiments stay outside the clock.
+/// Fixture parsing, contextual SVG preparation, and cap selection stay
+/// outside the clock; the timed call is the real typed refusal boundary.
 fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
     for part in &case.parts {
         if boundary_kind(part.kind) == "none" {
@@ -3466,7 +3987,7 @@ fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
         black_box(error);
     }
     for part in &case.parts {
-        if part.kind != PartKind::SvgBlip {
+        if !output_limit_supported(part.kind) {
             continue;
         }
         let prepared = case
@@ -3474,18 +3995,19 @@ fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
             .iter()
             .find(|value| value.id == part.id)
             .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-        let PreparedValue::SvgBlip(value) = &prepared.changed else {
-            return Err(fail("prepared SVG value has the wrong kind"));
-        };
-        let full_output = write_svg_contextual_default(value)?;
-        let mut sink = CountingSink::new(usize::MAX);
-        let error = write_svg_contextual_limited(
-            &mut sink,
-            value,
-            full_output.len().saturating_sub(1),
-        )
-        .expect_err("SVG production preflight must refuse before its first write");
-        black_box(error);
+        let preflight_bytes = output_payload_bytes(part, prepared)?;
+        if preflight_bytes <= 1 {
+            return Err(fail(format!(
+                "{} output fixture is too small for a strict cap",
+                part.id
+            )));
+        }
+        black_box(output_limit_attempt(
+            part,
+            prepared,
+            preflight_bytes - 1,
+            true,
+        )?);
     }
     Ok(())
 }
@@ -3620,7 +4142,10 @@ fn entry_read_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, 
 }
 
 /// Write timing consumes values parsed once in `make_case`; no reader or
-/// source round trip is hidden in the writer sample.
+/// source round trip is hidden in the writer sample. Diagram and Theme Family
+/// part entries intentionally exercise their public source-edit-and-serialize
+/// operations, and their receipt names that scope rather than calling it a
+/// detached pure writer.
 fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if timed {
         for part in &case.parts {
@@ -3644,7 +4169,24 @@ fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, P
         sink.write_all(&output)
             .map_err(|error| io_failure(error, output.len()))?;
     }
-    Ok(OperationValue::Sink(write_receipt(sink)))
+    Ok(OperationValue::SinkDetails {
+        sink: write_receipt(sink),
+        details: serde_json::json!({
+            "operation_scope": "mixed_prepared_output",
+            "source_edit_serialize_parts": case
+                .parts
+                .iter()
+                .filter(|part| matches!(part.kind, PartKind::Diagram | PartKind::ThemeFamilyPart))
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
+            "typed_writer_parts": case
+                .parts
+                .iter()
+                .filter(|part| !matches!(part.kind, PartKind::Diagram | PartKind::ThemeFamilyPart))
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
+        }),
+    })
 }
 
 fn owner_operation(
@@ -4039,6 +4581,11 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
     } else if let Some(scope) = arguments.raw_scope.as_deref() {
         select_raw_scope(&mut case, scope).map_err(|error| io::Error::other(error.message))?;
     }
+    // Freeze the generated bytes before any warmup or timed row.  The paired
+    // validator compares this receipt across baseline/candidate legs so a
+    // source-generation drift cannot be mistaken for an endpoint speedup.
+    let generated_fixture_parts = build_generated_fixture_parts(&case);
+    let generated_fixture_sha256 = generated_fixture_identity(&generated_fixture_parts);
     let size_classes = if arguments.endpoint == "raw" {
         size_class_receipts(&case).map_err(|error| io::Error::other(error.message))?
     } else {
@@ -4105,6 +4652,8 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
         fixture_root_sha256: sha256(fixture.root.as_bytes()),
         fixture_mutation: fixture.mutation,
         fixture_lane_identity_sha256: case.fixture_identity_sha256.clone(),
+        generated_fixture_sha256,
+        generated_fixture_parts,
         capabilities: capability_receipts(&case, &arguments.endpoint),
         raw_fidelity,
         theme_family_mutations,
