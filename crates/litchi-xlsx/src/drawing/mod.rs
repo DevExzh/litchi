@@ -13,7 +13,6 @@ mod svg;
 pub mod worksheet_source;
 
 pub use codec::parse;
-pub(crate) use codec::parse_with_limits;
 pub use model::{Chart, ContentPartSelector, Drawing, Object, Picture, Unknown, UnknownKind, text};
 pub use source::{
     ByteRange, ContentPartProfile, ContentPartSource, DrawingDialect, ElementRange, PictureSource,

@@ -920,20 +920,13 @@ impl Parser {
     }
 }
 
-pub fn parse(xml: &str) -> Result<Option<Drawing>> {
-    parse_with_limits(xml, &litchi_opc::SourceLimits::default())
-}
-
 /// Parse a worksheet drawing under the caller's retained package read policy.
 ///
 /// The MCE processor receives the same per-part, XML-event, and XML-depth
 /// ceilings that bound the typed drawing parser.  Its bounded output is then
 /// passed directly to the parser, so a selected MCE branch cannot grow beyond
 /// the caller's part budget before semantic allocations begin.
-pub(crate) fn parse_with_limits(
-    xml: &str,
-    caller: &litchi_opc::SourceLimits,
-) -> Result<Option<Drawing>> {
+pub fn parse(xml: &str, caller: &litchi_opc::SourceLimits) -> Result<Option<Drawing>> {
     let caller_part_bytes = usize::try_from(caller.max_part_bytes()).unwrap_or(usize::MAX);
     let max_xml_bytes = MAX_DRAWING_XML_BYTES.min(caller_part_bytes);
     if xml.len() > max_xml_bytes {
@@ -1233,7 +1226,7 @@ fn limit(message: impl Into<String>) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_with_limits;
+    use super::parse;
     use litchi_ooxml_common::mce::process_markup_compatibility;
 
     const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -1266,7 +1259,7 @@ mod tests {
             .build()
             .expect("consistent read limits");
         assert!(xml.len() <= caller_limit.max_part_bytes() as usize);
-        assert!(parse_with_limits(&xml, &caller_limit).is_err());
+        assert!(parse(&xml, &caller_limit).is_err());
     }
 
     #[test]
@@ -1278,7 +1271,7 @@ mod tests {
             .build()
             .expect("consistent read limits");
 
-        let drawing = parse_with_limits(&xml, &caller_limit)
+        let drawing = parse(&xml, &caller_limit)
             .expect("exact no-MCE part limit should be accepted")
             .expect("drawing root should be present");
         assert!(drawing.is_empty());
@@ -1295,6 +1288,6 @@ mod tests {
             .expect("positive depth limit")
             .build()
             .expect("consistent read limits");
-        assert!(parse_with_limits(&empty_child, &caller_limit).is_err());
+        assert!(parse(&empty_child, &caller_limit).is_err());
     }
 }

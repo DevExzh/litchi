@@ -128,7 +128,7 @@ fn load_for_sheet(
             return Err(limit("drawing part bytes"));
         }
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(xml_error)?;
-        let drawing = parse(drawing_xml)?
+        let drawing = parse(drawing_xml, &package.read_limits())?
             .ok_or_else(|| invalid(format!("drawing part '{drawing_uri}' has no wsDr root")))?;
         for chart in drawing.charts() {
             let chart_relationship =

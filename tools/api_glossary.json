@@ -5489,6 +5489,17 @@
         "litchi_xlsx::Worksheet"
       ],
       "family_methods": true,
+      "required_signatures": [
+        {
+          "method": "litchi_xlsx::drawing::parse",
+          "inputs": [
+            "xml",
+            "caller"
+          ],
+          "limits_argument": "caller",
+          "limits_type": "litchi_xlsx::SourceLimits"
+        }
+      ],
       "result_methods": [
         {
           "method": "litchi_xlsx::Package::apply",
@@ -7063,6 +7074,17 @@
         "litchi_xlsx::Worksheet"
       ],
       "family_methods": true,
+      "required_signatures": [
+        {
+          "method": "litchi_xlsx::drawing::parse",
+          "inputs": [
+            "xml",
+            "caller"
+          ],
+          "limits_argument": "caller",
+          "limits_type": "litchi_xlsx::SourceLimits"
+        }
+      ],
       "result_methods": [
         {
           "method": "litchi_xlsx::Package::apply",
