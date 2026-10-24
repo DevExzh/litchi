@@ -5,6 +5,8 @@
   "source": {
     "commit": "af6844b2baceb7eb5c8eb9a0ce441001ce45a9ab",
     "tree": "c488dee3014f6db3606b1f83bd121c50482936ac",
+    "followup_commit": "b14ea9d225ef56887b1526e2035e97eb9345bc52",
+    "followup_tree": "8cd797710eedd6c5a675c9bc63c4bcb72c7b0edb",
     "parent_source_commit": "f7e3a52bdb44cb256b0933b3cdbc8bf55ba47377",
     "parent_source_tree": "ce16fd65494ba4c0eccb9cfc302665ac685ae0b7",
     "changes": [
@@ -34,6 +36,16 @@
         "bytes": 40252,
         "sha256": "e8e33f67cbf9b3732acc3c039bb41a690a87ceda4d65485ab8266384b9c5eccf"
       }
+    },
+    "opaque_nested_followup_theme_tests": {
+      "passed": 14,
+      "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-opaque cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/theme-opaque-followup.log",
+        "bytes": 6985,
+        "sha256": "b05d38ec5d07f5d942661e8dc15eeb4be12025515dbfccc4f450a062a875641a"
+      },
+      "regression": "opaque foreign parent permits a locally counterpart-bound modeled-looking child and preserves exact replacement splice/readback"
     },
     "fmt": true,
     "diff_check": true,

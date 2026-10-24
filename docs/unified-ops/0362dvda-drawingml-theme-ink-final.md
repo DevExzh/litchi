@@ -22,6 +22,13 @@ namespace decoding remains bounded by the existing attribute/XML limits.
 Reserved XML/XMLNS bindings and the valid opaque-extension path have focused
 regressions. No public aliases or compatibility spellings were introduced.
 
+The follow-up source commit `b14ea9d225ef56887b1526e2035e97eb9345bc52`
+(tree `8cd797710eedd6c5a675c9bc63c4bcb72c7b0edb`) skips this modeled-binding
+guard only when the immediate parent is already an opaque foreign extension.
+The valid nested `dk1`/strict-default subtree is spliced byte-for-byte and
+still reads back with the original palette; modeled descendants outside opaque
+subtrees retain the refusal.
+
 ## Validation provenance
 
 The final source test ran before commit `af6844b2...` on a working tree whose
@@ -47,6 +54,15 @@ Final all-target precommit command exited 0; its external log is
 
 ```text
 env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-nested cargo test -p litchi-drawingml --all-targets --offline --locked
+```
+
+The follow-up focused command ran against the source that became
+`b14ea9d225ef56887b1526e2035e97eb9345bc52` and passed 14/14 Theme codec
+tests. Its external log is 6,985 bytes, SHA-256
+`b05d38ec5d07f5d942661e8dc15eeb4be12025515dbfccc4f450a062a875641a`:
+
+```text
+env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-opaque cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked
 ```
 
 `cargo fmt --all -- --check` and `git diff --check` passed. The staged large
