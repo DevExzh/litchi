@@ -14,7 +14,7 @@ use super::{Build, Change, Commit, Id, Patch, Result, ShapeRef, SlideLimits, Sli
 use crate::Package;
 use crate::animation::diagram_build::BuildType;
 use crate::package::Error as PackageError;
-use crate::scoped::{self, Base, Failure};
+use crate::scoped::{self, Base, Failure, Lazy};
 use crate::slide_order::{self, records::Owner};
 
 const OPERATION: &str = "edit_diagrams";
@@ -23,8 +23,12 @@ const OPERATION: &str = "edit_diagrams";
 /// [`Package`].
 pub struct Edit {
     base: Base,
-    native: slide_order::Snapshot,
     slide: Position,
+    state: Lazy<State>,
+}
+
+struct State {
+    native: slide_order::Snapshot,
     before: Vec<u8>,
     inner: SlideEditor,
 }
@@ -34,7 +38,7 @@ impl std::fmt::Debug for Edit {
         formatter
             .debug_struct("Edit")
             .field("slide", &self.slide)
-            .field("changes", &self.inner.changes().len())
+            .field("initialized", &self.state.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -42,8 +46,16 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     fn new(package: &Package, slide: Position) -> Result<Self> {
         let base = Base::capture(package)?;
-        let native = base.native()?;
-        let before = base.owner_record(&native, Owner::Slide(slide))?;
+        Ok(Self {
+            base,
+            slide,
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> std::result::Result<State, Failure> {
+        let native = self.base.native()?;
+        let before = self.base.owner_record(&native, Owner::Slide(self.slide))?;
         let snapshot =
             SlideSnapshot::from_bytes_with_limits(before.clone(), SlideLimits::default()).map_err(
                 |error| match error {
@@ -54,18 +66,42 @@ impl Edit {
                     error => Failure::Package(error),
                 },
             )?;
-        let inner = snapshot.edit();
-        Ok(Self {
-            base,
+        Ok(State {
             native,
-            slide,
             before,
-            inner,
+            inner: snapshot.edit(),
+        })
+    }
+
+    fn state(&self) -> std::result::Result<&State, Failure> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
+        let base = self.base.clone();
+        let slide = self.slide;
+        self.state.get_or_try_init_mut(|| {
+            let native = base.native()?;
+            let before = base.owner_record(&native, Owner::Slide(slide))?;
+            let snapshot =
+                SlideSnapshot::from_bytes_with_limits(before.clone(), SlideLimits::default())
+                    .map_err(|error| match error {
+                        PackageError::InvalidFormat(_) => scoped::unsupported_target(
+                            OPERATION,
+                            "the slide carries no editable diagram build list",
+                        ),
+                        error => Failure::Package(error),
+                    })?;
+            Ok(State {
+                native,
+                before,
+                inner: snapshot.edit(),
+            })
         })
     }
 
     fn require_build(&self, operation: &'static str, id: Id) -> Result<()> {
-        if self.inner.builds().any(|build| build.id() == id) {
+        if self.state()?.inner.builds().any(|build| build.id() == id) {
             Ok(())
         } else {
             Err(scoped::not_found(
@@ -83,15 +119,15 @@ impl Edit {
     }
 
     /// The staged typed diagram builds, in `BuildList` order.
-    #[must_use]
-    pub fn builds(&self) -> impl ExactSizeIterator<Item = Build> + '_ {
-        self.inner.builds()
+    #[must_use = "handle the fallible diagram projection result"]
+    pub fn builds(&self) -> Result<impl ExactSizeIterator<Item = Build> + '_> {
+        Ok(self.state()?.inner.builds())
     }
 
     /// The staged operations, in order.
-    #[must_use]
-    pub fn changes(&self) -> &[Change] {
-        self.inner.changes()
+    #[must_use = "handle the fallible diagram changes result"]
+    pub fn changes(&self) -> Result<&[Change]> {
+        Ok(self.state()?.inner.changes())
     }
 
     /// Change one diagram's `DiagramBuildEnum` value.
@@ -105,6 +141,7 @@ impl Edit {
     pub fn set_mode(&mut self, id: Id, mode: BuildType) -> Result<()> {
         self.require_build("diagrams.set_mode", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .set_mode(id, mode)
             .map_err(scoped::staging("diagrams.set_mode"))?)
@@ -122,6 +159,7 @@ impl Edit {
     pub fn set_shape_id(&mut self, id: Id, shape_id: u32) -> Result<Id> {
         self.require_build("diagrams.set_shape_id", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .set_shape_id(id, shape_id)
             .map_err(scoped::staging("diagrams.set_shape_id"))?)
@@ -135,6 +173,7 @@ impl Edit {
     pub fn set_shape(&mut self, id: Id, shape: ShapeRef) -> Result<Id> {
         self.require_build("diagrams.set_shape", id)?;
         Ok(self
+            .state_mut()?
             .inner
             .set_shape(id, shape)
             .map_err(scoped::staging("diagrams.set_shape"))?)
@@ -149,13 +188,19 @@ impl Edit {
     /// package and [`super::Error::Package`] when the result cannot be
     /// republished.
     pub fn commit(self) -> Result<Commit> {
-        let Self {
-            base,
+        self.state
+            .get_or_try_init(|| self.initialize_state())
+            .map_err(super::Error::from)?;
+        let Self { base, slide, state } = self;
+        let State {
             native,
-            slide,
             before,
             inner,
-        } = self;
+        } = state.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT diagram edit state was not initialized".into(),
+            ))
+        })?;
         let (target, _) = inner
             .commit()
             .map_err(scoped::publication("diagrams.commit"))?
@@ -175,11 +220,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error::Refused`] with
-    /// [`litchi_core::edit::RefusalKind::NotFound`] when no slide is at
-    /// `slide`, with [`litchi_core::edit::RefusalKind::UnsupportedTarget`]
-    /// when the slide carries no diagram build list, and
-    /// [`super::Error::Package`] for an encrypted or unreadable presentation.
+    /// An encrypted presentation is refused immediately. Missing slides,
+    /// absent build lists, and unreadable records are reported by the first
+    /// projection, staging operation, or commit.
     pub fn edit_diagrams(&self, slide: Position) -> Result<Edit> {
         Edit::new(self, slide)
     }

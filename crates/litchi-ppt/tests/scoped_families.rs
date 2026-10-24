@@ -60,6 +60,7 @@ fn font_edits_publish_replay_and_invert_exactly() {
     let mut edit = source.edit_fonts().unwrap();
     let mut font = edit
         .fonts()
+        .unwrap()
         .collection(Scope::Base)
         .unwrap()
         .get(0)
@@ -74,6 +75,7 @@ fn font_edits_publish_replay_and_invert_exactly() {
     let mut edit = source.edit_fonts().unwrap();
     let mut font = edit
         .fonts()
+        .unwrap()
         .collection(Scope::Base)
         .unwrap()
         .get(0)
@@ -116,7 +118,7 @@ fn font_removal_is_a_typed_refusal() {
         panic!("font removal must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedOperation);
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
 }
 
 #[test]
@@ -131,12 +133,17 @@ fn a_missing_broadcast_is_not_found() {
             .broadcasts
             .is_empty()
     );
-    let Err(broadcast::Error::Refused(refusal)) = source.edit_broadcast(Position::new(0)) else {
+    let Err(broadcast::Error::Refused(refusal)) = source
+        .edit_broadcast(Position::new(0))
+        .and_then(|edit| edit.broadcast().map(|_| ()))
+    else {
         panic!("a presentation without broadcasts must refuse the edit");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
     assert!(matches!(
-        built().edit_broadcast(Position::new(0)),
+        built()
+            .edit_broadcast(Position::new(0))
+            .and_then(|edit| edit.broadcast().map(|_| ())),
         Err(broadcast::Error::Refused(refusal)) if refusal.kind() == RefusalKind::NotFound
     ));
 }
@@ -189,15 +196,15 @@ fn external_media_edits_publish_replay_and_invert_exactly() {
         panic!("a missing media id must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
-    if edit.owner_count(id) > 0 {
+    if edit.owner_count(id).unwrap() > 0 {
         let Err(external_media::Error::Refused(refusal)) = edit.remove(id) else {
             panic!("an owned media object cannot be removed");
         };
         assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
     }
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
     edit.set_path(id, Some("scoped.avi".into())).unwrap();
-    assert_eq!(edit.changes().len(), 1);
+    assert_eq!(edit.changes().unwrap().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -254,6 +261,7 @@ fn layout_record(package: &Package, kind: Kind) -> litchi_ppt::records::Record {
         .edit_master_layout(kind, Position::new(0))
         .unwrap()
         .record()
+        .unwrap()
         .clone()
 }
 
@@ -353,15 +361,16 @@ fn master_metadata_edits_publish_replay_and_invert_exactly() {
     let Err(master_metadata::Error::Refused(_)) = handout.set_template_name("x") else {
         panic!("a handout master cannot carry a design name");
     };
-    assert!(handout.changes().is_empty());
+    assert!(handout.changes().unwrap().is_empty());
 
     for (kind, position) in [
         (Kind::Main, Position::new(99)),
         (Kind::Handout, Position::new(1)),
         (Kind::Title, Position::new(0)),
     ] {
-        let Err(master_metadata::Error::Refused(refusal)) =
-            source.edit_master_metadata(kind, position)
+        let Err(master_metadata::Error::Refused(refusal)) = source
+            .edit_master_metadata(kind, position)
+            .and_then(|edit| edit.name().map(|_| ()))
         else {
             panic!("a missing master must be refused");
         };
@@ -386,21 +395,21 @@ fn master_layout_edits_publish_replay_and_invert_exactly() {
 
     let handout_before = layout_record(&source, Kind::Handout);
     let mut edit = source.edit_master_layout(Kind::Main, main).unwrap();
-    let original = edit.record().clone();
+    let original = edit.record().unwrap().clone();
     let count = original.children.len();
     let last = original.children[count - 1].clone();
     edit.append(master_layout::Path::root(), last.clone())
         .unwrap();
-    assert_eq!(edit.changes().len(), 1);
-    assert_eq!(edit.view().record().children.len(), count + 1);
+    assert_eq!(edit.changes().unwrap().len(), 1);
+    assert_eq!(edit.view().unwrap().record().children.len(), count + 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let published = commit
         .package()
         .edit_master_layout(Kind::Main, main)
         .unwrap();
-    assert_eq!(published.record().children.len(), count + 1);
-    assert_eq!(published.record().children[count], last);
+    assert_eq!(published.record().unwrap().children.len(), count + 1);
+    assert_eq!(published.record().unwrap().children[count], last);
     assert_eq!(
         layout_record(commit.package(), Kind::Handout),
         handout_before
@@ -439,7 +448,8 @@ fn master_layout_edits_publish_replay_and_invert_exactly() {
             .package()
             .edit_master_layout(Kind::Main, main)
             .unwrap()
-            .record(),
+            .record()
+            .unwrap(),
         &original
     );
 
@@ -451,13 +461,15 @@ fn master_layout_edits_publish_replay_and_invert_exactly() {
         panic!("an out-of-range path must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::InvalidValue);
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
 
     for (kind, position) in [
         (Kind::Title, Position::new(99)),
         (Kind::Handout, Position::new(1)),
     ] {
-        let Err(master_layout::Error::Refused(refusal)) = source.edit_master_layout(kind, position)
+        let Err(master_layout::Error::Refused(refusal)) = source
+            .edit_master_layout(kind, position)
+            .and_then(|edit| edit.record().map(|_| ()))
         else {
             panic!("a missing master must be refused");
         };
@@ -645,8 +657,9 @@ fn title_master_metadata_edits_publish_replay_and_invert_exactly() {
         commit.package().apply_master_metadata(commit.patch()),
         Err(master_metadata::Error::PatchConflict)
     ));
-    let Err(master_metadata::Error::Refused(refusal)) =
-        source.edit_master_metadata(Kind::Title, Position::new(1))
+    let Err(master_metadata::Error::Refused(refusal)) = source
+        .edit_master_metadata(Kind::Title, Position::new(1))
+        .and_then(|edit| edit.name().map(|_| ()))
     else {
         panic!("a missing title master must be refused");
     };
@@ -670,7 +683,7 @@ fn title_master_layout_edits_publish_replay_and_invert_exactly() {
 
     let main_before = layout_record(&source, Kind::Main);
     let mut edit = source.edit_master_layout(Kind::Title, title).unwrap();
-    let original = edit.record().clone();
+    let original = edit.record().unwrap().clone();
     let count = original.children.len();
     let last = original.children[count - 1].clone();
     edit.append(master_layout::Path::root(), last.clone())
@@ -770,6 +783,7 @@ fn embedded_object_edits_publish_replay_and_invert_exactly() {
     edit.replace_storage(persist_id, storage.clone()).unwrap();
     assert_eq!(
         edit.objects()
+            .unwrap()
             .objects
             .iter()
             .map(object::ExternalObject::id)
@@ -820,7 +834,7 @@ fn embedded_object_edits_publish_replay_and_invert_exactly() {
         refusal_kind(edit.reorder(&[1, 2, 3])),
         RefusalKind::InvalidValue
     );
-    assert_eq!(edit.objects().objects.len(), ids.len());
+    assert_eq!(edit.objects().unwrap().objects.len(), ids.len());
     assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
@@ -859,8 +873,8 @@ fn embedded_objects_are_added_to_a_deck_without_an_object_list() {
 
         // Nothing staged, or an add that is removed again: an exact no-op.
         let edit = source.edit_objects().unwrap();
-        assert!(edit.objects().objects.is_empty());
-        assert_eq!(edit.objects().id_seed, 1);
+        assert!(edit.objects().unwrap().objects.is_empty());
+        assert_eq!(edit.objects().unwrap().id_seed, 1);
         let no_op = edit.commit().unwrap();
         assert!(!no_op.diagnostics().changed());
         assert!(no_op.patch().is_noop());
@@ -892,7 +906,7 @@ fn embedded_objects_are_added_to_a_deck_without_an_object_list() {
             );
             assert_eq!(slide_texts(package), slide_texts(&source));
             let edit = package.edit_objects().unwrap();
-            assert_eq!(edit.objects(), &objects);
+            assert_eq!(edit.objects().unwrap(), &objects);
         }
 
         let replayed = source.apply_objects(commit.patch()).unwrap();
@@ -1030,7 +1044,7 @@ fn a_signed_deck_admits_master_edits_and_refuses_only_a_changed_commit() {
             &source,
             |package: &Package| package.edit_master_layout(kind, position).unwrap(),
             |edit: &mut master_layout::Edit| {
-                let last = edit.record().children.last().unwrap().clone();
+                let last = edit.record().unwrap().children.last().unwrap().clone();
                 edit.append(master_layout::Path::root(), last).unwrap();
             },
             master_layout::Error::Signed

@@ -205,7 +205,7 @@ fn package_slide_sync_edits_publish_replay_and_invert_exactly() {
 
     let mut edit = source.edit_slide_sync(slide).unwrap();
     edit.set(synchronization()).unwrap();
-    assert_eq!(edit.changes().len(), 1);
+    assert_eq!(edit.changes().unwrap().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -262,7 +262,10 @@ fn package_slide_sync_edits_publish_replay_and_invert_exactly() {
             .is_none()
     );
 
-    let Err(Error::Refused(refusal)) = source.edit_slide_sync(Position::new(2)) else {
+    let Err(Error::Refused(refusal)) = source
+        .edit_slide_sync(Position::new(2))
+        .and_then(|edit| edit.synchronization().map(|_| ()))
+    else {
         panic!("a missing slide must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);

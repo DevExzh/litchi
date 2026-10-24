@@ -5,8 +5,9 @@
 //! x::Commit` publishing a new [`Package`], and `Package::apply_x(&self,
 //! &x::Patch) -> x::Commit`. Dropping an `Edit` discards it. The families
 //! keep their record-level codecs and staging owners crate-private; this
-//! module captures the source package, publishes a family's candidate bytes
-//! as a new package, and replays byte patches.
+//! module retains the source package, lazily captures exact bytes when a
+//! family first needs them, publishes candidate bytes as a new package, and
+//! replays byte patches.
 //!
 //! A family's patch is exact and record-sized (record 0357a): it carries the
 //! length and block root (record 0357b, [`digest`]) of the source and target
@@ -19,8 +20,9 @@
 
 #[cfg(test)]
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 
+use litchi_core::SourceVersion;
 use litchi_core::edit::{Diagnostics, Refusal, RefusalKind};
 
 use crate::package::{Error as PackageError, OpenOptions, Package};
@@ -30,6 +32,90 @@ mod digest;
 
 pub(crate) use digest::ExactCache;
 use digest::{BlockDigests, BlockSpan, Digest, Recipe};
+
+/// A fallible, retryable lazy value.
+///
+/// The source package is immutable, but opening one of its native projections
+/// can still fail.  Keeping the failure outside the cell means a failed
+/// attempt returns its original typed error and does not require a panic or a
+/// dummy value merely to satisfy `OnceLock`'s infallible initializer.  The
+/// mutex is only held while the first successful value is built; the common
+/// initialized path is one `OnceLock` read.
+pub(crate) struct Lazy<T> {
+    value: OnceLock<T>,
+    initializing: Mutex<()>,
+}
+
+impl<T> Lazy<T> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            value: OnceLock::new(),
+            initializing: Mutex::new(()),
+        }
+    }
+
+    pub(crate) fn get_or_try_init<E>(
+        &self,
+        mut initialize: impl FnMut() -> Result<T, E>,
+    ) -> Result<&T, E> {
+        if let Some(value) = self.value.get() {
+            return Ok(value);
+        }
+        let _guard = match self.initializing.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        loop {
+            if let Some(value) = self.value.get() {
+                return Ok(value);
+            }
+            let value = initialize()?;
+            if self.value.set(value).is_ok() {
+                // The successful set is guarded above, so the value is
+                // necessarily visible here.  Keep the branch explicit rather
+                // than relying on an unchecked unwrap in a public operation.
+                if let Some(value) = self.value.get() {
+                    return Ok(value);
+                }
+            }
+        }
+    }
+
+    pub(crate) fn get_or_try_init_mut<E>(
+        &mut self,
+        mut initialize: impl FnMut() -> Result<T, E>,
+    ) -> Result<&mut T, E> {
+        if self.value.get().is_none() {
+            let value = initialize()?;
+            let _ = self.value.set(value);
+        }
+        // `&mut self` excludes a concurrent initializer, so the successful
+        // fallible initialization above leaves the cell populated.  Keep the
+        // invariant local rather than retrying through a borrow-checker loop
+        // that could retain a mutable borrow across another initialization.
+        Ok(self
+            .value
+            .get_mut()
+            .expect("fallible lazy initialization populated its cell"))
+    }
+
+    pub(crate) fn get(&self) -> Option<&T> {
+        self.value.get()
+    }
+
+    pub(crate) fn into_inner(self) -> Option<T> {
+        self.value.into_inner()
+    }
+}
+
+impl<T> std::fmt::Debug for Lazy<T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Lazy")
+            .field("initialized", &self.value.get().is_some())
+            .finish()
+    }
+}
 
 /// One side of an exact byte patch: the package length and its block root
 /// (record 0357b).
@@ -354,12 +440,13 @@ pub(crate) struct Published {
     pub(crate) diagnostics: Diagnostics,
 }
 
-/// The immutable source package a scoped edit started from, with its exact
-/// bytes.
+/// The immutable source package a scoped edit started from, with a retryable
+/// lazy handle for its exact bytes.
 #[derive(Clone)]
 pub(crate) struct Base {
     package: Package,
-    bytes: Arc<[u8]>,
+    expected_source: SourceVersion,
+    bytes: Arc<Lazy<Arc<[u8]>>>,
 }
 
 impl std::fmt::Debug for Base {
@@ -378,32 +465,69 @@ impl Base {
         if package.is_encrypted() {
             return Err(Failure::Package(PackageError::EncryptionPolicy));
         }
-        let bytes: Arc<[u8]> = Arc::from(package.to_encrypted_bytes()?);
+        // Keep the source fence and encryption policy at entry, but defer the
+        // exact-byte copy until a native editor, digest or publication really
+        // needs it.  Cloning the package and the lazy handle is O(1).
+        let expected_source = package.source_version()?;
         Ok(Self {
             package: package.clone(),
-            bytes,
+            expected_source,
+            bytes: Arc::new(Lazy::new()),
         })
     }
 
+    /// Borrow the retained immutable package for a projection that already
+    /// lives in the package owner.  This accessor does not materialize the
+    /// exact source bytes.
+    pub(crate) const fn package(&self) -> &Package {
+        &self.package
+    }
+
     /// The exact source package bytes.
-    pub(crate) fn bytes(&self) -> &[u8] {
-        &self.bytes
+    pub(crate) fn bytes(&self) -> Result<&[u8], Failure> {
+        Ok(self.bytes_arc()?.as_ref())
+    }
+
+    fn bytes_arc(&self) -> Result<&Arc<[u8]>, Failure> {
+        self.ensure_source_version()?;
+        let bytes = self.bytes.get_or_try_init(|| {
+            self.ensure_source_version()?;
+            let bytes = self.package.to_encrypted_bytes().map_err(Failure::from)?;
+            self.ensure_source_version()?;
+            Ok::<Arc<[u8]>, Failure>(Arc::from(bytes))
+        })?;
+        self.ensure_source_version()?;
+        Ok(bytes)
+    }
+
+    fn ensure_source_version(&self) -> Result<(), Failure> {
+        let observed = self.package.source_version()?;
+        if observed != self.expected_source {
+            return Err(Failure::Package(PackageError::Ole(
+                litchi_cfb::OleError::SourceChanged {
+                    expected: self.expected_source,
+                    observed,
+                },
+            )));
+        }
+        Ok(())
     }
 
     /// The block root of the exact source bytes, cached on the package.
-    fn digest(&self) -> Digest {
-        self.package.exact().root(&self.bytes)
+    fn digest(&self) -> Result<Digest, Failure> {
+        Ok(self.package.exact().root(self.bytes()?))
     }
 
     /// Whether the source carries a digital-signature component, cached on
     /// the package.
     pub(crate) fn is_signed(&self) -> Result<bool, Failure> {
+        self.ensure_source_version()?;
         source_signed(&self.package)
     }
 
     /// A shared handle on the exact source package bytes.
-    pub(crate) fn shared_bytes(&self) -> Arc<[u8]> {
-        Arc::clone(&self.bytes)
+    pub(crate) fn shared_bytes(&self) -> Result<Arc<[u8]>, Failure> {
+        Ok(Arc::clone(self.bytes_arc()?))
     }
 
     /// The options every republished package is opened with: the source
@@ -415,11 +539,17 @@ impl Base {
     /// The source as the native slide-order read view, for families whose
     /// records live in the live document or a slide.
     pub(crate) fn native(&self) -> Result<slide_order::Snapshot, Failure> {
-        Ok(slide_order::Snapshot::from_package_with_options(
+        let bytes = self.shared_bytes()?;
+        let snapshot = slide_order::Snapshot::from_package_with_options(
             &self.package,
-            Arc::clone(&self.bytes),
+            bytes,
             self.open_options(),
-        )?)
+        );
+        // Preserve the edit-entry source fence even when the native snapshot
+        // reused cached package projections whose own check observed a newer
+        // baseline during construction.
+        self.ensure_source_version()?;
+        Ok(snapshot?)
     }
 
     /// The exact current bytes of one persisted owner record.
@@ -461,15 +591,16 @@ impl Base {
     /// must not use the unsigned-cache seed without an equivalent proof.
     pub(crate) fn publish(self, after: Vec<u8>) -> Result<Published, Failure> {
         self.admit_output_length(after.len())?;
-        let ranges = BytePatch::ranges(&self.bytes, &after);
+        let bytes = self.shared_bytes()?;
+        let ranges = BytePatch::ranges(&bytes, &after);
         if ranges.is_empty() {
-            return Ok(self.unchanged());
+            return self.unchanged();
         }
         let block_spans = Arc::from(spans(&ranges));
-        let source = self.package.exact().blocks(&self.bytes);
+        let source = self.package.exact().blocks(&bytes);
         let target = Arc::new(source.derive(&after, &block_spans));
         let patch = BytePatch {
-            source: Endpoint::new(self.bytes.len(), source.root()),
+            source: Endpoint::new(bytes.len(), source.root()),
             target: Endpoint::new(after.len(), target.root()),
             ranges,
             block_spans,
@@ -483,6 +614,7 @@ impl Base {
     /// index bound. Preserve the publication path's freshness/signature error
     /// precedence for an oversized changed candidate.
     fn admit_output_length(&self, observed: usize) -> Result<(), Failure> {
+        self.ensure_source_version()?;
         admit_output_length(&self.package, observed)
     }
 
@@ -507,7 +639,7 @@ impl Base {
         after: Vec<u8>,
     ) -> Result<Published, Failure> {
         if before == after {
-            return Ok(self.unchanged());
+            return self.unchanged();
         }
         if self.is_signed()? {
             return Err(Failure::Signed);
@@ -524,12 +656,14 @@ impl Base {
     }
 
     /// The exact no-op publication: the source package unchanged.
-    pub(crate) fn unchanged(self) -> Published {
-        Published {
-            patch: BytePatch::noop(self.bytes.len(), self.digest()),
+    pub(crate) fn unchanged(self) -> Result<Published, Failure> {
+        let bytes = self.shared_bytes()?;
+        let digest = self.digest()?;
+        Ok(Published {
+            patch: BytePatch::noop(bytes.len(), digest),
             package: self.package,
             diagnostics: Diagnostics::UNCHANGED,
-        }
+        })
     }
 }
 
@@ -554,11 +688,9 @@ pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, F
     if package.is_encrypted() {
         return Err(Failure::Package(PackageError::EncryptionPolicy));
     }
-    // Keep the one exact source image in its original Vec. `Base::capture`
-    // converts that Vec to a short-lived `Arc<[u8]>` owner even though replay
-    // only borrows the bytes until it has rebuilt the target. The edit/native
-    // path still uses `Base::capture`, because those paths retain the source
-    // bytes for their staged projection.
+    // Keep the one exact source image in its original Vec. Replay only borrows
+    // it until it has rebuilt the target, so it does not need to create a
+    // retained `Base` or an additional source `Arc`.
     let bytes = package.to_encrypted_bytes()?;
     let digest = package.exact().root(&bytes);
     if !patch.is_source(bytes.len(), &digest) {
@@ -969,7 +1101,7 @@ fn detach_cfb_leaf(bytes: &mut [u8], name: &str) {
     reason = "byte-patch unit tests use panic-driven assertions"
 )]
 mod tests {
-    use super::{BLOCK, BlockDigests, BytePatch, Endpoint};
+    use super::{BLOCK, Base, BlockDigests, BytePatch, Endpoint};
     use crate::package::{Error, OpenOptions, Package, SourceLimits};
     use litchi_cfb::OleError;
     use litchi_core::{ReadAt, SourceVersion};
@@ -980,6 +1112,19 @@ mod tests {
 
     fn root(bytes: &[u8]) -> super::Digest {
         BlockDigests::of(bytes).root()
+    }
+
+    #[test]
+    fn base_capture_defers_the_exact_source_copy_until_requested() {
+        let package = Package::new().unwrap();
+        let base = Base::capture(&package).unwrap();
+        assert!(base.bytes.value.get().is_none());
+        drop(base);
+
+        let base = Base::capture(&package).unwrap();
+        let expected = package.to_encrypted_bytes().unwrap();
+        assert_eq!(base.bytes().unwrap(), expected.as_slice());
+        assert!(base.bytes.value.get().is_some());
     }
 
     impl BytePatch {
@@ -1014,6 +1159,7 @@ mod tests {
     struct VersionedSource {
         bytes: Vec<u8>,
         revision: AtomicU64,
+        flip_after_versions: AtomicU64,
     }
 
     impl VersionedSource {
@@ -1021,11 +1167,16 @@ mod tests {
             Self {
                 bytes,
                 revision: AtomicU64::new(0),
+                flip_after_versions: AtomicU64::new(0),
             }
         }
 
         fn change(&self) {
             self.revision.fetch_add(1, Ordering::AcqRel);
+        }
+
+        fn change_before_version_call(&self, calls: u64) {
+            self.flip_after_versions.store(calls, Ordering::Release);
         }
     }
 
@@ -1035,10 +1186,20 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
-            Ok(SourceVersion::new(
-                0x5050,
-                self.revision.load(Ordering::Acquire),
-            ))
+            let remaining = self.flip_after_versions.load(Ordering::Acquire);
+            if remaining == 1 {
+                if self
+                    .flip_after_versions
+                    .compare_exchange(1, 0, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    self.revision.fetch_add(1, Ordering::AcqRel);
+                }
+            } else if remaining > 1 {
+                self.flip_after_versions.fetch_sub(1, Ordering::AcqRel);
+            }
+            let revision = self.revision.load(Ordering::Acquire);
+            Ok(SourceVersion::new(0x5050, revision))
         }
 
         fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
@@ -1058,7 +1219,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
 
         assert!(!base.is_signed().unwrap());
         source.change();
@@ -1068,6 +1229,102 @@ mod tests {
                 OleError::SourceChanged { .. }
             )))
         ));
+    }
+
+    #[test]
+    fn lazy_source_capture_rejects_a_change_before_first_materialization() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = Base::capture(&package).unwrap();
+        source.change();
+
+        assert!(matches!(
+            base.bytes(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn lazy_source_capture_rechecks_a_change_after_materialization() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = Base::capture(&package).unwrap();
+        assert!(!base.bytes().unwrap().is_empty());
+        source.change();
+
+        assert!(matches!(
+            base.bytes(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn native_projection_rechecks_a_cached_positional_source() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = Base::capture(&package).unwrap();
+        base.bytes().unwrap();
+        source.change();
+
+        assert!(matches!(
+            base.native(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn native_projection_fences_a_source_change_during_construction() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = Base::capture(&package).unwrap();
+        base.bytes().unwrap();
+
+        // Arm the source immediately before the final Base fence. The
+        // package's own presentation fence has already accepted the same
+        // source revision, so this isolates the owner-level check.
+        source.change_before_version_call(9);
+        assert!(matches!(
+            base.native(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+
+        // The same transition does not make native construction fail by
+        // itself: without Base::native's final fence, the package's own
+        // presentation fence observes the new revision and succeeds.
+        let control_source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let control_package = Package::from_read_at(control_source.clone()).unwrap();
+        let control = Base::capture(&control_package).unwrap();
+        control.bytes().unwrap();
+        control_source.change_before_version_call(9);
+        let bytes = control.shared_bytes().unwrap();
+        let control_snapshot = crate::slide_order::Snapshot::from_package_with_options(
+            control.package(),
+            bytes,
+            control.open_options(),
+        );
+        assert!(control_snapshot.is_ok());
     }
 
     #[test]
@@ -1232,7 +1489,7 @@ mod tests {
         let package =
             Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))
                 .unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         base.admit_output_length(maximum).unwrap();
         for observed in [maximum + 1, usize::MAX] {
             assert!(matches!(
@@ -1256,14 +1513,14 @@ mod tests {
         ));
 
         let signed = super::signed(&source);
-        let signed_base = super::Base::capture(&signed).unwrap();
+        let signed_base = Base::capture(&signed).unwrap();
         assert!(matches!(
             signed_base.admit_output_length(usize::MAX),
             Err(super::Failure::Signed)
         ));
         let versioned = Arc::new(VersionedSource::new(source.to_bytes().unwrap()));
         let package = Package::from_read_at(versioned.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         versioned.change();
         assert!(matches!(
             base.admit_output_length(usize::MAX),

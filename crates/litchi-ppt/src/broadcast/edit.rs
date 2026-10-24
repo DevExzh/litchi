@@ -16,7 +16,7 @@ use super::{Broadcast, BroadcastProperties, Commit, Patch, Result, UnknownRecord
 use crate::Package;
 use crate::consts::RecordType;
 use crate::record_wire as wire;
-use crate::scoped::{self, Base, Failure};
+use crate::scoped::{self, Base, Failure, Lazy};
 use crate::slide_order::{self, records::Owner};
 
 const OPERATION: &str = "edit_broadcast";
@@ -25,9 +25,13 @@ const OPERATION: &str = "edit_broadcast";
 /// [`Package`].
 pub struct Edit {
     base: Base,
+    position: usize,
+    state: Lazy<State>,
+}
+
+struct State {
     native: slide_order::Snapshot,
     document: Vec<u8>,
-    position: usize,
     inner: RecordEdit,
 }
 
@@ -36,6 +40,7 @@ impl std::fmt::Debug for Edit {
         formatter
             .debug_struct("Edit")
             .field("position", &self.position)
+            .field("initialized", &self.state.get().is_some())
             .finish_non_exhaustive()
     }
 }
@@ -43,32 +48,61 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     fn new(package: &Package, position: Position) -> Result<Self> {
         let base = Base::capture(package)?;
-        let native = base.native()?;
-        let document = base.owner_record(&native, Owner::Document)?;
+        Ok(Self {
+            base,
+            position: position.get(),
+            state: Lazy::new(),
+        })
+    }
+
+    fn initialize_state(&self) -> std::result::Result<State, Failure> {
+        let native = self.base.native()?;
+        let document = self.base.owner_record(&native, Owner::Document)?;
         let located = Located::find(&document)?;
-        let source = located.container(position.get())?;
+        let source = located.container(self.position)?;
         let inner = Snapshot::parse(source)
             .map_err(scoped::publication(OPERATION))?
             .edit();
-        Ok(Self {
-            base,
+        Ok(State {
             native,
             document,
-            position: position.get(),
             inner,
         })
     }
 
+    fn state(&self) -> std::result::Result<&State, Failure> {
+        self.state.get_or_try_init(|| self.initialize_state())
+    }
+
+    fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
+        let base = self.base.clone();
+        let position = self.position;
+        self.state.get_or_try_init_mut(|| {
+            let native = base.native()?;
+            let document = base.owner_record(&native, Owner::Document)?;
+            let located = Located::find(&document)?;
+            let source = located.container(position)?;
+            let inner = Snapshot::parse(source)
+                .map_err(scoped::publication(OPERATION))?
+                .edit();
+            Ok(State {
+                native,
+                document,
+                inner,
+            })
+        })
+    }
+
     /// Current typed broadcast projection.
-    #[must_use]
-    pub fn broadcast(&self) -> &Broadcast {
-        self.inner.broadcast()
+    #[must_use = "handle the fallible broadcast projection result"]
+    pub fn broadcast(&self) -> Result<&Broadcast> {
+        Ok(self.state()?.inner.broadcast())
     }
 
     /// Opaque source records retained by every candidate publication.
-    #[must_use]
-    pub fn unknown_records(&self) -> &[UnknownRecord] {
-        self.inner.unknown_records()
+    #[must_use = "handle the fallible broadcast records result"]
+    pub fn unknown_records(&self) -> Result<&[UnknownRecord]> {
+        Ok(self.state()?.inner.unknown_records())
     }
 
     /// Replace all typed broadcast fields atomically.
@@ -79,6 +113,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn replace(&mut self, replacement: Broadcast) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .replace(replacement)
             .map_err(scoped::staging("broadcast.replace"))?)
@@ -92,6 +127,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_title(value)
             .map_err(scoped::staging("broadcast.set_title"))?)
@@ -105,6 +141,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_description(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_description(value)
             .map_err(scoped::staging("broadcast.set_description"))?)
@@ -118,6 +155,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_speaker(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_speaker(value)
             .map_err(scoped::staging("broadcast.set_speaker"))?)
@@ -131,6 +169,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_contact(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_contact(value)
             .map_err(scoped::staging("broadcast.set_contact"))?)
@@ -144,6 +183,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_remote_server_name(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_remote_server_name(value)
             .map_err(scoped::staging("broadcast.set_remote_server_name"))?)
@@ -157,6 +197,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_email_address(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_email_address(value)
             .map_err(scoped::staging("broadcast.set_email_address"))?)
@@ -170,6 +211,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_email_name(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_email_name(value)
             .map_err(scoped::staging("broadcast.set_email_name"))?)
@@ -183,6 +225,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_chat_url(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_chat_url(value)
             .map_err(scoped::staging("broadcast.set_chat_url"))?)
@@ -196,6 +239,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_archive_directory(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_archive_directory(value)
             .map_err(scoped::staging("broadcast.set_archive_directory"))?)
@@ -209,6 +253,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_netshow_files_base_directory(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_netshow_files_base_directory(value)
             .map_err(scoped::staging(
@@ -224,6 +269,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_netshow_files_directory(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_netshow_files_directory(value)
             .map_err(scoped::staging("broadcast.set_netshow_files_directory"))?)
@@ -237,6 +283,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_netshow_server_name(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_netshow_server_name(value)
             .map_err(scoped::staging("broadcast.set_netshow_server_name"))?)
@@ -250,6 +297,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_entry_id(&mut self, value: Option<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_entry_id(value)
             .map_err(scoped::staging("broadcast.set_entry_id"))?)
@@ -263,6 +311,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_ppt_files_base_directory(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_ppt_files_base_directory(value)
             .map_err(scoped::staging("broadcast.set_ppt_files_base_directory"))?)
@@ -276,6 +325,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_ppt_files_directory(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_ppt_files_directory(value)
             .map_err(scoped::staging("broadcast.set_ppt_files_directory"))?)
@@ -289,6 +339,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_ppt_files_base_url(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_ppt_files_base_url(value)
             .map_err(scoped::staging("broadcast.set_ppt_files_base_url"))?)
@@ -302,6 +353,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_user_name(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_user_name(value)
             .map_err(scoped::staging("broadcast.set_user_name"))?)
@@ -315,6 +367,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_broadcast_date_time(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_broadcast_date_time(value)
             .map_err(scoped::staging("broadcast.set_broadcast_date_time"))?)
@@ -328,6 +381,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_presentation_name(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_presentation_name(value)
             .map_err(scoped::staging("broadcast.set_presentation_name"))?)
@@ -341,6 +395,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_asd_file_name(&mut self, value: impl Into<String>) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_asd_file_name(value)
             .map_err(scoped::staging("broadcast.set_asd_file_name"))?)
@@ -354,6 +409,7 @@ impl Edit {
     /// request, leaving the edit unchanged.
     pub fn set_properties(&mut self, value: BroadcastProperties) -> Result<()> {
         Ok(self
+            .state_mut()?
             .inner
             .set_properties(value)
             .map_err(scoped::staging("broadcast.set_properties"))?)
@@ -368,13 +424,23 @@ impl Edit {
     /// package and [`super::Error::Package`] when the result cannot be
     /// republished.
     pub fn commit(self) -> Result<Commit> {
+        self.state
+            .get_or_try_init(|| self.initialize_state())
+            .map_err(super::Error::from)?;
         let Self {
             base,
+            position,
+            state,
+        } = self;
+        let State {
             native,
             document,
-            position,
             inner,
-        } = self;
+        } = state.into_inner().ok_or_else(|| {
+            Failure::Package(crate::package::Error::Corrupted(
+                "PPT broadcast edit state was not initialized".into(),
+            ))
+        })?;
         let (snapshot, _) = inner
             .commit()
             .map_err(scoped::publication("broadcast.commit"))?
@@ -483,10 +549,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error::Refused`] with
-    /// [`litchi_core::edit::RefusalKind::NotFound`] when no description is at
-    /// `position`, and [`super::Error::Package`] for an encrypted or
-    /// unreadable presentation.
+    /// An encrypted presentation is refused immediately. A missing or
+    /// unreadable description is reported by the first projection, staging
+    /// operation, or commit.
     pub fn edit_broadcast(&self, position: Position) -> Result<Edit> {
         Edit::new(self, position)
     }

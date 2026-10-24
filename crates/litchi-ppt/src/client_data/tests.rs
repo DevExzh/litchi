@@ -456,6 +456,7 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
             .edit_client_data(target)
             .unwrap()
             .children()
+            .unwrap()
             .iter()
             .map(ClientDataChild::kind)
             .collect::<Vec<_>>()
@@ -482,9 +483,9 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
         panic!("a missing child must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
     edit.insert(0, flags).unwrap();
-    assert_eq!(edit.changes().len(), 1);
+    assert_eq!(edit.changes().unwrap().len(), 1);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -515,7 +516,10 @@ fn package_client_data_edits_publish_replay_and_invert_exactly() {
         Err(super::Error::PatchConflict)
     ));
 
-    let refusal_kind = |target| match source.edit_client_data(target) {
+    let refusal_kind = |target| match source
+        .edit_client_data(target)
+        .and_then(|edit| edit.children().map(|_| ()))
+    {
         Err(super::Error::Refused(refusal)) => refusal.kind(),
         other => panic!("expected a refusal, got {other:?}"),
     };

@@ -341,7 +341,10 @@ fn package_broadcast_edits_publish_replay_and_invert_exactly() {
         commit.package().apply_broadcast(commit.patch()),
         Err(super::Error::PatchConflict)
     ));
-    let Err(super::Error::Refused(refusal)) = source.edit_broadcast(Position::new(1)) else {
+    let Err(super::Error::Refused(refusal)) = source
+        .edit_broadcast(Position::new(1))
+        .and_then(|edit| edit.broadcast().map(|_| ()))
+    else {
         panic!("a position past the last broadcast must be refused");
     };
     assert_eq!(refusal.kind(), litchi_core::edit::RefusalKind::NotFound);

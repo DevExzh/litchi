@@ -1325,7 +1325,9 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
     assert_eq!(native.leniency(), Leniency::TolerateUserEditChainDefects);
     let canonical = litchi_ppt::Package::from_bytes_with_options(&bytes, options).unwrap();
     assert!(matches!(
-        canonical.edit(),
+        canonical
+            .edit()
+            .and_then(litchi_ppt::package::edit::Edit::commit),
         Err(litchi_ppt::package::edit::Error::Native(
             litchi_ppt::slide_order::Error::Refused(
                 litchi_ppt::slide_order::Refusal::RepairedUserEditChain

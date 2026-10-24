@@ -381,6 +381,7 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
         .edit_diagrams(slide)
         .unwrap()
         .builds()
+        .unwrap()
         .next()
         .unwrap()
         .id();
@@ -405,12 +406,12 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
         panic!("a missing shape must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::InvalidValue);
-    assert!(edit.changes().is_empty());
+    assert!(edit.changes().unwrap().is_empty());
     edit.set_mode(id, BuildType::Down).unwrap();
     let other = shape_ids[shape_ids.len() - 2];
     let moved = edit.set_shape_id(id, other).unwrap();
     assert_eq!(moved, Id::new(7, other));
-    assert_eq!(edit.changes().len(), 2);
+    assert_eq!(edit.changes().unwrap().len(), 2);
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().source_len(), source_bytes.len());
@@ -419,7 +420,7 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
         commit.package().to_bytes().unwrap().len()
     );
     let published = commit.package().edit_diagrams(slide).unwrap();
-    let build = published.builds().next().unwrap();
+    let build = published.builds().unwrap().next().unwrap();
     assert_eq!(build.id(), moved);
     assert_eq!(build.mode(), BuildType::Down);
     assert_eq!(
@@ -427,6 +428,7 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
             .edit_diagrams(slide)
             .unwrap()
             .builds()
+            .unwrap()
             .next()
             .unwrap()
             .mode(),
@@ -448,14 +450,20 @@ fn package_diagram_edits_publish_replay_and_invert_exactly() {
         Err(Error::PatchConflict)
     ));
 
-    let Err(Error::Refused(refusal)) = source.edit_diagrams(Position::new(1)) else {
+    let Err(Error::Refused(refusal)) = source
+        .edit_diagrams(Position::new(1))
+        .and_then(|edit| edit.builds().map(|_| ()))
+    else {
         panic!("a missing slide must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
     let mut builder = crate::Builder::new();
     builder.add_slide().unwrap();
     let plain = builder.build().unwrap();
-    let Err(Error::Refused(refusal)) = plain.edit_diagrams(slide) else {
+    let Err(Error::Refused(refusal)) = plain
+        .edit_diagrams(slide)
+        .and_then(|edit| edit.builds().map(|_| ()))
+    else {
         panic!("a slide without a build list must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::UnsupportedTarget);
@@ -473,6 +481,7 @@ fn package_diagram_edits_admit_a_signed_package_and_refuse_a_changed_commit() {
         .edit_diagrams(slide)
         .unwrap()
         .builds()
+        .unwrap()
         .next()
         .unwrap()
         .id();

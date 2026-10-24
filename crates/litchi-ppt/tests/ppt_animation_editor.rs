@@ -17,7 +17,7 @@ fn built() -> (Package, u32, u32) {
         .unwrap();
     let package = builder.build().unwrap();
     let edit = package.edit_animations().unwrap();
-    let timelines = edit.timelines();
+    let timelines = edit.timelines().unwrap();
     let slide = timelines
         .iter()
         .find(|timeline| timeline.scope == Scope::Slide)
@@ -46,6 +46,7 @@ fn node(kind: TimeNodeKind, duration_ms: i32) -> ExtendedTimeNode {
 fn root_children(edit: &animation::Edit, persist_id: u32) -> usize {
     edit.find(persist_id)
         .unwrap()
+        .unwrap()
         .extension
         .time_node
         .map_or(0, |root| root.children.len())
@@ -56,8 +57,8 @@ fn built_timeline_add_update_reorder_remove_and_reopen() {
     let (source, slide, master) = built();
     let source_bytes = source.to_bytes().unwrap();
     let mut edit = source.edit_animations().unwrap();
-    assert_eq!(edit.find(slide).unwrap().scope, Scope::Slide);
-    assert_eq!(edit.find(master).unwrap().scope, Scope::MainMaster);
+    assert_eq!(edit.find(slide).unwrap().unwrap().scope, Scope::Slide);
+    assert_eq!(edit.find(master).unwrap().unwrap().scope, Scope::MainMaster);
     let first = node(TimeNodeKind::Parallel, 100);
     let second = node(TimeNodeKind::Sequential, 200);
     edit.add(slide, 0, first).unwrap();
@@ -115,13 +116,13 @@ fn an_unstaged_or_dropped_edit_leaves_the_package_unchanged() {
 fn invalid_indexes_and_limits_are_atomic() {
     let (source, slide, _master) = built();
     let mut edit = source.edit_animations().unwrap();
-    let before = edit.timelines();
+    let before = edit.timelines().unwrap();
     assert!(matches!(
         edit.add(slide, 1, ExtendedTimeNode::default()),
         Err(animation::Error::Refused(_))
     ));
     assert!(edit.reorder(slide, &[0]).is_err());
-    assert_eq!(edit.timelines(), before);
+    assert_eq!(edit.timelines().unwrap(), before);
     let Err(animation::Error::Refused(refusal)) =
         edit.add(u32::MAX, 0, ExtendedTimeNode::default())
     else {
@@ -134,7 +135,7 @@ fn invalid_indexes_and_limits_are_atomic() {
         panic!("an unknown shape must be refused");
     };
     assert_eq!(refusal.kind(), RefusalKind::NotFound);
-    assert_eq!(edit.timelines(), before);
+    assert_eq!(edit.timelines().unwrap(), before);
 }
 
 #[test]
@@ -150,8 +151,18 @@ fn poi_animation_fixtures_are_strictly_gated() {
         };
         match package.edit_animations() {
             Ok(edit) => {
-                let _timelines = edit.timelines();
-                let commit = edit.commit().unwrap();
+                let _timelines = match edit.timelines() {
+                    Ok(timelines) => timelines,
+                    Err(animation::Error::Refused(refusal)) => {
+                        assert_eq!(refusal.kind(), RefusalKind::UnsupportedContent);
+                        assert_eq!(std::fs::read(&path).unwrap(), original);
+                        continue;
+                    },
+                    Err(error) => panic!("{path:?}: animation projection failed: {error:?}"),
+                };
+                let commit = edit
+                    .commit()
+                    .unwrap_or_else(|error| panic!("{path:?}: animation commit failed: {error:?}"));
                 assert!(!commit.diagnostics().changed());
                 assert_eq!(
                     commit.package().to_bytes().unwrap(),
@@ -190,14 +201,19 @@ fn a_signed_package_admits_animation_edits_and_refuses_only_a_changed_commit() {
 
     // Staging and reading work; an exact no-op commit keeps the signature.
     let edit = signed.edit_animations().unwrap();
-    assert_eq!(edit.find(slide).unwrap().scope, Scope::Slide);
+    assert_eq!(edit.find(slide).unwrap().unwrap().scope, Scope::Slide);
     let no_op = edit.commit().unwrap();
     assert!(!no_op.diagnostics().changed());
     assert!(no_op.patch().is_noop());
     assert_eq!(no_op.package().to_bytes().unwrap(), signed_bytes);
 
     // A change that is reverted before the commit is a no-op too.
-    let original = signed.edit_animations().unwrap().find(slide).unwrap();
+    let original = signed
+        .edit_animations()
+        .unwrap()
+        .find(slide)
+        .unwrap()
+        .unwrap();
     let mut edit = signed.edit_animations().unwrap();
     edit.add(slide, 0, node(TimeNodeKind::Parallel, 100))
         .unwrap();
@@ -229,7 +245,12 @@ fn a_change_reverted_before_the_commit_is_an_exact_no_op() {
     let source = edit.commit().unwrap().package().clone();
     let source_bytes = source.to_bytes().unwrap();
     let staged = |package: &Package, persist_id| {
-        package.edit_animations().unwrap().find(persist_id).unwrap()
+        package
+            .edit_animations()
+            .unwrap()
+            .find(persist_id)
+            .unwrap()
+            .unwrap()
     };
     let original = staged(&source, slide);
     let original_master = staged(&source, master);
@@ -247,7 +268,7 @@ fn a_change_reverted_before_the_commit_is_an_exact_no_op() {
     edit.update(slide, 0, node(TimeNodeKind::Sequential, 999))
         .unwrap();
     edit.update(slide, 0, first.clone()).unwrap();
-    assert_eq!(edit.find(slide).unwrap(), original);
+    assert_eq!(edit.find(slide).unwrap().unwrap(), original);
     assert_no_op(edit);
 
     // Add, reorder and remove back to the source order.
@@ -256,7 +277,7 @@ fn a_change_reverted_before_the_commit_is_an_exact_no_op() {
         .unwrap();
     edit.reorder(slide, &[1, 0]).unwrap();
     edit.remove(slide, 0).unwrap();
-    assert_eq!(edit.find(slide).unwrap(), original);
+    assert_eq!(edit.find(slide).unwrap().unwrap(), original);
     assert_no_op(edit);
 
     // Give the master a timeline, then restore its source timeline: the
@@ -270,7 +291,7 @@ fn a_change_reverted_before_the_commit_is_an_exact_no_op() {
         original_master.extension.build_list.clone(),
     )
     .unwrap();
-    assert_eq!(edit.find(master).unwrap(), original_master);
+    assert_eq!(edit.find(master).unwrap().unwrap(), original_master);
     assert_no_op(edit);
 
     // A partial revert publishes only the record that still changed: the

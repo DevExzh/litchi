@@ -566,13 +566,13 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
             if refusal.kind() == SlideRemovalRefusal::UnsupportedRelationship.kind()
     );
     let staging_names = transaction
-        .slides()
+        .slides()?
         .iter()
         .map(|slide| slide.name().to_owned())
         .collect::<Vec<_>>();
     let staging_unchanged = !transaction.clone().commit()?.diagnostics().changed()
-        && transaction.source().revision() == source_revision;
-    let rolled_back = transaction.source().clone();
+        && transaction.source()?.revision() == source_revision;
+    let rolled_back = transaction.source()?.clone();
     drop(transaction);
     let rollback_names = rolled_back
         .slides()
