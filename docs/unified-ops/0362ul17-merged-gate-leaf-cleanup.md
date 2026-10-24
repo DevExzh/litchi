@@ -1,0 +1,7 @@
+# Merged gate leaves removed
+
+Cleanup wave 48 removes `uo2-zip-gate-repair` at `a4d69035be39881a10aada4d1576d7eb696cb9c5` and `uo2-w8-numbers-snappy` at `5232e9bcdb7f9e69f6bcaa93a3d9eb97c373c160`. Both exact tips are merged ancestors of integration `c796d0acc24c7c6e6fd08980b9e31af6bb86b18b`. Immediate identity, branch, ancestry, clean-source and process-holder checks pass. Both worktrees are removed without force; both branch refs remain.
+
+The two ignored `Cargo.lock` files, totaling 279,058 bytes, are preserved under `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/ignored/`. The restoration exercise recreates both worktrees, restores and checks the files and modes, then removes the recreated worktrees without force. The coordinator independently verifies all artifact hashes, payload bytes and modes, retained refs, ancestry and final absence. The [reduced verification receipt](results/0362ul17/cleanup-verification.json) binds the external manifest, removal and restoration receipts, and scripts.
+
+The removed checkouts contained 12,512,840,255 bytes of regular files before cleanup. This is an apparent-file-size observation, not a filesystem free-space measurement. The ignored payloads remain preserved separately. Staging stays fixed throughout removal and the hold is released. Native endpoints, targets, evidence, other worktrees and the protected trunk probe are unchanged. No process is signalled. This cleanup changes no API or acceptance status. Nothing is pushed.
