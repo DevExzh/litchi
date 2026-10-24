@@ -21,15 +21,25 @@ reviewed baseline endpoints are:
 | `legacy-ole-properties` | `604822b44107999aaddb0bffb96b705e9464f546` / `152ff0abf3a49bb957eeae5ebae7fb2b27156223` | reviewed source-candidate `472b` | `ole-properties` |
 | `legacy-xls-properties` | `509bf28e7531ad75f278eaec3a732714a243915a` / `cd282aea544138c152923a3c4c7ba3c7a10bc6b4` | production `472b` | `xls-properties` |
 
-The old tracked and accepted packet manifests were not edited. Their
-SHA-256 values are: W4b `32374ee41072e86a7bee5f1a7fd13e172c74d85a17283a61e9b06b12ac244e8d`
-(4,958 bytes), XLSX raw
-`5b15481cbc139772d3c9ed03bc386e6e4f1dfa4a62a3af327fe2319baabbef83`
-(6,140 bytes), RTF `6cdbd2158793d867218a9a5c85847b0140804c5c28dde6ef577125a17c5d667b`
-(4,838 bytes), OLE `6ef65bfa960f4869db7a511bd0d0b55604e2001df4f767c564792e7ee00349be`
-(6,238 bytes), and XLS
-`3495667fdad6f8d9a02929357c376df4574e2448ac2b080316a4d7964f6da2bd`
-(4,816 bytes).
+The old source files were not edited. The W4b and XLSX values below are the
+tracked templates at the runner source commit (W4b
+`32374ee41072e86a7bee5f1a7fd13e172c74d85a17283a61e9b06b12ac244e8d`, 4,958
+bytes; XLSX raw
+`5b15481cbc139772d3c9ed03bc386e6e4f1dfa4a62a3af327fe2319baabbef83`, 6,140
+bytes). The RTF/OLE/XLS values are explicitly the final 472b external packet
+manifests from record 0362ul8f, not the historical c796 manifests: RTF
+`6cdbd2158793d867218a9a5c85847b0140804c5c28dde6ef577125a17c5d667b` (4,838
+bytes), OLE
+`6ef65bfa960f4869db7a511bd0d0b55604e2001df4f767c564792e7ee00349be` (6,238
+bytes), and XLS
+`3495667fdad6f8d9a02929357c376df4574e2448ac2b080316a4d7964f6da2bd` (4,816
+bytes). The corresponding historical c796 artifacts are retained and are
+`57eff528690834135e74edb897dba55a0373e3a38a2dc3b5c245bedc7b275356` (RTF,
+4,660 bytes), `a8a4f34647165fc627ae7aacdc87db846dc7b28b4e0ecfca63c361797522fb8c`
+(OLE, 5,637 bytes), and
+`36dcc6296d7434b1729c4dbb4bdfde5425539bc7703c9a09f09501715d684ff3` (XLS,
+4,693 bytes). These labels preserve both historical and final provenance;
+neither class was overwritten.
 
 Fresh rendered copies and receipts are outside Git at:
 
@@ -139,3 +149,78 @@ The source-preparation commands exited 0. Their generated receipts are the
 authoritative outputs; their stdout/stderr was not captured. No Cargo build,
 correctness probe, timing, allocation capture, ABBA result, RSS result, or
 performance claim is made by this record.
+
+## Follow-up v2 — explicit TMPDIR repair
+
+Independent review found that the v1 W4b and XLSX rendered manifests did not
+carry an explicit `TMPDIR`, although fresh TMP directories had been reserved.
+The v1 packet above remains immutable. This v2 packet preserves the same
+`litchi.native-build-permit.v1` protocol and source endpoints, adds a distinct
+explicit TMPDIR to both manifests, and regenerates every manifest-bound
+receipt and permit. It is outside Git at:
+
+`/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v2/`
+
+The v2 manifest identities and TMPDIR bindings are:
+
+| Lane | Manifest bytes | Manifest SHA-256 | TMPDIR |
+| --- | ---: | --- | --- |
+| `w4b-xlsb` | 7,333 | `ba50bf05b13f177640f36234d4bd42692708c1dd36edad1bec1d3e514c80858f` | `packet-v2/tmp/w4b-xlsb` |
+| `w4-xlsx-raw` | 7,697 | `14bbbe0886b8ac8989dd0c37691b31575ce84645330afb65668ad0717c452e24` | `packet-v2/tmp/w4-xlsx-raw` |
+| `legacy-rtf` | 4,849 | `d87e9bc74dddda54111756ad6a96d5a0ebdbf580c3c89bd310fe76efda7e67d9` | `packet-v2/tmp/rtf` |
+| `legacy-ole-properties` | 6,326 | `f1980403282d90a4f9438455b3d789d5f7ba8b0bd765d66ad827b6f7811f5ae9` | `packet-v2/tmp/ole-properties` |
+| `legacy-xls-properties` | 4,904 | `2acb6b0caa1830cab16c63ec7494e37920553e510e0ef8ac5b97c1bacd9ca447` | `packet-v2/tmp/xls-properties` |
+
+All v2 lane-specific output, target, and TMP paths were absent at receipt time
+and are pairwise disjoint. The v2 permit is 4,809 bytes,
+SHA-256 `2b97f236d018905091bf2624d7f5e941c038839715b8fd2e992e99290371ee4f`,
+grant `cfb-compile-cohort-20261024-v2`, `max_jobs: 4`, and expires at
+`2026-10-26T20:47:20Z`. The v2 packet receipt is 36,078 bytes,
+SHA-256 `7d15632e350641bd3041ce2c567adb143b0f0943daedf1bca24671882f7e1ac0`.
+
+The regenerated preparation receipts are:
+
+| Receipt | Bytes | SHA-256 |
+| --- | ---: | --- |
+| XLSX raw | 10,340 | `4dafe3c38ca84f66d704819bec90c45ef438a3a51d35e5ccef635d89f355337e` |
+| RTF | 7,392 | `831bf4ca78b6991ecdf0f7026bad60c6af74f2d0f51a784af2b74aa83b4a2bfb` |
+| OLE properties | 7,814 | `b4f4d9f54969da168f56c33b711407db2fcbc506b4603471e538482375313799` |
+| XLS properties | 7,726 | `f82c01160f28554ba1d5f12064b62398a5f455bba2226f93d29a096f76808f1b` |
+| accepted W4b/W5 source preparation, copied byte-for-byte | 6,404 | `664fac47612eacc9c21caf5099785b8486e050b9dc4644ce55dc682c31d9f0b2` |
+| accepted W4b/W5 manifest-source validation, copied byte-for-byte | 36,381 | `1029b6e4f7c59ca72a0806b3f537cc2ce1f87f4e6e47c06ffd57adbbadf5e2f7` |
+
+The v2 static validation passed manifest loading, all five permit bindings,
+all 14 normalized build phases, and TMP/output/target disjointness. Its log
+is 13,094 bytes, SHA-256
+`c1fcf2b84ddce5997a7be7dec0d9043f625b2c9695e69cbbe82ae3005da9ba28`.
+The current runner accepted all six regenerated legacy source legs; its log
+is 2,217 bytes, SHA-256
+`b89c9459f7f7f338e5548be992cad14d6fc65e836fdb3d6c5a234fcf8e021530`.
+The repeated Python-only suite passed 78 tests (exit 0); its 333-byte log is
+SHA-256 `cf6c0b8e2d82d0c387e7465b033d113bf0a4692339fe2c1ed79b9d5a25bc8fdd`.
+The XLSX preparation stdout/stderr log is empty (0 bytes,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).
+
+The exact v2 phase hashes (canonical normalized argv, cwd, target, and source)
+are retained in the packet receipt:
+
+| Lane | Phase hashes |
+| --- | --- |
+| `legacy-ole-properties` | after `d8881c09a50324b79ff492b0749203ec8cabe6874c061a70f9db0d3cb9efece0`; before `b2def306ef9d938e286dc7923b43f91d251482acb62198a5182929888b4ecd8a` |
+| `legacy-rtf` | after `aba9ce6095d3f02ab7b535be8677e74a97fcf6bc4d9df22a11d6bcd5b9898cb9`; before `db98efd28040d166361b3dd59d1e0349c4e1a2b367e467949df8e8c3b1ed2f1c` |
+| `legacy-xls-properties` | after `1d6e02a60f957a217d58c1c0f499a7618665481ac7a7957009466c9c991cb9de`; before `97a86d5fd3d3ec97de2720e2a44daa88f1bfb1e6b6c7ad7929cfd62c5b59ddc3` |
+| `w4-xlsx-raw` | after `9ef2771a6dc353f341a46d47c17af34a49e49f406df711b344d18eda07035d67`; before `409abdaf9357862b825bdab7ae84afb8529268edb595dad27b9ba7f05f3e9179` |
+| `w4b-xlsb` | after sheet `ed2f07124c1580677243360db823023b095a55553d9b07192e88bfbe437b9c09`, after CRUD `acab7259936646f29b0df58cd42bfc8e1df9eb7b7973d0c3df364e0c1ab30bc6`, after probe `1bb18f293198a2f35e8ee893c7c8c3bca62b7d7d312d1e8d1794d1ee53173f45`; before sheet `8f79f20de0008f98af76656b22763bdc26d3da4b6fc54f21b0190f4611bf3d63`, before CRUD `45f937e8a39b5fe05f8d3a7a9f29be017fcf8dffe646719c3ac27cc098e6d3df`, before probe `f1ccf7bf6e3052e6da1c49a4f2f834e653bbb012efb12f619a65a617d86302e0` |
+
+The v2 launch command remains build-only and is not authorized while the
+known unleased full-gate builder is active:
+
+```sh
+unset LITCHI_CAPPED LITCHI_BLESS
+python3 tools/native_qualification_runner.py \
+  --manifest /home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v2/manifests/w4b-xlsb-compile-only.json \
+  --phase build
+```
+
+No v2 Cargo/native command was launched. Controls, validators, ABBA, rustdoc,
+profilers, and all measurements remain globally exclusive.
