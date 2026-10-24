@@ -58,11 +58,13 @@ interpreting the two defined settings.
 
 ## Resource and transaction policy
 
-Use `Record::parse_with_limits`, package `*_with_limits` constructors, or
-`OpenOptions::record_limits` for untrusted input. Limits cover the input stream,
-individual record and payload sizes, record count, nesting depth, and aggregate
-copied payload bytes. EOT validation has independent input, output, font,
-table-count, and name-byte limits.
+Use `OpenOptions::source_limits` when opening an untrusted package. The package
+retains that source profile and constrains its internal record and payload
+decoders, including record count, nesting depth, and aggregate copied payload
+bytes. EOT validation has independent input, output, font, table-count, and
+name-byte limits. Detached record and font codecs are internal implementation
+details; applications should configure the package owner rather than call
+private codec entry points.
 
 Exact no-op package transactions must return the original compound-file bytes.
 A changed embedded-font transaction must refuse signed or encrypted sources;

@@ -39,7 +39,7 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    let _ = transport::decompress_with_limits(data, transport::Limits::new(MAX_INPUT_BYTES));
+    let _ = transport::decompress(data, transport::DecompressionLimits::new(MAX_INPUT_BYTES));
     if let Ok(doc) = Package::from_bytes_with_options(data, parse_options()) {
         let _ = doc.text();
         let mut paragraphs = doc.body().paragraphs();

@@ -17,11 +17,11 @@
 //! | `remove <file> <path> [--prop k=v...]` | `File::apply` with a `remove` item |
 //! | `move <file> <path> [--to P] [--index N \| --after P \| --before P]` | `File::apply` with a `move` item |
 //! | `swap <file> <path1> <path2>` | `File::apply` with a `swap` item |
-//! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort] [--unsupported P]` | `batch::from_bytes_with_limits`, `File::batch_with` |
+//! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort] [--unsupported P]` | `batch::from_bytes` with its required `SourceLimits`, then `File::batch_with` |
 //! | `capabilities (<file> \| --format T)` | `File::capabilities` or `Capabilities::of` |
 //! | `schema <type>` | `litchi_ops::schema` |
 //! | `merge <template> <data> --out <file> [--format json\|csv\|tsv] [--missing keep\|empty] [--no-fields] [--force]`, or OfficeCLI's `merge <template> <output> --data <json\|file>` | `merge::Data::from_json`/`from_csv`, then `File::merge` and `File::save_with` per record (refusing existing outputs unless `--force`); several records need `{n}` in the output name |
-//! | `refresh <file> [--clock DATETIME] [--write-cache] [--require-page-numbers] [--no-dirty] [--out F]` | `File::refresh_with_limits`, then `File::save` (in place, as OfficeCLI) or `File::save_as`; nothing is written when every result is current |
+//! | `refresh <file> [--clock DATETIME] [--write-cache] [--require-page-numbers] [--no-dirty] [--out F]` | `File::refresh_with_options`, then `File::save` (in place, as OfficeCLI) or `File::save_as`; nothing is written when every result is current |
 //! | `dump <file> [/] [--format batch] [--out F]` | `File::dump`; the JSON array on stdout (or `--out`), skipped content as `warning[...]` lines on stderr (record 0336) |
 //! | `raw <file> [<part>] [--out F]` | `File::parts` without a part, else `File::raw`: the XML on stdout, or the bytes to `--out` |
 //! | `raw-set <file> <part> --xpath X --action A [--xml X] [--out F]` | `File::raw_set`, then a save in place (or to `--out`) |
