@@ -112,7 +112,7 @@ def policy_owner_paths(surface: Inventory, crate: str,
         identity = return_types.nominal_identity(path)
         if identity is None:
             raise InventoryError(
-                f"{crate}: policy immutable owner {'::'.join(path)} has an "
+                f"{crate}: policy immutable owner {'::'.join(path)} has a "
                 "missing or ambiguous nominal identity"
             )
         identities.add(identity)

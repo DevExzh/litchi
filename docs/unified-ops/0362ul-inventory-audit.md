@@ -56,6 +56,10 @@ structural errors, so malformed input cannot raise a `None.strip()` traceback
 or hide extra columns. CRLF files remain valid, and empty `detail` and
 `target` fields remain allowed.
 
+The persistent GitHub Actions unit step named `Test API glossary, debt
+inventory, and disposition gates` runs the glossary, inventory and disposition
+test modules together, so these checks remain registered in CI.
+
 The exact post-fix test command was:
 
 ```text
