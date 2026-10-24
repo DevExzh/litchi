@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from dataclasses import replace
 import hashlib
 import json
 import os
@@ -80,6 +81,9 @@ SCOPES = ("join_apply", "join_apply_publish")
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
 ROLE_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
 REVISION = re.compile(r"[0-9a-f]{40}\Z")
+REQUIRED_BLOCKS = 2
+REQUIRED_WARMUPS = 20
+REQUIRED_SAMPLES = 1
 MAX_MANIFEST_BYTES = 256 * 1024
 MAX_FIXTURE_BYTES = 4 * 1024 * 1024
 TARGET_PREFLIGHT_BYTES = 19_200_000_000
@@ -87,6 +91,7 @@ TARGET_HARD_LIMIT_BYTES = 20_000_000_000
 EXPECTED_LIMITS = {"max_sub_edits": 8, "max_effects_per_sub_edit": 8, "max_total_effects": 32, "max_conflicts": 16}
 EXPECTED_PROBE_DESTINATIONS = {
     "common": "crates/litchi-odg/examples/odg_joined_qualification_common.rs",
+    "allocator": "crates/litchi-odg/examples/odg_joined_qualification_allocator.rs",
     "baseline": "crates/litchi-odg/examples/litchi-perf-odg-joined-qualification.rs",
     "candidate": "crates/litchi-odg/examples/litchi-perf-odg-joined-qualification.rs",
 }
@@ -105,6 +110,14 @@ def _identity_file(value: Any, label: str, base: Path) -> IdentityFile:
         bytes=_positive_int(item.get("bytes"), f"{label}.bytes"),
         sha256=_digest(item.get("sha256"), f"{label}.sha256"),
     )
+
+
+def _tree_identity(value: Any, label: str) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"entries", "bytes", "sha256"}, label)
+    entries = _positive_int(item.get("entries"), f"{label}.entries")
+    bytes_value = _positive_int(item.get("bytes"), f"{label}.bytes")
+    return {"entries": entries, "bytes": bytes_value, "sha256": _digest(item.get("sha256"), f"{label}.sha256")}
 
 
 @dataclass(frozen=True)
@@ -133,7 +146,19 @@ class Endpoint:
     profile: str
     lock: IdentityFile
     toolchain: IdentityFile
+    cargo_config: IdentityFile
+    source_manifest: dict[str, Any]
     features: tuple[str, ...]
+    allocator_binary: Path
+    allocator_target_dir: Path
+
+
+@dataclass(frozen=True)
+class BuildPaths:
+    prepare_receipt: Path
+    receipt: Path
+    final_candidate_ref: str
+    cpu: int
 
 
 @dataclass(frozen=True)
@@ -156,6 +181,7 @@ class Manifest:
     protocol: Protocol
     tmpdir: Path
     limits: dict[str, int]
+    build: BuildPaths
 
 
 @dataclass(frozen=True)
@@ -164,8 +190,10 @@ class ResolvedEndpoint:
     resolved_ref: str
     tree: str
     binary: dict[str, Any]
+    allocator_binary: dict[str, Any]
     lock: dict[str, Any]
     toolchain: dict[str, Any]
+    cargo_config: dict[str, Any]
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -239,7 +267,7 @@ def load_manifest(path: Path) -> Manifest:
     value = _load_manifest_file(path)
     _exact_keys(value, {
         "schema", "fixture", "baseline", "candidate", "probe_sources", "protocol",
-        "runtime", "composition_limits", "__sha256",
+        "runtime", "composition_limits", "build", "__sha256",
     }, "manifest")
     if value.get("schema") != INPUT_SCHEMA:
         raise RunFailure(f"manifest.schema must be {INPUT_SCHEMA!r}")
@@ -258,7 +286,8 @@ def load_manifest(path: Path) -> Manifest:
     def endpoint(name: str, profile: str) -> Endpoint:
         item = _object(value.get(name), f"manifest.{name}")
         _exact_keys(item, {
-            "root", "ref", "tree", "profile", "binary", "target_dir", "lock", "toolchain", "features",
+            "root", "ref", "tree", "profile", "binary", "target_dir", "lock", "toolchain",
+            "cargo_config", "source_manifest", "allocator_binary", "allocator_target_dir", "features",
         }, f"manifest.{name}")
         requested_ref = _string(item.get("ref"), f"manifest.{name}.ref")
         expected_tree = _string(item.get("tree"), f"manifest.{name}.tree")
@@ -268,10 +297,10 @@ def load_manifest(path: Path) -> Manifest:
         if actual != profile:
             raise RunFailure(f"manifest.{name}.profile must be {profile!r}")
         features_value = item.get("features")
-        if (not isinstance(features_value, list) or not features_value
+        if (not isinstance(features_value, list)
                 or any(not isinstance(feature, str) or not feature for feature in features_value)
                 or features_value != sorted(set(features_value))):
-            raise RunFailure(f"manifest.{name}.features must be a non-empty sorted unique string list")
+            raise RunFailure(f"manifest.{name}.features must be a sorted unique string list")
         return Endpoint(
             name=name,
             root=_path(item.get("root"), f"manifest.{name}.root", base),
@@ -282,7 +311,11 @@ def load_manifest(path: Path) -> Manifest:
             profile=actual,
             lock=_identity_file(item.get("lock"), f"manifest.{name}.lock", base),
             toolchain=_identity_file(item.get("toolchain"), f"manifest.{name}.toolchain", base),
+            cargo_config=_identity_file(item.get("cargo_config"), f"manifest.{name}.cargo_config", base),
+            source_manifest=_tree_identity(item.get("source_manifest"), f"manifest.{name}.source_manifest"),
             features=tuple(features_value),
+            allocator_binary=_path(item.get("allocator_binary"), f"manifest.{name}.allocator_binary", base),
+            allocator_target_dir=_path(item.get("allocator_target_dir"), f"manifest.{name}.allocator_target_dir", base),
         )
 
     baseline = endpoint("baseline", BASELINE_PROFILE)
@@ -290,9 +323,9 @@ def load_manifest(path: Path) -> Manifest:
     if baseline.root == candidate.root:
         raise RunFailure("baseline and candidate roots must be distinct")
     source_value = _object(value.get("probe_sources"), "manifest.probe_sources")
-    _exact_keys(source_value, {"common", "baseline", "candidate"}, "manifest.probe_sources")
+    _exact_keys(source_value, {"common", "allocator", "baseline", "candidate"}, "manifest.probe_sources")
     probe_sources: list[ProbeSource] = []
-    for name in ("common", "baseline", "candidate"):
+    for name in ("common", "allocator", "baseline", "candidate"):
         item = _object(source_value.get(name), f"manifest.probe_sources.{name}")
         _exact_keys(item, {"path", "bytes", "sha256", "destination"}, f"manifest.probe_sources.{name}")
         destination = _string(item.get("destination"), f"manifest.probe_sources.{name}.destination")
@@ -316,6 +349,11 @@ def load_manifest(path: Path) -> Manifest:
     cpu = _nonnegative_int(protocol_value.get("cpu"), "manifest.protocol.cpu")
     blocks = _positive_int(protocol_value.get("blocks"), "manifest.protocol.blocks")
     warmups = _nonnegative_int(protocol_value.get("warmups"), "manifest.protocol.warmups")
+    if blocks != REQUIRED_BLOCKS or warmups != REQUIRED_WARMUPS:
+        raise RunFailure(
+            f"ODG protocol requires exactly {REQUIRED_BLOCKS} ABBA blocks and "
+            f"{REQUIRED_WARMUPS} warmups"
+        )
     target_ms = _positive_float(protocol_value.get("target_ms"), "manifest.protocol.target_ms")
     minimum_ms = _positive_float(protocol_value.get("minimum_ms"), "manifest.protocol.minimum_ms")
     if target_ms < 500 or minimum_ms < 150 or target_ms < minimum_ms:
@@ -338,7 +376,20 @@ def load_manifest(path: Path) -> Manifest:
     limits = {key: _positive_int(limit_value.get(key), f"manifest.composition_limits.{key}") for key in EXPECTED_LIMITS}
     if limits != EXPECTED_LIMITS:
         raise RunFailure(f"composition_limits must equal {EXPECTED_LIMITS!r}")
-    return Manifest(path, value["__sha256"], fixture, baseline, candidate, tuple(probe_sources), protocol, tmpdir, limits)
+    build_value = _object(value.get("build"), "manifest.build")
+    _exact_keys(build_value, {"prepare_receipt", "receipt", "final_candidate_ref", "cpu"}, "manifest.build")
+    final_candidate_ref = _string(build_value.get("final_candidate_ref"), "manifest.build.final_candidate_ref")
+    if REVISION.fullmatch(final_candidate_ref) is None or final_candidate_ref != candidate.requested_ref:
+        raise RunFailure("manifest.build.final_candidate_ref must equal the immutable candidate ref")
+    build = BuildPaths(
+        prepare_receipt=_path(build_value.get("prepare_receipt"), "manifest.build.prepare_receipt", base),
+        receipt=_path(build_value.get("receipt"), "manifest.build.receipt", base),
+        final_candidate_ref=final_candidate_ref,
+        cpu=_nonnegative_int(build_value.get("cpu"), "manifest.build.cpu"),
+    )
+    if build.prepare_receipt == build.receipt:
+        raise RunFailure("manifest build receipts must be distinct")
+    return Manifest(path, value["__sha256"], fixture, baseline, candidate, tuple(probe_sources), protocol, tmpdir, limits, build)
 
 
 def validate_fixture(fixture: Fixture) -> dict[str, Any]:
@@ -388,11 +439,22 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
         )
     if not endpoint.target_dir.is_dir():
         raise RunFailure(f"{endpoint.name}.target_dir is not a directory")
+    if not endpoint.allocator_binary.is_file() or not endpoint.allocator_binary.stat().st_mode & 0o111:
+        raise RunFailure(f"{endpoint.name}.allocator_binary is not executable")
+    if endpoint.allocator_binary.name != "litchi-perf-odg-joined-qualification":
+        raise RunFailure(f"{endpoint.name}.allocator_binary has an unexpected basename")
+    if not endpoint.allocator_target_dir.is_dir():
+        raise RunFailure(f"{endpoint.name}.allocator_target_dir is not a directory")
     _validate_external_target(endpoint.target_dir, roots, f"{endpoint.name}.target_dir")
+    _validate_external_target(endpoint.allocator_target_dir, roots, f"{endpoint.name}.allocator_target_dir")
     try:
         endpoint.binary.relative_to(endpoint.target_dir)
     except ValueError as error:
         raise RunFailure(f"{endpoint.name}.binary must be below target_dir") from error
+    try:
+        endpoint.allocator_binary.relative_to(endpoint.allocator_target_dir)
+    except ValueError as error:
+        raise RunFailure(f"{endpoint.name}.allocator_binary must be below allocator_target_dir") from error
     def identity_file(value: IdentityFile, label: str) -> dict[str, Any]:
         try:
             value.path.relative_to(endpoint.root)
@@ -404,7 +466,9 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
         return {"path": str(value.path), "bytes": actual_bytes, "sha256": actual_sha}
     lock = identity_file(endpoint.lock, f"{endpoint.name}.lock")
     toolchain = identity_file(endpoint.toolchain, f"{endpoint.name}.toolchain")
-    return ResolvedEndpoint(endpoint, resolved, tree, binary_identity(endpoint.binary), lock, toolchain)
+    cargo_config = identity_file(endpoint.cargo_config, f"{endpoint.name}.cargo_config")
+    return ResolvedEndpoint(endpoint, resolved, tree, binary_identity(endpoint.binary),
+                            binary_identity(endpoint.allocator_binary), lock, toolchain, cargo_config)
 
 
 def _under(left: Path, right: Path) -> bool:
@@ -413,23 +477,49 @@ def _under(left: Path, right: Path) -> bool:
 
 def _validate_layout(manifest: Manifest, out_dir: Path) -> None:
     roots = (manifest.baseline.root, manifest.candidate.root)
+    try:
+        from odg_joined_qualification_builder import _raw_path, _safe_path
+    except ImportError:  # pragma: no cover
+        from tools.odg_joined_qualification_builder import _raw_path, _safe_path  # type: ignore[no-redef]
+    _safe_path(out_dir.absolute(), "artifact directory")
+    raw = _load_json(manifest.path)
+    runtime_value = _object(raw.get("runtime"), "manifest.runtime")
+    _safe_path(_raw_path(runtime_value.get("tmpdir"), "manifest.runtime.tmpdir", manifest.path.parent),
+               "temporary directory")
     _validate_external_target(out_dir, roots, "artifact directory")
     _validate_external_target(manifest.tmpdir, roots, "temporary directory")
+    _validate_external_target(manifest.build.prepare_receipt, roots, "prepare receipt")
+    _validate_external_target(manifest.build.receipt, roots, "build receipt")
+    if "3rdparty" in manifest.build.receipt.parts or "3rdparty" in manifest.build.prepare_receipt.parts:
+        raise RunFailure("build receipts must not reference 3rdparty")
     if _under(out_dir, manifest.tmpdir) or _under(manifest.tmpdir, out_dir):
         raise RunFailure("artifact and temporary directories must be disjoint")
     pairs = (
         (out_dir, manifest.baseline.target_dir),
         (out_dir, manifest.candidate.target_dir),
+        (out_dir, manifest.baseline.allocator_target_dir),
+        (out_dir, manifest.candidate.allocator_target_dir),
         (manifest.baseline.target_dir, manifest.candidate.target_dir),
+        (manifest.baseline.allocator_target_dir, manifest.candidate.allocator_target_dir),
+        (manifest.baseline.target_dir, manifest.baseline.allocator_target_dir),
+        (manifest.candidate.target_dir, manifest.candidate.allocator_target_dir),
         (manifest.tmpdir, manifest.baseline.target_dir),
         (manifest.tmpdir, manifest.candidate.target_dir),
+        (manifest.tmpdir, manifest.baseline.allocator_target_dir),
+        (manifest.tmpdir, manifest.candidate.allocator_target_dir),
     )
     if any(_under(left, right) or _under(right, left) for left, right in pairs):
         raise RunFailure("target and temporary directories must be pairwise disjoint")
 
 
-def runtime_identity(manifest: Manifest, out_dir: Path) -> dict[str, Any]:
+def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt: bool = True) -> dict[str, Any]:
     _validate_layout(manifest, out_dir)
+    if require_build_receipt:
+        try:
+            from odg_joined_qualification_builder import validate_build_receipt
+        except ImportError:  # pragma: no cover - direct module loading in tests.
+            from tools.odg_joined_qualification_builder import validate_build_receipt  # type: ignore[no-redef]
+        validate_build_receipt(manifest.path)
     fixture = validate_fixture(manifest.fixture)
     probes = validate_probe_sources(manifest.probe_sources)
     roots = (manifest.baseline.root, manifest.candidate.root)
@@ -446,12 +536,18 @@ def runtime_identity(manifest: Manifest, out_dir: Path) -> dict[str, Any]:
                      "resolved_ref": baseline.resolved_ref, "tree": baseline.tree,
                      "profile": baseline.endpoint.profile, "features": list(baseline.endpoint.features),
                      "lock": baseline.lock, "toolchain": baseline.toolchain,
-                     "binary": baseline.binary, "target_dir": str(baseline.endpoint.target_dir)},
+                     "cargo_config": baseline.cargo_config,
+                     "binary": baseline.binary, "allocator_binary": baseline.allocator_binary,
+                     "target_dir": str(baseline.endpoint.target_dir),
+                     "allocator_target_dir": str(baseline.endpoint.allocator_target_dir)},
         "candidate": {"root": str(candidate.endpoint.root), "requested_ref": candidate.endpoint.requested_ref,
                       "resolved_ref": candidate.resolved_ref, "tree": candidate.tree,
                       "profile": candidate.endpoint.profile, "features": list(candidate.endpoint.features),
                       "lock": candidate.lock, "toolchain": candidate.toolchain,
-                      "binary": candidate.binary, "target_dir": str(candidate.endpoint.target_dir)},
+                      "cargo_config": candidate.cargo_config,
+                      "binary": candidate.binary, "allocator_binary": candidate.allocator_binary,
+                      "target_dir": str(candidate.endpoint.target_dir),
+                      "allocator_target_dir": str(candidate.endpoint.allocator_target_dir)},
         "endpoints": {"baseline": baseline, "candidate": candidate},
     }
 
@@ -463,18 +559,29 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
                               "probe_sources": validate_probe_sources(manifest.probe_sources)}
     for name, resolved in endpoints.items():
         root = resolved.endpoint.root
+        try:
+            from odg_joined_qualification_builder import _check_worktree_shape, _tree_manifest
+        except ImportError:  # pragma: no cover
+            from tools.odg_joined_qualification_builder import _check_worktree_shape, _tree_manifest  # type: ignore[no-redef]
+        _check_worktree_shape(root, name)
         status = _run_git(root, "status", "--porcelain", "--untracked-files=all")
         head = _run_git(root, "rev-parse", "--verify", "HEAD")
         requested = _run_git(root, "rev-parse", "--verify", f"{resolved.endpoint.requested_ref}^{{commit}}")
         tree = _run_git(root, "rev-parse", "--verify", f"{resolved.resolved_ref}^{{tree}}")
         if status or head != resolved.resolved_ref or requested != resolved.resolved_ref or tree != resolved.tree:
             raise RunFailure(f"{phase}: {name} source ref or cleanliness changed")
+        if _tree_manifest(root, resolved.resolved_ref) != resolved.endpoint.source_manifest:
+            raise RunFailure(f"{phase}: {name} complete source tree changed")
         actual = binary_identity(resolved.endpoint.binary)
         if actual != resolved.binary:
             raise RunFailure(f"{phase}: {name} binary changed")
+        actual_allocator = binary_identity(resolved.endpoint.allocator_binary)
+        if actual_allocator != resolved.allocator_binary:
+            raise RunFailure(f"{phase}: {name} allocator binary changed")
         for label, value, expected in (
             ("lock", resolved.endpoint.lock, resolved.lock),
             ("toolchain", resolved.endpoint.toolchain, resolved.toolchain),
+            ("cargo_config", resolved.endpoint.cargo_config, resolved.cargo_config),
         ):
             actual_sha, actual_bytes = _sha256_file(value.path)
             if (actual_bytes, actual_sha) != (value.bytes, value.sha256) or {
@@ -483,15 +590,18 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
                 raise RunFailure(f"{phase}: {name} {label} changed")
         result[name] = {"head": head, "tree": tree, "requested_ref": requested,
                         "features": list(resolved.endpoint.features), "binary": actual,
-                        "lock": resolved.lock, "toolchain": resolved.toolchain}
+                        "allocator_binary": actual_allocator,
+                        "lock": resolved.lock, "toolchain": resolved.toolchain,
+                        "cargo_config": resolved.cargo_config}
     result["checked_unix_ns"] = time.time_ns()
     return result
 
 
-def _probe_command(endpoint: ResolvedEndpoint, manifest: Manifest, mode: str, **kwargs: Any) -> list[str]:
+def _probe_command(endpoint: ResolvedEndpoint, manifest: Manifest, mode: str,
+                   *, binary: Path | None = None, **kwargs: Any) -> list[str]:
     taskset = _require_taskset(manifest.protocol.cpu)
     command = [taskset, "--cpu-list", str(manifest.protocol.cpu),
-               str(endpoint.endpoint.binary), "--mode", mode, "--fixture", str(manifest.fixture.path)]
+               str(binary or endpoint.endpoint.binary), "--mode", mode, "--fixture", str(manifest.fixture.path)]
     for key in ("route", "scope", "iterations", "samples", "warmups", "target_ns"):
         if kwargs.get(key) is not None:
             command.extend((f"--{key.replace('_', '-')}", str(kwargs[key])))
@@ -499,38 +609,51 @@ def _probe_command(endpoint: ResolvedEndpoint, manifest: Manifest, mode: str, **
     return command
 
 
-def _run_probe(endpoint: ResolvedEndpoint, manifest: Manifest, out_dir: Path, mode: str, label: str, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-    command = _probe_command(endpoint, manifest, mode, **kwargs)
+def _run_probe(endpoint: ResolvedEndpoint, manifest: Manifest, out_dir: Path, mode: str, label: str,
+               *, binary: Path | None = None, target_dir: Path | None = None, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    command = _probe_command(endpoint, manifest, mode, binary=binary, **kwargs)
     environment = dict(os.environ)
     environment["TMPDIR"] = str(manifest.tmpdir)
     try:
-        completed = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, env=environment,
-                                   timeout=manifest.protocol.timeout_s, check=False)
-    except (OSError, subprocess.SubprocessError) as error:
-        raise RunFailure(f"{label}: probe failed or timed out: {error}") from error
-    if len(completed.stdout) > MAX_CHILD_OUTPUT or len(completed.stderr) > MAX_CHILD_OUTPUT:
-        raise RunFailure(f"{label}: child output exceeds {MAX_CHILD_OUTPUT} bytes")
-    stdout_path = out_dir / f"{label}.stdout"
-    stderr_path = out_dir / f"{label}.stderr"
-    stdout_path.write_bytes(completed.stdout)
-    stderr_path.write_bytes(completed.stderr)
-    logs = {"command": command, "returncode": completed.returncode,
-            "endpoint": endpoint.endpoint.name, "profile": endpoint.endpoint.profile,
-            "resolved_ref": endpoint.resolved_ref, "binary": endpoint.binary,
-            "binding": {"mode": mode, "route": kwargs.get("route"), "scope": kwargs.get("scope")},
-            "stdout": {"path": str(stdout_path), "bytes": len(completed.stdout), "sha256": _sha256_file(stdout_path)[0]},
-            "stderr": {"path": str(stderr_path), "bytes": len(completed.stderr), "sha256": _sha256_file(stderr_path)[0]}}
-    if completed.returncode != 0:
-        raise RunFailure(f"{label}: probe exited {completed.returncode}: {completed.stderr.decode(errors='replace')}")
-    report = _parse_child_json(completed.stdout, label)
+        from odg_joined_qualification_builder import _stream_command
+    except ImportError:  # pragma: no cover - direct module loading in tests.
+        from tools.odg_joined_qualification_builder import _stream_command  # type: ignore[no-redef]
+    guard_before = quiet_guard(manifest.protocol, f"before-{label}")
+    event = _stream_command(
+        command,
+        endpoint.endpoint.root,
+        out_dir,
+        label,
+        target_dir or endpoint.endpoint.target_dir,
+        manifest.protocol.cpu,
+        manifest.protocol.timeout_s,
+        environment,
+        MAX_CHILD_OUTPUT,
+        manifest.protocol.max_load,
+    )
+    guard_after = quiet_guard(manifest.protocol, f"after-{label}")
+    logs = {
+        "command": command, "returncode": event["returncode"],
+        "endpoint": endpoint.endpoint.name, "profile": endpoint.endpoint.profile,
+        "resolved_ref": endpoint.resolved_ref,
+        "binary": binary_identity(binary) if binary is not None else endpoint.binary,
+        "binding": {"mode": mode, "route": kwargs.get("route"), "scope": kwargs.get("scope")},
+        "stdout": event["stdout"], "stderr": event["stderr"],
+        "guard": {"before": guard_before, "live": event["monitor"]["samples"], "after": guard_after,
+                   "memory_limit_bytes": event["monitor"]["memory_limit_bytes"],
+                   "max_output_bytes": event["monitor"]["max_output_bytes"],
+                   "max_load": event["monitor"]["max_load"]},
+        "target": event["target"],
+    }
+    stdout_path = Path(event["stdout"]["path"])
+    report = _parse_child_json(stdout_path.read_bytes(), label)
     return report, logs
 
 
 def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, mode: str,
                           route: str | None, scope: str | None, label: str) -> None:
     _exact_keys(logs, {"command", "returncode", "endpoint", "profile", "resolved_ref", "binary",
-                       "binding", "stdout", "stderr"}, label)
+                       "binding", "stdout", "stderr", "guard", "target"}, label)
     if (logs.get("returncode") != 0 or logs.get("endpoint") != endpoint.endpoint.name
             or logs.get("profile") != endpoint.endpoint.profile
             or logs.get("resolved_ref") != endpoint.resolved_ref
@@ -541,7 +664,50 @@ def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, m
     if binding != {"mode": mode, "route": route, "scope": scope}:
         raise RunFailure(f"{label}: child log route/phase binding differs from the invocation")
     for stream in ("stdout", "stderr"):
-        _object(logs.get(stream), f"{label}.{stream}")
+        item = _object(logs.get(stream), f"{label}.{stream}")
+        _exact_keys(item, {"path", "bytes", "sha256"}, f"{label}.{stream}")
+        path = Path(_string(item.get("path"), f"{label}.{stream}.path"))
+        if not path.is_file() or path.is_symlink():
+            raise RunFailure(f"{label}.{stream}: log path is not a regular file")
+        actual_sha, actual_bytes = _sha256_file(path)
+        if item.get("bytes") != actual_bytes or item.get("sha256") != actual_sha:
+            raise RunFailure(f"{label}.{stream}: log bytes or hash changed")
+        if actual_bytes > MAX_CHILD_OUTPUT:
+            raise RunFailure(f"{label}.{stream}: log exceeds bounded child output")
+    guard = _object(logs.get("guard"), f"{label}.guard")
+    _exact_keys(guard, {"before", "live", "after", "memory_limit_bytes", "max_output_bytes", "max_load"}, f"{label}.guard")
+    if guard["memory_limit_bytes"] != 20_000_000_000 or guard["max_output_bytes"] != MAX_CHILD_OUTPUT:
+        raise RunFailure(f"{label}.guard resource limits differ from the fixed protocol")
+    for phase in ("before", "after"):
+        value = _object(guard.get(phase), f"{label}.guard.{phase}")
+        _exact_keys(value, {"phase", "load_1m", "max_load", "heavy_processes", "checked_unix_ns"},
+                    f"{label}.guard.{phase}")
+        if not isinstance(value["heavy_processes"], list):
+            raise RunFailure(f"{label}.guard.{phase}: process list is malformed")
+        if value["max_load"] != guard["max_load"]:
+            raise RunFailure(f"{label}.guard.{phase}: load ceiling identity differs")
+    live = guard["live"]
+    if not isinstance(live, list) or not live:
+        raise RunFailure(f"{label}.guard.live is incomplete")
+    for index, value in enumerate(live):
+        sample = _object(value, f"{label}.guard.live[{index}]")
+        _exact_keys(sample, {"checked_unix_ns", "output_bytes", "rss_bytes", "load_1m", "outside_processes"},
+                    f"{label}.guard.live[{index}]")
+        _positive_int(sample["checked_unix_ns"], f"{label}.guard.live[{index}].checked_unix_ns")
+        if type(sample["output_bytes"]) is not int or sample["output_bytes"] < 0 or sample["output_bytes"] > MAX_CHILD_OUTPUT:
+            raise RunFailure(f"{label}.guard.live[{index}]: output bound failed")
+        if type(sample["rss_bytes"]) is not int or sample["rss_bytes"] < 0 or sample["rss_bytes"] > TARGET_HARD_LIMIT_BYTES:
+            raise RunFailure(f"{label}.guard.live[{index}]: memory bound failed")
+        if sample["outside_processes"] != []:
+            raise RunFailure(f"{label}.guard.live[{index}]: unrelated process observed")
+    target = _object(logs.get("target"), f"{label}.target")
+    _exact_keys(target, {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}, f"{label}.target")
+    if type(target["bytes_before"]) is not int or type(target["bytes_after"]) is not int:
+        raise RunFailure(f"{label}.target byte accounting is malformed")
+    if target["hard_limit_bytes"] != TARGET_HARD_LIMIT_BYTES:
+        raise RunFailure(f"{label}.target hard limit identity differs")
+    if target["bytes_before"] > target["hard_limit_bytes"] or target["bytes_after"] > target["hard_limit_bytes"]:
+        raise RunFailure(f"{label}.target exceeded its hard bound")
 
 
 def _digest_object(value: Any, label: str) -> dict[str, Any]:
@@ -630,15 +796,19 @@ def validate_verify_report(report: Mapping[str, Any], endpoint_name: str, fixtur
         elif routes[route]["output"] == source:
             raise RunFailure(f"{endpoint_name}/{route}: changed route produced the source bytes")
     refusals = _object(report.get("refusals"), f"{endpoint_name}.refusals")
-    if set(refusals) != {"stale_lineage_refused", "conflicting_effect_refused", "changed_recipient_refused"}:
+    if set(refusals) != {"stale_lineage_refused", "conflicting_effect_refused",
+                         "changed_recipient_refused", "changed_recipient_scope"}:
         raise RunFailure(f"{endpoint_name}: refusal proof fields are incomplete")
     if refusals["stale_lineage_refused"] is not True or refusals["conflicting_effect_refused"] is not True:
         raise RunFailure(f"{endpoint_name}: stale/conflict refusal proof failed")
-    if refusals["changed_recipient_refused"] is not True:
+    if refusals["changed_recipient_scope"] != "candidate-only":
+        raise RunFailure(f"{endpoint_name}: changed-recipient scope is not explicit")
+    if refusals["changed_recipient_refused"] is not candidate:
         raise RunFailure(f"{endpoint_name}: changed-recipient capability boundary is incorrect")
     expected_capabilities = {"apply_joined": not candidate, "edit_join_commit": candidate, "commit_triads": candidate,
                              "patch_replay": candidate, "inverse_replay": candidate,
-                             "content_matching_replay": candidate, "changed_recipient_refusal": True}
+                             "content_matching_replay": candidate, "changed_recipient_refusal": candidate,
+                             "changed_recipient_refusal_scope": "candidate-only"}
     if _object(report.get("capabilities"), f"{endpoint_name}.capabilities") != expected_capabilities:
         raise RunFailure(f"{endpoint_name}: capability boundary is incomplete or overstated")
     aggregate = _object(report.get("checks"), f"{endpoint_name}.checks")
@@ -676,6 +846,8 @@ def validate_calibration(report: Mapping[str, Any], endpoint: str, route: str, s
     previous = 0
     for index, item in enumerate(attempts):
         attempt = _object(item, f"{endpoint}/{route}/{scope}.attempts[{index}]")
+        _exact_keys(attempt, {"iterations", "elapsed_ns", "proof"},
+                    f"{endpoint}/{route}/{scope}.attempts[{index}]")
         count = _positive_int(attempt.get("iterations"), "calibration attempt iterations")
         duration = _positive_int(attempt.get("elapsed_ns"), "calibration attempt elapsed_ns")
         if count <= previous or count > protocol.max_iterations or duration <= 0 or attempt.get("proof") != expected:
@@ -699,12 +871,84 @@ def validate_timed(report: Mapping[str, Any], endpoint: str, route: str, scope: 
     if report.get("iterations") != iterations or report.get("warmups") != protocol.warmups or report.get("proof") != expected:
         raise RunFailure(f"{endpoint}/{route}/{scope}: timed normalization/proof mismatch")
     samples = report.get("samples")
-    if not isinstance(samples, list) or len(samples) != 1:
-        raise RunFailure(f"{endpoint}/{route}/{scope}: timed output must contain one sample")
+    if not isinstance(samples, list) or len(samples) != REQUIRED_SAMPLES:
+        raise RunFailure(
+            f"{endpoint}/{route}/{scope}: timed output must contain exactly "
+            f"{REQUIRED_SAMPLES} sample"
+        )
     sample = _positive_int(samples[0], "timed sample")
     if sample < protocol.minimum_ns:
         raise RunFailure(f"{endpoint}/{route}/{scope}: timed sample below minimum")
     return sample
+
+
+def validate_allocation(report: Mapping[str, Any], endpoint: str, route: str, scope: str,
+                        protocol: Protocol, expected: Mapping[str, Any]) -> dict[str, Any]:
+    schema = CANDIDATE_SCHEMA if endpoint == "candidate" else BASELINE_SCHEMA
+    expected_endpoint = "candidate-edit-join-commit" if endpoint == "candidate" else "baseline-apply-joined"
+    _exact_keys(report, {"schema", "endpoint", "mode", "route", "scope", "iterations", "warmups", "samples"},
+                f"{endpoint}/{route}/{scope}.allocation")
+    if (report.get("schema") != schema or report.get("endpoint") != expected_endpoint
+            or report.get("mode") != "allocation" or report.get("route") != route
+            or report.get("scope") != scope or report.get("iterations") != 1
+            or report.get("warmups") != REQUIRED_WARMUPS):
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation identity mismatch")
+    samples = report.get("samples")
+    if not isinstance(samples, list) or len(samples) != REQUIRED_SAMPLES:
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation sample count is not fixed")
+    sample = _object(samples[0], f"{endpoint}/{route}/{scope}.allocation.samples[0]")
+    _exact_keys(sample, {"metrics", "proof"}, f"{endpoint}/{route}/{scope}.allocation.sample")
+    if sample["proof"] != expected:
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation proof differs from correctness")
+    metrics = _object(sample["metrics"], f"{endpoint}/{route}/{scope}.allocation.metrics")
+    _exact_keys(metrics, {"tool", "allocation", "latency_claim"}, f"{endpoint}/{route}/{scope}.allocation.metrics")
+    if metrics["latency_claim"] != "allocator_instrumented_elapsed_not_latency_claim":
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation report made a latency claim")
+    tool = _object(metrics["tool"], f"{endpoint}/{route}/{scope}.allocation.tool")
+    _exact_keys(tool, {"binary", "instrumentation", "allocator_counter_revision"},
+                f"{endpoint}/{route}/{scope}.allocation.tool")
+    if (tool["binary"] != "litchi-perf-odg-joined-qualification-alloc"
+            or tool["instrumentation"] != "system_allocator_operation_scoped"
+            or tool["allocator_counter_revision"] != "serialized_region_peak_v3"):
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocator tool identity is incorrect")
+    allocation = _object(metrics["allocation"], f"{endpoint}/{route}/{scope}.allocation.allocation")
+    fields = {"status", "scope", "allocation_calls", "deallocation_calls", "reallocation_calls",
+              "failed_allocation_calls", "allocated_bytes", "deallocated_bytes", "live_bytes_before",
+              "live_bytes_after", "peak_live_bytes_before", "peak_live_bytes_after", "region_peak_live_bytes"}
+    _exact_keys(allocation, fields, f"{endpoint}/{route}/{scope}.allocation.allocation")
+    if allocation["status"] != "measured" or allocation["scope"] != "operation_global_system_allocator":
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation observation is not measured")
+    numbers: dict[str, int] = {}
+    for field in fields - {"status", "scope"}:
+        numbers[field] = _nonnegative_int(allocation.get(field), f"allocation.{field}")
+    if (numbers["live_bytes_after"] - numbers["live_bytes_before"]
+            != numbers["allocated_bytes"] - numbers["deallocated_bytes"]):
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation live-byte conservation failed")
+    if (numbers["peak_live_bytes_before"] < numbers["live_bytes_before"]
+            or numbers["peak_live_bytes_after"] < numbers["live_bytes_after"]
+            or numbers["region_peak_live_bytes"] < numbers["live_bytes_before"]
+            or numbers["region_peak_live_bytes"] < numbers["live_bytes_after"]):
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocation peak bounds failed")
+    return {"metrics": metrics, "proof": expected}
+
+
+def validate_allocation_rows(rows: Any, key: str) -> list[dict[str, Any]]:
+    if not isinstance(rows, list) or len(rows) != len(ABBA_ORDER):
+        raise RunFailure(f"{key}: allocation ABBA must contain exactly four legs")
+    normalized: list[dict[str, Any]] = []
+    for index, (value, role) in enumerate(zip(rows, ABBA_ORDER)):
+        row = _object(value, f"{key}.rows[{index}]")
+        _exact_keys(row, {"role", "endpoint", "guard", "target", "logs", "allocation", "proof"},
+                    f"{key}.rows[{index}]")
+        if row["role"] != role or row["endpoint"] != ROLE_ENDPOINT[role]:
+            raise RunFailure(f"{key}: allocation leg {index} has the wrong endpoint")
+        _object(row["guard"], f"{key}.rows[{index}].guard")
+        _object(row["target"], f"{key}.rows[{index}].target")
+        _object(row["logs"], f"{key}.rows[{index}].logs")
+        _object(row["allocation"], f"{key}.rows[{index}].allocation")
+        _object(row["proof"], f"{key}.rows[{index}].proof")
+        normalized.append(row)
+    return normalized
 
 
 def validate_abba_rows(rows: Any, key: str) -> list[dict[str, Any]]:
@@ -721,20 +965,43 @@ def validate_abba_rows(rows: Any, key: str) -> list[dict[str, Any]]:
         _positive_int(row.get("iterations"), f"{key}.rows[{index}].iterations")
         _positive_int(row.get("sample_ns"), f"{key}.rows[{index}].sample_ns")
         _positive_float(row.get("per_operation_ns"), f"{key}.rows[{index}].per_operation_ns")
-        _object(row.get("guard"), f"{key}.rows[{index}].guard")
-        _object(row.get("target"), f"{key}.rows[{index}].target")
-        _object(row.get("logs"), f"{key}.rows[{index}].logs")
-        _object(row.get("proof"), f"{key}.rows[{index}].proof")
+        guard = _object(row.get("guard"), f"{key}.rows[{index}].guard")
+        _exact_keys(guard, {"phase", "load_1m", "max_load", "heavy_processes", "checked_unix_ns"},
+                    f"{key}.rows[{index}].guard")
+        target = _object(row.get("target"), f"{key}.rows[{index}].target")
+        _exact_keys(target, {"targets", "phase", "checked_unix_ns"}, f"{key}.rows[{index}].target")
+        logs = _object(row.get("logs"), f"{key}.rows[{index}].logs")
+        _exact_keys(logs, {"command", "returncode", "endpoint", "profile", "resolved_ref", "binary",
+                           "binding", "stdout", "stderr", "guard", "target"},
+                    f"{key}.rows[{index}].logs")
+        for stream in ("stdout", "stderr"):
+            _digest_object(logs[stream], f"{key}.rows[{index}].logs.{stream}")
+        proof = _object(row.get("proof"), f"{key}.rows[{index}].proof")
+        if set(proof) != {"output", "semantic"}:
+            raise RunFailure(f"{key}.rows[{index}].proof identity is incomplete")
+        _digest_object(proof["output"], f"{key}.rows[{index}].proof.output")
+        _object(proof["semantic"], f"{key}.rows[{index}].proof.semantic")
         normalized.append(row)
     return normalized
 
 
 def _write_json(path: Path, value: Any) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    with temporary.open("rb") as stream:
-        os.fsync(stream.fileno())
-    temporary.replace(path)
+    if path.exists() or temporary.exists() or path.is_symlink() or temporary.is_symlink():
+        raise RunFailure(f"refusing to overwrite existing JSON receipt: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with temporary.open("xb") as stream:
+            stream.write((json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        # Link publication is exclusive on the same filesystem; unlike
+        # `replace`, it cannot silently overwrite a concurrently-created
+        # receipt.
+        os.link(temporary, path)
+        temporary.unlink()
+    except OSError as error:
+        raise RunFailure(f"cannot publish JSON receipt {path}: {error}") from error
 
 
 def _plan(manifest: Manifest, out_dir: Path) -> dict[str, Any]:
@@ -748,11 +1015,28 @@ def _plan(manifest: Manifest, out_dir: Path) -> dict[str, Any]:
                           "minimum_ns": manifest.protocol.minimum_ns, "max_iterations": manifest.protocol.max_iterations}}
 
 
-def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool) -> dict[str, Any]:
-    if out_dir.exists() and (not out_dir.is_dir() or any(out_dir.iterdir())):
-        raise RunFailure(f"output directory must be new and empty: {out_dir}")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    manifest.tmpdir.mkdir(parents=True, exist_ok=True)
+def _allocator_endpoints(endpoints: Mapping[str, ResolvedEndpoint]) -> dict[str, ResolvedEndpoint]:
+    return {
+        name: replace(
+            resolved,
+            endpoint=replace(
+                resolved.endpoint,
+                binary=resolved.endpoint.allocator_binary,
+                target_dir=resolved.endpoint.allocator_target_dir,
+            ),
+            binary=resolved.allocator_binary,
+        )
+        for name, resolved in endpoints.items()
+    }
+
+
+def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocation_only: bool = False) -> dict[str, Any]:
+    if out_dir.exists():
+        raise RunFailure(f"output directory must not already exist: {out_dir}")
+    if manifest.tmpdir.exists():
+        raise RunFailure(f"temporary directory must not already exist: {manifest.tmpdir}")
+    out_dir.mkdir(parents=True, exist_ok=False)
+    manifest.tmpdir.mkdir(parents=True, exist_ok=False)
     identity = runtime_identity(manifest, out_dir)
     endpoints: Mapping[str, ResolvedEndpoint] = identity["endpoints"]
     target_before = _target_guard(endpoints, "before-correctness")
@@ -791,6 +1075,43 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool) -> dict[
         _write_json(out_dir / "report.json", result)
         return result
 
+    if allocation_only:
+        allocation_endpoints = _allocator_endpoints(endpoints)
+        allocation_dir = out_dir / "allocation"
+        allocation_dir.mkdir()
+        allocation: dict[str, Any] = {}
+        for route in ROUTES:
+            for scope in SCOPES:
+                key = f"{route}/{scope}"
+                blocks = []
+                for block in range(REQUIRED_BLOCKS):
+                    rows = []
+                    for role in ABBA_ORDER:
+                        endpoint_name = ROLE_ENDPOINT[role]
+                        guard = quiet_guard(manifest.protocol, f"before-allocation-{block}-{role}-{key}")
+                        target = _target_guard(allocation_endpoints, f"before-allocation-{block}-{role}-{key}")
+                        report, logs = _run_probe(
+                            allocation_endpoints[endpoint_name], manifest, allocation_dir, "allocation",
+                            f"allocation-block-{block}-{role}-{route}-{scope}",
+                            route=route, scope=scope, samples=REQUIRED_SAMPLES,
+                            warmups=REQUIRED_WARMUPS, iterations=1,
+                        )
+                        _validate_log_binding(logs, allocation_endpoints[endpoint_name], "allocation", route, scope,
+                                             f"allocation-{role}-{route}-{scope}")
+                        expected = _expected_proof(baseline if endpoint_name == "baseline" else candidate, route, scope)
+                        metrics = validate_allocation(report, endpoint_name, route, scope, manifest.protocol, expected)
+                        rows.append({"role": role, "endpoint": endpoint_name, "guard": guard, "target": target,
+                                     "logs": logs, "allocation": metrics["metrics"], "proof": expected})
+                        _assert_unchanged(manifest, endpoints, f"after-allocation-{block}-{role}-{key}")
+                    blocks.append({"block": block, "order": list(ABBA_ORDER),
+                                   "rows": validate_allocation_rows(rows, f"{key}/block-{block}")})
+                allocation[key] = {"blocks": blocks, "order": list(ABBA_ORDER)}
+        result["claim_scope"] = "correctness-allocation"
+        result["allocation"] = allocation
+        result["identity_checks"].append(_assert_unchanged(manifest, endpoints, "after-allocation"))
+        _write_json(out_dir / "report.json", result)
+        return result
+
     calibration_dir = out_dir / "calibration"
     calibration_dir.mkdir()
     calibrations: dict[str, Any] = {}
@@ -821,7 +1142,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool) -> dict[
         for scope in SCOPES:
             key = f"{route}/{scope}"
             blocks = []
-            for block in range(manifest.protocol.blocks):
+            for block in range(REQUIRED_BLOCKS):
                 rows = []
                 for role in ABBA_ORDER:
                     endpoint_name = ROLE_ENDPOINT[role]
@@ -856,35 +1177,63 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
     parser.add_argument("--plan", action="store_true")
+    parser.add_argument("--prepare", action="store_true", help="create a fresh source/build preparation receipt")
+    parser.add_argument("--build", action="store_true", help="build both paired probe kinds and write a receipt")
+    parser.add_argument("--validate-build", action="store_true", help="rehash and validate the build receipt")
     parser.add_argument("--correctness-only", action="store_true")
+    parser.add_argument("--allocation-only", action="store_true")
     args = parser.parse_args(argv)
-    if args.plan and args.correctness_only:
-        parser.error("--plan and --correctness-only are mutually exclusive")
+    selected = sum(bool(getattr(args, name)) for name in (
+        "plan", "prepare", "build", "validate_build", "correctness_only", "allocation_only"
+    ))
+    if selected > 1:
+        parser.error("qualification phase flags are mutually exclusive")
     return args
 
 
 def _failure_receipt(path: Path, error: BaseException) -> None:
     try:
-        path.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            # A failure must never turn an existing artifact directory into a
+            # mutable log sink or overwrite a prior receipt.
+            return
+        path.mkdir(parents=True, exist_ok=False)
         receipt = path / "failure.json"
-        if not receipt.exists():
-            _write_json(receipt, {"schema": REPORT_SCHEMA, "status": "failed", "error": str(error)})
-    except OSError:
+        _write_json(receipt, {"schema": REPORT_SCHEMA, "status": "failed", "error": str(error)})
+    except (OSError, RunFailure):
         return
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    out_dir = args.out_dir.resolve()
+    out_dir = args.out_dir.absolute()
     try:
         manifest = load_manifest(args.manifest)
         if args.plan:
-            if out_dir.exists() and any(out_dir.iterdir()):
-                raise RunFailure(f"output directory must be new and empty: {out_dir}")
-            out_dir.mkdir(parents=True, exist_ok=True)
+            if out_dir.exists():
+                raise RunFailure(f"output directory must not already exist: {out_dir}")
+            out_dir.mkdir(parents=True, exist_ok=False)
             _write_json(out_dir / "plan.json", _plan(manifest, out_dir))
+        elif args.prepare:
+            try:
+                from odg_joined_qualification_builder import prepare
+            except ImportError:  # pragma: no cover
+                from tools.odg_joined_qualification_builder import prepare  # type: ignore[no-redef]
+            prepare(manifest.path)
+        elif args.build:
+            try:
+                from odg_joined_qualification_builder import build
+            except ImportError:  # pragma: no cover
+                from tools.odg_joined_qualification_builder import build  # type: ignore[no-redef]
+            build(manifest.path)
+        elif args.validate_build:
+            try:
+                from odg_joined_qualification_builder import validate_build_receipt
+            except ImportError:  # pragma: no cover
+                from tools.odg_joined_qualification_builder import validate_build_receipt  # type: ignore[no-redef]
+            validate_build_receipt(manifest.path)
         else:
-            _execute(manifest, out_dir, args.correctness_only)
+            _execute(manifest, out_dir, args.correctness_only, args.allocation_only)
     except (RunFailure, OSError, ValueError) as error:
         _failure_receipt(out_dir, error)
         print(str(error), file=sys.stderr)

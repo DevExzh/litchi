@@ -13,22 +13,32 @@ post-migration checkout and calls `Package::edit`, `Edit::join`, and
 `Edit::commit`. They are separate source adapters so the baseline cannot
 silently acquire the candidate commit triad.
 
-The external build overlay copies
+`tools/odg_joined_qualification_builder.py` is the paired build/preparation
+entry point. It copies
 `tools/perf-baseline/odg_joined_qualification_common.rs` to
 `crates/litchi-odg/examples/odg_joined_qualification_common.rs`, and copies
+`tools/perf-baseline/odg_joined_qualification_allocator.rs` to its paired
+allocator module, then copies
 exactly one of the two adapters to
 `crates/litchi-odg/examples/litchi-perf-odg-joined-qualification.rs`. The
 manifest records each overlay source digest and destination, the clean
-worktree's immutable commit SHA and tree SHA, `Cargo.lock` and
-`rust-toolchain.toml` digests, the enabled feature list, and the external
-binary identity. The runner requires
+worktree's immutable commit SHA and tree SHA, the complete `git ls-tree`
+source manifest, `Cargo.lock`, `.cargo/config.toml`, and
+`rust-toolchain.toml` digests, the enabled feature list, and both normal and
+allocator binary identities. The baseline is admitted only at pristine
+`ad52437f5e5e2c71ea476eedd5ddcf61aee2021d`; the candidate ref is bound to the
+final candidate field. The builder rejects sparse/skip-worktree omissions,
+symlinked paths, and `3rdparty` inputs. The runner requires
 the exact paired binary basename and rejects stale refs, dirty trees, changed
 lock/toolchain/probe/fixture files, or changed binaries.
 
 The overlay is a build-staging input, not a source mutation accepted by the
 runner: the external build receipt retains its source/destination digests,
-then removes the temporary example files and verifies both source worktrees
-are clean before the execution manifest is resolved.
+streams each Cargo child into exclusive bounded logs with live RSS, output,
+load, process, and target guards, then removes the temporary example files
+and verifies both source worktrees are clean before the execution manifest is
+resolved. Preparation and build receipts, targets, logs, and runtime output
+must all be fresh; receipt validation rehashes every log and artifact.
 
 ## Routes and clocks
 
@@ -60,12 +70,19 @@ crediting the baseline with candidate-only capabilities.
 `tools/odg_joined_qualification.py` reuses the generic native qualification
 helpers for manifest JSON, executable identity, Git checks, external target
 guards, `/proc` process checks, load checks, CPU-pinned `taskset` launches,
-calibration, and fixed `a1,b1,b2,a2` ABBA ordering. It requires a 500 ms
-calibration target and 150 ms minimum accepted sample. Each child report and
-log is bound to endpoint, resolved ref, binary digest, route, scope, and
-phase; malformed, extra, stale, or incomplete rows fail closed. Allocator
-capture remains an external metric collected by the shared native
-qualification workflow and is not mixed into elapsed-operation claims.
+calibration, and fixed `a1,b1,b2,a2` ABBA ordering. It requires exactly two
+ABBA blocks, 20 warmups, and one sample per fresh child, a 500 ms calibration
+target, and a 150 ms minimum accepted sample. Each child report and log is
+bound to endpoint, resolved ref, binary digest, route, scope, phase, live
+guard, target, and rehashed stream identities; malformed, extra, stale, or
+incomplete rows fail closed.
+
+`--allocation-only` runs the same routes/scopes and ABBA order against a
+separate allocator-instrumented build. The overlay allocator publishes
+operation-scoped global-system-allocator counters whose region starts before
+durable plan reconstruction and closes after the selected apply/publication
+boundary. Allocation reports carry no latency claim and validate live-byte
+conservation, peak bounds, tool identity, and the fixed one-sample envelope.
 
 The runner writes only to a new external output directory. Use, for example:
 
@@ -74,6 +91,17 @@ python3 tools/odg_joined_qualification.py \
   --manifest /external/0362ux/manifest.json \
   --out-dir /external/0362ux/run-v1 \
   --correctness-only
+```
+
+Build preparation and admission are explicit and receipt-bound:
+
+```text
+python3 tools/odg_joined_qualification.py --manifest /external/0362ux/manifest.json \
+  --out-dir /external/0362ux/unused --prepare
+python3 tools/odg_joined_qualification.py --manifest /external/0362ux/manifest.json \
+  --out-dir /external/0362ux/unused --build
+python3 tools/odg_joined_qualification.py --manifest /external/0362ux/manifest.json \
+  --out-dir /external/0362ux/unused --validate-build
 ```
 
 The full calibration/ABBA command is the same invocation without
@@ -94,9 +122,11 @@ and the calibration floor.
 Static validation for this source-only commit is:
 
 ```text
-python3 -m py_compile tools/odg_joined_qualification.py tools/test_odg_joined_qualification.py
+python3 -m py_compile tools/odg_joined_qualification.py \
+  tools/odg_joined_qualification_builder.py tools/test_odg_joined_qualification.py
 python3 -m unittest -v tools.test_odg_joined_qualification
 rustfmt --check tools/perf-baseline/odg_joined_qualification_common.rs \
+  tools/perf-baseline/odg_joined_qualification_allocator.rs \
   tools/perf-baseline/odg_joined_qualification_probe.rs \
   tools/perf-baseline/odg_joined_qualification_ad524_probe.rs
 ```

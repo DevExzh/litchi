@@ -4,11 +4,16 @@
 //! checkout. It deliberately calls the old `Package::apply_joined` lifecycle
 //! and does not claim the candidate commit-triad or replay capabilities.
 
-#![forbid(unsafe_code)]
+#![cfg_attr(not(odg_joined_allocator), forbid(unsafe_code))]
 
+#[cfg(odg_joined_allocator)]
+#[path = "odg_joined_qualification_allocator.rs"]
+mod allocation;
 #[path = "odg_joined_qualification_common.rs"]
 mod common;
 
+#[cfg(odg_joined_allocator)]
+use common::allocation_once;
 use common::{
     Args, Mode, PreparedRoute, Result, digest, fixture_package, foreign_package, prepare_all,
     publish, rebuild_plan, run_batch, run_once, summary, write_json,
@@ -116,6 +121,7 @@ fn refusal_proofs(source: &Package, fixture: &[u8], routes: &[PreparedRoute]) ->
         "stale_lineage_refused": stale_error,
         "conflicting_effect_refused": conflict_error,
         "changed_recipient_refused": changed_recipient_refused,
+        "changed_recipient_scope": "candidate-only",
     }))
 }
 
@@ -156,13 +162,14 @@ fn verify(args: &Args) -> Result<Value> {
             "apply_joined": true, "edit_join_commit": false, "commit_triads": false,
             "patch_replay": false, "inverse_replay": false,
             "content_matching_replay": false, "changed_recipient_refusal": false,
+            "changed_recipient_refusal_scope": "candidate-only",
         },
         "checks": {
             "source_fixture_deterministic": source_fixture_deterministic, "all_routes_checked": true,
             "all_baseline_apply_proofs": true,
             "all_refusal_proofs": refusals["stale_lineage_refused"].as_bool() == Some(true)
                 && refusals["conflicting_effect_refused"].as_bool() == Some(true)
-                && refusals["changed_recipient_refused"].as_bool() == Some(true),
+                && refusals["changed_recipient_scope"].as_str() == Some("candidate-only"),
         },
     }))
 }
@@ -219,11 +226,38 @@ fn timed(args: &Args, mode: Mode) -> Result<Value> {
     }))
 }
 
+#[cfg(odg_joined_allocator)]
+fn allocation(args: &Args) -> Result<Value> {
+    allocation::enable();
+    let (_fixture, source) = fixture_package(&args.fixture)?;
+    let route_name = args.route.as_deref().ok_or("route is required")?;
+    let route = common::prepare_route(&source, route_name)?;
+    let scope = args.scope.ok_or("scope is required")?;
+    let mut samples = Vec::new();
+    for _ in 0..args.warmups {
+        let _ = allocation_once(&source, &route, scope, |plan| apply_plan(&source, plan))?;
+    }
+    for _ in 0..args.samples {
+        let (metrics, proof) =
+            allocation_once(&source, &route, scope, |plan| apply_plan(&source, plan))?;
+        samples.push(json!({"metrics": metrics, "proof": proof}));
+    }
+    Ok(json!({
+        "schema": SCHEMA, "endpoint": ENDPOINT, "mode": Mode::Allocation.as_str(),
+        "route": route_name, "scope": scope.as_str(), "iterations": 1,
+        "warmups": args.warmups, "samples": samples,
+    }))
+}
+
 fn run() -> Result<()> {
     let args = Args::parse()?;
     let report = match args.mode {
         Mode::Verify => verify(&args)?,
         Mode::Calibrate | Mode::Timed => timed(&args, args.mode)?,
+        #[cfg(odg_joined_allocator)]
+        Mode::Allocation => allocation(&args)?,
+        #[cfg(not(odg_joined_allocator))]
+        Mode::Allocation => return Err("allocation mode requires the allocator probe build".into()),
     };
     write_json(&report)
 }

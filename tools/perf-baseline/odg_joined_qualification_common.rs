@@ -23,6 +23,8 @@ pub const ROUTES: &[&str] = &[
 pub const SCOPES: &[&str] = &["join_apply", "join_apply_publish"];
 pub const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
 pub const DEFAULT_MAX_ITERATIONS: usize = 1_000_000;
+pub const REQUIRED_WARMUPS: usize = 20;
+pub const REQUIRED_SAMPLES: usize = 1;
 pub const MAX_FIXTURE_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_SUB_EDIT_WIRE_BYTES: usize = 64 * 1024;
 pub const LIMITS: CompositionLimits = CompositionLimits::new(8, 8, 32, 16);
@@ -34,6 +36,7 @@ pub enum Mode {
     Verify,
     Calibrate,
     Timed,
+    Allocation,
 }
 
 impl Mode {
@@ -42,6 +45,7 @@ impl Mode {
             "verify" => Ok(Self::Verify),
             "calibrate" => Ok(Self::Calibrate),
             "timed" => Ok(Self::Timed),
+            "allocation" => Ok(Self::Allocation),
             other => Err(format!("unknown mode {other:?}").into()),
         }
     }
@@ -51,6 +55,7 @@ impl Mode {
             Self::Verify => "verify",
             Self::Calibrate => "calibrate",
             Self::Timed => "timed",
+            Self::Allocation => "allocation",
         }
     }
 }
@@ -157,10 +162,21 @@ impl Args {
             return Err("verify does not accept route or scope".into());
         }
         if !matches!(mode, Mode::Verify) && route.is_none() {
-            return Err("calibrate and timed require --route".into());
+            return Err("calibrate, timed, and allocation require --route".into());
         }
-        if matches!(mode, Mode::Timed | Mode::Calibrate) && scope.is_none() {
-            return Err("calibrate and timed require --scope".into());
+        if matches!(mode, Mode::Timed | Mode::Calibrate | Mode::Allocation) && scope.is_none() {
+            return Err("calibrate, timed, and allocation require --scope".into());
+        }
+        if matches!(mode, Mode::Allocation) && iterations != 1 {
+            return Err("allocation measures one operation per sample".into());
+        }
+        if matches!(mode, Mode::Calibrate | Mode::Timed | Mode::Allocation)
+            && warmups != REQUIRED_WARMUPS
+        {
+            return Err(format!("timing modes require exactly {REQUIRED_WARMUPS} warmups").into());
+        }
+        if matches!(mode, Mode::Timed | Mode::Allocation) && samples != REQUIRED_SAMPLES {
+            return Err(format!("timing modes require exactly {REQUIRED_SAMPLES} sample").into());
         }
         if let Some(route) = route.as_deref() {
             if !ROUTES.contains(&route) {
@@ -183,7 +199,7 @@ impl Args {
 
 pub fn usage(program: &str) -> String {
     format!(
-        "usage: {program} --mode verify|calibrate|timed --fixture PATH \
+        "usage: {program} --mode verify|calibrate|timed|allocation --fixture PATH \
          [--route ROUTE --scope join_apply|join_apply_publish] \
          [--iterations N --samples N --warmups N --target-ns N --max-iterations N]"
     )
@@ -369,8 +385,12 @@ pub fn summary(package: &Package) -> Value {
 
 pub fn foreign_package(content: &[u8]) -> Result<Package> {
     let mut changed = content.to_vec();
+    // Keep the replacement the same length as the quoted attribute value.
+    // The previous `Other 1` replacement was one byte longer and overwrote
+    // the following quote, making this refusal proof a malformed-XML panic
+    // rather than a changed-recipient check.
     let marker = b"Page 1";
-    let replacement = b"Other 1";
+    let replacement = b"Page 2";
     let position = changed
         .windows(marker.len())
         .position(|window| window == marker)
@@ -390,16 +410,54 @@ where
 {
     let started = Instant::now();
     let package = apply(rebuild_plan(source, route)?)?;
-    let output = match scope {
-        Scope::JoinApply => package.as_bytes().to_vec(),
-        Scope::JoinApplyPublish => publish(&package)?.0,
+    // `join_apply` measures the apply operation only.  Materializing bytes
+    // for its proof happens after the clock closes; publication deliberately
+    // remains inside the `join_apply_publish` scope because write/readback is
+    // the operation being compared there.
+    let (elapsed_ns, output) = match scope {
+        Scope::JoinApply => {
+            let elapsed_ns = started.elapsed().as_nanos();
+            (elapsed_ns, package.as_bytes().to_vec())
+        },
+        Scope::JoinApplyPublish => {
+            let output = publish(&package)?.0;
+            (started.elapsed().as_nanos(), output)
+        },
     };
-    let elapsed_ns = started.elapsed().as_nanos();
     if elapsed_ns == 0 {
         return Err("timed joined operation completed in zero nanoseconds".into());
-    }
+    };
     Ok((
         elapsed_ns,
+        json!({"output": digest(&output), "semantic": summary(&package)}),
+    ))
+}
+
+#[cfg(odg_joined_allocator)]
+pub fn allocation_once<F>(
+    source: &Package,
+    route: &PreparedRoute,
+    scope: Scope,
+    mut apply: F,
+) -> Result<(Value, Value)>
+where
+    F: FnMut(edit::JoinedEdits) -> Result<Package>,
+{
+    // The allocator region begins before durable plan reconstruction.  This
+    // is the operation boundary: preparation, join/application, and (for the
+    // publication scope) write/readback are all accounted for.  Proof
+    // serialization is intentionally after the region closes.
+    let region = crate::allocation::begin();
+    let package = apply(rebuild_plan(source, route)?)?;
+    let (allocation, output) = match scope {
+        Scope::JoinApply => (region.finish(), package.as_bytes().to_vec()),
+        Scope::JoinApplyPublish => {
+            let output = publish(&package)?.0;
+            (region.finish(), output)
+        },
+    };
+    Ok((
+        allocation,
         json!({"output": digest(&output), "semantic": summary(&package)}),
     ))
 }
