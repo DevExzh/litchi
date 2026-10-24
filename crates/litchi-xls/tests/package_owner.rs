@@ -255,9 +255,9 @@ fn signed_source_property_edit_reports_freshness_before_policy_refusal() {
     source.bump();
     assert!(matches!(
         edit.edit_summary_information(|_| Ok(())),
-        Err(PackageError::Reader(
+        Err(PackageError::Reader(litchi_xls::Error::Source(
             SourceBackedError::SourceChanged { .. }
-        ))
+        )))
     ));
 }
 
