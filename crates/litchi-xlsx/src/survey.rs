@@ -3494,7 +3494,7 @@ impl Edit {
     ) -> Result<bool> {
         self.ensure_prepared()?;
         let mut draft = self
-            .draft()
+            .draft()?
             .get(index)
             .cloned()
             .ok_or_else(|| invalid(format!("survey index {index} is absent")))?;
@@ -3532,7 +3532,7 @@ impl Edit {
         // remain immutable. Validate its bindings and catalog-wide uniqueness
         // before replacing one slot, so failures retain the exact staged state.
         if self
-            .draft()
+            .draft()?
             .iter()
             .enumerate()
             .any(|(other, entry)| other != index && entry.survey.id() == draft.survey.id())
