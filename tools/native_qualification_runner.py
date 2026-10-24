@@ -711,14 +711,24 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
             if argv[bin_index + 1 :] != [binary_name]:
                 raise RunnerError(f"{leg}/{command['id']} changes the reviewed DrawingML raw binary route")
             feature_args = argv[manifest_index + 2 : bin_index]
-            if any(value not in {"--no-default-features", "--features"} for value in feature_args):
+            feature_index = 0
+            while feature_index < len(feature_args):
+                option = feature_args[feature_index]
+                if option == "--no-default-features":
+                    feature_index += 1
+                    continue
+                if option == "--features":
+                    if (
+                        feature_index + 1 >= len(feature_args)
+                        or not feature_args[feature_index + 1]
+                        or feature_args[feature_index + 1].startswith("--")
+                    ):
+                        raise RunnerError(f"{leg}/{command['id']} has an empty Cargo feature set")
+                    feature_index += 2
+                    continue
                 raise RunnerError(f"{leg}/{command['id']} has an unreviewed Cargo feature argument")
             if feature_args.count("--features") > 1 or feature_args.count("--no-default-features") > 1:
                 raise RunnerError(f"{leg}/{command['id']} repeats a Cargo feature argument")
-            if "--features" in feature_args:
-                feature_index = feature_args.index("--features")
-                if feature_index + 1 >= len(feature_args) or not feature_args[feature_index + 1]:
-                    raise RunnerError(f"{leg}/{command['id']} has an empty Cargo feature set")
             expected_feature_names = data.get(
                 "drawingml_baseline_features" if leg == "before" else "drawingml_candidate_features",
                 [],

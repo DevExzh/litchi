@@ -24,6 +24,7 @@ pub mod docx_section_retention;
 mod docx_story_hyperlink_publication;
 mod docx_story_hyperlinks;
 mod docx_streaming_create;
+#[cfg(feature = "drawingml-probe")]
 pub mod drawingml_raw_probe;
 mod filesystem;
 mod marker_shape;
