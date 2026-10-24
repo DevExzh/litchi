@@ -67,7 +67,12 @@ was reviewed and extended in source commit
 `4c2fd76b49` to admit owned selector names against each family's retained or
 transaction ledger before copying, charge chart/image first-use sheet scans,
 and migrate the four standalone fuzz `path()` consumers to the fallible
-accessor.  Rustfmt and `git diff --check` pass for that successor.  Cargo
-validation was not rerun in this turn because the coordinator's build slot
-was transferred to another workstream; rerun the Numbers, iWork, facade, and
-strict-Clippy commands above on `4c2fd76b49` before coordinator integration.
+accessor.  A follow-up source commit `6a053c36d3` restores each retained
+edit budget after deferred selection, payload, or clone errors instead of
+turning the next accessor into a generic `InvalidSource`; it also exercises
+repeated getter/mutation/commit calls and proves cumulative transaction-work
+accounting after a typed selector refusal.  Rustfmt and `git diff --check`
+pass for these successors.  Cargo validation was not rerun in this turn
+because the coordinator's build slot was transferred to another workstream;
+rerun the Numbers, iWork, facade, and strict-Clippy commands above on
+`6a053c36d3` before coordinator integration.
