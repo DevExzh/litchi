@@ -276,7 +276,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(qualified["lane"], "w5-legacy")
             self.assertEqual(qualified["analysis"], analysis)
 
-    def test_w5_source_overlay_replaces_only_the_recorded_routes_module(self) -> None:
+    def test_w5_source_overlay_translates_common_api_and_retains_doc_controls(self) -> None:
         candidate = (ROOT / "crates/litchi-ops/examples/legacy_w5_source_probe.rs").read_text(encoding="utf-8")
         routes = (ROOT / "docs/unified-ops/results/0359a/routes_before.rs").read_text(encoding="utf-8")
         adapted = source_prep._adapt_w5_probe(candidate, routes)
@@ -284,6 +284,21 @@ class NativeQualificationRunnerTests(unittest.TestCase):
         self.assertIn("source_backed::Package::from_bytes", candidate)
         self.assertEqual(adapted.count("mod routes {"), 1)
         self.assertIn("PLAN_ONLY_ROUTE: bool = true", adapted)
+        self.assertIn(".edit_with_limits(&limits,", adapted)
+        self.assertIn("black_box(commit.file);", adapted)
+        self.assertNotIn("litchi_ops::EditOptions", adapted)
+        self.assertNotIn("commit.file()", adapted)
+        self.assertEqual(adapted.count("pub(super) fn doc_batch_leaf_write"), 1)
+        self.assertEqual(adapted.count("pub(super) fn doc_leaf_write"), 1)
+        with self.assertRaisesRegex(source_prep.PreparationError, "doc_leaf_write"):
+            source_prep._adapt_w5_probe(
+                candidate.replace(
+                    "pub(super) fn doc_leaf_write",
+                    "pub(super) fn removed_doc_leaf_write",
+                    1,
+                ),
+                routes,
+            )
 
     def test_w4b_crud_overlay_is_only_the_recorded_trait_import(self) -> None:
         baseline = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
