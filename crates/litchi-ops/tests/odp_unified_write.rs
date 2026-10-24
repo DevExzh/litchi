@@ -366,35 +366,38 @@ fn create_save_and_flat_refusals() {
     assert!(refused.is_err());
     assert_eq!(std::fs::read(&path).unwrap(), saved);
 
-    let flat = litchi_ops::open(fixture(
+    for (index, relative) in [
         "libreoffice-core/sd/qa/unit/data/draw-image-link.fodp",
-    ))
-    .unwrap();
-    // Record 0292: a flat presentation edits its packaged projection and
-    // republishes the edit into its flat bytes (`flat_odf_unified.rs`).
-    // The projection admission now handles this producer's empty
-    // master-page name; prove that the page rename is real and reversible,
-    // rather than accepting a false no-op.
-    let capabilities = flat.capabilities();
-    assert!(capabilities.verb(Verb::Set).is_supported());
-    assert!(capabilities.verb(Verb::Get).is_supported());
-    let before = flat.to_bytes().unwrap();
-    let original = prop(&flat, "/slide[1]", "name").unwrap();
-    let renamed = flat.set("/slide[1]", props! { "name" => "x" }).unwrap();
-    assert_eq!(prop(&renamed, "/slide[1]", "name").as_deref(), Some("x"));
-    assert_ne!(renamed.to_bytes().unwrap(), before);
-    let restored = renamed
-        .set("/slide[1]", props! { "name" => original.as_str() })
-        .unwrap();
-    assert_eq!(prop(&restored, "/slide[1]", "name"), Some(original));
-    assert_eq!(restored.to_bytes().unwrap(), before);
-    let copy = directory.path().join("copy.fodp");
-    flat.save_as(&copy).unwrap();
-    assert_eq!(
-        std::fs::read(&copy).unwrap(),
-        std::fs::read(fixture(
-            "libreoffice-core/sd/qa/unit/data/draw-image-link.fodp"
-        ))
-        .unwrap()
-    );
+        "libreoffice-core/sd/qa/unit/data/draw-object-link.fodp",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let source_path = fixture(relative);
+        let flat = litchi_ops::open(&source_path).unwrap();
+        // Record 0292: a flat presentation edits its packaged projection and
+        // republishes the edit into its flat bytes (`flat_odf_unified.rs`).
+        // The projection admission now handles these producers' empty
+        // master-page names; prove that the page rename is real and
+        // reversible, rather than accepting a false no-op.
+        let capabilities = flat.capabilities();
+        assert!(capabilities.verb(Verb::Set).is_supported());
+        assert!(capabilities.verb(Verb::Get).is_supported());
+        let before = flat.to_bytes().unwrap();
+        let original = prop(&flat, "/slide[1]", "name").unwrap();
+        let renamed = flat.set("/slide[1]", props! { "name" => "x" }).unwrap();
+        assert_eq!(prop(&renamed, "/slide[1]", "name").as_deref(), Some("x"));
+        assert_ne!(renamed.to_bytes().unwrap(), before);
+        let restored = renamed
+            .set("/slide[1]", props! { "name" => original.as_str() })
+            .unwrap();
+        assert_eq!(prop(&restored, "/slide[1]", "name"), Some(original));
+        assert_eq!(restored.to_bytes().unwrap(), before);
+        let copy = directory.path().join(format!("copy-{index}.fodp"));
+        flat.save_as(&copy).unwrap();
+        assert_eq!(
+            std::fs::read(&copy).unwrap(),
+            std::fs::read(&source_path).unwrap()
+        );
+    }
 }

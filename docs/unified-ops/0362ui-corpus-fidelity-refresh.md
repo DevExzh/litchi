@@ -29,6 +29,17 @@ stdout/stderr receipt is
 measured run took 2:52.30 and reached 184,132 KiB RSS. The corpus's
 `NORMALIZING` list remains empty.
 
+The same command was then rerun without `LITCHI_BLESS` against the committed
+goldens. The production source remained
+`f6fe430a4d19d94aa360c0e9ed03ebd757265225`; the report/test commit was
+`1c2214ad0090f5e6bf36a6dc53407e22cd236f56`, and the lockfile hash was
+unchanged. This unblessed equality run passed with 1,020 files opened in
+65.5 seconds and zero unreached CRUD cells in 30.89 seconds, and left the
+worktree unchanged. Its receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/corpus-crud-unblessed.log`
+(15,377 bytes, SHA-256
+`4ba489316f5c09e032fb90ec19ab99cf2cb4739614dd0895b109d17209fd2c23`).
+
 ## Row-by-row review
 
 The fidelity TSV has seven changed rows, and every change was reviewed against
@@ -43,10 +54,14 @@ the old and new tuple fields:
   exact source-byte restoration.
 * `field_hide_section.fodt`, `protectedLinkCopy.fodt` and
   `simple-ruby.odt` keep `exact`/`refused`/`one-way`, the same
-  `unsupported_capability` code, and the same revert result. Only the
-  content-free ODT element reason changed to the static `text:variable-set`,
-  `text:a` and `text:ruby` detail required by the 0358a source-backed ODF
-  migration (`77ab7cab8a`).
+  `unsupported_capability` code, and the same revert result. Their underlying
+  refusal reasons are unchanged: the old cleaned details already named
+  `text:variable-set`, `text:a` and `text:ruby`. The refreshed details only
+  add the fixed `ODF edit refused: ` display prefix; that 18-character prefix
+  pushes the old element-specific tail past the 140-character `clean()` cap,
+  so the report now ends in `replace...`. No element reason was newly
+  introduced or removed; this is the 0358 refusal-display change
+  (`77ab7cab8a`/`e4a0614f5d`).
 * The two `tdf169979-litchi.odp` native-resave rows keep
   `exact`/`one-way`, `unsupported_capability`, and the same value/byte
   outcomes. Only the refusal detail now carries the content-free
@@ -71,15 +86,21 @@ The CRUD TSV has five changed rows, all in the XLSX `run` element:
   observations. The pair is therefore exercised and refused intentionally;
   no claimed cell is lost.
 
-The focused consumer receipt for that review is
+The base `f6fe` consumer test had one stale refusal assertion for
+`draw-image-link.fodp`; the test-only patch in this leaf migrates it to the
+capability proof and extends the same proof to `draw-object-link.fodp` in one
+two-fixture loop. Both fixtures now check rename to `x`, changed output,
+rename back, exact source-byte restoration, and source-byte save. The focused
+receipt for that patched test is
+`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/odp-consumer-two-fixtures.log`
+(725 bytes, SHA-256
+`fe470e247b86fbdbc1cf37f2161fe6dabdb6027283923005e6ee9921c2c74088`); all
+7/7 `odp_unified_write` tests passed. The earlier combined focused receipt
+also passed all 6/6 `xlsx_cells_runs` tests:
 `/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/focused-consumers.log`
 (1,250 bytes, SHA-256
-`886947dcdd3917cb49444720d39a4e80697cd55f5d02cde7f74984c5e2cffe54`). It
-contains 7/7 `odp_unified_write` tests and 6/6 `xlsx_cells_runs` tests passed;
-the updated ODP test explicitly checks the rename/inverse proof above. Its
-peak RSS was 91,072 KiB.
+`886947dcdd3917cb49444720d39a4e80697cd55f5d02cde7f74984c5e2cffe54`).
 
-No production source was changed in this leaf. The only consumer adjustment
-is the stale ODP test assertion, migrated to the now-admitted flat projection;
-the report goldens contain no unreviewed rows, no `NORMALIZING` exception, and
-no new error code or warning.
+No production source was changed in this leaf. The only source patch is the
+consumer test migration described above; the report goldens contain no
+unreviewed rows, no `NORMALIZING` exception, and no new error code or warning.
