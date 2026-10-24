@@ -141,10 +141,30 @@ impl Edit {
             &value.relationship_id,
             &uri,
         )?;
+        // Admit the existing package before serializing the caller's value.
+        // In particular, an already-over-limit source must report its
+        // aggregate refusal rather than spending the output budget on a new
+        // cache first.  Keep the operation-local proof and reuse it on the
+        // unchanged candidate so this path pays one package census.
+        crate::slicer::validate(&value.definition)?;
+        let additions = [(
+            value.relationship_id.clone(),
+            crate::slicer_cache::SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(workbook.base_uri()),
+        )];
+        let budget = crate::raw::prepare_package_budget(
+            self.staged.opc(),
+            &workbook,
+            &additions,
+            &limits,
+        )?;
         let prepared = raw::prepare_cache(value, workbook.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::package::store_slicer_cache_prepared_in_place(
-                candidate, &prepared, &limits,
+            crate::slicer_cache::package::store_slicer_cache_prepared_in_place_with_budget(
+                candidate,
+                &prepared,
+                &limits,
+                &budget,
             )
         })
     }

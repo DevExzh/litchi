@@ -255,30 +255,38 @@ fn raw_slicer_rejects_lazy_baseline_without_decoding_payloads() {
 
 #[test]
 fn raw_slicer_rejects_a_misdeclared_lazy_member_without_mutation() {
-    let (package, _) = package();
+    let (mut package, _) = package();
+    let unrelated = PackURI::new("/xl/unrelated.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        unrelated,
+        "application/octet-stream".into(),
+        b"unrelated lazy payload".to_vec(),
+    )));
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let bytes = misdeclare_member(bytes, "xl/worksheets/sheet1.xml");
+    let bytes = misdeclare_member(bytes, "xl/unrelated.bin");
     let source = litchi_xlsx::Package::from_opc(
         OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap(),
     )
     .unwrap();
-    let before = PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap();
     let before_counters = source.clone().into_plain_opc().deferred_decode_counters();
 
-    let error = source
+    let mut edit = source
         .edit_slicers_with_options(slicer::EditOptions::default())
+        .unwrap();
+    let error = edit
+        .insert_cache(slicer::raw::Cache {
+            relationship_id: "rIdMisdeclared".into(),
+            part_name: "/xl/slicerCaches/misdeclared.xml".into(),
+            definition: slicer_cache("Misdeclared", "State"),
+        })
         .expect_err("raw edit must reject the declared-versus-decoded mismatch");
     assert!(matches!(error, Error::Package(OpcError::ZipError(_))));
     assert_eq!(
-        source.clone().into_plain_opc().deferred_decode_counters(),
+        edit.opc().deferred_decode_counters(),
         before_counters,
         "the bounded mismatch probe must not charge a failed payload"
     );
-    assert_eq!(
-        PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap(),
-        before,
-        "a rejected raw edit must not publish a mutation"
-    );
+    assert!(edit.cache("Misdeclared").unwrap().is_none());
 }
 
 #[test]
