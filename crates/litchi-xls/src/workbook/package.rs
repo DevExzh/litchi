@@ -513,17 +513,18 @@ impl<R: Read + Seek> Reader<R> {
         else {
             return Ok(None);
         };
-        let data = self.ole_file.open_stream(&[name.as_str()])?;
-        let observed = data.len();
         let effective_limits = self.source_limits.constrained_by(*limits);
         let maximum = effective_limits.max_entry_bytes();
-        if observed > maximum {
+        let observed = self.ole_file.stream_len(&[name.as_str()])?;
+        let maximum_u64 = u64::try_from(maximum).unwrap_or(u64::MAX);
+        if observed > maximum_u64 {
             return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,
-                observed: u64::try_from(observed).unwrap_or(u64::MAX),
-                maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+                observed,
+                maximum: maximum_u64,
             });
         }
+        let data = self.ole_file.open_stream(&[name.as_str()])?;
         crate::revision_log::parse_revision_log_stream_with_sheet_count(&data, self.sheets.len())
             .map(Some)
     }

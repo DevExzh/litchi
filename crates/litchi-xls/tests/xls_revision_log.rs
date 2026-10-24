@@ -2,11 +2,14 @@
 //! CFB container carrying both the `Workbook` stream and a `Revision Log`
 //! stream is opened through `Workbook`.
 
-use std::io::Cursor;
+use std::cell::Cell;
+use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::rc::Rc;
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::{
-    Builder, REVISION_LOG_STREAM_NAME, Revision, RevisionType, SourceLimits, raw::Reader,
+    Builder, Error, LimitKind, OpenOptions, REVISION_LOG_STREAM_NAME, Revision, RevisionType,
+    SourceLimits, raw::Reader,
 };
 
 // BIFF8 record types (MS-XLS 2.3 record enumeration values).
@@ -157,6 +160,26 @@ fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
     output.into_inner()
 }
 
+struct CountingCursor {
+    cursor: Cursor<Vec<u8>>,
+    bytes_read: Rc<Cell<usize>>,
+}
+
+impl Read for CountingCursor {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.cursor.read(buffer)?;
+        self.bytes_read
+            .set(self.bytes_read.get().saturating_add(count));
+        Ok(count)
+    }
+}
+
+impl Seek for CountingCursor {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        self.cursor.seek(position)
+    }
+}
+
 #[test]
 fn workbook_without_revision_log_reports_none() {
     let bytes = workbook_container(&[]);
@@ -216,4 +239,39 @@ fn malformed_revision_log_surfaces_an_error() {
     let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
     assert!(workbook.revision_log(&SourceLimits::default()).is_err());
+}
+
+#[test]
+fn revision_log_limit_is_preflighted_before_stream_body_read() {
+    let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, vec![0xA5; 32])]);
+    let bytes_read = Rc::new(Cell::new(0));
+    let reader = CountingCursor {
+        cursor: Cursor::new(bytes),
+        bytes_read: Rc::clone(&bytes_read),
+    };
+    let retained_limits = SourceLimits::builder()
+        .max_entry_bytes(2048)
+        .unwrap()
+        .build()
+        .unwrap();
+    let requested_limits = SourceLimits::builder()
+        .max_entry_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut workbook =
+        Reader::new_with_options(reader, OpenOptions::new().source_limits(retained_limits))
+            .unwrap();
+    let reads_after_admission = bytes_read.get();
+
+    let error = workbook.revision_log(&requested_limits).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed: 32,
+            maximum: 1,
+        }
+    ));
+    assert_eq!(bytes_read.get(), reads_after_admission);
 }
