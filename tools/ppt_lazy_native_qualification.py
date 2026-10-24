@@ -51,6 +51,33 @@ BASELINE_REF = "8779d059add6c90c74552801372c44f770db9f0f"
 BASELINE_TREE = "27e0b56e2f8e3ab11b00c119604b5636f358dfe2"
 BASELINE_LOCK_BYTES = 57_158
 BASELINE_LOCK_SHA256 = "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
+BASELINE_COMPILE_FIXTURES = (
+    (
+        "test-data/poi/test-data/slideshow/ppt_with_embeded.ppt",
+        180_736,
+        "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53",
+    ),
+    (
+        "test-data/unified-ops/0294/video.ppt",
+        43_520,
+        "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a",
+    ),
+    (
+        "test-data/poi/test-data/slideshow/bug61881.ppt",
+        74_752,
+        "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee",
+    ),
+    (
+        "test-data/poi/test-data/spreadsheet/54016.xls",
+        984_576,
+        "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    ),
+    (
+        "test-data/rtf/watermark.rtf",
+        69_471,
+        "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+    ),
+)
 ROUTES = (
     "primary_entry_drop",
     "primary_noop_commit",
@@ -251,6 +278,7 @@ def _build_spec(value: Any, *, plan: bool) -> dict[str, Any]:
     _exact_keys(
         build,
         {
+            "preparation",
             "receipt",
             "source_archive",
             "fixtures",
@@ -266,7 +294,7 @@ def _build_spec(value: Any, *, plan: bool) -> dict[str, Any]:
         },
         "manifest.build",
     )
-    for name in ("receipt", "source_archive", "toolchain", "cargo_config"):
+    for name in ("preparation", "receipt", "source_archive", "toolchain", "cargo_config"):
         _identity_spec(build.get(name), f"manifest.build.{name}", plan=plan)
     if build.get("profile") != "release" or build.get("target_subdir") != "target/release":
         raise RunFailure("manifest.build must pin the release profile and target/release")
@@ -368,7 +396,11 @@ def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
     for index, source in enumerate(sources):
         _identity_spec(source, f"manifest.probe_sources[{index}]", plan=plan)
     adapter = _object(value.get("baseline_adapter"), "manifest.baseline_adapter")
-    _exact_keys(adapter, {"overlay_paths", "registration"}, "manifest.baseline_adapter")
+    _exact_keys(
+        adapter,
+        {"overlay_paths", "registration", "fixture", "compile_fixtures"},
+        "manifest.baseline_adapter",
+    )
     if adapter.get("overlay_paths") != [
         "tools/perf-baseline/src/ppt_lazy_native.rs",
         "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
@@ -382,6 +414,23 @@ def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
         "line": "pub mod ppt_lazy_native;",
     }:
         raise RunFailure("manifest.baseline_adapter.registration differs from the reviewed adapter")
+    fixture = _object(adapter.get("fixture"), "manifest.baseline_adapter.fixture")
+    _exact_keys(fixture, {"path", "bytes", "sha256"}, "manifest.baseline_adapter.fixture")
+    if fixture != {
+        "path": "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+        "bytes": 14_848,
+        "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c",
+    }:
+        raise RunFailure("manifest.baseline_adapter.fixture differs from the reviewed fixture")
+    compile_fixtures = adapter.get("compile_fixtures")
+    if not isinstance(compile_fixtures, list):
+        raise RunFailure("manifest.baseline_adapter.compile_fixtures must be a list")
+    expected_compile_fixtures = [
+        {"path": path, "bytes": bytes_, "sha256": sha256}
+        for path, bytes_, sha256 in BASELINE_COMPILE_FIXTURES
+    ]
+    if compile_fixtures != expected_compile_fixtures:
+        raise RunFailure("manifest.baseline_adapter.compile_fixtures differs from the reviewed closure")
     _build_spec(value.get("build"), plan=plan)
     protocol = _object(value.get("protocol"), "manifest.protocol")
     _exact_keys(
@@ -596,6 +645,17 @@ def _validate_build_receipt(
     probe_sources: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     build = _object(manifest.get("build"), "manifest.build")
+    preparation_spec = _identity_spec(build.get("preparation"), "manifest.build.preparation", plan=False)
+    preparation_path = _safe_path(preparation_spec["path"], manifest_path.parent, must_exist=True)
+    if _overlap(preparation_path, baseline["root"]) or _overlap(preparation_path, candidate["root"]):
+        raise RunFailure("build preparation receipt must be outside both source roots")
+    preparation_identity = _identity(preparation_path)
+    if preparation_identity != {
+        "path": str(preparation_path),
+        "bytes": preparation_spec["bytes"],
+        "sha256": preparation_spec["sha256"],
+    }:
+        raise RunFailure("build preparation receipt identity differs from the manifest")
     receipt_spec = _identity_spec(build.get("receipt"), "manifest.build.receipt", plan=False)
     receipt_path = _safe_path(receipt_spec["path"], manifest_path.parent, must_exist=True)
     if _overlap(receipt_path, baseline["root"]) or _overlap(receipt_path, candidate["root"]):
@@ -614,6 +674,7 @@ def _validate_build_receipt(
         "status",
         "manifest",
         "manifest_sha256",
+        "preparation",
         "source_archive",
         "toolchain",
         "cargo_config",
@@ -638,6 +699,83 @@ def _validate_build_receipt(
     manifest_identity = _identity(manifest_path)
     if receipt.get("manifest") != str(manifest_path.resolve()) or receipt.get("manifest_sha256") != manifest_identity["sha256"]:
         raise RunFailure("build receipt is bound to a different manifest")
+    if receipt["preparation"] != preparation_identity:
+        raise RunFailure("build receipt preparation identity differs from the manifest")
+    preparation = _object(_strict_json(preparation_path.read_bytes(), "PPT preparation receipt"), "PPT preparation receipt")
+    _exact_keys(
+        preparation,
+        {"schema", "status", "lane", "baseline", "candidate", "claim_scope"},
+        "PPT preparation receipt",
+    )
+    if preparation["schema"] != "litchi.ppt.lazy-native-qualification.preparation.v1" or preparation["status"] != "prepared" or preparation["lane"] != "ppt-lazy-native":
+        raise RunFailure("PPT preparation receipt is not the reviewed prepared lane")
+    prepared_baseline = _object(preparation["baseline"], "PPT preparation receipt.baseline")
+    prepared_candidate = _object(preparation["candidate"], "PPT preparation receipt.candidate")
+    if prepared_baseline.get("ref") != baseline["head"] or prepared_baseline.get("tree") != baseline["tree"]:
+        raise RunFailure("PPT preparation receipt baseline source identity differs")
+    if prepared_candidate.get("ref") != candidate["head"] or prepared_candidate.get("tree") != candidate["tree"]:
+        raise RunFailure("PPT preparation receipt candidate source identity differs")
+    prepared_paths = prepared_baseline.get("overlay_paths")
+    expected_overlay_paths = sorted(
+        [
+            "tools/perf-baseline/src/ppt_lazy_native.rs",
+            "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+            "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+            "tools/perf-baseline/src/lib.rs",
+            "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+        ]
+        + [path for path, _, _ in BASELINE_COMPILE_FIXTURES]
+    )
+    if prepared_paths != expected_overlay_paths:
+        raise RunFailure("PPT preparation receipt overlay paths differ from the reviewed closure")
+    prepared_fixture = _object(prepared_baseline.get("fixture"), "PPT preparation receipt.baseline.fixture")
+    fixture_source = _object(prepared_fixture.get("source"), "PPT preparation receipt.baseline.fixture.source")
+    fixture_destination = _object(prepared_fixture.get("destination"), "PPT preparation receipt.baseline.fixture.destination")
+    expected_fixture = manifest["baseline_adapter"]["fixture"]
+    expected_fixture_path = candidate["root"] / expected_fixture["path"]
+    if fixture_source != {
+        "path": str(expected_fixture_path),
+        "bytes": expected_fixture["bytes"],
+        "sha256": expected_fixture["sha256"],
+    }:
+        raise RunFailure("PPT preparation receipt fixture source differs from the reviewed fixture")
+    if fixture_destination != {
+        "path": str(baseline["root"] / expected_fixture["path"]),
+        "bytes": expected_fixture["bytes"],
+        "sha256": expected_fixture["sha256"],
+    }:
+        raise RunFailure("PPT preparation receipt fixture destination differs from the baseline endpoint")
+    prepared_candidate_fixture = _object(prepared_candidate.get("fixture"), "PPT preparation receipt.candidate.fixture")
+    if prepared_candidate_fixture != {
+        "path": str(candidate["root"] / expected_fixture["path"]),
+        "bytes": expected_fixture["bytes"],
+        "sha256": expected_fixture["sha256"],
+    }:
+        raise RunFailure("PPT preparation receipt candidate fixture differs from the reviewed fixture")
+    prepared_compile_fixtures = prepared_baseline.get("compile_fixtures")
+    prepared_candidate_compile_fixtures = prepared_candidate.get("compile_fixtures")
+    if not isinstance(prepared_compile_fixtures, list) or not isinstance(prepared_candidate_compile_fixtures, list):
+        raise RunFailure("PPT preparation receipt compile fixture closure is missing")
+    expected_compile_fixtures = manifest["baseline_adapter"]["compile_fixtures"]
+    if len(prepared_compile_fixtures) != len(expected_compile_fixtures) or len(prepared_candidate_compile_fixtures) != len(expected_compile_fixtures):
+        raise RunFailure("PPT preparation receipt compile fixture closure length differs")
+    for index, expected_compile_fixture in enumerate(expected_compile_fixtures):
+        prepared_compile = _object(prepared_compile_fixtures[index], f"PPT preparation receipt.baseline.compile_fixtures[{index}]")
+        _exact_keys(prepared_compile, {"source", "destination"}, f"PPT preparation receipt.baseline.compile_fixtures[{index}]")
+        expected_source = {
+            "path": str(candidate["root"] / expected_compile_fixture["path"]),
+            "bytes": expected_compile_fixture["bytes"],
+            "sha256": expected_compile_fixture["sha256"],
+        }
+        expected_destination = {
+            "path": str(baseline["root"] / expected_compile_fixture["path"]),
+            "bytes": expected_compile_fixture["bytes"],
+            "sha256": expected_compile_fixture["sha256"],
+        }
+        if prepared_compile.get("source") != expected_source or prepared_compile.get("destination") != expected_destination:
+            raise RunFailure(f"PPT preparation receipt compile fixture {index} differs from the reviewed closure")
+        if prepared_candidate_compile_fixtures[index] != expected_source:
+            raise RunFailure(f"PPT preparation receipt candidate compile fixture {index} differs")
 
     roots = (baseline["root"], candidate["root"])
     external_inputs: dict[str, dict[str, Any]] = {}
@@ -697,9 +835,18 @@ def _validate_build_receipt(
     if receipt["probe_sources"] != expected_probe:
         raise RunFailure("build receipt probe source identities differ from the manifest")
     adapter = _object(receipt["baseline_adapter"], "build receipt baseline_adapter")
-    _exact_keys(adapter, {"overlay_paths", "registration"}, "build receipt baseline_adapter")
+    _exact_keys(
+        adapter,
+        {"overlay_paths", "registration", "fixture", "compile_fixtures"},
+        "build receipt baseline_adapter",
+    )
     if adapter["overlay_paths"] != expected_probe[:3]:
         raise RunFailure("build receipt baseline overlay identities differ from the reviewed probe")
+    adapter_fixture = _object(adapter["fixture"], "build receipt baseline_adapter.fixture")
+    if adapter_fixture != manifest["baseline_adapter"]["fixture"]:
+        raise RunFailure("build receipt baseline fixture identity differs from the reviewed fixture")
+    if adapter["compile_fixtures"] != manifest["baseline_adapter"]["compile_fixtures"]:
+        raise RunFailure("build receipt baseline compile fixture closure differs from the reviewed closure")
     registration = _object(adapter["registration"], "build receipt baseline_adapter.registration")
     _exact_keys(registration, {"path", "line", "before", "after"}, "build receipt baseline_adapter.registration")
     if registration["path"] != manifest["baseline_adapter"]["registration"]["path"] or registration["line"] != manifest["baseline_adapter"]["registration"]["line"]:
@@ -746,6 +893,7 @@ def _validate_build_receipt(
         "bytes": receipt_identity["bytes"],
         "sha256": receipt_identity["sha256"],
         "source_archive": external_inputs["source_archive"],
+        "preparation": preparation_identity,
         "toolchain": external_inputs["toolchain"],
         "cargo_config": external_inputs["cargo_config"],
         "fixtures": fixture_identities,
@@ -1187,6 +1335,7 @@ def _plan(manifest: Mapping[str, Any], path: Path, out_dir: Path) -> None:
         "manifest": str(path.resolve()),
         "baseline": {"ref": manifest["baseline"]["ref"], "tree": manifest["baseline"]["tree"], "lock": manifest["baseline"]["lock"]},
         "candidate": manifest["candidate"],
+        "preparation": manifest["build"]["preparation"],
         "routes": list(ROUTES),
         "fixtures": manifest["build"]["fixtures"],
         "fixture_routes": manifest["build"]["fixture_routes"],

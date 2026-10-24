@@ -1,0 +1,26 @@
+{
+  "at_utc": "2026-10-24T12:42:45.858974+00:00",
+  "source_index": "c0d5a695fc6e3fa10e2ba09be4c797d13386b109",
+  "leaf": "95257e510396cb85a48d22eb68283b7821791cb0",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_prepare_ole_owner_inputs",
+    "tools.test_ole_owner_paired_runner",
+    "tools.test_validate_ole_owner_run",
+    "tools.test_prepare_xlsx_raw_inputs",
+    "tools.test_xlsx_raw_native_qualification",
+    "tools.test_native_qualification_runner",
+    "tools.test_legacy_native_qualification",
+    "tools.test_ppt_lazy_native_qualification",
+    "tools.test_prepare_ppt_lazy_native_inputs",
+    "tools.test_no_3rdparty_references"
+  ],
+  "exit": 0,
+  "seconds": 30.20574162999401,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ppt-fixture-closure-merge/combined-tests.log",
+  "log_bytes": 428,
+  "log_sha256": "55c686a9727e6834acac16e7b49316c1008d9619b468f7d32739bb1be7c811b1",
+  "scope": "Composed Python protocol and preparation validation; no native measurement"
+}

@@ -6,6 +6,13 @@ no release build, native timing, allocator capture, or performance decision was
 made by this commit. One authorized compile-only type check of the probe is
 recorded below; it did not produce a qualification binary or execute a route.
 
+The bounded compile follow-up and corrected historical-baseline fixture
+materialization are recorded in
+[`0362ugjab-ppt-lazy-native-preparation-return.md`](0362ugjab-ppt-lazy-native-preparation-return.md).
+That return supersedes the source-only build-boundary paragraph below for
+future endpoint preparation; this record remains the original protocol
+contract and preserves its parameterized manifest.
+
 ## Why a new lane is required
 
 `0362ugj-ppt-lazy-edit-entry.md` is a consumer-validation receipt. It
