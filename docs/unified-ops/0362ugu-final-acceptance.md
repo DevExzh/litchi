@@ -77,3 +77,16 @@ candidate lock; the candidate capture used clean diagnostic source `2dfc4f134d`.
 These large metadata artifacts remain outside Git. The separate ODF
 shared-triad baseline remains `173dd5330476713714871007316794b9a3a1bdaa`;
 ODG preparation does not qualify that separate lane.
+
+
+## Composed strict consumer check
+
+After the XLS merge and formatting repair, clean source
+`97817cb75f5bd569cfaf13f73331b4bcd82d22ae` passes the selected all-target,
+all-feature strict Clippy step for `litchi-cli`, `litchi-ops`, `litchi` and
+`litchi-py`. The exact command and source/lock/environment identity are retained
+in `results/0362ugu/composed-strict-check.json`. It completed in 167.272
+seconds with an empty log, no owned builders after exit, and stable target
+size 4,706,734,564 bytes. This covers the composed XLS fallible consumers and
+PPTX refusal classification. It is one selected step, not the full 53-step
+gate, and predates the separate W8 baseline-adapter binding correction.
