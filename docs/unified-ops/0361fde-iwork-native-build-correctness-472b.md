@@ -49,7 +49,7 @@ The commands used the runner at
 prepare-fixtures $PACKET/fixtures
 build constructor $PACKET/constructor --base ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2 --candidate 472b6705475b073e7fe08f6e11ee17fb1e29f838 --lock $SOURCE/Cargo.lock
 validate constructor $PACKET/constructor
-build owner $PACKET/owner --base a18593385cf3162911f00ebd3cbb1379855a8eba --candidate 472b6705475b073e7fe08f6e11ee17fb1e29f838 --lock $SOURCE/Cargo.lock
+build owner $PACKET/owner --base a18593385cf3162911f00ebd3cbb1379855a8eba5 --candidate 472b6705475b073e7fe08f6e11ee17fb1e29f838 --lock $SOURCE/Cargo.lock
 validate owner $PACKET/owner --fixtures $PACKET/fixtures
 collect constructor $PACKET/constructor --out $PACKET/constructor-collection.json
 collect owner $PACKET/owner --out $PACKET/owner-collection.json
@@ -57,8 +57,11 @@ collect owner $PACKET/owner --out $PACKET/owner-collection.json
 
 Here `$SOURCE` is the frozen endpoint above and `$PACKET` is the external
 packet root above. `build` used the two endpoint-specific baseline refs shown
-above; `validate` ran both the native and counting-allocation binaries. The
-collection commands were read-only packet checks.
+above; the owner build's requested 41-character input ending in `a8eba5` is
+retained in its receipt, and Git resolved it to the canonical 40-character
+commit ending in `a8eba`. `validate` ran both the native and
+counting-allocation binaries. The collection commands were read-only packet
+checks.
 
 ## Build receipts
 
