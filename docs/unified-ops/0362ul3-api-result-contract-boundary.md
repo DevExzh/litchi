@@ -11,8 +11,11 @@ trusting a type's spelling.
 * `file()`/`into_file()` are recognized as owner accessors only for the
   nominated `litchi_ops` facade Commit paths. A format-owned Commit with those
   names still has to provide `package()`/`into_package()`.
-* Inventory checks foreign aliases in their defining crate. The shared core
-  Commit remains the explicit exception because its triad is a shared contract.
+* Inventory checks foreign aliases in their defining crate when that crate's
+  rustdoc is among the supplied inputs. A missing non-core defining graph
+  emits a `commit_type` debt row instead of being silently skipped. The shared
+  core Commit remains the explicit exemption because its triad is a shared
+  contract.
 * The glossary registers every identity-proven replay row from the frozen
   all-features capture: 262 ordinary rows, the nine ODF metadata rows enabled
   by the resolver, and the two unified-File rows. Minimal profiles omit only
@@ -63,3 +66,29 @@ python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory
 
 The change is tooling and glossary policy only; it does not alter format
 runtime paths or performance behavior.
+
+## Returned-review repair
+
+Review of `213fefbfd2df93946b46e6b3ebf2fa91662f0a0c` found two fail-open
+edges, now covered in the follow-up source and fixture tests:
+
+1. The inventory CLI passes the complete supplied crate set and an exact
+   canonical-coverage manifest into the row walker. A foreign `Commit` whose
+   defining crate, nominal target, or required triad is absent produces a debt
+   row; a crate name alone is not enough to delegate the audit.
+2. Namespace identity now follows local type-alias chains transitively, with
+   cycle/malformed-target guards. Aliases through separate chains to one
+   nominal target survive either traversal order, while unrelated targets
+   invalidate the path rather than being silently merged. The derive-macro
+   namespace remains independent of the nominal type namespace.
+
+The exact fixtures are `fixture::external_metadata::Commit` for the missing
+`litchi_odf_common` defining graph, `fixture::alias_chain::Error` for
+transitive aliases and unrelated targets, and
+`fixture::namespace_collision::Error` for both derive-macro visit orders.
+
+The returned-review receipt is 65 focused Python tests passing. No Cargo build
+was run. The Python inventory was rerun against the frozen `49c25ef...`
+captures after the repair and produced the same 19,440-byte TSV and SHA-256
+listed above; those category counts remain diagnostic evidence and are still
+not final-source closure.

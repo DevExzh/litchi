@@ -455,12 +455,46 @@ class Surface:
         target = resolved.get("id") if isinstance(resolved, dict) else None
         return str(target) if target is not None else None
 
+    def _nominal_identity(self, item_id: str):
+        """Resolve an alias chain to one guarded rustdoc nominal identity."""
+        visited = set()
+        current = str(item_id)
+        while current not in visited:
+            visited.add(current)
+            item = self.index.get(current)
+            entry = self.paths.get(current)
+            if item is None:
+                if not isinstance(entry, dict) or entry.get("kind") not in TYPE_KINDS:
+                    return None
+                crate_id = entry.get("crate_id")
+                return (crate_id, current) if type(crate_id) is int else None
+            inner = item.get("inner", {})
+            if not isinstance(inner, dict) or len(inner) != 1:
+                return None
+            kind, data = next(iter(inner.items()))
+            if kind == "type_alias":
+                target = self._type_alias_target(current)
+                if target is None:
+                    return None
+                current = target
+                continue
+            if kind not in TYPE_KINDS or not isinstance(entry, dict):
+                return None
+            crate_id = entry.get("crate_id")
+            return (crate_id, current) if type(crate_id) is int else None
+        # A cycle is not a nominal identity and must not make two aliases look
+        # equivalent merely because their spelling or first hop matches.
+        return None
+
     def _related_type_exports(self, first: str, second: str) -> bool:
-        """Whether two type IDs are one alias and its nominal target."""
+        """Whether two type IDs resolve to the same nominal target."""
         first, second = str(first), str(second)
-        return (first == second
-                or self._type_alias_target(first) == second
-                or self._type_alias_target(second) == first)
+        if first == second:
+            return True
+        first_identity = self._nominal_identity(first)
+        second_identity = self._nominal_identity(second)
+        return (first_identity is not None
+                and first_identity == second_identity)
 
     def _record_export(self, path: tuple[str, ...], kind: str, item_id: str) -> None:
         """Record an export while preserving Rust's separate namespaces."""

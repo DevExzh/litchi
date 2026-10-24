@@ -416,6 +416,64 @@ class RustdocTests(unittest.TestCase):
         })
         return document
 
+    def _alias_chain_document(self, *, reverse=False, unrelated=False):
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "alias-chain-module"
+        alias_a = "alias-chain-a"
+        alias_b = "alias-chain-b"
+        alias_c = "alias-chain-c"
+        external_one = "alias-chain-external-one"
+        external_two = "alias-chain-external-two"
+        use_a = "alias-chain-use-a"
+        use_b = "alias-chain-use-b"
+        use_c = "alias-chain-use-c"
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "alias_chain", "crate_id": 0, "visibility": "public",
+            "inner": {"module": {"items": [], "is_crate": False}},
+        }
+
+        def local_alias(item_id, name, target_id):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"type_alias": {"type": {
+                    "resolved_path": {"id": target_id, "args": None},
+                }, "generics": {"params": [], "where_predicates": []}}},
+            }
+
+        local_alias(alias_a, "AliasA", external_one)
+        local_alias(alias_b, "AliasB", alias_a)
+        local_alias(alias_c, "AliasC", external_two)
+        for item_id, name, target_id in (
+            (use_a, "Error", alias_a),
+            (use_b, "Error", alias_b),
+            (use_c, "Error", alias_c),
+        ):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"use": {"name": name, "id": target_id, "is_glob": False}},
+            }
+        items = [use_b, use_a] if reverse else [use_a, use_b]
+        if unrelated:
+            items.append(use_c)
+        document["index"][module_id]["inner"]["module"]["items"] = items
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "alias_chain"],
+                        "kind": "module"},
+            alias_a: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasA"],
+                      "kind": "type_alias"},
+            alias_b: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasB"],
+                      "kind": "type_alias"},
+            alias_c: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasC"],
+                      "kind": "type_alias"},
+            external_one: {"crate_id": 77,
+                           "path": ["external_common", "Error"], "kind": "struct"},
+            external_two: {"crate_id": 78,
+                           "path": ["other_common", "Error"], "kind": "struct"},
+        })
+        return document
+
     def test_type_namespace_survives_derive_macro_in_both_visit_orders(self):
         path = ("fixture", "namespace_collision", "Error")
         for macro_first in (False, True):
@@ -431,6 +489,22 @@ class RustdocTests(unittest.TestCase):
         )
         self.assertNotIn(path, conflict.item_ids)
         self.assertNotIn(conflict.exports.get(path), gate.TYPE_KINDS)
+
+    def test_transitive_aliases_share_identity_but_unrelated_targets_conflict(self):
+        path = ("fixture", "alias_chain", "Error")
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse):
+                surface = gate.Surface(
+                    self._alias_chain_document(reverse=reverse), "fixture"
+                )
+                self.assertEqual(surface.exports.get(path), "struct")
+                self.assertIn(surface.item_ids.get(path), {"alias-chain-a", "alias-chain-b"})
+
+        unrelated = gate.Surface(
+            self._alias_chain_document(reverse=True, unrelated=True), "fixture"
+        )
+        self.assertNotIn(path, unrelated.item_ids)
+        self.assertNotIn(unrelated.exports.get(path), gate.TYPE_KINDS)
 
     def test_inventory_catches_exact_and_suffixed_limit_twins(self):
         limits = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
@@ -875,6 +949,42 @@ class RustdocTests(unittest.TestCase):
         )
         self.assertIsNone(
             return_types.commit_package(("fixture", "external_metadata", "UnrelatedCommit"))
+        )
+
+        missing_defining_graph = list(inventory.rows(
+            document, "fixture", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+            available_crates={"fixture", "litchi_odf_common", "other_odf_common"},
+            covered_nominals=set(),
+        ))
+        self.assertTrue(
+            any(row[0] == "commit_type"
+                and row[1] == "fixture::external_metadata::Commit"
+                and "litchi_odf_common" in row[2]
+                for row in missing_defining_graph),
+            missing_defining_graph,
+        )
+        supplied_defining_graph = list(inventory.rows(
+            document, "fixture", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+            available_crates={"fixture", "litchi_odf_common", "other_odf_common"},
+            covered_nominals={
+                ("litchi_odf_common", "metadata", "Commit"),
+                ("other_odf_common", "metadata", "Commit"),
+            },
+        ))
+        self.assertNotIn(
+            "fixture::external_metadata::Commit",
+            {row[1] for row in supplied_defining_graph if row[0] == "commit_type"},
+        )
+        capture = self.directory / "foreign-alias-without-defining-graph.json"
+        capture.write_text(json.dumps(document), encoding="utf-8")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(inventory.main([str(capture)]), 0)
+        self.assertIn(
+            "fixture\tcommit_type\tfixture::external_metadata::Commit",
+            output.getvalue(),
         )
 
     def test_shared_type_rows_use_nominal_ids_for_aliases_and_reexports(self):
