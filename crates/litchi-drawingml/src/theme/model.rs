@@ -3,7 +3,7 @@
 use crate::{Error, Result};
 
 const MAX_NAME_CHARS: usize = 256;
-const MAX_SCRIPT_COUNT: usize = 64;
+pub(crate) const MAX_SCRIPT_COUNT: usize = 64;
 const MAX_SCRIPT_CHARS: usize = 16;
 
 /// One of the twelve `DrawingML` color slots.

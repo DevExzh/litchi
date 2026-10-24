@@ -11,8 +11,8 @@ use quick_xml::reader::{NsReader, Reader};
 use crate::{Error, LimitKind, Result};
 
 use super::model::{
-    Color, Face, FontSet, Override, Palette, Slot, System, Theme, validate_fonts, validate_name,
-    validate_palette, validate_xml_text,
+    Color, Face, FontSet, MAX_SCRIPT_COUNT, Override, Palette, Slot, System, Theme, validate_fonts,
+    validate_name, validate_palette, validate_xml_text,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -24,6 +24,8 @@ const MAX_DEPTH: usize = 128;
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
 const MAX_ATTRIBUTES_PER_ELEMENT: usize = 256;
 const MAX_ATTRIBUTE_VALUE_BYTES: usize = 1 << 20;
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
 
 /// Caller-selected bounds for a raw DrawingML theme codec operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1296,7 +1298,7 @@ fn replacement_root_namespace_range(
                 let raw = xml
                     .get(start..end)
                     .ok_or_else(|| invalid("theme replacement root range is invalid"))?;
-                let relative = if prefix == Some(b"a".as_slice()) {
+                let qname_relative = if prefix == Some(b"a".as_slice()) {
                     optional_attribute_value_range(raw, b"xmlns:a")?
                 } else if prefix.is_none() {
                     optional_attribute_value_range(raw, b"xmlns")?
@@ -1306,16 +1308,6 @@ fn replacement_root_namespace_range(
                     wanted.extend_from_slice(prefix);
                     optional_attribute_value_range(raw, &wanted)?
                 };
-                let Some(relative) = relative else {
-                    return Ok(None);
-                };
-                let range = (start + relative.start)..(start + relative.end);
-                let current = xml
-                    .get(range.clone())
-                    .ok_or_else(|| invalid("theme replacement namespace range is invalid"))?;
-                if current == source_namespace {
-                    return Ok(None);
-                }
                 let counterpart = if source_namespace == NAMESPACE.as_bytes() {
                     STRICT_NAMESPACE.as_bytes()
                 } else if source_namespace == STRICT_NAMESPACE.as_bytes() {
@@ -1323,7 +1315,46 @@ fn replacement_root_namespace_range(
                 } else {
                     return Err(invalid("theme source has an unsupported namespace"));
                 };
+                let default_relative = prefix
+                    .is_some()
+                    .then(|| optional_attribute_value_range(raw, b"xmlns"));
+                let default_relative = match default_relative {
+                    Some(result) => result?,
+                    None => None,
+                };
+                let default_range = default_relative
+                    .as_ref()
+                    .map(|relative| (start + relative.start)..(start + relative.end));
+                let default_current = default_range
+                    .as_ref()
+                    .map(|range| {
+                        xml.get(range.clone())
+                            .ok_or_else(|| invalid("theme replacement namespace range is invalid"))
+                    })
+                    .transpose()?;
+
+                let Some(relative) = qname_relative else {
+                    if default_current == Some(counterpart) {
+                        return Ok(default_range);
+                    }
+                    return Ok(None);
+                };
+                let range = (start + relative.start)..(start + relative.end);
+                let current = xml
+                    .get(range.clone())
+                    .ok_or_else(|| invalid("theme replacement namespace range is invalid"))?;
+                if current == source_namespace {
+                    if default_current == Some(counterpart) {
+                        return Ok(default_range);
+                    }
+                    return Ok(None);
+                }
                 if current == counterpart {
+                    if default_current == Some(counterpart) {
+                        return Err(invalid(
+                            "theme replacement has multiple cross-conformance namespace bindings",
+                        ));
+                    }
                     return Ok(Some(range));
                 }
                 return Err(invalid(
@@ -1376,6 +1407,7 @@ struct ReplacementSemantics {
     palette_values: [u8; Slot::ALL.len()],
     font_faces: [bool; 2],
     font_face_fields: [[bool; 3]; 2],
+    font_script_counts: [usize; 2],
 }
 
 fn replacement_slot_index(local: &[u8]) -> Option<usize> {
@@ -1470,6 +1502,9 @@ fn replacement_semantic_open(
             b"ea" => 1,
             b"cs" => 2,
             b"font" => {
+                if semantics.font_script_counts[face_index] >= MAX_SCRIPT_COUNT {
+                    return Err(invalid("font face replacement has too many script entries"));
+                }
                 let code = attr(element, b"script", decoder, limits)?
                     .ok_or_else(|| invalid("replacement script face lacks script"))?;
                 if code.is_empty()
@@ -1481,6 +1516,7 @@ fn replacement_semantic_open(
                 let typeface = attr(element, b"typeface", decoder, limits)?
                     .ok_or_else(|| invalid("replacement script face lacks typeface"))?;
                 validate_name("replacement script typeface", &typeface)?;
+                semantics.font_script_counts[face_index] += 1;
                 return Ok(());
             },
             _ => return Ok(()),
@@ -2139,6 +2175,44 @@ fn ensure_replacement_attributes(
     Ok(())
 }
 
+fn resolved_names_equal(left: &ResolveResult<'_>, right: &ResolveResult<'_>) -> bool {
+    match (left, right) {
+        (ResolveResult::Bound(Namespace(left)), ResolveResult::Bound(Namespace(right))) => {
+            left == right
+        },
+        (ResolveResult::Unbound, ResolveResult::Unbound) => true,
+        (ResolveResult::Unknown(left), ResolveResult::Unknown(right)) => left == right,
+        _ => false,
+    }
+}
+
+fn validate_theme_namespace_binding(prefix: &[u8], value: &str) -> Result<()> {
+    if prefix == b"xmlns" {
+        return Err(invalid(
+            "theme replacement rebinds the reserved xmlns prefix",
+        ));
+    }
+    if value == XMLNS_NAMESPACE {
+        return Err(invalid(
+            "theme replacement binds the reserved XMLNS namespace",
+        ));
+    }
+    if value == XML_NAMESPACE && prefix != b"xml" {
+        return Err(invalid(
+            "theme replacement binds the reserved XML namespace to another prefix",
+        ));
+    }
+    if !prefix.is_empty() && value.is_empty() {
+        return Err(invalid(
+            "theme replacement uses an empty prefixed namespace binding",
+        ));
+    }
+    if prefix == b"xml" && value != XML_NAMESPACE {
+        return Err(invalid("theme replacement rebinds the xml namespace"));
+    }
+    Ok(())
+}
+
 fn is_known_replacement_local(local: &[u8], target: &[u8]) -> bool {
     if local == target {
         return true;
@@ -2190,7 +2264,7 @@ fn validate_replacement_attributes(
     limits: Limits,
 ) -> Result<()> {
     let mut count = 0usize;
-    let mut expanded = Vec::<(Vec<u8>, Vec<u8>)>::new();
+    let mut expanded = Vec::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count = count
@@ -2208,28 +2282,6 @@ fn validate_replacement_attributes(
         }
         let is_namespace = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
-        if !is_namespace {
-            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
-            let namespace = match namespace {
-                ResolveResult::Bound(Namespace(value)) => value.to_vec(),
-                ResolveResult::Unbound => Vec::new(),
-                ResolveResult::Unknown(prefix) => {
-                    return Err(invalid(format!(
-                        "theme replacement attribute uses an undeclared namespace prefix '{}',",
-                        String::from_utf8_lossy(prefix.as_ref())
-                    )));
-                },
-            };
-            let local = local.as_ref().to_vec();
-            if expanded.iter().any(|(seen_namespace, seen_local)| {
-                seen_namespace == &namespace && seen_local == &local
-            }) {
-                return Err(invalid(
-                    "theme replacement has duplicate expanded attributes",
-                ));
-            }
-            expanded.push((namespace, local));
-        }
         // Namespace bindings have their own structural budget.  Do not charge
         // the selected scalar/attribute-value budget for a binding URI: a
         // narrow value policy applies to modeled attribute values, while the
@@ -2245,6 +2297,31 @@ fn validate_replacement_attributes(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
         validate_xml_text("theme replacement attribute", &value)?;
+        if is_namespace {
+            let prefix = attribute
+                .key
+                .as_ref()
+                .strip_prefix(b"xmlns:")
+                .unwrap_or(&[]);
+            validate_theme_namespace_binding(prefix, &value)?;
+        } else {
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            if matches!(namespace, ResolveResult::Unknown(_)) {
+                return Err(invalid(
+                    "theme replacement attribute uses an undeclared namespace prefix",
+                ));
+            }
+            if expanded.iter().copied().any(|seen| {
+                let (seen_namespace, seen_local) = reader.resolver().resolve_attribute(seen);
+                resolved_names_equal(&seen_namespace, &namespace)
+                    && seen_local.as_ref() == local.as_ref()
+            }) {
+                return Err(invalid(
+                    "theme replacement has duplicate expanded attributes",
+                ));
+            }
+            expanded.push(attribute.key);
+        }
         if !is_namespace && value.len() > limits.max_attribute_value_bytes {
             return Err(limit(
                 LimitKind::AttributeValueBytes,
@@ -3054,6 +3131,20 @@ mod tests {
             )
             .is_err()
         );
+        for binding in [
+            br#"xmlns:xml="urn:foreign""#.as_slice(),
+            br#"xmlns:xmlns="urn:foreign""#.as_slice(),
+            br#"xmlns:x="http://www.w3.org/XML/1998/namespace""#.as_slice(),
+            br#"xmlns:x="http://www.w3.org/2000/xmlns/""#.as_slice(),
+            br#"xmlns:x="""#.as_slice(),
+        ] {
+            let mut replacement = String::from_utf8(valid_palette_fragment()).unwrap();
+            replacement.insert_str(
+                replacement.find(" name=\"").unwrap(),
+                &format!("{} ", String::from_utf8_lossy(binding)),
+            );
+            assert!(replace_scheme(&original, b"clrScheme", replacement.as_bytes()).is_err());
+        }
     }
 
     #[test]
@@ -3324,6 +3415,12 @@ mod tests {
         let complete_fonts = String::from_utf8(valid_fonts_fragment()).unwrap();
         let incomplete_fonts = complete_fonts.replacen("<a:latin typeface=\"Aptos\"/>", "", 1);
         assert!(replace_scheme(&original, b"fontScheme", incomplete_fonts.as_bytes(),).is_err());
+        let scripts = (0..=MAX_SCRIPT_COUNT)
+            .map(|index| format!("<a:font script=\"S{index}\" typeface=\"Aptos\"/>"))
+            .collect::<String>();
+        let too_many_scripts =
+            complete_fonts.replacen("</a:majorFont>", &format!("{scripts}</a:majorFont>"), 1);
+        assert!(replace_scheme(&original, b"fontScheme", too_many_scripts.as_bytes(),).is_err());
         let empty_font_name = complete_fonts.replacen("name=\"Office\"", "name=\"\"", 1);
         assert!(replace_scheme(&original, b"fontScheme", empty_font_name.as_bytes(),).is_err());
     }
@@ -3332,9 +3429,10 @@ mod tests {
     fn scheme_replacement_normalizes_default_and_arbitrary_prefixes() {
         let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
         let original = encode_part("Office", &palette(), &fonts).unwrap();
-        let strict = String::from_utf8(original)
-            .unwrap()
-            .replacen(NAMESPACE, STRICT_NAMESPACE, 1);
+        let strict =
+            String::from_utf8(original.clone())
+                .unwrap()
+                .replacen(NAMESPACE, STRICT_NAMESPACE, 1);
         let generated = String::from_utf8(valid_palette_fragment()).unwrap();
         let default_prefix = generated.replace("<a:", "<").replace("</a:", "</").replace(
             "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
@@ -3354,5 +3452,24 @@ mod tests {
         let patched_arbitrary =
             replace_scheme(strict.as_bytes(), b"clrScheme", arbitrary_prefix.as_bytes()).unwrap();
         assert_eq!(read(&patched_arbitrary).unwrap().colors, palette());
+
+        let mut inherited_prefix = generated.replace(
+            "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
+            "xmlns=\"http://purl.oclc.org/ooxml/drawingml/main\"",
+        );
+        for slot in Slot::ALL {
+            let token = slot.token();
+            inherited_prefix = inherited_prefix
+                .replace(&format!("<a:{token}>"), &format!("<{token}>"))
+                .replace(&format!("</a:{token}>"), &format!("</{token}>"));
+        }
+        let patched_inherited =
+            replace_scheme(&original, b"clrScheme", inherited_prefix.as_bytes()).unwrap();
+        assert_eq!(read(&patched_inherited).unwrap().colors, palette());
+        assert!(
+            !patched_inherited
+                .windows(b"xmlns=\"http://purl.oclc.org/ooxml/drawingml/main\"".len())
+                .any(|window| { window == b"xmlns=\"http://purl.oclc.org/ooxml/drawingml/main\"" })
+        );
     }
 }

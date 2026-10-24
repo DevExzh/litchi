@@ -1425,7 +1425,8 @@ pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Lim
 ///
 /// # Errors
 ///
-/// Returns an error only when the caller-provided sink fails.
+/// Returns an error when source validation or the output budget fails, or when
+/// the caller-provided sink fails.
 pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
     validate_source(actions.source(), limits)?;
