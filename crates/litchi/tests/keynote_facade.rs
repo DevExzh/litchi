@@ -612,9 +612,9 @@ fn slide_body_span_edit_uses_only_public_semantic_facade_types()
         .ok_or_else(|| io::Error::other("native Keynote file has no body placeholder"))?;
     let span = TextSpan::from_utf16_indexes(6, 15)?;
     let mut edit = package.edit_slide_body(selector)?;
-    assert_eq!(edit.position(), Position::new(slide.index()));
+    assert_eq!(edit.position()?, Position::new(slide.index()));
     assert_eq!(edit.role(), Kind::Body);
-    assert_eq!(edit.text(), body);
+    assert_eq!(edit.text()?, body);
     assert_eq!(edit.span(), None);
     edit.replace(span, "selector-first")?;
     assert_eq!(edit.span(), Some(span));

@@ -12,7 +12,7 @@
     reason = "the package boundary redacts lower-layer failure details"
 )]
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{collections::HashSet, fmt};
 
 use litchi_core::Position;
@@ -28,6 +28,7 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{package_metadata_codec, table_info_codec, table_model_discovery_codec};
 use thiserror::Error as ThisError;
 
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -66,6 +67,7 @@ pub enum LimitKind {
     Retained,
     Scratch,
     Components,
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -86,6 +88,7 @@ impl fmt::Display for LimitKind {
             Self::Retained => "retained bytes",
             Self::Scratch => "scratch bytes",
             Self::Components => "components",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -554,60 +557,65 @@ impl LockBudget {
 /// One mutable lock value staged against an immutable package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    selection: LockSelection,
-    after: State,
+    slide: OwnedSlideSelector,
+    table: TableSelector,
+    selection: OnceLock<LockSelection>,
+    after: Option<State>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("path", &self.selection.path())
-            .field("before", &self.selection.before)
-            .field("after", &self.after)
+            .field("has_selection", &self.selection.get().is_some())
+            .field("has_staged", &self.after.is_some())
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.selection.slide_position
+    fn resolve(&self) -> Result<&LockSelection, Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let selection = select_table(self.source, self.slide.as_selector(), self.table)?;
+        let _ = self.selection.set(selection);
+        self.selection.get().ok_or(Error::InvalidSource)
     }
 
-    #[must_use]
-    pub const fn table_position(&self) -> Position {
-        self.selection.table_position
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.slide_position)
     }
 
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        self.selection.path()
+    pub fn table_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.table_position)
     }
 
-    #[must_use]
-    pub const fn before(&self) -> State {
-        self.selection.before
+    pub fn path(&self) -> Result<Path, Error> {
+        Ok(self.resolve()?.path())
     }
 
-    #[must_use]
-    pub const fn state(&self) -> State {
-        self.after
+    #[must_use = "handle the deferred table-lock result"]
+    pub fn state(&self) -> Result<State, Error> {
+        self.after()
     }
 
-    #[must_use]
-    pub const fn after(&self) -> State {
-        self.after
+    #[must_use = "handle the deferred table-lock result"]
+    pub fn after(&self) -> Result<State, Error> {
+        if let Some(after) = self.after {
+            return Ok(after);
+        }
+        Ok(self.resolve()?.before)
     }
 
     #[must_use]
     pub fn set(mut self, state: State) -> Self {
-        self.after = state;
+        self.after = Some(state);
         self
     }
 
     pub fn set_state(&mut self, state: State) -> &mut Self {
-        self.after = state;
+        self.after = Some(state);
         self
     }
 
@@ -619,8 +627,14 @@ impl Edit<'_> {
         self.set_state(State::Unlocked)
     }
 
+    pub fn before(&self) -> Result<State, Error> {
+        Ok(self.resolve()?.before)
+    }
+
     pub fn commit(self) -> Result<Commit, Error> {
-        commit_edit(self.source, &self.selection, self.after)
+        let selection = self.resolve()?.clone();
+        let after = self.after.unwrap_or(selection.before);
+        commit_edit(self.source, &selection, after)
     }
 }
 
@@ -829,16 +843,29 @@ impl Package {
     }
 
     /// Start an immutable exact edit of one slide table's persisted lock state.
+    ///
+    /// Entry retains only the source and archive-free selectors. Table graph
+    /// selection is deferred until a value is read or the edit is committed.
+    /// Selector names are admitted against the package's finite selector-byte
+    /// limit at entry.
     pub fn edit_slide_table_lock_state<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
     ) -> Result<Edit<'_>, Error> {
-        let selection = select_table(self, slide.into(), table.into())?;
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide.into(),
+            self.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Edit {
             source: self,
-            after: selection.before,
-            selection,
+            slide,
+            table: table.into(),
+            after: None,
+            selection: OnceLock::new(),
         })
     }
 
@@ -864,6 +891,17 @@ impl Package {
             });
         }
         reopen_patch(self, patch, current.admission_budget)
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 

@@ -19,7 +19,7 @@ fn merge_and_unmerge_preserve_exact_source_and_inverse() -> TestResult {
 
     let mut edit = source.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;
     edit.merge(region)?;
-    assert!(edit.regions().contains(&region));
+    assert!(edit.regions()?.contains(&region));
     let committed = edit.commit()?;
     assert!(committed.diagnostics().changed());
     assert_eq!(committed.diagnostics().regions_added(), 1);

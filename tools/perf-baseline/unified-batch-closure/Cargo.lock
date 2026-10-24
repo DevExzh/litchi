@@ -1208,6 +1208,7 @@ version = "0.0.1"
 dependencies = [
  "litchi-iwa-common",
  "litchi-iwa-protos",
+ "smallvec",
  "snap",
  "thiserror",
 ]
@@ -1578,6 +1579,8 @@ dependencies = [
  "quick-xml 0.41.0",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
+ "soapberry-zip",
  "unicode-normalization",
 ]
 
@@ -1626,6 +1629,7 @@ dependencies = [
  "quick-xml 0.41.0",
  "serde_json",
  "sha2 0.11.1",
+ "siphasher",
  "url",
  "zerocopy",
  "zerocopy-derive",
@@ -1772,7 +1776,7 @@ dependencies = [
  "litchi-xldm",
  "once_cell",
  "quick-xml 0.41.0",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "thiserror",
 ]
 
@@ -1797,6 +1801,7 @@ dependencies = [
  "quick-xml 0.41.0",
  "ryu",
  "serde_json",
+ "sha2 0.11.1",
  "smallvec",
  "thiserror",
  "unicode-normalization",

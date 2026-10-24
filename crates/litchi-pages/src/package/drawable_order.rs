@@ -194,7 +194,7 @@ struct OrderLocation {
 /// package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    before: Vec<BodyDrawableHandle>,
+    before: Option<Vec<BodyDrawableHandle>>,
     after: Vec<BodyDrawableHandle>,
 }
 
@@ -202,29 +202,40 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("before_positions", &positions(&self.before))
+            .field("before_resolved", &self.before.is_some())
             .field("after_positions", &positions(&self.after))
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.before.is_none() {
+            let before = self.source.body_drawable_order()?;
+            self.after = before.clone();
+            self.before = Some(before);
+        }
+        Ok(())
+    }
+
     /// Borrow the source order captured when this edit began.
-    #[must_use]
-    pub fn before(&self) -> &[BodyDrawableHandle] {
-        &self.before
+    pub fn before(&mut self) -> Result<&[BodyDrawableHandle], Error> {
+        self.resolve()?;
+        self.before.as_deref().ok_or(Error::InvalidSource)
     }
 
     /// Borrow the staged back-to-front order.
-    #[must_use]
-    pub fn order(&self) -> &[BodyDrawableHandle] {
-        &self.after
+    pub fn order(&mut self) -> Result<&[BodyDrawableHandle], Error> {
+        self.resolve()?;
+        Ok(&self.after)
     }
 
     /// Replace the staged order with an exact permutation of the handles
     /// issued by this source package.
     pub fn set_order(&mut self, requested: &[BodyDrawableHandle]) -> Result<&mut Self, Error> {
-        let current = handles_to_identities(&self.before, &self.source_bytes())?;
+        self.resolve()?;
+        let before = self.before.as_ref().ok_or(Error::InvalidSource)?;
+        let current = handles_to_identities(before, &self.source_bytes())?;
         let desired = handles_to_identities(requested, &self.source_bytes())?;
         validate_exact_permutation(&current, &desired)?;
         let mut staged = allocate_vec(requested.len())?;
@@ -242,6 +253,7 @@ impl Edit<'_> {
         selector: impl Into<BodyDrawableSelector>,
         movement: DrawableLayerMove,
     ) -> Result<bool, Error> {
+        self.resolve()?;
         let index = resolve_staged_selector(&self.after, selector.into())?;
         let final_index = self
             .after
@@ -272,7 +284,8 @@ impl Edit<'_> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 
@@ -478,13 +491,10 @@ impl Package {
     /// Start a selector-first immutable edit of the complete body drawable
     /// order.
     pub fn edit_body_drawable_order(&self) -> Result<Edit<'_>, Error> {
-        let before = self.body_drawable_order()?;
-        let mut after = allocate_vec(before.len())?;
-        after.extend(before.iter().cloned());
         Ok(Edit {
             source: self,
-            before,
-            after,
+            before: None,
+            after: Vec::new(),
         })
     }
 
@@ -538,7 +548,8 @@ impl Package {
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source.state.source.shared_source();
     let (location, current) = read_order(edit.source)?;
-    let before = handles_to_identities(&edit.before, &source)?;
+    let edit_before = edit.before.ok_or(Error::InvalidSource)?;
+    let before = handles_to_identities(&edit_before, &source)?;
     let after = handles_to_identities(&edit.after, &source)?;
     if current != before {
         return Err(Error::InvalidSource);
@@ -554,7 +565,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
                 proof: location,
-                before: edit.before,
+                before: edit_before,
                 after: edit.after,
             },
             diagnostics: Diagnostics::unchanged(),
@@ -581,7 +592,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             source_fingerprint,
             target_fingerprint: fingerprint(target.as_ref()),
             proof: location,
-            before: edit.before,
+            before: edit_before,
             after: target_handles,
         },
         diagnostics: Diagnostics::published(deleted_previews),

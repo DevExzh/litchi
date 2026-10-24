@@ -249,15 +249,27 @@ fn exercise_table_title(package: &Package, data: &[u8]) {
 
     // A transaction that preserves both optional-field presences must retain
     // the exact source package and publish no touched components.
-    let no_op = match package.edit_table_title(sheet, table) {
+    let mut no_op = match package.edit_table_title(sheet, table) {
         Ok(edit) => edit.set(before),
         Err(error) => {
             observe_error(error);
             return;
         },
     };
-    assert_eq!(no_op.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(no_op.settings(), before);
+    match no_op.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    match no_op.settings() {
+        Ok(settings) => assert_eq!(settings, before),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
     let no_op_commit = match no_op.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -286,15 +298,28 @@ fn exercise_table_title(package: &Package, data: &[u8]) {
 
     let after = changed_title_settings(before, data);
     assert_ne!(after, before);
-    let edit = match package.edit_table_title(sheet, table) {
+    let mut edit = match package.edit_table_title(sheet, table) {
         Ok(edit) => edit.set(after),
         Err(error) => {
             observe_error(error);
             return;
         },
     };
-    assert_eq!(edit.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), after);
+    match edit.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    let staged = match edit.settings() {
+        Ok(settings) => settings,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(staged, after);
     let commit = match edit.commit() {
         // A supported exact profile reaches apply/inverse/conflict checks.
         Ok(commit) => commit,

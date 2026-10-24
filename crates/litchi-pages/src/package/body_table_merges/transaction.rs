@@ -27,10 +27,11 @@ use crate::table::merge::Region;
 /// proof data and are resolved again before every changed commit.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: table_lock::BodyTableTarget,
-    before: Vec<Region>,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
+    before: Option<Vec<Region>>,
     regions: Vec<Region>,
-    budget: table_lock::WireBudget,
+    budget: Option<table_lock::WireBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -44,10 +45,44 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = match self.budget.take() {
+                Some(budget) => budget,
+                None => transaction_budget(self.source)?,
+            };
+            let target = match self
+                .selector
+                .resolve_with_budget(self.source, &mut budget)
+                .map_err(map_lock_error)
+            {
+                Ok(target) => target,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
+            let before = match read_regions(self.source, &target, &mut budget) {
+                Ok(before) => before,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
+            if self.before.is_none() {
+                self.before = Some(before.clone());
+                self.regions = before;
+            }
+            self.target = Some(target);
+            self.budget = Some(budget);
+        }
+        Ok(())
+    }
+
     /// Return the regions staged for publication.
-    #[must_use]
-    pub fn regions(&self) -> &[Region] {
-        &self.regions
+    pub fn regions(&mut self) -> Result<&[Region], Error> {
+        self.resolve()?;
+        Ok(&self.regions)
     }
 
     /// Stage one new merged-cell rectangle.
@@ -58,13 +93,12 @@ impl Edit<'_> {
     ///
     /// This changes merge geometry while preserving the underlying cell values.
     pub fn merge(&mut self, region: Region) -> Result<&mut Self, Error> {
-        validate_region(&self.target, region)?;
-        self.budget
-            .charge_payload_items(1)
-            .and_then(|_| {
-                self.budget
-                    .charge_payload_work(self.regions.len().saturating_add(1))
-            })
+        self.resolve()?;
+        validate_region(self.target.as_ref().ok_or(Error::InvalidSource)?, region)?;
+        let budget = self.budget.as_mut().ok_or(Error::InvalidSource)?;
+        budget.charge_payload_items(1).map_err(map_lock_error)?;
+        budget
+            .charge_payload_work(self.regions.len().saturating_add(1))
             .map_err(map_lock_error)?;
         if self
             .regions
@@ -87,12 +121,15 @@ impl Edit<'_> {
     /// Removing a rectangle that is absent is a successful semantic no-op,
     /// which makes this operation safe to use for idempotent cleanup.
     pub fn unmerge(&mut self, region: Region) -> Result<bool, Error> {
+        self.resolve()?;
         let work = self
             .regions
             .len()
             .checked_mul(2)
             .ok_or(Error::InvalidSource)?;
         self.budget
+            .as_mut()
+            .ok_or(Error::InvalidSource)?
             .charge_payload_work(work)
             .map_err(map_lock_error)?;
         let Some(index) = self.regions.iter().position(|existing| *existing == region) else {
@@ -103,7 +140,8 @@ impl Edit<'_> {
     }
 
     /// Validate and atomically publish the staged merge topology.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -261,17 +299,14 @@ impl Package {
     where
         S: Into<BodyTableSelector<'table>>,
     {
-        let mut budget = transaction_budget(self)?;
-        let target = self
-            .resolve_body_table_with_budget(selector.into(), &mut budget)
-            .map_err(map_lock_error)?;
-        let before = read_regions(self, &target, &mut budget)?;
         Ok(Edit {
             source: self,
-            target,
-            regions: before.clone(),
-            before,
-            budget,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            regions: Vec::new(),
+            before: None,
+            budget: None,
         })
     }
 
@@ -351,16 +386,18 @@ fn validate_region(target: &table_lock::BodyTableTarget, region: Region) -> Resu
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
-    let mut budget = edit.budget;
-    let after = normalize_regions(&edit.before, &edit.regions, &mut budget)?;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
+    let mut budget = edit.budget.ok_or(Error::InvalidSource)?;
+    let after = normalize_regions(&before, &edit.regions, &mut budget)?;
     let source_owner = SharedBytes::from_shared_slice(source.state.source.shared_source());
-    if edit.before == after {
+    if before == after {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
-                proof: edit.target,
-                before: edit.before,
+                proof: target,
+                before,
                 after,
             },
             diagnostics: Diagnostics::unchanged(),
@@ -371,29 +408,28 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             crate::table::merge::transaction::Refusal::UnsupportedSource,
         ));
     }
-    table_lock::validate_body_table_target(source, &edit.target, &mut budget)
-        .map_err(map_lock_error)?;
-    let package = rewrite_model(source, &edit.target, &edit.before, &after, &mut budget)?;
+    table_lock::validate_body_table_target(source, &target, &mut budget).map_err(map_lock_error)?;
+    let package = rewrite_model(source, &target, &before, &after, &mut budget)?;
     let candidate_target = package
         .resolve_body_table_with_budget(
-            BodyTableSelector::index(edit.target.table_position),
+            BodyTableSelector::index(target.table_position),
             &mut budget,
         )
         .map_err(map_lock_error)?;
-    if candidate_target.model_identifier != edit.target.model_identifier
+    if candidate_target.model_identifier != target.model_identifier
         || read_regions(&package, &candidate_target, &mut budget)? != after
     {
         return Err(Error::Verification);
     }
-    verify_locality(source, &package, &edit.target, &mut budget)?;
+    verify_locality(source, &package, &target, &mut budget)?;
     let target_owner = SharedBytes::from_shared_slice(package.state.source.shared_source());
     let artifacts = OwnedExactArtifacts::new(source_owner, target_owner);
     Ok(Commit {
         package,
         patch: Patch {
             artifacts,
-            proof: edit.target,
-            before: edit.before,
+            proof: target,
+            before,
             after,
         },
         diagnostics: Diagnostics::published(),
@@ -945,5 +981,43 @@ fn map_page_layout_error(error: page_layout::Error) -> Error {
         page_layout::Error::Allocation { amount } => Error::Allocation { amount },
         page_layout::Error::Verification => Error::Verification,
         page_layout::Error::PatchConflict => Error::PatchConflict,
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::{Error, LimitKind, Package};
+    use crate::selector::BodyTableSelector;
+    use crate::table::merge::transaction::Refusal;
+
+    fn fixture() -> Result<Package, Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages");
+        Ok(Package::open(path)?)
+    }
+
+    #[test]
+    fn deferred_resolution_preserves_wire_budget_after_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package.edit_body_table_merges(BodyTableSelector::index(usize::MAX))?;
+
+        assert!(matches!(
+            edit.regions(),
+            Err(Error::Refused(Refusal::TableNotFound))
+        ));
+        let budget = edit
+            .budget
+            .as_mut()
+            .expect("a failed lazy resolution retains its wire budget");
+        budget.exhaust_payload_work_for_test();
+        assert!(matches!(
+            edit.regions(),
+            Err(Error::Limit {
+                kind: LimitKind::WireWork,
+                ..
+            })
+        ));
+        Ok(())
     }
 }

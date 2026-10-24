@@ -181,19 +181,20 @@ fn selectors_read_and_stage_text_and_custom_marker_presence() -> TestResult {
     assert_eq!(footnotes[1].position, Position::from_utf16_index(5)?);
     assert_eq!(footnotes[1].custom_mark.as_deref(), Some("†"));
 
-    let by_index = package.edit_body_footnote_text(Selector::index(1))?;
-    assert_eq!(by_index.position(), Position::from_utf16_index(5)?);
-    assert_eq!(by_index.before(), &footnotes[1]);
-    assert_eq!(by_index.custom_mark(), Some("†"));
+    let mut by_index = package.edit_body_footnote_text(Selector::index(1))?;
+    assert_eq!(by_index.position()?, Position::from_utf16_index(5)?);
+    assert_eq!(by_index.before()?, &footnotes[1]);
+    assert_eq!(by_index.custom_mark()?, Some("†"));
 
     let mut by_position = package.edit_body_footnote_text(Selector::at(footnotes[1].position))?;
     by_position
         .set("UpdatedSecond")?
         .set_custom_mark(Some("‡"))?;
-    assert_eq!(by_position.text(), "UpdatedSecond");
-    assert_eq!(by_position.custom_mark(), Some("‡"));
+    assert_eq!(by_position.text()?, "UpdatedSecond");
+    assert_eq!(by_position.custom_mark()?, Some("‡"));
+    let mut missing = package.edit_body_footnote_text(Selector::index(2))?;
     assert!(matches!(
-        package.edit_body_footnote_text(Selector::index(2)),
+        missing.position(),
         Err(FootnoteTextError::Refused(
             litchi_pages::footnote::text::Refusal::NotFound
         ))
@@ -246,9 +247,10 @@ fn malformed_graph_rejects_selection_without_mutating_source() -> TestResult {
     let package = Package::from_bytes(&fixture.bytes)?;
     let before = exact_bytes(&package)?;
 
-    let error = package
-        .edit_body_footnote_text(Selector::index(0))
-        .expect_err("a truncated reference field must not stage an edit");
+    let mut edit = package.edit_body_footnote_text(Selector::index(0))?;
+    let error = edit
+        .position()
+        .expect_err("a truncated reference field must fail on first access");
     assert!(matches!(error, FootnoteTextError::InvalidSource));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())

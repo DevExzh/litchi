@@ -2920,8 +2920,9 @@ fn active_view_selection_and_multiview_writes_fail_closed() -> TestResult {
                 litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedSource
             ))
     ));
+    let mut missing_uuid_edit = missing_uuid.edit_body_table_hidden_axes(0usize)?;
     assert!(matches!(
-        missing_uuid.edit_body_table_hidden_axes(0usize),
+        missing_uuid_edit.before(),
         Err(Error::InvalidSource
             | Error::Refused(
                 litchi_pages::table::hidden_axes::transaction::Refusal::UnsupportedDependency
@@ -3757,8 +3758,9 @@ fn public_hidden_axis_transactions_are_send_sync_debug_and_redacted() -> TestRes
     assert_send_sync_debug::<BodyTableHiddenAxesLimitKind>();
 
     let package = Package::from_bytes(&normal_package()?)?;
-    let edit = package.edit_body_table_hidden_axes(0usize)?;
-    assert_redacted(&format!("{:?}", edit.path()));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    let path = edit.path()?;
+    assert_redacted(&format!("{path:?}"));
     assert_redacted(&format!("{edit:?}"));
     let commit = edit.set(HiddenAxes::new([AxisIndex::row(0)])?).commit()?;
     assert_redacted(&format!("{:?}", commit.patch().path()));
@@ -4909,10 +4911,8 @@ fn native_profile_mixes_are_rejected_before_graph_admission() -> TestResult {
         package.body_table_hidden_axes(0usize),
         Err(Error::InvalidSource)
     ));
-    assert!(matches!(
-        package.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource)
-    ));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    assert!(matches!(edit.before(), Err(Error::InvalidSource)));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -4936,10 +4936,8 @@ fn native_metadata_contradictions_remain_terminal() -> TestResult {
             package.body_table_hidden_axes(0usize),
             Err(Error::InvalidSource)
         ));
-        assert!(matches!(
-            package.edit_body_table_hidden_axes(0usize),
-            Err(Error::InvalidSource)
-        ));
+        let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+        assert!(matches!(edit.before(), Err(Error::InvalidSource)));
         assert_eq!(package.exact_bytes(), before);
     }
     Ok(())
@@ -4970,10 +4968,8 @@ fn native_nonempty_hidden_state_is_not_admitted() -> TestResult {
         package.body_table_hidden_axes(0usize),
         Err(Error::InvalidSource)
     ));
-    assert!(matches!(
-        package.edit_body_table_hidden_axes(0usize),
-        Err(Error::InvalidSource)
-    ));
+    let mut edit = package.edit_body_table_hidden_axes(0usize)?;
+    assert!(matches!(edit.before(), Err(Error::InvalidSource)));
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }

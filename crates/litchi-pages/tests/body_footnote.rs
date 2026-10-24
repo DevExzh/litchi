@@ -919,8 +919,8 @@ fn semantic_snapshot_is_selector_first_and_reuses_one_bounded_read() -> TestResu
 
     let cloned = snapshot.clone();
     assert_eq!(cloned.as_slice(), snapshot.as_slice());
-    let edit = package.edit_body_footnote(1usize)?;
-    assert_eq!(edit.before(), snapshot.get(1).expect("second footnote"));
+    let mut edit = package.edit_body_footnote(1usize)?;
+    assert_eq!(edit.before()?, snapshot.get(1).expect("second footnote"));
     Ok(())
 }
 
@@ -1025,7 +1025,7 @@ fn edit_set_custom_mark_and_clear_inserted_identity_atomically() -> TestResult {
     assert_graph_unknowns(&changed_bytes)?;
 
     let mut remove = changed.package().edit_body_footnote(Selector::index(0))?;
-    let removed_before = remove.before().clone();
+    let removed_before = remove.before()?.clone();
     remove.clear();
     let removed = remove.commit()?;
     assert_eq!(removed.diagnostics().touched_components(), 1);
@@ -1089,7 +1089,7 @@ fn remove_middle_note_preserves_inserted_and_following_identity() -> TestResult 
     let inserted =
         package.insert_body_footnote(Position::from_utf16_index(1)?, "Inserted", None)?;
     let mut remove = inserted.package().edit_body_footnote(Selector::index(1))?;
-    let removed_before = remove.before().clone();
+    let removed_before = remove.before()?.clone();
     assert_eq!(removed_before.text.as_ref(), "First");
     remove.clear();
     let removed = remove.commit()?;
@@ -1398,14 +1398,17 @@ fn selectors_and_empty_graph_edges_are_typed_and_atomic() -> TestResult {
     let fixture = build_fixture()?;
     let package = Package::from_bytes(&fixture.bytes)?;
     let source = exact_bytes(&package)?;
+    let mut missing_index = package.edit_body_footnote(Selector::index(99))?;
     assert!(matches!(
-        package.edit_body_footnote(Selector::index(99)),
+        missing_index.before(),
         Err(BodyFootnoteError::Refused(
             litchi_pages::footnote::body::transaction::Refusal::NotFound
         ))
     ));
+    let mut missing_position =
+        package.edit_body_footnote(Selector::at(Position::from_utf16_index(2)?))?;
     assert!(matches!(
-        package.edit_body_footnote(Selector::at(Position::from_utf16_index(2)?)),
+        missing_position.before(),
         Err(BodyFootnoteError::Refused(
             litchi_pages::footnote::body::transaction::Refusal::NotFound
         ))

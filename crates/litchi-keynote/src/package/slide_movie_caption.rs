@@ -2146,6 +2146,10 @@ fn map_slide_text_limit_kind(kind: super::slide_text::LimitKind) -> LimitKind {
         SlideTextLimitKind::TextStorages => LimitKind::TextStorages,
         SlideTextLimitKind::TextFragments => LimitKind::TextFragments,
         SlideTextLimitKind::TextBytes => LimitKind::TextBytes,
+        // Movie-caption selection retains no independent selector budget at
+        // this boundary; preserve the defensive forwarding path in the
+        // aggregate semantic text-byte class.
+        SlideTextLimitKind::SelectorBytes => LimitKind::TextBytes,
         SlideTextLimitKind::TextUnits => LimitKind::WireWork,
         SlideTextLimitKind::WireBytes => LimitKind::WireBytes,
         SlideTextLimitKind::WireFields => LimitKind::WireFields,

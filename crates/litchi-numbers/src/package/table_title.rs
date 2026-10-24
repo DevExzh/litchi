@@ -12,7 +12,7 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use crate::{
-    selector::{SheetSelector, TableSelector},
+    selector::{OwnedSheetSelector, OwnedTableSelector, SheetSelector, TableSelector},
     table::lock::State as LockState,
     table::title::Settings,
 };
@@ -194,42 +194,112 @@ struct ReopenCost {
 /// Immutable settings staged against one package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: Target,
-    before: Settings,
-    settings: Settings,
-    budget: TransactionBudget,
+    sheet_selector: OwnedSheetSelector,
+    table_selector: OwnedTableSelector,
+    sheet_position: Option<usize>,
+    table_position: Option<usize>,
+    target: Option<Target>,
+    before: Option<Settings>,
+    settings: Option<Settings>,
+    budget: Option<TransactionBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("path", &self.path())
+            .field("target", &"Table")
+            .field(
+                "path",
+                &self
+                    .sheet_position
+                    .zip(self.table_position)
+                    .map(|(sheet, table)| Path::Table { sheet, table }),
+            )
+            .field("resolved", &self.target.is_some())
+            .field("loaded", &self.target.is_some())
             .field("settings", &self.settings)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    /// Return the selected table path.
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            sheet: self.target.native.sheet_position,
-            table: self.target.native.table_position,
+    fn ensure_selected(&mut self) -> Result<(), Error> {
+        if self.sheet_position.is_some() && self.table_position.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or_else(invalid_source)?;
+        let selected = resolve_title_selectors(
+            self.source,
+            self.sheet_selector.as_selector(),
+            self.table_selector.as_selector(),
+            Some(&mut budget),
+        );
+        match selected {
+            Ok((sheet_position, table_position)) => {
+                self.sheet_position = Some(sheet_position);
+                self.table_position = Some(table_position);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
         }
     }
 
+    fn ensure_loaded(&mut self) -> Result<(), Error> {
+        if self.target.is_some() {
+            return Ok(());
+        }
+        self.ensure_selected()?;
+        let sheet_position = self.sheet_position.ok_or_else(invalid_source)?;
+        let table_position = self.table_position.ok_or_else(invalid_source)?;
+        let mut budget = self.budget.take().ok_or_else(invalid_source)?;
+        let target = resolve_title_at_positions_with_budget(
+            self.source,
+            sheet_position,
+            table_position,
+            &mut budget,
+        );
+        let target = match target {
+            Ok(target) => target,
+            Err(error) => {
+                self.budget = Some(budget);
+                return Err(error);
+            },
+        };
+        if self.settings.is_none() {
+            self.settings = Some(target.settings);
+        }
+        self.before = Some(target.settings);
+        self.target = Some(target);
+        self.budget = Some(budget);
+        Ok(())
+    }
+
+    /// Return the selected table path.
+    #[must_use = "inspect the selected table path result"]
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.ensure_selected()?;
+        Ok(Path::Table {
+            sheet: self.sheet_position.ok_or_else(invalid_source)?,
+            table: self.table_position.ok_or_else(invalid_source)?,
+        })
+    }
+
     /// Return the settings that would be published.
-    #[must_use]
-    pub const fn settings(&self) -> Settings {
-        self.settings
+    #[must_use = "inspect the table title settings result"]
+    pub fn settings(&mut self) -> Result<Settings, Error> {
+        self.ensure_loaded()?;
+        self.settings.ok_or_else(invalid_source)
     }
 
     /// Replace the staged settings without touching package bytes.
     #[must_use]
     pub fn set(mut self, settings: Settings) -> Self {
-        self.settings = settings;
+        self.settings = Some(settings);
         self
     }
 
@@ -238,7 +308,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns a typed source, lock, resource, or verification error.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.ensure_loaded()?;
         commit_edit(self)
     }
 }
@@ -435,19 +506,36 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         let mut budget = TransactionBudget::new(self);
         budget.charge_transaction_work(self.source_bytes().len().saturating_mul(2))?;
-        let (sheet_position, table_position) = resolve_title_selectors(self, sheet, table)?;
-        let target = resolve_title_at_positions_with_budget(
-            self,
-            sheet_position,
-            table_position,
-            &mut budget,
-        )?;
+        let sheet = sheet.into();
+        let maximum_sheet_name_bytes = budget.remaining_transaction_work();
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet) {
+            budget.charge_transaction_work(amount)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet, maximum_sheet_name_bytes)
+            .map_err(|amount| Error::Allocation {
+                amount,
+                path: Path::Package,
+            })?;
+        let table = table.into();
+        let maximum_table_name_bytes = budget.remaining_transaction_work();
+        if let Some(amount) = OwnedTableSelector::name_bytes(table) {
+            budget.charge_transaction_work(amount)?;
+        }
+        let table_selector = OwnedTableSelector::try_from(table, maximum_table_name_bytes)
+            .map_err(|amount| Error::Allocation {
+                amount,
+                path: Path::Package,
+            })?;
         Ok(Edit {
             source: self,
-            before: target.settings,
-            settings: target.settings,
-            target,
-            budget,
+            sheet_selector,
+            table_selector,
+            sheet_position: None,
+            table_position: None,
+            target: None,
+            before: None,
+            settings: None,
+            budget: Some(budget),
         })
     }
 
@@ -462,7 +550,7 @@ fn resolve_title_target<'sheet, 'table>(
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
 ) -> Result<Target, Error> {
-    let (sheet_position, table_position) = resolve_title_selectors(source, sheet, table)?;
+    let (sheet_position, table_position) = resolve_title_selectors(source, sheet, table, None)?;
     resolve_title_at_positions(source, sheet_position, table_position)
 }
 
@@ -470,23 +558,70 @@ fn resolve_title_selectors<'sheet, 'table>(
     source: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
+    mut budget: Option<&mut TransactionBudget>,
 ) -> Result<(usize, usize), Error> {
-    let selected_sheet = source
-        .state
-        .document
-        .sheet(sheet)
-        .map_err(|_error| Error::InvalidSource {
-            path: Path::Package,
-        })?
-        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
+    let selected_sheet = match sheet.into() {
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            if let Some(active) = budget.as_deref_mut() {
+                active.charge_transaction_work(1)?;
+            }
+            source.state.document.sheets().get(index)
+        },
+        SheetSelector::Name(name) => {
+            let mut selected = None;
+            for candidate in source.state.document.sheets() {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(
+                        candidate
+                            .name()
+                            .len()
+                            .saturating_add(name.len())
+                            .saturating_add(1),
+                    )?;
+                }
+                if candidate.name() == name {
+                    selected = Some(candidate);
+                    break;
+                }
+            }
+            selected
+        },
+    }
+    .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let table_position = match table.into() {
         TableSelector::Position(index) => {
             let index = index.get();
-            selected_sheet.tables().nth(index).map(|_| index)
+            let mut tables = selected_sheet.tables();
+            for _ in 0..=index {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(1)?;
+                }
+                if tables.next().is_none() {
+                    return Err(Error::Refused(Refusal::TableNotFound));
+                }
+            }
+            Some(index)
         },
-        TableSelector::Name(name) => selected_sheet
-            .tables()
-            .position(|candidate| candidate.name() == name),
+        TableSelector::Name(name) => {
+            let mut selected = None;
+            for (index, candidate) in selected_sheet.tables().enumerate() {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(
+                        candidate
+                            .name()
+                            .len()
+                            .saturating_add(name.len())
+                            .saturating_add(1),
+                    )?;
+                }
+                if candidate.name() == name {
+                    selected = Some(index);
+                    break;
+                }
+            }
+            selected
+        },
     }
     .ok_or(Error::Refused(Refusal::TableNotFound))?;
     Ok((selected_sheet.index(), table_position))
@@ -774,6 +909,10 @@ impl TransactionBudget {
             amount,
             LimitKind::TransactionWork,
         )
+    }
+
+    const fn remaining_transaction_work(&self) -> usize {
+        self.remaining_transaction_work
     }
 
     fn charge_index_lookup(&mut self, source: &Package) -> Result<(), Error> {
@@ -1492,17 +1631,21 @@ fn reopen_cost(source: &Package) -> Result<ReopenCost, Error> {
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let target = edit.target.ok_or_else(invalid_source)?;
+    let before = edit.before.ok_or_else(invalid_source)?;
+    let settings = edit.settings.ok_or_else(invalid_source)?;
+    let mut budget = edit.budget.ok_or_else(invalid_source)?;
     let catalog =
         super::table_headers::rewrite::physical_source(edit.source).map_err(map_header_error)?;
     let source = catalog.__source_owner();
-    if edit.before == edit.settings {
+    if before == settings {
         return Ok(Commit {
             package: edit.source.snapshot(),
             patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source.clone(), source),
-                target: edit.target,
-                before: edit.before,
-                after: edit.settings,
+                target,
+                before,
+                after: settings,
                 source_reopen: ReopenCost {
                     work: 0,
                     references: 0,
@@ -1520,31 +1663,26 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !catalog.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let mut budget = edit.budget;
     budget.charge_transaction_work(source.len().saturating_mul(2))?;
-    if edit.target.settings != edit.before {
+    if target.settings != before {
         return Err(invalid_source());
     }
-    validate_changed_source(edit.source, edit.target, &mut budget)?;
-    let requested_target = Target {
-        settings: edit.settings,
-        ..edit.target
-    };
+    validate_changed_source(edit.source, target, &mut budget)?;
+    let requested_target = Target { settings, ..target };
     validate_visible_prerequisites(edit.source, requested_target, &mut budget)?;
     let previews =
         super::table_headers::rewrite::root_preview_deletions(catalog).map_err(map_header_error)?;
     let source_reopen = reopen_cost(edit.source)?;
     let package = rewrite::rewrite(
         edit.source,
-        edit.target,
-        edit.settings,
+        target,
+        settings,
         &previews,
         &mut budget,
         source_reopen,
     )?;
-    let target_payload =
-        super::table_headers::rewrite::selected_payload(&package, edit.target.native)
-            .map_err(map_header_error)?;
+    let target_payload = super::table_headers::rewrite::selected_payload(&package, target.native)
+        .map_err(map_header_error)?;
     let target_bytes = super::table_headers::rewrite::physical_source(&package)
         .map_err(map_header_error)?
         .__source_owner();
@@ -1559,7 +1697,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     super::table_headers::rewrite::verify_exact_locality(
         edit.source,
         &package,
-        edit.target.native,
+        target.native,
         &previews,
         0,
         target_payload,
@@ -1569,9 +1707,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         package,
         patch: Patch {
             artifacts: OwnedExactArtifacts::new(source, target_bytes.clone()),
-            target: edit.target,
-            before: edit.before,
-            after: edit.settings,
+            target,
+            before,
+            after: settings,
             source_reopen,
             target_reopen,
             source_previews: previews.len(),
@@ -1675,8 +1813,8 @@ mod tests {
     use prost::Message as _;
 
     use super::{
-        Error, Package, TransactionBudget, decode_title_with_budget, reopen_cost,
-        resolve_title_at_positions_with_budget, validate_changed_source,
+        Error, LimitKind, Package, Refusal, TransactionBudget, decode_title_with_budget,
+        reopen_cost, resolve_title_at_positions_with_budget, validate_changed_source,
     };
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -1868,11 +2006,34 @@ mod tests {
         assert!(matches!(
             attempted,
             Err(Error::Limit {
-                kind: super::LimitKind::TransactionWork,
+                kind: LimitKind::TransactionWork,
                 ..
             })
         ));
         assert_eq!(attempted_budget.test_usage(), (0, 0, 0, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_selector_budget_is_cumulative_after_a_typed_refusal() -> TestResult {
+        let package = Package::new();
+        let mut edit = package.edit_table_title("missing", 0usize)?;
+        edit.budget
+            .as_mut()
+            .expect("a new title edit retains its transaction budget")
+            .remaining_transaction_work = 15;
+
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Refused(Refusal::SheetNotFound))
+        ));
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                ..
+            })
+        ));
         Ok(())
     }
 }

@@ -520,19 +520,19 @@ fn assert_alias_text(package: &Package, expected: &str) -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))?
-            .text(),
+            .text()?,
         expected
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         expected
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         expected
     );
     Ok(())
@@ -898,7 +898,7 @@ fn enumeration_selectors_and_aliases_are_semantic() -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_alias_text(&package, SHARED_TEXT)?;
@@ -910,14 +910,11 @@ fn enumeration_selectors_and_aliases_are_semantic() -> TestResult {
                 Kind::Header,
                 Position::new(0),
             ))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
-    assert!(
-        package
-            .edit_header_footer_text(selector(8, Template::Odd, Kind::Header))
-            .is_err()
-    );
+    let mut missing = package.edit_header_footer_text(selector(8, Template::Odd, Kind::Header))?;
+    assert!(missing.text().is_err());
     Ok(())
 }
 
@@ -1121,7 +1118,7 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     let selected = selector(0, Template::First, Kind::Header);
 
     assert_eq!(
-        package.edit_header_footer_text(selected)?.text(),
+        package.edit_header_footer_text(selected)?.text()?,
         SHARED_TEXT
     );
     // The other two logical aliases still point at the original Document
@@ -1129,13 +1126,13 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     assert_eq!(
         package
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_eq!(
         package
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
 
@@ -1143,21 +1140,21 @@ fn cross_component_storage_is_a_supported_exact_owner() -> TestResult {
     edit.set("Cross component — 北区")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.package().edit_header_footer_text(selected)?.text(),
+        commit.package().edit_header_footer_text(selected)?.text()?,
         "Cross component — 北区"
     );
     assert_eq!(
         commit
             .package()
             .edit_header_footer_text(selector(0, Template::Even, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     assert_eq!(
         commit
             .package()
             .edit_header_footer_text(selector(1, Template::Odd, Kind::Footer))?
-            .text(),
+            .text()?,
         SHARED_TEXT
     );
     let target = exact_bytes(commit.package())?;

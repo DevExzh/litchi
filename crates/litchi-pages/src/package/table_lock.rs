@@ -194,6 +194,57 @@ pub struct Edit<'a> {
     state: State,
 }
 
+/// Owned selector retained by lazy edit constructors.
+///
+/// Name selectors are copied once at the API boundary so an edit can defer
+/// the rooted body graph walk until its first operation without borrowing the
+/// caller's temporary string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedBodyTableSelector {
+    Name(Box<str>),
+    Position(crate::Position),
+}
+
+impl OwnedBodyTableSelector {
+    pub(crate) fn try_from(
+        package: &Package,
+        selector: BodyTableSelector<'_>,
+    ) -> Result<Self, Error> {
+        match selector {
+            BodyTableSelector::Name(name) => {
+                let mut budget = WireBudget::new(package.state.source.limits())?;
+                budget.admit_selector_name(name.len())?;
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| Error::Allocation { amount: name.len() })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            BodyTableSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn resolve(&self, package: &Package) -> Result<BodyTableTarget, Error> {
+        let mut budget = WireBudget::new(package.state.source.limits())?;
+        self.resolve_with_budget(package, &mut budget)
+    }
+
+    pub(crate) fn resolve_with_budget(
+        &self,
+        package: &Package,
+        budget: &mut WireBudget,
+    ) -> Result<BodyTableTarget, Error> {
+        match self {
+            Self::Name(name) => {
+                package.resolve_body_table_with_budget(BodyTableSelector::Name(name), budget)
+            },
+            Self::Position(position) => package
+                .resolve_body_table_with_budget(BodyTableSelector::Position(*position), budget),
+        }
+    }
+}
+
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // The source snapshot and target contain native identifiers and raw
@@ -2707,6 +2758,11 @@ impl WireBudget {
         Ok(())
     }
 
+    #[cfg(test)]
+    pub(crate) fn exhaust_payload_work_for_test(&mut self) {
+        self.payload_work = self.maximum_payload_work;
+    }
+
     pub(crate) fn charge_payload_references(&mut self, amount: usize) -> Result<(), Error> {
         self.charge_wire_work(amount)?;
         Self::charge_counter(
@@ -2724,6 +2780,16 @@ impl WireBudget {
             self.physical_limits.max_input_bytes(),
             LimitKind::InputBytes,
         )
+    }
+
+    /// Admit a caller-owned selector name before retaining its bytes.
+    ///
+    /// This is intentionally limited to scalar byte ceilings.  Rooted table
+    /// discovery remains deferred until the edit is first used.
+    pub(crate) fn admit_selector_name(&mut self, amount: usize) -> Result<(), Error> {
+        self.charge_input_bytes(amount)?;
+        self.charge_payload_bytes(amount)?;
+        self.charge_total_payload_bytes(amount)
     }
 
     pub(crate) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), Error> {

@@ -131,7 +131,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
     };
     let after = appearance_from_bytes(before, data);
 
-    let edit = match package.edit_body_table_appearance(selector) {
+    let mut edit = match package.edit_body_table_appearance(selector) {
         Ok(edit) => edit,
         Err(error) => {
             observe_error(error);
@@ -139,10 +139,32 @@ fn exercise_package(package: &Package, data: &[u8]) {
             return;
         },
     };
-    black_box(edit.path());
-    assert_eq!(edit.appearance(), before);
-    let edit = edit.set(after);
-    assert_eq!(edit.appearance(), after);
+    let path = match edit.path() {
+        Ok(path) => path,
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    black_box(path);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, before),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    }
+    let mut edit = edit.set(after);
+    match edit.appearance() {
+        Ok(appearance) => assert_eq!(appearance, after),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    }
 
     let commit = match edit.commit() {
         Ok(commit) => commit,

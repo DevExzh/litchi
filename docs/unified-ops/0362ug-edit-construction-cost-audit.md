@@ -292,8 +292,8 @@ execution; it does not count as running the 53-step gate.
 
 The composed iWork ops check passes at `5ac9b25891`. That older non-iWork
 source boundary requires direct XLS/PPT metadata property access in its bench
-example; the coordinator must reconcile it with the final fallible XLS/PPT
-APIs when merging the assemblies. Standalone fuzz validation found one missed
+example. The actual merged XLS getter remains infallible; the queued PPT
+packet must migrate its own getter call when it merges. Standalone fuzz validation found one missed
 fallible Keynote `position()` result; `a0bf134246` now observes the error and
 returns before further work. The rerun passes with only the three pre-existing
 unused media constants. The final iWork harness check and receipt remain open.

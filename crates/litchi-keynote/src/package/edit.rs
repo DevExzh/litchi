@@ -10,7 +10,104 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use thiserror::Error as ThisError;
 
 use super::{Package, ReadError, strict_slide_node_skipped};
-use crate::{SlideSelector, SlideSelectorError};
+use crate::{ChartSelector, SlideSelector, SlideSelectorError};
+
+/// An owned slide selector retained by a deferred edit.
+///
+/// Selector names are small caller input, not package payload.  Owning the
+/// name lets an edit keep only its source and selector while deferring the
+/// package-wide show lookup until the first value read or commit.
+#[derive(Clone, Debug)]
+pub(crate) enum OwnedSlideSelector {
+    Name(Arc<str>),
+    Position(Position),
+}
+
+impl OwnedSlideSelector {
+    pub(crate) fn from_selector(
+        selector: SlideSelector<'_>,
+        maximum_bytes: usize,
+        retained_bytes: &mut usize,
+    ) -> Result<Self, SelectorError> {
+        match selector {
+            SlideSelector::Name(name) => Ok(Self::Name(own_selector_name(
+                name,
+                maximum_bytes,
+                retained_bytes,
+            )?)),
+            SlideSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> SlideSelector<'_> {
+        match self {
+            Self::Name(name) => SlideSelector::Name(name.as_ref()),
+            Self::Position(position) => SlideSelector::Position(*position),
+        }
+    }
+}
+
+/// An owned chart selector retained by a deferred chart edit.
+#[derive(Clone, Debug)]
+pub(crate) enum OwnedChartSelector {
+    Name(Arc<str>),
+    Index(usize),
+}
+
+impl OwnedChartSelector {
+    pub(crate) fn from_selector(
+        selector: ChartSelector<'_>,
+        maximum_bytes: usize,
+        retained_bytes: &mut usize,
+    ) -> Result<Self, SelectorError> {
+        match selector {
+            ChartSelector::Name(name) => Ok(Self::Name(own_selector_name(
+                name,
+                maximum_bytes,
+                retained_bytes,
+            )?)),
+            ChartSelector::Index(index) => Ok(Self::Index(index)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> ChartSelector<'_> {
+        match self {
+            Self::Name(name) => ChartSelector::Name(name.as_ref()),
+            Self::Index(index) => ChartSelector::Index(*index),
+        }
+    }
+}
+
+/// A selector name was rejected before it could be retained by a deferred
+/// edit.  The edit family maps this small internal error to its own typed
+/// limit and allocation dimensions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SelectorError {
+    Limit { observed: usize, maximum: usize },
+    Allocation { amount: usize },
+}
+
+fn own_selector_name(
+    name: &str,
+    maximum_bytes: usize,
+    retained_bytes: &mut usize,
+) -> Result<Arc<str>, SelectorError> {
+    let observed = retained_bytes.checked_add(name.len()).unwrap_or(usize::MAX);
+    if observed > maximum_bytes {
+        return Err(SelectorError::Limit {
+            observed,
+            maximum: maximum_bytes,
+        });
+    }
+
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_error| SelectorError::Allocation { amount: name.len() })?;
+    owned.push_str(name);
+    *retained_bytes = observed;
+    Ok(Arc::from(owned.into_boxed_str()))
+}
 
 /// An error raised while staging or committing a Keynote slide-state edit.
 #[derive(Debug, ThisError)]
@@ -94,6 +191,67 @@ impl Refusal {
 impl From<Refusal> for Error {
     fn from(refusal: Refusal) -> Self {
         Self::Refused(refusal)
+    }
+}
+
+#[cfg(test)]
+mod selector_tests {
+    use super::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
+    use crate::{ChartSelector, SlideSelector};
+    use litchi_core::Position;
+
+    #[test]
+    fn selector_names_are_admitted_before_retention_and_cumulative() {
+        let mut retained = 0;
+        let _slide =
+            OwnedSlideSelector::from_selector(SlideSelector::name("slide"), 10, &mut retained)
+                .expect("the first selector fits");
+        let _chart =
+            OwnedChartSelector::from_selector(ChartSelector::name("chart"), 10, &mut retained)
+                .expect("the cumulative selector budget fits");
+        assert_eq!(retained, 10);
+
+        let error = OwnedSlideSelector::from_selector(SlideSelector::name("x"), 10, &mut retained)
+            .expect_err("the next name exceeds the cumulative budget");
+        assert_eq!(
+            error,
+            SelectorError::Limit {
+                observed: 11,
+                maximum: 10,
+            }
+        );
+        assert_eq!(retained, 10);
+    }
+
+    #[test]
+    fn positions_do_not_consume_selector_name_budget() {
+        let mut retained = 0;
+        OwnedSlideSelector::from_selector(
+            SlideSelector::position(Position::new(2)),
+            1,
+            &mut retained,
+        )
+        .expect("positions have no retained caller bytes");
+        OwnedChartSelector::from_selector(ChartSelector::index(3), 1, &mut retained)
+            .expect("indexes have no retained caller bytes");
+        assert_eq!(retained, 0);
+    }
+
+    #[test]
+    fn large_selector_name_is_rejected_without_an_unbounded_copy() {
+        let mut retained = 0;
+        let name = "x".repeat(64 * 1024);
+        let error =
+            OwnedSlideSelector::from_selector(SlideSelector::name(&name), 1024, &mut retained)
+                .expect_err("the finite selector budget rejects the large name");
+        assert_eq!(
+            error,
+            SelectorError::Limit {
+                observed: name.len(),
+                maximum: 1024,
+            }
+        );
+        assert_eq!(retained, 0);
     }
 }
 
@@ -602,7 +760,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
+mod patch_tests {
     use super::*;
 
     #[test]

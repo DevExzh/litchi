@@ -654,6 +654,10 @@ impl ChartBudget {
         )
     }
 
+    pub(super) const fn remaining_retained(&self) -> usize {
+        self.max_retained.saturating_sub(self.retained)
+    }
+
     pub(super) fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
@@ -1091,7 +1095,7 @@ impl Package {
         let mut budget = ChartBudget::for_package(self)?;
         let charts = discover_sheet_charts(
             self,
-            resolve_sheet_position(self, sheet_selector.into())?,
+            resolve_sheet_position(self, sheet_selector.into(), &mut budget)?,
             false,
             &mut budget,
         )?;
@@ -1182,30 +1186,40 @@ impl Package {
     }
 }
 
-fn resolve_sheet_position(
+pub(super) fn resolve_sheet_position(
     package: &Package,
     selector: SheetSelector<'_>,
+    budget: &mut ChartBudget,
 ) -> Result<Position, Error> {
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
                 return Err(Error::Refused(Refusal::EmptySheetName));
             }
-            let mut matches = package
-                .workbook_ref()
-                .sheets()
-                .iter()
-                .filter(|sheet| sheet.name() == name);
-            let Some(sheet) = matches.next() else {
-                return Err(Error::Refused(Refusal::SheetNameNotFound));
-            };
-            if matches.next().is_some() {
-                return Err(Error::Refused(Refusal::AmbiguousSelector));
+            let mut selected = None;
+            for sheet in package.workbook_ref().sheets() {
+                budget.work(
+                    sheet
+                        .name()
+                        .len()
+                        .saturating_add(name.len())
+                        .saturating_add(1),
+                )?;
+                if sheet.name() != name {
+                    continue;
+                }
+                if selected.is_some() {
+                    return Err(Error::Refused(Refusal::AmbiguousSelector));
+                }
+                selected = Some(sheet);
             }
-            Ok(Position::new(sheet.index()))
+            selected
+                .map(|sheet| Position::new(sheet.index()))
+                .ok_or(Error::Refused(Refusal::SheetNameNotFound))
         },
         SheetSelector::Position(index) => {
             let index = index.get();
+            budget.work(1)?;
             if package.workbook_ref().sheets().get(index).is_none() {
                 return Err(Error::Refused(Refusal::SheetPositionNotFound {
                     position: Position::new(index),
@@ -1223,7 +1237,7 @@ pub(super) fn select_chart_with_budget(
     require_editable: bool,
     budget: &mut ChartBudget,
 ) -> Result<ChartSelection, Error> {
-    let sheet_position = resolve_sheet_position(package, sheet_selector)?;
+    let sheet_position = resolve_sheet_position(package, sheet_selector, budget)?;
     let charts = discover_sheet_charts(package, sheet_position, require_editable, budget)?;
     charts
         .into_iter()

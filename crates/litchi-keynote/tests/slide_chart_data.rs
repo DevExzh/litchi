@@ -139,10 +139,9 @@ fn native_chart_data_transaction_rewrites_values_and_restores_exact_source() -> 
         values,
     )?;
 
-    let noop = package
-        .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
-        .set(before.clone())
-        .commit()?;
+    let edit = package.edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    let noop = edit.set(before.clone()).commit()?;
     assert!(noop.patch().is_noop());
     assert!(!noop.diagnostics().changed());
     assert_eq!(exact_bytes(noop.package())?, source);

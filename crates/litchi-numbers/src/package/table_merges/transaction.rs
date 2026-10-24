@@ -17,7 +17,10 @@ use super::{Budget, Package, decode_model_merges, select_semantic_positions};
 use crate::table::merge::Region;
 use crate::table::merge::transaction::Error as TableMergesError;
 use crate::table::merge::transaction::LimitKind as TableMergesLimitKind;
-use crate::{SheetSelector, TableSelector};
+use crate::{
+    SheetSelector, TableSelector,
+    selector::{OwnedSheetSelector, OwnedTableSelector},
+};
 
 /// A mutable, selector-first merge state staged against one immutable package.
 ///
@@ -26,32 +29,86 @@ use crate::{SheetSelector, TableSelector};
 /// their staging order after all surviving source regions.
 pub struct Edit<'a> {
     source: &'a Package,
-    sheet_position: usize,
-    table_position: usize,
-    before: Vec<Region>,
-    regions: Vec<Region>,
-    max_regions: usize,
-    budget: Budget,
-    rows: u32,
-    columns: u32,
+    sheet_selector: OwnedSheetSelector,
+    table_selector: OwnedTableSelector,
+    sheet_position: Option<usize>,
+    table_position: Option<usize>,
+    before: Option<Vec<Region>>,
+    regions: Option<Vec<Region>>,
+    max_regions: Option<usize>,
+    budget: Option<Budget>,
+    rows: Option<u32>,
+    columns: Option<u32>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("sheet_position", &self.sheet_position)
-            .field("table_position", &self.table_position)
-            .field("regions", &self.regions)
+            .field("loaded", &self.regions.is_some())
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn ensure_loaded(&mut self) -> Result<(), TableMergesError> {
+        if self.regions.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let loaded = (|| {
+            let (sheet_position, table_position) = select_semantic_positions(
+                self.source,
+                self.sheet_selector.as_selector(),
+                self.table_selector.as_selector(),
+                &mut budget,
+            )?;
+            let target = super::super::table_headers::resolve::resolve_target(
+                self.source,
+                sheet_position,
+                table_position,
+            )
+            .map_err(map_header_error)?;
+            let model = super::super::table_headers::rewrite::selected_payload(self.source, target)
+                .map_err(map_header_error)?;
+            let before = decode_model_merges(model, &mut budget)?;
+            let regions = clone_regions(&before)?;
+            Ok((
+                sheet_position,
+                table_position,
+                target.rows,
+                target.columns,
+                before,
+                regions,
+                budget.max_regions,
+            ))
+        })();
+        match loaded {
+            Ok((sheet_position, table_position, rows, columns, before, regions, max_regions)) => {
+                self.max_regions = Some(max_regions);
+                self.rows = Some(rows);
+                self.columns = Some(columns);
+                self.sheet_position = Some(sheet_position);
+                self.table_position = Some(table_position);
+                self.before = Some(before);
+                self.regions = Some(regions);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
+    }
+
     /// Return the currently staged merged regions.
-    #[must_use]
-    pub fn regions(&self) -> &[Region] {
-        &self.regions
+    #[must_use = "inspect the merged regions result"]
+    pub fn regions(&mut self) -> Result<&[Region], TableMergesError> {
+        self.ensure_loaded()?;
+        self.regions
+            .as_deref()
+            .ok_or(TableMergesError::InvalidSource)
     }
 
     /// Stage one new merged-cell rectangle.
@@ -61,15 +118,25 @@ impl Edit<'_> {
     ///
     /// This changes merge geometry while preserving the underlying cell values.
     pub fn merge(&mut self, region: Region) -> Result<&mut Self, TableMergesError> {
-        if region.end_row() >= self.rows || region.end_column() >= self.columns {
+        self.ensure_loaded()?;
+        let rows = self.rows.ok_or(TableMergesError::InvalidSource)?;
+        let columns = self.columns.ok_or(TableMergesError::InvalidSource)?;
+        let max_regions = self.max_regions.ok_or(TableMergesError::InvalidSource)?;
+        let regions = self
+            .regions
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        let budget = self
+            .budget
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        if region.end_row() >= rows || region.end_column() >= columns {
             return Err(TableMergesError::Refused(
                 crate::package::table_merges::Refusal::InvalidRegion,
             ));
         }
-        self.budget
-            .charge_work(self.regions.len().saturating_add(1))?;
-        if self
-            .regions
+        budget.charge_work(regions.len().saturating_add(1))?;
+        if regions
             .iter()
             .copied()
             .any(|existing| existing.overlaps(region))
@@ -78,22 +145,21 @@ impl Edit<'_> {
                 crate::package::table_merges::Refusal::OverlappingRegion,
             ));
         }
-        let observed = self
-            .regions
+        let observed = regions
             .len()
             .checked_add(1)
             .ok_or(TableMergesError::InvalidSource)?;
-        if observed > self.max_regions {
+        if observed > max_regions {
             return Err(TableMergesError::Limit {
                 kind: TableMergesLimitKind::Regions,
                 observed: usize_as_u64(observed),
-                maximum: usize_as_u64(self.max_regions),
+                maximum: usize_as_u64(max_regions),
             });
         }
-        self.regions
+        regions
             .try_reserve(1)
             .map_err(|_| TableMergesError::Allocation { amount: 1 })?;
-        self.regions.push(region);
+        regions.push(region);
         Ok(self)
     }
 
@@ -103,28 +169,37 @@ impl Edit<'_> {
     /// native Numbers operation's `false` result without exposing that host
     /// mutation API at this focused boundary.
     pub fn unmerge(&mut self, region: Region) -> Result<bool, TableMergesError> {
-        self.budget
-            .charge_work(self.regions.len().saturating_add(1))?;
-        if let Some(index) = self
+        self.ensure_loaded()?;
+        let regions = self
             .regions
-            .iter()
-            .position(|candidate| *candidate == region)
-        {
-            self.regions.remove(index);
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?;
+        self.budget
+            .as_mut()
+            .ok_or(TableMergesError::InvalidSource)?
+            .charge_work(regions.len().saturating_add(1))?;
+        if let Some(index) = regions.iter().position(|candidate| *candidate == region) {
+            regions.remove(index);
             return Ok(true);
         }
         Ok(false)
     }
 
     /// Commit the staged state as a fully reopened exact-source package.
-    pub fn commit(self) -> Result<Commit, TableMergesError> {
+    pub fn commit(mut self) -> Result<Commit, TableMergesError> {
+        self.ensure_loaded()?;
         let source_catalog = physical_source(self.source)?;
         let source_bytes = source_catalog.__source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         let mut edit = self;
-        let after = normalize_regions(&edit.before, &edit.regions, &mut edit.budget)?;
+        let before = edit.before.take().ok_or(TableMergesError::InvalidSource)?;
+        let regions = edit.regions.take().ok_or(TableMergesError::InvalidSource)?;
+        let mut budget = edit.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let sheet_position = edit.sheet_position.ok_or(TableMergesError::InvalidSource)?;
+        let table_position = edit.table_position.ok_or(TableMergesError::InvalidSource)?;
+        let after = normalize_regions(&before, &regions, &mut budget)?;
 
-        if after == edit.before {
+        if after == before {
             return Ok(Commit {
                 package: edit.source.snapshot(),
                 patch: Patch {
@@ -132,9 +207,9 @@ impl Edit<'_> {
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    sheet_position: edit.sheet_position,
-                    table_position: edit.table_position,
-                    before: edit.before,
+                    sheet_position,
+                    table_position,
+                    before,
                     after,
                 },
                 diagnostics: Diagnostics::unchanged(),
@@ -149,11 +224,11 @@ impl Edit<'_> {
 
         let package = rewrite(
             edit.source,
-            edit.sheet_position,
-            edit.table_position,
-            edit.before.len(),
+            sheet_position,
+            table_position,
+            before.len(),
             &after,
-            &mut edit.budget,
+            &mut budget,
         )?;
         let target = physical_source(&package)?.__source_owner();
         let target_fingerprint = fingerprint(&target);
@@ -162,9 +237,9 @@ impl Edit<'_> {
             target,
             source_fingerprint,
             target_fingerprint,
-            sheet_position: edit.sheet_position,
-            table_position: edit.table_position,
-            before: edit.before,
+            sheet_position,
+            table_position,
+            before,
             after,
         };
         let diagnostics = Diagnostics::published(&patch.before, &patch.after);
@@ -357,28 +432,34 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
     ) -> Result<Edit<'_>, TableMergesError> {
         let mut budget = Budget::new(self)?;
-        let (sheet_position, table_position) =
-            select_semantic_positions(self, sheet.into(), table.into(), &mut budget)?;
-        let target = super::super::table_headers::resolve::resolve_target(
-            self,
-            sheet_position,
-            table_position,
-        )
-        .map_err(map_header_error)?;
-        let model = super::super::table_headers::rewrite::selected_payload(self, target)
-            .map_err(map_header_error)?;
-        let before = decode_model_merges(model, &mut budget)?;
-        let regions = clone_regions(&before)?;
+        let sheet = sheet.into();
+        let maximum_sheet_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet, maximum_sheet_name_bytes)
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
+        let table = table.into();
+        let maximum_table_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedTableSelector::name_bytes(table) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let table_selector = OwnedTableSelector::try_from(table, maximum_table_name_bytes)
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
         Ok(Edit {
             source: self,
-            sheet_position,
-            table_position,
-            before,
-            regions,
-            max_regions: budget.max_regions,
-            budget,
-            rows: target.rows,
-            columns: target.columns,
+            sheet_selector,
+            table_selector,
+            sheet_position: None,
+            table_position: None,
+            before: None,
+            regions: None,
+            max_regions: None,
+            budget: Some(budget),
+            rows: None,
+            columns: None,
         })
     }
 

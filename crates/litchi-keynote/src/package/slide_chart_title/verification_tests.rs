@@ -361,8 +361,16 @@ fn assert_public_rejects(source: &[u8]) {
         package.slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
         Err(Error::InvalidSource)
     ));
+    let edit = package
+        .edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0))
+        .expect("malformed chart edit entry must remain lazy");
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    drop(edit);
+    assert_eq!(exact_bytes(&package), source);
     assert!(matches!(
-        package.edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0)),
+        package
+            .edit_slide_chart_title(SlideSelector::index(0), ChartSelector::index(0))
+            .and_then(|edit| edit.commit()),
         Err(Error::InvalidSource)
     ));
 }

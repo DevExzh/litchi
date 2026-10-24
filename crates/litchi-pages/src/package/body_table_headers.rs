@@ -240,36 +240,51 @@ impl From<Refusal> for Error {
 /// Mutable semantic header settings staged against one immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: table_lock::BodyTableTarget,
-    before: Settings,
-    settings: Settings,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
+    before: Option<Settings>,
+    settings: Option<Settings>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edit")
-            .field("before", &self.before)
+            .field("resolved", &self.target.is_some())
             .field("settings", &self.settings)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let target = self.selector.resolve(self.source).map_err(map_lock_error)?;
+            let before = settings_at_target(self.source, &target)?;
+            if self.settings.is_none() {
+                self.settings = Some(before);
+            }
+            self.before = Some(before);
+            self.target = Some(target);
+        }
+        Ok(())
+    }
+
     /// Return the staged settings.
-    #[must_use]
-    pub const fn settings(&self) -> Settings {
-        self.settings
+    pub fn settings(&mut self) -> Result<Settings, Error> {
+        self.resolve()?;
+        self.settings.ok_or(Error::InvalidSource)
     }
 
     /// Replace the complete staged settings.
     #[must_use]
     pub fn set(mut self, settings: Settings) -> Self {
-        self.settings = settings;
+        self.settings = Some(settings);
         self
     }
 
     /// Validate and publish the staged settings atomically.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -456,13 +471,13 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
     ) -> Result<Edit<'_>, Error> {
-        let target = resolve_target(self, selector.into())?;
-        let before = settings_at_target(self, &target)?;
         Ok(Edit {
             source: self,
-            target,
-            before,
-            settings: before,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            before: None,
+            settings: None,
         })
     }
 
@@ -514,12 +529,15 @@ impl Package {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
+    let settings = edit.settings.ok_or(Error::InvalidSource)?;
     let source_bytes = source.state.source.shared_source();
     let mut budget =
         table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
     let source_fingerprint = fingerprint(source_bytes.as_ref(), &mut budget)?;
     let source_preview_count = preview_count(source, &mut budget)?;
-    if edit.before == edit.settings {
+    if before == settings {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -527,9 +545,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 target: source_bytes,
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
-                proof: edit.target,
-                before: edit.before,
-                after: edit.settings,
+                proof: target,
+                before,
+                after: settings,
                 source_preview_count,
                 target_preview_count: source_preview_count,
             },
@@ -539,26 +557,20 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !source.state.source.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let package = rewrite_headers(
-        source,
-        &edit.target,
-        edit.before,
-        edit.settings,
-        &mut budget,
-    )?;
-    let target = package.state.source.shared_source();
-    let target_fingerprint = fingerprint(target.as_ref(), &mut budget)?;
+    let package = rewrite_headers(source, &target, before, settings, &mut budget)?;
+    let target_owner = package.state.source.shared_source();
+    let target_fingerprint = fingerprint(target_owner.as_ref(), &mut budget)?;
     let target_preview_count = preview_count(&package, &mut budget)?;
     Ok(Commit {
         package,
         patch: Patch {
             source: source_bytes,
-            target,
+            target: target_owner,
             source_fingerprint,
             target_fingerprint,
-            proof: edit.target,
-            before: edit.before,
-            after: edit.settings,
+            proof: target,
+            before,
+            after: settings,
             source_preview_count,
             target_preview_count,
         },

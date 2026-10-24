@@ -101,8 +101,9 @@ fn refusals_are_typed() -> TestResult {
             litchi_pages::table::values::Refusal::InvalidCell
         ))
     ));
+    let mut missing = package.edit_body_table_values(BodyTableSelector::index(40))?;
     assert!(matches!(
-        package.edit_body_table_values(BodyTableSelector::index(40)),
+        missing.set(0, 0, Value::Empty),
         Err(Error::Refused(
             litchi_pages::table::values::Refusal::TableNotFound
         ))

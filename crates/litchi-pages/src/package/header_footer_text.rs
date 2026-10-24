@@ -434,36 +434,67 @@ impl From<Refusal> for Error {
 /// Mutable selector-first header/footer text edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    selector: ResolvedSelector,
-    before: String,
+    selector: DeferredSelector,
+    resolved: Option<ResolvedSelector>,
+    before: Option<String>,
     after: String,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Edit")
-            .field("selector", &self.selector.public)
-            .field("before_bytes", &self.before.len())
+            .field("selector", &self.selector)
+            .field("before_bytes", &self.before.as_ref().map_or(0, String::len))
             .field("after_bytes", &self.after.len())
             .finish()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.resolved.is_none() {
+            let mut budget = TransactionBudget::new(self.source)?;
+            budget.charge(LimitKind::Allocations, self.selector.retained_allocations())?;
+            let selector = self.selector.public();
+            let section_index =
+                resolve_section_index(self.source, selector.section(), &mut budget)?;
+            let canonical = HeaderFooterSelector::index(
+                section_index,
+                selector.template(),
+                selector.kind(),
+                selector.slot_index(),
+            );
+            let records = discover_slots_with_budget(self.source, &mut budget)?;
+            let selected = select_record(&records, canonical, &mut budget)?;
+            if self.before.is_none() {
+                budget.charge(LimitKind::Allocations, 2)?;
+                budget.charge(
+                    LimitKind::RetainedBytes,
+                    selected.text.len().saturating_mul(2),
+                )?;
+                self.before = Some(selected.text.clone());
+                self.after = selected.text.clone();
+            }
+            self.resolved = Some(selected.resolved);
+        }
+        Ok(())
+    }
+
     /// Borrow the current text.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.after
+    pub fn text(&mut self) -> Result<&str, Error> {
+        self.resolve()?;
+        Ok(&self.after)
     }
 
     /// Borrow the source text captured when the edit was created.
-    #[must_use]
-    pub fn before(&self) -> &str {
-        &self.before
+    pub fn before(&mut self) -> Result<&str, Error> {
+        self.resolve()?;
+        self.before.as_deref().ok_or(Error::InvalidSource)
     }
 
     /// Replace a checked UTF-16 range in the staged text.
     pub fn replace(&mut self, range: Range<usize>, replacement: &str) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_authored(replacement)?;
         let start = utf16_boundary(&self.after, range.start)?;
         let end = utf16_boundary(&self.after, range.end)?;
@@ -477,6 +508,7 @@ impl Edit<'_> {
 
     /// Replace the complete staged value.
     pub fn set(&mut self, value: &str) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_authored(value)?;
         self.after.clear();
         self.after
@@ -494,7 +526,8 @@ impl Edit<'_> {
     }
 
     /// Validate and publish the staged replacement.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -672,6 +705,106 @@ struct ResolvedSelector {
     template_id: u64,
     storage_id: u64,
     component_index: usize,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct DeferredSelector {
+    section_position: Option<Position>,
+    section_name: Option<Box<str>>,
+    template: Template,
+    kind: Kind,
+    slot: Position,
+}
+
+impl fmt::Debug for DeferredSelector {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DeferredSelector")
+            .field("section_by_name", &self.section_name.is_some())
+            .field("section_position", &self.section_position)
+            .field("template", &self.template)
+            .field("kind", &self.kind)
+            .field("slot", &self.slot)
+            .finish()
+    }
+}
+
+impl DeferredSelector {
+    fn try_from_public(
+        source: &Package,
+        selector: HeaderFooterSelector<'_>,
+    ) -> Result<Self, Error> {
+        let (section_position, section_name) = match selector.section() {
+            SectionSelector::Position(position) => (Some(position), None),
+            SectionSelector::Name(name) => {
+                let mut budget = TransactionBudget::new(source)?;
+                (None, Some(own_section_name(&mut budget, name)?))
+            },
+        };
+        Ok(Self {
+            section_position,
+            section_name,
+            template: selector.template(),
+            kind: selector.kind(),
+            slot: selector.slot(),
+        })
+    }
+
+    fn public(&self) -> HeaderFooterSelector<'_> {
+        let section = self.section_position.map_or_else(
+            || SectionSelector::Name(self.section_name.as_deref().unwrap_or("")),
+            SectionSelector::Position,
+        );
+        HeaderFooterSelector::new(section, self.template, self.kind, self.slot)
+    }
+
+    fn retained_allocations(&self) -> usize {
+        self.section_name.is_some() as usize
+    }
+}
+
+fn own_section_name(budget: &mut TransactionBudget, name: &str) -> Result<Box<str>, Error> {
+    budget.charge(LimitKind::TextBytes, name.len())?;
+    budget.charge(LimitKind::RetainedBytes, name.len())?;
+    budget.charge(LimitKind::Allocations, 1)?;
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_| Error::Allocation { amount: name.len() })?;
+    owned.push_str(name);
+    Ok(owned.into_boxed_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn budget_with_allocations(maximum: u64) -> TransactionBudget {
+        let mut maximums = [u64::MAX; 17];
+        maximums[LimitKind::Allocations as usize] = maximum;
+        TransactionBudget {
+            maximum: maximums,
+            observed: [0; 17],
+        }
+    }
+
+    #[test]
+    fn named_selector_allocation_admission_is_typed_at_exact_and_one_under() {
+        let mut exact = budget_with_allocations(1);
+        let owned = own_section_name(&mut exact, "section").unwrap();
+        assert_eq!(&*owned, "section");
+        assert_eq!(exact.observed[LimitKind::Allocations as usize], 1,);
+
+        let mut one_under = budget_with_allocations(0);
+        assert_eq!(
+            own_section_name(&mut one_under, "section"),
+            Err(Error::Limit {
+                kind: LimitKind::Allocations,
+                observed: 1,
+                maximum: 0,
+            })
+        );
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -857,27 +990,12 @@ impl Package {
         &self,
         selector: HeaderFooterSelector<'_>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = TransactionBudget::new(self)?;
-        let records = discover_slots_with_budget(self, &mut budget)?;
-        let section_index = resolve_section_index(self, selector.section(), &mut budget)?;
-        let canonical = HeaderFooterSelector::index(
-            section_index,
-            selector.template(),
-            selector.kind(),
-            selector.slot_index(),
-        );
-        let selected = select_record(&records, canonical, &mut budget)?;
-        budget.charge(LimitKind::Allocations, 2)?;
-        budget.charge(
-            LimitKind::RetainedBytes,
-            selected.text.len().saturating_mul(2),
-        )?;
-        let before = selected.text.clone();
         Ok(Edit {
             source: self,
-            selector: selected.resolved,
-            before: before.clone(),
-            after: before,
+            selector: DeferredSelector::try_from_public(self, selector)?,
+            resolved: None,
+            before: None,
+            after: String::new(),
         })
     }
 
@@ -974,20 +1092,23 @@ fn source_preview_count(source: &Package) -> usize {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut budget = TransactionBudget::new(edit.source)?;
+    budget.charge(LimitKind::Allocations, edit.selector.retained_allocations())?;
     edit.source.validate().map_err(map_package_error)?;
     let records = discover_slots_with_budget(edit.source, &mut budget)?;
     budget.charge(LimitKind::WireWork, records.len())?;
+    let selector = edit.resolved.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
     let selected = records
         .iter()
-        .find(|record| record.resolved == edit.selector)
+        .find(|record| record.resolved == selector)
         .ok_or(Error::PatchConflict)?;
-    if selected.text != edit.before {
+    if selected.text != before {
         return Err(Error::PatchConflict);
     }
-    if edit.before == edit.after {
+    if before == edit.after {
         let bytes: Arc<[u8]> = edit.source.state.source.shared_source();
         let fingerprint = fingerprint(&bytes);
-        let aliases = alias_selectors(&records, edit.selector, &mut budget)?;
+        let aliases = alias_selectors(&records, selector, &mut budget)?;
         return Ok(Commit {
             package: edit.source.clone(),
             patch: Patch {
@@ -995,19 +1116,19 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 target: bytes,
                 source_fingerprint: fingerprint,
                 target_fingerprint: fingerprint,
-                selector: edit.selector,
-                before: edit.before,
+                selector,
+                before,
                 after: edit.after,
                 aliases: aliases.into(),
             },
             diagnostics: Diagnostics::unchanged(),
         });
     }
-    let aliases = alias_selectors(&records, edit.selector, &mut budget)?;
+    let aliases = alias_selectors(&records, selector, &mut budget)?;
     publish_rewrite(
         edit.source,
-        edit.selector,
-        &edit.before,
+        selector,
+        &before,
         &edit.after,
         &aliases,
         &mut budget,
@@ -1347,28 +1468,6 @@ fn rooted_section_ids(source: &Package, budget: &mut TransactionBudget) -> Resul
     Ok(identifiers)
 }
 
-fn select_record<'a>(
-    records: &'a [SlotRecord],
-    selector: HeaderFooterSelector<'_>,
-    budget: &mut TransactionBudget,
-) -> Result<&'a SlotRecord, Error> {
-    let section_index = selector
-        .section()
-        .as_position()
-        .ok_or(Error::InvalidSource)?
-        .get();
-    budget.charge(LimitKind::WireWork, records.len())?;
-    records
-        .iter()
-        .find(|record| {
-            record.resolved.public.section() == SectionSelector::index(section_index)
-                && record.resolved.public.template() == selector.template()
-                && record.resolved.public.kind() == selector.kind()
-                && record.resolved.public.slot() == selector.slot()
-        })
-        .ok_or(Error::Refused(Refusal::NotFound))
-}
-
 fn resolve_section_index(
     source: &Package,
     selector: SectionSelector<'_>,
@@ -1391,15 +1490,35 @@ fn resolve_section_index(
                         .saturating_add(section.name().map_or(0, str::len))
                         .saturating_add(1),
                 )?;
-                if section.name() == Some(name) {
-                    if found.replace(index).is_some() {
-                        return Err(Error::Refused(Refusal::AmbiguousSelector));
-                    }
+                if section.name() == Some(name) && found.replace(index).is_some() {
+                    return Err(Error::Refused(Refusal::AmbiguousSelector));
                 }
             }
             found.ok_or(Error::Refused(Refusal::NotFound))
         },
     }
+}
+
+fn select_record<'a>(
+    records: &'a [SlotRecord],
+    selector: HeaderFooterSelector<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<&'a SlotRecord, Error> {
+    let section_index = selector
+        .section()
+        .as_position()
+        .ok_or(Error::InvalidSource)?
+        .get();
+    budget.charge(LimitKind::WireWork, records.len())?;
+    records
+        .iter()
+        .find(|record| {
+            record.resolved.public.section() == SectionSelector::index(section_index)
+                && record.resolved.public.template() == selector.template()
+                && record.resolved.public.kind() == selector.kind()
+                && record.resolved.public.slot() == selector.slot()
+        })
+        .ok_or(Error::Refused(Refusal::NotFound))
 }
 
 fn alias_selectors(

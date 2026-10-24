@@ -176,10 +176,12 @@ impl From<Refusal> for Error {
 /// Mutable selector-first body-table dimension edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: table_lock::BodyTableTarget,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
     dimension: Dimension,
-    before: Size,
+    before: Option<Size>,
     size: Size,
+    staged: bool,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -187,23 +189,40 @@ impl fmt::Debug for Edit<'_> {
         formatter
             .debug_struct("Edit")
             .field("dimension", &self.dimension)
-            .field("before", &self.before)
+            .field("resolved", &self.target.is_some())
             .field("size", &self.size)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let target = self.selector.resolve(self.source).map_err(map_lock_error)?;
+            let mut budget = transaction_budget(self.source)?;
+            let before = read_dimension(self.source, &target, self.dimension, &mut budget)?;
+            if self.before.is_none() {
+                self.before = Some(before);
+                if !self.staged {
+                    self.size = before;
+                }
+            }
+            self.target = Some(target);
+        }
+        Ok(())
+    }
+
     /// Return the staged size.
-    #[must_use]
-    pub const fn size(&self) -> Size {
-        self.size
+    pub fn size(&mut self) -> Result<Size, Error> {
+        self.resolve()?;
+        Ok(self.size)
     }
 
     /// Replace the staged size.
     #[must_use]
     pub fn set(mut self, size: Size) -> Self {
         self.size = size;
+        self.staged = true;
         self
     }
 
@@ -220,7 +239,8 @@ impl Edit<'_> {
     }
 
     /// Validate and publish this edit atomically.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -428,15 +448,15 @@ impl Package {
         selector: impl Into<BodyTableSelector<'table>>,
         dimension: Dimension,
     ) -> Result<Edit<'_>, Error> {
-        let target = resolve_target(self, selector.into())?;
-        let mut budget = transaction_budget(self)?;
-        let before = read_dimension(self, &target, dimension, &mut budget)?;
         Ok(Edit {
             source: self,
-            target,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
             dimension,
-            before,
-            size: before,
+            before: None,
+            size: Size::Default,
+            staged: false,
         })
     }
 
@@ -493,12 +513,14 @@ impl Package {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
     let source_bytes: Arc<[u8]> = source.state.source.shared_source();
     let source_fingerprint = page_layout::fingerprint(source_bytes.as_ref());
     let source_preview_count = preview_count(source);
     let mut budget = transaction_budget(source)?;
-    if edit.before == edit.size {
-        let evidence = read_evidence(source, &edit.target, edit.dimension, &mut budget)?;
+    if before == edit.size {
+        let evidence = read_evidence(source, &target, edit.dimension, &mut budget)?;
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -506,10 +528,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 target: source_bytes,
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
-                proof: edit.target,
+                proof: target,
                 evidence,
                 dimension: edit.dimension,
-                before: edit.before,
+                before,
                 after: edit.size,
                 source_preview_count,
                 target_preview_count: source_preview_count,
@@ -520,16 +542,16 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !source.state.source.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let selected = select_dimension(source, &edit.target, edit.dimension, &mut budget)?;
-    if selected.size != edit.before {
+    let selected = select_dimension(source, &target, edit.dimension, &mut budget)?;
+    if selected.size != before {
         return Err(Error::InvalidSource);
     }
-    if edit.target.explicit_locked == Some(true) {
+    if target.explicit_locked == Some(true) {
         return Err(Error::Refused(Refusal::TableLocked));
     }
     let previews = preview_names(source);
     let package = rewrite_dimension(source, selected, edit.size, &previews, &mut budget)?;
-    let candidate_selected = select_dimension(&package, &edit.target, edit.dimension, &mut budget)?;
+    let candidate_selected = select_dimension(&package, &target, edit.dimension, &mut budget)?;
     if candidate_selected.size != edit.size {
         return Err(Error::Verification);
     }
@@ -541,20 +563,20 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         preview_count(&package),
         &mut budget,
     )?;
-    let target = package.state.source.shared_source();
-    let target_fingerprint = page_layout::fingerprint(target.as_ref());
+    let target_owner = package.state.source.shared_source();
+    let target_fingerprint = page_layout::fingerprint(target_owner.as_ref());
     let target_preview_count = preview_count(&package);
     Ok(Commit {
         package,
         patch: Patch {
             source: source_bytes,
-            target,
+            target: target_owner,
             source_fingerprint,
             target_fingerprint,
-            proof: edit.target,
+            proof: target,
             evidence: selected.evidence,
             dimension: edit.dimension,
-            before: edit.before,
+            before,
             after: edit.size,
             source_preview_count,
             target_preview_count,

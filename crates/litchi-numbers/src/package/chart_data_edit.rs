@@ -35,6 +35,7 @@ use super::chart_arrangement::{
     select_chart_with_budget, selected_chart_payload, verify_locality,
 };
 use super::chart_data::{map_arrangement_error, map_codec_limit, read_selected_chart_data};
+use crate::selector::OwnedSheetSelector;
 use crate::sheet::chart::arrangement::Error as ChartArrangementError;
 use crate::sheet::chart::data::Error as ChartDataError;
 use crate::{ChartSelector, SheetSelector};
@@ -64,8 +65,11 @@ const FORMULA_SCHEME_FIELD: u32 = 10;
 /// A staged standalone Numbers chart-data edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    selection: ChartSelection,
-    before: Arc<ChartData>,
+    sheet_selector: OwnedSheetSelector,
+    chart_position: Position,
+    selection: Option<ChartSelection>,
+    before: Option<Arc<ChartData>>,
+    budget: Option<ChartBudget>,
     after: Option<ChartData>,
 }
 
@@ -73,10 +77,10 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("sheet_position", &self.selection.sheet_position)
-            .field("chart_position", &self.selection.chart_position)
-            .field("before", &self.before)
-            .field("after", &self.after())
+            .field("chart_position", &self.chart_position)
+            .field("selection_loaded", &self.selection.is_some())
+            .field("before_loaded", &self.before.is_some())
+            .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
@@ -84,41 +88,105 @@ impl fmt::Debug for Edit<'_> {
 impl<'a> Edit<'a> {
     fn new(
         source: &'a Package,
-        selection: ChartSelection,
-        before: ChartData,
-        budget: &mut ChartBudget,
+        sheet_selector: OwnedSheetSelector,
+        chart_position: Position,
+        budget: ChartBudget,
     ) -> Result<Self, ChartDataError> {
-        let before = retain_chart_data_header(before, budget)?;
         Ok(Self {
             source,
-            selection,
+            sheet_selector,
+            chart_position,
+            selection: None,
+            before: None,
+            budget: Some(budget),
             after: None,
-            before,
         })
     }
 
+    fn ensure_selection(&mut self) -> Result<(), ChartDataError> {
+        if self.selection.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or(ChartDataError::InvalidSource)?;
+        let selected = (|| {
+            let selection = select_chart_with_budget(
+                self.source,
+                self.sheet_selector.as_selector(),
+                ChartSelector::position(self.chart_position),
+                true,
+                &mut budget,
+            )
+            .map_err(map_arrangement_error)?;
+            ensure_standalone_chart(self.source, &selection, &mut budget)
+                .map_err(map_arrangement_error)?;
+            Ok(selection)
+        })();
+        match selected {
+            Ok(selection) => {
+                self.selection = Some(selection);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
+    }
+
+    fn ensure_before(&mut self) -> Result<(), ChartDataError> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        self.ensure_selection()?;
+        let selection = self
+            .selection
+            .as_ref()
+            .ok_or(ChartDataError::InvalidSource)?
+            .clone();
+        let budget = self.budget.as_mut().ok_or(ChartDataError::InvalidSource)?;
+        let data = read_selected_chart_data(self.source, &selection, budget)?;
+        self.before = Some(retain_chart_data_header(data, budget)?);
+        Ok(())
+    }
+
     /// Return the selected sheet source position.
-    #[must_use]
-    pub const fn sheet_position(&self) -> Position {
-        self.selection.sheet_position
+    #[must_use = "inspect the selected chart sheet position result"]
+    pub fn sheet_position(&mut self) -> Result<Position, ChartDataError> {
+        self.ensure_selection()?;
+        self.selection
+            .as_ref()
+            .map(|selection| selection.sheet_position)
+            .ok_or(ChartDataError::InvalidSource)
     }
 
     /// Return the selected chart source position within the sheet.
-    #[must_use]
-    pub const fn chart_position(&self) -> Position {
-        self.selection.chart_position
+    #[must_use = "inspect the selected chart position result"]
+    pub fn chart_position(&mut self) -> Result<Position, ChartDataError> {
+        self.ensure_selection()?;
+        self.selection
+            .as_ref()
+            .map(|selection| selection.chart_position)
+            .ok_or(ChartDataError::InvalidSource)
     }
 
     /// Return the chart data observed when this edit began.
-    #[must_use]
-    pub fn before(&self) -> &ChartData {
-        &self.before
+    #[must_use = "inspect the chart data result"]
+    pub fn before(&mut self) -> Result<&ChartData, ChartDataError> {
+        self.ensure_before()?;
+        self.before.as_deref().ok_or(ChartDataError::InvalidSource)
     }
 
     /// Return the chart data staged for publication.
-    #[must_use]
-    pub fn after(&self) -> &ChartData {
-        self.after.as_ref().unwrap_or(&self.before)
+    #[must_use = "inspect the staged chart data result"]
+    pub fn after(&mut self) -> Result<&ChartData, ChartDataError> {
+        if self.after.is_none() {
+            self.ensure_before()?;
+        }
+        self.after
+            .as_ref()
+            .or(self.before.as_deref())
+            .ok_or(ChartDataError::InvalidSource)
     }
 
     /// Stage a complete replacement of the finite numeric values.
@@ -133,13 +201,11 @@ impl<'a> Edit<'a> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<Commit, ChartDataError> {
-        commit_edit(
-            self.source,
-            &self.selection,
-            Arc::clone(&self.before),
-            self.after,
-        )
+    pub fn commit(mut self) -> Result<Commit, ChartDataError> {
+        self.ensure_before()?;
+        let before = self.before.take().ok_or(ChartDataError::InvalidSource)?;
+        let selection = self.selection.take().ok_or(ChartDataError::InvalidSource)?;
+        commit_edit(self.source, &selection, before, self.after)
     }
 }
 
@@ -327,17 +393,25 @@ impl Package {
         chart_selector: impl Into<ChartSelector>,
     ) -> Result<Edit<'_>, ChartDataError> {
         let mut budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
-        let selection = select_chart_with_budget(
-            self,
-            sheet_selector.into(),
-            chart_selector.into(),
-            true,
-            &mut budget,
-        )
-        .map_err(map_arrangement_error)?;
-        ensure_standalone_chart(self, &selection, &mut budget).map_err(map_arrangement_error)?;
-        let before = read_selected_chart_data(self, &selection, &mut budget)?;
-        Edit::new(self, selection, before, &mut budget)
+        let sheet_selector = sheet_selector.into();
+        if matches!(sheet_selector, SheetSelector::Name(name) if name.is_empty()) {
+            return Err(ChartDataError::Refused(
+                crate::sheet::chart::data::Refusal::EmptySheetName,
+            ));
+        }
+        let maximum_name_bytes = budget.remaining_retained();
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet_selector) {
+            budget
+                .preflight_retained(amount)
+                .and_then(|_| budget.preflight_allocations(1))
+                .map_err(map_arrangement_error)?;
+            budget.retained(amount).map_err(map_arrangement_error)?;
+            budget.allocations(1).map_err(map_arrangement_error)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector, maximum_name_bytes)
+            .map_err(|amount| ChartDataError::Allocation { amount })?;
+        let chart_position = chart_selector.into().as_position();
+        Edit::new(self, sheet_selector, chart_position, budget)
     }
 
     /// Apply an exact-source checked standalone chart-data patch.

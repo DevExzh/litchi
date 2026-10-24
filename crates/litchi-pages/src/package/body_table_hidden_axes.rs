@@ -287,9 +287,11 @@ impl fmt::Debug for Error {
 /// Selector-first immutable hidden-axis edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: table_lock::BodyTableTarget,
-    before: HiddenAxes,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
+    before: Option<HiddenAxes>,
     axes: HiddenAxes,
+    staged: bool,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -298,39 +300,71 @@ impl fmt::Debug for Edit<'_> {
             // Hidden row/column positions are semantic content.  Public
             // diagnostics may report only bounded counts and state changes;
             // the source, proof, and selected package member stay private.
-            .field("before_count", &self.before.as_slice().len())
+            .field("before_resolved", &self.before.is_some())
             .field("axes_count", &self.axes.as_slice().len())
-            .field("changed", &(self.before != self.axes))
+            .field(
+                "changed",
+                &self
+                    .before
+                    .as_ref()
+                    .is_some_and(|before| before != &self.axes),
+            )
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            table: self.target.table_position,
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = transaction_budget(self.source)?;
+            let selector = match &self.selector {
+                table_lock::OwnedBodyTableSelector::Name(name) => BodyTableSelector::Name(name),
+                table_lock::OwnedBodyTableSelector::Position(position) => {
+                    BodyTableSelector::Position(*position)
+                },
+            };
+            let graph = resolve_graph(self.source, selector, &mut budget)?;
+            if self.before.is_none() {
+                let before = graph.before;
+                if !self.staged {
+                    self.axes = before.clone();
+                }
+                self.before = Some(before);
+            }
+            self.target = Some(graph.target);
         }
+        Ok(())
     }
 
-    #[must_use]
-    pub const fn before(&self) -> &HiddenAxes {
-        &self.before
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.table_position,
+            })
+            .ok_or(Error::InvalidSource)
     }
 
-    #[must_use]
-    pub const fn axes(&self) -> &HiddenAxes {
-        &self.axes
+    pub fn before(&mut self) -> Result<&HiddenAxes, Error> {
+        self.resolve()?;
+        self.before.as_ref().ok_or(Error::InvalidSource)
     }
 
-    #[must_use]
-    pub const fn hidden_axes(&self) -> &HiddenAxes {
-        &self.axes
+    pub fn axes(&mut self) -> Result<&HiddenAxes, Error> {
+        self.resolve()?;
+        Ok(&self.axes)
+    }
+
+    pub fn hidden_axes(&mut self) -> Result<&HiddenAxes, Error> {
+        self.resolve()?;
+        Ok(&self.axes)
     }
 
     #[must_use]
     pub fn set(mut self, axes: HiddenAxes) -> Self {
         self.axes = axes;
+        self.staged = true;
         self
     }
 
@@ -344,7 +378,8 @@ impl Edit<'_> {
         self.clear()
     }
 
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -669,13 +704,14 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = transaction_budget(self)?;
-        let graph = resolve_graph(self, selector.into(), &mut budget)?;
         Ok(Edit {
             source: self,
-            target: graph.target,
-            before: graph.before.clone(),
-            axes: graph.before,
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            before: None,
+            axes: HiddenAxes::empty(),
+            staged: false,
         })
     }
 
@@ -748,21 +784,21 @@ impl Package {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
     let mut budget = transaction_budget(source)?;
     let source_bytes = source.state.source.shared_source();
     let source_fingerprint = page_layout::fingerprint(source_bytes.as_ref());
     let source_previews = preview_count(source);
-    if edit.before == edit.axes {
+    if before == edit.axes {
         // Re-read against the captured target so an edit cannot silently
         // publish after its source graph changed underneath it.
         let graph = resolve_graph(
             source,
-            BodyTableSelector::index(edit.target.table_position),
+            BodyTableSelector::index(target.table_position),
             &mut budget,
         )?;
-        if graph.target.model_identifier != edit.target.model_identifier
-            || graph.before != edit.before
-        {
+        if graph.target.model_identifier != target.model_identifier || graph.before != before {
             return Err(Error::InvalidSource);
         }
         return Ok(Commit {
@@ -772,8 +808,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 target: source_bytes,
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
-                proof: edit.target,
-                before: edit.before,
+                proof: target,
+                before: before.clone(),
                 after: edit.axes,
                 source_previews,
                 target_previews: source_previews,
@@ -786,15 +822,15 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !source.state.source.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    if edit.target.explicit_locked == Some(true) {
+    if target.explicit_locked == Some(true) {
         return Err(Error::Refused(Refusal::TableLocked));
     }
     let graph = resolve_graph(
         source,
-        BodyTableSelector::index(edit.target.table_position),
+        BodyTableSelector::index(target.table_position),
         &mut budget,
     )?;
-    if graph.before != edit.before {
+    if graph.before != before {
         return Err(Error::InvalidSource);
     }
     if graph.profile.is_native() && graph.model.owner.is_none() {
@@ -810,12 +846,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         rewrite::run(source, &graph, &edit.axes, &mut budget)?;
     let verified = resolve_graph(
         &candidate,
-        BodyTableSelector::index(edit.target.table_position),
+        BodyTableSelector::index(target.table_position),
         &mut budget,
     )?;
-    if verified.target.model_identifier != edit.target.model_identifier
-        || verified.before != edit.axes
-    {
+    if verified.target.model_identifier != target.model_identifier || verified.before != edit.axes {
         return Err(Error::Verification);
     }
     if preview_count(&candidate) != 0 {
@@ -824,23 +858,23 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     verify_locality(
         source,
         &candidate,
-        &edit.target,
+        &target,
         touched_components,
         added_object_ids.as_ref(),
         &mut budget,
     )?;
-    let target = candidate.state.source.shared_source();
-    let target_fingerprint = page_layout::fingerprint(target.as_ref());
+    let target_owner = candidate.state.source.shared_source();
+    let target_fingerprint = page_layout::fingerprint(target_owner.as_ref());
     let target_previews = preview_count(&candidate);
     Ok(Commit {
         package: candidate,
         patch: Patch {
             source: source_bytes,
-            target,
+            target: target_owner,
             source_fingerprint,
             target_fingerprint,
-            proof: edit.target,
-            before: edit.before,
+            proof: target,
+            before,
             after: edit.axes,
             source_previews,
             target_previews,
