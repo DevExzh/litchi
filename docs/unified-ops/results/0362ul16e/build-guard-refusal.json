@@ -1,0 +1,80 @@
+{
+  "schema": "litchi.native-qualification.build-guard-refusal.v1",
+  "status": "refused_before_cargo",
+  "qualification_claim": false,
+  "lane": "w4b-xlsb",
+  "source_ref": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+  "manifest": {
+    "path": "tools/native_qualification/manifests/w4b-xlsb.json",
+    "sha256": "32374ee41072e86a7bee5f1a7fd13e172c74d85a17283a61e9b06b12ac244e8d"
+  },
+  "runner": {
+    "path": "tools/native_qualification_runner.py",
+    "sha256": "07fb47403d2fb27a560ba7afba9f59cefbce0b561bb6cc38161ab33b2ba3b62a"
+  },
+  "command": "python3 tools/native_qualification_runner.py --manifest tools/native_qualification/manifests/w4b-xlsb.json --phase build",
+  "source_roots": {
+    "before": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/sources/w4b-before",
+    "after": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source"
+  },
+  "fresh_paths": {
+    "output": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/run-w4b-build",
+    "target_before": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/targets/w4b-build/before",
+    "target_after": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/targets/w4b-build/after"
+  },
+  "result": {
+    "exit_code": 2,
+    "runner_receipt": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/run-w4b-build/build-receipt.json",
+      "bytes": 17167,
+      "sha256": "a2ede68b1779aca12e3ffa634e690cc40d19bb3fc0420d43b38942aaa77dcc91"
+    },
+    "stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/run-w4b-build.stderr",
+      "bytes": 12135,
+      "sha256": "b50f3d35999c8c1a805fe831a1b10cbf62ccd9ffb77c96813a83f738bf960a15"
+    },
+    "stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/run-w4b-build.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "receipt_status": "failed",
+    "event_count": 0,
+    "targets_created": false,
+    "cargo_child_started": false,
+    "reason": "ProcessGuard.require_quiet rejected active unrelated Litchi builders before the first build command."
+  },
+  "active_guard_offenders": [
+    {
+      "pid": 700738,
+      "kind": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+      "command": "cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-target --bin ppt_lazy_native"
+    },
+    {
+      "pid": 792388,
+      "kind": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-native-qualification-472b670547-20261024T171900Z/owner/project-candidate",
+      "command": "cargo build --offline --locked --release --message-format=json-render-diagnostics"
+    },
+    {
+      "pid": 794986,
+      "kind": "cargo",
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781cf6d87/source",
+      "command": "cargo check --offline --locked -q -p litchi-cli -p litchi-ops -p litchi -p litchi-py --all-targets --all-features"
+    },
+    {
+      "pid": 796580,
+      "kind": "rustc",
+      "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/crates/litchi-ppt",
+      "command": "rustc compiling litchi_ppt as a child of PID 700738"
+    }
+  ],
+  "deferred": {
+    "w5_build": true,
+    "correctness_preflights": true,
+    "quiet_abba": true,
+    "reason": "The runner requires global quiet even for build children. No guard bypass, W5 invocation, probe, analyzer or ABBA was attempted after refusal."
+  }
+}
