@@ -6,6 +6,7 @@
 //! `Edit::join(...).commit()` lifecycles separately.
 
 #![allow(dead_code)]
+#![allow(unexpected_cfgs)]
 
 use std::{error::Error, fs, io::Write, path::PathBuf, time::Instant};
 
@@ -14,25 +15,25 @@ use litchi_odf_common::core::{PackageWriter, StreamingArchiveLimits};
 use litchi_odg::{Package, edit};
 use serde_json::{Value, json};
 
-pub const ROUTES: &[&str] = &[
+pub(crate) const ROUTES: &[&str] = &[
     "package_replace_one",
     "semantic_two_disjoint",
     "semantic_four_disjoint",
     "empty_join",
 ];
-pub const SCOPES: &[&str] = &["join_apply", "join_apply_publish"];
-pub const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
-pub const DEFAULT_MAX_ITERATIONS: usize = 1_000_000;
-pub const REQUIRED_WARMUPS: usize = 20;
-pub const REQUIRED_SAMPLES: usize = 1;
-pub const MAX_FIXTURE_BYTES: usize = 4 * 1024 * 1024;
-pub const MAX_SUB_EDIT_WIRE_BYTES: usize = 64 * 1024;
-pub const LIMITS: CompositionLimits = CompositionLimits::new(8, 8, 32, 16);
+pub(crate) const SCOPES: &[&str] = &["join_apply", "join_apply_publish"];
+pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.graphics";
+pub(crate) const DEFAULT_MAX_ITERATIONS: usize = 1_000_000;
+pub(crate) const REQUIRED_WARMUPS: usize = 20;
+pub(crate) const REQUIRED_SAMPLES: usize = 1;
+pub(crate) const MAX_FIXTURE_BYTES: usize = 4 * 1024 * 1024;
+pub(crate) const MAX_SUB_EDIT_WIRE_BYTES: usize = 64 * 1024;
+pub(crate) const LIMITS: CompositionLimits = CompositionLimits::new(8, 8, 32, 16);
 
-pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
+pub(crate) type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
+pub(crate) enum Mode {
     Verify,
     Calibrate,
     Timed,
@@ -50,7 +51,7 @@ impl Mode {
         }
     }
 
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Verify => "verify",
             Self::Calibrate => "calibrate",
@@ -61,13 +62,13 @@ impl Mode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Scope {
+pub(crate) enum Scope {
     JoinApply,
     JoinApplyPublish,
 }
 
 impl Scope {
-    pub fn parse(value: &str) -> Result<Self> {
+    pub(crate) fn parse(value: &str) -> Result<Self> {
         match value {
             "join_apply" => Ok(Self::JoinApply),
             "join_apply_publish" => Ok(Self::JoinApplyPublish),
@@ -75,7 +76,7 @@ impl Scope {
         }
     }
 
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::JoinApply => "join_apply",
             Self::JoinApplyPublish => "join_apply_publish",
@@ -84,20 +85,20 @@ impl Scope {
 }
 
 #[derive(Debug)]
-pub struct Args {
-    pub mode: Mode,
-    pub fixture: PathBuf,
-    pub route: Option<String>,
-    pub scope: Option<Scope>,
-    pub iterations: usize,
-    pub samples: usize,
-    pub warmups: usize,
-    pub target_ns: u128,
-    pub max_iterations: usize,
+pub(crate) struct Args {
+    pub(crate) mode: Mode,
+    pub(crate) fixture: PathBuf,
+    pub(crate) route: Option<String>,
+    pub(crate) scope: Option<Scope>,
+    pub(crate) iterations: usize,
+    pub(crate) samples: usize,
+    pub(crate) warmups: usize,
+    pub(crate) target_ns: u128,
+    pub(crate) max_iterations: usize,
 }
 
 impl Args {
-    pub fn parse() -> Result<Self> {
+    pub(crate) fn parse() -> Result<Self> {
         let mut arguments = std::env::args_os();
         let program = arguments
             .next()
@@ -197,7 +198,7 @@ impl Args {
     }
 }
 
-pub fn usage(program: &str) -> String {
+pub(crate) fn usage(program: &str) -> String {
     format!(
         "usage: {program} --mode verify|calibrate|timed|allocation --fixture PATH \
          [--route ROUTE --scope join_apply|join_apply_publish] \
@@ -231,11 +232,11 @@ fn parse_positive_u128(value: &str, name: &str) -> Result<u128> {
     Ok(parsed)
 }
 
-pub fn digest(bytes: &[u8]) -> Value {
+pub(crate) fn digest(bytes: &[u8]) -> Value {
     json!({"bytes": bytes.len(), "sha256": DiagnosticFingerprint::of(bytes).as_hex()})
 }
 
-pub fn fixture_package(path: &PathBuf) -> Result<(Vec<u8>, Package)> {
+pub(crate) fn fixture_package(path: &PathBuf) -> Result<(Vec<u8>, Package)> {
     let content = fs::read(path)?;
     if content.is_empty() || content.len() > MAX_FIXTURE_BYTES {
         return Err(format!("fixture content length is invalid: {}", content.len()).into());
@@ -244,7 +245,7 @@ pub fn fixture_package(path: &PathBuf) -> Result<(Vec<u8>, Package)> {
     Ok((content, package))
 }
 
-pub fn package_from_content(content: &[u8]) -> Result<Package> {
+pub(crate) fn package_from_content(content: &[u8]) -> Result<Package> {
     let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE)?;
     writer.add_file("content.xml", content)?;
@@ -253,15 +254,15 @@ pub fn package_from_content(content: &[u8]) -> Result<Package> {
 }
 
 #[derive(Clone)]
-pub struct PreparedSubEdit {
-    pub id: String,
-    pub writes: Vec<String>,
-    pub wire: Vec<u8>,
+pub(crate) struct PreparedSubEdit {
+    pub(crate) id: String,
+    pub(crate) writes: Vec<String>,
+    pub(crate) wire: Vec<u8>,
 }
 
-pub struct PreparedRoute {
-    pub route: &'static str,
-    pub sub_edits: Vec<PreparedSubEdit>,
+pub(crate) struct PreparedRoute {
+    pub(crate) route: &'static str,
+    pub(crate) sub_edits: Vec<PreparedSubEdit>,
 }
 
 fn encode_sub_edit(sub_edit: &edit::SubEdit) -> Result<PreparedSubEdit> {
@@ -282,7 +283,12 @@ where
     Ok(encode_sub_edit(&commit.patch().prepare(id, LIMITS)?)?)
 }
 
-pub fn prepare_route(source: &Package, route: &'static str) -> Result<PreparedRoute> {
+pub(crate) fn prepare_route(source: &Package, route: &str) -> Result<PreparedRoute> {
+    let route = ROUTES
+        .iter()
+        .copied()
+        .find(|candidate| *candidate == route)
+        .ok_or_else(|| format!("unknown route {route:?}"))?;
     let sub_edits = match route {
         "package_replace_one" => vec![prepare_one(source, "package-replace", |edit| {
             edit.add_page(litchi_odg::page::Page::new("Replacement Page"))?;
@@ -322,7 +328,7 @@ pub fn prepare_route(source: &Package, route: &'static str) -> Result<PreparedRo
     Ok(PreparedRoute { route, sub_edits })
 }
 
-pub fn prepare_all(source: &Package) -> Result<Vec<PreparedRoute>> {
+pub(crate) fn prepare_all(source: &Package) -> Result<Vec<PreparedRoute>> {
     ROUTES
         .iter()
         .copied()
@@ -330,7 +336,7 @@ pub fn prepare_all(source: &Package) -> Result<Vec<PreparedRoute>> {
         .collect()
 }
 
-pub fn rebuild_plan(source: &Package, route: &PreparedRoute) -> Result<edit::JoinedEdits> {
+pub(crate) fn rebuild_plan(source: &Package, route: &PreparedRoute) -> Result<edit::JoinedEdits> {
     if route.sub_edits.len() > LIMITS.max_sub_edits() {
         return Err("joined route exceeds max_sub_edits".into());
     }
@@ -360,14 +366,14 @@ pub fn rebuild_plan(source: &Package, route: &PreparedRoute) -> Result<edit::Joi
     Ok(joined)
 }
 
-pub fn publish(package: &Package) -> Result<(Vec<u8>, Package)> {
+pub(crate) fn publish(package: &Package) -> Result<(Vec<u8>, Package)> {
     let mut bytes = Vec::new();
     package.write_to(&mut bytes)?;
     let readback = Package::from_bytes(&bytes)?;
     Ok((bytes, readback))
 }
 
-pub fn summary(package: &Package) -> Value {
+pub(crate) fn summary(package: &Package) -> Value {
     let pages = package
         .pages()
         .iter()
@@ -383,7 +389,7 @@ pub fn summary(package: &Package) -> Value {
     json!({"pages": pages})
 }
 
-pub fn foreign_package(content: &[u8]) -> Result<Package> {
+pub(crate) fn foreign_package(content: &[u8]) -> Result<Package> {
     let mut changed = content.to_vec();
     // Keep the replacement the same length as the quoted attribute value.
     // The previous `Other 1` replacement was one byte longer and overwrote
@@ -399,7 +405,7 @@ pub fn foreign_package(content: &[u8]) -> Result<Package> {
     package_from_content(&changed)
 }
 
-pub fn run_once<F>(
+pub(crate) fn run_once<F>(
     source: &Package,
     route: &PreparedRoute,
     scope: Scope,
@@ -434,7 +440,7 @@ where
 }
 
 #[cfg(odg_joined_allocator)]
-pub fn allocation_once<F>(
+pub(crate) fn allocation_once<F>(
     source: &Package,
     route: &PreparedRoute,
     scope: Scope,
@@ -462,7 +468,7 @@ where
     ))
 }
 
-pub fn run_batch<F>(
+pub(crate) fn run_batch<F>(
     source: &Package,
     route: &PreparedRoute,
     scope: Scope,
@@ -488,7 +494,7 @@ where
     Ok((elapsed_ns, proof.ok_or("empty timed batch")?))
 }
 
-pub fn write_json(value: &Value) -> Result<()> {
+pub(crate) fn write_json(value: &Value) -> Result<()> {
     let mut output = std::io::BufWriter::new(std::io::stdout().lock());
     serde_json::to_writer(&mut output, value)?;
     output.write_all(b"\n")?;

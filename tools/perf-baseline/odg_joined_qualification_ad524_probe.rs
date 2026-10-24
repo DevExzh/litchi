@@ -5,6 +5,7 @@
 //! and does not claim the candidate commit-triad or replay capabilities.
 
 #![cfg_attr(not(odg_joined_allocator), forbid(unsafe_code))]
+#![allow(unexpected_cfgs)]
 
 #[cfg(odg_joined_allocator)]
 #[path = "odg_joined_qualification_allocator.rs"]

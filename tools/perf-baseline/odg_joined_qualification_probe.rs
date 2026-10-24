@@ -5,6 +5,7 @@
 //! measures `Edit::join(...).commit()` and can prove the returned commit triad.
 
 #![cfg_attr(not(odg_joined_allocator), forbid(unsafe_code))]
+#![allow(unexpected_cfgs)]
 
 #[cfg(odg_joined_allocator)]
 #[path = "odg_joined_qualification_allocator.rs"]
@@ -15,8 +16,8 @@ mod common;
 #[cfg(odg_joined_allocator)]
 use common::allocation_once;
 use common::{
-    Args, Mode, PreparedRoute, Result, Scope, digest, fixture_package, foreign_package,
-    prepare_all, publish, rebuild_plan, run_batch, run_once, summary, write_json,
+    Args, Mode, PreparedRoute, Result, digest, fixture_package, foreign_package, prepare_all,
+    publish, rebuild_plan, run_batch, run_once, summary, write_json,
 };
 use litchi_odg::{Package, edit};
 use serde_json::{Value, json};
@@ -98,21 +99,19 @@ fn candidate_route(source: &Package, route: &PreparedRoute) -> Result<(Package, 
     let durable_inverse = durable.inverse().apply(&output)?;
     let inverse = output.apply(&patch.inverse())?.into_package();
     let matching = durable.apply(&Package::from_bytes(source.as_bytes())?)?;
-    Ok((
-        output,
-        json!({
-            "diagnostics_changed": commit.diagnostics().changed(),
-            "diagnostics_change_count": commit.diagnostics().change_count(),
-            "diagnostics_resource_change_count": commit.diagnostics().resource_change_count(),
-            "patch_applicable": patch.is_applicable_to(source),
-            "patch_noop": patch.is_noop(),
-            "direct_forward_exact": direct_forward.as_bytes() == output.as_bytes(),
-            "durable_forward_exact": durable_forward.as_bytes() == output.as_bytes(),
-            "inverse_exact": inverse.as_bytes() == source.as_bytes(),
-            "durable_inverse_exact": durable_inverse.as_bytes() == source.as_bytes(),
-            "content_matching_forward_exact": matching.as_bytes() == output.as_bytes(),
-        }),
-    ))
+    let proof = json!({
+        "diagnostics_changed": commit.diagnostics().changed(),
+        "diagnostics_change_count": commit.diagnostics().change_count(),
+        "diagnostics_resource_change_count": commit.diagnostics().resource_change_count(),
+        "patch_applicable": patch.is_applicable_to(source),
+        "patch_noop": patch.is_noop(),
+        "direct_forward_exact": direct_forward.as_bytes() == output.as_bytes(),
+        "durable_forward_exact": durable_forward.as_bytes() == output.as_bytes(),
+        "inverse_exact": inverse.as_bytes() == source.as_bytes(),
+        "durable_inverse_exact": durable_inverse.as_bytes() == source.as_bytes(),
+        "content_matching_forward_exact": matching.as_bytes() == output.as_bytes(),
+    });
+    Ok((output, proof))
 }
 
 fn refusal_proofs(source: &Package, fixture: &[u8], routes: &[PreparedRoute]) -> Result<Value> {
@@ -124,7 +123,7 @@ fn refusal_proofs(source: &Package, fixture: &[u8], routes: &[PreparedRoute]) ->
     let stale_error = {
         let mut owner = foreign.edit();
         match owner.join(rebuild_plan(source, semantic)?) {
-            Err(error) => matches!(error.error(), litchi_odg::Error::PatchConflict),
+            Err(error) => matches!(error.error(), litchi_core::Error::PatchConflict),
             Ok(_) => false,
         }
     };
