@@ -143,5 +143,58 @@ The collector's build-provenance validator was also run directly against its
 synthetic source-only fixture (no Cargo/native). Its log is 1,096 bytes,
 f2340aa2053a227b6ff1b8702f88b7ce7824877eeab40e29c929aab4d29a5110.
 
-No Cargo build, native execution, allocation capture, timing, or acceptance
-claim was made. Prior c796/e157 receipts remain historical and untouched.
+## Actual build and correctness preflight
+
+The reviewed build command above was run once at the fresh external output
+root:
+
+    /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final
+
+The runner was PID 712349 (tool session 87275). Its baseline Cargo child was
+PID 712779 and its candidate Cargo child was PID 741799. No runner quiet-state
+guard refused the run. The command used the reviewed capped wrapper, one Cargo
+job, incremental compilation off, offline mode and `--locked`; no allocation
+capture, native timing, ABBA or native qualification was run.
+
+The reduced build receipt is `build.json`, 192,372 bytes,
+SHA-256 `f318000e4e92c79a08b8b1c1020a1a3da3b11615b18931dee47b0ab1cea6b915`.
+It reports schema `litchi.docx-durable-ink.qualify.v2`, status `complete`, the
+requested and resolved refs d040/472b, 121 equal registry identities, and
+the following generated project lock for both endpoints:
+
+    project-base/Cargo.lock and project-candidate/Cargo.lock
+    30,062 bytes, SHA-256 70a7c70549244bc911a4931d76b5aed820079905d355c2cb2acd6d70cc7e7153
+
+The materialized source locks were not changed: both are 139,606 bytes with
+SHA-256 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`,
+matching the reviewed root lock.
+
+All four builds and all four protected correctness preflights exited zero:
+
+| endpoint | normal binary (bytes, SHA-256) | allocator binary (bytes, SHA-256) |
+| --- | --- | --- |
+| baseline d040 | `ink-native`, 3,929,032, `94ab36c7bd70a026da4bf8a560f02976b6d9a627a908f726369ee25cab7abf7d` | `ink-allocation`, 4,147,472, `506b9a4dfc60560d6c7b0bd7fae1b3880639d818eb6cd724578dd56b40fda7a4` |
+| candidate 472b | `ink-native`, 4,018,152, `3b3e63077d82bf085cd70ce4d6de2d681164b618c98fc2f6ff5fb0601037a3e1` | `ink-allocation`, 4,248,760, `6be09c7c6c2c3ca14361c09eaa63b86c26e7b2780feed1c97151f3af2843cb79` |
+
+Each of the four protected validation directories contains the same eight
+expected outputs. The exact output hashes are forward.docx (4,249 bytes,
+`735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae`),
+forward.json (127,509 bytes,
+`a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2`),
+inverse.docx/noop.docx/source.docx (each 3,592 bytes,
+`b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5`),
+inverse.json (127,509 bytes,
+`9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55`),
+noop.json (615 bytes,
+`9a8f7ae53873720c88492cbd0ad3b478c65d0c4f1c7263891ac2092b56e6c441`) and
+streaming.json (575 bytes,
+`bf9ffb743229f9ecfcbc519b30c91789a4679a3081f3bc2c04adbe3f05ce80c3`).
+The four route outputs matched byte-for-byte, including the normal versus
+allocator variants. Logical target sizes were 422,298,713 bytes (baseline)
+and 431,376,748 bytes (candidate), below the 20,000,000,000-byte guard; the
+external run's logical file total was 1,654,189,250 bytes.
+
+The complete reduced receipt, binaries and validation outputs remain outside
+Git at the run root above. Prior c796/e157 receipts remain historical and
+untouched. Native allocation capture, timing, ABBA and any acceptance claim
+remain pending their separate coordinator grants.
