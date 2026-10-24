@@ -30,12 +30,14 @@ measured run took 2:52.30 and reached 184,132 KiB RSS. The corpus's
 `NORMALIZING` list remains empty.
 
 The same command was then rerun without `LITCHI_BLESS` against the committed
-goldens. The production source remained
-`f6fe430a4d19d94aa360c0e9ed03ebd757265225`; the report/test commit was
-`1c2214ad0090f5e6bf36a6dc53407e22cd236f56`, and the lockfile hash was
-unchanged. This unblessed equality run passed with 1,020 files opened in
-65.5 seconds and zero unreached CRUD cells in 30.89 seconds, and left the
-worktree unchanged. Its receipt is
+goldens. That diagnostic pass was not a bounded validation: its Cargo output
+printed relative `target/debug/deps/...` paths, and the later cleanup found
+the old leaf's local `target/` at 14,428 files and over 20.3 billion apparent
+bytes. Its tracked worktree was unchanged, but its old receipt must not be
+used as bounded-build evidence. The corrected explicit-path rerun is recorded
+in `0362uia`.
+
+The old diagnostic receipt is
 `/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/corpus-crud-unblessed.log`
 (15,377 bytes, SHA-256
 `4ba489316f5c09e032fb90ec19ab99cf2cb4739614dd0895b109d17209fd2c23`).
@@ -100,6 +102,12 @@ also passed all 6/6 `xlsx_cells_runs` tests:
 `/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/focused-consumers.log`
 (1,250 bytes, SHA-256
 `886947dcdd3917cb49444720d39a4e80697cd55f5d02cde7f74984c5e2cffe54`).
+
+That earlier focused pass is also diagnostic rather than bounded provenance:
+its command metadata did not include the shim `PATH`, explicit memory
+environment, or an explicit `--target-dir`, even though its inherited target
+path happened to print externally. The corrected two-fixture focused run with
+all of those settings is in `0362uia`.
 
 No production source was changed in this leaf. The only source patch is the
 consumer test migration described above; the report goldens contain no
