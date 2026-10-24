@@ -3900,3 +3900,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   artifact/conservation/history review pass. Peak allocation-count increases
   remain visible in the record for final qualification review. No native
   performance acceptance is claimed; no branch is pushed.
+
+- Coordinator continuation (2026-10-24, complete capture and wire canonicalization):
+  Fresh all-68 capture at `082fbeafe8` passes with no reused artifacts. All 84
+  inventory rows receive independent source-role review and exact dispositions;
+  no DrawingML or historical result/limits-error rows remain. Record 0362ul14
+  binds every capture and review artifact. Review also finds six unused IWA
+  wire aliases outside the inventory. Repair `69194102b6` removes them, adds
+  exact glossary bans, and registers the canonical wire-request descriptor.
+  All 68 tooling and 64 codec tests, consumer checks, focused rustdoc and the
+  glossary pass. The full capture remains bound to 082; the alias repair has
+  a separate fresh IWA-protos capture.
+
+  DrawingML raw packet `b2da8f8ba6` is returned before merge. Record 0362dvifa
+  requires real inherited SVG context, independent mutation fidelity checks,
+  removal of timed error normalization/setup, and matching Diagram cap routes.
+  It also corrects the false claim that the Ink writer canonicalizes source:
+  both historical and current writers retain exact bytes, and qualification
+  must keep that proof. Owner and raw repairs continue in separate leaves.
+
+  The current 691 source is assigned a fresh full 53-step gate and actual
+  corpus verification. Final source binding, native qualification and glossary
+  performance closure remain required. No new deferral or performance waiver
+  is accepted; only redaction audit 22 remains deferred. Nothing is pushed.
