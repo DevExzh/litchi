@@ -230,6 +230,12 @@ class _FrozenMap(Mapping[str, Any]):
     def __len__(self) -> int:
         return len(self._items)
 
+    def __setattr__(self, _name: str, _value: Any) -> None:
+        raise TypeError("frozen endpoint mappings are immutable")
+
+    def __delattr__(self, _name: str) -> None:
+        raise TypeError("frozen endpoint mappings are immutable")
+
 
 def _freeze(value: Any) -> Any:
     if isinstance(value, _FrozenMap):
@@ -270,6 +276,9 @@ class _ValidatedEndpoint(Mapping[str, Any]):
         return len(self._fields)
 
     def __setattr__(self, _name: str, _value: Any) -> None:
+        raise TypeError("validated endpoint fields are immutable")
+
+    def __delattr__(self, _name: str) -> None:
         raise TypeError("validated endpoint fields are immutable")
 
     def public(self) -> dict[str, Any]:

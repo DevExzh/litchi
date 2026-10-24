@@ -111,6 +111,14 @@ class ProjectionPolicyTests(unittest.TestCase):
             fields["manifest"] = {"path": "/forged/endpoint.json"}
         with self.assertRaises(TypeError):
             fields["manifest"]["path"] = "/forged/endpoint.json"
+        with self.assertRaises(TypeError):
+            fields["manifest"]._items = ()
+        with self.assertRaises(TypeError):
+            del fields["manifest"]._items
+        with self.assertRaises(TypeError):
+            fields._fields = {}
+        with self.assertRaises(TypeError):
+            del fields._fields
         detached = policy.endpoint_public_fields(fields)
         detached["manifest"]["path"] = "/detached/copy.json"
         self.assertEqual(fields["manifest"]["path"], "/original/endpoint.json")
