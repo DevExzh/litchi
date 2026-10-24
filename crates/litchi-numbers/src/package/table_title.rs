@@ -12,7 +12,7 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use crate::{
-    selector::{SheetSelector, TableSelector},
+    selector::{OwnedSheetSelector, OwnedTableSelector, SheetSelector, TableSelector},
     table::lock::State as LockState,
     table::title::Settings,
 };
@@ -194,8 +194,10 @@ struct ReopenCost {
 /// Immutable settings staged against one package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    sheet_position: usize,
-    table_position: usize,
+    sheet_selector: OwnedSheetSelector,
+    table_selector: OwnedTableSelector,
+    sheet_position: Option<usize>,
+    table_position: Option<usize>,
     target: Option<Target>,
     before: Option<Settings>,
     settings: Option<Settings>,
@@ -206,7 +208,15 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("path", &self.path())
+            .field("target", &"Table")
+            .field(
+                "path",
+                &self
+                    .sheet_position
+                    .zip(self.table_position)
+                    .map(|(sheet, table)| Path::Table { sheet, table }),
+            )
+            .field("resolved", &self.target.is_some())
             .field("loaded", &self.target.is_some())
             .field("settings", &self.settings)
             .finish_non_exhaustive()
@@ -214,15 +224,30 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl Edit<'_> {
+    fn ensure_selected(&mut self) -> Result<(), Error> {
+        if self.sheet_position.is_some() && self.table_position.is_some() {
+            return Ok(());
+        }
+        let (sheet_position, table_position) = resolve_title_selectors(
+            self.source,
+            self.sheet_selector.as_selector(),
+            self.table_selector.as_selector(),
+        )?;
+        self.sheet_position = Some(sheet_position);
+        self.table_position = Some(table_position);
+        Ok(())
+    }
+
     fn ensure_loaded(&mut self) -> Result<(), Error> {
         if self.target.is_some() {
             return Ok(());
         }
+        self.ensure_selected()?;
         let mut budget = self.budget.take().ok_or_else(invalid_source)?;
         let target = resolve_title_at_positions_with_budget(
             self.source,
-            self.sheet_position,
-            self.table_position,
+            self.sheet_position.ok_or_else(invalid_source)?,
+            self.table_position.ok_or_else(invalid_source)?,
             &mut budget,
         )?;
         if self.settings.is_none() {
@@ -235,12 +260,13 @@ impl Edit<'_> {
     }
 
     /// Return the selected table path.
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            sheet: self.sheet_position,
-            table: self.table_position,
-        }
+    #[must_use = "inspect the selected table path result"]
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.ensure_selected()?;
+        Ok(Path::Table {
+            sheet: self.sheet_position.ok_or_else(invalid_source)?,
+            table: self.table_position.ok_or_else(invalid_source)?,
+        })
     }
 
     /// Return the settings that would be published.
@@ -460,11 +486,22 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         let mut budget = TransactionBudget::new(self);
         budget.charge_transaction_work(self.source_bytes().len().saturating_mul(2))?;
-        let (sheet_position, table_position) = resolve_title_selectors(self, sheet, table)?;
+        let sheet_selector =
+            OwnedSheetSelector::try_from(sheet.into()).map_err(|amount| Error::Allocation {
+                amount,
+                path: Path::Package,
+            })?;
+        let table_selector =
+            OwnedTableSelector::try_from(table.into()).map_err(|amount| Error::Allocation {
+                amount,
+                path: Path::Package,
+            })?;
         Ok(Edit {
             source: self,
-            sheet_position,
-            table_position,
+            sheet_selector,
+            table_selector,
+            sheet_position: None,
+            table_position: None,
             target: None,
             before: None,
             settings: None,

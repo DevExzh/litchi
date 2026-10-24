@@ -17,7 +17,10 @@ use super::{Budget, Package, decode_model_merges, select_semantic_positions};
 use crate::table::merge::Region;
 use crate::table::merge::transaction::Error as TableMergesError;
 use crate::table::merge::transaction::LimitKind as TableMergesLimitKind;
-use crate::{SheetSelector, TableSelector};
+use crate::{
+    SheetSelector, TableSelector,
+    selector::{OwnedSheetSelector, OwnedTableSelector},
+};
 
 /// A mutable, selector-first merge state staged against one immutable package.
 ///
@@ -26,8 +29,10 @@ use crate::{SheetSelector, TableSelector};
 /// their staging order after all surviving source regions.
 pub struct Edit<'a> {
     source: &'a Package,
-    sheet_position: usize,
-    table_position: usize,
+    sheet_selector: OwnedSheetSelector,
+    table_selector: OwnedTableSelector,
+    sheet_position: Option<usize>,
+    table_position: Option<usize>,
     before: Option<Vec<Region>>,
     regions: Option<Vec<Region>>,
     max_regions: Option<usize>,
@@ -40,8 +45,6 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("sheet_position", &self.sheet_position)
-            .field("table_position", &self.table_position)
             .field("loaded", &self.regions.is_some())
             .finish_non_exhaustive()
     }
@@ -53,10 +56,16 @@ impl Edit<'_> {
             return Ok(());
         }
         let mut budget = self.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let (sheet_position, table_position) = select_semantic_positions(
+            self.source,
+            self.sheet_selector.as_selector(),
+            self.table_selector.as_selector(),
+            &mut budget,
+        )?;
         let target = super::super::table_headers::resolve::resolve_target(
             self.source,
-            self.sheet_position,
-            self.table_position,
+            sheet_position,
+            table_position,
         )
         .map_err(map_header_error)?;
         let model = super::super::table_headers::rewrite::selected_payload(self.source, target)
@@ -66,6 +75,8 @@ impl Edit<'_> {
         self.max_regions = Some(budget.max_regions);
         self.rows = Some(target.rows);
         self.columns = Some(target.columns);
+        self.sheet_position = Some(sheet_position);
+        self.table_position = Some(table_position);
         self.before = Some(before);
         self.regions = Some(regions);
         self.budget = Some(budget);
@@ -76,8 +87,7 @@ impl Edit<'_> {
     #[must_use = "inspect the merged regions result"]
     pub fn regions(&mut self) -> Result<&[Region], TableMergesError> {
         self.ensure_loaded()?;
-        self
-            .regions
+        self.regions
             .as_deref()
             .ok_or(TableMergesError::InvalidSource)
     }
@@ -166,6 +176,8 @@ impl Edit<'_> {
         let before = edit.before.take().ok_or(TableMergesError::InvalidSource)?;
         let regions = edit.regions.take().ok_or(TableMergesError::InvalidSource)?;
         let mut budget = edit.budget.take().ok_or(TableMergesError::InvalidSource)?;
+        let sheet_position = edit.sheet_position.ok_or(TableMergesError::InvalidSource)?;
+        let table_position = edit.table_position.ok_or(TableMergesError::InvalidSource)?;
         let after = normalize_regions(&before, &regions, &mut budget)?;
 
         if after == before {
@@ -176,8 +188,8 @@ impl Edit<'_> {
                     target: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    sheet_position: edit.sheet_position,
-                    table_position: edit.table_position,
+                    sheet_position,
+                    table_position,
                     before,
                     after,
                 },
@@ -193,8 +205,8 @@ impl Edit<'_> {
 
         let package = rewrite(
             edit.source,
-            edit.sheet_position,
-            edit.table_position,
+            sheet_position,
+            table_position,
             before.len(),
             &after,
             &mut budget,
@@ -206,8 +218,8 @@ impl Edit<'_> {
             target,
             source_fingerprint,
             target_fingerprint,
-            sheet_position: edit.sheet_position,
-            table_position: edit.table_position,
+            sheet_position,
+            table_position,
             before,
             after,
         };
@@ -401,12 +413,16 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
     ) -> Result<Edit<'_>, TableMergesError> {
         let mut budget = Budget::new(self)?;
-        let (sheet_position, table_position) =
-            select_semantic_positions(self, sheet.into(), table.into(), &mut budget)?;
+        let sheet_selector = OwnedSheetSelector::try_from(sheet.into())
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
+        let table_selector = OwnedTableSelector::try_from(table.into())
+            .map_err(|amount| TableMergesError::Allocation { amount })?;
         Ok(Edit {
             source: self,
-            sheet_position,
-            table_position,
+            sheet_selector,
+            table_selector,
+            sheet_position: None,
+            table_position: None,
             before: None,
             regions: None,
             max_regions: None,

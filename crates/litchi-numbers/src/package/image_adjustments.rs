@@ -26,7 +26,7 @@ use litchi_iwa_protos::image_adjustments_codec::{
 use thiserror::Error as ThisError;
 
 use super::{Error as PackageError, Package, SemanticLimitKind};
-use crate::{SheetSelector, shape::image::ImageSelector};
+use crate::{SheetSelector, selector::OwnedSheetSelector, shape::image::ImageSelector};
 
 /// Typed failures at the hidden Numbers image-adjustment seam.
 #[doc(hidden)]
@@ -347,7 +347,7 @@ const fn image_enhancement_to_native(value: ImageEnhancement) -> bool {
 /// package.
 pub struct Edit<'a> {
     source: &'a Package,
-    sheet_position: Position,
+    sheet_selector: OwnedSheetSelector,
     image_position: Position,
     selection: Option<ImageSelection>,
     after: Option<ImageAdjustments>,
@@ -358,7 +358,6 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("sheet_position", &self.sheet_position)
             .field("image_position", &self.image_position)
             .field("loaded", &self.selection.is_some())
             .field("after", &self.after)
@@ -374,7 +373,7 @@ impl<'a> Edit<'a> {
         let mut budget = self.budget.take().ok_or(Error::InvalidSource)?;
         let selection = select_image_with_budget(
             self.source,
-            SheetSelector::position(self.sheet_position),
+            self.sheet_selector.as_selector(),
             ImageSelector::position(self.image_position),
             true,
             &mut budget,
@@ -392,12 +391,17 @@ impl<'a> Edit<'a> {
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
     ) -> Result<Self, Error> {
-        let sheet_position = resolve_sheet_position(source, sheet_selector.into())?;
+        let sheet_selector = sheet_selector.into();
+        if matches!(sheet_selector, SheetSelector::Name(name) if name.is_empty()) {
+            return Err(Error::Refused(Refusal::EmptySheetName));
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector)
+            .map_err(|amount| Error::Allocation { amount })?;
         let image_position = image_selector.into().as_position();
         let budget = ImageBudget::for_package(source)?;
         Ok(Self {
             source,
-            sheet_position,
+            sheet_selector,
             image_position,
             selection: None,
             after: None,
@@ -406,15 +410,23 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the selected sheet source position.
-    #[must_use]
-    pub const fn sheet_position(&self) -> Position {
-        self.sheet_position
+    #[must_use = "inspect the selected image sheet position result"]
+    pub fn sheet_position(&mut self) -> Result<Position, Error> {
+        self.ensure_loaded()?;
+        self.selection
+            .as_ref()
+            .map(|selection| selection.sheet_position)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the selected image source position.
-    #[must_use]
-    pub const fn image_position(&self) -> Position {
-        self.image_position
+    #[must_use = "inspect the selected image position result"]
+    pub fn image_position(&mut self) -> Result<Position, Error> {
+        self.ensure_loaded()?;
+        self.selection
+            .as_ref()
+            .map(|selection| selection.image_position)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the controls read before this edit.

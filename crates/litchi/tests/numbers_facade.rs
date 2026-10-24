@@ -247,7 +247,7 @@ fn table_title_transaction_reaches_numbers_facade() -> Result<(), Box<dyn std::e
     let before = package.table_title_settings(sheet, table)?;
 
     let mut edit = package.edit_table_title(sheet, table)?;
-    assert_eq!(edit.path(), Path::Table { sheet: 0, table: 0 });
+    assert_eq!(edit.path()?, Path::Table { sheet: 0, table: 0 });
     assert_eq!(edit.settings()?, before);
     let edit_debug = format!("{edit:?}");
     assert!(edit_debug.contains("Table { sheet: 0, table: 0 }"));

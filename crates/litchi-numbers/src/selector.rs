@@ -208,6 +208,69 @@ impl From<Position> for TableSelector<'_> {
     }
 }
 
+/// An owned sheet selector retained by a deferred edit entry.
+///
+/// Name selectors are copied once at the API boundary so the edit can defer
+/// package-owned catalog resolution without borrowing a caller-owned string.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedSheetSelector {
+    Name(Box<str>),
+    Position(Position),
+}
+
+impl OwnedSheetSelector {
+    pub(crate) fn try_from(selector: SheetSelector<'_>) -> Result<Self, usize> {
+        match selector {
+            SheetSelector::Name(name) => {
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| name.len())?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            SheetSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> SheetSelector<'_> {
+        match self {
+            Self::Name(name) => SheetSelector::Name(name.as_ref()),
+            Self::Position(position) => SheetSelector::Position(*position),
+        }
+    }
+}
+
+/// An owned table selector retained by a deferred edit entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OwnedTableSelector {
+    Name(Box<str>),
+    Position(Position),
+}
+
+impl OwnedTableSelector {
+    pub(crate) fn try_from(selector: TableSelector<'_>) -> Result<Self, usize> {
+        match selector {
+            TableSelector::Name(name) => {
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|_| name.len())?;
+                owned.push_str(name);
+                Ok(Self::Name(owned.into_boxed_str()))
+            },
+            TableSelector::Position(position) => Ok(Self::Position(position)),
+        }
+    }
+
+    pub(crate) fn as_selector(&self) -> TableSelector<'_> {
+        match self {
+            Self::Name(name) => TableSelector::Name(name.as_ref()),
+            Self::Position(position) => TableSelector::Position(*position),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

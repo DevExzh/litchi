@@ -4,22 +4,24 @@ This slice addresses the confirmed edit-construction cost debt in the Numbers
 title, chart-data, table-merges, and image-adjustment families.  It is based on
 coordinator integration `c3f56b7a9d`; no native qualification is claimed.
 
-The edit constructors retain only the immutable package reference, checked
-semantic positions, selectors already resolved through the package's cheap
-projection, and the operation budget.  Native target resolution, selected
-payload reads, wire decoding, semantic value copies, and merge-region clones
-move to the first value request, mutation, or commit.  Dropping an untouched
-edit therefore does not copy a chart grid, image graph, title payload, or
-merge-region vector.
+The edit constructors retain only the immutable package reference, owned
+selectors, cheap syntax/options checks, and the operation budget.  Name
+catalog resolution, native target resolution, selected payload reads, wire
+decoding, semantic value copies, and merge-region clones move to the first
+value request, mutation, or commit.  Dropping an untouched edit therefore
+does not scan a workbook catalog or copy a chart grid, image graph, title
+payload, or merge-region vector.
 
-The chart-data edit keeps optional bounded selection and `Arc<ChartData>` state
-and loads it only for `before`, `after`, or `commit`.  Image adjustments retain the
-sheet/image positions and load the graph selection only when a value is
-requested or published.  Table-title settings retain the selected positions;
-its target and decoded settings are loaded by `settings` or `commit`.
-Table-merges keeps the selected positions and budget until `regions`, a merge
-operation, or `commit`; its source regions and dimensions are then decoded
-once and reused by the existing mutation and exact-publication paths.
+The chart-data edit keeps an owned sheet selector, optional bounded selection,
+and `Arc<ChartData>` state and loads them only for a position/data getter,
+`before`, `after`, or `commit`.  Image adjustments retain an owned sheet
+selector and image position and load the graph selection only when a position,
+value, mutation, or publication is requested.  Table-title settings retain
+owned sheet/table selectors and resolve positions, target, and decoded settings
+only for `path`, `settings`, or `commit`.  Table-merges keeps owned selectors,
+optional positions, and its budget until `regions`, a merge operation, or
+`commit`; its source regions and dimensions are then decoded once and reused
+by the existing mutation and exact-publication paths.
 
 The iWork Numbers chart consumer now calls the fallible chart `before` getter
 while it still owns the requested grid.  A deferred `UnsupportedDependency`
@@ -59,5 +61,7 @@ The raw logs remain outside the repository at
   SHA-256 `0e5a23a1c2bbeaf2517caf5b397dd663313df818457878ad7a6f73ac4cdfd059`.
   Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo test --offline --locked -p litchi --all-features --test numbers_facade --no-fail-fast --message-format=short 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/numbers-facade-test.log`; it reported all 5 facade tests passed and 0 failed.
 
-`cargo fmt --all -- --check` and `git diff --check` also passed.  The source
-commit is ready for coordinator integration.
+`cargo fmt --all -- --check` and `git diff --check` passed for the validated
+commit above.  The selector deferral follow-up is statically formatted and
+diff-clean; rerun the Numbers, iWork, facade, and strict-Clippy commands above
+on its successor before coordinator integration.
