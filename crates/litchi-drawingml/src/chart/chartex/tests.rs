@@ -175,6 +175,42 @@ fn companion_parts_are_valid_chart_styles() {
 }
 
 #[test]
+fn chartex_writer_checks_external_relationship_limit_before_output() {
+    let spec = Spec::new(Variant::new(Kind::Funnel)).with_series(Series::new("Only", vec![1.0]));
+    let mut limits = Limits::DEFAULT;
+    limits.max_attribute_value_bytes = 2;
+    assert!(matches!(
+        write_with_limits(&spec, Some("rId3"), &limits),
+        Err(Error::Limit {
+            kind: crate::LimitKind::AttributeValueBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn chartex_text_limit_counts_decoded_general_references() {
+    let spec = Spec::new(Variant::new(Kind::Funnel))
+        .with_title("A&")
+        .with_series(Series::new("S", vec![1.0]));
+    let xml = spec.to_xml(None).unwrap();
+
+    let mut exact = Limits::DEFAULT;
+    exact.max_text_bytes = 2;
+    assert!(read(&xml, &exact).is_ok());
+
+    let mut narrow = Limits::DEFAULT;
+    narrow.max_text_bytes = 1;
+    assert!(matches!(
+        read(&xml, &narrow),
+        Err(Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn waterfall_subtotals_are_admitted_before_their_vector_grows() {
     let spec = Spec::new(Variant::new(Kind::Waterfall)).with_series(Series::new("Only", vec![1.0]));
     let xml = String::from_utf8(spec.to_xml(None).unwrap())

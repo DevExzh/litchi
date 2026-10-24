@@ -1,7 +1,8 @@
 use std::io::Cursor;
 
 use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
-use litchi_drawingml::chart::{Limits, chartex, reader, style, writer};
+use litchi_drawingml::chart::data::{RichText, TitleText};
+use litchi_drawingml::chart::{DataLabel, DataLabels, Limits, chartex, reader, style, writer};
 use litchi_drawingml::{Error, LimitKind};
 
 fn chart_xml() -> Vec<u8> {
@@ -184,6 +185,53 @@ fn chartex_limits_bound_series_and_total_points_before_vectors() {
         chartex::read(&xml, &limits).unwrap_err(),
         LimitKind::ChartPoints,
     );
+}
+
+#[test]
+fn chart_reader_limits_data_labels_and_pivot_formats_before_retention() {
+    let labels = String::from_utf8(chart_xml())
+        .unwrap()
+        .replace(
+            "</c:ser>",
+            r#"<c:dLbls><c:dLbl><c:idx val="0"/></c:dLbl><c:dLbl><c:idx val="1"/></c:dLbl></c:dLbls></c:ser>"#,
+        );
+    let mut limits = Limits::DEFAULT;
+    limits.max_points = 1;
+    assert_limit(
+        reader::read(Cursor::new(labels.as_bytes()), &limits).unwrap_err(),
+        LimitKind::ChartPoints,
+    );
+
+    let pivot_formats = String::from_utf8(chart_xml())
+        .unwrap()
+        .replace(
+            "</c:chart>",
+            r#"<c:pivotFmts><c:pivotFmt><c:idx val="0"/></c:pivotFmt><c:pivotFmt><c:idx val="1"/></c:pivotFmt></c:pivotFmts></c:chart>"#,
+        );
+    assert_limit(
+        reader::read(Cursor::new(pivot_formats.as_bytes()), &limits).unwrap_err(),
+        LimitKind::ChartPoints,
+    );
+}
+
+#[test]
+fn chart_writer_validates_nested_data_label_text_before_output() {
+    let mut chart = reader::read(Cursor::new(chart_xml()), &Limits::DEFAULT).unwrap();
+    let mut label = DataLabel::new(0);
+    label.text = Some(TitleText::Literal(RichText::new("too long")));
+    label.separator = Some("too long".into());
+    let mut labels = DataLabels::new();
+    labels.labels.push(label);
+    chart.plot_area.type_groups[0].common_mut().data_labels = Some(labels);
+
+    let mut limits = Limits::DEFAULT;
+    limits.max_text_bytes = 3;
+    let mut sink = RecordingSink::default();
+    assert_limit(
+        writer::write(&mut sink, &chart, &limits).unwrap_err(),
+        LimitKind::ChartTextBytes,
+    );
+    assert_eq!(sink.calls, 0);
 }
 
 #[test]

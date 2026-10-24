@@ -699,7 +699,30 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 return invalid("DTD and processing instructions are rejected in chart styles");
             },
             Event::Eof => break,
-            Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
+            Event::GeneralRef(reference) => {
+                let value = match reference
+                    .resolve_char_ref()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                {
+                    Some(character) => character.to_string(),
+                    None => {
+                        let name = reference
+                            .decode()
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        quick_xml::escape::resolve_predefined_entity(&name)
+                            .ok_or_else(|| Error::Xml("unknown XML entity".into()))?
+                            .to_owned()
+                    },
+                };
+                preflight_strings(strings, value.len(), limits.max_style_string_bytes)?;
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&value);
+                } else if !value.trim().is_empty() {
+                    return invalid("text outside chart style root");
+                }
+                add_strings(&mut strings, value.len(), limits.max_style_string_bytes)?;
+            },
+            Event::Comment(_) | Event::Decl(_) => {},
         }
     }
     if !stack.is_empty() {
@@ -1296,5 +1319,15 @@ mod tests {
         ] {
             assert!(parse_color(xml.as_bytes(), &Limits::DEFAULT).is_err());
         }
+    }
+
+    #[test]
+    fn decodes_style_text_references_before_budgeting() {
+        let xml = style_xml().replace(
+            "<cs:lineWidthScale>1.25</cs:lineWidthScale>",
+            "<cs:lineWidthScale>1&#46;25</cs:lineWidthScale>",
+        );
+        let document = parse(xml.as_bytes(), &Limits::DEFAULT).unwrap();
+        assert_eq!(document.info().entries[0].line_width_scale, "1.25");
     }
 }
