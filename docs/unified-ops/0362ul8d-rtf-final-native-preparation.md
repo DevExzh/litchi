@@ -21,7 +21,8 @@ The baseline is the frozen `86d708878fa537eab42fd4bd5ffbc0f79c606191`
 checkout plus the reviewed consumer-only adapter.  Its only dirty paths are
 `tools/perf-baseline/Cargo.toml` and the added
 `tools/perf-baseline/examples/refusal_contract_bench.rs`; the candidate is
-clean at `82798234ede3d77bc2a96a36d2da5d0c9aafaec2`.
+clean at `82798234ede3d77bc2a96a36d2da5d0c9aafaec2` (the production API files
+are unchanged from 691).
 
 | identity | baseline | candidate |
 | --- | --- | --- |
@@ -48,9 +49,13 @@ The immutable external manifest and source-only receipt are:
 
 ```text
 manifest: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/legacy-rtf-final.json
-manifest SHA-256: dbd3a4768795388adda9e51b17e18772f4b3369f7be0e377c06d6413646edc6c (4649 bytes)
+manifest SHA-256: bcdf11642a7d7eba139781ff9ac113013f78b23cc0cdba2e154a6d47c91a26f8 (4649 bytes)
 receipt: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/source-preparation.json
-receipt SHA-256: 5349e7ff15b8a2f437fba218870b463f254a7615cbe6f0cd5f3eddf3f8550441 (7504 bytes)
+receipt SHA-256: 0058a7049b09903134b2f9653421217c9d737670f76fc38a6320e77ae3bbc8cd (7504 bytes)
+The superseded first receipt, generated before the candidate revision was
+bound to the pin-repair commit, remains at
+`driver/source-preparation-before-revision-fix.json`, SHA-256
+`5349e7ff15b8a2f437fba218870b463f254a7615cbe6f0cd5f3eddf3f8550441`.
 ```
 
 The receipt binds the candidate-side preparer
@@ -87,7 +92,8 @@ The fresh receipt was produced with:
 python3 source-candidate/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest driver/legacy-rtf-final.json --before source-baseline --after source-candidate --output driver/source-preparation.json
 ```
 
-The explicit manifest loaded successfully, and a build-free runner identity
+The explicit manifest binds candidate revision
+`82798234ede3d77bc2a96a36d2da5d0c9aafaec2`, loaded successfully, and a build-free runner identity
 round-trip matched both receipt identities.  The focused protocol command
 completed with 44 tests passing:
 
