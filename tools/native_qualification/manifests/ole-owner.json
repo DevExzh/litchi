@@ -17,7 +17,7 @@
     "clone_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_package_clone_probe.rs",
     "lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a",
     "lock_provenance": "external matched-harness lock retained by 0359j W5 qualification; Cargo.lock from the reviewed current driver",
-    "oracle_source_sha256": "49df705ccd92e498efc51388cb3d00310de453a12e84d1919128c52ffeddee95"
+    "oracle_source_sha256": "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
   },
   "routes": [
     "open",
