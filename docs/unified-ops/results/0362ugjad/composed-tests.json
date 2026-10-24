@@ -1,0 +1,26 @@
+{
+  "at_utc": "2026-10-24T13:21:29.983063+00:00",
+  "source_index": "4f07dad478cac8411b1af725dce9e9876cf6465b",
+  "leaf": "079ad7e3bc277d16ce5cf165e612280fa15b85f0",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_prepare_ole_owner_inputs",
+    "tools.test_ole_owner_paired_runner",
+    "tools.test_validate_ole_owner_run",
+    "tools.test_prepare_xlsx_raw_inputs",
+    "tools.test_xlsx_raw_native_qualification",
+    "tools.test_native_qualification_runner",
+    "tools.test_legacy_native_qualification",
+    "tools.test_ppt_lazy_native_qualification",
+    "tools.test_prepare_ppt_lazy_native_inputs",
+    "tools.test_no_3rdparty_references"
+  ],
+  "exit": 0,
+  "seconds": 27.167985088992282,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ppt-correctness-merge/combined-tests.log",
+  "log_bytes": 428,
+  "log_sha256": "556668301476890f96332b7a33b9190beb1e9fb43588cea857f077bce1faacd3",
+  "scope": "Composed Python validation of PPT probe/correctness packet; no timing measurement"
+}
