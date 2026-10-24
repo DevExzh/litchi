@@ -206,7 +206,7 @@ fn pptx(slides: usize, matches: usize) -> Outcome<serde_json::Value> {
     let leaf = || -> Outcome<litchi_pptx::Package> {
         let mut edit = package.edit()?;
         let parts: Vec<_> = edit
-            .slides()
+            .slides()?
             .iter()
             .map(|slide| slide.part_name().clone())
             .collect();
