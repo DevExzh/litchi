@@ -203,8 +203,8 @@ def target_family(method: str) -> str:
     return f"{name}::Edit via Package::edit_{name}() / apply_{name}(&Patch)"
 
 
-def rows(document, crate: str, result_rules=None, immutable_owners=None,
-         delegated_globs=None):
+def _rows(document, crate: str, result_rules=None, immutable_owners=None,
+          delegated_globs=None):
     profiles = None
     if result_rules is None or immutable_owners is None or delegated_globs is None:
         profiles = gate.checked_policy(gate.read_json(gate.POLICY))
@@ -322,6 +322,23 @@ def rows(document, crate: str, result_rules=None, immutable_owners=None,
             yield "unsafe_edit", text, "variant", "Refused(litchi_core::edit::Refusal)"
 
 
+def rows(document, crate: str, result_rules=None, immutable_owners=None,
+         delegated_globs=None):
+    """Yield unique debt rows while preserving distinct public paths.
+
+    Rustdoc can expose the same nominal item through both a public spelling
+    and an alias.  Those paths remain separate rows, but repeated emission of
+    the exact same tuple is not a second debt item and must not make the
+    inventory structurally ambiguous.
+    """
+    seen = set()
+    for row in _rows(document, crate, result_rules, immutable_owners,
+                     delegated_globs):
+        if row not in seen:
+            seen.add(row)
+            yield row
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -330,14 +347,16 @@ def main(argv=None) -> int:
     print("crate\tcategory\tpath\tdetail\ttarget")
     try:
         profiles = gate.checked_policy(gate.read_json(gate.POLICY))
-        # Read only each graph's root identity first.  The second pass below
-        # remains sequential so the inventory does not retain all 1+ GiB of
-        # all-features rustdoc JSON in memory.
+        # Parse each graph to obtain its root identity, retaining only those
+        # names before the sequential row pass.  This prepass still parses
+        # each full graph; the second pass remains sequential so the
+        # inventory does not retain all 1+ GiB of all-features JSON.
         crates = []
         for path in args.json:
             document = gate.read_json(path)
             root = str(document["root"])
             crates.append(document["index"][root]["name"])
+        del document
         missing = missing_delegated_inputs(crates, profiles)
         if missing:
             details = "; ".join(

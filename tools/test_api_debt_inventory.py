@@ -75,6 +75,69 @@ def delegated_glob_fixture() -> dict:
     return document
 
 
+def delegated_debt_fixture() -> dict:
+    """A supplied delegated-crate document with the same owner debt."""
+    document = owner_fixture()
+    document["index"]["0"]["name"] = "external"
+    for entry in document["paths"].values():
+        entry["path"] = ["external", *entry["path"][1:]]
+    return document
+
+
+def duplicate_edit_fixture() -> dict:
+    """Two nominal items emit one exact row through the same public path."""
+    index = {
+        "0": {
+            "name": "fixture", "crate_id": 0, "visibility": "public",
+            "inner": {"module": {"items": [1, 2], "is_crate": True}},
+        },
+        "1": {
+            "name": "DuplicateEdit", "crate_id": 0, "visibility": "public",
+            "inner": {"struct": {"fields": [], "impls": [3]}},
+        },
+        "2": {
+            "name": "DuplicateEdit", "crate_id": 0, "visibility": "public",
+            "inner": {"struct": {"fields": [], "impls": [4]}},
+        },
+        "3": {
+            "name": "DuplicateEdit", "crate_id": 0, "visibility": "public",
+            "inner": {"impl": {"items": [5]}}, "span": {},
+        },
+        "4": {
+            "name": "DuplicateEdit", "crate_id": 0, "visibility": "public",
+            "inner": {"impl": {"items": [6]}}, "span": {},
+        },
+        "5": {
+            "name": "apply_change", "crate_id": 0, "visibility": "public",
+            "inner": {"function": {
+                "sig": {"inputs": [["self", {"borrowed_ref": {"is_mutable": True}}]],
+                        "output": {"primitive": "unit"}},
+                "generics": {"params": []},
+            }},
+        },
+        "6": {
+            "name": "apply_change", "crate_id": 0, "visibility": "public",
+            "inner": {"function": {
+                "sig": {"inputs": [["self", {"borrowed_ref": {"is_mutable": True}}]],
+                        "output": {"primitive": "unit"}},
+                "generics": {"params": []},
+            }},
+        },
+    }
+    paths = {
+        "0": {"path": ["fixture"], "kind": "module", "crate_id": 0},
+        "1": {"path": ["fixture", "DuplicateEdit"], "kind": "struct", "crate_id": 0},
+        "2": {"path": ["fixture", "DuplicateEdit"], "kind": "struct", "crate_id": 0},
+        "3": {"path": ["fixture", "DuplicateEdit"], "kind": "impl", "crate_id": 0},
+        "4": {"path": ["fixture", "DuplicateEdit"], "kind": "impl", "crate_id": 0},
+        "5": {"path": ["fixture", "DuplicateEdit", "apply_change"],
+              "kind": "function", "crate_id": 0},
+        "6": {"path": ["fixture", "DuplicateEdit", "apply_change"],
+              "kind": "function", "crate_id": 0},
+    }
+    return {"root": 0, "includes_private": False, "index": index, "paths": paths}
+
+
 class InventoryOwnerCoverageTests(unittest.TestCase):
     def test_policy_owner_name_outside_heuristic_covers_alias_once(self):
         document = owner_fixture()
@@ -168,11 +231,39 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
             delegated_globs=frozenset({"external"}),
         ))
         self.assertIn(
+            ("mut_owner", "fixture::AliasOwner::apply_change", "&mut self",
+             "change::Edit via Package::edit_change() / apply_change(&Patch)"),
+            findings,
+        )
+        self.assertIn(
             ("replay_return", "fixture::AliasOwner::apply_change",
              "return contract unverified",
              "register and satisfy Result<family::Commit> in result_methods"),
             findings,
         )
+
+    def test_supplied_delegated_document_is_checked_for_debt(self):
+        findings = list(inventory.rows(
+            delegated_debt_fixture(), "external", result_rules=[],
+            immutable_owners={"external::OddOwner"}, delegated_globs=set(),
+        ))
+        self.assertTrue(
+            any(row[0] == "mut_owner" and
+                row[1] == "external::AliasOwner::apply_change"
+                for row in findings),
+            findings,
+        )
+
+    def test_exact_duplicate_rows_are_emitted_once(self):
+        findings = list(inventory.rows(
+            duplicate_edit_fixture(), "fixture", result_rules=[],
+            immutable_owners=set(), delegated_globs=set(),
+        ))
+        expected = (
+            "edit_type", "fixture::DuplicateEdit", "",
+            "rename to the focused module's Edit",
+        )
+        self.assertEqual(findings, [expected])
 
     def test_missing_policy_owner_fails_closed(self):
         surface = inventory.Inventory(owner_fixture(), "fixture")
