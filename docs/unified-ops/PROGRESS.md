@@ -4489,3 +4489,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   because measured CFB/PPT paths have changed. A final run of that same
   workload is being prepared separately from the diagnostic primary-noop
   cold probe. Actual qualification and the signed-batch decision remain open.
+
+- Coordinator consumer and PPT tooling integration (2026-10-24):
+  RTF/CLI/DOC/XLSB consumer and guide repairs merge at `1ff6aae60a` from
+  `2cb3cdd55d`. The actual locked RTF fuzz check passes in 72.066 seconds,
+  with a maximum sampled target of 118,970,506 bytes. Root independently
+  verifies the receipt and all 83 registry identities against the approved
+  root lock's 518 identities. The current fuzz gate also covers RTF and
+  observes its standalone lock. Record 0362ul37 retains the initial sparse
+  metadata failure and distinguishes the later successful check.
+
+  Reviewed PPT tooling merges at `30aaafbf98` from `8d8dfce1f`. Public
+  execution validates its build projection and child-event provenance;
+  26 composed tests pass with the tools import path configured. The initial
+  plain module invocation exposes an import failure, so 0362ul41 is assigned
+  to fix the current tooling row and register both new suites. The frozen
+  28-route workload is unchanged. Cold primary-noop observations remain
+  supplemental; neither tooling readiness nor old 472b builds are final
+  performance acceptance.
+
+  A further source review finds public PPT record/codec decoders that still
+  choose limits internally. Required engineering record 0362ul39 migrates
+  their canonical entry points to explicit limits and updates current
+  consumers, preserving package-selected profiles and public capabilities.
+  An independent sweep is checking other formats for the same gap. Final
+  candidate API and performance bindings must be refreshed after this repair;
+  the CLI run remains held during source stabilization. The signed-batch
+  contract choice is still pending.
+
+  Review returns the changed-commit qualification handoff for executable
+  setup, changed-output oracle, quiet-process and target-size corrections.
+  A newly found fast-exit output/TMP cap race is repaired in 0362ul40 and is
+  under independent review. No native measurements are claimed. Cleanup
+  wave 55 remains in preflight; the owner has retired an obsolete scanner
+  that pinned inactive leaves. No additional worktree has been removed, and
+  nothing is pushed.
