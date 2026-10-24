@@ -91,6 +91,8 @@ class ProjectionPolicyTests(unittest.TestCase):
             runner.shared_identity(before, changed)
 
     def test_pair_receipt_requires_opaque_full_validation_result(self) -> None:
+        with self.assertRaises(TypeError):
+            policy._ValidatedEndpoint({}, object())
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory) / "receipt.json"
             receipt.write_bytes(policy.canonical({}))
@@ -110,8 +112,8 @@ class ProjectionPolicyTests(unittest.TestCase):
             "workload": {"routes": ["docx/open_get"], "route_count": 1},
             "status": "verified_protocol_only",
         }
-        before = policy._ValidatedEndpoint({})
-        after = policy._ValidatedEndpoint({})
+        before = policy._make_validated_endpoint({})
+        after = policy._make_validated_endpoint({})
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory) / "receipt.json"
             receipt.write_bytes(policy.canonical(expected))
@@ -197,7 +199,7 @@ class ProjectionPolicyTests(unittest.TestCase):
                 "toolchain": toolchain,
                 "source_assembly": assembly_artifact,
             }
-            fields = policy._ValidatedEndpoint({
+            fields = policy._make_validated_endpoint({
                 "manifest": policy.artifact(manifest_path),
                 "source_commit": policy.BASELINE_COMMIT,
                 "dependency_projection_sha256": projection["sha256"],
@@ -235,6 +237,14 @@ class ProjectionPolicyTests(unittest.TestCase):
                 with self.assertRaises(policy.ProjectionPolicyError):
                     policy._check_fields_fixed(endpoint, fields, "before")
                 patch_path.write_bytes(b"adapter")
+                source_path = root / "source.tar"
+                source_path.write_bytes(b"tampered source archive")
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy._check_fields_fixed(endpoint, fields, "before")
+                source_path.write_bytes(b"source archive")
+                source_path.unlink()
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy._check_fields_fixed(endpoint, fields, "before")
                 manifest_path.write_bytes(b"tampered endpoint manifest")
                 with self.assertRaises(policy.ProjectionPolicyError):
                     policy._check_fields_fixed(endpoint, fields, "before")

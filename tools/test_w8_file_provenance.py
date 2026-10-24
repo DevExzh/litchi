@@ -377,6 +377,20 @@ class EndpointManifest(unittest.TestCase):
             with self.assertRaises(provenance.ProvenanceError):
                 provenance.endpoint_manifest(args)
 
+    def test_endpoint_rejects_source_archive_and_overlay_patch_mutations(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            args, _paths, _values = self.inputs(Path(tmp))
+            provenance.endpoint_manifest(args)
+            args.source.write_bytes(b"mutated source archive")
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.endpoint_manifest(args)
+
+            args.source.write_bytes(b"audited source archive")
+            args.overlay_patch = Path(tmp) / "compatibility.patch"
+            args.overlay_patch.write_bytes(b"mutated adapter patch")
+            with self.assertRaises(provenance.ProvenanceError):
+                provenance.endpoint_manifest(args)
+
     def test_endpoint_rejects_short_source_commit_and_incomplete_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             args, paths, _ = self.inputs(Path(tmp))

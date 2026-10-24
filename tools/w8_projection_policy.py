@@ -13,7 +13,9 @@ hashes.
 The module does not build or execute a probe.  Endpoint manifests have
 already passed the complete existing endpoint validator before the runner
 calls the in-memory verifier.  The standalone ``pair`` command invokes that
-same validator for both endpoints before producing a pair receipt.
+same validator for both endpoints before producing a pair receipt.  Pair
+verification rehashes the source archives before timing starts so a stale or
+missing source cannot be represented by metadata alone.
 """
 
 from __future__ import annotations
@@ -211,9 +213,15 @@ class _ValidatedEndpoint(dict[str, Any]):
 
     __slots__ = ("_token",)
 
-    def __init__(self, fields: dict[str, Any]) -> None:
+    def __init__(self, fields: dict[str, Any], token: object) -> None:
+        if token is not _VALIDATION_TOKEN:
+            raise TypeError("validated endpoint objects are created by the endpoint validator")
         super().__init__(fields)
-        self._token = _VALIDATION_TOKEN
+        self._token = token
+
+
+def _make_validated_endpoint(fields: dict[str, Any]) -> _ValidatedEndpoint:
+    return _ValidatedEndpoint(fields, _VALIDATION_TOKEN)
 
 
 def _runner_module() -> Any:
@@ -239,7 +247,7 @@ def validate_endpoint_manifest(path: Path, binary: Path, label: str) -> _Validat
         raise fail(f"{label} endpoint failed the complete W8 validator: {error}") from error
     if not isinstance(fields, dict) or not fields.get("manifest") or not fields.get("routes"):
         raise fail(f"{label} endpoint validator returned incomplete fields")
-    return _ValidatedEndpoint(fields)
+    return _make_validated_endpoint(fields)
 
 
 def _validated_manifest(path: Path, label: str) -> _ValidatedEndpoint:
@@ -465,7 +473,7 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
 
 
 def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: str) -> None:
-    """Check a runner-validated endpoint without hashing its source archive again."""
+    """Check a runner-validated endpoint, including a fresh source hash."""
     expected = FIXED_INPUTS[side]
     if endpoint.get("schema") != "litchi_file_endpoint.v1":
         raise fail(f"{side} endpoint schema is invalid")
@@ -508,10 +516,9 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
         field = fields.get(name, {})
         if not isinstance(field, dict) or (row.get("bytes"), row.get("sha256")) != (field.get("bytes"), field.get("sha256")):
             raise fail(f"{side} endpoint {name} identity differs from the runner fields")
-        if name != "source":
-            actual = artifact(Path(row["path"]))
-            if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
-                raise fail(f"{side} {name} artifact identity is stale")
+        actual = artifact(Path(row["path"]))
+        if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
+            raise fail(f"{side} {name} artifact identity is stale")
         return row
 
     for name in ("source", "lock", "probe", "fixture", "workspace_manifest", "package_manifest", "toolchain"):
@@ -630,8 +637,8 @@ def verify_pair_receipt(policy_path: Path, receipt_path: Path, before_fields: ob
     """Verify a precomputed pair receipt against already-validated endpoints.
 
     The runner has just hashed the large source archives while checking each
-    endpoint.  This path reuses those actual fields and therefore does not
-    perform a second multi-gigabyte source hash during runner startup.
+    endpoint.  This path checks the endpoint again, including source archive
+    hashes, before timing starts; the cost is outside all measured routes.
     """
     policy = load_reviewed_policy(policy_path)
     receipt = _load_json(receipt_path.resolve(), "original-to-final pair receipt")

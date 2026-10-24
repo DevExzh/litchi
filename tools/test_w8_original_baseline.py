@@ -46,6 +46,21 @@ class AdapterSource(unittest.TestCase):
         # its only accepted API spelling is the old public result field.
         self.assertEqual(adapted.decode("utf-8").count(".file"), source.count(".file") + 4)
 
+    def test_workspace_rejects_a_fake_short_historical_lock(self):
+        source = PROBE.read_text(encoding="utf-8")
+        adapted, _records = overlay.consumer_adapter(source)
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp)
+            probe = workspace / overlay.PROBE_RELATIVE
+            adapter = workspace / overlay.ADAPTER_RELATIVE
+            lock = workspace / overlay.LOCK_RELATIVE
+            probe.parent.mkdir(parents=True, exist_ok=True)
+            probe.write_bytes(source.encode("utf-8"))
+            adapter.write_bytes(adapted)
+            lock.write_bytes(b"fake lock accepted by the old verifier\n")
+            with self.assertRaises(overlay.OverlayError):
+                overlay.verify_workspace(workspace, {}, probe, adapter, lock, adapted)
+
     def test_baseline_adapter_matches_pinned_d39_adapter_identity(self):
         source = PROBE.read_text(encoding="utf-8")
         adapted, _records = overlay.consumer_adapter(source)
@@ -120,22 +135,61 @@ class RouteProof(unittest.TestCase):
 
 
 class SourceClosure(unittest.TestCase):
+    @staticmethod
+    def _archive(path: Path, files: dict[str, bytes], extra: list[tarfile.TarInfo] | None = None) -> None:
+        with tarfile.open(path, "w") as stream:
+            for name, payload in files.items():
+                file_path = path.parent / name
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_bytes(payload)
+                stream.add(file_path, arcname=name)
+            for member in extra or []:
+                stream.addfile(member)
+
     def test_archive_rejects_an_extra_production_file(self):
         files = {"Cargo.toml": b"[workspace]\n", "crates/litchi-ops/Cargo.toml": b"[package]\n"}
         tree = {name: ("100644", overlay.git_blob_sha1(payload)) for name, payload in files.items()}
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary) / "source.tar"
-            with tarfile.open(archive, "w") as stream:
-                for name, payload in files.items():
-                    path = Path(temporary) / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(payload)
-                    stream.add(path, arcname=name)
+            self._archive(archive, files)
+            with tarfile.open(archive, "a") as stream:
                 extra = Path(temporary) / "unexpected.rs"
                 extra.write_bytes(b"not in f2")
                 stream.add(extra, arcname=extra.name)
             with self.assertRaises(overlay.OverlayError):
                 overlay.verify_source_archive(archive, tree)
+
+    def test_archive_rejects_missing_and_mutated_production_files(self):
+        files = {"Cargo.toml": b"[workspace]\n", "crates/litchi-ops/Cargo.toml": b"[package]\n"}
+        tree = {name: ("100644", overlay.git_blob_sha1(payload)) for name, payload in files.items()}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            missing = root / "missing.tar"
+            self._archive(missing, {"Cargo.toml": files["Cargo.toml"]})
+            with self.assertRaises(overlay.OverlayError):
+                overlay.verify_source_archive(missing, tree)
+            mutated = root / "mutated.tar"
+            self._archive(mutated, {**files, "Cargo.toml": b"changed\n"})
+            with self.assertRaises(overlay.OverlayError):
+                overlay.verify_source_archive(mutated, tree)
+
+    def test_archive_rejects_links_and_devices(self):
+        files = {"Cargo.toml": b"[workspace]\n", "crates/litchi-ops/Cargo.toml": b"[package]\n"}
+        tree = {name: ("100644", overlay.git_blob_sha1(payload)) for name, payload in files.items()}
+        members = []
+        for member_type, name in ((tarfile.SYMTYPE, "symlink"), (tarfile.LNKTYPE, "hardlink"), (tarfile.CHRTYPE, "device")):
+            member = tarfile.TarInfo(name)
+            member.type = member_type
+            member.linkname = "Cargo.toml"
+            member.devmajor = 1
+            member.devminor = 3
+            members.append(member)
+        with tempfile.TemporaryDirectory() as temporary:
+            for member in members:
+                archive = Path(temporary) / f"{member.name}.tar"
+                self._archive(archive, files, [member])
+                with self.subTest(member=member.name), self.assertRaises(overlay.OverlayError):
+                    overlay.verify_source_archive(archive, tree)
 
 
 if __name__ == "__main__":
