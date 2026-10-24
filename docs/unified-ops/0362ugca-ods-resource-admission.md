@@ -1,8 +1,9 @@
 # 0362ugca — ODS resource admission stays out of package open
 
-- Date: 2026-10-23.
-- Status: coordinator review correction complete on `uo2/ods-lazy-entry`;
-  integration and the final workspace gate remain pending.
+- Date: 2026-10-24.
+- Status: coordinator review correction and pinned ODS validation complete on
+  `uo2/ods-lazy-entry`; integration and the final workspace gate remain
+  pending.
 - Performance claim: no native timing or baseline claim.
 
 ## Review return and correction
@@ -32,14 +33,15 @@ sheet-metadata, and source-cell lazy parser/protection behavior from
 
 ## Source and validation boundary
 
-The correction is in the successor source commit for `0362ugc`. It is source
-review only in this coordinator lane; no Cargo slot was allocated and no new
-Cargo test or performance result is claimed. The focused regression
+The correction is in the successor source commits for `0362ugc`, with the
+redundant `#[must_use]` Clippy fix in
+`1fdfcdcdba11b2860c08037aa9939450770ecc84`. The focused regression
 `resource_admission_stays_cold_until_edit_operation_or_commit` records the
 construction/drop, reopening/handoff, first-operation, and pre-staging
-failure proof for the next validation run. The previously recorded pinned
-ODS suite and Clippy receipts remain valid for the parser/admission changes;
-the full workspace gate must rerun after integration.
+failure proof. The final pinned ODS suite and strict all-target/all-feature
+Clippy receipts are recorded in `0362ugc`; the full workspace gate must rerun
+after integration.
 
-The source-level checks were limited to `git diff --check` and the repository
-artifact guards. No binaries, fixtures, or evidence files were added.
+The full suite exited `0` with 119 result blocks and 1,768 passed tests;
+Clippy exited `0` with no diagnostics under Rust/Clippy 1.95.0. No binaries,
+fixtures, or evidence files were added.
