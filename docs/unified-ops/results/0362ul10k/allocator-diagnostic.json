@@ -1,0 +1,1310 @@
+{
+  "allocator_routes": {
+    "after": {
+      "doc_history": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "doc_history",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 327168,
+          "route": "doc_history",
+          "rows": [
+            {
+              "base_live_bytes": 1282122,
+              "base_live_calls": 64,
+              "base_peak_bytes": 1282122,
+              "base_peak_calls": 64,
+              "delta_bytes": 1770442324,
+              "delta_calls": 1571392,
+              "iteration": 0,
+              "live_bytes": 139412114,
+              "live_calls": 14211,
+              "peak_bytes": 142369120,
+              "peak_calls": 14948,
+              "peak_delta_bytes": 141086998,
+              "peak_delta_calls": 14884,
+              "phase": "full",
+              "route": "doc_history"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-doc_history.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 383,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-doc_history.stdout",
+          "sha256": "990eddb68544254a8ecb3b522cb5c0426a1218c67089c60425532c490fc3ec34"
+        }
+      },
+      "edit": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "edit",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 6,
+          "route": "edit",
+          "rows": [
+            {
+              "base_live_bytes": 279565,
+              "base_live_calls": 22,
+              "base_peak_bytes": 279565,
+              "base_peak_calls": 22,
+              "delta_bytes": 3523,
+              "delta_calls": 33,
+              "iteration": 0,
+              "live_bytes": 280629,
+              "live_calls": 31,
+              "peak_bytes": 281935,
+              "peak_calls": 45,
+              "peak_delta_bytes": 2370,
+              "peak_delta_calls": 23,
+              "phase": "full",
+              "route": "edit"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-edit.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 326,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-edit.stdout",
+          "sha256": "0a9f3e057f0bd734956ea1ecc5c7749576bc4391cda36add38a04a52fd2e4677"
+        }
+      },
+      "read": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "read",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 6,
+          "route": "read",
+          "rows": [
+            {
+              "base_live_bytes": 280629,
+              "base_live_calls": 31,
+              "base_peak_bytes": 280629,
+              "base_peak_calls": 31,
+              "delta_bytes": 1192,
+              "delta_calls": 45,
+              "iteration": 0,
+              "live_bytes": 280629,
+              "live_calls": 31,
+              "peak_bytes": 280848,
+              "peak_calls": 37,
+              "peak_delta_bytes": 219,
+              "peak_delta_calls": 6,
+              "phase": "full",
+              "route": "read"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-read.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 325,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-read.stdout",
+          "sha256": "79f79a3bb7c73f2010f1f2fb5a1949d068155fef454fffbd3feced5dea8d09df"
+        }
+      },
+      "xls_cells": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_cells",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_cells",
+          "rows": [
+            {
+              "base_live_bytes": 609904,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609904,
+              "base_peak_calls": 172,
+              "delta_bytes": 2136873,
+              "delta_calls": 1583,
+              "iteration": 0,
+              "live_bytes": 722544,
+              "live_calls": 173,
+              "peak_bytes": 1332673,
+              "peak_calls": 431,
+              "peak_delta_bytes": 722769,
+              "peak_delta_calls": 259,
+              "phase": "full",
+              "route": "xls_cells"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_cells.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 356,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_cells.stdout",
+          "sha256": "299c9999b83c71cd060d2b2fb918dbf594c4b317fffb526a1817b4a67a6832bf"
+        }
+      },
+      "xls_cells_stage": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_cells_stage",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_cells_stage",
+          "rows": [
+            {
+              "base_live_bytes": 609910,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609910,
+              "base_peak_calls": 172,
+              "delta_bytes": 2024233,
+              "delta_calls": 1582,
+              "iteration": 0,
+              "live_bytes": 1100669,
+              "live_calls": 412,
+              "peak_bytes": 1332679,
+              "peak_calls": 431,
+              "peak_delta_bytes": 722769,
+              "peak_delta_calls": 259,
+              "phase": "stage",
+              "route": "xls_cells_stage"
+            },
+            {
+              "base_live_bytes": 609910,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609910,
+              "base_peak_calls": 172,
+              "delta_bytes": 2136873,
+              "delta_calls": 1583,
+              "iteration": 0,
+              "live_bytes": 1213309,
+              "live_calls": 413,
+              "peak_bytes": 1332679,
+              "peak_calls": 431,
+              "peak_delta_bytes": 722769,
+              "peak_delta_calls": 259,
+              "phase": "full",
+              "route": "xls_cells_stage"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_cells_stage.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 472,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_cells_stage.stdout",
+          "sha256": "9bfda1a101256d075d9be6d00316d92732e21e6b1e8027eb3ca8d0673af68c53"
+        }
+      },
+      "xls_history": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_history",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_history",
+          "rows": [
+            {
+              "base_live_bytes": 609906,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609906,
+              "base_peak_calls": 172,
+              "delta_bytes": 398348820,
+              "delta_calls": 386993,
+              "iteration": 0,
+              "live_bytes": 47969698,
+              "live_calls": 27085,
+              "peak_bytes": 48727777,
+              "peak_calls": 27561,
+              "peak_delta_bytes": 48117871,
+              "peak_delta_calls": 27389,
+              "phase": "full",
+              "route": "xls_history"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_history.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 377,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/after-allocator-xls_history.stdout",
+          "sha256": "a376b59bb1d21ee53efed6b87634d279da539130427f9bc3ba712756068458f9"
+        }
+      }
+    },
+    "before": {
+      "doc_history": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "doc_history",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 327168,
+          "route": "doc_history",
+          "rows": [
+            {
+              "base_live_bytes": 1282098,
+              "base_live_calls": 64,
+              "base_peak_bytes": 1282098,
+              "base_peak_calls": 64,
+              "delta_bytes": 1830103867,
+              "delta_calls": 1609900,
+              "iteration": 0,
+              "live_bytes": 139409018,
+              "live_calls": 14211,
+              "peak_bytes": 142365936,
+              "peak_calls": 14987,
+              "peak_delta_bytes": 141083838,
+              "peak_delta_calls": 14923,
+              "phase": "full",
+              "route": "doc_history"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-doc_history.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 383,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-doc_history.stdout",
+          "sha256": "80af58a29861fcad22f3ac79c43b127876388edb42904c88941c0289032e210a"
+        }
+      },
+      "edit": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "edit",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 6,
+          "route": "edit",
+          "rows": [
+            {
+              "base_live_bytes": 279565,
+              "base_live_calls": 22,
+              "base_peak_bytes": 279565,
+              "base_peak_calls": 22,
+              "delta_bytes": 3523,
+              "delta_calls": 33,
+              "iteration": 0,
+              "live_bytes": 280629,
+              "live_calls": 31,
+              "peak_bytes": 281935,
+              "peak_calls": 45,
+              "peak_delta_bytes": 2370,
+              "peak_delta_calls": 23,
+              "phase": "full",
+              "route": "edit"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-edit.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 327,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-edit.stdout",
+          "sha256": "45cfe2e586901abb747587b4f0537433c2b801e0ec59d26c445602afd3933959"
+        }
+      },
+      "read": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "read",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 6,
+          "route": "read",
+          "rows": [
+            {
+              "base_live_bytes": 280629,
+              "base_live_calls": 31,
+              "base_peak_bytes": 280629,
+              "base_peak_calls": 31,
+              "delta_bytes": 1192,
+              "delta_calls": 45,
+              "iteration": 0,
+              "live_bytes": 280629,
+              "live_calls": 31,
+              "peak_bytes": 280848,
+              "peak_calls": 37,
+              "peak_delta_bytes": 219,
+              "peak_delta_calls": 6,
+              "phase": "full",
+              "route": "read"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-read.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 325,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-read.stdout",
+          "sha256": "c0ffc6ce39dc30f3599b6ebb1a6ef0661cc0c904f1a1d1232e55d1f03f5df23b"
+        }
+      },
+      "xls_cells": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_cells",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_cells",
+          "rows": [
+            {
+              "base_live_bytes": 609864,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609864,
+              "base_peak_calls": 172,
+              "delta_bytes": 2361904,
+              "delta_calls": 1589,
+              "iteration": 0,
+              "live_bytes": 722504,
+              "live_calls": 173,
+              "peak_bytes": 1332635,
+              "peak_calls": 421,
+              "peak_delta_bytes": 722771,
+              "peak_delta_calls": 249,
+              "phase": "full",
+              "route": "xls_cells"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_cells.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 356,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_cells.stdout",
+          "sha256": "4ca0f99057ea8326bd9ada81a39785aa32ab4f96369d2cc6a6cb41765fc5f642"
+        }
+      },
+      "xls_cells_stage": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_cells_stage",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_cells_stage",
+          "rows": [
+            {
+              "base_live_bytes": 609870,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609870,
+              "base_peak_calls": 172,
+              "delta_bytes": 2249264,
+              "delta_calls": 1588,
+              "iteration": 0,
+              "live_bytes": 1100549,
+              "live_calls": 410,
+              "peak_bytes": 1332641,
+              "peak_calls": 421,
+              "peak_delta_bytes": 722771,
+              "peak_delta_calls": 249,
+              "phase": "stage",
+              "route": "xls_cells_stage"
+            },
+            {
+              "base_live_bytes": 609870,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609870,
+              "base_peak_calls": 172,
+              "delta_bytes": 2361904,
+              "delta_calls": 1589,
+              "iteration": 0,
+              "live_bytes": 1213189,
+              "live_calls": 411,
+              "peak_bytes": 1332641,
+              "peak_calls": 421,
+              "peak_delta_bytes": 722771,
+              "peak_delta_calls": 249,
+              "phase": "full",
+              "route": "xls_cells_stage"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_cells_stage.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 472,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_cells_stage.stdout",
+          "sha256": "c09cddf89ddc03be25a22a21662c1f1673e508c24b18d05dcaec6d450e01cc12"
+        }
+      },
+      "xls_history": {
+        "command": [
+          "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "--route",
+          "xls_history",
+          "--warmup",
+          "0",
+          "--samples",
+          "1",
+          "--batch",
+          "1"
+        ],
+        "report": {
+          "output_bytes": 112640,
+          "route": "xls_history",
+          "rows": [
+            {
+              "base_live_bytes": 609866,
+              "base_live_calls": 172,
+              "base_peak_bytes": 609866,
+              "base_peak_calls": 172,
+              "delta_bytes": 441765854,
+              "delta_calls": 387769,
+              "iteration": 0,
+              "live_bytes": 47964514,
+              "live_calls": 26956,
+              "peak_bytes": 48722505,
+              "peak_calls": 27430,
+              "peak_delta_bytes": 48112639,
+              "peak_delta_calls": 27258,
+              "phase": "full",
+              "route": "xls_history"
+            }
+          ]
+        },
+        "status": "exit-0-and-parsed",
+        "stderr": {
+          "bytes": 0,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_history.stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stdout": {
+          "bytes": 377,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/probes/before-allocator-xls_history.stdout",
+          "sha256": "a07e7b9c1b3477e6a4ab610e323905a3790cca1d797d4b48cf7623118bf78ef7"
+        }
+      }
+    }
+  },
+  "builds": {
+    "after": {
+      "artifacts": {
+        "ole_owner_oracle": {
+          "bytes": 9211928,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_owner_oracle",
+          "sha256": "b3bd7a913f0587d50e0c50327aab6c9b233df20767ab9b90399e4be9740263bd"
+        },
+        "ole_package_clone_probe": {
+          "bytes": 1383088,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_package_clone_probe",
+          "sha256": "4cdcf1ddbdb30c63c28334af3e4c60712cc13b14ed0f7c809a2c1ee4a1ad18f4"
+        },
+        "ole_w5_probe": {
+          "bytes": 9169144,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_w5_probe",
+          "sha256": "c5ca4592144e7eba1f0fba0fadaf1ebc958d34c9050e96f660ae6f286a7dadb2"
+        }
+      },
+      "command": [
+        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+        "--no-default-features",
+        "--features",
+        "current-api,w5-counting-allocator",
+        "--example",
+        "ole_w5_probe",
+        "--example",
+        "ole_package_clone_probe",
+        "--example",
+        "ole_owner_oracle"
+      ],
+      "features": "current-api,w5-counting-allocator",
+      "log": {
+        "bytes": 5956,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/candidate-build.log",
+        "sha256": "c3d3cf7b16f31cda3baced55b1167d83f18594f3c59f89f9d6da1fb0e6c1e8dd"
+      },
+      "status": "passed",
+      "target": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target",
+      "target_bytes": 405022478
+    },
+    "before": {
+      "artifacts": {
+        "ole_owner_oracle": {
+          "bytes": 9036848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_owner_oracle",
+          "sha256": "535f45040b6190efef84a81ae97476553d60f554c9aa0b948ee2a92dfea9eb00"
+        },
+        "ole_package_clone_probe": {
+          "bytes": 1381560,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_package_clone_probe",
+          "sha256": "1bf1d66bc12085c8b932d02bb5b907a8d0603eaf9527d365ef7c5ff2b027b9a2"
+        },
+        "ole_w5_probe": {
+          "bytes": 8987312,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_w5_probe",
+          "sha256": "ec18dfadce1bf949ee4a12845411c648c60b461af462b05dd97901cdfcf3b908"
+        }
+      },
+      "command": [
+        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "build",
+        "--release",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+        "--no-default-features",
+        "--features",
+        "legacy-owner-api,legacy-property-api,w5-counting-allocator",
+        "--example",
+        "ole_w5_probe",
+        "--example",
+        "ole_package_clone_probe",
+        "--example",
+        "ole_owner_oracle"
+      ],
+      "features": "legacy-owner-api,legacy-property-api,w5-counting-allocator",
+      "log": {
+        "bytes": 5991,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/baseline-build.log",
+        "sha256": "abfe8d9bac4d3f005285329f31fcfb400a42125c8a1777aff915caeb63d36f48"
+      },
+      "status": "passed",
+      "target": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target",
+      "target_bytes": 402392492
+    }
+  },
+  "claim_scope": "allocator correctness and observation diagnostic only; no timing, ABBA, calibration, acceptance, or performance claim",
+  "drivers": {
+    "after": {
+      "files": {
+        "Cargo.lock": {
+          "bytes": 33735,
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.lock",
+          "sha256": "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf"
+        },
+        "Cargo.toml": {
+          "bytes": 1140,
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+          "sha256": "6486356f5fff18e6805380a0fb6ef4f81b6eee47fb36a4776f0a45d3de91ad5d"
+        }
+      },
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate"
+    },
+    "before": {
+      "files": {
+        "Cargo.lock": {
+          "bytes": 33719,
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.lock",
+          "sha256": "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14"
+        },
+        "Cargo.toml": {
+          "bytes": 1152,
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+          "sha256": "80fadfb717d1cb0b2540b5387c6edbec3bdfec38903b11e8d5dab21fa7279bf4"
+        }
+      },
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline"
+    }
+  },
+  "independent_validator": {
+    "bytes": 83045,
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-ole-owner-native-protocol/tools/native_qualification/validate_ole_owner_run.py",
+    "sha256": "34de0f7160dd0bad5eb1b778c57364210a9cdde35c090aee64552fef84f98588"
+  },
+  "limits": {
+    "cargo_jobs": 1,
+    "incremental": false,
+    "locked": true,
+    "memory_env": "LITCHI_MEM_MAX=20G",
+    "offline": true,
+    "target_root": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f"
+  },
+  "manifest": {
+    "bytes": 4303,
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-ole-owner-native-protocol/tools/native_qualification/manifests/ole-owner.json",
+    "sha256": "bfac695d1de1e4fc55e9cf76c8d7719705c7f0212bab3e6fa6d9725c2ff36e40"
+  },
+  "oracle": {
+    "after": {
+      "allocator_rows": [
+        {
+          "alloc_bytes": 628,
+          "alloc_calls": 27,
+          "base_live_bytes": 1800539,
+          "base_live_calls": 222,
+          "dealloc_bytes": 910,
+          "dealloc_calls": 27,
+          "live_bytes": 1800539,
+          "live_calls": 222,
+          "peak_bytes": 1800758,
+          "peak_calls": 228,
+          "realloc_calls": 18,
+          "realloc_new_bytes": 564,
+          "realloc_old_bytes": 282,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "read"
+        },
+        {
+          "alloc_bytes": 3523,
+          "alloc_calls": 33,
+          "base_live_bytes": 1801371,
+          "base_live_calls": 223,
+          "dealloc_bytes": 3523,
+          "dealloc_calls": 33,
+          "live_bytes": 1801371,
+          "live_calls": 223,
+          "peak_bytes": 1803741,
+          "peak_calls": 245,
+          "realloc_calls": 0,
+          "realloc_new_bytes": 0,
+          "realloc_old_bytes": 0,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "edit"
+        },
+        {
+          "alloc_bytes": 2177675,
+          "alloc_calls": 1649,
+          "base_live_bytes": 1801371,
+          "base_live_calls": 223,
+          "dealloc_bytes": 2296395,
+          "dealloc_calls": 1649,
+          "live_bytes": 1801371,
+          "live_calls": 223,
+          "peak_bytes": 2741834,
+          "peak_calls": 631,
+          "realloc_calls": 316,
+          "realloc_new_bytes": 230784,
+          "realloc_old_bytes": 112064,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "xls_cells"
+        },
+        {
+          "alloc_bytes": 2065035,
+          "alloc_calls": 1648,
+          "base_live_bytes": 1801371,
+          "base_live_calls": 223,
+          "dealloc_bytes": 2183755,
+          "dealloc_calls": 1648,
+          "live_bytes": 1801371,
+          "live_calls": 223,
+          "peak_bytes": 2741834,
+          "peak_calls": 631,
+          "realloc_calls": 316,
+          "realloc_new_bytes": 230784,
+          "realloc_old_bytes": 112064,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "xls_cells_stage"
+        },
+        {
+          "alloc_bytes": 350913729,
+          "alloc_calls": 800257,
+          "base_live_bytes": 1801371,
+          "base_live_calls": 223,
+          "dealloc_bytes": 352600240,
+          "dealloc_calls": 800040,
+          "live_bytes": 8602365,
+          "live_calls": 440,
+          "peak_bytes": 8907325,
+          "peak_calls": 1013,
+          "realloc_calls": 6273,
+          "realloc_new_bytes": 16936120,
+          "realloc_old_bytes": 8448615,
+          "retained_packages": 129,
+          "retained_patches": 128,
+          "route": "doc_history"
+        },
+        {
+          "alloc_bytes": 183237837,
+          "alloc_calls": 128193,
+          "base_live_bytes": 1802203,
+          "base_live_calls": 223,
+          "dealloc_bytes": 142543463,
+          "dealloc_calls": 101132,
+          "live_bytes": 49267049,
+          "live_calls": 27284,
+          "peak_bytes": 49468870,
+          "peak_calls": 27335,
+          "realloc_calls": 21525,
+          "realloc_new_bytes": 12932816,
+          "realloc_old_bytes": 6162344,
+          "retained_packages": 129,
+          "retained_patches": 128,
+          "route": "xls_history"
+        }
+      ],
+      "command": [
+        "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/candidate-target/release/examples/ole_owner_oracle",
+        "--output",
+        "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator"
+      ],
+      "files": {
+        "allocator.tsv": {
+          "bytes": 782,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/allocator.tsv",
+          "sha256": "39a93ba03da0039799aa4a7fdfd0747a5cce3deecf5556e360cbf7634d39be31"
+        },
+        "doc-edit.bin": {
+          "bytes": 41984,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/doc-edit.bin",
+          "sha256": "537790f96727d05c6abf1f2881dd7012aa600b3bfc2d753be781fd7445d10d40"
+        },
+        "doc-history-final.bin": {
+          "bytes": 41984,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/doc-history-final.bin",
+          "sha256": "537790f96727d05c6abf1f2881dd7012aa600b3bfc2d753be781fd7445d10d40"
+        },
+        "doc-proof.tsv": {
+          "bytes": 19788,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/doc-proof.tsv",
+          "sha256": "2798b05d25808db45ba4be890710f5f7594486c1e1460c5555c679598e097a77"
+        },
+        "doc-source.bin": {
+          "bytes": 35840,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/doc-source.bin",
+          "sha256": "be5d6369180c83792b6a0d607642e86edbed53074567cef1e45719fbb489eb67"
+        },
+        "history-proof.tsv": {
+          "bytes": 102,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/history-proof.tsv",
+          "sha256": "8f876954960b5536335f13b11d91d7be0ef9338023fec471cd55c55069673795"
+        },
+        "ole-inventory.tsv": {
+          "bytes": 15986,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/ole-inventory.tsv",
+          "sha256": "7de06bfdf9bf75268df188dae5910fa331a4b4c668d9055ce667134f3167c4ae"
+        },
+        "ole-noop.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/ole-noop.bin",
+          "sha256": "1c269e29c32222e33b11b45703ab6eaeb7dedfe11e5cf7fba2e924949f45652b"
+        },
+        "ole-replacement.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/ole-replacement.bin",
+          "sha256": "3a6026c5b2a77cea52351af8166b269b7e4a25a9eb9de419ff189e27691a2e8f"
+        },
+        "ole-source.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/ole-source.bin",
+          "sha256": "1c269e29c32222e33b11b45703ab6eaeb7dedfe11e5cf7fba2e924949f45652b"
+        },
+        "oracle.tsv": {
+          "bytes": 190,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/oracle.tsv",
+          "sha256": "d5c9b176bf8aa97025cd7b07c5c992c86fbf072486eb3a07d55a0a693d5c213d"
+        },
+        "properties.tsv": {
+          "bytes": 133,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/properties.tsv",
+          "sha256": "020b446e448429126e33201a86975613926df4c0a558f31f22d9a010f1788ccc"
+        },
+        "xls-edit.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-edit.bin",
+          "sha256": "e0cd6668e86a6fe665b2f2ecae4b2b86351eb5eb5a2e205b74e8cb473a3f263b"
+        },
+        "xls-history-final.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-history-final.bin",
+          "sha256": "92733713e8a9f703d454be17d9e6b4d37d77b313418f8aa2d6eb7ce251f4f83f"
+        },
+        "xls-opaque-edit.bin": {
+          "bytes": 98304,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-opaque-edit.bin",
+          "sha256": "9bc22b608d26fd897a83b72afd3d4500e8ec9693c4325ae682d854deab11a18e"
+        },
+        "xls-opaque-source.bin": {
+          "bytes": 98304,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-opaque-source.bin",
+          "sha256": "9bc22b608d26fd897a83b72afd3d4500e8ec9693c4325ae682d854deab11a18e"
+        },
+        "xls-proof.tsv": {
+          "bytes": 15161,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-proof.tsv",
+          "sha256": "b304e4a5627c7bdec3f8d3a18e269f27121b597121750c39f8085de232887b27"
+        },
+        "xls-source.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator/xls-source.bin",
+          "sha256": "562cb4340aae464f102eefd35c76cd5a3fb2701c16c1437dfa1d3903f20816d9"
+        }
+      },
+      "status": "exit-0",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/oracle-after-allocator.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 1922,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/oracle-after-allocator.stdout",
+        "sha256": "ec7243c5f1df01ea7e698902c280b9f6f0853317ee8d61c718df146d05701d9e"
+      }
+    },
+    "before": {
+      "allocator_rows": [
+        {
+          "alloc_bytes": 628,
+          "alloc_calls": 27,
+          "base_live_bytes": 1813276,
+          "base_live_calls": 222,
+          "dealloc_bytes": 910,
+          "dealloc_calls": 27,
+          "live_bytes": 1813276,
+          "live_calls": 222,
+          "peak_bytes": 1813495,
+          "peak_calls": 228,
+          "realloc_calls": 18,
+          "realloc_new_bytes": 564,
+          "realloc_old_bytes": 282,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "read"
+        },
+        {
+          "alloc_bytes": 3523,
+          "alloc_calls": 33,
+          "base_live_bytes": 1814108,
+          "base_live_calls": 223,
+          "dealloc_bytes": 3523,
+          "dealloc_calls": 33,
+          "live_bytes": 1814108,
+          "live_calls": 223,
+          "peak_bytes": 1816478,
+          "peak_calls": 245,
+          "realloc_calls": 0,
+          "realloc_new_bytes": 0,
+          "realloc_old_bytes": 0,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "edit"
+        },
+        {
+          "alloc_bytes": 2402594,
+          "alloc_calls": 1653,
+          "base_live_bytes": 1814108,
+          "base_live_calls": 223,
+          "dealloc_bytes": 2521314,
+          "dealloc_calls": 1653,
+          "live_bytes": 1814108,
+          "live_calls": 223,
+          "peak_bytes": 2754533,
+          "peak_calls": 621,
+          "realloc_calls": 316,
+          "realloc_new_bytes": 230784,
+          "realloc_old_bytes": 112064,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "xls_cells"
+        },
+        {
+          "alloc_bytes": 2289954,
+          "alloc_calls": 1652,
+          "base_live_bytes": 1814108,
+          "base_live_calls": 223,
+          "dealloc_bytes": 2408674,
+          "dealloc_calls": 1652,
+          "live_bytes": 1814108,
+          "live_calls": 223,
+          "peak_bytes": 2754533,
+          "peak_calls": 621,
+          "realloc_calls": 316,
+          "realloc_new_bytes": 230784,
+          "realloc_old_bytes": 112064,
+          "retained_packages": 0,
+          "retained_patches": 0,
+          "route": "xls_cells_stage"
+        },
+        {
+          "alloc_bytes": 351204319,
+          "alloc_calls": 805462,
+          "base_live_bytes": 1814108,
+          "base_live_calls": 223,
+          "dealloc_bytes": 352934374,
+          "dealloc_calls": 805245,
+          "live_bytes": 8615054,
+          "live_calls": 440,
+          "peak_bytes": 8921924,
+          "peak_calls": 1043,
+          "realloc_calls": 6303,
+          "realloc_new_bytes": 17057288,
+          "realloc_old_bytes": 8526287,
+          "retained_packages": 129,
+          "retained_patches": 128,
+          "route": "doc_history"
+        },
+        {
+          "alloc_bytes": 197741890,
+          "alloc_calls": 128451,
+          "base_live_bytes": 1814940,
+          "base_live_calls": 223,
+          "dealloc_bytes": 157052700,
+          "dealloc_calls": 101519,
+          "live_bytes": 49274602,
+          "live_calls": 27155,
+          "peak_bytes": 49476497,
+          "peak_calls": 27206,
+          "realloc_calls": 21525,
+          "realloc_new_bytes": 12932816,
+          "realloc_old_bytes": 6162344,
+          "retained_packages": 129,
+          "retained_patches": 128,
+          "route": "xls_history"
+        }
+      ],
+      "command": [
+        "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/baseline-target/release/examples/ole_owner_oracle",
+        "--output",
+        "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator"
+      ],
+      "files": {
+        "allocator.tsv": {
+          "bytes": 782,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/allocator.tsv",
+          "sha256": "d39d3acdf14372bd5b8db1dcaef51ab658bbbd9ca70ff1556116876db8ef687c"
+        },
+        "doc-edit.bin": {
+          "bytes": 41984,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/doc-edit.bin",
+          "sha256": "537790f96727d05c6abf1f2881dd7012aa600b3bfc2d753be781fd7445d10d40"
+        },
+        "doc-history-final.bin": {
+          "bytes": 41984,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/doc-history-final.bin",
+          "sha256": "537790f96727d05c6abf1f2881dd7012aa600b3bfc2d753be781fd7445d10d40"
+        },
+        "doc-proof.tsv": {
+          "bytes": 19788,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/doc-proof.tsv",
+          "sha256": "2798b05d25808db45ba4be890710f5f7594486c1e1460c5555c679598e097a77"
+        },
+        "doc-source.bin": {
+          "bytes": 35840,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/doc-source.bin",
+          "sha256": "be5d6369180c83792b6a0d607642e86edbed53074567cef1e45719fbb489eb67"
+        },
+        "history-proof.tsv": {
+          "bytes": 102,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/history-proof.tsv",
+          "sha256": "8f876954960b5536335f13b11d91d7be0ef9338023fec471cd55c55069673795"
+        },
+        "ole-inventory.tsv": {
+          "bytes": 15986,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/ole-inventory.tsv",
+          "sha256": "7de06bfdf9bf75268df188dae5910fa331a4b4c668d9055ce667134f3167c4ae"
+        },
+        "ole-noop.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/ole-noop.bin",
+          "sha256": "1c269e29c32222e33b11b45703ab6eaeb7dedfe11e5cf7fba2e924949f45652b"
+        },
+        "ole-replacement.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/ole-replacement.bin",
+          "sha256": "3a6026c5b2a77cea52351af8166b269b7e4a25a9eb9de419ff189e27691a2e8f"
+        },
+        "ole-source.bin": {
+          "bytes": 14848,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/ole-source.bin",
+          "sha256": "1c269e29c32222e33b11b45703ab6eaeb7dedfe11e5cf7fba2e924949f45652b"
+        },
+        "oracle.tsv": {
+          "bytes": 190,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/oracle.tsv",
+          "sha256": "d5c9b176bf8aa97025cd7b07c5c992c86fbf072486eb3a07d55a0a693d5c213d"
+        },
+        "properties.tsv": {
+          "bytes": 133,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/properties.tsv",
+          "sha256": "020b446e448429126e33201a86975613926df4c0a558f31f22d9a010f1788ccc"
+        },
+        "xls-edit.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-edit.bin",
+          "sha256": "e0cd6668e86a6fe665b2f2ecae4b2b86351eb5eb5a2e205b74e8cb473a3f263b"
+        },
+        "xls-history-final.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-history-final.bin",
+          "sha256": "92733713e8a9f703d454be17d9e6b4d37d77b313418f8aa2d6eb7ce251f4f83f"
+        },
+        "xls-opaque-edit.bin": {
+          "bytes": 98304,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-opaque-edit.bin",
+          "sha256": "9bc22b608d26fd897a83b72afd3d4500e8ec9693c4325ae682d854deab11a18e"
+        },
+        "xls-opaque-source.bin": {
+          "bytes": 98304,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-opaque-source.bin",
+          "sha256": "9bc22b608d26fd897a83b72afd3d4500e8ec9693c4325ae682d854deab11a18e"
+        },
+        "xls-proof.tsv": {
+          "bytes": 15161,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-proof.tsv",
+          "sha256": "b304e4a5627c7bdec3f8d3a18e269f27121b597121750c39f8085de232887b27"
+        },
+        "xls-source.bin": {
+          "bytes": 112640,
+          "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator/xls-source.bin",
+          "sha256": "562cb4340aae464f102eefd35c76cd5a3fb2701c16c1437dfa1d3903f20816d9"
+        }
+      },
+      "status": "exit-0",
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/oracle-before-allocator.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 1923,
+        "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/logs/oracle-before-allocator.stdout",
+        "sha256": "a349ac721bc419b0f8a3fd18808d5a6ff029f9953aaca7cd62cf83d0f5b7ff90"
+      }
+    }
+  },
+  "preparation": {
+    "bytes": 59007,
+    "path": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-preparation-29f.json",
+    "sha256": "1fada236dd406750c20a6930e442963793dcebaf1532d5e07ae9ee89cd4ec02b"
+  },
+  "protocol_check": {
+    "actual_metadata_rows": {
+      "after": [
+        "schema\t1",
+        "owner_streams\t65",
+        "owner_target\tole_w5_edit_target.bin",
+        "owner_original_bytes\t15",
+        "owner_replacement_bytes\t18",
+        "properties\tvalidated",
+        "doc\trevision\tInsertion\t0\t24\tW5Oracle",
+        "xls\tCells\t0\t0\t4242"
+      ],
+      "before": [
+        "schema\t1",
+        "owner_streams\t65",
+        "owner_target\tole_w5_edit_target.bin",
+        "owner_original_bytes\t15",
+        "owner_replacement_bytes\t18",
+        "properties\tvalidated",
+        "doc\trevision\tInsertion\t0\t24\tW5Oracle",
+        "xls\tCells\t0\t0\t4242"
+      ]
+    },
+    "actual_replacement_literal": {
+      "bytes": 18,
+      "value": "ole-w5-replacement"
+    },
+    "allocator_oracle_retention": {
+      "doc_history": [
+        129,
+        128
+      ],
+      "other": [
+        0,
+        0
+      ],
+      "xls_history": [
+        129,
+        128
+      ]
+    },
+    "allocator_route_set": [
+      "read",
+      "edit",
+      "xls_cells",
+      "xls_cells_stage",
+      "doc_history",
+      "xls_history"
+    ],
+    "clone_binary_built_not_executed": true,
+    "common_oracle_artifacts": [
+      "doc-edit.bin",
+      "doc-history-final.bin",
+      "doc-proof.tsv",
+      "doc-source.bin",
+      "history-proof.tsv",
+      "ole-inventory.tsv",
+      "ole-noop.bin",
+      "ole-replacement.bin",
+      "ole-source.bin",
+      "oracle.tsv",
+      "properties.tsv",
+      "xls-edit.bin",
+      "xls-history-final.bin",
+      "xls-opaque-edit.bin",
+      "xls-opaque-source.bin",
+      "xls-proof.tsv",
+      "xls-source.bin"
+    ],
+    "common_oracle_artifacts_equal": true,
+    "no_calibration_or_abba": true,
+    "oracle_metadata_validator": "failed-before-allocation-checks",
+    "oracle_metadata_validator_error": "oracle metadata is not the explicit expected-value record: owner_replacement_bytes expected 19, actual 18"
+  },
+  "runner": {
+    "bytes": 80497,
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-ole-owner-native-protocol/tools/native_qualification/ole_owner_paired_runner.py",
+    "sha256": "31f2332dbcbec4c2762d8cd966a02d4251c07b76fb35964b6644c36007d07b7c"
+  },
+  "schema": "litchi.ole-owner-allocator-diagnostic.v1",
+  "source_policy": {
+    "baseline_commit": "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c",
+    "baseline_overlay": false,
+    "candidate_commit": "29f072f19c53503395164fcb3a618c44fc22cf75",
+    "candidate_overlay": false
+  },
+  "sources": {
+    "after": {
+      "clean": true,
+      "head": "29f072f19c53503395164fcb3a618c44fc22cf75",
+      "production_tree_sha256": "0e4e85e7ff2789c582c11aa9160eec746fda0cf70c1a64f96eae3ca358feba2b",
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/source",
+      "status": "",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tree": "6d9d110c8c7f72a3b5646e5423fa2d0147d6c225"
+    },
+    "before": {
+      "clean": true,
+      "head": "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c",
+      "production_tree_sha256": "47b8a0ecfbb2d63ace8dcf37a19f6cee1b01082438ee692af4918621fe219ea0",
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-baseline-0ce4",
+      "status": "",
+      "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tree": "f54db6e7c4b759b60cf50738698387ab93de59d6"
+    }
+  },
+  "status": "allocator-correctness-complete; paired-metadata-validator-blocked",
+  "toolchain": {
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "python": "Python 3.14.4",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+  }
+}

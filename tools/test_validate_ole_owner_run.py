@@ -241,7 +241,8 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
         build_path.write_text(json.dumps(build_receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
         reports = {}
-        metadata = "\n".join(["schema\t1", "owner_streams\t65", "owner_target\tole-w5_edit_target.bin", "owner_original_bytes\t15", "owner_replacement_bytes\t19", "properties\tvalidated", "doc\trevision\tInsertion\t0\t24\tW5Oracle", "xls\tCells\t0\t0\t4242"]) + "\n"
+        replacement_payload = b"ole-w5-replacement"
+        metadata = "\n".join(["schema\t1", "owner_streams\t65", "owner_target\tole_w5_edit_target.bin", "owner_original_bytes\t15", f"owner_replacement_bytes\t{len(replacement_payload)}", "properties\tvalidated", "doc\trevision\tInsertion\t0\t24\tW5Oracle", "xls\tCells\t0\t0\t4242"]) + "\n"
         allocator_header = "route\talloc_calls\talloc_bytes\tdealloc_calls\tdealloc_bytes\trealloc_calls\trealloc_old_bytes\trealloc_new_bytes\tbase_live_calls\tbase_live_bytes\tlive_calls\tlive_bytes\tpeak_calls\tpeak_bytes\tretained_packages\tretained_patches"
         allocator_rows = [allocator_header]
         for route in validator.ALLOCATOR_ROUTES:
@@ -266,11 +267,11 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
         entries = [("Root Entry", 5, 0, 0, "")] + [
             (f"ole_w5_sibling_{index:03}", 2, index + 1, len(f"opaque sibling payload {index:03}"), f"opaque sibling payload {index:03}".encode().hex())
             for index in range(64)
-        ] + [("ole-w5_edit_target.bin", 2, 65, 15, b"ole-w5-original".hex())]
+        ] + [("ole_w5_edit_target.bin", 2, 65, 15, b"ole-w5-original".hex())]
         for kind in ("source", "replacement"):
             for name, entry_type, sid, size, payload in entries:
-                if kind == "replacement" and name == "ole-w5_edit_target.bin":
-                    size, payload = 19, b"ole-w5-replacement".hex()
+                if kind == "replacement" and name == "ole_w5_edit_target.bin":
+                    size, payload = len(replacement_payload), replacement_payload.hex()
                 fields = (kind, name, str(entry_type), str(sid), "0", "0", "0", "", "0", "0", "0", str(size), payload)
                 inventory_rows.append("\t".join(fields))
         history_proof = "kind\tpackages\tpatches\tforward\tinverse\ndoc\t129\t128\tvalidated\tvalidated\nxls\t129\t128\tvalidated\tvalidated\n"
@@ -583,6 +584,43 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             lines.append(f"{route}\t10\t100\t2\t20\t1\t5\t6\t100\t1000\t108\t1081\t110\t1100\t{retained}")
         with self.assertRaisesRegex(validator.ValidationError, "route order and uniqueness"):
             validator._validate_allocator_rows(lines, "duplicate-route")
+
+    def test_oracle_metadata_matches_payload_and_rejects_size_drift(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, _ = self._fixture(Path(directory))
+            measurements = json.loads(paths["measurements"].read_text())
+            files = measurements["oracle"]["files"]["before/normal"]["files"]
+            metadata_path = Path(files["oracle.tsv"]["path"])
+            metadata = metadata_path.read_text()
+            oracle_directory = metadata_path.parent
+            validator._validate_oracle_proofs(files, "native-payload")
+            runner.PairedRunner._oracle_metadata(oracle_directory)
+            for changed in (
+                metadata.replace("owner_replacement_bytes\t18", "owner_replacement_bytes\t19"),
+                metadata.replace("ole_w5_edit_target.bin", "ole-w5_edit_target.bin"),
+            ):
+                with self.subTest(metadata=changed):
+                    metadata_path.write_text(changed)
+                    with self.assertRaisesRegex(validator.ValidationError, "metadata"):
+                        validator._validate_oracle_proofs(files, "wrong-metadata")
+                    with self.assertRaisesRegex(runner.RunnerError, "metadata"):
+                        runner.PairedRunner._oracle_metadata(oracle_directory)
+            metadata_path.write_text(metadata)
+            inventory_path = Path(files["ole-inventory.tsv"]["path"])
+            lines = inventory_path.read_text().splitlines()
+            for index, line in enumerate(lines):
+                if line.startswith("replacement\tole_w5_edit_target.bin\t"):
+                    fields = line.split("\t")
+                    fields[-2] = "19"
+                    lines[index] = "\t".join(fields)
+                    break
+            else:
+                self.fail("replacement target missing from oracle fixture")
+            inventory_path.write_text("\n".join(lines) + "\n")
+            with self.assertRaisesRegex(validator.ValidationError, "stream size"):
+                validator._validate_oracle_proofs(files, "wrong-size")
+            with self.assertRaisesRegex(runner.RunnerError, "stream size"):
+                runner.PairedRunner._oracle_metadata(oracle_directory)
 
     def test_rejects_duplicate_doc_xls_indices_and_root_identity(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:

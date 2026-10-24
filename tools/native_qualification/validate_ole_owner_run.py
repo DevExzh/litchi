@@ -100,7 +100,7 @@ LOCK_HASH = re.compile(r"^[0-9a-f]{64}$")
 PROBE_NAME = "ole_w5_probe.rs"
 CLONE_NAME = "ole_package_clone_probe.rs"
 ORACLE_NAME = "ole_owner_oracle.rs"
-TARGET_NAME = "ole-w5_edit_target.bin"
+TARGET_NAME = "ole_w5_edit_target.bin"
 REQUIRED_PROBE_MARKERS = (
     "const SIBLINGS: usize = 64;",
     "const DOC_HISTORY_STEPS: usize = 128;",
@@ -1150,7 +1150,7 @@ def _validate_oracle_proofs(files: Mapping[str, Any], label: str) -> None:
     metadata = (_path(files["oracle.tsv"]["path"], f"{label}.metadata")).read_text(encoding="utf-8").splitlines()
     _same(metadata, [
         "schema\t1", "owner_streams\t65", f"owner_target\t{TARGET_NAME}",
-        "owner_original_bytes\t15", "owner_replacement_bytes\t19", "properties\tvalidated",
+        "owner_original_bytes\t15", "owner_replacement_bytes\t18", "properties\tvalidated",
         "doc\trevision\tInsertion\t0\t24\tW5Oracle", "xls\tCells\t0\t0\t4242",
     ], f"{label} metadata")
     properties = (_path(files["properties.tsv"]["path"], f"{label}.properties")).read_text(encoding="utf-8").splitlines()
@@ -1195,6 +1195,8 @@ def _validate_oracle_proofs(files: Mapping[str, Any], label: str) -> None:
             after_payload = bytes.fromhex(after[-1])
         except ValueError as error:
             raise ValidationError(f"{label} inventory payload is not hex") from error
+        if before[-2] != str(len(before_payload)) or after[-2] != str(len(after_payload)):
+            raise ValidationError(f"{label} stream size differs from its payload: {name}")
         if name == TARGET_NAME:
             if before_payload != b"ole-w5-original" or after_payload != b"ole-w5-replacement":
                 raise ValidationError(f"{label} target inventory proof differs")

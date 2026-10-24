@@ -151,7 +151,7 @@ ORACLE_FILES = (
     "oracle.tsv",
     "allocator.tsv",
 )
-TARGET_NAME = "ole-w5_edit_target.bin"
+TARGET_NAME = "ole_w5_edit_target.bin"
 
 
 class RunnerError(RuntimeError):
@@ -1271,7 +1271,7 @@ class PairedRunner:
             "owner_streams\t65",
             f"owner_target\t{TARGET_NAME}",
             "owner_original_bytes\t15",
-            "owner_replacement_bytes\t19",
+            "owner_replacement_bytes\t18",
             "properties\tvalidated",
             "doc\trevision\tInsertion\t0\t24\tW5Oracle",
             "xls\tCells\t0\t0\t4242",
@@ -1317,6 +1317,8 @@ class PairedRunner:
         for name in expected_streams:
             before = rows["source"][name]
             after = rows["replacement"][name]
+            if any(fields[-2] != str(len(bytes.fromhex(fields[-1]))) for fields in (before, after)):
+                raise RunnerError(f"oracle stream size differs from its payload: {directory}/{name}")
             if name == TARGET_NAME:
                 if bytes.fromhex(before[-1]) != b"ole-w5-original" or bytes.fromhex(after[-1]) != b"ole-w5-replacement":
                     raise RunnerError(f"oracle replacement target proof differs: {directory}")
