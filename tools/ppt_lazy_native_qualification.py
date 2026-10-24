@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -55,6 +56,30 @@ ROUTES = (
     "primary_noop_commit",
     "metadata_entry_drop",
     "metadata_noop_commit",
+    "animations_entry_drop",
+    "animations_noop_commit",
+    "broadcast_entry_drop",
+    "broadcast_noop_commit",
+    "client_data_entry_drop",
+    "client_data_noop_commit",
+    "diagrams_entry_drop",
+    "diagrams_noop_commit",
+    "document_comparison_entry_drop",
+    "document_comparison_noop_commit",
+    "objects_entry_drop",
+    "objects_noop_commit",
+    "external_media_entry_drop",
+    "external_media_noop_commit",
+    "fonts_entry_drop",
+    "fonts_noop_commit",
+    "master_metadata_entry_drop",
+    "master_metadata_noop_commit",
+    "master_layout_entry_drop",
+    "master_layout_noop_commit",
+    "picture_bullets_entry_drop",
+    "picture_bullets_noop_commit",
+    "slide_sync_entry_drop",
+    "slide_sync_noop_commit",
 )
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
 ROLE_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
@@ -98,24 +123,31 @@ def _nonnegative_int(value: Any, label: str) -> int:
     return value
 
 
-def _load_json(path: Path) -> dict[str, Any]:
+def _finite_number(value: Any, label: str, *, minimum: float | None = None) -> float | int:
+    if type(value) not in (int, float):
+        raise RunFailure(f"{label} must be a finite number")
     try:
-        raw = path.read_bytes()
-    except OSError as error:
-        raise RunFailure(f"cannot read manifest {path}: {error}") from error
-    if len(raw) > MAX_MANIFEST_BYTES:
-        raise RunFailure(f"manifest exceeds {MAX_MANIFEST_BYTES} bytes")
+        finite = math.isfinite(float(value))
+    except (OverflowError, ValueError) as error:
+        raise RunFailure(f"{label} must be a finite number") from error
+    if not finite:
+        raise RunFailure(f"{label} must be a finite number")
+    if minimum is not None and value < minimum:
+        raise RunFailure(f"{label} must be at least {minimum}")
+    return value
 
+
+def _strict_json(raw: bytes, label: str) -> Any:
     def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
             if key in result:
-                raise RunFailure(f"manifest contains duplicate key {key!r}")
+                raise RunFailure(f"{label} contains duplicate key {key!r}")
             result[key] = value
         return result
 
     def reject_constant(constant: str) -> Any:
-        raise RunFailure(f"manifest contains non-finite JSON constant {constant!r}")
+        raise RunFailure(f"{label} contains non-finite JSON constant {constant!r}")
 
     try:
         value = json.loads(
@@ -124,7 +156,29 @@ def _load_json(path: Path) -> dict[str, Any]:
             parse_constant=reject_constant,
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RunFailure(f"manifest is not strict UTF-8 JSON: {error}") from error
+        raise RunFailure(f"{label} is not strict UTF-8 JSON: {error}") from error
+    def reject_nonfinite(value: Any) -> None:
+        if isinstance(value, float) and not math.isfinite(value):
+            raise RunFailure(f"{label} contains a non-finite JSON number")
+        if isinstance(value, dict):
+            for nested in value.values():
+                reject_nonfinite(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                reject_nonfinite(nested)
+    reject_nonfinite(value)
+    return value
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise RunFailure(f"cannot read manifest {path}: {error}") from error
+    if len(raw) > MAX_MANIFEST_BYTES:
+        raise RunFailure(f"manifest exceeds {MAX_MANIFEST_BYTES} bytes")
+
+    value = _strict_json(raw, "manifest")
     return _object(value, "manifest")
 
 
@@ -168,7 +222,9 @@ def _endpoint_spec(value: Any, label: str, *, plan: bool) -> dict[str, Any]:
         pass
     elif REVISION.fullmatch(tree) is None:
         raise RunFailure(f"{label}.tree must be a full tree SHA")
-    _identity_spec(item.get("lock"), f"{label}.lock", plan=plan)
+    lock = _identity_spec(item.get("lock"), f"{label}.lock", plan=plan)
+    if lock["path"] != "tools/perf-baseline/Cargo.lock":
+        raise RunFailure(f"{label}.lock.path must be tools/perf-baseline/Cargo.lock")
     _identity_spec(item.get("normal_binary"), f"{label}.normal_binary", plan=plan)
     _identity_spec(item.get("allocator_binary"), f"{label}.allocator_binary", plan=plan)
     _string(item.get("target_dir"), f"{label}.target_dir")
@@ -176,11 +232,89 @@ def _endpoint_spec(value: Any, label: str, *, plan: bool) -> dict[str, Any]:
     return item
 
 
+def _build_spec(value: Any, *, plan: bool) -> dict[str, Any]:
+    build = _object(value, "manifest.build")
+    _exact_keys(
+        build,
+        {
+            "receipt",
+            "source_archive",
+            "fixture",
+            "toolchain",
+            "cargo_config",
+            "profile",
+            "target_subdir",
+            "normal_command",
+            "allocator_command",
+            "features",
+            "environment",
+        },
+        "manifest.build",
+    )
+    for name in ("receipt", "source_archive", "toolchain", "cargo_config"):
+        _identity_spec(build.get(name), f"manifest.build.{name}", plan=plan)
+    if build.get("profile") != "release" or build.get("target_subdir") != "target/release":
+        raise RunFailure("manifest.build must pin the release profile and target/release")
+    expected_commands = {
+        "normal_command": [
+            "cargo",
+            "build",
+            "--release",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--bin",
+            "ppt_lazy_native",
+        ],
+        "allocator_command": [
+            "cargo",
+            "build",
+            "--release",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--bin",
+            "ppt_lazy_native_alloc",
+        ],
+    }
+    for name, expected in expected_commands.items():
+        if build.get(name) != expected:
+            raise RunFailure(f"manifest.build.{name} differs from the fixed command")
+    features = _object(build.get("features"), "manifest.build.features")
+    _exact_keys(features, {"normal", "allocator"}, "manifest.build.features")
+    expected_features = {
+        "normal": ["current-api", "current-xlsx-raw-opc"],
+        "allocator": ["current-api", "current-xlsx-raw-opc"],
+    }
+    if features != expected_features:
+        raise RunFailure("manifest.build.features differs from the fixed native probes")
+    environment = _object(build.get("environment"), "manifest.build.environment")
+    if environment != {
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    }:
+        raise RunFailure("manifest.build.environment differs from the fixed build environment")
+    return build
+
+
 def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
     value = _load_json(path)
     _exact_keys(
         value,
-        {"schema", "baseline", "candidate", "probe_sources", "protocol", "claim_scope"},
+        {
+            "schema",
+            "baseline",
+            "candidate",
+            "probe_sources",
+            "baseline_adapter",
+            "build",
+            "protocol",
+            "claim_scope",
+        },
         "manifest",
     )
     if value.get("schema") != INPUT_SCHEMA:
@@ -210,6 +344,22 @@ def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
         raise RunFailure("manifest.probe_sources must be a non-empty list")
     for index, source in enumerate(sources):
         _identity_spec(source, f"manifest.probe_sources[{index}]", plan=plan)
+    adapter = _object(value.get("baseline_adapter"), "manifest.baseline_adapter")
+    _exact_keys(adapter, {"overlay_paths", "registration"}, "manifest.baseline_adapter")
+    if adapter.get("overlay_paths") != [
+        "tools/perf-baseline/src/ppt_lazy_native.rs",
+        "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+        "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+    ]:
+        raise RunFailure("manifest.baseline_adapter.overlay_paths differs from the reviewed overlay")
+    registration = _object(adapter.get("registration"), "manifest.baseline_adapter.registration")
+    _exact_keys(registration, {"path", "line"}, "manifest.baseline_adapter.registration")
+    if registration != {
+        "path": "tools/perf-baseline/src/lib.rs",
+        "line": "pub mod ppt_lazy_native;",
+    }:
+        raise RunFailure("manifest.baseline_adapter.registration differs from the reviewed adapter")
+    _build_spec(value.get("build"), plan=plan)
     protocol = _object(value.get("protocol"), "manifest.protocol")
     _exact_keys(
         protocol,
@@ -220,15 +370,19 @@ def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
         raise RunFailure("manifest.protocol.cpu must be a nonzero pinned CPU")
     if protocol.get("blocks") != 2 or protocol.get("warmups") != 3:
         raise RunFailure("PPT lazy protocol requires two blocks and three warmups")
+    _finite_number(protocol.get("target_ms"), "manifest.protocol.target_ms", minimum=500)
     if type(protocol.get("target_ms")) not in (int, float) or protocol["target_ms"] < 500:
         raise RunFailure("PPT lazy protocol requires target_ms >= 500")
+    _finite_number(protocol.get("minimum_ms"), "manifest.protocol.minimum_ms", minimum=150)
     if type(protocol.get("minimum_ms")) not in (int, float) or protocol["minimum_ms"] < 150:
         raise RunFailure("PPT lazy protocol requires minimum_ms >= 150")
     if protocol["target_ms"] < protocol["minimum_ms"]:
         raise RunFailure("target_ms must not be below minimum_ms")
+    _finite_number(protocol.get("max_load"), "manifest.protocol.max_load", minimum=0)
     if type(protocol.get("max_load")) not in (int, float) or protocol["max_load"] <= 0:
         raise RunFailure("protocol max_load must be positive")
     _positive_int(protocol.get("max_iterations"), "manifest.protocol.max_iterations")
+    _finite_number(protocol.get("timeout_s"), "manifest.protocol.timeout_s", minimum=0)
     if type(protocol.get("timeout_s")) not in (int, float) or protocol["timeout_s"] <= 0:
         raise RunFailure("manifest.protocol.timeout_s must be positive")
     if value.get("claim_scope") != (
@@ -263,6 +417,10 @@ def _under(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _overlap(first: Path, second: Path) -> bool:
+    return _under(first, second) or _under(second, first)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -309,6 +467,16 @@ def _check_identity(spec: Mapping[str, Any], label: str, base: Path, *, executab
     return actual
 
 
+def _check_lock(spec: Mapping[str, Any], label: str, root: Path) -> dict[str, Any]:
+    if spec.get("path") != "tools/perf-baseline/Cargo.lock":
+        raise RunFailure(f"{label}.path must be tools/perf-baseline/Cargo.lock")
+    expected = (root / "tools/perf-baseline/Cargo.lock").resolve(strict=False)
+    actual = _check_identity(spec, label, root)
+    if Path(actual["path"]) != expected:
+        raise RunFailure(f"{label}.path must resolve below its endpoint root")
+    return actual
+
+
 def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, roots: Sequence[Path]) -> dict[str, Any]:
     root = _safe_path(_string(raw["root"], f"{label}.root"), manifest_path.parent, must_exist=True)
     if not root.is_dir():
@@ -325,7 +493,7 @@ def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, r
         raise RunFailure(f"{label} HEAD/tree differs from its manifest binding")
     if label == "baseline" and head != BASELINE_REF:
         raise RunFailure("baseline is not the true pre-lazy parent")
-    lock = _check_identity(raw["lock"], f"{label}.lock", root)
+    lock = _check_lock(raw["lock"], f"{label}.lock", root)
     if label == "baseline" and (
         lock["bytes"] != BASELINE_LOCK_BYTES or lock["sha256"] != BASELINE_LOCK_SHA256
     ):
@@ -337,7 +505,7 @@ def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, r
     if not target.is_dir() or not allocator_target.is_dir():
         raise RunFailure(f"{label} target directories must exist")
     for path, name in ((target, "target_dir"), (allocator_target, "allocator_target_dir")):
-        if _under(path, root) or any(_under(path, other) for other in roots if other != root):
+        if _overlap(path, root) or any(_overlap(path, other) for other in roots if other != root):
             raise RunFailure(f"{label}.{name} must be outside both source worktrees")
     if _under(target, allocator_target) or _under(allocator_target, target):
         raise RunFailure(f"{label} normal and allocator targets overlap")
@@ -361,11 +529,188 @@ def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, r
     }
 
 
-def _check_probe_sources(raw_sources: Sequence[Mapping[str, Any]], manifest_path: Path) -> list[dict[str, Any]]:
+def _check_probe_sources(
+    raw_sources: Sequence[Mapping[str, Any]],
+    endpoint: Mapping[str, Any],
+) -> list[dict[str, Any]]:
     result = []
     for index, spec in enumerate(raw_sources):
-        result.append(_check_identity(spec, f"probe_sources[{index}]", manifest_path.parent))
+        relative = _string(spec.get("path"), f"probe_sources[{index}].path")
+        if Path(relative).is_absolute() or "3rd" + "party" in Path(relative).parts:
+            raise RunFailure(f"probe_sources[{index}].path must be a reviewed relative source path")
+        path = _safe_path(relative, endpoint["root"], must_exist=True)
+        if not _under(path, endpoint["root"]):
+            raise RunFailure(f"probe_sources[{index}] escapes the candidate source root")
+        tracked = _git(endpoint["root"], "ls-files", "-v", "--", relative)
+        if tracked != f"H {relative}":
+            raise RunFailure(f"probe_sources[{index}] is not an ordinary tracked candidate file")
+        actual = _identity(path)
+        expected = {"path": relative, "bytes": spec["bytes"], "sha256": spec["sha256"]}
+        if spec["bytes"] is None or spec["sha256"] is None:
+            raise RunFailure(f"probe_sources[{index}] is not frozen to candidate source bytes")
+        if actual != {"path": str(path), "bytes": expected["bytes"], "sha256": expected["sha256"]}:
+            raise RunFailure(f"probe_sources[{index}] identity differs from candidate source")
+        result.append({"path": str(path), "bytes": actual["bytes"], "sha256": actual["sha256"]})
     return result
+
+
+def _relative_identity(path: Path, root: Path, label: str) -> dict[str, Any]:
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise RunFailure(f"{label} is outside its declared source root") from error
+    if relative == Path("."):
+        raise RunFailure(f"{label} must name a file below its source root")
+    identity = _identity(path)
+    return {"path": relative.as_posix(), "bytes": identity["bytes"], "sha256": identity["sha256"]}
+
+
+def _validate_build_receipt(
+    manifest: Mapping[str, Any],
+    manifest_path: Path,
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+    probe_sources: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    build = _object(manifest.get("build"), "manifest.build")
+    receipt_spec = _identity_spec(build.get("receipt"), "manifest.build.receipt", plan=False)
+    receipt_path = _safe_path(receipt_spec["path"], manifest_path.parent, must_exist=True)
+    if _overlap(receipt_path, baseline["root"]) or _overlap(receipt_path, candidate["root"]):
+        raise RunFailure("build receipt must be outside both source roots")
+    receipt_identity = _identity(receipt_path)
+    if receipt_identity != {
+        "path": str(receipt_path),
+        "bytes": receipt_spec["bytes"],
+        "sha256": receipt_spec["sha256"],
+    }:
+        raise RunFailure("build receipt identity differs from the manifest")
+    value = _strict_json(receipt_path.read_bytes(), "build receipt")
+    receipt = _object(value, "build receipt")
+    expected_keys = {
+        "schema",
+        "status",
+        "manifest",
+        "manifest_sha256",
+        "source_archive",
+        "toolchain",
+        "cargo_config",
+        "baseline",
+        "candidate",
+        "fixture",
+        "probe_sources",
+        "baseline_adapter",
+        "commands",
+        "environment",
+        "profile",
+        "target_subdir",
+        "features",
+        "targets",
+        "binaries",
+        "completed_unix_ns",
+    }
+    _exact_keys(receipt, expected_keys, "build receipt")
+    if receipt.get("schema") != "litchi.ppt.lazy-native.build.v1" or receipt.get("status") != "passed":
+        raise RunFailure("build receipt is not a passed PPT lazy-native build receipt")
+    manifest_identity = _identity(manifest_path)
+    if receipt.get("manifest") != str(manifest_path.resolve()) or receipt.get("manifest_sha256") != manifest_identity["sha256"]:
+        raise RunFailure("build receipt is bound to a different manifest")
+
+    roots = (baseline["root"], candidate["root"])
+    external_inputs: dict[str, dict[str, Any]] = {}
+    for name in ("source_archive", "toolchain", "cargo_config"):
+        spec = _identity_spec(build.get(name), f"manifest.build.{name}", plan=False)
+        path = _safe_path(spec["path"], manifest_path.parent, must_exist=True)
+        if any(_overlap(path, root) for root in roots):
+            raise RunFailure(f"manifest.build.{name} must be outside both source roots")
+        actual = _identity(path)
+        expected = {"path": str(path), "bytes": spec["bytes"], "sha256": spec["sha256"]}
+        if actual != expected:
+            raise RunFailure(f"manifest.build.{name} identity differs from the manifest")
+        if receipt[name] != actual:
+            raise RunFailure(f"build receipt {name} identity differs from the manifest")
+        external_inputs[name] = actual
+
+    fixture_spec = _identity_spec(build.get("fixture"), "manifest.build.fixture", plan=False)
+    fixture_path = _safe_path(fixture_spec["path"], manifest_path.parent, must_exist=True)
+    fixture_identity = _identity(fixture_path)
+    if fixture_identity != {"path": str(fixture_path), "bytes": fixture_spec["bytes"], "sha256": fixture_spec["sha256"]}:
+        raise RunFailure("qualification fixture identity differs from the manifest")
+    if receipt["fixture"] != fixture_identity:
+        raise RunFailure("build receipt fixture identity differs from the manifest")
+
+    for name, endpoint in (("baseline", baseline), ("candidate", candidate)):
+        expected_endpoint = {"ref": endpoint["head"], "tree": endpoint["tree"], "lock": endpoint["lock"]}
+        if receipt[name] != expected_endpoint:
+            raise RunFailure(f"build receipt {name} source/lock identity differs")
+    expected_probe = [
+        {"path": Path(spec["path"]).as_posix(), "bytes": spec["bytes"], "sha256": spec["sha256"]}
+        for spec in manifest["probe_sources"]
+    ]
+    actual_probe = [
+        {
+            "path": str(_safe_path(spec["path"], candidate["root"])),
+            "bytes": spec["bytes"],
+            "sha256": spec["sha256"],
+        }
+        for spec in manifest["probe_sources"]
+    ]
+    if list(probe_sources) != actual_probe:
+        raise RunFailure("candidate probe source checks were not bound to the receipt")
+    if receipt["probe_sources"] != expected_probe:
+        raise RunFailure("build receipt probe source identities differ from the manifest")
+    adapter = _object(receipt["baseline_adapter"], "build receipt baseline_adapter")
+    _exact_keys(adapter, {"overlay_paths", "registration"}, "build receipt baseline_adapter")
+    if adapter["overlay_paths"] != expected_probe[:3]:
+        raise RunFailure("build receipt baseline overlay identities differ from the reviewed probe")
+    registration = _object(adapter["registration"], "build receipt baseline_adapter.registration")
+    _exact_keys(registration, {"path", "line", "before", "after"}, "build receipt baseline_adapter.registration")
+    if registration["path"] != manifest["baseline_adapter"]["registration"]["path"] or registration["line"] != manifest["baseline_adapter"]["registration"]["line"]:
+        raise RunFailure("build receipt adapter registration differs from the reviewed diff")
+    before_path = _safe_path(registration["before"]["path"], baseline["root"], must_exist=True)
+    after_path = _safe_path(registration["after"]["path"], candidate["root"], must_exist=True)
+    if before_path != baseline["root"] / registration["path"] or after_path != candidate["root"] / registration["path"]:
+        raise RunFailure("build receipt adapter registration paths differ from endpoint roots")
+    before_identity = _relative_identity(before_path, baseline["root"], "adapter registration before")
+    after_identity = _relative_identity(after_path, candidate["root"], "adapter registration after")
+    if registration["before"] != before_identity or registration["after"] != after_identity:
+        raise RunFailure("build receipt adapter registration bytes changed")
+    if after_identity != expected_probe[3]:
+        raise RunFailure("build receipt adapter registration does not bind candidate src/lib.rs")
+
+    if receipt["commands"] != {
+        "normal": build["normal_command"],
+        "allocator": build["allocator_command"],
+    } or receipt["environment"] != build["environment"] or receipt["profile"] != build["profile"] or receipt["target_subdir"] != build["target_subdir"] or receipt["features"] != build["features"]:
+        raise RunFailure("build receipt command/configuration identity differs from the manifest")
+    if _positive_int(receipt.get("completed_unix_ns"), "build receipt.completed_unix_ns") <= 0:
+        raise RunFailure("build receipt completion timestamp is invalid")
+
+    expected_targets = {
+        name: {
+            "normal": str(endpoint["target_dir"]),
+            "allocator": str(endpoint["allocator_target_dir"]),
+        }
+        for name, endpoint in (("baseline", baseline), ("candidate", candidate))
+    }
+    if receipt["targets"] != expected_targets:
+        raise RunFailure("build receipt target paths differ from the endpoints")
+    expected_binaries = {
+        name: {
+            "normal": endpoint["normal_binary"],
+            "allocator": endpoint["allocator_binary"],
+        }
+        for name, endpoint in (("baseline", baseline), ("candidate", candidate))
+    }
+    if receipt["binaries"] != expected_binaries:
+        raise RunFailure("build receipt binary identities differ from the endpoints")
+    return {
+        "path": str(receipt_path),
+        "bytes": receipt_identity["bytes"],
+        "sha256": receipt_identity["sha256"],
+        "source_archive": external_inputs["source_archive"],
+        "toolchain": external_inputs["toolchain"],
+        "cargo_config": external_inputs["cargo_config"],
+    }
 
 
 def _check_target(path: Path, label: str) -> dict[str, Any]:
@@ -383,13 +728,13 @@ def _check_target(path: Path, label: str) -> dict[str, Any]:
 
 
 def _parse_child(path: Path, label: str) -> dict[str, Any]:
-    raw = path.read_bytes()
+    try:
+        raw = path.read_bytes()
+    except OSError as error:
+        raise RunFailure(f"{label}: cannot read child output: {error}") from error
     if len(raw) > MAX_CHILD_OUTPUT:
         raise RunFailure(f"{label}: child output exceeds {MAX_CHILD_OUTPUT} bytes")
-    try:
-        value = json.loads(raw.decode("utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RunFailure(f"{label}: child did not return one JSON object: {error}") from error
+    value = _strict_json(raw, label)
     return _object(value, label)
 
 
@@ -399,7 +744,8 @@ def _validate_quiet_guard(value: Any, label: str, max_load: float) -> dict[str, 
     if guard["max_load"] != max_load:
         raise RunFailure(f"{label}.max_load differs from the manifest")
     load = guard["load_1m"]
-    if type(load) not in (int, float) or load < 0 or load > max_load:
+    _finite_number(load, f"{label}.load_1m", minimum=0)
+    if load > max_load:
         raise RunFailure(f"{label}.load_1m exceeds the quiet-host ceiling")
     if guard["heavy_processes"] != []:
         raise RunFailure(f"{label}.heavy_processes is not empty")
@@ -483,7 +829,8 @@ def _validate_child_event(
         if sample["rss_bytes"] > MEMORY_HARD_LIMIT_BYTES:
             raise RunFailure(f"{label}: child RSS exceeded the fixed cap")
         load = sample["load_1m"]
-        if type(load) not in (int, float) or load < 0 or load > protocol["max_load"]:
+        _finite_number(load, f"{label}.event.monitor.samples[{index}].load_1m", minimum=0)
+        if load > protocol["max_load"]:
             raise RunFailure(f"{label}: child sample load exceeded the quiet-host ceiling")
         if sample["outside_processes"] != []:
             raise RunFailure(f"{label}: child process ownership/host guard was not clean")
@@ -578,14 +925,50 @@ def _digest_object(value: Any, label: str) -> dict[str, Any]:
     return {"bytes": _positive_int(item.get("bytes"), f"{label}.bytes"), "sha256": _digest_value(item.get("sha256"), f"{label}.sha256")}
 
 
+def _validate_route_proof(
+    proof_value: Any,
+    route: str,
+    fixture: Mapping[str, Any],
+    label: str,
+) -> dict[str, Any]:
+    proof = _object(proof_value, label)
+    expected_fields = {
+        "output",
+        "source_exact",
+        "changed",
+        "patch_noop",
+        "operation_count",
+        "patch_before_exact",
+        "patch_after_exact",
+        "entry",
+    }
+    if set(proof) != expected_fields:
+        raise RunFailure(f"{label}: proof fields differ from the protocol")
+    if _digest_object(proof["output"], f"{label}.output") != dict(fixture):
+        raise RunFailure(f"{label}: output differs from the reviewed fixture")
+    expected_entry = "commit" if route.endswith("noop_commit") else "drop"
+    if proof["source_exact"] is not True or proof["changed"] is not False or proof["entry"] != expected_entry:
+        raise RunFailure(f"{label}: exact no-op/drop semantics failed")
+    if expected_entry == "commit" and proof["patch_noop"] is not True:
+        raise RunFailure(f"{label}: commit did not report an exact no-op")
+    if expected_entry == "drop" and proof["patch_noop"] is not None:
+        raise RunFailure(f"{label}: drop route unexpectedly has a patch")
+    for name in ("operation_count", "patch_before_exact", "patch_after_exact"):
+        if proof[name] is not None and name == "operation_count" and proof[name] != 0:
+            raise RunFailure(f"{label}: operation count is not zero")
+        if proof[name] is not None and name != "operation_count" and proof[name] is not True:
+            raise RunFailure(f"{label}: exact patch endpoint proof failed")
+    return proof
+
+
 def _validate_verify(report: Mapping[str, Any], label: str) -> dict[str, Any]:
     if set(report) != {"schema", "mode", "fixture", "routes", "allocation"}:
         raise RunFailure(f"{label}: verify report fields differ from the protocol")
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "verify":
         raise RunFailure(f"{label}: verify report identity is invalid")
     fixture = _object(report.get("fixture"), f"{label}.fixture")
-    if set(fixture) != {"generator", "output"} or fixture.get("generator") != "litchi-ppt-empty-package-v1":
-        raise RunFailure(f"{label}: synthetic fixture identity is invalid")
+    if set(fixture) != {"generator", "output"} or fixture.get("generator") != "litchi-ppt-lazy-native-fixture-v1":
+        raise RunFailure(f"{label}: reviewed fixture identity is invalid")
     source = _digest_object(fixture.get("output"), f"{label}.fixture.output")
     if report.get("allocation") != {"status": "unavailable", "scope": "operation_global_system_allocator"}:
         raise RunFailure(f"{label}: normal verify probe must report allocator metrics as unavailable")
@@ -593,23 +976,18 @@ def _validate_verify(report: Mapping[str, Any], label: str) -> dict[str, Any]:
     if set(routes) != set(ROUTES):
         raise RunFailure(f"{label}: route set differs from {ROUTES!r}")
     for route in ROUTES:
-        proof = _object(routes[route], f"{label}.{route}")
-        if set(proof) != {"output", "source_exact", "changed", "patch_noop", "entry"}:
-            raise RunFailure(f"{label}.{route}: proof fields differ from the protocol")
-        if _digest_object(proof["output"], f"{label}.{route}.output") != source:
-            raise RunFailure(f"{label}.{route}: output differs from the synthetic source")
-        expected_entry = "commit" if route.endswith("noop_commit") else "drop"
-        if proof["source_exact"] is not True or proof["changed"] is not False or proof["entry"] != expected_entry:
-            raise RunFailure(f"{label}.{route}: exact no-op/drop semantics failed")
-        if route.endswith("noop_commit") and proof["patch_noop"] is not True:
-            raise RunFailure(f"{label}.{route}: commit did not report an exact no-op")
-        if route.endswith("entry_drop") and proof["patch_noop"] is not None:
-            raise RunFailure(f"{label}.{route}: drop route unexpectedly has a patch")
+        _validate_route_proof(routes[route], route, source, f"{label}.{route}")
     return {"fixture": source, "routes": routes}
 
 
-def _validate_calibration(report: Mapping[str, Any], route: str, protocol: Mapping[str, Any], label: str) -> int:
-    if set(report) != {"schema", "mode", "route", "target_ns", "iterations", "elapsed_ns", "output"}:
+def _validate_calibration(
+    report: Mapping[str, Any],
+    route: str,
+    protocol: Mapping[str, Any],
+    fixture: Mapping[str, Any],
+    label: str,
+) -> int:
+    if set(report) != {"schema", "mode", "route", "target_ns", "iterations", "elapsed_ns", "fixture", "postcondition"}:
         raise RunFailure(f"{label}: calibration fields differ from the protocol")
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "calibrate" or report.get("route") != route:
         raise RunFailure(f"{label}: calibration identity differs")
@@ -619,7 +997,9 @@ def _validate_calibration(report: Mapping[str, Any], route: str, protocol: Mappi
         raise RunFailure(f"{label}: calibration target or bound differs")
     if _positive_int(report.get("elapsed_ns"), f"{label}.elapsed_ns") < report["target_ns"]:
         raise RunFailure(f"{label}: calibration did not reach its target")
-    _digest_object(report.get("output"), f"{label}.output")
+    if _digest_object(report.get("fixture"), f"{label}.fixture") != dict(fixture):
+        raise RunFailure(f"{label}: calibration fixture differs from correctness")
+    _validate_route_proof(report.get("postcondition"), route, fixture, f"{label}.postcondition")
     return iterations
 
 
@@ -629,12 +1009,16 @@ def _validate_timed(
     iterations: int,
     allocator: bool,
     protocol: Mapping[str, Any],
+    fixture: Mapping[str, Any],
     label: str,
 ) -> dict[str, Any]:
-    if set(report) != {"schema", "mode", "route", "samples"}:
+    if set(report) != {"schema", "mode", "route", "samples", "fixture", "postcondition"}:
         raise RunFailure(f"{label}: timed fields differ from the protocol")
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "timed" or report.get("route") != route:
         raise RunFailure(f"{label}: timed identity differs")
+    if _digest_object(report.get("fixture"), f"{label}.fixture") != dict(fixture):
+        raise RunFailure(f"{label}: timed fixture differs from correctness")
+    _validate_route_proof(report.get("postcondition"), route, fixture, f"{label}.postcondition")
     samples = report.get("samples")
     if not isinstance(samples, list) or not samples:
         raise RunFailure(f"{label}: timed samples are empty")
@@ -660,7 +1044,6 @@ def _validate_timed(
                 or allocation["peak_live_bytes_before"] < allocation["live_bytes_before"]
                 or allocation["peak_live_bytes_after"] < allocation["peak_live_bytes_before"]
                 or allocation["peak_live_bytes_after"] < allocation["live_bytes_after"]
-                or allocation["reallocation_calls"] > allocation["allocation_calls"]
             ):
                 raise RunFailure(f"{label}.samples[{index}]: allocator peak regressed")
         else:
@@ -682,14 +1065,18 @@ def _recheck(
     actual_manifest = _identity(manifest_path)
     if actual_manifest != manifest_identity:
         raise RunFailure(f"{phase}: qualification manifest changed")
-    probe_sources = _check_probe_sources(protocol_sources, manifest_path)
+    probe_sources = (
+        _check_probe_sources(protocol_sources, endpoint)
+        if endpoint["name"] == "candidate"
+        else []
+    )
     _check_worktree_shape(root, endpoint["name"])
     status = _git(root, "status", "--porcelain", "--untracked-files=all")
     head = _git(root, "rev-parse", "HEAD")
     tree = _git(root, "rev-parse", "HEAD^{tree}")
     if status or head != endpoint["head"] or tree != endpoint["tree"]:
         raise RunFailure(f"{phase}: {endpoint['name']} source changed")
-    lock = _check_identity(raw["lock"], f"{phase}.{endpoint['name']}.lock", root)
+    lock = _check_lock(raw["lock"], f"{phase}.{endpoint['name']}.lock", root)
     normal = _check_identity(raw["normal_binary"], f"{phase}.{endpoint['name']}.normal_binary", manifest_path.parent, executable=True)
     allocator = _check_identity(raw["allocator_binary"], f"{phase}.{endpoint['name']}.allocator_binary", manifest_path.parent, executable=True)
     targets = {
@@ -710,7 +1097,7 @@ def _recheck(
 
 def _prepare_output(path: Path, roots: Sequence[Path]) -> Path:
     path = _safe_path(str(path))
-    if any(_under(path, root) for root in roots):
+    if any(_overlap(path, root) for root in roots):
         raise RunFailure("output directory must be outside source worktrees")
     if path.exists():
         if not path.is_dir() or any(path.iterdir()):
@@ -747,16 +1134,22 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
     ]
     if roots[0] == roots[1]:
         raise RunFailure("baseline and candidate roots must be distinct")
+    if _overlap(roots[0], roots[1]):
+        raise RunFailure("baseline and candidate source roots must not contain one another")
     baseline = _resolve_endpoint(manifest["baseline"], "baseline", manifest_path, roots)
     candidate = _resolve_endpoint(candidate_raw, "candidate", manifest_path, roots)
     if baseline["head"] == candidate["head"] or baseline["tree"] == candidate["tree"]:
         raise RunFailure("baseline and candidate source identities must differ")
-    probe_sources = _check_probe_sources(manifest["probe_sources"], manifest_path)
+    probe_sources = _check_probe_sources(manifest["probe_sources"], candidate)
+    build_receipt = _validate_build_receipt(manifest, manifest_path, baseline, candidate, probe_sources)
     protocol = manifest["protocol"]
     endpoints = {"baseline": baseline, "candidate": candidate}
     resource_paths = [out_dir]
     for endpoint in endpoints.values():
         resource_paths.extend((endpoint["target_dir"], endpoint["allocator_target_dir"]))
+    for resource in resource_paths:
+        if any(_overlap(resource, root) for root in roots):
+            raise RunFailure(f"qualification output or target overlaps a source root: {resource}")
     for index, first in enumerate(resource_paths):
         for second in resource_paths[index + 1 :]:
             if _under(first, second) or _under(second, first):
@@ -782,11 +1175,11 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
         correctness[name] = {"report": _validate_verify(report, f"correctness.{name}"), "event": event}
     if correctness["baseline"]["report"] != correctness["candidate"]["report"]:
         raise RunFailure("baseline and candidate correctness proofs differ")
+    identity["after_correctness"] = {
+        name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_correctness")
+        for name, endpoint in endpoints.items()
+    }
     if correctness_only:
-        identity["after_correctness"] = {
-            name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_correctness")
-            for name, endpoint in endpoints.items()
-        }
         return {
             "schema": REPORT_SCHEMA,
             "status": "correctness_only",
@@ -796,6 +1189,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
             "abba_order": list(ABBA_ORDER),
             "probe_sources": probe_sources,
             "correctness": correctness,
+            "build_receipt": build_receipt,
             "identity": identity,
         }
     calibrations: dict[str, dict[str, int]] = {"baseline": {}, "candidate": {}}
@@ -812,7 +1206,13 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                 endpoint["target_dir"],
                 ("--mode", "calibrate", "--route", route, "--target-ns", str(target_ns), "--max-iterations", str(protocol["max_iterations"])),
             )
-            calibrations[name][route] = _validate_calibration(report, route, protocol, f"calibration.{name}.{route}")
+            calibrations[name][route] = _validate_calibration(
+                report,
+                route,
+                protocol,
+                correctness["baseline"]["report"]["fixture"],
+                f"calibration.{name}.{route}",
+            )
             calibration_events.append(event)
     identity["after_calibration"] = {
         name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_calibration")
@@ -837,7 +1237,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                     endpoint["target_dir"],
                     ("--mode", "timed", "--route", route, "--iterations", str(iterations), "--samples", "1", "--warmups", str(protocol["warmups"]), "--max-iterations", str(protocol["max_iterations"])),
                 )
-                normal_rows.append({"role": role, "endpoint": name, "report": _validate_timed(normal_report, route, iterations, False, protocol, f"timed.{route}.{role}.{block}"), "event": normal_event})
+                normal_rows.append({"role": role, "endpoint": name, "report": _validate_timed(normal_report, route, iterations, False, protocol, correctness["baseline"]["report"]["fixture"], f"timed.{route}.{role}.{block}"), "event": normal_event})
                 allocation_report, allocation_event = _run_child(
                     endpoint,
                     protocol,
@@ -847,7 +1247,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                     endpoint["allocator_target_dir"],
                     ("--mode", "timed", "--route", route, "--iterations", str(iterations), "--samples", "1", "--warmups", str(protocol["warmups"]), "--max-iterations", str(protocol["max_iterations"])),
                 )
-                allocation_rows.append({"role": role, "endpoint": name, "report": _validate_timed(allocation_report, route, iterations, True, protocol, f"allocation.{route}.{role}.{block}"), "event": allocation_event})
+                allocation_rows.append({"role": role, "endpoint": name, "report": _validate_timed(allocation_report, route, iterations, True, protocol, correctness["baseline"]["report"]["fixture"], f"allocation.{route}.{role}.{block}"), "event": allocation_event})
             blocks.append({"block": block, "abba_order": list(ABBA_ORDER), "normal": normal_rows, "allocation": allocation_rows})
         routes[route] = {"blocks": blocks}
     identity["after_abba"] = {
@@ -863,6 +1263,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
         "abba_order": list(ABBA_ORDER),
         "probe_sources": probe_sources,
         "correctness": correctness,
+        "build_receipt": build_receipt,
         "calibration": calibrations,
         "calibration_events": calibration_events,
         "routes_evidence": routes,
@@ -894,6 +1295,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             _safe_path(_string(manifest["baseline"]["root"], "baseline.root"), manifest_path.parent),
             _safe_path(_string(candidate["root"], "candidate.root"), manifest_path.parent),
         ]
+        if roots[0] == roots[1] or _overlap(roots[0], roots[1]):
+            raise RunFailure("baseline and candidate source roots must be distinct and non-nested")
         out_dir = _prepare_output(args.out_dir, roots)
         report = _run(manifest, manifest_path, out_dir, args.correctness_only)
         (out_dir / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")

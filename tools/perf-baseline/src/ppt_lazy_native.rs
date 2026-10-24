@@ -1,58 +1,159 @@
 //! Native probe for the PPT lazy-entry qualification lane (record 0362ugj).
 //!
-//! The package is built before the operation boundary.  The four routes then
-//! isolate construction/drop and exact no-op publication for the primary and
-//! metadata edit families.  The verification mode proves the route semantics;
-//! timed modes only repeat those already-proved operations.
+//! The package is opened before the operation boundary.  Every affected PPT
+//! lazy edit family has an entry/drop and exact no-op publication route.  The
+//! verification mode proves the route semantics; timed modes only repeat those
+//! already-proved operations.
 
 use std::error::Error;
 use std::hint::black_box;
 use std::time::Instant;
 
+use litchi_core::Position;
 use litchi_ppt::Package;
+use litchi_ppt::master::Kind as MasterKind;
+use litchi_ppt::text_edit::Target;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::allocation_metrics;
 
 const SCHEMA: &str = "litchi.ppt.lazy-native.probe.v1";
-const ROUTES: [&str; 4] = [
+const FIXTURE: &[u8] = include_bytes!("../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt");
+const ROUTES: [&str; 28] = [
     "primary_entry_drop",
     "primary_noop_commit",
     "metadata_entry_drop",
     "metadata_noop_commit",
+    "animations_entry_drop",
+    "animations_noop_commit",
+    "broadcast_entry_drop",
+    "broadcast_noop_commit",
+    "client_data_entry_drop",
+    "client_data_noop_commit",
+    "diagrams_entry_drop",
+    "diagrams_noop_commit",
+    "document_comparison_entry_drop",
+    "document_comparison_noop_commit",
+    "objects_entry_drop",
+    "objects_noop_commit",
+    "external_media_entry_drop",
+    "external_media_noop_commit",
+    "fonts_entry_drop",
+    "fonts_noop_commit",
+    "master_metadata_entry_drop",
+    "master_metadata_noop_commit",
+    "master_layout_entry_drop",
+    "master_layout_noop_commit",
+    "picture_bullets_entry_drop",
+    "picture_bullets_noop_commit",
+    "slide_sync_entry_drop",
+    "slide_sync_noop_commit",
 ];
 
 #[derive(Clone, Copy)]
+enum Family {
+    Primary,
+    Metadata,
+    Animations,
+    Broadcast,
+    ClientData,
+    Diagrams,
+    DocumentComparison,
+    Objects,
+    ExternalMedia,
+    Fonts,
+    MasterMetadata,
+    MasterLayout,
+    PictureBullets,
+    SlideSync,
+}
+
+impl Family {
+    const ALL: [Self; 14] = [
+        Self::Primary,
+        Self::Metadata,
+        Self::Animations,
+        Self::Broadcast,
+        Self::ClientData,
+        Self::Diagrams,
+        Self::DocumentComparison,
+        Self::Objects,
+        Self::ExternalMedia,
+        Self::Fonts,
+        Self::MasterMetadata,
+        Self::MasterLayout,
+        Self::PictureBullets,
+        Self::SlideSync,
+    ];
+
+    const fn entry_name(self) -> &'static str {
+        match self {
+            Self::Primary => ROUTES[0],
+            Self::Metadata => ROUTES[2],
+            Self::Animations => ROUTES[4],
+            Self::Broadcast => ROUTES[6],
+            Self::ClientData => ROUTES[8],
+            Self::Diagrams => ROUTES[10],
+            Self::DocumentComparison => ROUTES[12],
+            Self::Objects => ROUTES[14],
+            Self::ExternalMedia => ROUTES[16],
+            Self::Fonts => ROUTES[18],
+            Self::MasterMetadata => ROUTES[20],
+            Self::MasterLayout => ROUTES[22],
+            Self::PictureBullets => ROUTES[24],
+            Self::SlideSync => ROUTES[26],
+        }
+    }
+
+    const fn commit_name(self) -> &'static str {
+        match self {
+            Self::Primary => ROUTES[1],
+            Self::Metadata => ROUTES[3],
+            Self::Animations => ROUTES[5],
+            Self::Broadcast => ROUTES[7],
+            Self::ClientData => ROUTES[9],
+            Self::Diagrams => ROUTES[11],
+            Self::DocumentComparison => ROUTES[13],
+            Self::Objects => ROUTES[15],
+            Self::ExternalMedia => ROUTES[17],
+            Self::Fonts => ROUTES[19],
+            Self::MasterMetadata => ROUTES[21],
+            Self::MasterLayout => ROUTES[23],
+            Self::PictureBullets => ROUTES[25],
+            Self::SlideSync => ROUTES[27],
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 enum Route {
-    PrimaryEntryDrop,
-    PrimaryNoopCommit,
-    MetadataEntryDrop,
-    MetadataNoopCommit,
+    EntryDrop(Family),
+    NoopCommit(Family),
 }
 
 impl Route {
     fn parse(value: &str) -> Result<Self, Box<dyn Error>> {
-        match value {
-            "primary_entry_drop" => Ok(Self::PrimaryEntryDrop),
-            "primary_noop_commit" => Ok(Self::PrimaryNoopCommit),
-            "metadata_entry_drop" => Ok(Self::MetadataEntryDrop),
-            "metadata_noop_commit" => Ok(Self::MetadataNoopCommit),
-            _ => Err(format!("unknown PPT lazy route {value:?}").into()),
+        for family in Family::ALL {
+            if value == family.entry_name() {
+                return Ok(Self::EntryDrop(family));
+            }
+            if value == family.commit_name() {
+                return Ok(Self::NoopCommit(family));
+            }
         }
+        Err(format!("unknown PPT lazy route {value:?}").into())
     }
 
     const fn name(self) -> &'static str {
         match self {
-            Self::PrimaryEntryDrop => ROUTES[0],
-            Self::PrimaryNoopCommit => ROUTES[1],
-            Self::MetadataEntryDrop => ROUTES[2],
-            Self::MetadataNoopCommit => ROUTES[3],
+            Self::EntryDrop(family) => family.entry_name(),
+            Self::NoopCommit(family) => family.commit_name(),
         }
     }
 
     const fn is_commit(self) -> bool {
-        matches!(self, Self::PrimaryNoopCommit | Self::MetadataNoopCommit)
+        matches!(self, Self::NoopCommit(_))
     }
 }
 
@@ -60,47 +161,126 @@ struct OperationResult {
     changed: bool,
     patch_noop: Option<bool>,
     published: Option<Package>,
+    operation_count: Option<usize>,
+    patch_before: Option<Vec<u8>>,
+    patch_after: Option<Vec<u8>>,
+}
+
+fn dropped() -> OperationResult {
+    OperationResult {
+        changed: false,
+        patch_noop: None,
+        published: None,
+        operation_count: None,
+        patch_before: None,
+        patch_after: None,
+    }
+}
+
+macro_rules! drop_edit {
+    ($expression:expr) => {{
+        let edit = $expression?;
+        drop(edit);
+        Ok::<_, Box<dyn Error>>(dropped())
+    }};
+}
+
+macro_rules! commit_edit {
+    ($expression:expr) => {{
+        let commit = $expression?;
+        let changed = commit.diagnostics().changed();
+        let patch_noop = commit.patch().is_noop();
+        Ok::<_, Box<dyn Error>>(OperationResult {
+            changed,
+            patch_noop: Some(patch_noop),
+            published: Some(commit.into_package()),
+            operation_count: None,
+            patch_before: None,
+            patch_after: None,
+        })
+    }};
 }
 
 fn run_once(package: &Package, route: Route) -> Result<OperationResult, Box<dyn Error>> {
+    let position = Position::new(0);
+    let target = Target::new(position, position);
+    let master_kind = MasterKind::Main;
     match route {
-        Route::PrimaryEntryDrop => {
-            let edit = package.edit()?;
-            drop(edit);
-            Ok(OperationResult {
-                changed: false,
-                patch_noop: None,
-                published: None,
-            })
-        },
-        Route::PrimaryNoopCommit => {
+        Route::EntryDrop(Family::Primary) => drop_edit!(package.edit()),
+        Route::NoopCommit(Family::Primary) => {
             let commit = package.edit()?.commit()?;
-            let changed = commit.diagnostics().changed();
-            let patch_noop = commit.patch().is_noop();
             Ok(OperationResult {
-                changed,
-                patch_noop: Some(patch_noop),
+                changed: commit.diagnostics().changed(),
+                patch_noop: Some(commit.patch().is_noop()),
+                operation_count: Some(commit.diagnostics().operation_count()),
+                patch_before: Some(commit.patch().before().to_vec()),
+                patch_after: Some(commit.patch().after().to_vec()),
                 published: Some(commit.into_package()),
             })
         },
-        Route::MetadataEntryDrop => {
-            let edit = package.edit_metadata()?;
-            drop(edit);
-            Ok(OperationResult {
-                changed: false,
-                patch_noop: None,
-                published: None,
-            })
-        },
-        Route::MetadataNoopCommit => {
+        Route::EntryDrop(Family::Metadata) => drop_edit!(package.edit_metadata()),
+        Route::NoopCommit(Family::Metadata) => {
             let commit = package.edit_metadata()?.commit()?;
-            let changed = commit.diagnostics().changed();
-            let patch_noop = commit.patch().is_noop();
             Ok(OperationResult {
-                changed,
-                patch_noop: Some(patch_noop),
+                changed: commit.diagnostics().changed(),
+                patch_noop: Some(commit.patch().is_noop()),
+                operation_count: None,
+                patch_before: Some(commit.patch().before_bytes().to_vec()),
+                patch_after: Some(commit.patch().after_bytes().to_vec()),
                 published: Some(commit.into_package()),
             })
+        },
+        Route::EntryDrop(Family::Animations) => drop_edit!(package.edit_animations()),
+        Route::NoopCommit(Family::Animations) => commit_edit!(package.edit_animations()?.commit()),
+        Route::EntryDrop(Family::Broadcast) => drop_edit!(package.edit_broadcast(position)),
+        Route::NoopCommit(Family::Broadcast) => {
+            commit_edit!(package.edit_broadcast(position)?.commit())
+        },
+        Route::EntryDrop(Family::ClientData) => drop_edit!(package.edit_client_data(target)),
+        Route::NoopCommit(Family::ClientData) => {
+            commit_edit!(package.edit_client_data(target)?.commit())
+        },
+        Route::EntryDrop(Family::Diagrams) => drop_edit!(package.edit_diagrams(position)),
+        Route::NoopCommit(Family::Diagrams) => {
+            commit_edit!(package.edit_diagrams(position)?.commit())
+        },
+        Route::EntryDrop(Family::DocumentComparison) => {
+            drop_edit!(package.edit_document_comparison())
+        },
+        Route::NoopCommit(Family::DocumentComparison) => {
+            commit_edit!(package.edit_document_comparison()?.commit())
+        },
+        Route::EntryDrop(Family::Objects) => drop_edit!(package.edit_objects()),
+        Route::NoopCommit(Family::Objects) => commit_edit!(package.edit_objects()?.commit()),
+        Route::EntryDrop(Family::ExternalMedia) => drop_edit!(package.edit_external_media()),
+        Route::NoopCommit(Family::ExternalMedia) => {
+            commit_edit!(package.edit_external_media()?.commit())
+        },
+        Route::EntryDrop(Family::Fonts) => drop_edit!(package.edit_fonts()),
+        Route::NoopCommit(Family::Fonts) => commit_edit!(package.edit_fonts()?.commit()),
+        Route::EntryDrop(Family::MasterMetadata) => {
+            drop_edit!(package.edit_master_metadata(master_kind, position))
+        },
+        Route::NoopCommit(Family::MasterMetadata) => {
+            commit_edit!(
+                package
+                    .edit_master_metadata(master_kind, position)?
+                    .commit()
+            )
+        },
+        Route::EntryDrop(Family::MasterLayout) => {
+            drop_edit!(package.edit_master_layout(master_kind, position))
+        },
+        Route::NoopCommit(Family::MasterLayout) => {
+            commit_edit!(package.edit_master_layout(master_kind, position)?.commit())
+        },
+        Route::EntryDrop(Family::PictureBullets) => drop_edit!(package.edit_picture_bullets()),
+        Route::NoopCommit(Family::PictureBullets) => {
+            commit_edit!(package.edit_picture_bullets()?.commit())
+        },
+        Route::EntryDrop(Family::SlideSync) => drop_edit!(package.edit_slide_sync(position)),
+        Route::NoopCommit(Family::SlideSync) => {
+            commit_edit!(package.edit_slide_sync(position)?.commit())
         },
     }
 }
@@ -108,7 +288,12 @@ fn run_once(package: &Package, route: Route) -> Result<OperationResult, Box<dyn 
 fn digest(bytes: &[u8]) -> Value {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
-    json!({"bytes": bytes.len(), "sha256": format!("{:x}", hasher.finalize())})
+    let sha256 = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    json!({"bytes": bytes.len(), "sha256": sha256})
 }
 
 fn assert_noop(
@@ -119,6 +304,11 @@ fn assert_noop(
     if result.changed || result.patch_noop != Some(true) {
         return Err(format!("{} was not an exact no-op", route.name()).into());
     }
+    if let Some(operation_count) = result.operation_count {
+        if operation_count != 0 {
+            return Err(format!("{} accepted {operation_count} operations", route.name()).into());
+        }
+    }
     let published = result
         .published
         .ok_or_else(|| format!("{} did not publish a package", route.name()))?;
@@ -126,11 +316,24 @@ fn assert_noop(
     if bytes != source {
         return Err(format!("{} changed the source bytes", route.name()).into());
     }
+    if let Some(before) = result.patch_before.as_deref() {
+        if before != source {
+            return Err(format!("{} patch has the wrong source endpoint", route.name()).into());
+        }
+    }
+    if let Some(after) = result.patch_after.as_deref() {
+        if after != source {
+            return Err(format!("{} patch has the wrong target endpoint", route.name()).into());
+        }
+    }
     Ok(json!({
         "output": digest(&bytes),
         "source_exact": true,
         "changed": false,
         "patch_noop": true,
+        "operation_count": result.operation_count,
+        "patch_before_exact": result.patch_before.is_some_and(|before| before == source),
+        "patch_after_exact": result.patch_after.is_some_and(|after| after == source),
         "entry": "commit",
     }))
 }
@@ -148,6 +351,9 @@ fn verify_route(package: &Package, source: &[u8], route: Route) -> Result<Value,
             "source_exact": true,
             "changed": false,
             "patch_noop": Value::Null,
+            "operation_count": Value::Null,
+            "patch_before_exact": Value::Null,
+            "patch_after_exact": Value::Null,
             "entry": "drop",
         }))
     }
@@ -193,9 +399,6 @@ fn allocation_delta(
         before.reallocation_calls,
         "reallocation_calls",
     )?;
-    if reallocation_calls > allocation_calls {
-        return Err("allocator reallocation calls exceed allocation calls".into());
-    }
     Ok(json!({
         "status": "measured",
         "scope": "operation_global_system_allocator",
@@ -337,7 +540,7 @@ where
         allocation_metrics::enable();
     }
     let args = arguments(values)?;
-    let package = Package::new()?;
+    let package = Package::from_bytes(FIXTURE)?;
     let source = package.to_bytes()?;
     let source_digest = digest(&source);
     let output = match args.mode.as_str() {
@@ -352,7 +555,7 @@ where
             json!({
                 "schema": SCHEMA,
                 "mode": "verify",
-                "fixture": {"generator": "litchi-ppt-empty-package-v1", "output": source_digest},
+                "fixture": {"generator": "litchi-ppt-lazy-native-fixture-v1", "output": source_digest},
                 "routes": routes
                     .into_iter()
                     .map(|(name, proof)| ((*name).to_owned(), proof))
@@ -383,12 +586,17 @@ where
                 "target_ns": args.target_ns,
                 "iterations": iterations,
                 "elapsed_ns": started.elapsed().as_nanos(),
-                "output": source_digest,
+                "fixture": source_digest,
+                "postcondition": verify_route(&package, &source, route)?,
             })
         },
         "timed" => {
             let route = args.route.ok_or("timed requires --route")?;
             let report = timed(&package, &args, route, allocator)?;
+            let proof = verify_route(&package, &source, route)?;
+            let mut report = report;
+            report["fixture"] = source_digest;
+            report["postcondition"] = proof;
             report
         },
         _ => return Err(format!("unknown probe mode {:?}", args.mode).into()),

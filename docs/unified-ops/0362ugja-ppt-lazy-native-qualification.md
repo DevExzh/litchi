@@ -2,8 +2,9 @@
 
 This record prepares the missing native qualification lane for the PPT lazy
 edit entry correction in 0362ugj. It is source and runner infrastructure only:
-no Cargo command, release build, native timing, allocator capture, or
-performance decision was made by this commit.
+no release build, native timing, allocator capture, or performance decision was
+made by this commit. One authorized compile-only type check of the probe is
+recorded below; it did not produce a qualification binary or execute a route.
 
 ## Why a new lane is required
 
@@ -25,27 +26,40 @@ The baseline is not a later consumer-validation tip or a replay comparison.
 ## Probe contract
 
 `tools/perf-baseline/src/ppt_lazy_native.rs` is shared by the normal and
-allocator binaries. It constructs the smallest valid PPT package before each
-operation boundary, then measures only the operation. Its four routes are:
+allocator binaries. It opens the reviewed non-empty fixture before each
+operation boundary, then measures only the operation. Every affected lazy
+constructor has both an entry/drop route and an exact no-op commit route:
 
-| route | operation inside the boundary | exact proof |
-| --- | --- | --- |
-| `primary_entry_drop` | `Package::edit()` followed by drop | no publication and no source change |
-| `primary_noop_commit` | `Package::edit().commit()` | `Diagnostics::changed() == false`, patch is a no-op, published bytes equal source |
-| `metadata_entry_drop` | `Package::edit_metadata()` followed by drop | no publication and no source change |
-| `metadata_noop_commit` | `Package::edit_metadata().commit()` | shared diagnostics unchanged, patch is a no-op, published bytes equal source |
+```text
+primary, metadata, animations, broadcast, client_data, diagrams,
+document_comparison, objects, external_media, fonts, master_metadata,
+master_layout, picture_bullets, slide_sync
+```
 
-`--mode verify` runs all four routes once and emits the synthetic package
-generator identity plus byte count/SHA-256. `--mode calibrate` doubles a
-route-local operation batch to a fixed target. `--mode timed` runs warmups
-outside the clock and returns one elapsed batch sample per request. The
-allocator binary uses the existing `allocation_metrics` system-allocator
-observer and reports allocation/deallocation/reallocation calls, bytes, live
-bytes, and monotonic high-water bytes. The normal binary reports allocator
-metrics as unavailable; an uninstrumented run is never interpreted as zero.
-The probe rejects counter overflow, live-byte conservation failures, peak
-regressions, and reallocation counts that exceed allocation counts; the runner
-rechecks those same bounds for every timed sample.
+The fixture has one slide with two text shapes, client data, a PPT9 broadcast
+record, a PPT10 diagram build list, and a valid main master. It is tracked at
+`test-data/unified-ops/ppt-lazy-native-fixture.ppt`; its SHA-256 is
+`02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c` and its
+size is 14,848 bytes. Thus every position/target/kind selector is exercised
+against a real non-empty owner. Drop proofs publish nothing; commit proofs
+require unchanged diagnostics, a no-op patch, and byte-identical output. The
+primary proof additionally requires zero operation count and exact patch
+before/after endpoints; metadata requires exact `before_bytes`/
+`after_bytes` endpoints.
+
+`--mode verify` runs all 28 routes once and emits the fixture generator identity
+plus byte count/SHA-256. `--mode calibrate` doubles a route-local operation
+batch to a fixed target and repeats the verified fixture digest and route proof.
+`--mode timed` runs warmups outside the clock and returns one elapsed batch
+sample per request; a postcondition proof is performed outside the timed
+interval. The allocator binary uses the existing `allocation_metrics`
+system-allocator observer and reports allocation/deallocation/reallocation
+calls, bytes, live bytes, and monotonic high-water bytes. The normal binary
+reports allocator metrics as unavailable; an uninstrumented run is never
+interpreted as zero. The probe rejects counter overflow, live-byte conservation
+failures, and peak regressions. A reallocation may legally occur without a
+same-interval allocation call, so no invalid `reallocation_calls <=
+allocation_calls` invariant is applied.
 
 The probe performs no source reopen or output serialization in the timed
 loop. The verify phase is the semantic oracle; timed samples repeat only the
@@ -69,14 +83,20 @@ For each endpoint it requires:
   before correctness, after correctness, after calibration, and after ABBA.
 
 The checked-in manifest is intentionally parameterized. It pins the true
-baseline ref/tree and lock path but leaves external roots, binary identities,
-and the final candidate unset. `--plan` validates that shape without touching
-those paths. At final freeze, fill every placeholder with the coordinator's
-selected full candidate ref, source tree, lock, probe, target, and binary
-identities; the runner rejects a still-parameterized candidate.
+baseline ref/tree and exact lock path, the reviewed relative probe closure, the
+fixture, the baseline overlay paths and `src/lib.rs` registration, and the
+release build commands. The normal and allocator builds use the package
+defaults explicitly recorded as `current-api,current-xlsx-raw-opc` (the
+commands omit `--no-default-features` and therefore select those defaults).
+It leaves external roots, source archive, build
+receipt, toolchain/config identities, binary identities, and the final
+candidate unset. `--plan` validates that shape without touching those paths.
+At final freeze, fill every placeholder with the coordinator's selected full
+candidate ref, source tree, lock, probe, target, binary, archive, and retained
+build-receipt identities; the runner rejects a still-parameterized candidate.
 
 The correctness preflight runs both normal endpoints and requires the same
-synthetic source digest and all four route proofs. The timed phase then uses
+reviewed fixture digest and all 28 route proofs. The timed phase then uses
 two `A1, B1, B2, A2` blocks for every route, with the same calibrated
 iteration count for the normal and allocator legs. Each child is pinned to
 the manifest CPU, receives the fixed 20,000,000,000-byte address-space cap,
@@ -107,15 +127,20 @@ tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs
 tools/perf-baseline/src/lib.rs  (add `pub mod ppt_lazy_native;` only for the temporary build overlay)
 ```
 
-Record the source-file hashes, baseline ref/tree, lock hash, exact commands,
-external target paths, and both resulting executable hashes in the external
-build receipt. Remove only the named temporary overlay and require the
-baseline checkout to be clean before handing it to the runner. Build normal
-and allocator targets separately, with one job, incremental compilation off,
-offline/locked mode, and the repository's 20-GB memory-capped cargo shim.
-The candidate uses the same sources and commands from its final clean source
-tip. The build and receipt remain outside the repository; this record carries
-no executable or raw evidence.
+The manifest's retained build receipt must bind the source archive, toolchain,
+Cargo configuration, exact source/lock/tree identities, fixture, all four
+candidate probe files, the three-file baseline overlay plus the exact
+`src/lib.rs` registration diff, commands, environment, release target/profile,
+features, target paths, and both resulting executable hashes. Remove only the
+named temporary overlay and require the baseline checkout to be clean before
+handing it to the runner. Build normal and allocator targets separately, with
+one job, incremental compilation off, offline/locked mode, and the
+repository's 20-GB memory-capped cargo shim. The binaries are the actual
+`<CARGO_TARGET_DIR>/release/ppt_lazy_native` and
+`<CARGO_TARGET_DIR>/release/ppt_lazy_native_alloc` outputs (not an
+`release/examples` path). The candidate uses the same sources and commands
+from its final clean source tip. The build, archive, receipt, and logs remain
+outside the repository; this record carries no executable or raw evidence.
 
 ## Source-only validation
 
@@ -139,3 +164,15 @@ python3 tools/ppt_lazy_native_qualification.py \
 The plan proves the fixed route set, baseline parent, ABBA order, and resource
 caps. It does not claim that either binary has been built or that any native
 measurement has passed.
+
+An authorized compile-only slot type-checked the shared probe through a
+temporary external mini-crate that supplied the allocator-metrics interface;
+this avoided a release build and did not run the probe. The exact command was
+`cargo check --offline --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/ppt-probe-check/Cargo.toml`
+with the repository memory-capped Cargo shim, `LITCHI_MEM_MAX=20G`,
+`CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, `CARGO_NET_OFFLINE=true`, an
+external target directory, and a 20-GB cap. It exited 0; the external target
+was 281 MiB. The 6,687-byte log is retained outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/probe-harness-final.log`
+with SHA-256
+`012cbf16ad29524ee3a9ca5739f92de10da3bc8b6cdcfeece7bbd5e662ed1cf7`.

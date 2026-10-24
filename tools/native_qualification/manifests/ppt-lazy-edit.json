@@ -10,12 +10,12 @@
       "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
     },
     "normal_binary": {
-      "path": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET/release/examples/ppt_lazy_native",
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET/release/ppt_lazy_native",
       "bytes": null,
       "sha256": null
     },
     "allocator_binary": {
-      "path": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET/release/examples/ppt_lazy_native_alloc",
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET/release/ppt_lazy_native_alloc",
       "bytes": null,
       "sha256": null
     },
@@ -25,21 +25,104 @@
   "candidate": null,
   "probe_sources": [
     {
-      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/ppt_lazy_native.rs",
+      "path": "tools/perf-baseline/src/ppt_lazy_native.rs",
       "bytes": null,
       "sha256": null
     },
     {
-      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+      "path": "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
       "bytes": null,
       "sha256": null
     },
     {
-      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+      "path": "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "tools/perf-baseline/src/lib.rs",
       "bytes": null,
       "sha256": null
     }
   ],
+  "baseline_adapter": {
+    "overlay_paths": [
+      "tools/perf-baseline/src/ppt_lazy_native.rs",
+      "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+      "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs"
+    ],
+    "registration": {
+      "path": "tools/perf-baseline/src/lib.rs",
+      "line": "pub mod ppt_lazy_native;"
+    }
+  },
+  "build": {
+    "receipt": {
+      "path": "PARAMETERIZED_EXTERNAL_BUILD_RECEIPT",
+      "bytes": null,
+      "sha256": null
+    },
+    "source_archive": {
+      "path": "PARAMETERIZED_EXTERNAL_SOURCE_ARCHIVE",
+      "bytes": null,
+      "sha256": null
+    },
+    "fixture": {
+      "path": "../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+      "bytes": 14848,
+      "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+    },
+    "toolchain": {
+      "path": "PARAMETERIZED_EXTERNAL_TOOLCHAIN",
+      "bytes": null,
+      "sha256": null
+    },
+    "cargo_config": {
+      "path": "PARAMETERIZED_EXTERNAL_CARGO_CONFIG",
+      "bytes": null,
+      "sha256": null
+    },
+    "profile": "release",
+    "target_subdir": "target/release",
+    "normal_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "ppt_lazy_native"
+    ],
+    "allocator_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "ppt_lazy_native_alloc"
+    ],
+    "features": {
+      "normal": [
+        "current-api",
+        "current-xlsx-raw-opc"
+      ],
+      "allocator": [
+        "current-api",
+        "current-xlsx-raw-opc"
+      ]
+    },
+    "environment": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0"
+    }
+  },
   "protocol": {
     "cpu": 3,
     "blocks": 2,

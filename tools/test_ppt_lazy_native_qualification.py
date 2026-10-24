@@ -1,5 +1,7 @@
 import json
+import hashlib
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -23,6 +25,30 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "primary_noop_commit",
             "metadata_entry_drop",
             "metadata_noop_commit",
+            "animations_entry_drop",
+            "animations_noop_commit",
+            "broadcast_entry_drop",
+            "broadcast_noop_commit",
+            "client_data_entry_drop",
+            "client_data_noop_commit",
+            "diagrams_entry_drop",
+            "diagrams_noop_commit",
+            "document_comparison_entry_drop",
+            "document_comparison_noop_commit",
+            "objects_entry_drop",
+            "objects_noop_commit",
+            "external_media_entry_drop",
+            "external_media_noop_commit",
+            "fonts_entry_drop",
+            "fonts_noop_commit",
+            "master_metadata_entry_drop",
+            "master_metadata_noop_commit",
+            "master_layout_entry_drop",
+            "master_layout_noop_commit",
+            "picture_bullets_entry_drop",
+            "picture_bullets_noop_commit",
+            "slide_sync_entry_drop",
+            "slide_sync_noop_commit",
         ))
 
     def test_plan_writes_only_a_small_external_receipt(self):
@@ -49,6 +75,13 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
     def test_source_only_protocol_has_fixed_caps(self):
         manifest = protocol._load_manifest(MANIFEST, plan=True)
         protocol_value = manifest["protocol"]
+        self.assertEqual(
+            manifest["build"]["features"],
+            {
+                "normal": ["current-api", "current-xlsx-raw-opc"],
+                "allocator": ["current-api", "current-xlsx-raw-opc"],
+            },
+        )
         self.assertEqual(protocol_value["blocks"], 2)
         self.assertEqual(protocol_value["warmups"], 3)
         self.assertGreaterEqual(protocol_value["target_ms"], 500)
@@ -56,6 +89,119 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
         self.assertEqual(protocol.TARGET_HARD_LIMIT_BYTES, 20_000_000_000)
         self.assertEqual(protocol.MEMORY_HARD_LIMIT_BYTES, 20_000_000_000)
         self.assertEqual(protocol.MAX_CHILD_OUTPUT, 4 * 1024 * 1024)
+
+    def test_strict_json_rejects_duplicate_keys_and_nonfinite_constants(self):
+        with self.assertRaises(protocol.RunFailure):
+            protocol._strict_json(b'{"route": 1, "route": 2}', "child")
+        with self.assertRaises(protocol.RunFailure):
+            protocol._strict_json(b'{"value": NaN}', "child")
+        with self.assertRaises(protocol.RunFailure):
+            protocol._strict_json(b'{"value": 1e999}', "child")
+        with self.assertRaises(protocol.RunFailure):
+            protocol._finite_number(10**10_000, "child.value")
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-child-") as temporary:
+            child = Path(temporary) / "child.json"
+            child.write_bytes(b'{"value": 1e999}')
+            with self.assertRaises(protocol.RunFailure):
+                protocol._parse_child(child, "child")
+
+    def test_candidate_probe_recheck_rejects_source_mutation(self):
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-probe-") as temporary:
+            root = Path(temporary) / "candidate"
+            root.mkdir()
+            subprocess.run(["git", "-C", str(root), "init", "--quiet"], check=True)
+            source = root / "probe.rs"
+            source.write_bytes(b"before")
+            subprocess.run(["git", "-C", str(root), "add", "probe.rs"], check=True)
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            spec = [{"path": "probe.rs", "bytes": 6, "sha256": digest}]
+            endpoint = {"root": root}
+            self.assertEqual(protocol._check_probe_sources(spec, endpoint)[0]["sha256"], digest)
+            source.write_bytes(b"after!")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._check_probe_sources(spec, endpoint)
+
+    def test_manifest_rejects_nonfinite_numeric_limits_and_wrong_lock_path(self):
+        source = MANIFEST.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-invalid-manifest-") as temporary:
+            path = Path(temporary) / "manifest.json"
+            path.write_text(source.replace('"target_ms": 500', '"target_ms": 1e999'), encoding="utf-8")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._load_manifest(path, plan=True)
+            path.write_text(source.replace('"path": "tools/perf-baseline/Cargo.lock"', '"path": "/tmp/Cargo.lock"'), encoding="utf-8")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._load_manifest(path, plan=True)
+
+    def test_source_and_resource_overlap_is_rejected_both_directions(self):
+        root = Path("/tmp/ppt-lazy-root")
+        nested = root / "nested"
+        self.assertTrue(protocol._overlap(root, nested))
+        self.assertTrue(protocol._overlap(nested, root))
+
+    def test_route_and_variant_identity_mismatches_fail_closed(self):
+        manifest = protocol._load_manifest(MANIFEST, plan=True)
+        fixture = {"bytes": 1, "sha256": "0" * 64}
+        proof = {
+            "output": fixture,
+            "source_exact": True,
+            "changed": False,
+            "patch_noop": None,
+            "operation_count": None,
+            "patch_before_exact": None,
+            "patch_after_exact": None,
+            "entry": "drop",
+        }
+        with self.assertRaises(protocol.RunFailure):
+            protocol._validate_route_proof(
+                dict(proof, output={"bytes": 2, "sha256": "0" * 64}),
+                "primary_entry_drop",
+                fixture,
+                "wrong-workload",
+            )
+        report = {
+            "schema": protocol.PROBE_SCHEMA,
+            "mode": "verify",
+            "fixture": {"generator": "litchi-ppt-lazy-native-fixture-v1", "output": fixture},
+            "routes": {"primary_entry_drop": proof},
+            "allocation": {"status": "unavailable", "scope": "operation_global_system_allocator"},
+        }
+        with self.assertRaises(protocol.RunFailure):
+            protocol._validate_verify(report, "partial-routes")
+        timed = {
+            "schema": protocol.PROBE_SCHEMA,
+            "mode": "timed",
+            "route": "primary_entry_drop",
+            "fixture": fixture,
+            "postcondition": proof,
+            "samples": [{
+                "elapsed_ns": 150_000_000,
+                "iterations": 1,
+                "allocation": {
+                    "status": "measured",
+                    "scope": "operation_global_system_allocator",
+                    "allocation_calls": 0,
+                    "deallocation_calls": 0,
+                    "reallocation_calls": 0,
+                    "failed_allocation_calls": 0,
+                    "allocated_bytes": 0,
+                    "deallocated_bytes": 0,
+                    "live_bytes_before": 0,
+                    "live_bytes_after": 0,
+                    "peak_live_bytes_before": 0,
+                    "peak_live_bytes_after": 0,
+                },
+            }],
+        }
+        with self.assertRaises(protocol.RunFailure):
+            protocol._validate_timed(
+                timed,
+                "primary_entry_drop",
+                1,
+                False,
+                manifest["protocol"],
+                fixture,
+                "normal-allocator-mismatch",
+            )
 
     def test_timed_validator_enforces_minimum_sample(self):
         manifest = protocol._load_manifest(MANIFEST, plan=True)
@@ -73,15 +219,28 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 1,
                 False,
                 manifest["protocol"],
+                {"bytes": 1, "sha256": "0" * 64},
                 "short",
             )
-        valid = dict(report_base, samples=[{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}])
+        proof = {
+            "output": {"bytes": 1, "sha256": "0" * 64},
+            "source_exact": True,
+            "changed": False,
+            "patch_noop": None,
+            "operation_count": None,
+            "patch_before_exact": None,
+            "patch_after_exact": None,
+            "entry": "drop",
+        }
+        valid = dict(report_base, fixture={"bytes": 1, "sha256": "0" * 64}, postcondition=proof,
+                     samples=[{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}])
         result = protocol._validate_timed(
             valid,
             "primary_entry_drop",
             1,
             False,
             manifest["protocol"],
+            {"bytes": 1, "sha256": "0" * 64},
             "valid",
         )
         self.assertEqual(result["samples"][0]["elapsed_ns"], 150_000_000)
@@ -106,6 +265,17 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "schema": protocol.PROBE_SCHEMA,
             "mode": "timed",
             "route": "primary_entry_drop",
+            "fixture": {"bytes": 1, "sha256": "0" * 64},
+            "postcondition": {
+                "output": {"bytes": 1, "sha256": "0" * 64},
+                "source_exact": True,
+                "changed": False,
+                "patch_noop": None,
+                "operation_count": None,
+                "patch_before_exact": None,
+                "patch_after_exact": None,
+                "entry": "drop",
+            },
             "samples": [{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}],
         }
         with self.assertRaises(protocol.RunFailure):
@@ -115,8 +285,53 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 1,
                 True,
                 manifest["protocol"],
+                {"bytes": 1, "sha256": "0" * 64},
                 "broken-allocation",
             )
+
+    def test_allocator_validator_allows_reallocation_without_allocation_call(self):
+        manifest = protocol._load_manifest(MANIFEST, plan=True)
+        allocation = {
+            "status": "measured",
+            "scope": "operation_global_system_allocator",
+            "allocation_calls": 0,
+            "deallocation_calls": 0,
+            "reallocation_calls": 1,
+            "failed_allocation_calls": 0,
+            "allocated_bytes": 0,
+            "deallocated_bytes": 0,
+            "live_bytes_before": 10,
+            "live_bytes_after": 10,
+            "peak_live_bytes_before": 10,
+            "peak_live_bytes_after": 10,
+        }
+        digest = {"bytes": 1, "sha256": "0" * 64}
+        report = {
+            "schema": protocol.PROBE_SCHEMA,
+            "mode": "timed",
+            "route": "primary_entry_drop",
+            "fixture": digest,
+            "postcondition": {
+                "output": digest,
+                "source_exact": True,
+                "changed": False,
+                "patch_noop": None,
+                "operation_count": None,
+                "patch_before_exact": None,
+                "patch_after_exact": None,
+                "entry": "drop",
+            },
+            "samples": [{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}],
+        }
+        protocol._validate_timed(
+            report,
+            "primary_entry_drop",
+            1,
+            True,
+            manifest["protocol"],
+            digest,
+            "reallocation-only",
+        )
 
 
 if __name__ == "__main__":
