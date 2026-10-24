@@ -1469,7 +1469,7 @@ class BuildOverlapLease:
         if self.expires <= _dt.datetime.now(_dt.timezone.utc):
             raise RunnerError("build permit is expired")
         max_jobs = value.get("max_jobs")
-        if not isinstance(max_jobs, int) or not 1 <= max_jobs <= 4:
+        if isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or not 1 <= max_jobs <= 4:
             raise RunnerError("build permit max_jobs must be between 1 and 4")
         self.max_jobs = max_jobs
         self.allowed_lanes = self._text_list("allowed_lanes")
@@ -1496,6 +1496,8 @@ class BuildOverlapLease:
         _ensure_external(self.lease_dir, source_roots, "build permit lease_dir")
         if _overlap(self.lease_dir, output):
             raise RunnerError("build permit lease_dir must be disjoint from output_dir")
+        if _overlap(self.permit_path, self.lease_dir):
+            raise RunnerError("build permit path must be disjoint from lease_dir")
         if self.lease_dir.exists() and not self.lease_dir.is_dir():
             raise RunnerError(f"build permit lease_dir is not a directory: {self.lease_dir}")
         self.root_pid = os.getpid()
@@ -1584,7 +1586,7 @@ class BuildOverlapLease:
             raise RunnerError(f"build lease permit hash differs: {path}")
         pid = value.get("root_pid")
         starttime = value.get("root_starttime")
-        if not isinstance(pid, int) or pid <= 0 or not isinstance(starttime, str) or not starttime:
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or not isinstance(starttime, str) or not starttime:
             raise RunnerError(f"build lease root identity is malformed: {path}")
         if value.get("lane") not in self.allowed_lanes:
             raise RunnerError(f"build lease lane is not admitted: {path}")
@@ -1615,6 +1617,8 @@ class BuildOverlapLease:
                 resolved = _resolve_path(item)
                 if not resolved.is_absolute():
                     raise RunnerError(f"build lease {key} must be absolute: {path}")
+        if value.get("expires_utc") != self.permit.get("expires_utc"):
+            raise RunnerError(f"build lease expiry differs from its permit: {path}")
         _parse_utc(value.get("expires_utc"), f"build lease {path} expires_utc")
         entry = snapshot.get(pid)
         if entry is None:

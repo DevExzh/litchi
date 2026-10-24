@@ -869,6 +869,18 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "unrelated Litchi"):
                 runner.ProcessGuard().require_quiet()
 
+    def test_compile_only_manifest_rejects_non_build_command(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-command-") as directory:
+            root = Path(directory)
+            manifest, _manifest_path, _permit, _lease_dir = self._overlap_fixture(root)
+            manifest["legs"]["after"]["build"][0]["argv"] = ["cargo", "check"]
+            with self.assertRaisesRegex(runner.RunnerError, "only cargo build"):
+                runner._validate_build_execution(
+                    manifest,
+                    output=root / "output",
+                    source_roots=[ROOT, ROOT],
+                )
+
     def test_compile_overlap_lease_rejects_stale_hash_pid_reuse_expiry_and_excess(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-negative-") as directory:
             root = Path(directory)
