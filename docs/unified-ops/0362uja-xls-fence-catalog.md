@@ -59,3 +59,46 @@ logs remain outside Git:
 
 Native and ABBA qualification remain coordinator work. The full workspace gate
 is not claimed by this leaf.
+
+## Full native validation receipt
+
+At the independent-reviewer request, the complete native XLS suite and
+doctests were rerun on `dfe8281fb36a920a02b6ed150bf604663ea602fe` with the
+same one-job capped environment. Both commands passed:
+
+```text
+env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
+  CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
+  CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-target \
+  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp \
+  cargo test --offline --locked -p litchi-xls --all-features \
+    --all-targets --no-fail-fast
+  status: 0; 1,327 unit tests plus all integration tests and examples passed
+
+env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
+  CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
+  CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-target \
+  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp \
+  cargo test --offline --locked -p litchi-xls --all-features \
+    --doc --no-fail-fast
+  status: 0; 23 doctests passed, 1 expected ignored, 1 compile-fail doctest passed
+```
+
+The combined log is retained outside Git at
+`/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/xls-full-tests-doctests.log`
+(172,749 bytes, SHA-256
+`1fa5a7299d317b4f8f6920977dde1eab5b4a977c1af9fcb83b83ff84208939fd`). The
+external target measured 4,531,008,467 bytes (4.3 GiB), below the 20 GiB cap.
+The locked `/home/zhuhe/code/litchi-worktrees/uo2-final-xls-fence/Cargo.lock`
+was 139,591 bytes with SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
+
+This validates native correctness after moving the parsed catalog into its
+shared representation. The first-access benefit is structural—the eager
+package no longer clones the catalog—but the allocation/conversion placement
+and the Arc handle cost remain pending ABBA qualification; this receipt makes
+no performance acceptance claim.
