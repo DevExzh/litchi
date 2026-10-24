@@ -1056,3 +1056,177 @@ Under `quarantine/wave27-w4b/`, the 1,210-byte manifest has SHA-256
 the 1,489-byte restore helper has SHA-256
 `cb07b3abea6858b661984627c73c01f8e3cf69289836308d95168b05c7542536`.
 Recreate the leaf from its retained branch, then run that `restore.py`.
+
+
+## Twenty-eighth cleanup, 2026-10-24
+
+The reviewed inventory and encrypted-DOCX leaves were removed without force
+after their merges into `dd78c02a23a202b6fa25562872a58113c4b20cb8`.
+Their retained branches point to `668249cebf45f58ca6c460e36499561093cc4976`
+and `696352d066ee6eb92cdcd0be941ca9102d041570`. The checkouts measured
+7,552,352,256 and 7,552,401,408 apparent bytes before removal. Nine ignored
+files totaling 322,218 bytes remain in quarantine; those preserved bytes
+are not reclaimed. All external targets, locked validation logs and native
+endpoints remain intact. No process held either leaf and no signals were sent.
+
+The coordinator independently verified every payload's size, SHA-256 and
+mode, both retained refs and merge ancestry, the removed paths, external
+evidence identities and the restore helper's expected directory layout.
+The 6,584-byte receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/wave28-cleanup-success.json`,
+SHA-256 `30e7c38ce3ea3507843a64cbbf4fe28a85229efa432f8169df591d432b64d4d8`.
+Under the adjacent `quarantine/wave28/`, the 2,416-byte manifest has SHA-256
+`cfca857cf0bb33f1457c4ecb382c51836906d65a88c8d501501fb144f8d0b630`;
+the 1,845-byte restore helper has SHA-256
+`787069c930c1604a4aa7a9e426d02d1eca6ec213a1d65bab028f6e5c652b9c39`.
+Recreate both leaves from their retained branches before running `restore.py`.
+
+
+## Twenty-ninth cleanup, 2026-10-24
+
+The reviewed short Unix socket fixture leaf was removed without force after
+merge at `250769e1dcb692994a382829c238bf23bda5035d`. Its retained branch
+`uo2/short-unix-socket-fixtures` points to
+`35f47e34dce1c57695db71e3709c01ec29cc170c`. The checkout measured
+7,552,471,040 apparent bytes before removal. Its 139,592-byte ignored lock
+remains hash-quarantined. No process held the leaf; no signals were sent.
+The DOCX cache and all validation evidence remain intact.
+
+The coordinator independently verified the retained ref and ancestry,
+removed path, payload size/hash/mode, external logs and restoration layout.
+The 4,543-byte receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/wave29-cleanup-success.json`,
+SHA-256 `323693fe374143b443f4fe15fb13df1d04b35f1e3e8939700a9711d563df6078`.
+Under `quarantine/wave29/`, the 788-byte manifest has SHA-256
+`682fc30452608a7d3d952437387c56f86ebc94c88c414068ef38e22470da8169`;
+the 1,755-byte restore helper has SHA-256
+`99ebea657b9386ccac7b02dccb0d3f240c08877aeea59fb644e8d7851a5f98e9`.
+Recreate the leaf from its retained branch before running `restore.py`.
+The receipt also retains a read-only target inspection; no build artifacts
+were deleted by this cleanup.
+
+## Build-cache headroom after cleanup twenty-nine
+
+With no active holder of the coordinator target, 126 regenerable ELF
+executables under `budget-validation/target/debug/examples` were removed.
+Each was an exact SHA-256 duplicate of an executable already recorded as
+pruned by a completed safe-chunked check. Before unlinking, the cleanup
+rechecked each file's type, executable mode, size, hash, device, inode and
+link count against its manifest and matching completed receipt. It removed
+3,712,220,600 bytes. All three benchmark/profile executables and 5,610
+non-executable files remained; the immediate and final holder scans were empty.
+
+The external directory is
+`/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave3-examples/`.
+Its 3,605,760-byte `manifest.json` remains outside Git, SHA-256
+`7a25d4cff6bd9a42f77daa62587e52bf9a7f78d958ecfa7a49219c46c2bb0138`.
+The 45,319-byte `deletion-receipt.json` has SHA-256
+`0088c05ac29ad9aefa361a5a7cc8b04668fecea64bf0faf346042dfe71452c02`.
+The coordinator verified the receipt identities, candidate totals and
+preservation/holder observations. Build commands in the retained gate logs
+regenerate these duplicate outputs. No source, benchmark binary, native
+endpoint or validation evidence was removed. The target's allocated size
+after cleanup was 14,922,784,768 bytes; subsequent checks may grow it again.
+
+## Thirtieth cleanup, 2026-10-24
+
+The merged upstream-guard, evidence-catalog and corpus-report leaves were
+removed without force. Their retained tips are `00b2831d067908aeb93211d1e82ff1380ed47efd`,
+`1d2f6cfcad3a3b269a9ed4c639e088e61fd6a8c1` and
+`2510bf5b40d2db17e774cf68734f7e08d91700ec`. No live holder was found and
+no signal was sent. The cleanup preserved 14,437 ignored records, including
+the corpus leaf's unexpected local target. Its 20,343,611,392 allocated
+quarantine bytes remain preserved, not reclaimed. That local target exceeds
+the validation lane's 20-billion-byte ceiling; the corpus owner must rerun
+the affected checks with explicit bounded external-target provenance.
+
+Independent verification passed every payload's type, size, hash and mode,
+all 696 directory modes, exact restoration layout, all 94 hardlink groups,
+retained refs/ancestry and removed paths. The verification's final historical
+external-target size comparison returned exit 1 because the approved corpus
+rerun was already rebuilding that target. The receipt preserves this result
+as superseded by authorized reuse; it does not claim that a live build cache
+still equals its earlier snapshot. The cleanup's own before/after snapshots
+remain historical evidence.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave30/`.
+The 6,608,213-byte `manifest.json` remains outside Git, SHA-256
+`bcbd9d94c404131cee9e4c60d680a43b25ad306593be4e7d0693f821efb821ba`.
+The 4,344-byte cleanup receipt has SHA-256
+`0c3bba4101354e978cf0b94e35c83e54528d99faea08c56c98fdaa3c8e0b664b`;
+the 4,219-byte restore helper has SHA-256
+`534829b9c03ee4892ae27d4b6f68d530c8d89bc4d2f310e27bfdf4cefe90aa84`.
+The generating command was `python3` with the adjacent `prepare_cleanup.py`.
+Regeneration requires recreating the three retained branches, restoring their
+ignored files with `restore.py`, and directing the helper's `QUARANTINE`,
+`MANIFEST` and `RECEIPT` paths to a fresh external directory. Do not reuse the
+archived oversized target for validation.
+
+The 5,063-byte independent receipt is
+`.coord/worktree-cleanup-2026-10-23/wave30-independent-verification.json`,
+SHA-256 `b504842a0b015fbc9fc8e8e5360adcd258258617b1a3ca6c4a58af7048128a0d`.
+It binds the durable verification log, original exit 1 and active worker
+observation, alongside the completed payload verification.
+
+## Thirty-first cleanup, 2026-10-24
+
+The merged W8 policy and XLS catalog leaves were removed without force.
+Their retained tips are `e12b57d6246ee825fc2879b8b71bc7b57546204d` and
+`3ddd72e97e46219d9e75c4a8b5cf7925ac86eeeb`. Eight ignored records totaling
+451,585 bytes remain quarantined. The coordinator verified every payload's
+size/hash/mode, directory layout, retained ref, ancestry and removed path.
+All external native endpoints, XLS targets and logs remain intact. No live
+holder was found and no signal was sent; the active corpus rerun was untouched.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave31/`.
+The 9,601-byte manifest has SHA-256
+`7b39a5f45db462a0a73b59b8b9b3b0ca956a1678f715518aaed0aa8190bf4269`;
+the 4,269-byte receipt has SHA-256
+`4c066c0ae8ce3ced70a8ee168be4bdb455c6e08fe17a66b8924cf0a955ae15f5`;
+the 3,978-byte restore helper has SHA-256
+`9fd26f2ba511a08d61666459616b24641f3bd2dafada88c45b5882e6de977a7f`.
+Recreate the two retained branch worktrees before running `restore.py`.
+
+
+## Thirty-second cleanup, 2026-10-24
+
+The merged gate-registration leaf was removed without force. Its retained
+branch tip is `8a795fb7692198fe1ae50e44e4bcafa461479456`, merged at
+`8220f809b928fac57ec6048f28079cc45c421adf`. It had no ignored files. The
+coordinator independently verified the retained ref, ancestry, absent path
+and empty payload container. The active and prepared gate runners remain
+intact; no holder was found or signal sent.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave32/`.
+The 3,208-byte manifest has SHA-256
+`dd48c9878503bb108a17e002a1444459e0ed7f3fca6b0f76b6b82cc577a50eea`;
+the 3,185-byte receipt has SHA-256
+`5c301768005e32314ca47717f0694da656544c0488e59dd6dbfc5d27f1c69288`;
+the 3,961-byte restore helper has SHA-256
+`ec17d03d7e052188affc75ba6b60dc71aacd7617deb49ee0d5bdcb9d3fa30f8b`.
+
+## Thirty-third cleanup, 2026-10-24
+
+The reviewed boundary and corrected corpus-receipt leaves were removed
+without force after their merges. Their retained tips are
+`5a8cfa93c13352808baa825742a17e50f68696a4` and
+`36cf4e3dadfb8e29f78df50d9d07bd00ede10c15`, merged at `b7968d4814` and
+`885cdc82af`. Three ignored records totaling 6,309,808 bytes remain
+quarantined: two Python caches and the corpus lock. The coordinator verified
+every payload's size, hash, mode and directory layout, retained refs,
+ancestry and removed paths. External corpus caches and receipts, both gate
+runners, the earlier oversized-target quarantine and active OPC/ODP repair
+leaves remain intact. No live holder was found and no signal was sent.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave33/`.
+The 12,211-byte manifest has SHA-256
+`e9dfafa2dad22e01e421ee46a5a5418b86f765928c2fe036af5fe6592f2bf63b`;
+the 18,748-byte receipt has SHA-256
+`2f2183e0cce371e47ab124d17bd327fd292d19371b6c46252b40f20861c90e73`;
+the 3,961-byte restore helper has SHA-256
+`19983979ab7d1780fd09aee8ed4ebc91e2d794bca89d0c312eef76c8986c970a`.
+Recreate the two retained branch worktrees before running `restore.py`.
