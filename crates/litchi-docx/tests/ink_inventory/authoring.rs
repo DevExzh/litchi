@@ -59,6 +59,7 @@ fn creates_base_ink_in_all_story_roles_and_restores_exact_members_after_reopen()
             let mut edit = package.edit_ink().unwrap();
             let locations: Vec<_> = edit
                 .inventory()
+                .unwrap()
                 .annotations()
                 .iter()
                 .map(|annotation| annotation.location())

@@ -475,6 +475,13 @@ pub(crate) trait Change: Clone + Send + Sync + 'static {
     fn allows_foreign_restore(&self) -> bool {
         true
     }
+    /// Validate a foreign recipient before an authenticated mismatch is
+    /// reported. Families may use this to preserve a source parse failure's
+    /// precedence over the complete-artifact proof; the default keeps replay
+    /// on its existing fast path.
+    fn preflight_foreign(&self, _package: &Package) -> std::result::Result<(), Self::Error> {
+        Ok(())
+    }
     /// The change that restores the before state.
     #[must_use]
     fn inverse(&self) -> Self;
@@ -624,6 +631,10 @@ macro_rules! source_family {
                     // A retained owner patch records a complete artifact base.
                     // A mismatch must not fall back to a scoped record patch.
                     if !package.same_artifact(before)? {
+                        crate::source_backed::deferred::Change::preflight_foreign(
+                            &patch.change,
+                            package,
+                        )?;
                         return Err(crate::Error::conflict(
                             $what,
                             "the patch base does not match the supplied source",

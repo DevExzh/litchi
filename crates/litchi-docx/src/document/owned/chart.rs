@@ -171,11 +171,11 @@ impl Edit<Package> {
         let extended = spec.variant().kind.is_extended();
         let workbook = workbook_bytes(&spec)?;
         let id = self
-            .inner
+            .inner_mut()?
             .max_drawing_id()?
             .map_or(Some(1), |maximum| maximum.checked_add(1))
             .ok_or_else(invalid)?;
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let base = self.main_folder()?;
         let used = self.part_names()?;
         let free = |directory: &str, stem: &str, extension: &str, taken: &[String]| {
@@ -279,7 +279,7 @@ impl Edit<Package> {
         let relationship_id = self.next_relationship_id()?;
         let name = chart.name.clone().unwrap_or_else(|| format!("Chart {id}"));
         // The drawing first: a refused target stages nothing.
-        let position = self.inner.insert_chart_markup_at(
+        let position = self.inner_mut()?.insert_chart_markup_at(
             paragraph,
             at,
             &relationship_id,
@@ -292,7 +292,7 @@ impl Edit<Package> {
                 extended,
             },
         )?;
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([TransferRelationship {
                     id: relationship_id,
@@ -390,7 +390,7 @@ impl Edit<Package> {
         if replaced.is_empty() {
             return Ok(false);
         }
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([]),
                 parts: Arc::new([]),
@@ -417,7 +417,7 @@ impl Edit<Package> {
         if !(1..=MAX_EXTENT).contains(&width) || !(1..=MAX_EXTENT).contains(&height) {
             return Err(invalid());
         }
-        self.inner
+        self.inner_mut()?
             .rewrite_chart_at(paragraph, chart, Some((width, height)))
     }
 
@@ -430,7 +430,7 @@ impl Edit<Package> {
     ///
     /// Returns [`Refusal::RunNotFound`] for a missing chart.
     pub fn remove_chart_at(&mut self, paragraph: &ElementPath, chart: Position) -> Result<()> {
-        self.inner.rewrite_chart_at(paragraph, chart, None)?;
+        self.inner_mut()?.rewrite_chart_at(paragraph, chart, None)?;
         Ok(())
     }
 
@@ -450,22 +450,24 @@ impl Edit<Package> {
                 relationship.is_external(),
             )
         });
-        for (change, forward) in self.inner.staged_graph_changes() {
-            if !forward {
-                continue;
+        self.inner_ref(|inner| {
+            for (change, forward) in inner.staged_graph_changes() {
+                if !forward {
+                    continue;
+                }
+                for staged in change
+                    .relationships
+                    .iter()
+                    .filter(|staged| staged.id == relationship_id)
+                {
+                    relationship = Some((
+                        staged.relationship_type.clone(),
+                        staged.target.clone(),
+                        staged.external,
+                    ));
+                }
             }
-            for staged in change
-                .relationships
-                .iter()
-                .filter(|staged| staged.id == relationship_id)
-            {
-                relationship = Some((
-                    staged.relationship_type.clone(),
-                    staged.target.clone(),
-                    staged.external,
-                ));
-            }
-        }
+        })?;
         let Some((relationship_type, target, external)) = relationship else {
             return Ok(None);
         };
@@ -495,23 +497,26 @@ impl Edit<Package> {
                 }
             }
         }
-        for (change, forward) in self.inner.staged_graph_changes() {
-            if !forward {
-                continue;
-            }
-            for part in change.parts.iter().filter(|part| part.name == chart) {
-                for child in part.relationships.iter() {
-                    if !child.external && is_package(&child.relationship_type) {
-                        workbook = Some(
-                            PackURI::from_rel_ref(chart_uri.base_uri(), &child.target)
-                                .map_err(crate::Error::Invalid)?
-                                .as_str()
-                                .to_owned(),
-                        );
+        self.inner_ref(|inner| {
+            for (change, forward) in inner.staged_graph_changes() {
+                if !forward {
+                    continue;
+                }
+                for part in change.parts.iter().filter(|part| part.name == chart) {
+                    for child in part.relationships.iter() {
+                        if !child.external && is_package(&child.relationship_type) {
+                            workbook = Some(
+                                PackURI::from_rel_ref(chart_uri.base_uri(), &child.target)
+                                    .map_err(crate::Error::Invalid)?
+                                    .as_str()
+                                    .to_owned(),
+                            );
+                        }
                     }
                 }
             }
-        }
+            Ok::<_, crate::Error>(())
+        })??;
         Ok(Some((chart, workbook)))
     }
 }
@@ -593,8 +598,10 @@ mod tests {
             .unwrap();
         assert_eq!((first.get(), second.get()), (0, 1));
         // Staged reads see the new parts.
-        let charts =
-            crate::chart::inline::parse_inline_charts(edit.inner.projected().xml_bytes()).unwrap();
+        let charts = {
+            let projected = edit.projected().unwrap();
+            crate::chart::inline::parse_inline_charts(projected.xml_bytes()).unwrap()
+        };
         let (xml, workbook) = edit
             .chart_parts(charts[1].relationship_id())
             .unwrap()

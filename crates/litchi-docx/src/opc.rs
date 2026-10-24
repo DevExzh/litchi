@@ -1,9 +1,9 @@
 //! The raw OPC family (record 0355): a low-level escape for graph edits the
 //! typed families do not model.
 //!
-//! [`Package::edit_opc`](crate::Package::edit_opc) stages an [`Edit`] over a
-//! structural copy of the package graph (built-in part payloads stay shared
-//! until changed); [`Edit::commit`] validates the candidate — its Word main
+//! [`Package::edit_opc`](crate::Package::edit_opc) stages an [`Edit`] retaining
+//! the source graph; the structural candidate is copied on the first mutation
+//! (built-in part payloads stay shared until changed); [`Edit::commit`] validates the candidate — its Word main
 //! relationship and content type, its core and custom properties and its
 //! signature disposition — and publishes a new package, and
 //! [`Package::apply_opc`](crate::Package::apply_opc) replays the [`Patch`].
@@ -42,7 +42,7 @@ graph_family!("raw OPC");
 #[derive(Clone)]
 pub struct Edit {
     source: crate::Package,
-    candidate: OpcPackage,
+    candidate: Option<OpcPackage>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -52,20 +52,32 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn materialize(&mut self) -> &mut OpcPackage {
+        if self.candidate.is_none() {
+            self.candidate = Some(self.source.opc_package().clone());
+        }
+        self.candidate
+            .as_mut()
+            .expect("candidate is materialized above")
+    }
+
     /// The staged graph.
     #[must_use]
-    pub const fn package(&self) -> &OpcPackage {
-        &self.candidate
+    pub fn package(&self) -> &OpcPackage {
+        match &self.candidate {
+            Some(candidate) => candidate,
+            None => self.source.opc_package(),
+        }
     }
 
     /// The staged graph, for a raw change.
     pub fn package_mut(&mut self) -> &mut OpcPackage {
-        &mut self.candidate
+        self.materialize()
     }
 
     /// Discard every staged change, keeping the edit.
     pub fn reset(&mut self) {
-        self.candidate = self.source.opc_package().clone();
+        self.candidate = None;
     }
 
     /// Validate the staged graph and publish it as a new package with its
@@ -77,7 +89,15 @@ impl Edit {
     /// properties, an encrypted source, or a changed signed graph without a
     /// signature disposition.
     pub fn commit(self) -> Result<Commit> {
-        let patch = GraphPatch::between(self.source.opc_package(), &self.candidate)?;
+        let Some(candidate) = self.candidate else {
+            // A never-mutated edit is already an exact no-op. Keep the source
+            // graph owned by the package instead of cloning the whole OPC
+            // graph merely to diff it against itself at commit time.
+            let source = self.source;
+            let patch = GraphPatch::between(source.opc_package(), source.opc_package())?;
+            return Ok(Commit::new(source, Patch(patch), Diagnostics::UNCHANGED));
+        };
+        let patch = GraphPatch::between(self.source.opc_package(), &candidate)?;
         if patch.is_noop() {
             return Ok(Commit::new(
                 self.source,
@@ -86,7 +106,6 @@ impl Edit {
             ));
         }
         let mut next = self.source.clone();
-        let candidate = self.candidate;
         next.edit_opc_in_place(move |opc| {
             *opc = candidate;
             Ok(())
@@ -102,7 +121,7 @@ impl crate::Package {
     pub fn edit_opc(&self) -> Edit {
         Edit {
             source: self.clone(),
-            candidate: self.opc_package().clone(),
+            candidate: None,
         }
     }
 

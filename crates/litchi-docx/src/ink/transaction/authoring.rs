@@ -33,19 +33,18 @@ enum StructuralEdit {
 }
 
 pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
+    let base = edit.base_state()?;
     bound(
         LimitKind::Annotations,
-        edit.base
-            .snapshot
+        base.snapshot
             .annotations()
             .len()
             .saturating_sub(edit.removals.len())
             .saturating_add(edit.additions.len()),
         edit.limits.inventory.max_annotations,
     )?;
-    let stories =
-        crate::package::story::capture(&edit.base.package, edit.limits.inventory.stories)?;
-    let mut candidate = edit.base.package.as_ref().clone();
+    let stories = crate::package::story::capture(&base.package, edit.limits.inventory.stories)?;
+    let mut candidate = base.package.as_ref().clone();
     let mut drawing_ids = DrawingIds::new(edit.limits.inventory.max_xml_nodes);
     if edit
         .additions
@@ -89,7 +88,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
         let mut addition_plans = Vec::new();
         let mut targets = Vec::new();
         for (host_index, entry) in hosts.iter().enumerate() {
-            if !is_annotation(&edit.base.package, story.part(), &entry.anchor)? {
+            if !is_annotation(&base.package, story.part(), &entry.anchor)? {
                 continue;
             }
             let selected = ordinal;
@@ -126,7 +125,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                     },
                     (_, Some(_)) => {},
                 }
-                let owner = edit.base.package.get_part(story.part())?;
+                let owner = base.package.get_part(story.part())?;
                 let relationship =
                     owner
                         .rels()
@@ -136,10 +135,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
                                 "Ink replacement relationship disappeared".into(),
                             )
                         })?;
-                let previous = edit
-                    .base
-                    .package
-                    .get_part(&relationship.target_partname()?)?;
+                let previous = base.package.get_part(&relationship.target_partname()?)?;
                 let ink_target = targets.len();
                 push(
                     &mut targets,
@@ -444,7 +440,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     if inserted != edit.additions.len()
         || replaced != edit.replacements.len()
         || removed != edit.removals.len()
-        || ordinal != edit.base.snapshot.annotations().len()
+        || ordinal != base.snapshot.annotations().len()
     {
         return Err(invalid(
             "Ink authoring selectors did not resolve against the complete source snapshot",
@@ -465,7 +461,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     });
     Ok(Planned {
         patch: Patch {
-            before: edit.base,
+            before: base,
             after,
             changes: Arc::new(changes),
             reversed: false,

@@ -913,7 +913,7 @@ fn managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection() 
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "candidate")
         .unwrap();
-    let expected_xml = edit.projected().xml_bytes().to_vec();
+    let expected_xml = edit.projected().unwrap().xml_bytes().to_vec();
     let source_reserved = budget.used(Resource::Memory);
     let remaining = budget
         .limit(Resource::Memory)
@@ -923,11 +923,17 @@ fn managed_edit_try_clone_refuses_memory_boundary_without_mutating_projection() 
 
     let result = edit.try_clone();
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), expected_xml.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        expected_xml.as_slice()
+    );
 
     drop(hold);
     let cloned = edit.try_clone().unwrap();
-    assert_eq!(cloned.projected().xml_bytes(), expected_xml.as_slice());
+    assert_eq!(
+        cloned.projected().unwrap().xml_bytes(),
+        expected_xml.as_slice()
+    );
     let commit = cloned.commit().unwrap();
     assert_eq!(commit.patch().target().xml_bytes(), expected_xml.as_slice());
 
@@ -1060,7 +1066,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         let source = tracked_revision_fixture(signed);
         let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
         let mut edit = package.edit().unwrap();
-        let projected = edit.projected().xml_bytes().to_vec();
+        let projected = edit.projected().unwrap().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
 
         let reference = edit
@@ -1124,7 +1130,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         }
 
         // Every refusal happened before any state change or admission.
-        assert_eq!(edit.projected().xml_bytes(), projected.as_slice());
+        assert_eq!(edit.projected().unwrap().xml_bytes(), projected.as_slice());
         assert_eq!(budget.used(Resource::Memory), reserved);
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
@@ -1453,7 +1459,7 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
-    let first_projected = edit.projected().xml_bytes().to_vec();
+    let first_projected = edit.projected().unwrap().xml_bytes().to_vec();
     let remaining = budget
         .limit(Resource::Memory)
         .saturating_sub(budget.used(Resource::Memory));
@@ -1461,7 +1467,10 @@ fn managed_failed_second_edit_budget_leaves_first_projection_intact() {
     let hold = budget.reserve(Resource::Memory, remaining).unwrap();
     let result = edit.replace_paragraph_text(Position::new(1), "second changed");
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), first_projected.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        first_projected.as_slice()
+    );
     drop(hold);
 
     let commit = edit.commit().unwrap();
@@ -1496,11 +1505,14 @@ fn managed_failed_second_edit_cancellation_leaves_first_projection_intact() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first changed")
         .unwrap();
-    let first_projected = edit.projected().xml_bytes().to_vec();
+    let first_projected = edit.projected().unwrap().xml_bytes().to_vec();
     cancellation_source.cancel();
     let result = edit.replace_paragraph_text(Position::new(1), "second changed");
     assert!(result.as_ref().is_err_and(is_cancelled));
-    assert_eq!(edit.projected().xml_bytes(), first_projected.as_slice());
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        first_projected.as_slice()
+    );
     drop(edit);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -1528,7 +1540,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
 
     let (budget, _cancellation_source, package) = managed(source.clone(), 1 << 20);
     let mut edit = package.edit().unwrap();
-    let source_xml = edit.source().xml_bytes().to_vec();
+    let source_xml = edit.source().unwrap().xml_bytes().to_vec();
     edit.replace_paragraph_text(Position::new(0), "after")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -2185,6 +2197,7 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
 fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
     let edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     assert!(budget.used(Resource::Memory) > 0);
     cancellation_source.cancel();
 
@@ -2199,6 +2212,7 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
     let source = fixture_with_document(empty_text_slot_document(4096), 37, 13);
     let (probe_budget, _cancellation_source, probe_package) = managed(source.clone(), 1 << 24);
     let probe_edit = probe_package.edit().unwrap();
+    let _ = probe_edit.projected().unwrap();
     let baseline_memory = probe_budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     drop(probe_edit);
@@ -2208,10 +2222,10 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
     let low_memory_limit = baseline_memory.saturating_add(2 * 1024 * 1024);
     let (budget, _cancellation_source, package) = managed(source, low_memory_limit);
     let mut edit = package.edit().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     let result = edit.replace_paragraph_text(Position::new(0), "x");
     assert!(result.as_ref().is_err_and(is_budget_refusal));
-    assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     drop(edit);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -2222,6 +2236,7 @@ fn managed_candidate_budget_failure_happens_before_publication_output() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
     let mut edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     let baseline_memory = budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     let remaining = budget

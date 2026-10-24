@@ -69,7 +69,7 @@ impl Edit<Package> {
                 reason: Refusal::InvalidPropertyValue,
             });
         }
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let relationship = if strict {
             STRICT_NUMBERING_RELATIONSHIP
         } else {
@@ -117,7 +117,7 @@ impl Edit<Package> {
     ///
     /// Returns a typed error for a malformed numbering part.
     pub fn list_kind(&self, num_id: u32) -> Result<Option<ListKind>> {
-        let relationship = if self.inner.is_strict() {
+        let relationship = if self.is_strict()? {
             STRICT_NUMBERING_RELATIONSHIP
         } else {
             NUMBERING_RELATIONSHIP
@@ -270,7 +270,7 @@ impl Edit<Package> {
                 Ok(id)
             },
             None => {
-                let strict = self.inner.is_strict();
+                let strict = self.is_strict()?;
                 let empty = crate::numbering::empty_numbering_xml(strict);
                 let catalog =
                     Catalog::from_xml(std::sync::Arc::new(empty)).map_err(Error::Document)?;
@@ -363,8 +363,7 @@ impl Edit<Package> {
 
     /// The numbering part's name and catalog, staged changes included.
     fn numbering_part(&self) -> Result<Option<(String, Catalog)>> {
-        let Some((name, _)) = self.related_part(numbering_relationship(self.inner.is_strict()))?
-        else {
+        let Some((name, _)) = self.related_part(numbering_relationship(self.is_strict()?))? else {
             return Ok(None);
         };
         let payload = self

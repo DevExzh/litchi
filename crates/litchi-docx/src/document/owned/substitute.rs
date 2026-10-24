@@ -68,7 +68,7 @@ impl<P: Clone> Edit<P> {
     ///
     /// Returns an XML error for malformed markup.
     pub fn story(&self) -> Result<Story> {
-        self.inner.story()
+        self.inner_ref(|inner| inner.story())?
     }
 
     /// The main document's story within the elements `scopes` name. See
@@ -94,7 +94,7 @@ impl<P: Clone> Edit<P> {
     ///
     /// A typed refusal for a path that names nothing, or an XML error.
     pub fn story_within(&self, scopes: &[super::super::ElementPath]) -> Result<Story> {
-        self.inner.story_within(scopes)
+        self.inner_ref(|inner| inner.story_within(scopes))?
     }
 
     /// Apply `replacements`, sorted by paragraph and range and planned over
@@ -109,7 +109,7 @@ impl<P: Clone> Edit<P> {
     /// error. The edit is unchanged on failure. Source-backed edits refuse
     /// it as an unmanaged-only operation.
     pub fn substitute(&mut self, story: &Story, replacements: &[Replacement]) -> Result<Outcome> {
-        self.inner.substitute(story, replacements)
+        self.inner_mut()?.substitute(story, replacements)
     }
 
     /// [`Self::substitute`], formatting the runs that
@@ -126,7 +126,8 @@ impl<P: Clone> Edit<P> {
         replacements: &[Replacement],
         format: F,
     ) -> Result<Outcome> {
-        self.inner.substitute_formatted(story, replacements, format)
+        self.inner_mut()?
+            .substitute_formatted(story, replacements, format)
     }
 }
 

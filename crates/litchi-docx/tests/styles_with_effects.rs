@@ -1347,27 +1347,45 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
     }
     assert!(maximum_depth > 2);
     let limits = [
-        SourceLimits::builder()
-            .max_events(events - 1)
-            .unwrap()
-            .build()
+        (
+            SourceLimits::builder()
+                .max_events(events - 1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            Limits::new(
+                Limits::DEFAULT.xml_bytes(),
+                events - 1,
+                Limits::DEFAULT.depth(),
+                Limits::DEFAULT.nodes(),
+                Limits::DEFAULT.attributes(),
+                Limits::DEFAULT.attribute_bytes(),
+            )
             .unwrap(),
-        SourceLimits::builder()
-            .max_depth(maximum_depth - 1)
-            .unwrap()
-            .build()
+        ),
+        (
+            SourceLimits::builder()
+                .max_depth(maximum_depth - 1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            Limits::new(
+                Limits::DEFAULT.xml_bytes(),
+                Limits::DEFAULT.events(),
+                maximum_depth - 1,
+                Limits::DEFAULT.nodes(),
+                Limits::DEFAULT.attributes(),
+                Limits::DEFAULT.attribute_bytes(),
+            )
             .unwrap(),
+        ),
     ];
-    for limit in limits {
+    for (limit, effects_limits) in limits {
         let package = litchi_opc::OpcPackage::from_vec(bytes.clone(), limit)
             .expect("native OPC package fits ingress limits");
         assert!(
-            litchi_docx::styles::effects::raw::load(
-                &package,
-                Owner::MainDocument,
-                &Limits::DEFAULT
-            )
-            .is_err()
+            litchi_docx::styles::effects::raw::load(&package, Owner::MainDocument, &effects_limits)
+                .is_err()
         );
     }
     Ok(())

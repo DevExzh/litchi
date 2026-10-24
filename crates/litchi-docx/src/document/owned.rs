@@ -8,6 +8,7 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 use litchi_core::patch::CompositionLimits;
+use std::sync::{Mutex, TryLockError};
 
 mod chart;
 mod comments;
@@ -41,7 +42,24 @@ pub(crate) use substitute::story_parts_of;
 /// package; the source is unchanged on success and failure.
 pub struct Edit<P = Package> {
     package: P,
-    inner: transaction::Edit,
+    /// The native transaction is populated on the first operation (or
+    /// projection/output query).  Keeping the source materializer here makes
+    /// `Package::edit*` O(1) without introducing a fake empty snapshot.
+    inner: Mutex<Option<transaction::Edit>>,
+    materializer: fn(&P, super::EditOptions) -> Result<transaction::Edit>,
+    options: super::EditOptions,
+    compaction: CompactionPolicy,
+}
+
+fn deferred_error(operation: &'static str) -> transaction::Error {
+    transaction::Error::Document(crate::Error::internal(
+        operation,
+        "document edit materializer is unavailable",
+    ))
+}
+
+fn unavailable_materializer<P>(_: &P, _: super::EditOptions) -> Result<transaction::Edit> {
+    Err(deferred_error("document.edit.materialize"))
 }
 
 impl<P> std::fmt::Debug for Edit<P> {
@@ -52,7 +70,87 @@ impl<P> std::fmt::Debug for Edit<P> {
 
 impl<P: Clone> Edit<P> {
     pub(crate) fn new(package: P, inner: transaction::Edit) -> Self {
-        Self { package, inner }
+        let options = match inner.snapshot_budget() {
+            Some(maximum) => super::EditOptions::new().max_snapshot_bytes(maximum),
+            None => super::EditOptions::new(),
+        };
+        let compaction = inner.compaction_policy();
+        Self {
+            package,
+            inner: Mutex::new(Some(inner)),
+            materializer: unavailable_materializer,
+            options,
+            compaction,
+        }
+    }
+
+    pub(crate) fn deferred(
+        package: P,
+        options: super::EditOptions,
+        materializer: fn(&P, super::EditOptions) -> Result<transaction::Edit>,
+    ) -> Self {
+        Self {
+            package,
+            inner: Mutex::new(None),
+            materializer,
+            options,
+            compaction: CompactionPolicy::default(),
+        }
+    }
+
+    fn build_inner(&self) -> Result<transaction::Edit> {
+        let inner = (self.materializer)(&self.package, self.options)?;
+        Ok(inner
+            .with_options(self.options)
+            .with_compaction_policy(self.compaction))
+    }
+
+    fn inner_slot_mut(&mut self) -> &mut Option<transaction::Edit> {
+        match self.inner.get_mut() {
+            Ok(slot) => slot,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+
+    pub(crate) fn inner_mut(&mut self) -> Result<&mut transaction::Edit> {
+        if self.inner_slot_mut().is_none() {
+            let inner = self.build_inner()?;
+            *self.inner_slot_mut() = Some(inner);
+        }
+        self.inner_slot_mut()
+            .as_mut()
+            .ok_or_else(|| deferred_error("document.edit"))
+    }
+
+    fn into_inner(mut self) -> Result<transaction::Edit> {
+        if self.inner_slot_mut().is_none() {
+            let inner = self.build_inner()?;
+            *self.inner_slot_mut() = Some(inner);
+        }
+        let state = match self.inner.into_inner() {
+            Ok(state) => state,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        state.ok_or_else(|| deferred_error("document.edit"))
+    }
+
+    fn inner_ref<R>(&self, read: impl FnOnce(&transaction::Edit) -> R) -> Result<R> {
+        let mut state = match self.inner.try_lock() {
+            Ok(state) => state,
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(TryLockError::WouldBlock) => return Err(deferred_error("document.edit.borrow")),
+        };
+        if state.is_none() {
+            *state = Some(self.build_inner()?);
+        }
+        let inner = state
+            .as_ref()
+            .ok_or_else(|| deferred_error("document.edit"))?;
+        Ok(read(inner))
+    }
+
+    pub(crate) fn is_strict(&self) -> Result<bool> {
+        self.inner_ref(transaction::Edit::is_strict)
     }
 
     /// Configure the retained main-document XML-pair policy.
@@ -60,14 +158,17 @@ impl<P: Clone> Edit<P> {
     /// The package owner remains unchanged. The bound is checked before each
     /// native projection is retained.
     pub fn with_options(mut self, options: super::EditOptions) -> Self {
-        self.inner = self.inner.with_options(options);
+        self.options = options;
+        if let Some(inner) = self.inner_slot_mut().take() {
+            *self.inner_slot_mut() = Some(inner.with_options(options));
+        }
         self
     }
 
     /// Return the retained main-document XML-pair bound, if any.
     #[must_use]
     pub const fn max_snapshot_bytes_value(&self) -> Option<usize> {
-        self.inner.snapshot_budget()
+        self.options.max_snapshot_bytes_value()
     }
 
     /// Apply one already-planned composition batch without opening a second
@@ -78,7 +179,7 @@ impl<P: Clone> Edit<P> {
         operations: &[transaction::Operation],
     ) -> Result<&mut Self> {
         for operation in operations {
-            self.inner.apply_operation(operation)?;
+            self.inner_mut()?.apply_operation(operation)?;
         }
         Ok(self)
     }
@@ -96,7 +197,7 @@ impl<P: Clone> Edit<P> {
         run: Position,
         change: impl FnOnce(&mut crate::properties::Run),
     ) -> Result<&mut Self> {
-        self.inner.format_run(paragraph, run, change)?;
+        self.inner_mut()?.format_run(paragraph, run, change)?;
         Ok(self)
     }
 
@@ -112,7 +213,7 @@ impl<P: Clone> Edit<P> {
         paragraph: Position,
         change: impl FnOnce(&mut crate::properties::Paragraph),
     ) -> Result<&mut Self> {
-        self.inner.format_paragraph(paragraph, change)?;
+        self.inner_mut()?.format_paragraph(paragraph, change)?;
         Ok(self)
     }
 
@@ -128,7 +229,7 @@ impl<P: Clone> Edit<P> {
         at: super::BodyAnchor,
         paragraph: &super::NewParagraph,
     ) -> Result<Position> {
-        self.inner.insert_formatted_paragraph(at, paragraph)
+        self.inner_mut()?.insert_formatted_paragraph(at, paragraph)
     }
 
     /// Remove a paragraph after checking ranges, section breaks and story references.
@@ -139,7 +240,7 @@ impl<P: Clone> Edit<P> {
     /// Returns a typed selection, property, dependency or resource refusal without
     /// changing the staged document. Managed snapshots currently refuse this operation.
     pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self> {
-        self.inner.remove_paragraph(position)?;
+        self.inner_mut()?.remove_paragraph(position)?;
         Ok(self)
     }
 
@@ -155,7 +256,7 @@ impl<P: Clone> Edit<P> {
         position: Position,
         to: super::BodyAnchor,
     ) -> Result<Position> {
-        self.inner.move_paragraph(position, to)
+        self.inner_mut()?.move_paragraph(position, to)
     }
 
     /// Swap two direct-body paragraphs while retaining their exact XML.
@@ -163,7 +264,7 @@ impl<P: Clone> Edit<P> {
     /// See [`super::raw::Tree::swap_paragraphs`] for selection and
     /// preservation rules.
     pub fn swap_paragraphs(&mut self, first: Position, second: Position) -> Result<&mut Self> {
-        self.inner.swap_paragraphs(first, second)?;
+        self.inner_mut()?.swap_paragraphs(first, second)?;
         Ok(self)
     }
 
@@ -180,7 +281,7 @@ impl<P: Clone> Edit<P> {
         run: Position,
         new_run: &super::NewRun,
     ) -> Result<Position> {
-        self.inner.insert_run(paragraph, run, new_run)
+        self.inner_mut()?.insert_run(paragraph, run, new_run)
     }
 
     /// Append a typed run after a paragraph's last child.
@@ -191,7 +292,7 @@ impl<P: Clone> Edit<P> {
     /// Returns a typed selection, property, dependency or resource refusal without
     /// changing the staged document. Managed snapshots currently refuse this operation.
     pub fn append_run(&mut self, paragraph: Position, new_run: &super::NewRun) -> Result<Position> {
-        self.inner.append_run(paragraph, new_run)
+        self.inner_mut()?.append_run(paragraph, new_run)
     }
 
     /// Remove one direct run after checking field and story dependencies.
@@ -202,7 +303,7 @@ impl<P: Clone> Edit<P> {
     /// Returns a typed selection, property, dependency or resource refusal without
     /// changing the staged document. Managed snapshots currently refuse this operation.
     pub fn remove_run(&mut self, paragraph: Position, run: Position) -> Result<&mut Self> {
-        self.inner.remove_run(paragraph, run)?;
+        self.inner_mut()?.remove_run(paragraph, run)?;
         Ok(self)
     }
 
@@ -216,7 +317,7 @@ impl<P: Clone> Edit<P> {
         run: Position,
         to: RunAnchor,
     ) -> Result<Position> {
-        self.inner.move_run(paragraph, run, to)
+        self.inner_mut()?.move_run(paragraph, run, to)
     }
 
     /// Move one direct run to another direct-body paragraph when the source
@@ -231,7 +332,7 @@ impl<P: Clone> Edit<P> {
         to_paragraph: Position,
         to: RunAnchor,
     ) -> Result<Position> {
-        self.inner
+        self.inner_mut()?
             .move_run_to(from_paragraph, run, to_paragraph, to)
     }
 
@@ -245,7 +346,7 @@ impl<P: Clone> Edit<P> {
         first: Position,
         second: Position,
     ) -> Result<&mut Self> {
-        self.inner.swap_runs(paragraph, first, second)?;
+        self.inner_mut()?.swap_runs(paragraph, first, second)?;
         Ok(self)
     }
 
@@ -258,21 +359,19 @@ impl<P: Clone> Edit<P> {
         second_paragraph: Position,
         second: Position,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .swap_runs_to(first_paragraph, first, second_paragraph, second)?;
         Ok(self)
     }
 
-    /// Borrow the source main-document projection.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        self.inner.source()
+    /// Return the source main-document projection.
+    pub fn source(&self) -> Result<Snapshot> {
+        self.inner_ref(|inner| inner.source().clone())
     }
 
-    /// Borrow the staged main-document projection.
-    #[must_use]
-    pub const fn projected(&self) -> &Snapshot {
-        self.inner.projected()
+    /// Return the staged main-document projection.
+    pub fn projected(&self) -> Result<Snapshot> {
+        self.inner_ref(|inner| inner.projected().clone())
     }
 
     /// Convert this staged edit into an immutable sub-edit for a package
@@ -286,7 +385,7 @@ impl<P: Clone> Edit<P> {
         limits: CompositionLimits,
         identifier: impl Into<String>,
     ) -> Result<super::composition::Prepared> {
-        self.inner.prepare(limits, identifier)
+        self.into_inner()?.prepare(limits, identifier)
     }
 
     /// Change the direct properties of the paragraph at `path`.
@@ -301,7 +400,7 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         change: impl FnOnce(&mut crate::properties::Paragraph),
     ) -> Result<&mut Self> {
-        self.inner.format_paragraph_at(path, change)?;
+        self.inner_mut()?.format_paragraph_at(path, change)?;
         Ok(self)
     }
 
@@ -317,7 +416,7 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         change: impl FnOnce(&mut crate::properties::Table),
     ) -> Result<&mut Self> {
-        self.inner.format_table_at(path, change)?;
+        self.inner_mut()?.format_table_at(path, change)?;
         Ok(self)
     }
 
@@ -334,7 +433,7 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         change: impl FnOnce(&mut crate::properties::Row),
     ) -> Result<&mut Self> {
-        self.inner.format_row_at(path, change)?;
+        self.inner_mut()?.format_row_at(path, change)?;
         Ok(self)
     }
 
@@ -350,7 +449,7 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         change: impl FnOnce(&mut crate::properties::Run),
     ) -> Result<&mut Self> {
-        self.inner.format_run_at(path, change)?;
+        self.inner_mut()?.format_run_at(path, change)?;
         Ok(self)
     }
 
@@ -366,7 +465,7 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.replace_text_at(path, authored_text)?;
+        self.inner_mut()?.replace_text_at(path, authored_text)?;
         Ok(self)
     }
 
@@ -382,7 +481,8 @@ impl<P: Clone> Edit<P> {
         path: &super::ElementPath,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.replace_cell_text_at(path, authored_text)?;
+        self.inner_mut()?
+            .replace_cell_text_at(path, authored_text)?;
         Ok(self)
     }
 
@@ -399,7 +499,8 @@ impl<P: Clone> Edit<P> {
         hyperlink: &super::ElementPath,
         tooltip: Option<&str>,
     ) -> Result<&mut Self> {
-        self.inner.set_hyperlink_tooltip_at(hyperlink, tooltip)?;
+        self.inner_mut()?
+            .set_hyperlink_tooltip_at(hyperlink, tooltip)?;
         Ok(self)
     }
 
@@ -416,7 +517,7 @@ impl<P: Clone> Edit<P> {
         at: Option<Position>,
         new_run: &super::NewRun,
     ) -> Result<Position> {
-        self.inner.insert_run_at(owner, at, new_run)
+        self.inner_mut()?.insert_run_at(owner, at, new_run)
     }
 
     /// Insert a run holding one break of `kind` into the paragraph at
@@ -455,26 +556,27 @@ impl<P: Clone> Edit<P> {
             crate::RunBreakType::Column => Some("column"),
             crate::RunBreakType::TextWrapping => None,
         };
-        self.inner.insert_run_markup_at(paragraph, at, |prefix| {
-            let prefix = String::from_utf8_lossy(prefix);
-            let q = |local: &str| {
-                if prefix.is_empty() {
-                    local.to_owned()
-                } else {
-                    format!("{prefix}:{local}")
+        self.inner_mut()?
+            .insert_run_markup_at(paragraph, at, |prefix| {
+                let prefix = String::from_utf8_lossy(prefix);
+                let q = |local: &str| {
+                    if prefix.is_empty() {
+                        local.to_owned()
+                    } else {
+                        format!("{prefix}:{local}")
+                    }
+                };
+                Ok(match value {
+                    Some(value) => format!(
+                        r#"<{r}><{br} {ty}="{value}"/></{r}>"#,
+                        r = q("r"),
+                        br = q("br"),
+                        ty = q("type"),
+                    ),
+                    None => format!("<{r}><{br}/></{r}>", r = q("r"), br = q("br")),
                 }
-            };
-            Ok(match value {
-                Some(value) => format!(
-                    r#"<{r}><{br} {ty}="{value}"/></{r}>"#,
-                    r = q("r"),
-                    br = q("br"),
-                    ty = q("type"),
-                ),
-                None => format!("<{r}><{br}/></{r}>", r = q("r"), br = q("br")),
-            }
-            .into_bytes())
-        })
+                .into_bytes())
+            })
     }
 
     /// Insert a paragraph into the body, a cell or a block content control.
@@ -490,7 +592,8 @@ impl<P: Clone> Edit<P> {
         anchor: super::ElementAnchor,
         paragraph: &super::NewParagraph,
     ) -> Result<Position> {
-        self.inner.insert_paragraph_at(container, anchor, paragraph)
+        self.inner_mut()?
+            .insert_paragraph_at(container, anchor, paragraph)
     }
 
     /// Insert a table into the body, a cell or a block content control.
@@ -506,7 +609,7 @@ impl<P: Clone> Edit<P> {
         anchor: super::ElementAnchor,
         table: &super::NewTable,
     ) -> Result<Position> {
-        self.inner.insert_table_at(container, anchor, table)
+        self.inner_mut()?.insert_table_at(container, anchor, table)
     }
 
     /// Insert a row into the table at `table`.
@@ -523,7 +626,7 @@ impl<P: Clone> Edit<P> {
         cells: Option<usize>,
         texts: &[String],
     ) -> Result<Position> {
-        self.inner.insert_row_at(table, at, cells, texts)
+        self.inner_mut()?.insert_row_at(table, at, cells, texts)
     }
 
     /// Insert a cell into the row at `row`, keeping the table grid in step
@@ -540,7 +643,7 @@ impl<P: Clone> Edit<P> {
         at: Option<Position>,
         cell: &super::NewCell,
     ) -> Result<Position> {
-        self.inner.insert_cell_at(row, at, cell)
+        self.inner_mut()?.insert_cell_at(row, at, cell)
     }
 
     /// Insert a grid column, with a cell in every row, into the table at
@@ -558,7 +661,7 @@ impl<P: Clone> Edit<P> {
         width: Option<u32>,
         text: &str,
     ) -> Result<Position> {
-        self.inner.insert_column_at(table, at, width, text)
+        self.inner_mut()?.insert_column_at(table, at, width, text)
     }
 
     /// Remove a grid column and its cells from the table at `table`
@@ -574,7 +677,7 @@ impl<P: Clone> Edit<P> {
         table: &super::ElementPath,
         column: Position,
     ) -> Result<&mut Self> {
-        self.inner.remove_column_at(table, column)?;
+        self.inner_mut()?.remove_column_at(table, column)?;
         Ok(self)
     }
 
@@ -592,7 +695,8 @@ impl<P: Clone> Edit<P> {
         column: Position,
         width: u32,
     ) -> Result<&mut Self> {
-        self.inner.set_column_width_at(table, column, width)?;
+        self.inner_mut()?
+            .set_column_width_at(table, column, width)?;
         Ok(self)
     }
 
@@ -604,7 +708,7 @@ impl<P: Clone> Edit<P> {
     /// Returns a typed selection, dependency or resource refusal without
     /// changing the staged document.
     pub fn remove_element_at(&mut self, path: &super::ElementPath) -> Result<&mut Self> {
-        self.inner.remove_element_at(path)?;
+        self.inner_mut()?.remove_element_at(path)?;
         Ok(self)
     }
 
@@ -621,15 +725,15 @@ impl<P: Clone> Edit<P> {
         container: &super::ElementPath,
         anchor: super::ElementAnchor,
     ) -> Result<super::ElementPath> {
-        self.inner.move_element_at(path, container, anchor)
+        self.inner_mut()?.move_element_at(path, container, anchor)
     }
 
     /// The exact bytes of the element at `path` in the staged document.
     ///
     /// # Errors
     /// Returns a typed selection refusal for a path that names no element.
-    pub fn element_xml(&self, path: &super::ElementPath) -> Result<&[u8]> {
-        self.inner.element_xml(path)
+    pub fn element_xml(&self, path: &super::ElementPath) -> Result<Vec<u8>> {
+        self.inner_ref(|inner| inner.element_xml(path).map(ToOwned::to_owned))?
     }
 
     /// Remaining semantic-operation slots in the native document ledger.
@@ -638,20 +742,27 @@ impl<P: Clone> Edit<P> {
     /// One caller command may stage several operations or only exact no-ops.
     #[must_use]
     pub fn remaining_operations(&self) -> usize {
-        self.inner.remaining_operations()
+        self.inner
+            .try_lock()
+            .ok()
+            .and_then(|state| state.as_ref().map(transaction::Edit::remaining_operations))
+            .unwrap_or(transaction::MAX_OPERATIONS)
     }
 
     /// Choose how changed main-document XML is compacted at commit.
     #[must_use]
     pub fn with_compaction_policy(mut self, policy: CompactionPolicy) -> Self {
-        self.inner = self.inner.with_compaction_policy(policy);
+        self.compaction = policy;
+        if let Some(inner) = self.inner_slot_mut().take() {
+            *self.inner_slot_mut() = Some(inner.with_compaction_policy(policy));
+        }
         self
     }
 
     /// Return the selected compaction policy.
     #[must_use]
     pub const fn compaction_policy(&self) -> CompactionPolicy {
-        self.inner.compaction_policy()
+        self.compaction
     }
 
     /// Clone the staged operations while retaining the same source package.
@@ -659,9 +770,25 @@ impl<P: Clone> Edit<P> {
     /// # Errors
     /// Returns an allocation or operation admission error.
     pub fn try_clone(&self) -> Result<Self> {
+        let inner = {
+            let state = match self.inner.try_lock() {
+                Ok(state) => state,
+                Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+                Err(TryLockError::WouldBlock) => {
+                    return Err(deferred_error("document.edit.clone"));
+                },
+            };
+            match state.as_ref() {
+                Some(inner) => Some(inner.try_clone()?),
+                None => None,
+            }
+        };
         Ok(Self {
             package: self.package.clone(),
-            inner: self.inner.try_clone()?,
+            inner: Mutex::new(inner),
+            materializer: self.materializer,
+            options: self.options,
+            compaction: self.compaction,
         })
     }
 
@@ -680,7 +807,8 @@ impl<P: Clone> Edit<P> {
         &mut self,
         replacements: &[ParagraphTextReplacement],
     ) -> Result<&mut Self> {
-        self.inner.replace_body_paragraph_texts(replacements)?;
+        self.inner_mut()?
+            .replace_body_paragraph_texts(replacements)?;
         Ok(self)
     }
 
@@ -703,7 +831,8 @@ impl<P: Clone> Edit<P> {
         position: Position,
         authored_text: impl Into<String> + AsRef<str>,
     ) -> Result<&mut Self> {
-        self.inner.replace_paragraph_text(position, authored_text)?;
+        self.inner_mut()?
+            .replace_paragraph_text(position, authored_text)?;
         Ok(self)
     }
 
@@ -720,7 +849,7 @@ impl<P: Clone> Edit<P> {
         hyperlink: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_hyperlink_text(paragraph, hyperlink, authored_text)?;
         Ok(self)
     }
@@ -742,7 +871,8 @@ impl<P: Clone> Edit<P> {
         &mut self,
         replacements: &[HyperlinkTextReplacement],
     ) -> Result<&mut Self> {
-        self.inner.replace_body_hyperlink_texts(replacements)?;
+        self.inner_mut()?
+            .replace_body_hyperlink_texts(replacements)?;
         Ok(self)
     }
 
@@ -761,7 +891,8 @@ impl<P: Clone> Edit<P> {
         run: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.replace_run_text(paragraph, run, authored_text)?;
+        self.inner_mut()?
+            .replace_run_text(paragraph, run, authored_text)?;
         Ok(self)
     }
 
@@ -780,7 +911,7 @@ impl<P: Clone> Edit<P> {
         run: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_run_text_node(paragraph, run, authored_text)?;
         Ok(self)
     }
@@ -793,7 +924,8 @@ impl<P: Clone> Edit<P> {
         paragraph: Position,
         run: Position,
     ) -> Result<&mut Self> {
-        self.inner.mark_cached_run_field_dirty(paragraph, run)?;
+        self.inner_mut()?
+            .mark_cached_run_field_dirty(paragraph, run)?;
         Ok(self)
     }
 
@@ -812,7 +944,7 @@ impl<P: Clone> Edit<P> {
         field: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_simple_field_text(paragraph, field, authored_text)?;
         Ok(self)
     }
@@ -831,7 +963,7 @@ impl<P: Clone> Edit<P> {
         field: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_complex_field_result_text(paragraph, field, authored_text)?;
         Ok(self)
     }
@@ -850,7 +982,7 @@ impl<P: Clone> Edit<P> {
         revision: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_revision_text(paragraph, kind, revision, authored_text)?;
         Ok(self)
     }
@@ -882,7 +1014,7 @@ impl<P: Clone> Edit<P> {
         selector: RevisionSelector,
         action: RevisionAction,
     ) -> Result<&mut Self> {
-        self.inner.apply_revision(selector, action)?;
+        self.inner_mut()?.apply_revision(selector, action)?;
         Ok(self)
     }
 
@@ -897,7 +1029,8 @@ impl<P: Clone> Edit<P> {
         kind: RevisionKind,
         revision: Position,
     ) -> Result<&mut Self> {
-        self.inner.accept_revision(paragraph, kind, revision)?;
+        self.inner_mut()?
+            .accept_revision(paragraph, kind, revision)?;
         Ok(self)
     }
 
@@ -912,7 +1045,8 @@ impl<P: Clone> Edit<P> {
         kind: RevisionKind,
         revision: Position,
     ) -> Result<&mut Self> {
-        self.inner.reject_revision(paragraph, kind, revision)?;
+        self.inner_mut()?
+            .reject_revision(paragraph, kind, revision)?;
         Ok(self)
     }
 
@@ -932,7 +1066,7 @@ impl<P: Clone> Edit<P> {
         control: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_content_control_text(paragraph, control, authored_text)?;
         Ok(self)
     }
@@ -952,8 +1086,11 @@ impl<P: Clone> Edit<P> {
         controls: &[Position],
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
-            .replace_nested_content_control_text(paragraph, controls, authored_text)?;
+        self.inner_mut()?.replace_nested_content_control_text(
+            paragraph,
+            controls,
+            authored_text,
+        )?;
         Ok(self)
     }
 
@@ -972,12 +1109,13 @@ impl<P: Clone> Edit<P> {
         hyperlink: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.replace_nested_content_control_hyperlink_text(
-            paragraph,
-            controls,
-            hyperlink,
-            authored_text,
-        )?;
+        self.inner_mut()?
+            .replace_nested_content_control_hyperlink_text(
+                paragraph,
+                controls,
+                hyperlink,
+                authored_text,
+            )?;
         Ok(self)
     }
 
@@ -995,11 +1133,8 @@ impl<P: Clone> Edit<P> {
         paragraph: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.replace_block_content_control_paragraph_text(
-            controls,
-            paragraph,
-            authored_text,
-        )?;
+        self.inner_mut()?
+            .replace_block_content_control_paragraph_text(controls, paragraph, authored_text)?;
         Ok(self)
     }
 
@@ -1017,7 +1152,7 @@ impl<P: Clone> Edit<P> {
         hyperlink: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_block_content_control_paragraph_hyperlink_text(
                 controls,
                 paragraph,
@@ -1045,7 +1180,7 @@ impl<P: Clone> Edit<P> {
         controls: &[Position],
         replacements: &[HyperlinkTextReplacement],
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_block_content_control_paragraph_hyperlink_texts(controls, replacements)?;
         Ok(self)
     }
@@ -1068,7 +1203,7 @@ impl<P: Clone> Edit<P> {
         cell: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_table_cell_text(table, row, cell, authored_text)?;
         Ok(self)
     }
@@ -1089,8 +1224,13 @@ impl<P: Clone> Edit<P> {
         paragraph: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
-            .replace_table_cell_paragraph_text(table, row, cell, paragraph, authored_text)?;
+        self.inner_mut()?.replace_table_cell_paragraph_text(
+            table,
+            row,
+            cell,
+            paragraph,
+            authored_text,
+        )?;
         Ok(self)
     }
 
@@ -1108,8 +1248,11 @@ impl<P: Clone> Edit<P> {
         paragraph: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
-            .replace_nested_table_cell_paragraph_text(path, paragraph, authored_text)?;
+        self.inner_mut()?.replace_nested_table_cell_paragraph_text(
+            path,
+            paragraph,
+            authored_text,
+        )?;
         Ok(self)
     }
 
@@ -1127,7 +1270,7 @@ impl<P: Clone> Edit<P> {
         hyperlink: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_nested_table_cell_paragraph_hyperlink_text(
                 path,
                 paragraph,
@@ -1155,7 +1298,7 @@ impl<P: Clone> Edit<P> {
         path: &[TableCellAddress],
         replacements: &[HyperlinkTextReplacement],
     ) -> Result<&mut Self> {
-        self.inner
+        self.inner_mut()?
             .replace_nested_table_cell_paragraph_hyperlink_texts(path, replacements)?;
         Ok(self)
     }
@@ -1173,7 +1316,8 @@ impl<P: Clone> Edit<P> {
         position: Position,
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
-        self.inner.insert_paragraph(position, authored_text)?;
+        self.inner_mut()?
+            .insert_paragraph(position, authored_text)?;
         Ok(self)
     }
 
@@ -1192,7 +1336,8 @@ impl<P: Clone> Edit<P> {
         position: Position,
         plan: &ParagraphTransfer,
     ) -> Result<&mut Self> {
-        self.inner.insert_paragraph_transfer(position, plan)?;
+        self.inner_mut()?
+            .insert_paragraph_transfer(position, plan)?;
         Ok(self)
     }
 }
@@ -1219,10 +1364,12 @@ impl Edit<Package> {
     /// Returns document validation, stale-source, signature, protection or
     /// package publication errors without changing the retained source.
     pub fn commit(self) -> Result<Commit> {
-        let committed = self.inner.commit()?;
+        let this = self;
+        let source_package = this.package.clone();
+        let committed = this.into_inner()?.commit()?;
         let diagnostics = committed.diagnostics();
         let (_, patch) = committed.into_parts();
-        let package = self.package.apply(&patch)?.into_package();
+        let package = source_package.apply(&patch)?.into_package();
         Ok(Commit {
             package,
             patch,
@@ -1257,11 +1404,13 @@ impl Edit<crate::source_backed::Package> {
     /// # Errors
     /// Returns validation, source, signature, protection or admission failures.
     pub fn commit(self) -> Result<Commit<crate::source_backed::Package>> {
-        let committed = self.inner.commit()?;
+        let this = self;
+        let source_package = this.package.clone();
+        let committed = this.into_inner()?.commit()?;
         let diagnostics = committed.diagnostics();
         let (_, patch) = committed.into_parts();
-        let package = self.package.apply(&patch)?.into_package();
-        let patch = patch.with_restore(self.package, package.clone());
+        let package = source_package.apply(&patch)?.into_package();
+        let patch = patch.with_restore(source_package, package.clone());
         Ok(Commit {
             package,
             patch,

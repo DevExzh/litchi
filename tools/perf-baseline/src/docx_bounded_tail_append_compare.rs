@@ -935,9 +935,8 @@ fn build_materialized_candidate(
     let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
         .edit_plain_paragraph_copy()?;
-    if edit.projected().paragraph_count() != count
-        || edit.projected().xml_bytes() != source_xml_bytes
-    {
+    let projected = edit.projected()?;
+    if projected.paragraph_count() != count || projected.xml_bytes() != source_xml_bytes {
         return Err("materialized source snapshot differs from generated XML".into());
     }
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
@@ -946,7 +945,7 @@ fn build_materialized_candidate(
     let output_xml = commit
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         .to_vec();
     let candidate_xml_expected = output_xml == expected.as_slice();
@@ -956,7 +955,7 @@ fn build_materialized_candidate(
     let replayed_xml = replayed
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         .to_vec();
     let replay_verified = replayed_xml == output_xml;
@@ -966,7 +965,7 @@ fn build_materialized_candidate(
     let inverse_verified = inverse_replayed
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         == source_xml_bytes;
     if !candidate_xml_expected || !replay_verified || !inverse_verified {

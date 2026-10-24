@@ -252,7 +252,7 @@ fn publishing_with_the_proof_emits_what_publishing_without_it_emits() {
     // publish the same bytes on both.
     for package in [&mut proven_package, &mut unproven_package] {
         let mut edit = package.edit().unwrap();
-        assert!(edit.projected().publication_proof().is_none());
+        assert!(edit.projected().unwrap().publication_proof().is_none());
         edit.replace_paragraph_text(Position::new(9), "second")
             .unwrap();
         *package = edit.commit().unwrap().into_package();
@@ -274,7 +274,8 @@ fn a_source_with_identity_is_proven_for_the_source_backed_writer() {
         litchi_core::OwnedSource::new(archive.into_inner()),
     ))
     .unwrap();
-    let base = source_backed.edit().unwrap().source().clone();
+    let source_edit = source_backed.edit().unwrap();
+    let base = source_edit.source().unwrap().clone();
     assert!(base.xml.identity().is_some());
     assert_eq!(base.xml_bytes(), plain.xml_bytes());
     let mut edit = base.edit();

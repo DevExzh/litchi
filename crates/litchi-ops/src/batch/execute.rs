@@ -339,6 +339,7 @@ impl File {
         } = *options;
         let limits = edit_options.semantic_limits_value();
         let coalesce = mode == BatchMode::Atomic;
+        self.preflight_batch()?;
         let commit = self.edit_with_options(edit_options, |edit| {
             let mut results = Vec::new();
             for (index, item) in items.into_iter().enumerate() {

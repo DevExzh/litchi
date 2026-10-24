@@ -660,7 +660,7 @@ fn detach_native_svg_publishes_and_reopens_without_touching_raster_or_anchor() {
         let mut edit = package
             .edit_svg([selector])
             .expect("select native SVG picture");
-        let before = edit.source().picture(selector).unwrap();
+        let before = edit.source().unwrap().picture(selector).unwrap();
         assert_eq!(before.svg().unwrap().relationship_id(), "rId5");
         assert!(edit.detach_svg(selector).expect("detach native SVG"));
         let commit = edit.commit().expect("commit native detach");
@@ -727,7 +727,7 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
 
         let selector = PictureSelector::new(0, 0);
         let mut edit = package.edit_svg([selector]).unwrap();
-        let before = edit.source().clone();
+        let before = edit.source().unwrap();
         assert!(edit.attach_svg(selector, Input::borrowed(payload)).unwrap());
         let commit = edit.commit().expect("commit borrowed attach");
         assert!(!commit.patch().is_noop());
@@ -739,6 +739,7 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
             .edit_svg([selector])
             .unwrap()
             .source()
+            .unwrap()
             .clone();
         assert!(
             target_snapshot
@@ -758,6 +759,7 @@ fn borrowed_attach_adds_graph_closure_and_reopens_with_raster_preserved() {
             .edit_svg([selector])
             .unwrap()
             .source()
+            .unwrap()
             .clone();
         assert_eq!(inverse.story_xml(), before.story_xml());
         assert!(inverse.picture(selector).unwrap().svg().is_none());
@@ -891,11 +893,11 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
     let source_content_types = content_types_bytes(&source);
     let package = open(&source);
     let mut edit = package.edit_svg([0usize, 1usize]).unwrap();
-    let before = edit.source().clone();
+    let before = edit.source().unwrap();
     let first_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="one"/></svg>"#;
     let second_payload = br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="two"/></svg>"#;
     assert!(edit.attach_svg(0, Input::borrowed(first_payload)).unwrap());
-    let projected_after_first = edit.projected();
+    let projected_after_first = edit.projected().unwrap();
     assert_eq!(
         projected_after_first
             .picture(0)
@@ -913,14 +915,15 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
             .is_none(),
         "a first operation must not leak into another selected picture"
     );
-    let projected_before_rejected_operation = edit.projected().story_xml().unwrap().to_vec();
+    let projected_before_rejected_operation =
+        edit.projected().unwrap().story_xml().unwrap().to_vec();
     assert!(edit.attach_svg(0, Input::borrowed(second_payload)).is_err());
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_rejected_operation.as_slice()
     );
     assert!(edit.attach_svg(1, Input::borrowed(second_payload)).unwrap());
-    let projected_after_second = edit.projected();
+    let projected_after_second = edit.projected().unwrap();
     assert_eq!(
         projected_after_second
             .picture(0)
@@ -953,6 +956,7 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
         .edit_svg([0usize, 1usize])
         .unwrap()
         .source()
+        .unwrap()
         .clone();
     assert_eq!(inverse.story_xml(), before.story_xml());
     assert!(inverse.picture(0).unwrap().svg().is_none());
@@ -1033,7 +1037,7 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
     );
     let shared_package = open(&shared_source);
     let mut shared_edit = shared_package.edit_svg([0usize, 1usize]).unwrap();
-    let shared_before = shared_edit.source().clone();
+    let shared_before = shared_edit.source().unwrap();
     assert!(shared_edit.detach_svg(0).unwrap());
     assert!(shared_edit.detach_svg(1).unwrap());
     let shared_commit = shared_edit.commit().unwrap();
@@ -1046,6 +1050,7 @@ fn batch_attach_and_shared_detach_are_one_atomic_edit() {
         .edit_svg([0usize, 1usize])
         .unwrap()
         .source()
+        .unwrap()
         .clone();
     assert_eq!(shared_inverse.story_xml(), shared_before.story_xml());
     let mut shared_output = Vec::new();
@@ -1129,7 +1134,8 @@ fn linked_raster_picture_is_refused_by_svg_lifecycle_edits() {
         .expect("linked raster remains inspectable");
     assert_eq!(views.len(), 1);
     assert_eq!(views[0].owner_state(), OwnerState::Refused);
-    assert!(package.edit_svg([0usize]).is_err());
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    assert!(edit.detach_svg(0usize).is_err());
 }
 
 #[test]
@@ -1336,7 +1342,7 @@ fn lifecycle_low_managed_memory_refuses_before_raster_retention() {
     let (budget, package) = managed_package(source, document_len + PNG.len() as u64 - 1, u64::MAX);
 
     assert!(
-        package.edit_svg([0usize]).is_err(),
+        package.edit_svg([0usize]).unwrap().commit().is_err(),
         "managed memory exhaustion must reject before retaining the raster"
     );
     assert_eq!(source_handle.selected_reads(), 0);
@@ -1353,7 +1359,7 @@ fn lifecycle_low_managed_work_refuses_before_raster_read() {
     let (budget, package) = managed_package(source, u64::MAX, document_len + PNG.len() as u64 - 1);
 
     assert!(
-        package.edit_svg([0usize]).is_err(),
+        package.edit_svg([0usize]).unwrap().commit().is_err(),
         "the cumulative managed work limit must reject before raster read"
     );
     assert_eq!(source_handle.selected_reads(), 0);
@@ -1392,6 +1398,7 @@ fn managed_attach_publish_reopen_physical_inverse_preserves_exact_source() {
         .edit_svg([PictureSelector::new(0, 0)])
         .unwrap()
         .source()
+        .unwrap()
         .clone();
     assert!(
         inverse_snapshot
@@ -1469,14 +1476,25 @@ fn lifecycle_single_picture_selection_does_not_read_unrelated_media() {
     let package =
         source_backed::Package::from_read_at(Arc::new(source)).expect("open two-raster source");
 
-    // The source-backed selector captures one inventory entry lazily; its
-    // selected raster is read for authoring while the other media payload
-    // remains cold.
+    // Selecting pictures only retains selectors. The source-backed record
+    // inventory (and its selected raster) is read by the first projection or
+    // mutation, while the other media payload remains cold.
     let edit = package
         .edit_svg([0usize])
         .expect("select only the first picture");
     assert_eq!(
+        source_handle.selected_reads(),
+        0,
+        "the cold SVG constructor must not read selected media"
+    );
+    assert_eq!(
+        source_handle.unrelated_reads(),
+        0,
+        "the cold SVG constructor must not read unrelated media"
+    );
+    assert_eq!(
         edit.source()
+            .unwrap()
             .picture(0usize)
             .unwrap()
             .raster_part_uri()
@@ -1492,6 +1510,40 @@ fn lifecycle_single_picture_selection_does_not_read_unrelated_media() {
         0,
         "selecting one picture must not read the other picture's media payload"
     );
+}
+
+#[test]
+fn deferred_svg_owner_constructor_does_not_materialize_pending_output() {
+    let source_bytes = two_raster_fixture("deferred-svg-constructor");
+    let selected_range = payload_range(&source_bytes, "word/media/image1.png");
+    let unrelated_range = payload_range(&source_bytes, "word/media/image2.png");
+    let source =
+        ObservedSource::new(source_bytes).with_media_ranges(selected_range, unrelated_range);
+    let source_handle = source.clone();
+    let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(
+        0usize,
+        Input::borrowed(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let selected_reads = source_handle.selected_reads();
+    let unrelated_reads = source_handle.unrelated_reads();
+    assert_eq!(
+        unrelated_reads, 0,
+        "the first commit did not need the other raster"
+    );
+
+    // The committed package owns a deferred output.  Merely selecting the
+    // next SVG edit must retain its policy without streaming that output.
+    let deferred_edit = commit
+        .package()
+        .edit_svg([0usize])
+        .expect("a deferred owner retains the SVG selector policy");
+    assert_eq!(source_handle.selected_reads(), selected_reads);
+    assert_eq!(source_handle.unrelated_reads(), unrelated_reads);
+    drop(deferred_edit);
 }
 
 #[test]
@@ -1560,7 +1612,7 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
         br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="reverse-second"/></svg>"#;
 
     assert!(edit.attach_svg(1, Input::borrowed(first_payload)).unwrap());
-    let projected_after_first = edit.projected().story_xml().unwrap().to_vec();
+    let projected_after_first = edit.projected().unwrap().story_xml().unwrap().to_vec();
     let scanned_first = SourceDrawing::scan(
         &projected_after_first,
         Default::default(),
@@ -1585,10 +1637,23 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .is_some()
     );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
-    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert!(
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     assert_eq!(
         projected_after_first
             .windows(opaque.len())
@@ -1603,13 +1668,13 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
         "a picture may be staged at most once in one batch"
     );
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_after_first.as_slice(),
         "a rejected same-picture operation must leave the projection unchanged"
     );
 
     assert!(edit.attach_svg(0, Input::borrowed(second_payload)).unwrap());
-    let projected_final = edit.projected().story_xml().unwrap().to_vec();
+    let projected_final = edit.projected().unwrap().story_xml().unwrap().to_vec();
     let scanned_final =
         SourceDrawing::scan(&projected_final, Default::default(), Default::default()).unwrap();
     assert_eq!(scanned_final.pictures().len(), 2);
@@ -1620,11 +1685,23 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .all(|picture| picture.svg_owner().owner().is_some())
     );
     assert_eq!(
-        edit.projected().picture(0).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         second_payload
     );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
     assert_eq!(
@@ -1645,6 +1722,7 @@ fn batch_reverse_order_projection_preserves_opaque_siblings_and_matches_commit()
             .edit_svg([0usize, 1usize])
             .unwrap()
             .source()
+            .unwrap()
             .story_xml()
             .unwrap(),
         projected_final.as_slice(),
@@ -1695,20 +1773,33 @@ fn batch_failed_aggregate_admission_leaves_projection_unchanged() {
         br#"<svg xmlns="http://www.w3.org/2000/svg"><path id="rejected"/></svg>"#;
 
     assert!(edit.attach_svg(1, Input::borrowed(first_payload)).unwrap());
-    let projected_before_rejection = edit.projected().story_xml().unwrap().to_vec();
+    let projected_before_rejection = edit.projected().unwrap().story_xml().unwrap().to_vec();
     assert!(
         edit.attach_svg(0, Input::borrowed(rejected_payload))
             .is_err(),
         "aggregate admission must reject the second attachment"
     );
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_rejection.as_slice(),
         "failed aggregate admission must leave the existing projection unchanged"
     );
-    assert!(edit.projected().picture(0).unwrap().svg().is_none());
+    assert!(
+        edit.projected()
+            .unwrap()
+            .picture(0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     assert_eq!(
-        edit.projected().picture(1).unwrap().svg().unwrap().bytes(),
+        edit.projected()
+            .unwrap()
+            .picture(1)
+            .unwrap()
+            .svg()
+            .unwrap()
+            .bytes(),
         first_payload
     );
     assert!(
@@ -1745,7 +1836,7 @@ fn batch_source_stale_between_operations_refuses_commit() {
         )
         .unwrap()
     );
-    let projected_before_stale = edit.projected().story_xml().unwrap().to_vec();
+    let projected_before_stale = edit.projected().unwrap().story_xml().unwrap().to_vec();
 
     source_handle.replace_and_bump(source_bytes);
     let second_result = edit.attach_svg(
@@ -1756,7 +1847,7 @@ fn batch_source_stale_between_operations_refuses_commit() {
     );
     assert!(second_result.is_err());
     assert_eq!(
-        edit.projected().story_xml().unwrap(),
+        edit.projected().unwrap().story_xml().unwrap(),
         projected_before_stale.as_slice(),
         "an immediately rejected stale operation must preserve the prior projection"
     );

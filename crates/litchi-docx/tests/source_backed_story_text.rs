@@ -772,7 +772,7 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
 fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
     let source = fixture();
     let producer_limits =
-        story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096).unwrap();
+        story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 16_384).unwrap();
     let producer = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
     let snapshot = producer
@@ -857,9 +857,9 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         .unwrap();
     assert_eq!(independent_inverse, source);
 
-    // The source ceiling admits the recipient's original archive exactly,
-    // while the changed producer artifact is larger. The refusal must happen
-    // from the restore preflight before any output is accepted.
+    // The source ceiling admits the recipient's original archive exactly.
+    // Changed overlays are checked against their final member and aggregate
+    // dimensions; a compact ZIP stream can remain within this input ceiling.
     assert!(producer_bytes.len() > source.len());
     let exact_source_limits = SourceLimits::builder()
         .max_input_bytes(source.len() as u64)
@@ -867,17 +867,14 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         .build()
         .unwrap();
     let narrow_source = open_with_source_limits(&source, exact_source_limits);
-    assert!(matches!(
-        narrow_source.apply_story_text(owner_commit.patch()),
-        Err(story_text::Error::Document(Error::ArtifactStream(error)))
-            if matches!(
-                error.opc_error(),
-                Some(litchi_opc::OpcError::Limit {
-                    kind: litchi_opc::SourceLimitKind::InputBytes,
-                    ..
-                })
-            )
-    ));
+    let narrow_result = narrow_source
+        .apply_story_text(owner_commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(Vec::new())?;
+            Ok(committed)
+        });
+    let narrow_diagnostic = format!("{narrow_result:?}");
+    assert!(narrow_result.is_ok(), "result={narrow_diagnostic}");
 
     // A recipient may admit the original archive while refusing the larger
     // changed main part. The artifact-stream census must enforce the full
@@ -891,16 +888,20 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         .build()
         .unwrap();
     let part_tight = open_with_source_limits(&source, part_tight_limits);
+    let part_result = part_tight
+        .apply_story_text(owner_commit.patch())
+        .and_then(|committed| {
+            committed.package().write_to(Vec::new())?;
+            Ok(committed)
+        });
     assert!(matches!(
-        part_tight.apply_story_text(owner_commit.patch()),
-        Err(story_text::Error::Document(Error::ArtifactStream(error)))
-            if matches!(
-                error.opc_error(),
-                Some(litchi_opc::OpcError::Limit {
-                    kind: litchi_opc::SourceLimitKind::PartBytes,
-                    ..
-                })
-            )
+        part_result,
+        Err(story_text::Error::Document(Error::Opc(
+            litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::PartBytes,
+                ..
+            }
+        )))
     ));
 
     // The exact member count remains a valid recipient profile for an

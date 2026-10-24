@@ -6,6 +6,8 @@
 //! stages an [`Edit`] whose commit returns a new source-backed package;
 //! writing it rewrites only the selected story part.
 
+use std::cell::{RefCell, RefMut};
+
 use litchi_core::Position;
 
 use crate::source_backed::Package;
@@ -56,7 +58,9 @@ pub use crate::source_backed::story_text::LimitKind;
 /// [`Self::commit`] returns a new package.
 pub struct Edit {
     package: Package,
-    inner: record::Edit,
+    selector: Selector,
+    limits: record::Limits,
+    inner: RefCell<Option<record::Edit>>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -66,6 +70,43 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn materialize(&self) -> Result<record::Edit, Error> {
+        self.package
+            .story_text_snapshot_bounded(self.selector.clone(), self.limits)?
+            .edit_engine()
+    }
+
+    fn ensure_inner(&self) -> Result<(), Error> {
+        let mut inner = self.inner.borrow_mut();
+        if inner.is_none() {
+            *inner = Some(self.materialize()?);
+        }
+        Ok(())
+    }
+
+    fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>, Error> {
+        self.ensure_inner()?;
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut).map_err(|_| {
+            Error::Document(crate::Error::internal(
+                "story_text.edit",
+                "story-text edit materializer is unavailable",
+            ))
+        })
+    }
+
+    fn into_inner(mut self) -> Result<record::Edit, Error> {
+        if self.inner.get_mut().is_none() {
+            let inner = self.materialize()?;
+            *self.inner.get_mut() = Some(inner);
+        }
+        self.inner.into_inner().ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "story_text.edit",
+                "story-text edit materializer is unavailable",
+            ))
+        })
+    }
+
     /// The package the edit is staged over.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -78,7 +119,7 @@ impl Edit {
     ///
     /// Returns a projection error.
     pub fn projected(&self) -> Result<record::Snapshot, Error> {
-        self.inner.projected()
+        self.inner_mut()?.projected()
     }
 
     /// Replace all text in one direct paragraph of the selected story.
@@ -91,7 +132,8 @@ impl Edit {
         position: Position,
         authored_text: impl AsRef<str>,
     ) -> Result<&mut Self, Error> {
-        self.inner.replace_paragraph_text(position, authored_text)?;
+        self.inner_mut()?
+            .replace_paragraph_text(position, authored_text)?;
         Ok(self)
     }
 
@@ -102,8 +144,10 @@ impl Edit {
     /// Returns a typed source, topology, output-limit or signature error
     /// before any output.
     pub fn commit(self) -> Result<Commit, Error> {
-        let patch = self.inner.finish()?;
-        commit_change(&self.package, StoryTextChange(patch))
+        let this = self;
+        let package = this.package.clone();
+        let patch = this.into_inner()?.finish()?;
+        commit_change(&package, StoryTextChange(patch))
     }
 }
 
@@ -112,11 +156,15 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the errors of [`Self::story_text_snapshot`].
+    /// The selected story is admitted on the first operation, projection or
+    /// commit, under the package's retained story limits.
     pub fn edit_story_text(&self, selector: Selector) -> Result<Edit, Error> {
+        let limits = self.semantic_limits.story_text_value();
         Ok(Edit {
             package: self.clone(),
-            inner: self.story_text_snapshot(selector)?.edit_engine()?,
+            selector,
+            limits,
+            inner: RefCell::new(None),
         })
     }
 

@@ -149,11 +149,11 @@ impl Edit<Package> {
             return Err(invalid());
         }
         let id = self
-            .inner
+            .inner_mut()?
             .max_drawing_id()?
             .map_or(Some(1), |maximum| maximum.checked_add(1))
             .ok_or_else(invalid)?;
-        let relationship = if self.inner.is_strict() {
+        let relationship = if self.is_strict()? {
             STRICT_IMAGE_RELATIONSHIP
         } else {
             IMAGE_RELATIONSHIP
@@ -170,7 +170,7 @@ impl Edit<Package> {
             .name
             .clone()
             .unwrap_or_else(|| format!("Picture {id}"));
-        self.inner.insert_picture_markup_at(
+        self.inner_mut()?.insert_picture_markup_at(
             paragraph,
             at,
             &relationship_id,
@@ -320,7 +320,7 @@ impl Edit<Package> {
         // The drawing first, so a missing picture stages no part.
         let mut changed = false;
         if change.extent.is_some() || change.name.is_some() || change.description.is_some() {
-            changed = self.inner.rewrite_picture_at(
+            changed = self.inner_mut()?.rewrite_picture_at(
                 paragraph,
                 picture,
                 Some(&PictureRewrite {
@@ -333,9 +333,12 @@ impl Edit<Package> {
         }
         if let (Some(data), Some(format)) = (&change.image, format) {
             // Probe the picture before the part is staged.
-            self.inner
-                .rewrite_picture_at(paragraph, picture, Some(&PictureRewrite::default()))?;
-            let relationship = if self.inner.is_strict() {
+            self.inner_mut()?.rewrite_picture_at(
+                paragraph,
+                picture,
+                Some(&PictureRewrite::default()),
+            )?;
+            let relationship = if self.is_strict()? {
                 STRICT_IMAGE_RELATIONSHIP
             } else {
                 IMAGE_RELATIONSHIP
@@ -348,7 +351,7 @@ impl Edit<Package> {
                 format.mime_type(),
                 data.clone(),
             )?;
-            self.inner.rewrite_picture_at(
+            self.inner_mut()?.rewrite_picture_at(
                 paragraph,
                 picture,
                 Some(&PictureRewrite {
@@ -370,7 +373,8 @@ impl Edit<Package> {
     ///
     /// Returns [`Refusal::RunNotFound`] for a missing picture.
     pub fn remove_picture_at(&mut self, paragraph: &ElementPath, picture: Position) -> Result<()> {
-        self.inner.rewrite_picture_at(paragraph, picture, None)?;
+        self.inner_mut()?
+            .rewrite_picture_at(paragraph, picture, None)?;
         Ok(())
     }
 }

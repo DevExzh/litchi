@@ -18,16 +18,26 @@ use libfuzzer_sys::fuzz_target;
 use litchi_docx::SourceLimits;
 use litchi_docx::source_backed::{
     Package,
+    paragraph_stream::{self, Commit as ParagraphStreamCommit},
     tail_append::Limits as TailAppendLimits,
     tail_append_stream::{
         ParagraphCursor as TailAppendStreamCursor, ParagraphStreamLimits as TailAppendStreamLimits,
-        PlainParagraphEvent as TailAppendStreamEvent,
+        ParagraphStreamPlan, PlainParagraphEvent as TailAppendStreamEvent,
         ReplayableParagraphSource as TailAppendStreamSource,
     },
 };
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;
 const ZIP_LOCAL_HEADER: &[u8] = b"PK\x03\x04";
+
+fn publish<'package, W: Write>(
+    plan: ParagraphStreamPlan<'package>,
+    output: W,
+) -> Result<ParagraphStreamCommit, paragraph_stream::Error> {
+    let commit = plan.commit()?;
+    commit.package().write_to(output)?;
+    Ok(commit)
+}
 
 #[derive(Clone, Debug)]
 enum Event {
@@ -331,7 +341,7 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         .expect("bounded authored paragraph count fits usize");
 
     let mut output = Vec::new();
-    let Ok(publication) = plan.write_to(&mut output) else {
+    let Ok(publication) = publish(plan, &mut output) else {
         return false;
     };
     assert!(
@@ -350,9 +360,12 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
     assert_eq!(after_count, before_count + authored_count);
 
     let mut restored = Vec::new();
-    publication
-        .write_inverse_to_stream(&current, &mut restored)
-        .expect("immediate inverse must authorize the current candidate");
+    current
+        .apply_paragraph_stream(&publication.patch().inverse())
+        .expect("immediate inverse must authorize the current candidate")
+        .package()
+        .write_to(&mut restored)
+        .expect("immediate inverse must publish");
     assert_eq!(
         restored, archive,
         "immediate inverse must restore exact bytes"
@@ -370,7 +383,7 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         return false;
     };
     let mut sink = PrefixFailSink::after(48);
-    let result = partial_plan.write_to(&mut sink);
+    let result = publish(partial_plan, &mut sink);
     assert!(
         result.is_err(),
         "short sink unexpectedly accepted full archive"

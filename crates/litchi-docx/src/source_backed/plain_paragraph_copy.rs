@@ -5,6 +5,8 @@
 //! stages an [`Edit`] whose commit returns a new source-backed package;
 //! writing it rewrites only the main-document part.
 
+use std::cell::{RefCell, RefMut};
+
 use litchi_core::Position;
 
 use crate::source_backed::Package;
@@ -86,7 +88,8 @@ impl From<raw::Patch> for Patch {
 #[derive(Clone)]
 pub struct Edit {
     package: Package,
-    inner: record::Edit,
+    limits: raw::Limits,
+    inner: RefCell<Option<record::Edit>>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -96,6 +99,37 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn materialize(&self) -> Result<record::Edit, Error> {
+        Ok(self
+            .package
+            .plain_paragraph_copy_snapshot_bounded(self.limits)?
+            .edit())
+    }
+
+    fn ensure_inner(&self) -> Result<(), Error> {
+        let mut inner = self.inner.borrow_mut();
+        if inner.is_none() {
+            *inner = Some(self.materialize()?);
+        }
+        Ok(())
+    }
+
+    fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>, Error> {
+        self.ensure_inner()?;
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut)
+            .map_err(|_| Error::InvalidDurable)
+    }
+
+    fn into_inner(mut self) -> Result<record::Edit, Error> {
+        if self.inner.get_mut().is_none() {
+            let inner = self.materialize()?;
+            *self.inner.get_mut() = Some(inner);
+        }
+        self.inner
+            .into_inner()
+            .ok_or_else(|| raw::Error::InvalidDurable)
+    }
+
     /// The package the edit is staged over.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -103,9 +137,10 @@ impl Edit {
     }
 
     /// The projected main story.
-    #[must_use]
-    pub fn projected(&self) -> raw::Tree {
-        raw::Tree::from_record(self.inner.projected().clone())
+    pub fn projected(&self) -> Result<raw::Tree, Error> {
+        Ok(raw::Tree::from_record(
+            self.inner_mut()?.projected().clone(),
+        ))
     }
 
     /// Copy source paragraph `source` before insertion slot `before`, both
@@ -119,14 +154,13 @@ impl Edit {
         source: Position,
         before: Position,
     ) -> Result<&mut Self, Error> {
-        self.inner.copy_plain_paragraph(source, before)?;
+        self.inner_mut()?.copy_plain_paragraph(source, before)?;
         Ok(self)
     }
 
     /// The effect the commit will have.
-    #[must_use]
-    pub fn effect_report(&self) -> EffectReport {
-        self.inner.clone().commit().effect_report()
+    pub fn effect_report(&self) -> Result<EffectReport, Error> {
+        Ok(self.inner_mut()?.clone().commit().effect_report())
     }
 
     /// Commit the copy as a new source-backed package.
@@ -135,8 +169,10 @@ impl Edit {
     ///
     /// Returns a typed source, signature or limit error before any output.
     pub fn commit(self) -> Result<Commit, Error> {
-        let patch = self.inner.commit().patch().clone();
-        commit_change(&self.package, CopyChange(patch))
+        let this = self;
+        let package = this.package.clone();
+        let patch = this.into_inner()?.commit().patch().clone();
+        commit_change(&package, CopyChange(patch))
     }
 }
 
@@ -145,11 +181,14 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the errors of the package's bounded plain-paragraph admission.
+    /// The bounded plain-paragraph admission runs on the first projection,
+    /// operation or commit.
     pub fn edit_plain_paragraph_copy(&self) -> Result<Edit, Error> {
+        let limits = self.semantic_limits.paragraph_copy_value();
         Ok(Edit {
             package: self.clone(),
-            inner: self.plain_paragraph_copy_snapshot()?.edit(),
+            limits,
+            inner: RefCell::new(None),
         })
     }
 

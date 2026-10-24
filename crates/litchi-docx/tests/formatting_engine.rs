@@ -1006,25 +1006,33 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     }
     let mut package_edit = package.edit().unwrap();
     stage(&mut package_edit);
-    let commit = package_edit.commit().unwrap();
-    assert!(package.apply(commit.patch()).is_err());
+    assert!(matches!(
+        package_edit.commit(),
+        Err(litchi_docx::document::Error::Document(
+            litchi_docx::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
+        ))
+    ));
     assert!(package.is_signed());
     assert_eq!(saved(&mut package), original);
+
+    let unsigned_for_patch = package.unsign();
+    let mut unsigned_edit = unsigned_for_patch.edit().unwrap();
+    stage(&mut unsigned_edit);
+    let commit = unsigned_edit.commit().unwrap();
+    assert!(package.apply(commit.patch()).is_err());
 
     let backed = source_backed::Package::from_reader(Cursor::new(source.as_slice())).unwrap();
     let mut backed_edit = backed.edit().unwrap();
     stage(&mut backed_edit);
-    let backed_commit = backed_edit.commit().unwrap();
-    let mut output = Vec::new();
     assert!(matches!(
-        backed.apply(backed_commit.patch()).and_then(|committed| {
-            let committed = committed.into_package();
-            committed.write_to(&mut output)?;
-            committed.document_snapshot()
-        }),
+        backed_edit.commit(),
         Err(litchi_docx::document::Error::Document(
             litchi_docx::Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)
         ))
+    ));
+    assert!(matches!(
+        backed.apply(commit.patch()),
+        Err(litchi_docx::document::Error::PatchConflict)
     ));
 
     package = package.unsign();

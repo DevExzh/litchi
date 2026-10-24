@@ -462,7 +462,7 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     let source_ptr = snapshot.xml_bytes().as_ptr();
     let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&replacements()).unwrap();
-    assert_ne!(edit.projected().xml_bytes().as_ptr(), source_ptr);
+    assert_ne!(edit.projected().unwrap().xml_bytes().as_ptr(), source_ptr);
     edit.replace_body_paragraph_texts(&original).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -553,7 +553,7 @@ fn managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically() {
     let (budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
     let mut edit = package.edit().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     for invalid in [
         Vec::new(),
         vec![
@@ -573,7 +573,7 @@ fn managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically() {
                 ..
             })
         ));
-        assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+        assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     }
     drop(edit);
     drop(snapshot);
@@ -588,7 +588,7 @@ fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
     let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first scalar")
         .unwrap();
-    let staged = edit.projected().xml_bytes().to_vec();
+    let staged = edit.projected().unwrap().xml_bytes().to_vec();
     let work_before = budget.used(Resource::Work);
     let input_before = budget.used(Resource::InputBytes);
 
@@ -604,7 +604,7 @@ fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), staged.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), staged.as_slice());
     assert!(budget.used(Resource::Work) >= work_before);
     assert!(budget.used(Resource::InputBytes) >= input_before);
 
@@ -617,7 +617,7 @@ fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
         result,
         Err(TransactionError::OutOfBounds { position: 99, .. })
     ));
-    assert_eq!(edit.projected().xml_bytes(), staged.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), staged.as_slice());
     assert!(budget.used(Resource::Work) >= work_before);
     assert!(budget.used(Resource::InputBytes) >= input_before);
 
@@ -635,13 +635,13 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
     let (budget, cancellation, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
     let mut edit = package.edit().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     let work_before = budget.used(Resource::Work);
     let input_before = budget.used(Resource::InputBytes);
     cancellation.cancel();
     let result = edit.replace_body_paragraph_texts(&replacements());
     assert!(result.as_ref().is_err_and(is_cancelled));
-    assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     assert!(budget.used(Resource::Work) >= work_before);
     assert!(budget.used(Resource::InputBytes) >= input_before);
     drop(edit);
@@ -652,8 +652,11 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
 
     let (probe_budget, _probe_cancel, probe_package) = managed(source_bytes());
     let probe_snapshot = probe_package.document_snapshot().unwrap();
+    let probe_edit = probe_package.edit().unwrap();
+    let _ = probe_edit.projected().unwrap();
     let baseline_work = probe_budget.used(Resource::Work);
     assert!(baseline_work > 0);
+    drop(probe_edit);
     drop(probe_snapshot);
     drop(probe_package);
     assert_eq!(probe_budget.used(Resource::Memory), 0);
@@ -662,7 +665,7 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
         managed_with_work(source_bytes(), FINITE_MEMORY, baseline_work + 11_000);
     let snapshot = package.document_snapshot().unwrap();
     let mut edit = package.edit().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     let work_before = budget.used(Resource::Work);
     let input_before = budget.used(Resource::InputBytes);
     let result = edit.replace_body_paragraph_texts(&replacements());
@@ -671,7 +674,7 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
             .as_ref()
             .is_err_and(|error| is_resource_limit(error, Resource::Work))
     );
-    assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     assert!(budget.used(Resource::Work) >= work_before);
     assert!(budget.used(Resource::InputBytes) >= input_before);
     drop(edit);
@@ -683,7 +686,7 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
     let (budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
     let mut edit = package.edit().unwrap();
-    let before = edit.projected().xml_bytes().to_vec();
+    let before = edit.projected().unwrap().xml_bytes().to_vec();
     let remaining = budget
         .limit(Resource::Memory)
         .saturating_sub(budget.used(Resource::Memory));
@@ -697,7 +700,7 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
             .as_ref()
             .is_err_and(|error| is_resource_limit(error, Resource::Memory))
     );
-    assert_eq!(edit.projected().xml_bytes(), before.as_slice());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), before.as_slice());
     assert!(budget.used(Resource::Work) >= work_before);
     assert!(budget.used(Resource::InputBytes) >= input_before);
     drop(hold);
@@ -758,21 +761,22 @@ fn managed_scalar_paragraph_controls_preserve_projection_and_noops() {
         .unwrap();
     assert_eq!(
         edit.projected()
+            .unwrap()
             .paragraph(Position::new(0))
             .unwrap()
             .text()
             .unwrap(),
         "first\tline\nsecond"
     );
-    let staged = edit.projected().xml_bytes().to_vec();
+    let staged = edit.projected().unwrap().xml_bytes().to_vec();
     edit.replace_paragraph_text(Position::new(0), "first\tline\nsecond")
         .unwrap();
-    assert_eq!(edit.projected().xml_bytes(), staged);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), staged);
     assert!(
         edit.replace_paragraph_text(Position::new(0), "bad\u{b}text")
             .is_err()
     );
-    assert_eq!(edit.projected().xml_bytes(), staged);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), staged);
     assert_eq!(snapshot.xml_bytes(), original);
 }
 
@@ -793,8 +797,8 @@ fn bulk_inline_controls_match_scalar_edits_and_are_reversible() {
             .unwrap();
     }
     assert_eq!(
-        batch.projected().xml_bytes(),
-        scalar.projected().xml_bytes()
+        batch.projected().unwrap().xml_bytes(),
+        scalar.projected().unwrap().xml_bytes()
     );
     let commit = batch.commit().unwrap();
     assert_eq!(commit.patch().target().paragraph_count(), 4);
@@ -836,7 +840,7 @@ fn late_invalid_bulk_control_preserves_an_earlier_staged_edit() {
         let mut edit = package.edit().unwrap();
         edit.replace_paragraph_text(Position::new(1), "staged\ntext")
             .unwrap();
-        let staged = edit.projected().xml_bytes().to_vec();
+        let staged = edit.projected().unwrap().xml_bytes().to_vec();
         let replacements = [
             ParagraphTextReplacement::new(Position::new(0), "valid\tfirst"),
             ParagraphTextReplacement::new(Position::new(2), invalid),
@@ -848,7 +852,7 @@ fn late_invalid_bulk_control_preserves_an_earlier_staged_edit() {
                 reason: Refusal::StructuralText
             })
         ));
-        assert_eq!(edit.projected().xml_bytes(), staged);
+        assert_eq!(edit.projected().unwrap().xml_bytes(), staged);
     }
 }
 

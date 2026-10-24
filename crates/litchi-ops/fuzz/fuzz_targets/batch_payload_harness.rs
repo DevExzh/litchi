@@ -134,11 +134,13 @@ fn lower_path(text: &str) {
 
 fn check_round_trip(items: &[BatchItem<'_>]) {
     let wire = serde_json::to_vec(items).expect("decoded items serialize");
-    let again = batch::from_bytes(&wire, &batch::SourceLimits::default()).expect("canonical wire form decodes");
+    let again = batch::from_bytes(&wire, &batch::SourceLimits::default())
+        .expect("canonical wire form decodes");
     // Numbers too: `serde_json` parses correctly rounded (record 0338 F1).
     assert!(again == items, "wire round trip changed the items");
     let rewire = serde_json::to_vec(&again).expect("round-tripped items serialize");
-    let third = batch::from_bytes(&rewire, &batch::SourceLimits::default()).expect("canonical wire form decodes again");
+    let third = batch::from_bytes(&rewire, &batch::SourceLimits::default())
+        .expect("canonical wire form decodes again");
     assert!(third == again, "canonical wire form is not stable");
     assert_eq!(rewire, wire, "canonical wire form is not a fixed point");
 }

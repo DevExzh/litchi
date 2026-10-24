@@ -1408,7 +1408,7 @@ fn durable_replay_limits_refuse_operations_staging_package_and_payloads_atomical
         &drawing_original,
         &drawing,
         fallback_limits,
-        Some("payload bytes"),
+        Some("durable prepared Ink bytes"),
     );
 
     let mut canonical_published = Package::from_reader(Cursor::new(&canonical_original)).unwrap();
@@ -1455,7 +1455,7 @@ fn durable_replay_limits_refuse_operations_staging_package_and_payloads_atomical
         &canonical_published_bytes,
         &inverse,
         inverse_topology_limits,
-        Some("Ink graph publication token bytes"),
+        Some("durable closure metadata bytes"),
     );
 
     let mut drawing_published = Package::from_reader(Cursor::new(&drawing_original)).unwrap();
@@ -1471,7 +1471,7 @@ fn durable_replay_limits_refuse_operations_staging_package_and_payloads_atomical
         &drawing_published_bytes,
         &drawing_inverse,
         inverse_relationship_limits,
-        Some("relationships"),
+        Some("durable closure relationships"),
     );
 }
 

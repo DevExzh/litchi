@@ -70,8 +70,16 @@ fn projected_xml(package: &source_backed::Package) -> Vec<u8> {
         .edit_plain_paragraph_removal()
         .unwrap()
         .projected()
+        .unwrap()
         .xml_bytes()
         .to_vec()
+}
+
+fn admit_removal(source: Vec<u8>) -> Result<(), Error> {
+    open(source)
+        .edit_plain_paragraph_removal()?
+        .projected()
+        .map(|_| ())
 }
 
 fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
@@ -261,7 +269,7 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
 fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() {
     let source = bytes(&fixture(document(&["a", "b"])));
     let mut edit = open(source.clone()).edit_plain_paragraph_removal().unwrap();
-    let original = edit.projected().xml_bytes().to_vec();
+    let original = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(2)),
         Err(Error::OutOfBounds {
@@ -269,9 +277,9 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), original);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original);
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
-    let once = edit.projected().xml_bytes().to_vec();
+    let once = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.remove_plain_paragraph(Position::new(0)),
         Err(Error::Limit {
@@ -279,7 +287,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), once);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), once);
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
@@ -287,7 +295,8 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
             )
-            .edit_plain_paragraph_removal(),
+            .edit_plain_paragraph_removal()
+            .and_then(|edit| edit.projected().map(|_| ())),
         Err(Error::Limit {
             kind: LimitKind::Paragraphs,
             ..
@@ -307,7 +316,10 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), projected_xml(edit.package()));
+    assert_eq!(
+        edit.projected().unwrap().xml_bytes(),
+        projected_xml(edit.package())
+    );
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
     let snapshot = open(bytes(&fixture(document(&["a"]))))
@@ -374,7 +386,7 @@ fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() 
             true,
         );
     assert!(matches!(
-        open(bytes(&external)).edit_plain_paragraph_removal(),
+        admit_removal(bytes(&external)),
         Err(Error::Refused(Refusal::ExternalRelationship))
     ));
 
@@ -383,7 +395,7 @@ fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() 
     )
     .into_bytes();
     assert!(matches!(
-        open(bytes(&fixture(complex))).edit_plain_paragraph_removal(),
+        admit_removal(bytes(&fixture(complex))),
         Err(Error::Refused(Refusal::ComplexParagraph))
     ));
 }

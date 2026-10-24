@@ -253,6 +253,15 @@ impl<W: Write> Write for FingerprintingWriter<W> {
 }
 
 impl Package {
+    fn materialize_document_edit(
+        package: &Self,
+        options: crate::document::EditOptions,
+    ) -> TransactionResult<crate::document::TransactionEdit> {
+        package
+            .main_document_snapshot_with_before("edit", true, None, Some(&options))
+            .map(|(_, snapshot)| snapshot.edit())
+    }
+
     /// Central boundary for operations that require the original OPC graph.
     fn physical_package(&self) -> Result<&SourceBackedPackage> {
         self.physical_opc_package()
@@ -1312,7 +1321,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the same failures as [`Self::document_snapshot`].
+    /// The same failures as [`Self::document_snapshot`] are deferred until
+    /// the first operation, projection or commit.
     pub fn edit(&self) -> TransactionResult<crate::document::Edit<Self>> {
         self.edit_with_options(crate::document::EditOptions::default())
     }
@@ -1323,9 +1333,11 @@ impl Package {
         &self,
         options: crate::document::EditOptions,
     ) -> TransactionResult<crate::document::Edit<Self>> {
-        let (_, snapshot) =
-            self.main_document_snapshot_with_before("edit", true, None, Some(&options))?;
-        Ok(crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options))
+        Ok(crate::document::Edit::deferred(
+            self.clone(),
+            options,
+            Self::materialize_document_edit,
+        ))
     }
 
     /// Publish one joined document composition through this source owner. The
@@ -1692,7 +1704,9 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current = self.external_hyperlink_sanitization_snapshot_bounded(patch.limits())?;
+        let current = self.external_hyperlink_sanitization_snapshot_bounded(
+            self.semantic_limits.hyperlinks_value(),
+        )?;
         let target = patch.apply(&current)?;
         Ok((main, target.shared_xml()))
     }
@@ -1709,7 +1723,9 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current = self.external_hyperlink_redaction_snapshot_bounded(patch.limits())?;
+        let current = self.external_hyperlink_redaction_snapshot_bounded(
+            self.semantic_limits.hyperlinks_value(),
+        )?;
         patch.validate_source(&current)?;
         Ok(main)
     }

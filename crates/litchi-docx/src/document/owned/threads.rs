@@ -72,7 +72,10 @@ impl Edit<Package> {
     /// Fresh paragraph identifiers: above every `paraId` of the projected
     /// main document and of `comments` (the comments part as staged).
     pub(super) fn fresh_paragraph_ids(&self, comments: Option<&[u8]>) -> Result<FreshIds> {
-        let mut used: BTreeSet<u32> = self.inner.paragraph_ids().into_iter().collect();
+        let mut used: BTreeSet<u32> = self
+            .inner_ref(|inner| inner.paragraph_ids())?
+            .into_iter()
+            .collect();
         if let Some(xml) = comments {
             used.extend(part_scan::paragraph_ids(xml));
         }
@@ -116,7 +119,7 @@ impl Edit<Package> {
                         done: entry.done.unwrap_or(false),
                     })
                     .collect();
-                let conformance = if self.inner.is_strict() {
+                let conformance = if self.is_strict()? {
                     Conformance::Strict
                 } else {
                     Conformance::Transitional

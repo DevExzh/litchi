@@ -2909,9 +2909,11 @@ fn parse_relationships(bytes: &[u8], limits: Limits) -> Result<Vec<RelationshipS
                     }
                 }
                 if relationships.len() >= maximum {
-                    return Err(invalid_durable(
-                        "Ink durable relationship count exceeds limits",
-                    ));
+                    return Err(Error::InkLimit {
+                        kind: LimitKind::DurableClosureRelationships,
+                        actual: relationships.len().saturating_add(1),
+                        maximum,
+                    });
                 }
                 relationships
                     .try_reserve(1)

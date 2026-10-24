@@ -4,7 +4,16 @@ use std::io::Cursor;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_docx::SourceLimits;
-use litchi_docx::source_backed::{Package, tail_append::{EditOptions, Limits}};
+use litchi_docx::source_backed::{
+    Package,
+    tail_append::{Commit, EditOptions, Error, Limits, Plan},
+};
+
+fn publish<'package>(plan: Plan<'package>, output: &mut Vec<u8>) -> Result<Commit, Error> {
+    let commit = plan.commit()?;
+    commit.package().write_to(output).map_err(Error::Document)?;
+    Ok(commit)
+}
 
 fn read_limits() -> SourceLimits {
     SourceLimits::builder()
@@ -63,10 +72,14 @@ fuzz_target!(|data: &[u8]| {
         max_output_bytes: 256 * 1024,
         max_token_bytes: 8192,
     };
-    if let Ok(plan) = package.tail_append_noop().with_options(EditOptions::new(limits)).prepare() {
+    if let Ok(plan) = package
+        .tail_append_noop()
+        .with_options(EditOptions::new(limits))
+        .prepare()
+    {
         let mut output = Vec::new();
-        if let Ok(publication) = plan.write_to(&mut output) {
-            assert!(publication.is_noop());
+        if let Ok(publication) = publish(plan, &mut output) {
+            assert!(publication.patch().is_noop());
             assert_eq!(output, data);
         }
     }
@@ -84,17 +97,20 @@ fuzz_target!(|data: &[u8]| {
     assert_eq!(before.sect_pr_len, after.sect_pr_len);
     assert_eq!(before.sect_pr_sha256, after.sect_pr_sha256);
     let mut output = Vec::new();
-    if let Ok(publication) = plan.write_to(&mut output) {
-        assert!(!publication.is_noop());
+    if let Ok(publication) = publish(plan, &mut output) {
+        assert!(!publication.patch().is_noop());
         let current = Package::from_reader_with_options(
             Cursor::new(&output),
             litchi_docx::OpenOptions::default().source_limits(read_limits()),
         )
         .expect("a successfully published bounded candidate must reopen");
         let mut restored = Vec::new();
-        publication
-            .write_inverse_to_stream(&current, &mut restored)
-            .expect("the exact published candidate must authorize its inverse");
+        current
+            .apply_tail_append(&publication.patch().inverse())
+            .expect("the exact published candidate must authorize its inverse")
+            .package()
+            .write_to(&mut restored)
+            .expect("the exact inverse candidate must publish");
         assert_eq!(restored, data);
     }
 });

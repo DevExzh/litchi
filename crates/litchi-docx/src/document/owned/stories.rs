@@ -226,24 +226,26 @@ impl Edit<Package> {
             .map_err(crate::Error::from)?;
         let mut entries = crate::header_footer::catalog::entries_of(main.rels())?;
         let mut removed = Vec::new();
-        for (change, forward) in self.inner.staged_graph_changes() {
-            if !forward {
-                removed.extend(change.parts.iter().map(|part| part.name.clone()));
-                continue;
-            }
-            for (relationship, part) in change.relationships.iter().zip(change.parts.iter()) {
-                let role = if relationship.relationship_type.ends_with("/header") {
-                    Role::Header
-                } else if relationship.relationship_type.ends_with("/footer") {
-                    Role::Footer
-                } else {
+        self.inner_ref(|inner| {
+            for (change, forward) in inner.staged_graph_changes() {
+                if !forward {
+                    removed.extend(change.parts.iter().map(|part| part.name.clone()));
                     continue;
-                };
-                entries.push(Entry::new(role, relationship.id.clone(), part.name.clone()));
+                }
+                for (relationship, part) in change.relationships.iter().zip(change.parts.iter()) {
+                    let role = if relationship.relationship_type.ends_with("/header") {
+                        Role::Header
+                    } else if relationship.relationship_type.ends_with("/footer") {
+                        Role::Footer
+                    } else {
+                        continue;
+                    };
+                    entries.push(Entry::new(role, relationship.id.clone(), part.name.clone()));
+                }
             }
-        }
-        entries.retain(|entry| !removed.iter().any(|name| name == entry.name()));
-        Ok(entries)
+            entries.retain(|entry| !removed.iter().any(|name| name == entry.name()));
+            entries
+        })
     }
 
     /// Add a header or footer of `kind` holding `story` to the body-final
@@ -278,8 +280,8 @@ impl Edit<Package> {
         kind: Kind,
         story: &NewStory,
     ) -> Result<String> {
-        let strict = self.inner.is_strict();
-        let section = self.inner.body_section()?;
+        let strict = self.is_strict()?;
+        let section = self.inner_mut()?.body_section()?;
         if let Some((xml, _)) = &section
             && references(xml)?
                 .iter()
@@ -367,7 +369,8 @@ impl Edit<Package> {
                     after = with_title_page(&after)?;
                 }
                 if after != before.as_slice() {
-                    self.inner.replace_body_section(&before, &Arc::new(after))?;
+                    self.inner_mut()?
+                        .replace_body_section(&before, &Arc::new(after))?;
                 }
             },
             None => {
@@ -377,7 +380,7 @@ impl Edit<Package> {
                     markup.extend_from_slice(b"<w:titlePg/>");
                 }
                 markup.extend_from_slice(b"</w:sectPr>");
-                self.inner.append_body_section(&Arc::new(markup))?;
+                self.inner_mut()?.append_body_section(&Arc::new(markup))?;
             },
         }
         if kind == Kind::EvenPage {
@@ -441,8 +444,8 @@ impl Edit<Package> {
             blob: part.blob_arc(),
             relationships: part_relationships.into(),
         };
-        let total = count_references(self.inner.main_xml(), &relationship_id)?;
-        let section = self.inner.body_section()?;
+        let total = count_references(self.inner_mut()?.main_xml(), &relationship_id)?;
+        let section = self.inner_mut()?.body_section()?;
         let in_section = match &section {
             Some((xml, _)) => count_references(xml, &relationship_id)?,
             None => 0,
@@ -457,9 +460,10 @@ impl Edit<Package> {
             && in_section > 0
         {
             let after = without_references(&before, &relationship_id)?;
-            self.inner.replace_body_section(&before, &Arc::new(after))?;
+            self.inner_mut()?
+                .replace_body_section(&before, &Arc::new(after))?;
         }
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([transfer_relationship]),
                 parts: Arc::new([transfer_part]),
@@ -484,7 +488,7 @@ impl Edit<Package> {
             .into_iter()
             .find(|entry| entry.name() == name)
             .ok_or_else(not_found)?;
-        let (before, _) = self.inner.body_section()?.ok_or_else(not_found)?;
+        let (before, _) = self.inner_mut()?.body_section()?.ok_or_else(not_found)?;
         let found = references(&before)?;
         let own = found
             .iter()
@@ -504,9 +508,10 @@ impl Edit<Package> {
         if kind == Kind::FirstPage {
             after = with_title_page(&after)?;
         }
-        self.inner.replace_body_section(&before, &Arc::new(after))?;
+        self.inner_mut()?
+            .replace_body_section(&before, &Arc::new(after))?;
         if kind == Kind::EvenPage {
-            self.turn_on_even_and_odd_headers(self.inner.is_strict())?;
+            self.turn_on_even_and_odd_headers(self.is_strict()?)?;
         }
         Ok(self)
     }
@@ -526,7 +531,7 @@ impl Edit<Package> {
     /// carry.
     pub fn set_story_text(&mut self, name: &str, text: &str) -> Result<&mut Self> {
         let xml = self.part_payload(name)?.ok_or_else(not_found)?;
-        let updated = story_with_text(&xml, text, self.inner.is_strict())?;
+        let updated = story_with_text(&xml, text, self.is_strict()?)?;
         if updated != xml.as_slice() {
             self.replace_part(name, updated)?;
         }
@@ -550,7 +555,7 @@ impl Edit<Package> {
         run: Option<&dyn Fn(&mut properties::Run)>,
     ) -> Result<&mut Self> {
         let xml = self.part_payload(name)?.ok_or_else(not_found)?;
-        let updated = formatted_story(&xml, paragraph, run, self.inner.is_strict())?;
+        let updated = formatted_story(&xml, paragraph, run, self.is_strict()?)?;
         if updated != xml.as_slice() {
             self.replace_part(name, updated)?;
         }

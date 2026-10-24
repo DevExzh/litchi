@@ -247,13 +247,15 @@ fn relationship_lexical_tokens_count_against_public_ink_topology_limit() {
     assert!(semantic_topology_bytes < limits.stories.max_topology_bytes);
     let before = members(&save(&mut package));
 
-    let error = package
+    let edit = package
         .edit_ink_with_options(litchi_docx::ink::EditOptions {
             inventory: limits,
             ..litchi_docx::ink::EditOptions::default()
         })
-        .err()
-        .expect("lexical relationship tokens should exceed the semantic-only budget");
+        .unwrap();
+    let error = edit
+        .inventory()
+        .expect_err("lexical relationship tokens should exceed the semantic-only budget");
     assert!(matches!(
         error,
         Error::InkLimit {

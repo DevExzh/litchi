@@ -243,20 +243,14 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     let commit = edit.commit().unwrap();
     let inverse = commit.patch().inverse();
 
-    // The patch replays onto another package whose settings part holds the
-    // before state; its own unrelated member is kept.
+    // An owner-created patch authenticates the complete artifact, so an
+    // otherwise matching settings part with a changed unrelated member is
+    // rejected rather than silently narrowing the patch scope.
     let foreign_source = change_unrelated_member(&source_bytes);
-    let mut foreign_output = Vec::new();
-    open_source(foreign_source.clone())
-        .apply_document_variables(commit.patch())
-        .unwrap()
-        .package()
-        .write_to(&mut foreign_output)
-        .unwrap();
-    assert_eq!(
-        &foreign_output[payload_range(&foreign_output, UNUSED)],
-        &foreign_source[payload_range(&foreign_source, UNUSED)]
-    );
+    assert!(matches!(
+        open_source(foreign_source).apply_document_variables(commit.patch()),
+        Err(Error::PatchConflict { .. })
+    ));
 
     let mut set_output = Vec::new();
     commit.package().write_to(&mut set_output).unwrap();
