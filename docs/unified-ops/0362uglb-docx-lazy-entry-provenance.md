@@ -2,9 +2,10 @@
 
 This documentation-only successor disambiguates the validation in
 `0362ugla-docx-lazy-entry-validation.md`.  No Cargo command was rerun for this
-record.  The final committed source is
-`0372b4849128edac317503431a1ccc97401aa9b3`.  The behavior-bearing validation
-pins are kept distinct below:
+record.  The final branch head is
+`c7c53f56e38a61753c9091062ad4165a1dd29859`; its final source tree (before the
+documentation-only records) is `0cf1a17174fffe46f970b0399ef39bf803cdebce`.
+The behavior-bearing validation pins are kept distinct below:
 
 * `e5bc620a13681d181e73c6e367f323e00af902fd` is the DOCX and facade test,
   doctest and DOCX Clippy source pin.
