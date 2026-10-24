@@ -909,7 +909,9 @@ fn selector_first_batch_stays_cold_until_first_use_and_defers_selector_errors() 
         .edit_many([SheetChange::set("Missing", address("A1"), 2u32)])
         .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Invalid(_))));
-    assert_ne!(source.read_diagnostics(), before);
+    // Resolving a missing selector needs only the cached workbook catalog; it
+    // must not materialize any worksheet payload at first use.
+    assert_eq!(source.read_diagnostics(), before);
 }
 
 #[test]
