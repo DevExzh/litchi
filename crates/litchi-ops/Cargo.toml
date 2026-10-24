@@ -215,6 +215,14 @@ required-features = ["docx", "pptx"]
 name              = "odf_leaves_bench"
 required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
 
+# Untimed correctness and bounded phase protocol for the shared-triad ODF
+# qualification lane (record 0362uw).  Keep this example out of no-default
+# and single-format all-targets checks: it deliberately pairs all four
+# changed families.
+[[example]]
+name              = "odf_shared_triad_qualification"
+required-features = ["odc", "odi", "oth", "odm"]
+
 # Paired leaf-vs-unified field refresh measurements (record 0279).
 [[example]]
 name              = "refresh_bench"
