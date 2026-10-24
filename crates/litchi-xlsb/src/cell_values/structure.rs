@@ -242,7 +242,7 @@ impl ImagePlan {
     }
 
     fn image(&self) -> Result<crate::writer::Image> {
-        let anchor = crate::chart::Anchor::with_offsets(
+        let anchor = crate::builder::chart::Anchor::with_offsets(
             self.from_col,
             self.from_col_offset,
             self.from_row,
@@ -1398,7 +1398,7 @@ impl Edit {
         source_sheet: usize,
         image_index: usize,
         target_sheet: usize,
-        target_anchor: crate::chart::Anchor,
+        target_anchor: crate::builder::chart::Anchor,
     ) -> Result<()> {
         let source_catalog_position = source.catalog_position_for_worksheet(source_sheet)?;
         let drawing = source

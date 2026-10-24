@@ -868,7 +868,7 @@ impl Xlsx {
                     .with_property("width"),
             );
         }
-        let anchor = xlsx::chart::Anchor::new(origin[0], origin[1], to_col, to_row);
+        let anchor = xlsx::builder::chart::Anchor::new(origin[0], origin[1], to_col, to_row);
         let source = match source {
             Some(source) => source,
             None => self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?,
@@ -1360,7 +1360,7 @@ impl Xlsx {
             native.set_anchor(
                 sheet,
                 item.chart as usize,
-                &xlsx::chart::Anchor::new(x, y, to_col, to_row),
+                &xlsx::builder::chart::Anchor::new(x, y, to_col, to_row),
             )?;
         }
         let xml = native.chart(sheet, item.chart as usize)?;

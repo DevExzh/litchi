@@ -12,9 +12,9 @@
 use std::io::Cursor;
 
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::chart::{Anchor, Chart};
 use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, TransferLimits, Value};
-use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::{Package, SourceLimits};
 

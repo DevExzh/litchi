@@ -1129,7 +1129,7 @@ fn array_constant_survives_package_roundtrip() {
 
 #[test]
 fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use crate::package::drawing::AnchorKind;
     use litchi_drawingml::chart::plot_area::TypeGroup;
 
@@ -1244,7 +1244,7 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
 
 #[test]
 fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
-    use crate::chart::{
+    use crate::builder::chart::{
         Anchor, Chart, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart,
     };
     use litchi_drawingml::chart::{ExtensionList, ShapeProperties};
@@ -1383,7 +1383,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
 
 #[test]
 fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
-    use crate::chart::{Anchor, Chart, Relationship, Target, UserShapesPart};
+    use crate::builder::chart::{Anchor, Chart, Relationship, Target, UserShapesPart};
 
     let mut sheet = Worksheet::new("Charts");
     let valid = Chart::bar_chart(
@@ -1431,7 +1431,7 @@ fn worksheet_chart_validation_and_crud_are_lossless_or_refuse() {
 
 #[test]
 fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use crate::package::drawing::{AnchorKind, Object};
     use crate::shapes::{Anchor as ObjectAnchor, Emu, EmuExtent, EmuOffset, Preset};
     use crate::writer::{Image, ImageFormat};
@@ -1588,7 +1588,7 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
 
 #[test]
 fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
-    use crate::chart::Anchor;
+    use crate::builder::chart::Anchor;
     use crate::writer::{Image, ImageFormat};
 
     assert!(

@@ -1251,7 +1251,7 @@ impl SourceWorksheet {
     /// The two-cell anchor of the chart at `index` (drawing order) on this
     /// worksheet; `None` past the last chart or for a one-cell or absolute
     /// anchor. Only the worksheet's relationships and its drawing are read.
-    pub fn chart_anchor(&self, index: usize) -> Result<Option<crate::chart::Anchor>> {
+    pub fn chart_anchor(&self, index: usize) -> Result<Option<crate::builder::chart::Anchor>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
                 sheet: self.data.name().to_owned(),

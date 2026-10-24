@@ -5,7 +5,7 @@
 
 //! Typed XLSB chart-sheet authoring (MS-XLSB 2.1.7.7).
 
-use crate::chart::Chart;
+use crate::builder::chart::Chart;
 use crate::package::chartsheet::{
     ChartSheet as ChartSheetMetadata, Color, ColorType, PageSetup, Protection, State, View,
 };

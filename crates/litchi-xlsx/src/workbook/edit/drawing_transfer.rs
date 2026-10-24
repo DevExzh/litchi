@@ -260,7 +260,7 @@ fn prepare_dependency(
                     "drawing chart target is outside /xl/charts or lacks .xml suffix",
                 ));
             }
-            let anchor = crate::chart::Anchor::new(0, 0, 1, 1);
+            let anchor = crate::builder::chart::Anchor::new(0, 0, 1, 1);
             let chart = crate::chart::read(source.blob(), anchor)?;
             clone_chart_relationships(workbook, source, target_uri, target, reserved, &chart)
         },
@@ -276,7 +276,7 @@ fn clone_chart_relationships(
     target_uri: &PackURI,
     target: &mut BlobPart,
     reserved: &mut BTreeSet<String>,
-    chart: &crate::chart::Chart,
+    chart: &crate::builder::chart::Chart,
 ) -> Result<Vec<GraphChange>> {
     let mut fragment_ids =
         litchi_spreadsheet_drawing::chart::relationship::fragment_ids(&chart.chart)?;

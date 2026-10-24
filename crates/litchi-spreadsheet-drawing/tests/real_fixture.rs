@@ -3,7 +3,8 @@
 use litchi_drawingml::chart::{reader as drawingml_reader, writer as drawingml_writer};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_spreadsheet_drawing::chart::anchor::write_all;
-use litchi_spreadsheet_drawing::chart::{Anchor, read as read_chart, write};
+use litchi_spreadsheet_drawing::chart::builder::Anchor;
+use litchi_spreadsheet_drawing::chart::{read as read_chart, write};
 use litchi_spreadsheet_drawing::shape::{Object, read as read_drawing};
 use std::path::{Path, PathBuf};
 

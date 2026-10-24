@@ -4127,6 +4127,60 @@
       "features": [],
       "banned_names": [
         {
+          "name": "Anchor",
+          "scope": "litchi_xlsx::drawing",
+          "replacement": "use litchi_xlsx::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Anchor",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataPart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::ExternalDataPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataTarget",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::ExternalDataTarget (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Relationship",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Relationship (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Series",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Series (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Target",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Target (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "UserShapesPart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::UserShapesPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
           "name": "ReadLimits",
           "scope": "litchi_xlsx",
           "replacement": "use SourceLimits"
@@ -5645,6 +5699,60 @@
         "vba-inspection"
       ],
       "banned_names": [
+        {
+          "name": "Anchor",
+          "scope": "litchi_xlsx::drawing",
+          "replacement": "use litchi_xlsx::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Anchor",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataPart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::ExternalDataPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataTarget",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::ExternalDataTarget (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Relationship",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Relationship (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Series",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Series (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Target",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::Target (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "UserShapesPart",
+          "scope": "litchi_xlsx::chart",
+          "replacement": "use litchi_xlsx::builder::chart::UserShapesPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
         {
           "name": "ReadLimits",
           "scope": "litchi_xlsx",
@@ -7167,6 +7275,66 @@
       "features": [],
       "banned_names": [
         {
+          "name": "Chart",
+          "scope": "litchi_xlsb::builder",
+          "replacement": "use litchi_xlsb::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ChartAnchor",
+          "scope": "litchi_xlsb::builder",
+          "replacement": "use litchi_xlsb::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Anchor",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataPart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::ExternalDataPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataTarget",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::ExternalDataTarget (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Relationship",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Relationship (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Series",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Series (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Target",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Target (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "UserShapesPart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::UserShapesPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
           "name": "ReadLimits",
           "scope": "litchi_xlsb",
           "replacement": "use SourceLimits",
@@ -7804,6 +7972,66 @@
         "vba-inspection"
       ],
       "banned_names": [
+        {
+          "name": "Chart",
+          "scope": "litchi_xlsb::builder",
+          "replacement": "use litchi_xlsb::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ChartAnchor",
+          "scope": "litchi_xlsb::builder",
+          "replacement": "use litchi_xlsb::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Anchor",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Anchor (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Chart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Chart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataPart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::ExternalDataPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "ExternalDataTarget",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::ExternalDataTarget (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Relationship",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Relationship (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Series",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Series (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "Target",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::Target (record 0362zab §2.1.7)",
+          "recursive": false
+        },
+        {
+          "name": "UserShapesPart",
+          "scope": "litchi_xlsb::chart",
+          "replacement": "use litchi_xlsb::builder::chart::UserShapesPart (record 0362zab §2.1.7)",
+          "recursive": false
+        },
         {
           "name": "ReadLimits",
           "scope": "litchi_xlsb",

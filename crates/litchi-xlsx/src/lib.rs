@@ -75,6 +75,7 @@ extern crate self as litchi_xlsx;
 
 pub mod active_x;
 pub mod auto_filter;
+pub mod builder;
 pub mod calculation_properties;
 pub mod cell;
 pub mod cell_values;

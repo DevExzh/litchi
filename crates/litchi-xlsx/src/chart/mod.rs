@@ -3,7 +3,4 @@
 
 pub mod edit;
 
-pub use litchi_spreadsheet_drawing::chart::{
-    Anchor, Chart, ExternalDataPart, ExternalDataTarget, Relationship, Series, Target,
-    UserShapesPart, read, write,
-};
+pub use litchi_spreadsheet_drawing::chart::{read, write};

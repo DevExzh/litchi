@@ -9,7 +9,7 @@
 //! relationship grammars as XLSX. This module validates, authors, and resolves
 //! those inert resources without opening linked targets or embedded payloads.
 
-use crate::chart::{
+use crate::builder::chart::{
     Chart, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart,
 };
 use crate::package::error::{Error, Result};
@@ -657,7 +657,7 @@ fn limit(_what: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use litchi_drawingml::chart::ExternalData;
 
     #[test]

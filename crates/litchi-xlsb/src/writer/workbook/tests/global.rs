@@ -268,7 +268,7 @@ fn external_link_constructors_refuse_malformed_metadata() {
 
 #[test]
 fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use crate::package::chartsheet::{Color, ColorType, PageSetup, Protection, State, View};
     use crate::sheet::StrongProtection;
 
@@ -438,7 +438,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
 
 #[test]
 fn chart_sheet_validation_is_lossless_or_refuse() {
-    use crate::chart::{Anchor, Chart};
+    use crate::builder::chart::{Anchor, Chart};
     use crate::package::chartsheet::{Color, ColorType};
 
     let chart = Chart::bar_chart(

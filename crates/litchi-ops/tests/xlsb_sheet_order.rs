@@ -12,8 +12,8 @@ const DATA: &str = "/sheet[2]";
 const TAIL: &str = "/sheet[3]";
 
 fn fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::chart::{Anchor, Chart};
     use litchi_xlsb::builder::{self, Builder};
-    use litchi_xlsb::chart::{Anchor, Chart};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",

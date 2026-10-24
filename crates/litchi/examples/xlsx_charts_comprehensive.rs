@@ -16,7 +16,7 @@ use litchi_drawingml::chart::plot_area::{
 };
 use litchi_drawingml::chart::series::Series;
 use litchi_drawingml::chart::types::{AxisPosition, LegendPosition, RadarStyle};
-use litchi_xlsx::chart::{Anchor, Chart as WorksheetChart};
+use litchi_xlsx::builder::chart::{Anchor, Chart as WorksheetChart};
 use litchi_xlsx::{Edit, Number, Package};
 use std::env;
 use std::error::Error;

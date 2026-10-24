@@ -18,9 +18,9 @@ use litchi_spreadsheet_drawing::shape::{
     Anchor as DrawingAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset,
 };
 
-use super::Anchor;
 use super::model::{Chart, Drawing, Object, Picture, Unknown, UnknownKind};
 use super::source::{MAX_RELATIONSHIP_ID_BYTES, RelationshipDialect};
+use crate::builder::chart::Anchor;
 use crate::error::{Error, Result, allocation};
 use crate::raw::namespace::relationship_attribute_value;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;

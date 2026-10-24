@@ -5,7 +5,7 @@
 
 //! Typed worksheet image payloads used by XLSB Drawings parts.
 
-use crate::chart::Anchor;
+use crate::builder::chart::Anchor;
 use crate::package::error::{Error, Result};
 use litchi_opc::constants::content_type as ct;
 use std::sync::Arc;

@@ -180,10 +180,10 @@ impl Builder {
     }
 
     fn normalized_pivot_chart(
-        chart: &crate::chart::Chart,
+        chart: &crate::builder::chart::Chart,
         host_sheet_name: &str,
         authored_pivot_tables: &[(String, String)],
-    ) -> Result<crate::chart::Chart> {
+    ) -> Result<crate::builder::chart::Chart> {
         let Some(source) = chart.chart.pivot_source.as_ref() else {
             return Ok(chart.clone());
         };
