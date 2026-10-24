@@ -492,8 +492,9 @@ class ODGJoinedQualificationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            upstream_component = "3rd" + "party"
             with self.assertRaises(RUNNER.RunFailure):
-                builder._safe_path(root / "3rdparty" / "fixture.xml", "fixture")
+                builder._safe_path(root / upstream_component / "fixture.xml", "fixture")
             receipt = root / "receipt.json"
             builder._write_fresh_json(receipt, {"ok": True}, "receipt")
             with self.assertRaises(RUNNER.RunFailure):

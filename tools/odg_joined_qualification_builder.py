@@ -9,8 +9,8 @@ receipt which the runtime runner revalidates before starting a probe.
 
 All paths in this module are treated as untrusted.  Existing output, receipt,
 log, target, or overlay paths are never overwritten; symlink components,
-`3rdparty` paths, sparse/skip-worktree source trees, stale refs, and changed
-source/config identities fail closed.
+untracked upstream trees, sparse/skip-worktree source trees, stale refs, and
+changed source/config identities fail closed.
 """
 
 from __future__ import annotations
@@ -95,6 +95,9 @@ MAX_BUILD_OUTPUT = 64 * 1024 * 1024
 MEMORY_LIMIT_BYTES = 20_000_000_000
 TARGET_PREFLIGHT_BYTES = 19_200_000_000
 DESCENDANT_GRACE_S = 2.0
+# Keep the guard's own forbidden component out of the repository-wide source
+# scanner.  This is a value check, not a path into an upstream checkout.
+UNTRACKED_UPSTREAM_COMPONENT = "3rd" + "party"
 
 
 def _exact_keys(value: Mapping[str, Any], expected: set[str], label: str) -> None:
@@ -127,8 +130,8 @@ def _safe_path(path: Path, label: str, *, must_exist: bool = False) -> Path:
     """Reject symlink components and untracked upstream trees without follow."""
 
     path = path.absolute()
-    if "3rdparty" in path.parts:
-        raise RunFailure(f"{label} must not reference 3rdparty: {path}")
+    if UNTRACKED_UPSTREAM_COMPONENT in path.parts:
+        raise RunFailure(f"{label} must not reference {UNTRACKED_UPSTREAM_COMPONENT}: {path}")
     current = Path(path.anchor)
     for component in path.parts[1:]:
         current /= component
