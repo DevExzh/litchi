@@ -500,6 +500,18 @@ pub(crate) fn store_slicer_part_limited(
     limits: &SourceLimits,
 ) -> Result<()> {
     preflight_slicer_part_insertion(package, worksheet_name, value, limits)?;
+    let part_name = crate::slicer::raw::validate_part_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        worksheet_name.base_uri(),
+        limits,
+    )?;
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICERS_RELATIONSHIP_TYPE.to_owned(),
+        part_name.relative_ref(worksheet_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
     let prepared = crate::slicer::raw::prepare_part(
         crate::slicer::raw::Part {
             relationship_id: value.relationship_id.clone(),
@@ -509,7 +521,13 @@ pub(crate) fn store_slicer_part_limited(
         worksheet_name.base_uri(),
         limits,
     )?;
-    store_slicer_part_prepared_limited(package, worksheet_name, &prepared, limits)
+    store_slicer_part_prepared_limited_with_budget(
+        package,
+        worksheet_name,
+        &prepared,
+        limits,
+        &budget,
+    )
 }
 
 pub(crate) fn store_slicer_part_prepared_limited(
@@ -517,6 +535,30 @@ pub(crate) fn store_slicer_part_prepared_limited(
     worksheet_name: &PackURI,
     prepared: &crate::slicer::raw::PreparedPart,
     limits: &SourceLimits,
+) -> Result<()> {
+    let value = &prepared.value;
+    let part_name = prepared.uri.clone();
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICERS_RELATIONSHIP_TYPE.to_owned(),
+        part_name.relative_ref(worksheet_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
+    store_slicer_part_prepared_limited_with_budget(
+        package,
+        worksheet_name,
+        prepared,
+        limits,
+        &budget,
+    )
+}
+
+pub(crate) fn store_slicer_part_prepared_limited_with_budget(
+    package: &mut OpcPackage,
+    worksheet_name: &PackURI,
+    prepared: &crate::slicer::raw::PreparedPart,
+    limits: &SourceLimits,
+    budget: &crate::raw::PackageBudget,
 ) -> Result<()> {
     let value = &prepared.value;
     validate_package_graph(package)?;
@@ -545,12 +587,6 @@ pub(crate) fn store_slicer_part_prepared_limited(
             "Slicers part '{part_name}' already exists"
         )));
     }
-    let additions = [(
-        value.relationship_id.clone(),
-        SLICERS_RELATIONSHIP_TYPE.to_owned(),
-        part_name.relative_ref(worksheet_name.base_uri()),
-    )];
-    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
     crate::raw::check_part_budget_with_ledger(package, &budget, 1, xml.len(), &[], limits)?;
     let target = part_name.relative_ref(worksheet_name.base_uri());
     crate::signature_policy::ensure_unsigned(package)?;

@@ -889,6 +889,29 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
 }
 
 #[test]
+fn selector_first_batch_stays_cold_until_first_use_and_defers_selector_errors() {
+    let source = Arc::new(VersionedSource::new(three_cells()));
+    let editor = SourceBackedEditor::from_read_at(Arc::clone(&source)).unwrap();
+    source.reset_read_diagnostics();
+    let before = source.read_diagnostics();
+
+    let edit = editor
+        .edit_many([SheetChange::set("Missing", address("A1"), 2u32)])
+        .unwrap();
+    assert_eq!(edit.len(), 1);
+    assert!(!edit.is_empty());
+    assert_eq!(source.read_diagnostics(), before);
+    drop(edit);
+    assert_eq!(source.read_diagnostics(), before);
+
+    let edit = editor
+        .edit_many([SheetChange::set("Missing", address("A1"), 2u32)])
+        .unwrap();
+    assert!(matches!(edit.commit(), Err(Error::Invalid(_))));
+    assert_ne!(source.read_diagnostics(), before);
+}
+
+#[test]
 fn insert_existing_empty_and_style_only_owners_refuse_with_empty_transaction() {
     let base = fixture(
         format!(

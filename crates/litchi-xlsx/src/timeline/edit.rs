@@ -117,16 +117,19 @@ impl Edit {
 
     /// Find a cache by its case-insensitive semantic name.
     pub fn cache(&self, name: &str) -> Result<Option<Cache>> {
-        crate::slicer_cache::crud::find_timeline_cache(self.staged.opc(), name)
+        crate::slicer_cache::crud::find_timeline_cache(self.staged.opc(), name, &self.limits)
     }
 
     /// Find a worksheet timeline by its case-insensitive semantic name.
     pub fn view(&self, worksheet: &PackURI, name: &str) -> Result<Option<View>> {
-        crate::slicer_cache::crud::find_timeline(self.staged.opc(), worksheet, name)
+        crate::slicer_cache::crud::find_timeline(self.staged.opc(), worksheet, name, &self.limits)
     }
 
     pub fn add_cache(&mut self, definition: CacheDefinition) -> Result<Cache> {
-        self.apply(|candidate| crate::slicer_cache::crud::add_timeline_cache(candidate, definition))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::add_timeline_cache(candidate, definition, &limits)
+        })
     }
 
     /// Insert a complete workbook View Cache set with caller-selected native
@@ -145,6 +148,7 @@ impl Edit {
         crate::raw::check_new_part_count(self.staged.opc(), values.len(), &limits)?;
         let mut ids = HashSet::with_capacity(values.len());
         let mut targets = HashSet::<String>::with_capacity(values.len());
+        let mut additions = Vec::with_capacity(values.len());
         for value in values {
             let uri = raw::validate_cache_identity(value, self.workbook.base_uri(), &limits)?;
             if !ids.insert(value.relationship_id.as_str()) {
@@ -161,7 +165,18 @@ impl Edit {
                 &value.relationship_id,
                 &uri,
             )?;
+            additions.push((
+                value.relationship_id.clone(),
+                crate::timeline::CACHE_RELATIONSHIP_TYPE.to_owned(),
+                uri.relative_ref(self.workbook.base_uri()),
+            ));
         }
+        let budget = crate::raw::prepare_package_budget(
+            self.staged.opc(),
+            &self.workbook,
+            &additions,
+            &limits,
+        )?;
         let prepared = values
             .iter()
             .cloned()
@@ -169,8 +184,8 @@ impl Edit {
             .collect::<Result<Vec<_>>>()?;
         let workbook = self.workbook.clone();
         self.apply_raw(&limits, move |candidate| {
-            crate::timelines::store_timeline_caches_prepared_limited(
-                candidate, &workbook, &prepared, &limits,
+            crate::timelines::store_timeline_caches_prepared_limited_with_budget(
+                candidate, &workbook, &prepared, &limits, &budget,
             )
         })
     }
@@ -179,32 +194,39 @@ impl Edit {
     where
         F: FnOnce(&mut CacheDefinition),
     {
+        let limits = self.limits;
         self.apply(|candidate| {
-            crate::slicer_cache::crud::update_timeline_cache(candidate, name, update)
+            crate::slicer_cache::crud::update_timeline_cache(candidate, name, update, &limits)
         })
     }
 
     pub fn replace_cache(&mut self, name: &str, replacement: CacheDefinition) -> Result<bool> {
+        let limits = self.limits;
         self.apply(|candidate| {
-            crate::slicer_cache::crud::replace_timeline_cache(candidate, name, replacement)
+            crate::slicer_cache::crud::replace_timeline_cache(candidate, name, replacement, &limits)
         })
     }
 
     pub fn reorder_caches(&mut self, names: &[String]) -> Result<Vec<Cache>> {
         let names = names.to_vec();
+        let limits = self.limits;
         self.apply(|candidate| {
-            crate::slicer_cache::crud::reorder_timeline_caches(candidate, &names)
+            crate::slicer_cache::crud::reorder_timeline_caches(candidate, &names, &limits)
         })
     }
 
     pub fn remove_cache(&mut self, name: &str) -> Result<bool> {
-        self.apply(|candidate| crate::slicer_cache::crud::remove_timeline_cache(candidate, name))
+        let limits = self.limits;
+        self.apply(|candidate| {
+            crate::slicer_cache::crud::remove_timeline_cache(candidate, name, &limits)
+        })
     }
 
     pub fn add_view(&mut self, worksheet: &PackURI, view: View) -> Result<Part> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::add_timeline(candidate, &worksheet, view)
+            crate::slicer_cache::crud::add_timeline(candidate, &worksheet, view, &limits)
         })
     }
 
@@ -220,11 +242,19 @@ impl Edit {
             &value.relationship_id,
             &uri,
         )?;
+        let additions = [(
+            value.relationship_id.clone(),
+            crate::timeline::RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(worksheet.base_uri()),
+        )];
+        // Admit the existing package before serializing the caller's value.
+        let budget =
+            crate::raw::prepare_package_budget(self.staged.opc(), &worksheet, &additions, &limits)?;
         let prepared = raw::prepare_part(value, &limits)?;
         let workbook = self.workbook.clone();
         self.apply_raw(&limits, move |candidate| {
-            crate::timelines::store_worksheet_timelines_prepared_limited(
-                candidate, &workbook, &prepared, &limits,
+            crate::timelines::store_worksheet_timelines_prepared_limited_with_budget(
+                candidate, &workbook, &prepared, &limits, &budget,
             )
         })
     }
@@ -234,8 +264,9 @@ impl Edit {
         F: FnOnce(&mut View),
     {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::update_timeline(candidate, &worksheet, name, update)
+            crate::slicer_cache::crud::update_timeline(candidate, &worksheet, name, update, &limits)
         })
     }
 
@@ -246,23 +277,32 @@ impl Edit {
         replacement: View,
     ) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::replace_timeline(candidate, &worksheet, name, replacement)
+            crate::slicer_cache::crud::replace_timeline(
+                candidate,
+                &worksheet,
+                name,
+                replacement,
+                &limits,
+            )
         })
     }
 
     pub fn reorder_views(&mut self, worksheet: &PackURI, names: &[String]) -> Result<Vec<View>> {
         let worksheet = worksheet.clone();
         let names = names.to_vec();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::reorder_timelines(candidate, &worksheet, &names)
+            crate::slicer_cache::crud::reorder_timelines(candidate, &worksheet, &names, &limits)
         })
     }
 
     pub fn remove_view(&mut self, worksheet: &PackURI, name: &str) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::remove_timeline(candidate, &worksheet, name)
+            crate::slicer_cache::crud::remove_timeline(candidate, &worksheet, name, &limits)
         })
     }
 

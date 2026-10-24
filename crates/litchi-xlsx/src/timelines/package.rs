@@ -269,6 +269,23 @@ pub(crate) fn store_timeline_caches_limited(
     limits: &SourceLimits,
 ) -> Result<()> {
     preflight_timeline_cache_insertions(package, workbook_name, caches, limits)?;
+    let additions: Vec<_> = caches
+        .iter()
+        .map(|cache| {
+            let uri = crate::timeline::raw::validate_cache_identity_fields(
+                &cache.relationship_id,
+                &cache.part_name,
+                workbook_name.base_uri(),
+                limits,
+            )?;
+            Ok((
+                cache.relationship_id.clone(),
+                TIMELINE_CACHE_RELATIONSHIP_TYPE.to_owned(),
+                uri.relative_ref(workbook_name.base_uri()),
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let budget = crate::raw::prepare_package_budget(package, workbook_name, &additions, limits)?;
     let prepared = caches
         .iter()
         .cloned()
@@ -284,7 +301,13 @@ pub(crate) fn store_timeline_caches_limited(
             )
         })
         .collect::<Result<Vec<_>>>()?;
-    store_timeline_caches_prepared_limited(package, workbook_name, &prepared, limits)
+    store_timeline_caches_prepared_limited_with_budget(
+        package,
+        workbook_name,
+        &prepared,
+        limits,
+        &budget,
+    )
 }
 
 pub(crate) fn store_timeline_caches_prepared_limited(
@@ -292,6 +315,36 @@ pub(crate) fn store_timeline_caches_prepared_limited(
     workbook_name: &PackURI,
     prepared: &[crate::timeline::raw::PreparedCache],
     limits: &SourceLimits,
+) -> Result<()> {
+    if prepared.is_empty() {
+        return Err(invalid("at least one View Cache is required for storage"));
+    }
+    let additions: Vec<_> = prepared
+        .iter()
+        .map(|cache| {
+            (
+                cache.value.relationship_id.clone(),
+                TIMELINE_CACHE_RELATIONSHIP_TYPE.to_owned(),
+                cache.uri.relative_ref(workbook_name.base_uri()),
+            )
+        })
+        .collect();
+    let budget = crate::raw::prepare_package_budget(package, workbook_name, &additions, limits)?;
+    store_timeline_caches_prepared_limited_with_budget(
+        package,
+        workbook_name,
+        prepared,
+        limits,
+        &budget,
+    )
+}
+
+pub(crate) fn store_timeline_caches_prepared_limited_with_budget(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    prepared: &[crate::timeline::raw::PreparedCache],
+    limits: &SourceLimits,
+    budget: &crate::raw::PackageBudget,
 ) -> Result<()> {
     if prepared.is_empty() {
         return Err(invalid("at least one View Cache is required for storage"));
@@ -311,7 +364,6 @@ pub(crate) fn store_timeline_caches_prepared_limited(
     let (core, rel) = source_namespaces(&root, "workbook")?;
     let mut targets = HashSet::new();
     let mut ids = HashSet::new();
-    let mut additions = Vec::with_capacity(prepared.len());
     for cache in prepared {
         let value = &cache.value;
         if !ids.insert(value.relationship_id.clone()) {
@@ -327,13 +379,7 @@ pub(crate) fn store_timeline_caches_prepared_limited(
         if !targets.insert(uri.to_string()) || package.get_part(&uri).is_ok() {
             return Err(invalid(format!("View Cache target '{uri}' already exists")));
         }
-        additions.push((
-            value.relationship_id.clone(),
-            TIMELINE_CACHE_RELATIONSHIP_TYPE.to_owned(),
-            uri.relative_ref(workbook_name.base_uri()),
-        ));
     }
-    let budget = crate::raw::prepare_package_budget(package, workbook_name, &additions, limits)?;
     let added_bytes = prepared.iter().try_fold(0usize, |total, cache| {
         total
             .checked_add(cache.xml.len())
@@ -541,6 +587,18 @@ pub(crate) fn store_worksheet_timelines_limited(
     limits: &SourceLimits,
 ) -> Result<()> {
     preflight_timeline_part_insertion(package, value, limits)?;
+    let (target_uri, worksheet_uri) = crate::timeline::raw::validate_part_identity_fields(
+        &value.worksheet_part_name,
+        &value.relationship_id,
+        &value.part_name,
+        limits,
+    )?;
+    let additions = [(
+        value.relationship_id.clone(),
+        TIMELINES_RELATIONSHIP_TYPE.to_owned(),
+        target_uri.relative_ref(worksheet_uri.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, &worksheet_uri, &additions, limits)?;
     let prepared = crate::timeline::raw::prepare_part(
         crate::timeline::raw::Part {
             worksheet_part_name: value.worksheet_part_name.clone(),
@@ -550,7 +608,13 @@ pub(crate) fn store_worksheet_timelines_limited(
         },
         limits,
     )?;
-    store_worksheet_timelines_prepared_limited(package, workbook_name, &prepared, limits)
+    store_worksheet_timelines_prepared_limited_with_budget(
+        package,
+        workbook_name,
+        &prepared,
+        limits,
+        &budget,
+    )
 }
 
 fn preflight_timeline_part_insertion(
@@ -593,6 +657,29 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
     prepared: &crate::timeline::raw::PreparedPart,
     limits: &SourceLimits,
 ) -> Result<()> {
+    let additions = [(
+        prepared.value.relationship_id.clone(),
+        TIMELINES_RELATIONSHIP_TYPE.to_owned(),
+        prepared.uri.relative_ref(prepared.worksheet.base_uri()),
+    )];
+    let budget =
+        crate::raw::prepare_package_budget(package, &prepared.worksheet, &additions, limits)?;
+    store_worksheet_timelines_prepared_limited_with_budget(
+        package,
+        workbook_name,
+        prepared,
+        limits,
+        &budget,
+    )
+}
+
+pub(crate) fn store_worksheet_timelines_prepared_limited_with_budget(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    prepared: &crate::timeline::raw::PreparedPart,
+    limits: &SourceLimits,
+    budget: &crate::raw::PackageBudget,
+) -> Result<()> {
     let value = &prepared.value;
     validate_views_local(&value.timelines)?;
     let caches = load_timeline_caches_limited(package, workbook_name, limits)?;
@@ -632,12 +719,6 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
     }
     let root = super::codec::parse_document_limited(worksheet.blob(), limits)?;
     let (core, rel) = source_namespaces(&root, "worksheet")?;
-    let additions = [(
-        value.relationship_id.clone(),
-        TIMELINES_RELATIONSHIP_TYPE.to_owned(),
-        target_uri.relative_ref(worksheet_uri.base_uri()),
-    )];
-    let budget = crate::raw::prepare_package_budget(package, &worksheet_uri, &additions, limits)?;
     let fragment = integration_extension(
         core,
         rel,

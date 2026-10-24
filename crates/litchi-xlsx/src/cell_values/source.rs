@@ -191,6 +191,7 @@ enum StagedValueEdit {
 pub struct Edit {
     source: LazySource<MultiSnapshot>,
     selectors: Vec<Selector<'static>>,
+    pending: Option<Vec<SheetChange<'static>>>,
     staged: BTreeMap<usize, Vec<(Address, StagedValueEdit)>>,
     staged_cells: usize,
 }
@@ -240,6 +241,7 @@ impl SourceBackedWorkbook {
         self.check_execution()?;
         let first =
             first.ok_or_else(|| invalid("multi-sheet value edits require one cell edit"))?;
+        let first = own_sheet_change(first)?;
         let mut selectors = Vec::new();
         selectors
             .try_reserve_exact(MAX_SHEET_OWNERS)
@@ -258,6 +260,7 @@ impl SourceBackedWorkbook {
         pending.push(first);
         for request in requests {
             self.check_execution()?;
+            let request = own_sheet_change(request)?;
             if pending.len() >= MAX_BATCH_EDITS {
                 return Err(Error::limit(
                     super::LimitKind::BatchEdits,
@@ -280,8 +283,8 @@ impl SourceBackedWorkbook {
             }
             pending.push(request);
         }
-        let mut transaction = self.edit_cell_values(selectors)?;
-        transaction.apply_batch(pending)?;
+        let mut transaction = Edit::new(self.clone(), selectors);
+        transaction.pending = Some(pending);
         Ok(transaction)
     }
 
@@ -372,6 +375,7 @@ impl Edit {
         Self {
             source: LazySource::new(workbook),
             selectors,
+            pending: None,
             staged: BTreeMap::new(),
             staged_cells: 0,
         }
@@ -392,12 +396,20 @@ impl Edit {
     #[must_use]
     pub const fn len(&self) -> usize {
         self.staged_cells
+            + match &self.pending {
+                Some(pending) => pending.len(),
+                None => 0,
+            }
     }
 
     /// Whether no cell selectors have been staged.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.staged_cells == 0
+            && match &self.pending {
+                Some(pending) => pending.is_empty(),
+                None => true,
+            }
     }
 
     /// Number of selected worksheet owners.
@@ -461,6 +473,23 @@ impl Edit {
 
     /// Stage a bounded cross-worksheet batch atomically.
     pub fn apply_batch<'a, I>(&mut self, edits: I) -> Result<()>
+    where
+        I: IntoIterator<Item = SheetChange<'a>>,
+    {
+        self.flush_pending()?;
+        self.apply_batch_inner(edits)
+    }
+
+    fn flush_pending(&mut self) -> Result<()> {
+        let Some(pending) = self.pending.clone() else {
+            return Ok(());
+        };
+        self.apply_batch_inner(pending)?;
+        self.pending = None;
+        Ok(())
+    }
+
+    fn apply_batch_inner<'a, I>(&mut self, edits: I) -> Result<()>
     where
         I: IntoIterator<Item = SheetChange<'a>>,
     {
@@ -634,13 +663,15 @@ impl Edit {
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
+        self.pending = None;
         self.staged.clear();
         self.staged_cells = 0;
     }
 
     /// Validate and rewrite the staged changes and return the committed
     /// workbook, the exact patch and the diagnostics.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.flush_pending()?;
         let before = self.resolve_before()?.clone();
         before.check_execution()?;
         let mut expected_actions = 0usize;
@@ -749,6 +780,13 @@ impl Edit {
             Record::new(before, after, changed_cells, touched_worksheets),
         )
     }
+}
+
+fn own_sheet_change(request: SheetChange<'_>) -> Result<SheetChange<'static>> {
+    Ok(SheetChange {
+        selector: own_selector(request.selector)?,
+        edit: request.edit,
+    })
 }
 
 fn effective_action_count(

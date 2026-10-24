@@ -112,16 +112,19 @@ impl Edit {
 
     /// Find a cache by its case-insensitive semantic name.
     pub fn cache(&self, name: &str) -> Result<Option<Cache>> {
-        crate::slicer_cache::crud::find_slicer_cache(self.staged.opc(), name)
+        crate::slicer_cache::crud::find_slicer_cache(self.staged.opc(), name, &self.limits)
     }
 
     /// Find a worksheet slicer by its case-insensitive semantic name.
     pub fn view(&self, worksheet: &PackURI, name: &str) -> Result<Option<Slicer>> {
-        crate::slicer_cache::crud::find_slicer(self.staged.opc(), worksheet, name)
+        crate::slicer_cache::crud::find_slicer(self.staged.opc(), worksheet, name, &self.limits)
     }
 
     pub fn add_cache(&mut self, definition: Definition) -> Result<Cache> {
-        self.apply(|candidate| crate::slicer_cache::crud::add_slicer_cache(candidate, definition))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::add_slicer_cache(candidate, definition, &limits)
+        })
     }
 
     /// Insert a workbook-owned Slicer Cache with its caller-selected native
@@ -166,30 +169,39 @@ impl Edit {
     where
         F: FnOnce(&mut Definition),
     {
-        self.apply(|candidate| {
-            crate::slicer_cache::crud::update_slicer_cache(candidate, name, update)
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::update_slicer_cache(candidate, name, update, &limits)
         })
     }
 
     pub fn replace_cache(&mut self, name: &str, replacement: Definition) -> Result<bool> {
-        self.apply(|candidate| {
-            crate::slicer_cache::crud::replace_slicer_cache(candidate, name, replacement)
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::replace_slicer_cache(candidate, name, replacement, &limits)
         })
     }
 
     pub fn reorder_caches(&mut self, names: &[String]) -> Result<Vec<Cache>> {
         let names = names.to_vec();
-        self.apply(|candidate| crate::slicer_cache::crud::reorder_slicer_caches(candidate, &names))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::reorder_slicer_caches(candidate, &names, &limits)
+        })
     }
 
     pub fn remove_cache(&mut self, name: &str) -> Result<bool> {
-        self.apply(|candidate| crate::slicer_cache::crud::remove_slicer_cache(candidate, name))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::remove_slicer_cache(candidate, name, &limits)
+        })
     }
 
     pub fn add_view(&mut self, worksheet: &PackURI, view: Slicer) -> Result<Part> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::add_slicer(candidate, &worksheet, view)
+            crate::slicer_cache::crud::add_slicer(candidate, &worksheet, view, &limits)
         })
     }
 
@@ -206,10 +218,18 @@ impl Edit {
             &value.relationship_id,
             &uri,
         )?;
+        let additions = [(
+            value.relationship_id.clone(),
+            crate::slicer_cache::views::SLICERS_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(worksheet.base_uri()),
+        )];
+        // Admit the existing package before serializing the caller's value.
+        let budget =
+            crate::raw::prepare_package_budget(self.staged.opc(), &worksheet, &additions, &limits)?;
         let prepared = raw::prepare_part(value, worksheet.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::views::store_slicer_part_prepared_limited(
-                candidate, &worksheet, &prepared, &limits,
+            crate::slicer_cache::views::store_slicer_part_prepared_limited_with_budget(
+                candidate, &worksheet, &prepared, &limits, &budget,
             )
         })
     }
@@ -219,8 +239,9 @@ impl Edit {
         F: FnOnce(&mut Slicer),
     {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::update_slicer(candidate, &worksheet, name, update)
+            crate::slicer_cache::crud::update_slicer(candidate, &worksheet, name, update, &limits)
         })
     }
 
@@ -231,23 +252,32 @@ impl Edit {
         replacement: Slicer,
     ) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::replace_slicer(candidate, &worksheet, name, replacement)
+            crate::slicer_cache::crud::replace_slicer(
+                candidate,
+                &worksheet,
+                name,
+                replacement,
+                &limits,
+            )
         })
     }
 
     pub fn reorder_views(&mut self, worksheet: &PackURI, names: &[String]) -> Result<Vec<Slicer>> {
         let worksheet = worksheet.clone();
         let names = names.to_vec();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::reorder_slicers(candidate, &worksheet, &names)
+            crate::slicer_cache::crud::reorder_slicers(candidate, &worksheet, &names, &limits)
         })
     }
 
     pub fn remove_view(&mut self, worksheet: &PackURI, name: &str) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::remove_slicer(candidate, &worksheet, name)
+            crate::slicer_cache::crud::remove_slicer(candidate, &worksheet, name, &limits)
         })
     }
 
