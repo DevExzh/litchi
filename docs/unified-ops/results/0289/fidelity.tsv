@@ -1019,3 +1019,4 @@ unified-ops/0294/parts.rtf	rtf	exact		refused	/body/p[1] text: unsupported_capab
 unified-ops/0294/shapes.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 456779 -> 456773 bytes, first difference at 328815	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains unmodelled native content with refer...
 unified-ops/0294/table.xlsb	xlsb	exact		byte-exact	/sheet[1] name	byte-exact	note add+remove
 unified-ops/0294/video.ppt	ppt	exact		none		-	
+unified-ops/ppt-lazy-native-fixture.ppt	ppt	exact		none		-	
