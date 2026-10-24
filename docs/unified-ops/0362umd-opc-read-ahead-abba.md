@@ -156,13 +156,34 @@ Capture the source, environment and command receipts before the build starts;
 these are inputs to the manifest rather than prose reconstructed after a run:
 
 ```sh
+BASE_HEAD=$(git -C "$BASE_TREE" rev-parse HEAD)
+CAND_HEAD=$(git -C "$CAND_TREE" rev-parse HEAD)
+test "$BASE_HEAD" = 410bd99f00fdfb4161a94215710340f16ea536bb || {
+  echo "baseline HEAD is not the frozen pre-repair revision: $BASE_HEAD" >&2
+  exit 1
+}
+test "$CAND_HEAD" = 49c25ef67f62a8bb943e7c6a0bf464e49ae87d07 || {
+  echo "candidate HEAD is not the frozen reviewed merge: $CAND_HEAD" >&2
+  exit 1
+}
+test -z "$(git -C "$BASE_TREE" status --porcelain=v1)" || {
+  echo "baseline checkout is dirty" >&2
+  exit 1
+}
+test -z "$(git -C "$CAND_TREE" status --porcelain=v1)" || {
+  echo "candidate checkout is dirty" >&2
+  exit 1
+}
+
 for pair in "baseline:$BASE_TREE" "candidate:$CAND_TREE"; do
   name=${pair%%:*}
   tree=${pair#*:}
+  status=$(git -C "$tree" status --porcelain=v1)
+  head=$(git -C "$tree" rev-parse HEAD)
   {
     printf 'endpoint=%s\n' "$name"
-    git -C "$tree" status --porcelain=v1
-    git -C "$tree" rev-parse HEAD
+    printf 'status_begin\n%sstatus_end\n' "$status"
+    printf 'head=%s\n' "$head"
     sha256sum "$tree/tools/perf-baseline/Cargo.toml" \
       "$tree/tools/perf-baseline/Cargo.lock" \
       "$tree/tools/perf-baseline/src/docx_managed_read_ahead.rs" \
@@ -432,9 +453,13 @@ oracle, not just elapsed time. In particular:
 2. `provider.max_range_bytes == 65536`, `provider.delay_us == 0`, and
    `provider.transfer_bytes_per_second == null` for all eight reports.
 3. Forward-start reports have `policy.name == "forward_start"`, configured
-   window 4096, enabled diagnostics and the expected physical trace. Exact
-   reports have `policy.name == "exact"`, no configured window, no source-read
-   diagnostics and the expected exact physical trace.
+   window 4096, and the full §2 forward oracle: retained window 4096, 19
+   logical requests, 16 hits, 3 misses, 3 fills, 3,966 requested logical
+   bytes, 5,445 returned physical bytes, and the three physical ranges with
+   3 calls and 5,445 requested/returned bytes. Exact reports have
+   `policy.name == "exact"`, no configured window, no source-read diagnostics,
+   and the full §2 nineteen-range, 19-call, 3,966-byte physical oracle. These
+   checks apply to every row of both endpoints; aggregates alone do not pass.
 4. Every sample passes text, source-version, cache-load, physical-returned
    bytes, and post-drop budget/object checks already enforced by the Rust
    driver. A failed row rejects its entire leg; no row may be dropped.
@@ -443,6 +468,25 @@ oracle, not just elapsed time. In particular:
    profile/flags, CPU lock and environment must match across endpoints except
    for the explicitly recorded source revision, tree, target directory and
    binary path/digest.
+6. The verifier parses `baseline-source.txt` and `candidate-source.txt`,
+   requires the `status_begin`/`status_end` region to be empty, and requires
+   the recorded `head=` value to equal the §1 A/B revision. It recomputes the
+   five input hashes, binary sizes/digests, `input-receipts.sha256`, build-log
+   and ABBA-log digests, and target-byte values; every result must match the
+   manifest and every target must remain below 20,000,000,000 bytes. It also
+   parses `build.argv` and `environment.txt`, requiring the exact endpoint
+   manifest paths/target directories and the recorded offline, one-job,
+   one-thread, no-incremental, debug/profile, 20G-memory and external-TMPDIR
+   settings, with `LITCHI_CAPPED` and `LITCHI_BLESS` absent. A receipt mismatch
+   rejects the lane before its timing ratio is considered.
+7. The verifier parses the before, throughout and after host receipts rather
+   than trusting the manifest's `quiet` boolean. It rejects missing or
+   truncated monitor coverage, any unrelated Cargo/rustc/rustdoc,
+   perf/valgrind/heaptrack or second benchmark process, any other CPU-bound
+   process on the selected CPU, or a throughout one-minute load maximum more
+   than one above the before sample. The lock path, selected CPU and allowed
+   process ancestry must agree with the manifest. A host receipt failure
+   rejects the lane and requires a quiet rerun.
 
 The summary reports p50, p95 and p99 elapsed nanoseconds for each leg, then
 compares `median(b1,b2)` with `median(a1,a2)` separately for forward-start and
