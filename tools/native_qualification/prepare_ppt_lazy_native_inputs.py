@@ -134,6 +134,65 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def _git_blob_identity(root: Path, relative: Path) -> dict[str, Any]:
+    result = subprocess.run(
+        ["git", "-C", str(root), "show", f"HEAD:{relative}"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        raise PreparationError(
+            f"baseline tracked fixture {relative} cannot be read from HEAD: "
+            f"{result.stderr.decode(errors='replace').strip()}"
+        )
+    return {
+        "path": str(root / relative),
+        "bytes": len(result.stdout),
+        "sha256": hashlib.sha256(result.stdout).hexdigest(),
+    }
+
+
+def _materialize_tracked_baseline_fixture(
+    root: Path,
+    relative: Path,
+    expected_bytes: int,
+    expected_sha256: str,
+) -> bool:
+    """Restore one reviewed tracked blob omitted by a sparse external checkout."""
+
+    destination = _resolve(root / relative)
+    records = _git(root, "ls-files", "-v", "-z", "--", str(relative))
+    tracked = records in (f"H {relative}\0", f"S {relative}\0")
+    if not tracked:
+        return False
+    baseline_identity = _git_blob_identity(root, relative)
+    if baseline_identity["bytes"] != expected_bytes or baseline_identity["sha256"] != expected_sha256:
+        raise PreparationError(f"baseline tracked fixture differs from the reviewed closure: {relative}")
+    if destination.exists() or destination.is_symlink():
+        if destination.is_symlink() or not destination.is_file():
+            raise PreparationError(f"baseline tracked fixture is not a regular file: {destination}")
+        actual = _identity(destination)
+        if actual["bytes"] != expected_bytes or actual["sha256"] != expected_sha256:
+            raise PreparationError(f"baseline tracked fixture bytes differ: {relative}")
+        return False
+    result = subprocess.run(
+        ["git", "-C", str(root), "checkout-index", "--force", "--", str(relative)],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode:
+        raise PreparationError(
+            f"could not materialize baseline tracked fixture {relative}: {result.stderr.strip()}"
+        )
+    actual = _identity(destination)
+    if actual["bytes"] != expected_bytes or actual["sha256"] != expected_sha256:
+        raise PreparationError(f"materialized baseline fixture differs: {relative}")
+    return True
+
+
 def _source_state(root: Path) -> dict[str, Any]:
     root = _resolve(root, must_exist=True)
     top = _resolve(Path(_git(root, "rev-parse", "--show-toplevel")))
@@ -255,6 +314,16 @@ def prepare(
     if output.exists() or _under(output, baseline_root) or _under(output, candidate_root):
         raise PreparationError("preparation receipt must be a new file outside both worktrees")
 
+    # A detached baseline checkout may have a sparse/omitted worktree file for
+    # a blob that is nevertheless part of its pinned Git tree.  Materialize
+    # only the reviewed compile fixtures before taking the clean baseline
+    # snapshot; checkout-index restores the exact pinned blob and therefore
+    # leaves the production tree unchanged.
+    for relative, expected_bytes, expected_sha256 in COMPILE_FIXTURES:
+        _materialize_tracked_baseline_fixture(
+            baseline_root, relative, expected_bytes, expected_sha256
+        )
+
     baseline_before = _source_state(baseline_root)
     candidate = _source_state(candidate_root)
     if baseline_before["ref"] != BASELINE_REF or baseline_before["tree"] != BASELINE_TREE:
@@ -287,13 +356,22 @@ def prepare(
         if identity["bytes"] != expected_bytes or identity["sha256"] != expected_sha256:
             raise PreparationError(f"candidate reviewed fixture differs: {relative}")
         destination = baseline_root / relative
-        overlay = _copy_new(source, destination, f"baseline reviewed fixture {relative}")
+        if destination.exists() or destination.is_symlink():
+            destination_identity = _identity(destination)
+            if destination_identity["bytes"] != expected_bytes or destination_identity["sha256"] != expected_sha256:
+                raise PreparationError(f"baseline reviewed fixture differs: {relative}")
+            overlay = {
+                "source": identity,
+                "destination": destination_identity,
+            }
+        else:
+            overlay = _copy_new(source, destination, f"baseline reviewed fixture {relative}")
         key = str(relative)
         fixture_overlays[key] = overlay
         fixture_identities[key] = identity
 
     baseline_after = _source_state(baseline_root)
-    expected_status = sorted(
+    expected_overlay_paths = sorted(
         [str(path) for path in PROBE_PATHS]
         + [str(REGISTRATION_PATH)]
         + [str(path) for path, _, _ in _reviewed_fixture_specs()]
@@ -328,6 +406,18 @@ def prepare(
             baseline_after["status"].encode()
         ).hexdigest()
     observed_status = sorted(set(observed_status))
+    expected_status = sorted(
+        {
+            *[str(path) for path in PROBE_PATHS],
+            str(REGISTRATION_PATH),
+            str(FIXTURE_PATH),
+            *[
+                str(path)
+                for path, _, _ in COMPILE_FIXTURES
+                if str(path) in observed_status
+            ],
+        }
+    )
     if observed_status != expected_status:
         raise PreparationError(f"baseline overlay changed unexpected paths: {observed_status!r}")
     if baseline_after["tree"] != baseline_before["tree"]:
@@ -344,7 +434,7 @@ def prepare(
             "tree": baseline_before["tree"],
             "production_tree_sha256": _production_tree_sha256(baseline_root),
             "lock": baseline_lock_identity,
-            "overlay_paths": expected_status,
+            "overlay_paths": expected_overlay_paths,
             "probes": overlays,
             "registration": registration,
             "fixture": fixture_overlays[str(FIXTURE_PATH)],
