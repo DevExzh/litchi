@@ -569,10 +569,12 @@ fn a_shared_string_cell_cannot_be_mutated_or_removed() {
         Change::remove(Address::from_a1("A1").expect("A1")),
     ] {
         let error = match editor(&source, &shape).and_then(|editor| {
-            editor.edit_many([SheetChange {
-                selector: "Sheet1".into(),
-                edit,
-            }])
+            editor
+                .edit_many([SheetChange {
+                    selector: "Sheet1".into(),
+                    edit,
+                }])
+                .and_then(|edit| edit.commit().map(|_| ()))
         }) {
             Err(error) => error,
             Ok(_) => panic!("a shared-string cell mutation must be refused"),
