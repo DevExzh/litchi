@@ -1,0 +1,83 @@
+{
+  "schema": "litchi.drawingml.raw-qualification.manifest.v1",
+  "plan_sha256": "d671c2dbd793d6b1b68c0aae25def384d6ceb44169be93b7daf848d6f13044f9",
+  "candidate_root": "${DRAWINGML_CANDIDATE_ROOT}",
+  "candidate_revision": "${DRAWINGML_CANDIDATE_REVISION}",
+  "output_dir": "${DRAWINGML_OUTPUT_DIR}",
+  "target_root": "${DRAWINGML_TARGET_ROOT}",
+  "fixture_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+  "fixture_bytes": 2407,
+  "profiles": [
+    {
+      "id": "drawingml-chart-raw",
+      "baseline_root": "${DRAWINGML_CHART_BASELINE_ROOT}",
+      "baseline_revision": "${DRAWINGML_CHART_BASELINE_REVISION}",
+      "perf_lock_sha256": "${DRAWINGML_CHART_PERF_LOCK_SHA256}",
+      "preparation_receipt": "${DRAWINGML_CHART_PREPARATION}",
+      "approved_baseline_revisions": ["2d330c3305b79da79cd924bf371d2941b7f14cc4"],
+      "source_fence": "owner packet f40464c5 / pre-change parent 2d330c3",
+      "record": "0362dvi §1 drawingml-chart-raw"
+    },
+    {
+      "id": "drawingml-diagram-raw",
+      "baseline_root": "${DRAWINGML_DIAGRAM_BASELINE_ROOT}",
+      "baseline_revision": "${DRAWINGML_DIAGRAM_BASELINE_REVISION}",
+      "perf_lock_sha256": "${DRAWINGML_DIAGRAM_PERF_LOCK_SHA256}",
+      "preparation_receipt": "${DRAWINGML_DIAGRAM_PREPARATION}",
+      "approved_baseline_revisions": ["2d330c3305b79da79cd924bf371d2941b7f14cc4"],
+      "source_fence": "owner packet f40464c5 / pre-change parent 2d330c3",
+      "record": "0362dvi §2 drawingml-diagram-raw"
+    },
+    {
+      "id": "drawingml-text-media-raw",
+      "baseline_root": "${DRAWINGML_TEXT_MEDIA_BASELINE_ROOT}",
+      "baseline_revision": "${DRAWINGML_TEXT_MEDIA_BASELINE_REVISION}",
+      "perf_lock_sha256": "${DRAWINGML_TEXT_MEDIA_PERF_LOCK_SHA256}",
+      "preparation_receipt": "${DRAWINGML_TEXT_MEDIA_PREPARATION}",
+      "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
+      "source_fence": "text/media raw 5771380 / d2c420c; pre-change parent 2f7db7e",
+      "record": "0362dvi §3 drawingml-text-media-raw"
+    },
+    {
+      "id": "drawingml-theme-ink",
+      "baseline_root": "${DRAWINGML_THEME_INK_BASELINE_ROOT}",
+      "baseline_revision": "${DRAWINGML_THEME_INK_BASELINE_REVISION}",
+      "perf_lock_sha256": "${DRAWINGML_THEME_INK_PERF_LOCK_SHA256}",
+      "preparation_receipt": "${DRAWINGML_THEME_INK_PREPARATION}",
+      "approved_baseline_revisions": ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
+      "route_baselines": {
+        "theme": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+        "ink": [
+          "9034328f32657bec6b144f607bfe71e5caf7d1f3",
+          "8e0d6a3e93db18b447f1a56a71608eae171fbb83",
+          "3b0ee480b798f3a65c1296fb03e13eaf2f1c3a34"
+        ]
+      },
+      "source_fence": "theme raw 20c7dd4 / parent 11728db; Ink/action closure 9e35acd, f5514ea, 9566398",
+      "record": "0362dvi §4 drawingml-theme-ink"
+    },
+    {
+      "id": "drawingml-geometry-color-formatcode2-transform",
+      "baseline_root": "${DRAWINGML_GEOMETRY_BASELINE_ROOT}",
+      "baseline_revision": "${DRAWINGML_GEOMETRY_BASELINE_REVISION}",
+      "perf_lock_sha256": "${DRAWINGML_GEOMETRY_PERF_LOCK_SHA256}",
+      "preparation_receipt": "${DRAWINGML_GEOMETRY_PREPARATION}",
+      "approved_baseline_revisions": ["2d330c3305b79da79cd924bf371d2941b7f14cc4"],
+      "source_fence": "owner packet f40464c5 / pre-change parent 2d330c3",
+      "record": "0362dvi §5 drawingml-geometry-color-formatcode2-transform"
+    }
+  ],
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmups": 3,
+    "samples_per_leg": 20,
+    "blocks": 5,
+    "minimum_leg_ms": 150,
+    "target_leg_ms": 500,
+    "fresh_process_per_leg": true,
+    "normal_and_allocator_are_separate": true,
+    "fidelity_outside_timing": true
+  },
+  "claim_scope": "paired raw DrawingML protocol only; current-source absolute profiles are controls, not qualification",
+  "status": "adapter_pending_until_final_source_freeze"
+}

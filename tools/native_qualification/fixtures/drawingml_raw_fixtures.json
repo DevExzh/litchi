@@ -1,0 +1,47 @@
+{
+  "schema": "litchi.drawingml.raw-fixtures.v1",
+  "license": "Repository-authored protocol fixtures; no upstream checkout is referenced.",
+  "purpose": "Small deterministic mutation seeds. Near/at/over-limit inputs are expanded by the frozen lane adapter, never committed as large evidence.",
+  "lanes": {
+    "drawingml-chart-raw": {
+      "root": "<c:chartSpace xmlns:c=\"http://schemas.openxmlformats.org/drawingml/2006/chart\"><c:plotArea/></c:chartSpace>",
+      "mutation": "replace the formatcode2 lexical value with 0.00",
+      "malformed": "<c:chartSpace><c:plotArea>"
+    },
+    "drawingml-diagram-raw": {
+      "root": "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"><dgm:ptLst><dgm:pt modelId=\"1\"/></dgm:ptLst></dgm:dataModel>",
+      "mutation": "append one deterministic point and its relationship edge",
+      "malformed": "<dgm:dataModel><dgm:ptLst>"
+    },
+    "drawingml-text-media-raw": {
+      "root": "<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>seed</a:t></a:r></a:p></a:txBody>",
+      "mutation": "replace the text leaf with the deterministic mutation marker",
+      "malformed": "<a:txBody><a:p><a:r><a:t>"
+    },
+    "drawingml-theme-ink": {
+      "root": "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"seed\"><a:themeElements/></a:theme>",
+      "mutation": "add the deterministic family/InkML policy marker without changing unrelated bytes",
+      "malformed": "<a:theme><a:themeElements>"
+    },
+    "drawingml-geometry-color-formatcode2-transform": {
+      "root": "<a:custGeom xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><a:avLst/><a:gdLst/><a:pathLst><a:path w=\"1\" h=\"1\"><a:moveTo><a:pt x=\"0\" y=\"0\"/></a:moveTo></a:path></a:pathLst></a:custGeom>",
+      "mutation": "change one coordinate/transform scalar while retaining all source spans",
+      "malformed": "<a:custGeom><a:pathLst><a:path>"
+    }
+  },
+  "size_classes": [
+    "small",
+    "near_limit",
+    "at_limit",
+    "over_limit",
+    "malformed"
+  ],
+  "required_fidelity": [
+    "source_preserving_noop_bytes",
+    "semantic_changed_output_readback",
+    "exact_forward_inverse_restoration",
+    "typed_limit_kind_or_invalid_limit",
+    "typed_patch_conflict_for_stale_source",
+    "zero_sink_writes_before_rejected_preflight"
+  ]
+}

@@ -143,3 +143,25 @@ JSON under its historical name, and run the real lane `analyze.py` as a
 fail-closed validator producing `summary.json`; W5's adapter preserves the
 analyzer's full parsed result in its `analysis` field.  A nonempty stdout
 stream alone is never accepted.
+
+## DrawingML raw protocol
+
+`drawingml_raw_paired_runner.py` and `manifests/drawingml-raw.json` add five
+source-fenced profiles: chart, diagram, text/media, theme/InkML, and
+geometry/color/formatcode2/transform. The profiles are materialized into this
+generic runner, so they retain the same source/lock/probe identity, Cargo
+path, target/address-space, process-quietness, fresh-output, and ABBA guards.
+Run `prepare_drawingml_raw_inputs.py` once for each historical parent before
+the build phase; it copies only the reviewed adapter paths and preserves the
+52ed historical workspace lock (plus the separately hashed perf-baseline
+lock).
+
+The checked-in probe is an explicit adapter boundary while the five API
+branches converge. It emits `unavailable` rows and no elapsed values until a
+final-source adapter is supplied. `drawingml_raw_validator.py` rejects a
+short leg, altered sample shape, missing source or fixture identity, an
+allocator elapsed claim, or a qualified row without outside-clock fidelity
+and typed-refusal receipts. The combined theme/InkML profile is fail-closed
+on the exact theme parent; its separately listed Ink/action parents cannot be
+selected as an ambiguous baseline. It never promotes an absolute
+current-source profile into a candidate-versus-baseline claim.
