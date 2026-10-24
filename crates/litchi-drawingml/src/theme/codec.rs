@@ -1292,7 +1292,10 @@ fn replacement_root_namespace_range(
             .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                let prefix = element.name().prefix();
+                let prefix = element
+                    .name()
+                    .prefix()
+                    .map(|prefix| prefix.into_inner().as_bytes());
                 let raw = xml
                     .get(start..end)
                     .ok_or_else(|| invalid("theme replacement root range is invalid"))?;
