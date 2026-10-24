@@ -1580,6 +1580,11 @@
           "name": "write_to_stream_with_expected_artifact",
           "scope": "litchi_opc",
           "replacement": "use write_to(impl Write) (ADR 0034 \u00a74, record 0343)"
+        },
+        {
+          "name": "ArtifactStreamPublication",
+          "scope": "litchi_opc",
+          "replacement": "use ArtifactStreamReport (record 0362ul19)"
         }
       ],
       "families": []
@@ -1733,6 +1738,11 @@
           "name": "write_to_stream_with_expected_artifact",
           "scope": "litchi_opc",
           "replacement": "use write_to(impl Write) (ADR 0034 \u00a74, record 0343)"
+        },
+        {
+          "name": "ArtifactStreamPublication",
+          "scope": "litchi_opc",
+          "replacement": "use ArtifactStreamReport (record 0362ul19)"
         }
       ],
       "families": []
@@ -13294,32 +13304,32 @@
         },
         {
           "name": "new_with_cache_limits",
-          "scope": "soapberry_zip::LazyArchiveReader",
+          "scope": "soapberry_zip::office::LazyArchiveReader",
           "replacement": "use LazyArchiveReader::new(data, archive_limits, cache_limits) (record 0362zaea)"
         },
         {
           "name": "new_with_active_flight_limits",
-          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use LazyArchiveCacheLimits::new(max_bytes, max_entries, max_active_flights, max_flight_key_bytes) (record 0362zaea)"
         },
         {
           "name": "new_with_flight_limits",
-          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use LazyArchiveCacheLimits::new(max_bytes, max_entries, max_active_flights, max_flight_key_bytes) (record 0362zaea)"
         },
         {
           "name": "with_active_flight_limits",
-          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use LazyArchiveCacheLimits::active_flight_limits (record 0362zaea)"
         },
         {
           "name": "with_flight_limits",
-          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use LazyArchiveCacheLimits::active_flight_limits (record 0362zaea)"
         },
         {
           "name": "max_active_key_bytes",
-          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "scope": "soapberry_zip::office::LazyArchiveCacheLimits",
           "replacement": "use max_flight_key_bytes_value (record 0362zaea)"
         }
       ],

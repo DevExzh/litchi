@@ -13,7 +13,7 @@ use std::sync::{Arc, OnceLock};
 
 use litchi_core::{ExecutionContext, OwnedSource};
 use litchi_opc::{
-    ArtifactStream, ArtifactStreamPolicy, ArtifactStreamPublication, ArtifactStreamTarget,
+    ArtifactStream, ArtifactStreamPolicy, ArtifactStreamReport, ArtifactStreamTarget,
     SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits, SourceReadPolicy,
 };
 
@@ -35,9 +35,8 @@ pub(crate) type Publish =
 /// output still owns its caller-provided `Write` sink; cross-owner artifact
 /// streams must instead select one native OPC publication method and return
 /// its target-bound proof.
-pub(crate) type StreamPublish = dyn for<'a> Fn(&mut ArtifactStreamTarget<'a>) -> Result<ArtifactStreamPublication>
-    + Send
-    + Sync;
+pub(crate) type StreamPublish =
+    dyn for<'a> Fn(&mut ArtifactStreamTarget<'a>) -> Result<ArtifactStreamReport> + Send + Sync;
 
 /// The pending output of a committed package.
 pub(crate) struct Deferred {
@@ -116,7 +115,7 @@ impl Deferred {
     pub(crate) fn stream_to(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         let publication = (self.stream_publish)(target)?;
         let _ = self.fingerprint.set((
             publication.written(),
@@ -134,9 +133,7 @@ impl Package {
         + Send
         + Sync
         + 'static,
-        stream_publish: impl for<'a> Fn(
-            &mut ArtifactStreamTarget<'a>,
-        ) -> Result<ArtifactStreamPublication>
+        stream_publish: impl for<'a> Fn(&mut ArtifactStreamTarget<'a>) -> Result<ArtifactStreamReport>
         + Send
         + Sync
         + 'static,
@@ -186,7 +183,7 @@ impl ArtifactStream for Package {
     fn stream_to(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+    ) -> std::result::Result<ArtifactStreamReport, Self::Error> {
         match (&self.effective, &self.deferred) {
             (Some(topology), _) => target.publish_topology(topology).map_err(Error::Opc),
             (None, Some(deferred)) => deferred.stream_to(target),

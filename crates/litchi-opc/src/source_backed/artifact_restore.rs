@@ -608,20 +608,20 @@ pub trait ArtifactStreamGuard {
     fn check(&self) -> std::result::Result<(), Self::Error>;
 }
 
-/// The exact result of one mediated artifact publication.
+/// The exact report from one mediated artifact stream.
 ///
 /// The producer cannot construct this value or write to the target directly.
 /// It is minted only after one of the native OPC publication methods has
 /// completed its recipient census and emitted one complete artifact. The
 /// fingerprint is over the bytes accepted by the target sink.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ArtifactStreamPublication {
+pub struct ArtifactStreamReport {
     written: u64,
     fingerprint: SourceArtifactFingerprint,
     target_token: u64,
 }
 
-impl ArtifactStreamPublication {
+impl ArtifactStreamReport {
     /// Return the exact number of bytes accepted by the publication target.
     #[must_use]
     pub const fn written(self) -> u64 {
@@ -652,7 +652,7 @@ pub struct ArtifactStreamTarget<'a> {
     invalidated: bool,
     written: u64,
     hasher: Sha256,
-    publication: Option<ArtifactStreamPublication>,
+    publication: Option<ArtifactStreamReport>,
 }
 
 impl<'a> ArtifactStreamTarget<'a> {
@@ -669,7 +669,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         }
     }
 
-    fn publish<F>(&mut self, operation: F) -> Result<ArtifactStreamPublication>
+    fn publish<F>(&mut self, operation: F) -> Result<ArtifactStreamReport>
     where
         F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
     {
@@ -683,7 +683,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         let policy = self.policy;
         let mut sink = ArtifactTargetSink { target: self };
         operation(&mut sink, policy)?;
-        let publication = ArtifactStreamPublication {
+        let publication = ArtifactStreamReport {
             written: sink.target.written,
             fingerprint: SourceArtifactFingerprint::from_sha256(
                 sink.target.hasher.clone().finalize().into(),
@@ -698,7 +698,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         guard: &G,
         operation: F,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>>
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>>
     where
         G: ArtifactStreamGuard,
         F: FnOnce(&mut dyn Write, &ArtifactStreamPolicy<'a>) -> Result<()>,
@@ -762,8 +762,8 @@ impl<'a> ArtifactStreamTarget<'a> {
         }
     }
 
-    fn mint_publication(&mut self) -> ArtifactStreamPublication {
-        let publication = ArtifactStreamPublication {
+    fn mint_publication(&mut self) -> ArtifactStreamReport {
+        let publication = ArtifactStreamReport {
             written: self.written,
             fingerprint: self.fingerprint(),
             target_token: self.token,
@@ -776,7 +776,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     pub fn publish_source_artifact(
         &mut self,
         artifact: &SourceArtifact,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| artifact.write_to_with_policy(writer, policy))
     }
 
@@ -786,7 +786,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         artifact: &SourceArtifact,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             artifact.write_to_with_policy(writer, policy)
         })
@@ -796,7 +796,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     pub fn publish_source_package(
         &mut self,
         package: SourceBackedPackage,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| package.write_exact_source_with_policy(writer, policy))
     }
 
@@ -805,7 +805,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         package: SourceBackedPackage,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             package.write_exact_source_with_policy(writer, policy)
         })
@@ -815,7 +815,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     pub fn publish_topology(
         &mut self,
         topology: &super::PreparedTopology,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| topology.publish_to_stream_with_policy(writer, policy))
     }
 
@@ -824,7 +824,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         topology: &super::PreparedTopology,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             topology.publish_to_stream_with_policy(writer, policy)
         })
@@ -840,7 +840,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         package: SourceBackedPackage,
         plan: super::SourceTopologyPlan,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| {
             package.write_topology_to_stream_with_policy(writer, plan, policy)
         })
@@ -857,7 +857,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         package: SourceBackedPackage,
         plan: super::SourceTopologyPlan,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             package.write_topology_to_stream_with_policy(writer, plan, policy)
         })
@@ -867,7 +867,7 @@ impl<'a> ArtifactStreamTarget<'a> {
     pub fn publish_splice(
         &mut self,
         plan: &super::SourcePartSplicePlan<'_>,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| {
             plan.duplicate()
                 .write_to_with_policy(writer, policy)
@@ -885,7 +885,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         plan: &super::SourcePartSplicePlan<'_>,
         expected_len: u64,
         expected_sha256: SourceArtifactFingerprint,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         self.publish(|writer, policy| {
             plan.duplicate()
                 .write_to_with_expected_artifact_with_policy(
@@ -903,7 +903,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         &mut self,
         plan: &super::SourcePartSplicePlan<'_>,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             plan.duplicate()
                 .write_to_with_policy(writer, policy)
@@ -918,7 +918,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         expected_len: u64,
         expected_sha256: SourceArtifactFingerprint,
         guard: &G,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<G::Error>> {
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<G::Error>> {
         self.publish_with_guard(guard, |writer, policy| {
             plan.duplicate()
                 .write_to_with_expected_artifact_with_policy(
@@ -943,7 +943,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         self.writer.flush()
     }
 
-    fn validate_publication(&self, publication: ArtifactStreamPublication) -> Result<()> {
+    fn validate_publication(&self, publication: ArtifactStreamReport) -> Result<()> {
         if self.invalidated
             || self.publication != Some(publication)
             || publication.target_token != self.token
@@ -970,7 +970,7 @@ impl<'a> ArtifactStreamTarget<'a> {
         original: &O,
         proof: SourceArtifactRestoreProof,
         max_output_bytes: u64,
-    ) -> std::result::Result<ArtifactStreamPublication, ArtifactStreamError<O::Error>>
+    ) -> std::result::Result<ArtifactStreamReport, ArtifactStreamError<O::Error>>
     where
         C: ArtifactStream + ?Sized,
         O: ArtifactStream + ?Sized,
@@ -1091,7 +1091,7 @@ pub trait ArtifactStream {
     fn stream_to(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> std::result::Result<ArtifactStreamPublication, Self::Error>;
+    ) -> std::result::Result<ArtifactStreamReport, Self::Error>;
 }
 
 impl<'recipient> ArtifactStreamPolicy<'recipient> {
@@ -2681,7 +2681,7 @@ impl ArtifactStream for SourceArtifact {
     fn stream_to(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+    ) -> std::result::Result<ArtifactStreamReport, Self::Error> {
         target.publish_source_artifact(self)
     }
 }
@@ -3436,7 +3436,7 @@ mod tests {
         fn stream_to(
             &self,
             target: &mut ArtifactStreamTarget<'_>,
-        ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+        ) -> std::result::Result<ArtifactStreamReport, Self::Error> {
             if self.calls.fetch_add(1, AtomicOrdering::SeqCst) == 0 {
                 target.publish_source_artifact(&self.first)
             } else {

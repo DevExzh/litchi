@@ -66,7 +66,7 @@ use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resourc
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    ArtifactStreamPolicy, ArtifactStreamPublication, ArtifactStreamTarget, BlobPart, PackURI, Part,
+    ArtifactStreamPolicy, ArtifactStreamReport, ArtifactStreamTarget, BlobPart, PackURI, Part,
     PartData, PartView, SourceArtifactFingerprint, SourceBackedPackage, SourceCacheDiagnostics,
     SourceTopologyPlan,
 };
@@ -1456,7 +1456,7 @@ impl Package {
         target: &mut ArtifactStreamTarget<'_>,
         partname: &PackURI,
         payload: &Arc<Vec<u8>>,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         let package = self.physical_package()?.clone();
         let mut plan = SourceTopologyPlan::new();
         plan.try_replace_part_shared(partname.clone(), Arc::clone(payload))
@@ -1470,7 +1470,7 @@ impl Package {
         &self,
         target: &mut ArtifactStreamTarget<'_>,
         overlays: impl IntoIterator<Item = (PackURI, Vec<u8>, Vec<String>)>,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         let package = self.physical_package()?.clone();
         let mut plan = SourceTopologyPlan::new();
         for (partname, replacement, removed_relationship_ids) in overlays {
