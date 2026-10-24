@@ -12,6 +12,13 @@
       ".cargo/config.toml"
     ]
   },
+  "validation_environment": {
+    "cargo_build_jobs": 1,
+    "memory_cap": "20G",
+    "incremental": false,
+    "network": "offline",
+    "target_hard_cap_bytes": 20000000000
+  },
   "preflight": {
     "command": "source /home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/env.sh; rustc --version; cargo --version; for path in clippy.toml rust-toolchain.toml .cargo/config.toml; do test -f \"$path\"; printf '%s present\\n' \"$path\"; done; printf 'jobs=%s mem=%s incremental=%s target=%s tmp=%s\\n' \"$CARGO_BUILD_JOBS\" \"$LITCHI_MEM_MAX\" \"$CARGO_INCREMENTAL\" \"$CARGO_TARGET_DIR\" \"$TMPDIR\"; du -sb \"$CARGO_TARGET_DIR\"",
     "result": "passed",
@@ -71,7 +78,19 @@
     "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/target",
     "bytes_before_last_observation": 1464103366,
     "bytes_after": 1464103546,
-    "hard_cap_bytes": 21474836480
+    "hard_cap_bytes": 20000000000
+  },
+  "working_tree": {
+    "exact_head_clean": false,
+    "unrelated_overlay": {
+      "path": "crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs",
+      "status": "pre-existing unstaged formatting-only change",
+      "semantic_change": false,
+      "preserved": true,
+      "present_during": [
+        "cargo check --offline --locked -p litchi-ops --all-targets --all-features"
+      ]
+    }
   },
   "performance": {
     "native_timing": false,

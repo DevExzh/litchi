@@ -46,9 +46,10 @@ replay, limit, refusal, fidelity and streaming tests remain green.
 ## Validation
 
 The isolated worktree used Rust 1.95.0, one capped Cargo job at a time,
-`--offline --locked`, debug information disabled, incremental compilation
-disabled, and the workspace-local temporary directory from the coordinator
-environment.  The source validation commit was
+`--offline --locked`, a 20G memory cap, debug information disabled,
+incremental compilation disabled, and the workspace-local temporary
+directory from the coordinator environment.  The target directory was kept
+under the separate 20,000,000,000-byte disk cap.  The source validation commit was
 `363a2497f9103a32d41aff47bb0d2c9bed040521`:
 
 * `cargo test --offline --locked -p litchi-odp --all-targets --all-features` —
@@ -62,6 +63,11 @@ The raw command logs, byte counts, SHA-256 values, toolchain preflight and
 target-size observations are recorded in the compact receipt below.  The
 receipt commit itself only changes documentation and therefore does not alter
 the validated ODP source.
+
+The consumer check ran with one known unrelated working-tree overlay:
+`crates/litchi-xlsx/src/workbook/edit/semantic/transaction.rs`, a pre-existing
+formatting-only change.  It was preserved, not attributed to this work, and
+the validation does not claim an exact-HEAD-clean checkout.
 
 No native timing, baseline build, or performance exception is claimed in this
 slice.  The compact command receipt is
