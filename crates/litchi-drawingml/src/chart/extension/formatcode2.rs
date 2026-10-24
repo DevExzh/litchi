@@ -117,6 +117,15 @@ impl Limits {
         }
         Ok(self)
     }
+
+    fn max_lexical_value_bytes(self) -> Result<usize> {
+        self.max_value_bytes
+            .checked_mul(7)
+            .map(|value| value.min(MAX_LEXICAL_VALUE_BYTES))
+            .ok_or_else(|| {
+                invalid("formatcode2 lexical value limit overflows the selected value budget")
+            })
+    }
 }
 
 impl Default for Limits {
@@ -514,9 +523,7 @@ pub fn write_attribute(value: &Attribute, limits: &Limits) -> Result<Vec<u8>> {
         if source.value == value.value {
             return clone_bounded_with(source.xml.as_ref(), limits.max_output_bytes);
         }
-        let output = rewrite_attribute(source, value.value.as_str())?;
-        ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
-        return Ok(output);
+        return rewrite_attribute(source, value.value.as_str(), limits.max_output_bytes);
     }
     Err(invalid(
         "formatcode2 attribute has no source backing; use write_attribute_value",
@@ -539,8 +546,7 @@ pub fn write_attribute_to<W: std::io::Write>(
         writer.write_all(source.xml.as_ref())?;
         return Ok(());
     }
-    writer.write_all(&write_attribute(value, &limits)?)?;
-    Ok(())
+    write_attribute_to_bounded(writer, value, limits.max_output_bytes)
 }
 
 #[derive(Debug)]
@@ -558,13 +564,10 @@ fn preflight_namespace_limits(xml: &[u8], limits: Limits) -> Result<()> {
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
-    let mut buffer = Vec::new();
     let mut nodes = 0usize;
     let mut depth = 0usize;
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(xml_event_error)?;
+        let event = reader.read_event().map_err(xml_event_error)?;
         match event {
             Event::Start(element) => {
                 nodes = nodes
@@ -597,7 +600,6 @@ fn preflight_namespace_limits(xml: &[u8], limits: Limits) -> Result<()> {
             Event::Eof => break,
             _ => {},
         }
-        buffer.clear();
     }
     Ok(())
 }
@@ -643,6 +645,7 @@ fn validate_namespace_declarations(element: &BytesStart<'_>, limits: Limits) -> 
 
 fn scan_attribute(xml: &[u8], limits: Limits) -> Result<ParsedAttribute> {
     preflight_namespace_limits(xml, limits)?;
+    preflight_attribute_value_budget(xml, limits)?;
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -651,13 +654,10 @@ fn scan_attribute(xml: &[u8], limits: Limits) -> Result<ParsedAttribute> {
     reader
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_attributes);
-    let mut buffer = Vec::new();
     let mut parsed = None;
     loop {
         let event_start = position(&reader, origin)?;
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_event_error)?;
+        let (resolved, event) = reader.read_resolved_event().map_err(xml_event_error)?;
         let namespace_result = resolved_namespace(&resolved, limits);
         let event = event.into_owned();
         let event_end = position(&reader, origin)?;
@@ -701,6 +701,7 @@ fn scan_attribute_with_bindings(
         return scan_attribute(xml, limits);
     }
     preflight_namespace_limits(xml, limits)?;
+    preflight_attribute_value_budget(xml, limits)?;
     let local_prefixes = local_namespace_prefixes(xml, limits)?;
     let additions = checked_inherited_bindings(bindings, &local_prefixes, limits)?;
     if additions.is_empty() {
@@ -718,11 +719,8 @@ fn local_namespace_prefixes(xml: &[u8], limits: Limits) -> Result<Vec<Vec<u8>>> 
     reader
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_attributes);
-    let mut buffer = Vec::new();
     let mut prefixes = Vec::new();
-    let event = reader
-        .read_event_into(&mut buffer)
-        .map_err(xml_event_error)?;
+    let event = reader.read_event().map_err(xml_event_error)?;
     match event {
         Event::Start(element) | Event::Empty(element) => {
             for raw_attribute in element.checked_attributes() {
@@ -922,16 +920,10 @@ fn attribute_projection(
         let lexical = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(xml_error)?;
-        let max_lexical_value_bytes = limits.max_value_bytes.saturating_mul(7);
-        if lexical.len() > max_lexical_value_bytes {
-            return Err(limit(
-                LimitKind::LexicalValueBytes,
-                lexical.len(),
-                max_lexical_value_bytes,
-            ));
-        }
+        let max_lexical_value_bytes = limits.max_lexical_value_bytes()?;
+        preflight_normalized_value(attribute.value.as_ref(), max_lexical_value_bytes)?;
         validate_xml_text(lexical.as_ref(), "formatcode2 attribute value")?;
-        let value = decode_xstring(lexical.as_ref())?;
+        let value = decode_xstring(lexical.as_ref(), limits.max_value_bytes)?;
         let value_range = source_value_range(
             xml,
             event_start,
@@ -944,7 +936,11 @@ fn attribute_projection(
     selected.ok_or_else(|| invalid("formatcode2 attribute is absent"))
 }
 
-fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
+fn rewrite_attribute(
+    source: &AttributeSource,
+    value: &str,
+    max_output_bytes: usize,
+) -> Result<Vec<u8>> {
     let replacement_len = escaped_xstring_xml_len(value, XStringContext::Attribute)?;
     let output_len = source
         .xml
@@ -952,9 +948,7 @@ fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
         .checked_sub(source.value_range.end - source.value_range.start)
         .and_then(|length| length.checked_add(replacement_len))
         .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
-    if output_len > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
-    }
+    ensure_output_limit_with(output_len, max_output_bytes)?;
     let replacement = encode_xstring_xml(value, XStringContext::Attribute)?;
     let mut output = Vec::new();
     output
@@ -964,6 +958,29 @@ fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
     output.extend_from_slice(replacement.as_bytes());
     output.extend_from_slice(&source.xml[source.value_range.end..]);
     Ok(output)
+}
+
+fn write_attribute_to_bounded<W: std::io::Write>(
+    writer: &mut W,
+    value: &Attribute,
+    max_output_bytes: usize,
+) -> Result<()> {
+    let source = value.source_state().ok_or_else(|| {
+        invalid("formatcode2 attribute has no source backing; use write_attribute_value")
+    })?;
+    let replacement_len = escaped_xstring_xml_len(value.value.as_str(), XStringContext::Attribute)?;
+    let output_len = source
+        .xml
+        .len()
+        .checked_sub(source.value_range.end - source.value_range.start)
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
+    ensure_output_limit_with(output_len, max_output_bytes)?;
+    let replacement = encode_xstring_xml(value.value.as_str(), XStringContext::Attribute)?;
+    writer.write_all(&source.xml[..source.value_range.start])?;
+    writer.write_all(replacement.as_bytes())?;
+    writer.write_all(&source.xml[source.value_range.end..])?;
+    Ok(())
 }
 
 fn validate_attribute_value_with(value: &Attribute, maximum: usize) -> Result<()> {
@@ -1062,13 +1079,9 @@ pub fn write(value: &Element, limits: &Limits) -> Result<Vec<u8>> {
         if source.value == value.value {
             return clone_bounded_with(source.xml.as_ref(), limits.max_output_bytes);
         }
-        let output = rewrite_source(source, value.value.as_str())?;
-        ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
-        return Ok(output);
+        return rewrite_source(source, value.value.as_str(), limits.max_output_bytes);
     }
-    let output = write_detached(value.value.as_str())?;
-    ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
-    Ok(output)
+    write_detached(value.value.as_str(), limits.max_output_bytes)
 }
 
 /// Serialize a `formatcode2` element to a caller-provided sink.
@@ -1082,8 +1095,7 @@ pub fn write_to<W: std::io::Write>(writer: &mut W, value: &Element, limits: &Lim
         writer.write_all(source.xml.as_ref())?;
         return Ok(());
     }
-    writer.write_all(&write(value, &limits)?)?;
-    Ok(())
+    write_to_bounded(writer, value, limits.max_output_bytes)
 }
 
 fn checked_value(value: &str) -> Result<Arc<str>> {
@@ -1104,23 +1116,23 @@ fn validate_value_with(value: &Element, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-fn write_detached(value: &str) -> Result<Vec<u8>> {
+fn write_detached(value: &str, max_output_bytes: usize) -> Result<Vec<u8>> {
     let content_len = escaped_xstring_xml_len(value, XStringContext::Element)?;
-    let mut output = Vec::new();
-    let prefix = b"c16r2";
-    let estimated = 64usize
+    let start = b"<c16r2:formatcode2 xmlns:c16r2=\"";
+    let output_len = start
+        .len()
         .checked_add(NAMESPACE.len())
+        .and_then(|length| length.checked_add(2))
         .and_then(|length| length.checked_add(content_len))
-        .and_then(|length| length.checked_add(prefix.len() * 2 + 32))
+        .and_then(|length| length.checked_add(b"</c16r2:formatcode2>".len()))
         .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
-    if estimated > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, estimated, MAX_XML_BYTES));
-    }
+    ensure_output_limit_with(output_len, max_output_bytes)?;
+    let mut output = Vec::new();
     output
-        .try_reserve_exact(estimated)
+        .try_reserve_exact(output_len)
         .map_err(|_| invalid("formatcode2 output allocation failed"))?;
     let content = encode_xstring_xml(value, XStringContext::Element)?;
-    output.extend_from_slice(b"<c16r2:formatcode2 xmlns:c16r2=\"");
+    output.extend_from_slice(start);
     output.extend_from_slice(NAMESPACE.as_bytes());
     output.extend_from_slice(b"\">");
     output.extend_from_slice(content.as_bytes());
@@ -1139,12 +1151,12 @@ fn clone_bounded(xml: &[u8]) -> Result<Vec<u8>> {
 
 fn clone_bounded_with(xml: &[u8], maximum: usize) -> Result<Vec<u8>> {
     if xml.len() > maximum {
-        return Err(limit(LimitKind::OutputBytes, xml.len(), maximum));
+        return Err(limit(output_limit_kind(maximum), xml.len(), maximum));
     }
     clone_bounded(xml)
 }
 
-fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
+fn rewrite_source(source: &Source, value: &str, max_output_bytes: usize) -> Result<Vec<u8>> {
     let mut replacements = Vec::<(Range<usize>, Vec<u8>)>::new();
     let mut writable = None;
     for segment in &source.segments {
@@ -1176,7 +1188,7 @@ fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
                     .ok_or_else(|| invalid("formatcode2 XML length underflows"))?;
             }
         }
-        ensure_output_limit(output_len)?;
+        ensure_output_limit_with(output_len, max_output_bytes)?;
         let replacement = if segment.kind == SegmentKind::CData && !value.contains("]]>") {
             let encoded = encode_xstring(value, XStringContext::Element)?;
             let mut bytes = Vec::new();
@@ -1200,17 +1212,127 @@ fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
             .len()
             .checked_add(escaped_len)
             .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
-        ensure_output_limit(output_len)?;
+        ensure_output_limit_with(output_len, max_output_bytes)?;
         let encoded = encode_xstring_xml(value, XStringContext::Element)?;
         replacements.push((start..start, encoded.into_bytes()));
         let _ = end;
     } else {
-        return rewrite_empty_root(source, value);
+        return rewrite_empty_root(source, value, max_output_bytes);
     }
-    apply_replacements(source.xml.as_ref(), replacements)
+    apply_replacements(source.xml.as_ref(), replacements, max_output_bytes)
 }
 
-fn rewrite_empty_root(source: &Source, value: &str) -> Result<Vec<u8>> {
+fn write_to_bounded<W: std::io::Write>(
+    writer: &mut W,
+    value: &Element,
+    max_output_bytes: usize,
+) -> Result<()> {
+    let Some(source) = value.source_state() else {
+        return write_detached_to(writer, value.value.as_str(), max_output_bytes);
+    };
+    write_source_to(writer, source, value.value.as_str(), max_output_bytes)
+}
+
+fn write_source_to<W: std::io::Write>(
+    writer: &mut W,
+    source: &Source,
+    value: &str,
+    max_output_bytes: usize,
+) -> Result<()> {
+    let mut writable = None;
+    for segment in &source.segments {
+        if matches!(
+            segment.kind,
+            SegmentKind::Text | SegmentKind::CData | SegmentKind::GeneralRef
+        ) && writable.is_none()
+        {
+            writable = Some(segment.clone());
+        }
+    }
+    if let Some(segment) = writable {
+        let segment_range = segment.range.clone();
+        let replacement_len = if segment.kind == SegmentKind::CData && !value.contains("]]>") {
+            12usize
+                .checked_add(encoded_xstring_len(value, XStringContext::Element)?)
+                .ok_or_else(|| invalid("formatcode2 XML length overflows"))?
+        } else {
+            escaped_xstring_xml_len(value, XStringContext::Element)?
+        };
+        let mut output_len = source.xml.len();
+        output_len = output_len
+            .checked_sub(segment.range.end - segment.range.start)
+            .and_then(|length| length.checked_add(replacement_len))
+            .ok_or_else(|| invalid("formatcode2 XML length underflows"))?;
+        for segment in &source.segments {
+            if segment.range != segment_range {
+                output_len = output_len
+                    .checked_sub(segment.range.end - segment.range.start)
+                    .ok_or_else(|| invalid("formatcode2 XML length underflows"))?;
+            }
+        }
+        ensure_output_limit_with(output_len, max_output_bytes)?;
+        let mut replacements = Vec::with_capacity(source.segments.len());
+        let replacement = if segment.kind == SegmentKind::CData && !value.contains("]]>") {
+            let encoded = encode_xstring(value, XStringContext::Element)?;
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(b"<![CDATA[");
+            bytes.extend_from_slice(encoded.as_bytes());
+            bytes.extend_from_slice(b"]]>");
+            bytes
+        } else {
+            encode_xstring_xml(value, XStringContext::Element)?.into_bytes()
+        };
+        replacements.push((segment.range, replacement));
+        for segment in &source.segments {
+            if segment.range != replacements[0].0 {
+                replacements.push((segment.range.clone(), Vec::new()));
+            }
+        }
+        return apply_replacements_to(writer, source.xml.as_ref(), replacements, max_output_bytes);
+    }
+    if let (Some(start), Some(end)) = (source.content_start, source.content_end) {
+        let escaped_len = escaped_xstring_xml_len(value, XStringContext::Element)?;
+        let output_len = source
+            .xml
+            .len()
+            .checked_add(escaped_len)
+            .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
+        ensure_output_limit_with(output_len, max_output_bytes)?;
+        let encoded = encode_xstring_xml(value, XStringContext::Element)?;
+        writer.write_all(&source.xml[..start])?;
+        writer.write_all(encoded.as_bytes())?;
+        writer.write_all(&source.xml[start..])?;
+        let _ = end;
+        return Ok(());
+    }
+    write_empty_root_to(writer, source, value, max_output_bytes)
+}
+
+fn write_detached_to<W: std::io::Write>(
+    writer: &mut W,
+    value: &str,
+    max_output_bytes: usize,
+) -> Result<()> {
+    let content_len = escaped_xstring_xml_len(value, XStringContext::Element)?;
+    let start = b"<c16r2:formatcode2 xmlns:c16r2=\"";
+    let output_len = start
+        .len()
+        .checked_add(NAMESPACE.len())
+        .and_then(|length| length.checked_add(2))
+        .and_then(|length| length.checked_add(content_len))
+        .and_then(|length| length.checked_add(b"</c16r2:formatcode2>".len()))
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
+    ensure_output_limit_with(output_len, max_output_bytes)?;
+    let content = encode_xstring_xml(value, XStringContext::Element)?;
+    writer.write_all(start)?;
+    writer.write_all(NAMESPACE.as_bytes())?;
+    writer.write_all(b"\">")?;
+    writer.write_all(content.as_bytes())?;
+    writer.write_all(b"</c16r2:formatcode2>")?;
+    Ok(())
+}
+
+fn rewrite_empty_root(source: &Source, value: &str, max_output_bytes: usize) -> Result<Vec<u8>> {
     let raw = &source.xml[source.root_start..source.root_end];
     let Some(slash) = raw.iter().rposition(|byte| *byte == b'/') else {
         return Err(invalid("formatcode2 empty root has no close marker"));
@@ -1231,7 +1353,7 @@ fn rewrite_empty_root(source: &Source, value: &str) -> Result<Vec<u8>> {
         .checked_sub(raw.len())
         .and_then(|length| length.checked_add(replacement_len))
         .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
-    ensure_output_limit(output_len)?;
+    ensure_output_limit_with(output_len, max_output_bytes)?;
     let mut replacement = Vec::new();
     replacement
         .try_reserve_exact(replacement_len)
@@ -1246,12 +1368,53 @@ fn rewrite_empty_root(source: &Source, value: &str) -> Result<Vec<u8>> {
     apply_replacements(
         source.xml.as_ref(),
         vec![(source.root_start..source.root_end, replacement)],
+        max_output_bytes,
     )
+}
+
+fn write_empty_root_to<W: std::io::Write>(
+    writer: &mut W,
+    source: &Source,
+    value: &str,
+    max_output_bytes: usize,
+) -> Result<()> {
+    let raw = &source.xml[source.root_start..source.root_end];
+    let Some(slash) = raw.iter().rposition(|byte| *byte == b'/') else {
+        return Err(invalid("formatcode2 empty root has no close marker"));
+    };
+    if raw.get(slash + 1) != Some(&b'>') {
+        return Err(invalid("formatcode2 empty root has no close marker"));
+    }
+    let escaped_len = escaped_xstring_xml_len(value, XStringContext::Element)?;
+    let replacement_len = raw[..slash]
+        .len()
+        .checked_add(1)
+        .and_then(|length| length.checked_add(escaped_len))
+        .and_then(|length| length.checked_add(2 + source.root_qname.len() + 1))
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
+    let output_len = source
+        .xml
+        .len()
+        .checked_sub(raw.len())
+        .and_then(|length| length.checked_add(replacement_len))
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
+    ensure_output_limit_with(output_len, max_output_bytes)?;
+    let encoded = encode_xstring_xml(value, XStringContext::Element)?;
+    writer.write_all(&source.xml[..source.root_start])?;
+    writer.write_all(&raw[..slash])?;
+    writer.write_all(b">")?;
+    writer.write_all(encoded.as_bytes())?;
+    writer.write_all(b"</")?;
+    writer.write_all(&source.root_qname)?;
+    writer.write_all(b">")?;
+    writer.write_all(&source.xml[source.root_end..])?;
+    Ok(())
 }
 
 fn apply_replacements(
     xml: &[u8],
     mut replacements: Vec<(Range<usize>, Vec<u8>)>,
+    max_output_bytes: usize,
 ) -> Result<Vec<u8>> {
     replacements.sort_by_key(|(range, _)| range.start);
     for pair in replacements.windows(2) {
@@ -1266,7 +1429,7 @@ fn apply_replacements(
             .and_then(|length| length.checked_add(bytes.len()))
             .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
     }
-    ensure_output_limit(output_len)?;
+    ensure_output_limit_with(output_len, max_output_bytes)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
@@ -1281,6 +1444,36 @@ fn apply_replacements(
     Ok(output)
 }
 
+fn apply_replacements_to<W: std::io::Write>(
+    writer: &mut W,
+    xml: &[u8],
+    mut replacements: Vec<(Range<usize>, Vec<u8>)>,
+    max_output_bytes: usize,
+) -> Result<()> {
+    replacements.sort_by_key(|(range, _)| range.start);
+    for pair in replacements.windows(2) {
+        if pair[0].0.end > pair[1].0.start {
+            return Err(invalid("formatcode2 source ranges overlap"));
+        }
+    }
+    let mut output_len = xml.len();
+    for (range, bytes) in &replacements {
+        output_len = output_len
+            .checked_sub(range.end - range.start)
+            .and_then(|length| length.checked_add(bytes.len()))
+            .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
+    }
+    ensure_output_limit_with(output_len, max_output_bytes)?;
+    let mut cursor = 0;
+    for (range, bytes) in replacements {
+        writer.write_all(&xml[cursor..range.start])?;
+        writer.write_all(&bytes)?;
+        cursor = range.end;
+    }
+    writer.write_all(&xml[cursor..])?;
+    Ok(())
+}
+
 fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     preflight_namespace_limits(xml, limits)?;
     let mut reader = NsReader::from_reader(xml);
@@ -1291,7 +1484,6 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     reader
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_attributes);
-    let mut buffer = Vec::new();
     let mut stack = Vec::<Vec<u8>>::new();
     let mut root_seen = false;
     let mut root_closed = false;
@@ -1302,6 +1494,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
     let mut content_end = None;
     let mut segments = Vec::new();
     let mut lexical_value = String::new();
+    let max_lexical_value_bytes = limits.max_lexical_value_bytes()?;
     let mut nodes = 0usize;
     let mut declaration_seen = false;
     let mut pre_root_event_seen = false;
@@ -1309,10 +1502,11 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
 
     loop {
         let event_start = position(&reader, origin)?;
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_event_error)?;
+        let (resolved, event) = reader.read_resolved_event().map_err(xml_event_error)?;
         let namespace = resolved_namespace(&resolved, limits)?;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            preflight_attribute_value_event(element, max_lexical_value_bytes)?;
+        }
         let event = event.into_owned();
         let event_end = position(&reader, origin)?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
@@ -1420,10 +1614,15 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                     }
                 } else {
                     validate_raw_text(text.as_ref())?;
+                    preflight_unescaped_value(text.as_ref(), max_lexical_value_bytes)?;
                     let decoded = text.decode().map_err(xml_error)?;
                     let decoded = unescape(decoded.as_ref()).map_err(xml_error)?;
                     validate_xml_text(decoded.as_ref(), "formatcode2 text")?;
-                    append_lexical(&mut lexical_value, decoded.as_ref())?;
+                    append_lexical(
+                        &mut lexical_value,
+                        decoded.as_ref(),
+                        max_lexical_value_bytes,
+                    )?;
                     segments.push(Segment {
                         range: event_start..event_end,
                         kind: SegmentKind::Text,
@@ -1434,9 +1633,14 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 if !root_seen || stack.is_empty() {
                     return Err(invalid("formatcode2 contains data outside its root"));
                 }
+                preflight_lexical_bytes(data.as_ref(), max_lexical_value_bytes)?;
                 let decoded = data.decode().map_err(xml_error)?;
                 validate_xml_text(decoded.as_ref(), "formatcode2 CDATA")?;
-                append_lexical(&mut lexical_value, decoded.as_ref())?;
+                append_lexical(
+                    &mut lexical_value,
+                    decoded.as_ref(),
+                    max_lexical_value_bytes,
+                )?;
                 segments.push(Segment {
                     range: event_start..event_end,
                     kind: SegmentKind::CData,
@@ -1448,7 +1652,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
                 }
                 let character = validate_general_ref(&reference, limits.max_value_bytes)?;
                 if let Some(character) = character {
-                    append_lexical_char(&mut lexical_value, character)?;
+                    append_lexical_char(&mut lexical_value, character, max_lexical_value_bytes)?;
                 }
                 segments.push(Segment {
                     range: event_start..event_end,
@@ -1460,7 +1664,6 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
             Event::DocType(_) => return Err(invalid("formatcode2 cannot contain a document type")),
             Event::Eof => break,
         }
-        buffer.clear();
     }
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("formatcode2 fragment has no complete root"));
@@ -1469,7 +1672,7 @@ fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
         content_start = None;
         content_end = None;
     }
-    let value = decode_xstring(&lexical_value)?;
+    let value = decode_xstring(&lexical_value, limits.max_value_bytes)?;
     Ok(Parsed {
         root_start: root_start.ok_or_else(|| invalid("formatcode2 root start is missing"))?,
         root_end: root_end.ok_or_else(|| invalid("formatcode2 root end is missing"))?,
@@ -1557,6 +1760,12 @@ fn validate_attributes(
             return Err(invalid("formatcode2 element has duplicate attributes"));
         }
         validate_raw_attribute_value(attribute.value.as_ref())?;
+        if attribute.key.local_name().as_ref() == b"formatcode2" {
+            preflight_normalized_value(
+                attribute.value.as_ref(),
+                limits.max_lexical_value_bytes()?,
+            )?;
+        }
         let value = decode_attribute_value(attribute.value.as_ref(), reader)?;
         validate_xml_text(value.as_str(), "formatcode2 attribute value")?;
         if is_namespace_attribute(attribute.key) {
@@ -1617,6 +1826,160 @@ fn decode_attribute_value(raw: &[u8], reader: &NsReader<&[u8]>) -> Result<String
     unescape_with(decoded.as_ref(), resolve_xml_entity)
         .map(|value| value.into_owned())
         .map_err(xml_error)
+}
+
+/// Count the XML-normalized attribute value without materializing it. This is
+/// the same XML 1.0 normalization used by `quick_xml` for
+/// `decoded_and_normalized_value`: ordinary characters retain their UTF-8
+/// width, whitespace becomes one ASCII space, and character/predefined
+/// references contribute their decoded scalar width. The count is performed
+/// before the projection allocates its normalized lexical string.
+fn preflight_normalized_value(raw: &[u8], maximum: usize) -> Result<()> {
+    let value = std::str::from_utf8(raw).map_err(xml_error)?;
+    let bytes = value.as_bytes();
+    let mut length = 0usize;
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let addition = match bytes[index] {
+            b'&' => {
+                let end = bytes
+                    .get(index + 1..)
+                    .ok_or_else(|| {
+                        invalid("formatcode2 attribute contains an unterminated entity")
+                    })?
+                    .iter()
+                    .position(|byte| *byte == b';')
+                    .map(|offset| index + 1 + offset)
+                    .ok_or_else(|| {
+                        invalid("formatcode2 attribute contains an unterminated entity")
+                    })?;
+                let entity = &value[index + 1..end];
+                index = end + 1;
+                decoded_entity_len(entity)?
+            },
+            b'\r' => {
+                index += 1;
+                if bytes.get(index) == Some(&b'\n') {
+                    index += 1;
+                }
+                1
+            },
+            b'\n' | b'\t' => {
+                index += 1;
+                1
+            },
+            _ => {
+                let character = value[index..]
+                    .chars()
+                    .next()
+                    .ok_or_else(|| invalid("formatcode2 attribute contains invalid UTF-8"))?;
+                index += character.len_utf8();
+                character.len_utf8()
+            },
+        };
+        length = length
+            .checked_add(addition)
+            .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
+        if length > maximum {
+            return Err(limit(LimitKind::LexicalValueBytes, length, maximum));
+        }
+    }
+    Ok(())
+}
+
+fn preflight_attribute_value_budget(xml: &[u8], limits: Limits) -> Result<()> {
+    let mut reader = Reader::from_reader(xml);
+    let event = reader.read_event().map_err(xml_event_error)?;
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element,
+        Event::Eof => return Err(invalid("formatcode2 attribute fragment has no start tag")),
+        _ => {
+            return Err(invalid(
+                "formatcode2 attribute fragment must begin with a start tag",
+            ));
+        },
+    };
+    preflight_attribute_value_event(&element, limits.max_lexical_value_bytes()?)
+}
+
+fn preflight_attribute_value_event(element: &BytesStart<'_>, maximum: usize) -> Result<()> {
+    for raw_attribute in element.checked_attributes() {
+        let attribute = raw_attribute.map_err(xml_error)?;
+        if attribute.key.local_name().as_ref() == b"formatcode2" {
+            preflight_normalized_value(attribute.value.as_ref(), maximum)?;
+        }
+    }
+    Ok(())
+}
+
+fn preflight_unescaped_value(raw: &[u8], maximum: usize) -> Result<()> {
+    let value = std::str::from_utf8(raw).map_err(xml_error)?;
+    let bytes = value.as_bytes();
+    let mut length = 0usize;
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let addition = if bytes[index] == b'&' {
+            let end = bytes
+                .get(index + 1..)
+                .ok_or_else(|| invalid("formatcode2 text contains an unterminated entity"))?
+                .iter()
+                .position(|byte| *byte == b';')
+                .map(|offset| index + 1 + offset)
+                .ok_or_else(|| invalid("formatcode2 text contains an unterminated entity"))?;
+            let entity = &value[index + 1..end];
+            index = end + 1;
+            decoded_entity_len(entity)?
+        } else {
+            let character = value[index..]
+                .chars()
+                .next()
+                .ok_or_else(|| invalid("formatcode2 text contains invalid UTF-8"))?;
+            index += character.len_utf8();
+            character.len_utf8()
+        };
+        length = length
+            .checked_add(addition)
+            .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
+        if length > maximum {
+            return Err(limit(LimitKind::LexicalValueBytes, length, maximum));
+        }
+    }
+    Ok(())
+}
+
+fn preflight_lexical_bytes(raw: &[u8], maximum: usize) -> Result<()> {
+    let length = std::str::from_utf8(raw).map_err(xml_error)?.len();
+    if length > maximum {
+        return Err(limit(LimitKind::LexicalValueBytes, length, maximum));
+    }
+    Ok(())
+}
+
+fn decoded_entity_len(entity: &str) -> Result<usize> {
+    if let Some(value) = resolve_xml_entity(entity) {
+        return Ok(value.len());
+    }
+    let number = entity
+        .strip_prefix("#x")
+        .or_else(|| entity.strip_prefix("#X"))
+        .map(|digits| u32::from_str_radix(digits, 16))
+        .or_else(|| entity.strip_prefix('#').map(|digits| digits.parse::<u32>()))
+        .transpose()
+        .map_err(|error| {
+            invalid(format!(
+                "formatcode2 character reference is invalid: {error}"
+            ))
+        })?;
+    let Some(number) = number else {
+        return Err(invalid("formatcode2 attribute contains an unknown entity"));
+    };
+    let character = char::from_u32(number)
+        .ok_or_else(|| invalid("formatcode2 character reference is invalid"))?;
+    validate_xml_text(
+        &character.to_string(),
+        "formatcode2 attribute character reference",
+    )?;
+    Ok(character.len_utf8())
 }
 
 fn namespace_attribute_prefix<'a>(key: quick_xml::name::QName<'a>) -> Result<&'a [u8]> {
@@ -1818,43 +2181,35 @@ fn normalize_namespace_uri(raw: &[u8], limits: Limits) -> Result<Vec<u8>> {
     Ok(decoded.into_bytes())
 }
 
-fn append_lexical(value: &mut String, addition: &str) -> Result<()> {
+fn append_lexical(value: &mut String, addition: &str, maximum: usize) -> Result<()> {
     let length = value
         .len()
         .checked_add(addition.len())
         .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
-    if length > MAX_LEXICAL_VALUE_BYTES {
-        return Err(limit(
-            LimitKind::LexicalValueBytes,
-            length,
-            MAX_LEXICAL_VALUE_BYTES,
-        ));
+    if length > maximum {
+        return Err(limit(LimitKind::LexicalValueBytes, length, maximum));
     }
     value.push_str(addition);
     Ok(())
 }
 
-fn append_lexical_char(value: &mut String, character: char) -> Result<()> {
+fn append_lexical_char(value: &mut String, character: char, maximum: usize) -> Result<()> {
     let length = value
         .len()
         .checked_add(character.len_utf8())
         .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
-    if length > MAX_LEXICAL_VALUE_BYTES {
-        return Err(limit(
-            LimitKind::LexicalValueBytes,
-            length,
-            MAX_LEXICAL_VALUE_BYTES,
-        ));
+    if length > maximum {
+        return Err(limit(LimitKind::LexicalValueBytes, length, maximum));
     }
     value.push(character);
     Ok(())
 }
 
-fn decode_xstring(value: &str) -> Result<Value> {
+fn decode_xstring(value: &str, maximum: usize) -> Result<Value> {
     let bytes = value.as_bytes();
     let mut decoded = String::new();
     decoded
-        .try_reserve(value.len().min(MAX_VALUE_BYTES))
+        .try_reserve(value.len().min(maximum))
         .map_err(|_| invalid("formatcode2 value allocation failed"))?;
     let mut copied_until = 0usize;
     let mut index = 0usize;
@@ -1863,7 +2218,7 @@ fn decode_xstring(value: &str) -> Result<Value> {
             index += 1;
             continue;
         };
-        append_decoded(&mut decoded, &value[copied_until..index])?;
+        append_decoded(&mut decoded, &value[copied_until..index], maximum)?;
         if (0xD800..=0xDBFF).contains(&unit) {
             let Some((low, pair_end)) = xstring_escape_at(bytes, end) else {
                 return Err(invalid(
@@ -1878,7 +2233,7 @@ fn decode_xstring(value: &str) -> Result<Value> {
             let scalar = 0x1_0000 + ((u32::from(unit) - 0xD800) << 10) + (u32::from(low) - 0xDC00);
             let character = char::from_u32(scalar)
                 .ok_or_else(|| invalid("formatcode2 ST_Xstring surrogate pair is invalid"))?;
-            append_decoded_char(&mut decoded, character)?;
+            append_decoded_char(&mut decoded, character, maximum)?;
             index = pair_end;
             copied_until = pair_end;
         } else if (0xDC00..=0xDFFF).contains(&unit) {
@@ -1888,36 +2243,36 @@ fn decode_xstring(value: &str) -> Result<Value> {
         } else {
             let character = char::from_u32(u32::from(unit))
                 .ok_or_else(|| invalid("formatcode2 ST_Xstring code unit is invalid"))?;
-            append_decoded_char(&mut decoded, character)?;
+            append_decoded_char(&mut decoded, character, maximum)?;
             index = end;
             copied_until = end;
         }
     }
-    append_decoded(&mut decoded, &value[copied_until..])?;
+    append_decoded(&mut decoded, &value[copied_until..], maximum)?;
     Ok(Value {
         value: Arc::from(decoded),
     })
 }
 
-fn append_decoded(value: &mut String, addition: &str) -> Result<()> {
+fn append_decoded(value: &mut String, addition: &str, maximum: usize) -> Result<()> {
     let length = value
         .len()
         .checked_add(addition.len())
         .ok_or_else(|| invalid("formatcode2 value length overflows"))?;
-    if length > MAX_VALUE_BYTES {
-        return Err(limit(LimitKind::TextBytes, length, MAX_VALUE_BYTES));
+    if length > maximum {
+        return Err(limit(LimitKind::TextBytes, length, maximum));
     }
     value.push_str(addition);
     Ok(())
 }
 
-fn append_decoded_char(value: &mut String, character: char) -> Result<()> {
+fn append_decoded_char(value: &mut String, character: char, maximum: usize) -> Result<()> {
     let length = value
         .len()
         .checked_add(character.len_utf8())
         .ok_or_else(|| invalid("formatcode2 value length overflows"))?;
-    if length > MAX_VALUE_BYTES {
-        return Err(limit(LimitKind::TextBytes, length, MAX_VALUE_BYTES));
+    if length > maximum {
+        return Err(limit(LimitKind::TextBytes, length, maximum));
     }
     value.push(character);
     Ok(())
@@ -2091,18 +2446,19 @@ fn hex(byte: u8) -> Option<u16> {
     }
 }
 
-fn ensure_output_limit(output_len: usize) -> Result<()> {
-    if output_len > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
+fn ensure_output_limit_with(output_len: usize, maximum: usize) -> Result<()> {
+    if output_len > maximum {
+        return Err(limit(output_limit_kind(maximum), output_len, maximum));
     }
     Ok(())
 }
 
-fn ensure_output_limit_with(output_len: usize, maximum: usize) -> Result<()> {
-    if output_len > maximum {
-        return Err(limit(LimitKind::OutputBytes, output_len, maximum));
+fn output_limit_kind(maximum: usize) -> LimitKind {
+    if maximum == MAX_XML_BYTES {
+        LimitKind::XmlBytes
+    } else {
+        LimitKind::OutputBytes
     }
-    Ok(())
 }
 
 fn is_xml_whitespace(bytes: &[u8]) -> Result<bool> {

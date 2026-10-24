@@ -237,6 +237,7 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
+    let mut transforms = 0usize;
 
     loop {
         let event = reader
@@ -253,6 +254,18 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                         nodes,
                         limits.max_nodes,
                     ));
+                }
+                if is_transform_name(element.local_name().as_ref()) {
+                    transforms = transforms.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML color transform count overflow".into())
+                    })?;
+                    if transforms > limits.max_transforms {
+                        return Err(Error::limit(
+                            crate::LimitKind::ColorTransforms,
+                            transforms,
+                            limits.max_transforms,
+                        ));
+                    }
                 }
                 if stack.is_empty() {
                     if root_seen {
@@ -271,7 +284,7 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                 }
                 stack.push(element.name().as_ref().to_vec());
             },
-            Event::Empty(_) => {
+            Event::Empty(element) => {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
@@ -282,6 +295,18 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                         limits.max_nodes,
                     ));
                 }
+                if is_transform_name(element.local_name().as_ref()) {
+                    transforms = transforms.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("DrawingML color transform count overflow".into())
+                    })?;
+                    if transforms > limits.max_transforms {
+                        return Err(Error::limit(
+                            crate::LimitKind::ColorTransforms,
+                            transforms,
+                            limits.max_transforms,
+                        ));
+                    }
+                }
                 if stack.is_empty() {
                     if root_seen {
                         return Err(Error::Invalid(
@@ -290,6 +315,13 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
                     }
                     root_seen = true;
                     root_closed = true;
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        stack.len().saturating_add(1),
+                        limits.max_depth,
+                    ));
                 }
             },
             Event::End(element) => {
@@ -344,4 +376,38 @@ pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
         ));
     }
     Ok(xml)
+}
+
+fn is_transform_name(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"alpha"
+            | b"alphaMod"
+            | b"alphaOff"
+            | b"blue"
+            | b"blueMod"
+            | b"blueOff"
+            | b"comp"
+            | b"gamma"
+            | b"gray"
+            | b"green"
+            | b"greenMod"
+            | b"greenOff"
+            | b"hue"
+            | b"hueMod"
+            | b"hueOff"
+            | b"inv"
+            | b"invGamma"
+            | b"lum"
+            | b"lumMod"
+            | b"lumOff"
+            | b"red"
+            | b"redMod"
+            | b"redOff"
+            | b"sat"
+            | b"satMod"
+            | b"satOff"
+            | b"shade"
+            | b"tint"
+    )
 }

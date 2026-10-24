@@ -176,6 +176,91 @@ fn scalar_and_transform_bounds_are_rejected() {
 }
 
 #[test]
+fn selected_raw_limits_apply_to_typed_and_unknown_writes() {
+    let transformed = Value::transformed(
+        Rgb::new(0x12, 0x34, 0x56),
+        [Transform::Complement, Transform::Gamma],
+    )
+    .unwrap();
+    let one_transform =
+        codec::Limits::new(codec::MAX_XML_BYTES, codec::MAX_DEPTH, codec::MAX_NODES, 1);
+    assert!(matches!(
+        codec::write(&transformed, &one_transform),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ColorTransforms,
+            maximum: 1,
+            ..
+        })
+    ));
+
+    let one_node = codec::Limits::new(
+        codec::MAX_XML_BYTES,
+        codec::MAX_DEPTH,
+        1,
+        codec::MAX_TRANSFORMS,
+    );
+    assert!(matches!(
+        codec::write(&transformed, &one_node),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::XmlNodes,
+            maximum: 1,
+            ..
+        })
+    ));
+
+    let one_level = codec::Limits::new(
+        codec::MAX_XML_BYTES,
+        1,
+        codec::MAX_NODES,
+        codec::MAX_TRANSFORMS,
+    );
+    assert!(matches!(
+        codec::write(&transformed, &one_level),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::XmlDepth,
+            maximum: 1,
+            ..
+        })
+    ));
+
+    let unknown = Value::unknown(
+        br#"<x:future xmlns:x="urn:future"><x:item/></x:future>"#,
+        &codec::Limits::DEFAULT,
+    )
+    .unwrap();
+    let shallow = codec::Limits::new(
+        codec::MAX_XML_BYTES,
+        1,
+        codec::MAX_NODES,
+        codec::MAX_TRANSFORMS,
+    );
+    assert!(matches!(
+        codec::write(&unknown, &shallow),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::XmlDepth,
+            maximum: 1,
+            ..
+        })
+    ));
+
+    let unknown_transforms = Value::unknown(
+        br#"<x:future xmlns:x="urn:future"><x:alpha/><x:alpha/></x:future>"#,
+        &codec::Limits::DEFAULT,
+    )
+    .unwrap();
+    let one_transform =
+        codec::Limits::new(codec::MAX_XML_BYTES, codec::MAX_DEPTH, codec::MAX_NODES, 1);
+    assert!(matches!(
+        codec::write(&unknown_transforms, &one_transform),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ColorTransforms,
+            maximum: 1,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn malformed_fragments_and_resource_exhaustion_are_rejected() {
     for xml in [
         br#""#.as_slice(),

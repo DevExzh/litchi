@@ -1,6 +1,6 @@
 //! XML codec for `a:CT_Transform2D`.
 
-use std::{fmt::Write as _, io::Write};
+use std::{fmt, io::Write};
 
 use quick_xml::{
     events::{BytesStart, Event},
@@ -212,16 +212,37 @@ pub fn write(transform: &Transform, limits: &Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validation::validate(transform)?;
 
-    let mut xml = String::with_capacity(192);
-    xml.push_str("<a:xfrm");
+    let mut length = LengthWriter::default();
+    write_transform_xml(&mut length, transform).map_err(format_error)?;
+    if length.overflow {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_xml_bytes,
+        ));
+    }
+    if length.len > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            length.len,
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut xml = String::with_capacity(length.len);
+    write_transform_xml(&mut xml, transform).map_err(format_error)?;
+    Ok(xml.into_bytes())
+}
+
+fn write_transform_xml<W: fmt::Write>(xml: &mut W, transform: &Transform) -> fmt::Result {
+    xml.write_str("<a:xfrm")?;
     if let Some(value) = transform.authored_rotation() {
-        write!(xml, r#" rot="{}""#, value.value()).map_err(format_error)?;
+        write!(xml, r#" rot="{}""#, value.value())?;
     }
     if let Some(value) = transform.authored_flip_horizontal() {
-        write!(xml, r#" flipH="{}""#, bool_token(value)).map_err(format_error)?;
+        write!(xml, r#" flipH="{}""#, bool_token(value))?;
     }
     if let Some(value) = transform.authored_flip_vertical() {
-        write!(xml, r#" flipV="{}""#, bool_token(value)).map_err(format_error)?;
+        write!(xml, r#" flipV="{}""#, bool_token(value))?;
     }
 
     let has_children = transform.offset().is_some()
@@ -229,25 +250,23 @@ pub fn write(transform: &Transform, limits: &Limits) -> Result<Vec<u8>> {
         || transform.child_offset().is_some()
         || transform.child_extent().is_some();
     if !has_children {
-        xml.push_str("/>");
-        return checked_output(xml.into_bytes(), limits);
+        return xml.write_str("/>");
     }
 
-    xml.push('>');
+    xml.write_char('>')?;
     if let Some(value) = transform.offset() {
-        write_point(&mut xml, "off", value).map_err(format_error)?;
+        write_point(xml, "off", value)?;
     }
     if let Some(value) = transform.extent() {
-        write_size(&mut xml, "ext", value).map_err(format_error)?;
+        write_size(xml, "ext", value)?;
     }
     if let Some(value) = transform.child_offset() {
-        write_point(&mut xml, "chOff", value).map_err(format_error)?;
+        write_point(xml, "chOff", value)?;
     }
     if let Some(value) = transform.child_extent() {
-        write_size(&mut xml, "chExt", value).map_err(format_error)?;
+        write_size(xml, "chExt", value)?;
     }
-    xml.push_str("</a:xfrm>");
-    checked_output(xml.into_bytes(), limits)
+    xml.write_str("</a:xfrm>")
 }
 
 /// Serialize a transform to a caller-owned sink.
@@ -256,8 +275,38 @@ pub fn write(transform: &Transform, limits: &Limits) -> Result<Vec<u8>> {
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn write_to<W: Write>(writer: &mut W, transform: &Transform, limits: &Limits) -> Result<()> {
-    writer.write_all(&write(transform, limits)?)?;
+    let limits = limits.validate()?;
+    validation::validate(transform)?;
+    let mut length = LengthWriter::default();
+    write_transform_xml(&mut length, transform).map_err(format_error)?;
+    if length.overflow {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_xml_bytes,
+        ));
+    }
+    if length.len > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            length.len,
+            limits.max_xml_bytes,
+        ));
+    }
+    write_transform_to(writer, transform)?;
     Ok(())
+}
+
+fn write_transform_to<W: Write>(writer: &mut W, transform: &Transform) -> Result<()> {
+    let mut sink = IoFmtWriter {
+        writer,
+        error: None,
+    };
+    let result = write_transform_xml(&mut sink, transform);
+    if let Some(error) = sink.error {
+        return Err(Error::Io(error));
+    }
+    result.map_err(format_error)
 }
 
 fn parse_root_attributes(
@@ -489,11 +538,11 @@ fn bool_token(value: bool) -> &'static str {
     if value { "1" } else { "0" }
 }
 
-fn write_point(xml: &mut String, name: &str, point: &Point) -> std::fmt::Result {
+fn write_point<W: fmt::Write>(xml: &mut W, name: &str, point: &Point) -> fmt::Result {
     write!(xml, r#"<a:{name} x="{}" y="{}"/>"#, point.x(), point.y())
 }
 
-fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
+fn write_size<W: fmt::Write>(xml: &mut W, name: &str, size: Size) -> fmt::Result {
     write!(
         xml,
         r#"<a:{name} cx="{}" cy="{}"/>"#,
@@ -502,22 +551,47 @@ fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
     )
 }
 
-fn checked_output(output: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
-    if output.len() > limits.max_xml_bytes {
-        return Err(limit(
-            crate::LimitKind::XmlBytes,
-            output.len(),
-            limits.max_xml_bytes,
-        ));
-    }
-    Ok(output)
+struct IoFmtWriter<'a, W> {
+    writer: &'a mut W,
+    error: Option<std::io::Error>,
 }
 
-fn format_error(error: std::fmt::Error) -> Error {
+impl<W: Write> fmt::Write for IoFmtWriter<'_, W> {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        match self.writer.write_all(value.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.error = Some(error);
+                Err(fmt::Error)
+            },
+        }
+    }
+}
+
+#[derive(Default)]
+struct LengthWriter {
+    len: usize,
+    overflow: bool,
+}
+
+impl fmt::Write for LengthWriter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        match self.len.checked_add(value.len()) {
+            Some(length) => self.len = length,
+            None => {
+                self.len = usize::MAX;
+                self.overflow = true;
+            },
+        }
+        Ok(())
+    }
+}
+
+fn format_error(error: fmt::Error) -> Error {
     Error::Xml(error.to_string())
 }
 
-fn xml_error(_error: impl std::fmt::Display) -> Error {
+fn xml_error(_error: impl fmt::Display) -> Error {
     Error::Xml("malformed DrawingML transform XML".into())
 }
 

@@ -537,6 +537,100 @@ fn detached_and_shared_writes_are_deterministic_and_sink_safe() {
 }
 
 #[test]
+fn selected_value_and_output_limits_preflight_before_sink_writes() {
+    let value_source = fragment("A");
+    let mut value = read(&value_source, &formatcode2::Limits::DEFAULT).unwrap();
+    value.set_value("a longer value").unwrap();
+    let expected = write(&value, &formatcode2::Limits::DEFAULT).unwrap();
+    let output_limits = formatcode2::Limits::new(
+        MAX_XML_BYTES,
+        MAX_VALUE_BYTES,
+        MAX_ATTRIBUTES,
+        MAX_NODES,
+        MAX_DEPTH,
+        MAX_NAMESPACE_BYTES,
+        expected.len() - 1,
+    );
+    let mut sink = b"sentinel".to_vec();
+    let before = sink.clone();
+    assert!(matches!(
+        write_to(&mut sink, &value, &output_limits),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            maximum,
+            ..
+        }) if maximum == expected.len() - 1
+    ));
+    assert_eq!(sink, before);
+
+    let attribute_source = format!(r#"<c:series xmlns:c="{NAMESPACE}" c:formatcode2="A"/>"#);
+    let mut attribute =
+        read_attribute(attribute_source.as_bytes(), &formatcode2::Limits::DEFAULT).unwrap();
+    attribute.set_value("a longer value").unwrap();
+    let expected = write_attribute(&attribute, &formatcode2::Limits::DEFAULT).unwrap();
+    let output_limits = formatcode2::Limits::new(
+        MAX_XML_BYTES,
+        MAX_VALUE_BYTES,
+        MAX_ATTRIBUTES,
+        MAX_NODES,
+        MAX_DEPTH,
+        MAX_NAMESPACE_BYTES,
+        expected.len() - 1,
+    );
+    sink.clear();
+    sink.extend_from_slice(b"sentinel");
+    let before = sink.clone();
+    assert!(matches!(
+        write_attribute_to(&mut sink, &attribute, &output_limits),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            maximum,
+            ..
+        }) if maximum == expected.len() - 1
+    ));
+    assert_eq!(sink, before);
+
+    let lexical_limit = formatcode2::Limits::new(
+        MAX_XML_BYTES,
+        1,
+        MAX_ATTRIBUTES,
+        MAX_NODES,
+        MAX_DEPTH,
+        MAX_NAMESPACE_BYTES,
+        MAX_XML_BYTES,
+    );
+    let oversized_lexical =
+        format!(r#"<c:series xmlns:c="{NAMESPACE}" c:formatcode2="aaaaaaaa"/>"#);
+    assert!(matches!(
+        read_attribute(oversized_lexical.as_bytes(), &lexical_limit),
+        Err(Error::Limit {
+            kind: LimitKind::LexicalValueBytes,
+            maximum: 7,
+            ..
+        })
+    ));
+
+    let entity_source = format!(r#"<c:series xmlns:c="{NAMESPACE}" c:formatcode2="&amp;&amp;"/>"#);
+    assert_eq!(
+        read_attribute(
+            entity_source.as_bytes(),
+            &formatcode2::Limits::new(
+                MAX_XML_BYTES,
+                2,
+                MAX_ATTRIBUTES,
+                MAX_NODES,
+                MAX_DEPTH,
+                MAX_NAMESPACE_BYTES,
+                MAX_XML_BYTES,
+            )
+        )
+        .unwrap()
+        .value(),
+        "&&"
+    );
+}
+
+#[test]
 fn qualified_attribute_owner_preserves_host_start_tag_and_detaches_cleanly() {
     let source = format!(
         r#"<c:series xmlns:c="{NAMESPACE}" id="7" c:formatcode2="_x0041__x0001_" data-extra="opaque"/>"#

@@ -597,9 +597,19 @@ impl<'a> Common<'a> {
             .xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape transform span became invalid".into()))?;
+        let transform_limits = litchi_drawingml::transform::Limits::new(
+            self.limits
+                .output_bytes()
+                .min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
+                .max(1),
+            self.limits
+                .nodes()
+                .min(litchi_drawingml::transform::Limits::DEFAULT.max_nodes)
+                .max(1),
+        );
         Ok(Some(litchi_drawingml::transform::codec::read(
             xml,
-            &litchi_drawingml::transform::Limits::DEFAULT,
+            &transform_limits,
         )?))
     }
 

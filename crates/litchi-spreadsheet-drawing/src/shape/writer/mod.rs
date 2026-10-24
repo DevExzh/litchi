@@ -983,8 +983,9 @@ pub struct Emitter {
 impl Emitter {
     /// Create an emitter whose first allocated object ID is `first_id`.
     #[must_use]
-    pub fn new(first_id: u32, geometry_limits: GeometryLimits) -> Self {
-        Self {
+    pub fn new(first_id: u32, geometry_limits: GeometryLimits) -> crate::Result<Self> {
+        let geometry_limits = geometry_limits.validate()?;
+        Ok(Self {
             inner: State {
                 next_id: first_id,
                 names: HashMap::new(),
@@ -992,7 +993,7 @@ impl Emitter {
                 emitted_names: HashSet::new(),
                 geometry_limits,
             },
-        }
+        })
     }
 
     /// Preallocate IDs for a complete fresh drawing graph.

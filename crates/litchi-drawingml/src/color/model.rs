@@ -869,8 +869,8 @@ impl Value {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn unknown(xml: &[u8]) -> crate::Result<Self> {
-        Ok(Self::Unknown(Unknown::from_xml(xml)?))
+    pub fn unknown(xml: &[u8], limits: &super::Limits) -> crate::Result<Self> {
+        Ok(Self::Unknown(Unknown::from_xml(xml, limits)?))
     }
 
     /// Return the direct sRGB value, when this is an untransformed RGB choice.
@@ -1031,9 +1031,9 @@ impl Unknown {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn from_xml(xml: &[u8]) -> crate::Result<Self> {
+    pub fn from_xml(xml: &[u8], limits: &super::Limits) -> crate::Result<Self> {
         Ok(Self {
-            xml: validation::validated_fragment(xml, validation::Limits::DEFAULT)?
+            xml: validation::validated_fragment(xml, *limits)?
                 .to_vec()
                 .into_boxed_slice(),
         })

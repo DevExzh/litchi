@@ -23,6 +23,7 @@ fn emitter_writes_a_fresh_shape() {
     };
     let mut xml = String::new();
     Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
+        .unwrap()
         .write_anchored_shape(
             &mut xml,
             &ShapeSpec::text_box("Title", anchor, Preset::Rect, "Hello"),
@@ -127,6 +128,7 @@ fn authoring_refuses_text_the_writer_cannot_write() {
     let mut xml = "prefix".to_owned();
     assert!(
         Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
+            .unwrap()
             .write_anchored_shape(&mut xml, &fonted)
             .is_err()
     );
@@ -156,6 +158,7 @@ fn authoring_refuses_lossy_break_without_touching_existing_output() {
     let mut xml = "prefix".to_owned();
 
     let error = Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
+        .unwrap()
         .write_anchored_shape(&mut xml, &shape)
         .unwrap_err();
 
@@ -185,6 +188,7 @@ fn authoring_refuses_incomplete_text_projection_without_touching_existing_output
     let mut xml = "prefix".to_owned();
 
     let error = Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
+        .unwrap()
         .write_anchored_shape(&mut xml, &shape)
         .unwrap_err();
 
@@ -215,6 +219,7 @@ fn authoring_preserves_break_markup() {
     let mut xml = String::new();
 
     Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
+        .unwrap()
         .write_anchored_shape(&mut xml, &shape)
         .unwrap();
 

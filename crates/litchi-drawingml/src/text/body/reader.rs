@@ -1184,9 +1184,18 @@ impl<'x> Builder<'x> {
                 // 100%, which producers write, is refused), so a fragment
                 // it refuses is kept as written rather than failing the
                 // body.
-                let value = match color::read(fragment, &color::Limits::DEFAULT) {
+                let color_limits = color::Limits::new(
+                    self.limits.input_bytes().min(color::MAX_XML_BYTES).max(1),
+                    self.limits.depth().min(color::MAX_DEPTH).max(1),
+                    self.limits.nodes().min(color::MAX_NODES).max(1),
+                    self.limits.nodes().min(color::MAX_TRANSFORMS).max(1),
+                );
+                let value = match color::read(fragment, &color_limits) {
                     Ok(value) => Some(value),
-                    Err(_) => self.checked(color::Value::unknown(fragment))?,
+                    Err(error @ (Error::Limit { .. } | Error::InvalidLimit { .. })) => {
+                        return Err(error);
+                    },
+                    Err(_) => self.checked(color::Value::unknown(fragment, &color_limits))?,
                 };
                 if let Some(value) = value {
                     self.set_color(target, value);
