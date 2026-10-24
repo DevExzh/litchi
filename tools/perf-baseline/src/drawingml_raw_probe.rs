@@ -260,11 +260,53 @@ fn owner_route_evidence(route: OwnerRoute) -> &'static str {
             "crates/litchi-drawingml/src/theme/family/transaction.rs:Package::edit,Edit::commit,Package::apply"
         },
         OwnerRoute::DrawingmlInkActions => {
-            "crates/litchi-drawingml/src/ink/actions_edit.rs:Prepared + Edit::from_profile,Edit::commit,Patch::apply"
+            "crates/litchi-drawingml/src/ink/actions_edit.rs:Prepared::edit (current) or Edit::from_profile (legacy),Edit::commit,Prepared/Patch::apply"
         },
         OwnerRoute::DrawingmlTransform => {
             "crates/litchi-drawingml/src/transform/transaction.rs:Package::edit,Edit::commit,Package::apply"
         },
+    }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_operation_path(route: OwnerRoute, operation: &str) -> &'static str {
+    match (route, operation) {
+        (
+            OwnerRoute::DrawingmlChart
+            | OwnerRoute::DrawingmlThemeFamily
+            | OwnerRoute::DrawingmlTransform,
+            "noop_commit" | "changed_commit",
+        ) => "Snapshot::edit -> Edit::commit",
+        (OwnerRoute::DrawingmlInkActions, "noop_commit" | "changed_commit") => {
+            "Edit::from_profile -> Edit::commit"
+        },
+        (_, "forward_replay" | "inverse_replay" | "stale_replay") => "Patch::apply",
+        _ => "unknown owner operation",
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_operation_path(route: OwnerRoute, operation: &str) -> &'static str {
+    match (route, operation) {
+        (
+            OwnerRoute::DrawingmlChart
+            | OwnerRoute::DrawingmlThemeFamily
+            | OwnerRoute::DrawingmlTransform,
+            "noop_commit" | "changed_commit",
+        ) => "Package::edit -> Edit::commit",
+        (OwnerRoute::DrawingmlInkActions, "noop_commit" | "changed_commit") => {
+            "Prepared::edit -> Edit::commit"
+        },
+        (
+            OwnerRoute::DrawingmlChart
+            | OwnerRoute::DrawingmlThemeFamily
+            | OwnerRoute::DrawingmlTransform,
+            "forward_replay" | "inverse_replay" | "stale_replay",
+        ) => "Package::apply",
+        (OwnerRoute::DrawingmlInkActions, "forward_replay" | "inverse_replay" | "stale_replay") => {
+            "Prepared::apply"
+        },
+        _ => "unknown owner operation",
     }
 }
 
@@ -407,6 +449,7 @@ struct OwnerWork {
     fixture: OwnerFixture,
     changed: Vec<u8>,
     patch: OwnerPatch,
+    inverse_patch: OwnerPatch,
     prepared: OwnerPrepared,
     changed_prepared: OwnerPrepared,
     stale_prepared: OwnerPrepared,
@@ -424,7 +467,7 @@ enum OwnerPatch {
 enum OwnerPrepared {
     DrawingmlChart(dml::chart::edit::Snapshot),
     DrawingmlThemeFamily(dml::theme::family::Snapshot),
-    DrawingmlInkActions(Vec<u8>),
+    DrawingmlInkActions(dml::ink::actions::Profile),
     DrawingmlTransform(dml::transform::Snapshot),
 }
 
@@ -437,8 +480,24 @@ enum OwnerPrepared {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct OwnerSemanticReceipt {
+    source_semantic_sha256: String,
+    noop_semantic_sha256: String,
+    changed_semantic_sha256: String,
+    forward_semantic_sha256: String,
+    inverse_semantic_sha256: String,
+    source_rest_semantic_sha256: String,
+    changed_rest_semantic_sha256: String,
+    expected_mutation: &'static str,
+    mutation_verified: bool,
+    unchanged_remainder: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct OwnerCommitReceipt {
     route: &'static str,
+    native_commit_path: &'static str,
+    native_replay_path: &'static str,
     fixture_identity_sha256: String,
     source_sha256: String,
     noop_sha256: String,
@@ -450,6 +509,7 @@ struct OwnerCommitReceipt {
     stale_error_variant: &'static str,
     stale_reason_verified: bool,
     stale_refusal: RefusalReceipt,
+    semantic: OwnerSemanticReceipt,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2762,8 +2822,14 @@ fn select_owner_route(case: &mut LaneCase, route: &str) -> Result<(), ProbeFailu
         )));
     }
     let fixture = &case.owners[0];
-    let (changed, patch) = owner_commit(fixture, true)?;
     let prepared = owner_prepare(fixture)?;
+    // Build the changed patch from the same retained native owner that the
+    // timed commit helper consumes.  In particular, current Ink actions must
+    // use `Prepared::edit`, rather than reopening the source through the
+    // detached legacy constructor merely to obtain a patch.
+    let (changed, patch) =
+        owner_native_commit_parts(route, owner_native_commit_prepared(route, &prepared, true))?;
+    let inverse_patch = owner_patch_inverse(&patch);
     let mut changed_fixture = fixture.clone();
     changed_fixture.source = changed.clone();
     let changed_prepared = owner_prepare(&changed_fixture)?;
@@ -2774,6 +2840,7 @@ fn select_owner_route(case: &mut LaneCase, route: &str) -> Result<(), ProbeFailu
         fixture: fixture.clone(),
         changed,
         patch,
+        inverse_patch,
         prepared,
         changed_prepared,
         stale_prepared,
@@ -2804,6 +2871,22 @@ fn select_raw_scope(case: &mut LaneCase, scope: &str) -> Result<(), ProbeFailure
     case.owners.clear();
     case.prepared_owners.clear();
     Ok(())
+}
+
+/// Build the inverse once, before a timed replay sample.  Inversion is part of
+/// the proof/preparation work; constructing it in the sample would measure a
+/// patch clone and its source-state swap in addition to the native replay.
+fn owner_patch_inverse(patch: &OwnerPatch) -> OwnerPatch {
+    match patch {
+        OwnerPatch::DrawingmlChart(patch) => OwnerPatch::DrawingmlChart(patch.clone().inverse()),
+        OwnerPatch::DrawingmlThemeFamily(patch) => {
+            OwnerPatch::DrawingmlThemeFamily(patch.clone().inverse())
+        },
+        OwnerPatch::DrawingmlInkActions(patch) => OwnerPatch::DrawingmlInkActions(patch.inverse()),
+        OwnerPatch::DrawingmlTransform(patch) => {
+            OwnerPatch::DrawingmlTransform(patch.clone().inverse())
+        },
+    }
 }
 
 #[cfg(not(feature = "drawingml-owner-current"))]
@@ -2864,84 +2947,6 @@ fn owner_error(_route: OwnerRoute, error: dml::Error) -> ProbeFailure {
 }
 
 #[cfg(not(feature = "drawingml-owner-current"))]
-fn owner_commit(
-    fixture: &OwnerFixture,
-    changed: bool,
-) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
-    match fixture.route {
-        OwnerRoute::DrawingmlChart => {
-            let snapshot = dml::chart::edit::Snapshot::from_xml(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = snapshot.edit();
-            if changed {
-                edit.set_title(Some(dml::chart::data::TitleText::from_string(
-                    "DrawingML qualification mutation",
-                )))
-                .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.snapshot().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlChart(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlThemeFamily => {
-            let snapshot = dml::theme::family::Snapshot::from_xml(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = snapshot.edit();
-            if changed {
-                edit.set_name("DrawingML qualification mutation")
-                    .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.snapshot().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlInkActions => {
-            use dml::ink::actions::{ActionSelector, Edit};
-            let profile = dml::ink::actions::read_profile(&fixture.source)
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit =
-                Edit::from_profile(&profile).map_err(|error| owner_error(fixture.route, error))?;
-            if changed {
-                edit.set_start_time(ActionSelector::ordinal(0), "0.50")
-                    .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit
-                    .to_vec()
-                    .map_err(|error| owner_error(fixture.route, error))?,
-                OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlTransform => {
-            let snapshot = dml::transform::Snapshot::from_xml(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = snapshot.edit();
-            if changed {
-                edit.set_rotation(Some(dml::transform::Angle::new(60000)));
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.snapshot().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlTransform(commit.patch().clone()),
-            ))
-        },
-    }
-}
-
-#[cfg(not(feature = "drawingml-owner-current"))]
 fn owner_prepare(fixture: &OwnerFixture) -> Result<OwnerPrepared, ProbeFailure> {
     match fixture.route {
         OwnerRoute::DrawingmlChart => dml::chart::edit::Snapshot::from_xml(fixture.source.clone())
@@ -2952,9 +2957,9 @@ fn owner_prepare(fixture: &OwnerFixture) -> Result<OwnerPrepared, ProbeFailure> 
                 .map(OwnerPrepared::DrawingmlThemeFamily)
                 .map_err(|error| owner_error(fixture.route, error))
         },
-        OwnerRoute::DrawingmlInkActions => {
-            Ok(OwnerPrepared::DrawingmlInkActions(fixture.source.clone()))
-        },
+        OwnerRoute::DrawingmlInkActions => dml::ink::actions::read_profile(&fixture.source)
+            .map(OwnerPrepared::DrawingmlInkActions)
+            .map_err(|error| owner_error(fixture.route, error)),
         OwnerRoute::DrawingmlTransform => {
             dml::transform::Snapshot::from_xml(fixture.source.clone())
                 .map(OwnerPrepared::DrawingmlTransform)
@@ -3031,421 +3036,434 @@ fn owner_transform_package(source: Vec<u8>) -> dml::Result<dml::transform::Packa
     dml::transform::Package::from_xml(source)
 }
 
-#[cfg(feature = "drawingml-owner-current")]
-fn owner_commit(
-    fixture: &OwnerFixture,
-    changed: bool,
-) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
-    match fixture.route {
-        OwnerRoute::DrawingmlChart => {
-            let package = dml::chart::edit::Package::from_xml(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = package.edit();
-            if changed {
-                edit.set_title(Some(dml::chart::data::TitleText::from_string(
-                    "DrawingML qualification mutation",
-                )))
-                .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.package().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlChart(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlThemeFamily => {
-            let package = owner_theme_package(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = package.edit();
-            if changed {
-                edit.set_name("DrawingML qualification mutation")
-                    .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.package().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlInkActions => {
-            use dml::ink::actions::builder::ActionSelector;
-            use dml::ink::actions::{Edit, EditOptions};
-            let profile = owner_read_profile(&fixture.source)
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = Edit::from_profile(&profile, EditOptions::default())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            if changed {
-                edit.set_start_time(ActionSelector::ordinal(0), "0.50")
-                    .map_err(|error| owner_error(fixture.route, error))?;
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.package().as_bytes().to_vec(),
-                OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
-            ))
-        },
-        OwnerRoute::DrawingmlTransform => {
-            let package = owner_transform_package(fixture.source.clone())
-                .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = package.edit();
-            if changed {
-                edit.set_rotation(Some(dml::transform::Angle::new(60000)));
-            }
-            let commit = edit
-                .commit()
-                .map_err(|error| owner_error(fixture.route, error))?;
-            Ok((
-                commit.package().xml_bytes().to_vec(),
-                OwnerPatch::DrawingmlTransform(commit.patch().clone()),
-            ))
-        },
-    }
-}
-
 #[cfg(not(feature = "drawingml-owner-current"))]
-fn owner_apply(
-    route: OwnerRoute,
-    source: &[u8],
-    patch: &OwnerPatch,
-    inverse: bool,
-) -> Result<Vec<u8>, ProbeFailure> {
-    match (route, patch) {
-        (OwnerRoute::DrawingmlChart, OwnerPatch::DrawingmlChart(patch)) => {
-            let snapshot = dml::chart::edit::Snapshot::from_xml(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(&snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlThemeFamily, OwnerPatch::DrawingmlThemeFamily(patch)) => {
-            let snapshot = dml::theme::family::Snapshot::from_xml(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(&snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlInkActions, OwnerPatch::DrawingmlInkActions(patch)) => {
-            let patch = if inverse {
-                patch.inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(source)
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
-            let snapshot = dml::transform::Snapshot::from_xml(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(&snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        _ => Err(fail("owner route and patch type differ")),
-    }
+enum NativeOwnerResult {
+    DrawingmlChart(dml::Result<dml::chart::edit::Commit>),
+    DrawingmlThemeFamily(dml::Result<dml::theme::family::Commit>),
+    DrawingmlInkActions(dml::Result<dml::ink::actions::Commit>),
+    DrawingmlTransform(dml::Result<dml::transform::Commit>),
 }
 
 #[cfg(feature = "drawingml-owner-current")]
-fn owner_apply(
-    route: OwnerRoute,
-    source: &[u8],
-    patch: &OwnerPatch,
-    inverse: bool,
-) -> Result<Vec<u8>, ProbeFailure> {
-    match (route, patch) {
-        (OwnerRoute::DrawingmlChart, OwnerPatch::DrawingmlChart(patch)) => {
-            let package = dml::chart::edit::Package::from_xml(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
-                .map(|commit| commit.package().xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlThemeFamily, OwnerPatch::DrawingmlThemeFamily(patch)) => {
-            let package =
-                owner_theme_package(source.to_vec()).map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
-                .map(|commit| commit.package().xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlInkActions, OwnerPatch::DrawingmlInkActions(patch)) => {
-            use dml::ink::actions::{Edit, EditOptions};
-            let patch = if inverse {
-                patch.inverse()
-            } else {
-                patch.clone()
-            };
-            let profile = owner_read_profile(source).map_err(|error| owner_error(route, error))?;
-            let prepared = Edit::from_profile(&profile, EditOptions::default())
-                .map_err(|error| owner_error(route, error))?
-                .commit()
-                .map_err(|error| owner_error(route, error))?
-                .into_package();
-            prepared
-                .apply(&patch)
-                .map(|commit| commit.package().as_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
-            let package = owner_transform_package(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
-                .map(|commit| commit.package().xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        _ => Err(fail("owner route and patch type differ")),
-    }
+enum NativeOwnerResult {
+    DrawingmlChart(dml::Result<dml::chart::edit::Commit>),
+    DrawingmlThemeFamily(dml::Result<dml::theme::family::Commit>),
+    DrawingmlInkActions(dml::Result<dml::ink::actions::Commit>),
+    DrawingmlTransform(dml::Result<dml::transform::Commit>),
 }
 
 #[cfg(not(feature = "drawingml-owner-current"))]
-fn owner_apply_prepared(
+enum NativeReplayResult {
+    DrawingmlChart(dml::Result<dml::chart::edit::Snapshot>),
+    DrawingmlThemeFamily(dml::Result<dml::theme::family::Snapshot>),
+    DrawingmlInkActions(dml::Result<Vec<u8>>),
+    DrawingmlTransform(dml::Result<dml::transform::Snapshot>),
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+enum NativeReplayResult {
+    DrawingmlChart(dml::Result<dml::chart::edit::Commit>),
+    DrawingmlThemeFamily(dml::Result<dml::theme::family::Commit>),
+    DrawingmlInkActions(dml::Result<dml::ink::actions::Commit>),
+    DrawingmlTransform(dml::Result<dml::transform::Commit>),
+}
+
+/// Run one owner edit against an already parsed/retained native owner.  This
+/// helper deliberately returns the native result without converting it to
+/// bytes or a probe error; the timed caller black-boxes that result directly.
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_native_commit_prepared(
     route: OwnerRoute,
     prepared: &OwnerPrepared,
-    patch: &OwnerPatch,
-    inverse: bool,
-) -> Result<Vec<u8>, ProbeFailure> {
-    match (route, prepared, patch) {
-        (
-            OwnerRoute::DrawingmlChart,
-            OwnerPrepared::DrawingmlChart(snapshot),
-            OwnerPatch::DrawingmlChart(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
+    changed: bool,
+) -> NativeOwnerResult {
+    match (prepared, route) {
+        (OwnerPrepared::DrawingmlChart(snapshot), OwnerRoute::DrawingmlChart) => {
+            let result = (|| {
+                let mut edit = snapshot.edit();
+                if changed {
+                    edit.set_title(Some(dml::chart::data::TitleText::from_string(
+                        "DrawingML qualification mutation",
+                    )))?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlChart(result)
+        },
+        (OwnerPrepared::DrawingmlThemeFamily(snapshot), OwnerRoute::DrawingmlThemeFamily) => {
+            let result = (|| {
+                let mut edit = snapshot.edit();
+                if changed {
+                    edit.set_name("DrawingML qualification mutation")?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlThemeFamily(result)
+        },
+        (OwnerPrepared::DrawingmlInkActions(profile), OwnerRoute::DrawingmlInkActions) => {
+            use dml::ink::actions::{ActionSelector, Edit};
+            let result = (|| {
+                let mut edit = Edit::from_profile(profile)?;
+                if changed {
+                    edit.set_start_time(ActionSelector::ordinal(0), "0.50")?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlInkActions(result)
+        },
+        (OwnerPrepared::DrawingmlTransform(snapshot), OwnerRoute::DrawingmlTransform) => {
+            let result = (|| {
+                let mut edit = snapshot.edit();
+                if changed {
+                    edit.set_rotation(Some(dml::transform::Angle::new(60000)));
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlTransform(result)
+        },
+        _ => unreachable!("owner route and prepared source type differ"),
+    }
+}
+
+/// Current owners expose immutable packages/prepared values.  In particular,
+/// Ink uses `Prepared::edit()` so the timed operation does not rebuild a
+/// detached profile from source bytes.
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_native_commit_prepared(
+    route: OwnerRoute,
+    prepared: &OwnerPrepared,
+    changed: bool,
+) -> NativeOwnerResult {
+    match (prepared, route) {
+        (OwnerPrepared::DrawingmlChart(package), OwnerRoute::DrawingmlChart) => {
+            let result = (|| {
+                let mut edit = package.edit();
+                if changed {
+                    edit.set_title(Some(dml::chart::data::TitleText::from_string(
+                        "DrawingML qualification mutation",
+                    )))?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlChart(result)
+        },
+        (OwnerPrepared::DrawingmlThemeFamily(package), OwnerRoute::DrawingmlThemeFamily) => {
+            let result = (|| {
+                let mut edit = package.edit();
+                if changed {
+                    edit.set_name("DrawingML qualification mutation")?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlThemeFamily(result)
+        },
+        (OwnerPrepared::DrawingmlInkActions(prepared), OwnerRoute::DrawingmlInkActions) => {
+            use dml::ink::actions::builder::ActionSelector;
+            let result = (|| {
+                let mut edit = prepared.edit()?;
+                if changed {
+                    edit.set_start_time(ActionSelector::ordinal(0), "0.50")?;
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlInkActions(result)
+        },
+        (OwnerPrepared::DrawingmlTransform(package), OwnerRoute::DrawingmlTransform) => {
+            let result = (|| {
+                let mut edit = package.edit();
+                if changed {
+                    edit.set_rotation(Some(dml::transform::Angle::new(60000)));
+                }
+                edit.commit()
+            })();
+            NativeOwnerResult::DrawingmlTransform(result)
+        },
+        _ => unreachable!("owner route and prepared source type differ"),
+    }
+}
+
+fn owner_native_commit(work: &OwnerWork, changed: bool) -> NativeOwnerResult {
+    owner_native_commit_prepared(work.fixture.route, &work.prepared, changed)
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_native_replay(prepared: &OwnerPrepared, patch: &OwnerPatch) -> NativeReplayResult {
+    match (prepared, patch) {
+        (OwnerPrepared::DrawingmlChart(snapshot), OwnerPatch::DrawingmlChart(patch)) => {
+            NativeReplayResult::DrawingmlChart(patch.apply(snapshot))
         },
         (
-            OwnerRoute::DrawingmlThemeFamily,
             OwnerPrepared::DrawingmlThemeFamily(snapshot),
             OwnerPatch::DrawingmlThemeFamily(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
+        ) => NativeReplayResult::DrawingmlThemeFamily(patch.apply(snapshot)),
+        (OwnerPrepared::DrawingmlInkActions(profile), OwnerPatch::DrawingmlInkActions(patch)) => {
+            NativeReplayResult::DrawingmlInkActions(patch.apply(profile.source()))
         },
-        (
-            OwnerRoute::DrawingmlInkActions,
-            OwnerPrepared::DrawingmlInkActions(source),
-            OwnerPatch::DrawingmlInkActions(patch),
-        ) => {
-            let patch = if inverse {
-                patch.inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(source)
-                .map_err(|error| owner_error(route, error))
+        (OwnerPrepared::DrawingmlTransform(snapshot), OwnerPatch::DrawingmlTransform(patch)) => {
+            NativeReplayResult::DrawingmlTransform(patch.apply(snapshot))
         },
-        (
-            OwnerRoute::DrawingmlTransform,
-            OwnerPrepared::DrawingmlTransform(snapshot),
-            OwnerPatch::DrawingmlTransform(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            patch
-                .apply(snapshot)
-                .map(|snapshot| snapshot.xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        _ => Err(fail("owner route, prepared source and patch type differ")),
+        _ => unreachable!("owner route, prepared source and patch type differ"),
     }
 }
 
 #[cfg(feature = "drawingml-owner-current")]
-fn owner_apply_prepared(
+fn owner_native_replay(prepared: &OwnerPrepared, patch: &OwnerPatch) -> NativeReplayResult {
+    match (prepared, patch) {
+        (OwnerPrepared::DrawingmlChart(package), OwnerPatch::DrawingmlChart(patch)) => {
+            NativeReplayResult::DrawingmlChart(package.apply(patch))
+        },
+        (OwnerPrepared::DrawingmlThemeFamily(package), OwnerPatch::DrawingmlThemeFamily(patch)) => {
+            NativeReplayResult::DrawingmlThemeFamily(package.apply(patch))
+        },
+        (OwnerPrepared::DrawingmlInkActions(prepared), OwnerPatch::DrawingmlInkActions(patch)) => {
+            NativeReplayResult::DrawingmlInkActions(prepared.apply(patch))
+        },
+        (OwnerPrepared::DrawingmlTransform(package), OwnerPatch::DrawingmlTransform(patch)) => {
+            NativeReplayResult::DrawingmlTransform(package.apply(patch))
+        },
+        _ => unreachable!("owner route, prepared source and patch type differ"),
+    }
+}
+
+fn black_box_native_owner(result: NativeOwnerResult) {
+    match result {
+        NativeOwnerResult::DrawingmlChart(result) => {
+            let _ = black_box(result);
+        },
+        NativeOwnerResult::DrawingmlThemeFamily(result) => {
+            let _ = black_box(result);
+        },
+        NativeOwnerResult::DrawingmlInkActions(result) => {
+            let _ = black_box(result);
+        },
+        NativeOwnerResult::DrawingmlTransform(result) => {
+            let _ = black_box(result);
+        },
+    }
+}
+
+fn black_box_native_replay(result: NativeReplayResult) {
+    match result {
+        NativeReplayResult::DrawingmlChart(result) => {
+            let _ = black_box(result);
+        },
+        NativeReplayResult::DrawingmlThemeFamily(result) => {
+            let _ = black_box(result);
+        },
+        NativeReplayResult::DrawingmlInkActions(result) => {
+            let _ = black_box(result);
+        },
+        NativeReplayResult::DrawingmlTransform(result) => {
+            let _ = black_box(result);
+        },
+    }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_native_commit_parts(
     route: OwnerRoute,
-    prepared: &OwnerPrepared,
-    patch: &OwnerPatch,
-    inverse: bool,
+    result: NativeOwnerResult,
+) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
+    match (route, result) {
+        (OwnerRoute::DrawingmlChart, NativeOwnerResult::DrawingmlChart(result)) => result
+            .map(|commit| {
+                (
+                    commit.snapshot().xml_bytes().to_vec(),
+                    OwnerPatch::DrawingmlChart(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlThemeFamily, NativeOwnerResult::DrawingmlThemeFamily(result)) => {
+            result
+                .map(|commit| {
+                    (
+                        commit.snapshot().xml_bytes().to_vec(),
+                        OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
+                    )
+                })
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlInkActions, NativeOwnerResult::DrawingmlInkActions(result)) => result
+            .map(|commit| {
+                (
+                    commit.as_bytes().to_vec(),
+                    OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlTransform, NativeOwnerResult::DrawingmlTransform(result)) => result
+            .map(|commit| {
+                (
+                    commit.snapshot().xml_bytes().to_vec(),
+                    OwnerPatch::DrawingmlTransform(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        _ => Err(fail("owner route and native commit result type differ")),
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_native_commit_parts(
+    route: OwnerRoute,
+    result: NativeOwnerResult,
+) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
+    match (route, result) {
+        (OwnerRoute::DrawingmlChart, NativeOwnerResult::DrawingmlChart(result)) => result
+            .map(|commit| {
+                (
+                    commit.package().xml_bytes().to_vec(),
+                    OwnerPatch::DrawingmlChart(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlThemeFamily, NativeOwnerResult::DrawingmlThemeFamily(result)) => {
+            result
+                .map(|commit| {
+                    (
+                        commit.package().xml_bytes().to_vec(),
+                        OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
+                    )
+                })
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlInkActions, NativeOwnerResult::DrawingmlInkActions(result)) => result
+            .map(|commit| {
+                (
+                    commit.package().as_bytes().to_vec(),
+                    OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlTransform, NativeOwnerResult::DrawingmlTransform(result)) => result
+            .map(|commit| {
+                (
+                    commit.package().xml_bytes().to_vec(),
+                    OwnerPatch::DrawingmlTransform(commit.patch().clone()),
+                )
+            })
+            .map_err(|error| owner_error(route, error)),
+        _ => Err(fail("owner route and native commit result type differ")),
+    }
+}
+
+fn owner_native_commit_output(
+    route: OwnerRoute,
+    result: NativeOwnerResult,
 ) -> Result<Vec<u8>, ProbeFailure> {
-    match (route, prepared, patch) {
-        (
-            OwnerRoute::DrawingmlChart,
-            OwnerPrepared::DrawingmlChart(package),
-            OwnerPatch::DrawingmlChart(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
+    owner_native_commit_parts(route, result).map(|(output, _patch)| output)
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_native_replay_output(
+    route: OwnerRoute,
+    result: NativeReplayResult,
+) -> Result<Vec<u8>, ProbeFailure> {
+    match (route, result) {
+        (OwnerRoute::DrawingmlChart, NativeReplayResult::DrawingmlChart(result)) => result
+            .map(|snapshot| snapshot.xml_bytes().to_vec())
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlThemeFamily, NativeReplayResult::DrawingmlThemeFamily(result)) => {
+            result
+                .map(|snapshot| snapshot.xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlInkActions, NativeReplayResult::DrawingmlInkActions(result)) => {
+            result.map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlTransform, NativeReplayResult::DrawingmlTransform(result)) => result
+            .map(|snapshot| snapshot.xml_bytes().to_vec())
+            .map_err(|error| owner_error(route, error)),
+        _ => Err(fail("owner route and native replay result type differ")),
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_native_replay_output(
+    route: OwnerRoute,
+    result: NativeReplayResult,
+) -> Result<Vec<u8>, ProbeFailure> {
+    match (route, result) {
+        (OwnerRoute::DrawingmlChart, NativeReplayResult::DrawingmlChart(result)) => result
+            .map(|commit| commit.package().xml_bytes().to_vec())
+            .map_err(|error| owner_error(route, error)),
+        (OwnerRoute::DrawingmlThemeFamily, NativeReplayResult::DrawingmlThemeFamily(result)) => {
+            result
                 .map(|commit| commit.package().xml_bytes().to_vec())
                 .map_err(|error| owner_error(route, error))
         },
-        (
-            OwnerRoute::DrawingmlThemeFamily,
-            OwnerPrepared::DrawingmlThemeFamily(package),
-            OwnerPatch::DrawingmlThemeFamily(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
-                .map(|commit| commit.package().xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        (
-            OwnerRoute::DrawingmlInkActions,
-            OwnerPrepared::DrawingmlInkActions(prepared),
-            OwnerPatch::DrawingmlInkActions(patch),
-        ) => {
-            let patch = if inverse {
-                patch.inverse()
-            } else {
-                patch.clone()
-            };
-            prepared
-                .apply(&patch)
+        (OwnerRoute::DrawingmlInkActions, NativeReplayResult::DrawingmlInkActions(result)) => {
+            result
                 .map(|commit| commit.package().as_bytes().to_vec())
                 .map_err(|error| owner_error(route, error))
         },
-        (
-            OwnerRoute::DrawingmlTransform,
-            OwnerPrepared::DrawingmlTransform(package),
-            OwnerPatch::DrawingmlTransform(patch),
-        ) => {
-            let patch = if inverse {
-                patch.clone().inverse()
-            } else {
-                patch.clone()
-            };
-            package
-                .apply(&patch)
-                .map(|commit| commit.package().xml_bytes().to_vec())
-                .map_err(|error| owner_error(route, error))
-        },
-        _ => Err(fail("owner route, prepared source and patch type differ")),
+        (OwnerRoute::DrawingmlTransform, NativeReplayResult::DrawingmlTransform(result)) => result
+            .map(|commit| commit.package().xml_bytes().to_vec())
+            .map_err(|error| owner_error(route, error)),
+        _ => Err(fail("owner route and native replay result type differ")),
     }
 }
 
-fn owner_replay(
-    fixture: &OwnerFixture,
-    patch: &OwnerPatch,
-    inverse: bool,
-) -> Result<Vec<u8>, ProbeFailure> {
-    let (source, inverse) = if inverse {
-        (owner_commit(fixture, true)?.0, true)
-    } else {
-        (fixture.source.clone(), false)
-    };
-    owner_apply(fixture.route, &source, patch, inverse)
-}
-
-fn owner_stale_refusal(
-    fixture: &OwnerFixture,
-    patch: &OwnerPatch,
-) -> Result<RefusalReceipt, ProbeFailure> {
-    match owner_apply(fixture.route, &fixture.stale, patch, false) {
-        Ok(_) => Err(fail(format!(
+fn owner_native_replay_error(
+    route: OwnerRoute,
+    result: NativeReplayResult,
+) -> Result<ProbeFailure, ProbeFailure> {
+    match result {
+        NativeReplayResult::DrawingmlChart(Ok(_))
+        | NativeReplayResult::DrawingmlThemeFamily(Ok(_))
+        | NativeReplayResult::DrawingmlInkActions(Ok(_))
+        | NativeReplayResult::DrawingmlTransform(Ok(_)) => Err(fail(format!(
             "{} accepted a stale patch",
-            owner_route_name(fixture.route)
+            owner_route_name(route)
         ))),
-        Err(error) => {
-            #[cfg(feature = "drawingml-owner-current")]
-            {
-                let Some(mut refusal) = error.refusal else {
-                    return Err(fail(format!(
-                        "{} stale replay returned an untyped error: {}",
-                        owner_route_name(fixture.route),
-                        error.message
-                    )));
-                };
-                if refusal.kind != "patch_conflict" || refusal.source_kind != Some("patch_conflict")
-                {
-                    return Err(fail(format!(
-                        "{} stale replay returned the wrong typed error: {}",
-                        owner_route_name(fixture.route),
-                        refusal.message
-                    )));
-                }
-                refusal.observed = fixture.stale.len();
-                Ok(refusal)
-            }
-            #[cfg(not(feature = "drawingml-owner-current"))]
-            {
-                let Some(mut refusal) = error.refusal else {
-                    return Err(fail(format!(
-                        "{} stale replay returned an unexpected error: {}",
-                        owner_route_name(fixture.route),
-                        error.message
-                    )));
-                };
-                if refusal.kind != "patch_conflict" || refusal.source_kind != Some("invalid_input")
-                {
-                    return Err(fail(format!(
-                        "{} stale replay returned the wrong legacy classification: {}",
-                        owner_route_name(fixture.route),
-                        refusal.message
-                    )));
-                }
-                refusal.observed = fixture.stale.len();
-                Ok(refusal)
-            }
-        },
+        NativeReplayResult::DrawingmlChart(Err(error))
+        | NativeReplayResult::DrawingmlThemeFamily(Err(error))
+        | NativeReplayResult::DrawingmlInkActions(Err(error))
+        | NativeReplayResult::DrawingmlTransform(Err(error)) => Ok(owner_error(route, error)),
     }
+}
+
+fn validate_stale_refusal(
+    route: OwnerRoute,
+    error: ProbeFailure,
+    observed: usize,
+) -> Result<RefusalReceipt, ProbeFailure> {
+    let Some(mut refusal) = error.refusal else {
+        return Err(fail(format!(
+            "{} stale replay returned an untyped error: {}",
+            owner_route_name(route),
+            error.message
+        )));
+    };
+    #[cfg(feature = "drawingml-owner-current")]
+    if refusal.kind != "patch_conflict" || refusal.source_kind != Some("patch_conflict") {
+        return Err(fail(format!(
+            "{} stale replay returned the wrong typed error: {}",
+            owner_route_name(route),
+            refusal.message
+        )));
+    }
+    #[cfg(not(feature = "drawingml-owner-current"))]
+    if refusal.kind != "patch_conflict" || refusal.source_kind != Some("invalid_input") {
+        return Err(fail(format!(
+            "{} stale replay returned the wrong legacy classification: {}",
+            owner_route_name(route),
+            refusal.message
+        )));
+    }
+    refusal.observed = observed;
+    Ok(refusal)
+}
+
+fn owner_native_stale_refusal(work: &OwnerWork) -> Result<RefusalReceipt, ProbeFailure> {
+    let error = match owner_native_replay_error(
+        work.fixture.route,
+        owner_native_replay(&work.stale_prepared, &work.patch),
+    ) {
+        Ok(error) => error,
+        Err(error) => return Err(error),
+    };
+    validate_stale_refusal(work.fixture.route, error, work.fixture.stale.len())
 }
 
 #[cfg(not(feature = "drawingml-owner-current"))]
@@ -3460,19 +3478,20 @@ const fn stale_error_variant() -> &'static str {
 
 #[cfg(not(feature = "drawingml-owner-current"))]
 fn stale_reason_verified(route: OwnerRoute, refusal: &RefusalReceipt) -> bool {
-    match route {
-        OwnerRoute::DrawingmlChart => {
-            refusal.message == "chart patch source does not match its byte precondition"
-        },
+    let reason = match route {
+        OwnerRoute::DrawingmlChart => "chart patch source does not match its byte precondition",
         OwnerRoute::DrawingmlThemeFamily => {
-            refusal.message == "theme family patch source does not match its byte precondition"
+            "theme family patch source does not match its byte precondition"
         },
-        OwnerRoute::DrawingmlInkActions => refusal.message == "ink action patch source is stale",
+        OwnerRoute::DrawingmlInkActions => "ink action patch source is stale",
         OwnerRoute::DrawingmlTransform => {
-            refusal.message
-                == "DrawingML transform patch source state does not match its precondition"
+            "DrawingML transform patch source state does not match its precondition"
         },
-    }
+    };
+    // Legacy `Error::Invalid` retains the exact source-specific cause inside
+    // the public Display prefix.  Verify both the concrete variant (recorded
+    // separately) and that full, non-redacted reason here.
+    refusal.message == format!("invalid DrawingML: {reason}")
 }
 
 #[cfg(feature = "drawingml-owner-current")]
@@ -3482,18 +3501,34 @@ fn stale_reason_verified(_route: OwnerRoute, refusal: &RefusalReceipt) -> bool {
 
 fn owner_proof(
     fixture_identity_sha256: &str,
-    fixture: &OwnerFixture,
+    work: &OwnerWork,
 ) -> Result<OwnerCommitReceipt, ProbeFailure> {
-    let (noop_bytes, _noop_patch) = owner_commit(fixture, false)?;
+    let fixture = &work.fixture;
+    // Correctness uses the very same native helpers as the timed rows.  Only
+    // the native result-to-bytes conversion and semantic oracle run here,
+    // outside the measurement clock.
+    let noop_bytes = owner_native_commit_output(fixture.route, owner_native_commit(work, false))?;
     if noop_bytes != fixture.source {
         return Err(fail(format!(
             "{} no-op commit changed the exact source bytes",
             owner_route_name(fixture.route)
         )));
     }
-    let (changed_bytes, patch) = owner_commit(fixture, true)?;
-    let forward_bytes = owner_replay(fixture, &patch, false)?;
-    let inverse_bytes = owner_replay(fixture, &patch, true)?;
+    let changed_bytes = owner_native_commit_output(fixture.route, owner_native_commit(work, true))?;
+    if changed_bytes != work.changed {
+        return Err(fail(format!(
+            "{} native changed commit differs from its prepared owner output",
+            owner_route_name(fixture.route)
+        )));
+    }
+    let forward_bytes = owner_native_replay_output(
+        fixture.route,
+        owner_native_replay(&work.prepared, &work.patch),
+    )?;
+    let inverse_bytes = owner_native_replay_output(
+        fixture.route,
+        owner_native_replay(&work.changed_prepared, &work.inverse_patch),
+    )?;
     if forward_bytes != changed_bytes {
         return Err(fail(format!(
             "{} forward replay differs from committed output",
@@ -3506,15 +3541,25 @@ fn owner_proof(
             owner_route_name(fixture.route)
         )));
     }
-    let stale_refusal = owner_stale_refusal(fixture, &patch)?;
+    let stale_refusal = owner_native_stale_refusal(work)?;
     if !stale_reason_verified(fixture.route, &stale_refusal) {
         return Err(fail(format!(
             "{} stale refusal did not preserve its exact source reason",
             owner_route_name(fixture.route)
         )));
     }
+    let semantic = owner_semantic_receipt(
+        fixture.route,
+        &fixture.source,
+        &noop_bytes,
+        &changed_bytes,
+        &forward_bytes,
+        &inverse_bytes,
+    )?;
     Ok(OwnerCommitReceipt {
         route: owner_route_name(fixture.route),
+        native_commit_path: owner_operation_path(fixture.route, "changed_commit"),
+        native_replay_path: owner_operation_path(fixture.route, "forward_replay"),
         fixture_identity_sha256: sha256(
             format!(
                 "drawingml-owner-fixture-v1\0{fixture_identity_sha256}\0{}\0{}\0{}",
@@ -3534,6 +3579,7 @@ fn owner_proof(
         stale_error_variant: stale_error_variant(),
         stale_reason_verified: true,
         stale_refusal,
+        semantic,
     })
 }
 
@@ -3603,6 +3649,193 @@ fn semantic_key(kind: PartKind, bytes: &[u8]) -> Result<String, ProbeFailure> {
         PartKind::Geometry => format!("{:?}", read_geometry_value(bytes)?),
         PartKind::Color => format!("{:?}", read_color_value(bytes)?),
         PartKind::Transform => format!("{:?}", read_transform_value(bytes)?),
+    })
+}
+
+fn owner_part_kind(route: OwnerRoute) -> PartKind {
+    match route {
+        OwnerRoute::DrawingmlChart => PartKind::Chart,
+        OwnerRoute::DrawingmlThemeFamily => PartKind::ThemeFamily,
+        OwnerRoute::DrawingmlInkActions => PartKind::InkActions,
+        OwnerRoute::DrawingmlTransform => PartKind::Transform,
+    }
+}
+
+fn first_ink_action<'a>(
+    children: &'a [dml::ink::actions::RootChild],
+) -> Option<&'a dml::ink::actions::Action> {
+    for child in children {
+        match child {
+            dml::ink::actions::RootChild::Action(action) => return Some(action),
+            dml::ink::actions::RootChild::ActionGroup(group) => {
+                if let Some(action) = group.actions().first() {
+                    return Some(action);
+                }
+            },
+            _ => {},
+        }
+    }
+    None
+}
+
+/// Return a semantic remainder fingerprint after removing the field changed
+/// by the owner fixture.  The full semantic fingerprint remains separate and
+/// proves the mutation itself; this fingerprint proves that the requested
+/// setter did not silently discard the other modeled fields or retained raw
+/// profile content.
+fn owner_rest_semantic_key(route: OwnerRoute, bytes: &[u8]) -> Result<String, ProbeFailure> {
+    match route {
+        OwnerRoute::DrawingmlChart => {
+            let mut value = read_chart_value(bytes)?;
+            value.title = None;
+            Ok(sha256(format!("{:?}", value).as_bytes()))
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            let value = read_family_value(bytes)?;
+            Ok(sha256(
+                format!("{:?}|{:?}", value.id(), value.variant_id()).as_bytes(),
+            ))
+        },
+        OwnerRoute::DrawingmlInkActions => {
+            let profile = read_ink_value(bytes)?;
+            let source = profile.source();
+            let Some(action) = first_ink_action(profile.children()) else {
+                return Err(fail("Ink owner fixture has no first action"));
+            };
+            let (start, end) = action.source_span();
+            if start > end || end > source.len() {
+                return Err(fail("Ink owner first action span is outside its source"));
+            }
+            let mut normalized = Vec::with_capacity(source.len() + 16);
+            normalized.extend_from_slice(&source[..start]);
+            normalized.extend(normalize_ink_start_time(&source[start..end]));
+            normalized.extend_from_slice(&source[end..]);
+            Ok(sha256(&normalized))
+        },
+        OwnerRoute::DrawingmlTransform => {
+            let mut value = read_transform_value(bytes)?;
+            value.set_rotation(None);
+            Ok(sha256(format!("{:?}", value).as_bytes()))
+        },
+    }
+}
+
+fn normalize_ink_start_time(action: &[u8]) -> Vec<u8> {
+    let needle = b"startTime";
+    let Some(name_start) = action
+        .windows(needle.len())
+        .position(|window| window == needle)
+    else {
+        return action.to_vec();
+    };
+    let Some(equal_offset) = action[name_start + needle.len()..]
+        .iter()
+        .position(|byte| *byte == b'=')
+    else {
+        return action.to_vec();
+    };
+    let equal = name_start + needle.len() + equal_offset;
+    let Some(quote) = action.get(equal + 1).copied() else {
+        return action.to_vec();
+    };
+    if quote != b'"' && quote != b'\'' {
+        return action.to_vec();
+    }
+    let value_start = equal + 2;
+    let Some(value_len) = action[value_start..].iter().position(|byte| *byte == quote) else {
+        return action.to_vec();
+    };
+    let value_end = value_start + value_len;
+    let mut normalized = Vec::with_capacity(action.len() + 16);
+    normalized.extend_from_slice(&action[..value_start]);
+    normalized.extend_from_slice(b"<owner-start-time>");
+    normalized.extend_from_slice(&action[value_end..]);
+    normalized
+}
+
+fn owner_semantic_receipt(
+    route: OwnerRoute,
+    source: &[u8],
+    noop: &[u8],
+    changed: &[u8],
+    forward: &[u8],
+    inverse: &[u8],
+) -> Result<OwnerSemanticReceipt, ProbeFailure> {
+    let kind = owner_part_kind(route);
+    let source_key = semantic_key(kind, source)?;
+    let noop_key = semantic_key(kind, noop)?;
+    let changed_key = semantic_key(kind, changed)?;
+    let forward_key = semantic_key(kind, forward)?;
+    let inverse_key = semantic_key(kind, inverse)?;
+    if source_key != noop_key {
+        return Err(fail(format!(
+            "{} no-op semantic projection changed",
+            owner_route_name(route)
+        )));
+    }
+    if source_key == changed_key || forward_key != changed_key || inverse_key != source_key {
+        return Err(fail(format!(
+            "{} semantic commit/replay identities are not reversible",
+            owner_route_name(route)
+        )));
+    }
+    let (expected_mutation, mutation_verified) = match route {
+        OwnerRoute::DrawingmlChart => {
+            let value = read_chart_value(changed)?;
+            let verified = matches!(
+                value.title.as_ref(),
+                Some(dml::chart::data::TitleText::Literal(text))
+                    if text.text == "DrawingML qualification mutation"
+            );
+            ("chart.title=DrawingML qualification mutation", verified)
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            let value = read_family_value(changed)?;
+            (
+                "theme_family.name=DrawingML qualification mutation",
+                value.name() == "DrawingML qualification mutation",
+            )
+        },
+        OwnerRoute::DrawingmlInkActions => {
+            let profile = read_ink_value(changed)?;
+            let verified = first_ink_action(profile.children())
+                .is_some_and(|action| action.start_time() == "0.50");
+            ("ink_actions.action[0].start_time=0.50", verified)
+        },
+        OwnerRoute::DrawingmlTransform => {
+            let value = read_transform_value(changed)?;
+            (
+                "transform.rotation=60000",
+                value.authored_rotation() == Some(dml::transform::Angle::new(60000)),
+            )
+        },
+    };
+    if !mutation_verified {
+        return Err(fail(format!(
+            "{} changed semantic projection does not contain the expected mutation",
+            owner_route_name(route)
+        )));
+    }
+    let source_rest = owner_rest_semantic_key(route, source)?;
+    let changed_rest = owner_rest_semantic_key(route, changed)?;
+    let unchanged_remainder = source_rest == changed_rest;
+    if !unchanged_remainder {
+        return Err(fail(format!(
+            "{} mutation changed an unrelated semantic remainder",
+            owner_route_name(route)
+        )));
+    }
+    Ok(OwnerSemanticReceipt {
+        source_semantic_sha256: sha256(source_key.as_bytes()),
+        noop_semantic_sha256: sha256(noop_key.as_bytes()),
+        changed_semantic_sha256: sha256(changed_key.as_bytes()),
+        forward_semantic_sha256: sha256(forward_key.as_bytes()),
+        inverse_semantic_sha256: sha256(inverse_key.as_bytes()),
+        source_rest_semantic_sha256: source_rest,
+        changed_rest_semantic_sha256: changed_rest,
+        expected_mutation,
+        mutation_verified,
+        unchanged_remainder,
     })
 }
 
@@ -4539,55 +4772,59 @@ fn owner_operation(
         let fixture = &work.fixture;
         match operation_name {
             "noop_commit" => {
-                let output = owner_commit(fixture, false)?.0;
                 if timed {
-                    black_box(output);
+                    black_box_native_owner(owner_native_commit(work, false));
                 } else {
+                    let output = owner_native_commit_output(
+                        fixture.route,
+                        owner_native_commit(work, false),
+                    )?;
                     sink.write_all(&output)
                         .map_err(|error| io_failure(error, output.len()))?;
                 }
             },
             "changed_commit" => {
-                let output = owner_commit(fixture, true)?.0;
                 if timed {
-                    black_box(output);
+                    black_box_native_owner(owner_native_commit(work, true));
                 } else {
+                    let output =
+                        owner_native_commit_output(fixture.route, owner_native_commit(work, true))?;
                     sink.write_all(&output)
                         .map_err(|error| io_failure(error, output.len()))?;
                 }
             },
             "forward_replay" => {
-                let output =
-                    owner_apply_prepared(fixture.route, &work.prepared, &work.patch, false)?;
                 if timed {
-                    black_box(output);
+                    black_box_native_replay(owner_native_replay(&work.prepared, &work.patch));
                 } else {
+                    let output = owner_native_replay_output(
+                        fixture.route,
+                        owner_native_replay(&work.prepared, &work.patch),
+                    )?;
                     sink.write_all(&output)
                         .map_err(|error| io_failure(error, output.len()))?;
                 }
             },
             "inverse_replay" => {
-                let output =
-                    owner_apply_prepared(fixture.route, &work.changed_prepared, &work.patch, true)?;
                 if timed {
-                    black_box(output);
+                    black_box_native_replay(owner_native_replay(
+                        &work.changed_prepared,
+                        &work.inverse_patch,
+                    ));
                 } else {
+                    let output = owner_native_replay_output(
+                        fixture.route,
+                        owner_native_replay(&work.changed_prepared, &work.inverse_patch),
+                    )?;
                     sink.write_all(&output)
                         .map_err(|error| io_failure(error, output.len()))?;
                 }
             },
             "stale_replay" => {
                 if timed {
-                    let error = owner_apply_prepared(
-                        fixture.route,
-                        &work.stale_prepared,
-                        &work.patch,
-                        false,
-                    )
-                    .expect_err("owner route accepted a stale patch");
-                    black_box(error);
+                    black_box_native_replay(owner_native_replay(&work.stale_prepared, &work.patch));
                 } else {
-                    let refusal = owner_stale_refusal(fixture, &work.patch)?;
+                    let refusal = owner_native_stale_refusal(work)?;
                     let reason_verified = stale_reason_verified(fixture.route, &refusal);
                     if !reason_verified {
                         return Err(fail(format!(
@@ -4618,12 +4855,26 @@ fn owner_operation(
                 "refusal": refusals.first().cloned(),
                 "refusals": refusals,
                 "stale_error_identities": stale_identities,
+                "native_operation": owner_operation_path(
+                    case.prepared_owners[0].fixture.route,
+                    operation_name,
+                ),
+                "error_checked_outside_clock": true,
             }))
         })
     } else if timed {
         Ok(OperationValue::Timed)
     } else {
-        Ok(OperationValue::Sink(write_receipt(sink)))
+        Ok(OperationValue::SinkDetails {
+            sink: write_receipt(sink),
+            details: serde_json::json!({
+                "native_operation": owner_operation_path(
+                    case.prepared_owners[0].fixture.route,
+                    operation_name,
+                ),
+                "result_serialized_outside_clock": true,
+            }),
+        })
     }
 }
 
@@ -4989,9 +5240,9 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
             Vec::new()
         };
     let owner_proofs = if arguments.endpoint == "owner" {
-        case.owners
+        case.prepared_owners
             .iter()
-            .map(|fixture| owner_proof(&case.fixture_identity_sha256, fixture))
+            .map(|work| owner_proof(&case.fixture_identity_sha256, work))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| io::Error::other(error.message))?
     } else {

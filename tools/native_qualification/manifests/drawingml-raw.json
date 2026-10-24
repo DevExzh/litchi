@@ -1,7 +1,7 @@
 {
   "schema": "litchi.drawingml.raw-qualification.manifest.v1",
-  "plan_path": ".coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T135637Z.json",
-  "plan_sha256": "662a915923f93216ec4684a663b105269816d59ad5782a14a876be5cc0cc83352",
+  "plan_path": "docs/unified-ops/results/0362dvie/qualification-plan.json",
+  "plan_sha256": "e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505",
   "candidate_root": "${DRAWINGML_CANDIDATE_ROOT}",
   "candidate_revision": "${DRAWINGML_CANDIDATE_REVISION}",
   "baseline_workspace_lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",

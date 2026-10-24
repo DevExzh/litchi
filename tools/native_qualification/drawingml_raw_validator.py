@@ -122,6 +122,55 @@ def _is_hash(value: Any) -> bool:
     )
 
 
+OWNER_SEMANTIC_FIELDS = (
+    "source_semantic_sha256",
+    "noop_semantic_sha256",
+    "changed_semantic_sha256",
+    "forward_semantic_sha256",
+    "inverse_semantic_sha256",
+    "source_rest_semantic_sha256",
+    "changed_rest_semantic_sha256",
+    "expected_mutation",
+    "mutation_verified",
+    "unchanged_remainder",
+)
+
+
+def _validate_owner_semantic_proof(proof: Mapping[str, Any], path: Path) -> Mapping[str, Any]:
+    semantic = proof.get("semantic")
+    _expect(isinstance(semantic, dict), f"{path}: owner semantic proof is missing")
+    for key in (
+        "source_semantic_sha256",
+        "noop_semantic_sha256",
+        "changed_semantic_sha256",
+        "forward_semantic_sha256",
+        "inverse_semantic_sha256",
+        "source_rest_semantic_sha256",
+        "changed_rest_semantic_sha256",
+    ):
+        _expect(_is_hash(semantic.get(key)), f"{path}: owner semantic {key} is missing")
+    _expect(
+        isinstance(semantic.get("expected_mutation"), str)
+        and semantic["expected_mutation"],
+        f"{path}: owner semantic mutation description is missing",
+    )
+    _expect(
+        semantic.get("mutation_verified") is True
+        and semantic.get("unchanged_remainder") is True,
+        f"{path}: owner semantic mutation/remainder proof is incomplete",
+    )
+    _expect(
+        semantic["noop_semantic_sha256"] == semantic["source_semantic_sha256"]
+        and semantic["source_semantic_sha256"] != semantic["changed_semantic_sha256"]
+        and semantic["forward_semantic_sha256"] == semantic["changed_semantic_sha256"]
+        and semantic["inverse_semantic_sha256"] == semantic["source_semantic_sha256"]
+        and semantic["source_rest_semantic_sha256"]
+        == semantic["changed_rest_semantic_sha256"],
+        f"{path}: owner semantic proof is not reversible",
+    )
+    return semantic
+
+
 def _argv_sha256(argv: list[str]) -> str:
     return hashlib.sha256("\0".join(argv).encode("utf-8")).hexdigest()
 
@@ -682,6 +731,28 @@ def _validate_rows(
         [row.get("operation") for row in rows] == expected_operations,
         f"{path}: operation matrix differs",
     )
+    if endpoint == "owner":
+        for row in rows:
+            operation_name = row["operation"]
+            details = row.get("details")
+            if operation_name == "stale_replay":
+                _expect(isinstance(details, dict), f"{path}: stale owner details are missing")
+                operation_details = details
+                marker = "error_checked_outside_clock"
+            else:
+                _expect(isinstance(details, dict), f"{path}: owner operation details are missing")
+                operation_details = details.get("route")
+                marker = "result_serialized_outside_clock"
+                _expect(
+                    isinstance(operation_details, dict),
+                    f"{path}: owner operation route details are missing",
+                )
+            _expect(
+                isinstance(operation_details.get("native_operation"), str)
+                and operation_details["native_operation"] != "unknown owner operation"
+                and operation_details.get(marker) is True,
+                f"{path}: {operation_name} is not bound to its native operation path",
+            )
     protocol = report.get("protocol")
     _expect(isinstance(protocol, dict), f"{path}: protocol receipt is missing")
     _expect(protocol.get("minimum_ms") == MINIMUM_MS, f"{path}: minimum duration was weakened")
@@ -1024,6 +1095,13 @@ def _validate_rows(
             ):
                 _expect(_is_hash(proof.get(key)), f"{path}: owner proof {key} is missing")
             _expect(
+                isinstance(proof.get("native_commit_path"), str)
+                and proof["native_commit_path"] != "unknown owner operation"
+                and isinstance(proof.get("native_replay_path"), str)
+                and proof["native_replay_path"] != "unknown owner operation",
+                f"{path}: owner proof native operation paths are missing",
+            )
+            _expect(
                 proof.get("fixture_identity_sha256")
                 == _owner_fixture_identity(
                     expected_fixture_lane_identity,
@@ -1043,6 +1121,7 @@ def _validate_rows(
                 and proof["inverse_sha256"] == proof["source_sha256"],
                 f"{path}: owner proof identities are not reversible",
             )
+            _validate_owner_semantic_proof(proof, path)
             _expect(proof.get("stale_kind") == "patch_conflict", f"{path}: owner proof stale kind differs")
             _refusal(proof.get("stale_refusal"), "patch_conflict", path, "owner stale")
         _expect(proof_routes == owner_route_names, f"{path}: owner proofs do not cover capabilities")
@@ -1156,6 +1235,13 @@ def _validate_rows(
             ):
                 _expect(_is_hash(proof.get(key)), f"{path}: owner proof {key} is missing")
             _expect(
+                isinstance(proof.get("native_commit_path"), str)
+                and proof["native_commit_path"] != "unknown owner operation"
+                and isinstance(proof.get("native_replay_path"), str)
+                and proof["native_replay_path"] != "unknown owner operation",
+                f"{path}: owner proof native operation paths are missing",
+            )
+            _expect(
                 proof.get("fixture_identity_sha256")
                 == _owner_fixture_identity(
                     expected_fixture_lane_identity,
@@ -1175,6 +1261,7 @@ def _validate_rows(
                 and proof["inverse_sha256"] == proof["source_sha256"],
                 f"{path}: owner proof identities are not reversible",
             )
+            _validate_owner_semantic_proof(proof, path)
             _expect(proof.get("stale_kind") == "patch_conflict", f"{path}: owner proof stale kind differs")
             _refusal(proof.get("stale_refusal"), "patch_conflict", path, "owner stale")
         _expect(proof_routes == owner_route_names, f"{path}: owner proofs do not cover capabilities")
@@ -1315,6 +1402,37 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
                 report.get("generated_fixture_sha256") == expected_generated_identity
                 and report.get("generated_fixture_parts") == expected_generated_parts,
                 f"{path}: generated source/changed/malformed fixtures differ across paired legs",
+            )
+    if endpoint == "owner" and qualified_reports:
+        first_path, first_report = qualified_reports[0]
+        first_proofs = first_report.get("owner_proofs")
+        _expect(isinstance(first_proofs, list), f"{first_path}: owner proofs are missing")
+        expected_semantics = {
+            proof.get("route"): {
+                key: proof["semantic"][key]
+                for key in OWNER_SEMANTIC_FIELDS
+            }
+            for proof in first_proofs
+            if isinstance(proof, dict) and isinstance(proof.get("semantic"), dict)
+        }
+        _expect(
+            set(expected_semantics) and len(expected_semantics) == len(first_proofs),
+            f"{first_path}: owner semantic cross-leg baseline is incomplete",
+        )
+        for path, report in qualified_reports[1:]:
+            proofs = report.get("owner_proofs")
+            _expect(isinstance(proofs, list), f"{path}: owner proofs are missing")
+            actual_semantics = {
+                proof.get("route"): {
+                    key: proof["semantic"][key]
+                    for key in OWNER_SEMANTIC_FIELDS
+                }
+                for proof in proofs
+                if isinstance(proof, dict) and isinstance(proof.get("semantic"), dict)
+            }
+            _expect(
+                actual_semantics == expected_semantics,
+                f"{path}: owner semantic receipts differ across paired legs",
             )
     if external_capture is not None:
         _expect(

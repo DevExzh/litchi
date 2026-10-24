@@ -39,8 +39,8 @@ from native_qualification import prepare_drawingml_raw_inputs as preparation  # 
 
 SCHEMA = "litchi.drawingml.raw-qualification.manifest.v1"
 RECEIPT_SCHEMA = "litchi.drawingml.raw-qualification.receipt.v1"
-PLAN_PATH = ".coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T135637Z.json"
-PLAN_SHA256 = "662a915923f93216ec4684a663b105269816d59ad5782a14a876be5cc0cc83352"
+PLAN_PATH = "docs/unified-ops/results/0362dvie/qualification-plan.json"
+PLAN_SHA256 = "e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505"
 EXTERNAL_RESOURCE_SCHEMA = "litchi.drawingml.external-process-resource.v1"
 EXTERNAL_RESOURCE_FILENAME = "external-process-resource.jsonl"
 EXTERNAL_RESOURCE_EXCLUDED_EVENTS = frozenset(
