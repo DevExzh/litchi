@@ -78,7 +78,8 @@ fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
         .build()
         .unwrap();
     let options = OpenOptions::new().source_limits(limits);
-    Reader::new_with_options(Cursor::new(&bytes), options).unwrap();
+    let workbook = Reader::new_with_options(Cursor::new(&bytes), options).unwrap();
+    assert_eq!(workbook.source_limits(), limits);
     Reader::from_ole_file_with_options(ole, options).unwrap();
     let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
     assert!(

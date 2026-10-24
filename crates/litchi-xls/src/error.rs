@@ -62,6 +62,10 @@ pub enum Error {
     Object(litchi_ole_common::Error),
     /// MS-OVBA project authoring or parsing error
     Vba(litchi_vba::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// XML signature verification failure.
+    Signature(litchi_sign::Error),
     /// Host-neutral Office Graph parsing or encoding error.
     Graph(litchi_ograph::Error),
     /// Invalid BIFF record
@@ -215,6 +219,8 @@ impl fmt::Display for Error {
             Error::Cfb(e) => write!(f, "CFB error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
             Error::Vba(e) => write!(f, "VBA project error: {e}"),
+            Error::CustomXml(e) => write!(f, "Custom XML error: {e}"),
+            Error::Signature(e) => write!(f, "signature verification error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidRecord {
                 record_type,
@@ -370,6 +376,8 @@ impl std::error::Error for Error {
             Error::Cfb(e) => Some(e),
             Error::Object(e) => Some(e),
             Error::Vba(e) => Some(e),
+            Error::CustomXml(e) => Some(e),
+            Error::Signature(e) => Some(e),
             Error::Graph(e) => Some(e),
             Error::Metadata(e) => Some(e),
             _ => None,
@@ -410,6 +418,18 @@ impl From<litchi_ole_common::property_set::summary_properties::MetadataError> fo
 impl From<litchi_vba::Error> for Error {
     fn from(err: litchi_vba::Error) -> Self {
         Error::Vba(err)
+    }
+}
+
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(err: litchi_ole_common::custom_xml::Error) -> Self {
+        Error::CustomXml(err)
+    }
+}
+
+impl From<litchi_sign::Error> for Error {
+    fn from(err: litchi_sign::Error) -> Self {
+        Error::Signature(err)
     }
 }
 

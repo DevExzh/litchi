@@ -661,7 +661,10 @@ mod tests {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/SimpleMacro.xls");
         let mut workbook = Reader::new(std::fs::File::open(fixture).unwrap()).unwrap();
-        let project = workbook.vba().unwrap().unwrap();
+        let project = workbook
+            .vba(&litchi_vba::Limits::default())
+            .unwrap()
+            .unwrap();
 
         assert!(!project.name().is_empty());
         assert!(!project.modules().is_empty());

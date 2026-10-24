@@ -24,6 +24,8 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct Reader<R: Read + Seek> {
     pub(super) ole_file: OleFile<R>,
+    /// Physical source limits inherited by every lazy package-stream reader.
+    pub(super) source_limits: SourceLimits,
     /// Password-to-open profile selected by the Workbook stream's BIFF
     /// `FILEPASS` record. The parsed bytes may be clear after decryption, but
     /// package publication must retain this source protection state and its

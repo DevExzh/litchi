@@ -1050,7 +1050,9 @@ fn validate_cfb(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             if !storage.is_structurally_complete() || !storage.may_contain_macro_code() {
                 return Err(format!("{} VBA storage is incomplete", fixture.id).into());
             }
-            let project = workbook.vba()?.ok_or("macro fixture has no VBA project")?;
+            let project = workbook
+                .vba(&litchi_vba::Limits::default())?
+                .ok_or("macro fixture has no VBA project")?;
             if !project
                 .modules()
                 .iter()

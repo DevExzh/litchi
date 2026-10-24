@@ -299,7 +299,9 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
         .ok_or("macro fixture has no VBA project storage")?;
     assert!(storage.is_structurally_complete());
     assert!(storage.may_contain_macro_code());
-    let project = workbook.vba()?.ok_or("macro fixture has no VBA project")?;
+    let project = workbook
+        .vba(&litchi_vba::Limits::default())?
+        .ok_or("macro fixture has no VBA project")?;
     assert!(
         project
             .modules()

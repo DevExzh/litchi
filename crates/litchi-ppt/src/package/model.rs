@@ -607,6 +607,11 @@ pub enum Error {
     Ole(OleError),
     /// Shared OLE object or Property Set error with typed classification.
     Object(litchi_ole_common::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// XML signature verification failure.
+    #[cfg(feature = "sign")]
+    Signature(litchi_sign::Error),
     /// Checked `OfficeArt` parsing or validation error.
     OfficeArt(litchi_odraw::Error),
     /// Host-neutral Office Graph parsing or validation error.
@@ -661,6 +666,15 @@ impl std::fmt::Debug for Error {
             Self::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
             Self::Ole(error) => formatter.debug_tuple("Error::Ole").field(error).finish(),
             Self::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
+            Self::CustomXml(error) => formatter
+                .debug_tuple("Error::CustomXml")
+                .field(error)
+                .finish(),
+            #[cfg(feature = "sign")]
+            Self::Signature(error) => formatter
+                .debug_tuple("Error::Signature")
+                .field(error)
+                .finish(),
             Self::OfficeArt(error) => formatter
                 .debug_tuple("Error::OfficeArt")
                 .field(error)
@@ -745,6 +759,19 @@ impl From<litchi_ole_common::Error> for Error {
     }
 }
 
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(error: litchi_ole_common::custom_xml::Error) -> Self {
+        Self::CustomXml(error)
+    }
+}
+
+#[cfg(feature = "sign")]
+impl From<litchi_sign::Error> for Error {
+    fn from(error: litchi_sign::Error) -> Self {
+        Self::Signature(error)
+    }
+}
+
 impl From<litchi_odraw::Error> for Error {
     fn from(err: litchi_odraw::Error) -> Self {
         Error::OfficeArt(err)
@@ -764,6 +791,9 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
+            Error::CustomXml(e) => write!(f, "Custom XML error: {e}"),
+            #[cfg(feature = "sign")]
+            Error::Signature(e) => write!(f, "signature verification error: {e}"),
             Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
@@ -812,6 +842,9 @@ impl std::error::Error for Error {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Object(error) => Some(error),
+            Self::CustomXml(error) => Some(error),
+            #[cfg(feature = "sign")]
+            Self::Signature(error) => Some(error),
             Self::OfficeArt(error) => Some(error),
             Self::Graph(error) => Some(error),
             Self::InvalidFormat(_)
@@ -874,6 +907,13 @@ impl From<Error> for litchi_core::Error {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
             Error::Object(error) => litchi_core::Error::from(error),
+            Error::CustomXml(error) => {
+                litchi_core::Error::CorruptedFile(format!("PPT Custom XML error: {error}"))
+            },
+            #[cfg(feature = "sign")]
+            Error::Signature(error) => litchi_core::Error::CorruptedFile(format!(
+                "PPT signature verification error: {error}"
+            )),
             Error::OfficeArt(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
             },

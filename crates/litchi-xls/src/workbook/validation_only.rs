@@ -23,6 +23,7 @@ use crate::error::{Error, Result};
 use crate::protection::{SheetProtection, WorkbookProtection};
 use crate::records::SharedStringProperties;
 use crate::sheet_metadata::SheetMetadata;
+use crate::source_limits::SourceLimits;
 use litchi_cfb::{OleFile, OleFileLimits};
 use std::io::{Read, Seek};
 use std::sync::Arc;
@@ -136,7 +137,10 @@ impl<R: Read + Seek> Reader<R> {
         kept: KeptCells,
         cfb_limits: OleFileLimits,
     ) -> Result<ValidationWorkbook<R>> {
-        let mut workbook = Self::empty(OleFile::open_with_limits(reader, cfb_limits)?);
+        let mut workbook = Self::empty(
+            OleFile::open_with_limits(reader, cfb_limits)?,
+            SourceLimits::default(),
+        );
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&OpenOptions::default(), CellDecoding::Kept(&kept))?;
         Ok(ValidationWorkbook { workbook, kept })

@@ -310,6 +310,14 @@ pub enum Error {
     Ole(OleError),
     /// Shared OLE object capture or publication failure.
     Object(litchi_ole_common::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// Inert MS-OVBA project parsing failure.
+    Vba(litchi_vba::Error),
+    /// XML signature verification failure.
+    Signature(litchi_sign::Error),
+    /// MS-OFFCRYPTO DataSpaces inspection or patch failure.
+    Crypto(litchi_crypto::spaces::Error),
     /// Invalid DOC format
     InvalidFormat(String),
     /// Stream not found
@@ -390,6 +398,10 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
+            Error::CustomXml(e) => write!(f, "Custom XML error: {e}"),
+            Error::Vba(e) => write!(f, "VBA project error: {e}"),
+            Error::Signature(e) => write!(f, "signature verification error: {e}"),
+            Error::Crypto(e) => write!(f, "DataSpaces error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
@@ -442,6 +454,10 @@ impl std::error::Error for Error {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Object(error) => Some(error),
+            Self::CustomXml(error) => Some(error),
+            Self::Vba(error) => Some(error),
+            Self::Signature(error) => Some(error),
+            Self::Crypto(error) => Some(error),
             Self::Allocation { source, .. } => Some(source),
             Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
@@ -625,6 +641,18 @@ impl From<Error> for litchi_core::Error {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
             Error::Object(error) => litchi_core::Error::from(error),
+            Error::CustomXml(error) => {
+                litchi_core::Error::CorruptedFile(format!("DOC Custom XML error: {error}"))
+            },
+            Error::Vba(error) => {
+                litchi_core::Error::CorruptedFile(format!("DOC VBA project error: {error}"))
+            },
+            Error::Signature(error) => litchi_core::Error::CorruptedFile(format!(
+                "DOC signature verification error: {error}"
+            )),
+            Error::Crypto(error) => {
+                litchi_core::Error::CorruptedFile(format!("DOC DataSpaces error: {error}"))
+            },
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
@@ -674,6 +702,33 @@ impl From<litchi_ole_common::Error> for Error {
         match error {
             litchi_ole_common::Error::PatchConflict => Self::PatchConflict,
             error => Self::Object(error),
+        }
+    }
+}
+
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(error: litchi_ole_common::custom_xml::Error) -> Self {
+        Self::CustomXml(error)
+    }
+}
+
+impl From<litchi_vba::Error> for Error {
+    fn from(error: litchi_vba::Error) -> Self {
+        Self::Vba(error)
+    }
+}
+
+impl From<litchi_sign::Error> for Error {
+    fn from(error: litchi_sign::Error) -> Self {
+        Self::Signature(error)
+    }
+}
+
+impl From<litchi_crypto::spaces::Error> for Error {
+    fn from(error: litchi_crypto::spaces::Error) -> Self {
+        match error {
+            litchi_crypto::spaces::Error::PatchConflict => Self::PatchConflict,
+            error => Self::Crypto(error),
         }
     }
 }

@@ -294,11 +294,9 @@ impl<R: Read + Seek> Reader<R> {
     /// Returns an error if the operation fails.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(
-            &mut self.ole,
-            litchi_ole_common::custom_xml::Limits::default(),
-        )
+        limits: litchi_ole_common::custom_xml::Limits,
+    ) -> Result<Option<litchi_ole_common::custom_xml::Store>> {
+        litchi_ole_common::custom_xml::inspect(&mut self.ole, limits).map_err(Error::from)
     }
 
     /// Read the legacy Summary Information property set stream.
@@ -319,28 +317,18 @@ impl<R: Read + Seek> Reader<R> {
         }
     }
 
-    /// Verify presentation XML signatures with the safe strict policy, without
-    /// evaluating certificate trust or opening any VBA project stream.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    #[cfg(feature = "sign")]
-    pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
-        self.signatures_with(&litchi_sign::Policy::strict())
-    }
-
     /// Verify presentation XML signatures with an explicit trust-neutral policy.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     #[cfg(feature = "sign")]
-    pub fn signatures_with(
+    pub fn signatures(
         &mut self,
         policy: &litchi_sign::Policy,
-    ) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+    ) -> Result<Vec<litchi_sign::cfb::Report>> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Ppt, policy)
+            .map_err(Error::from)
     }
 
     /// Read the legacy Document Summary Information property set stream.
