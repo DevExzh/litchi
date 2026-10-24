@@ -47,7 +47,7 @@ STATIC_REVIEWED_ADAPTER_SHA256 = {
     "Cargo.lock": HISTORICAL_WORKSPACE_LOCK_SHA256,
     "tools/perf-baseline/Cargo.toml": "4d2726d2ba629c5ee8f6e28a6db978c8098d9bf26c4da4972d7e9676ea93b748",
     "tools/perf-baseline/src/lib.rs": "99b2595d031c9d0ece1a5b46e17d0ddc017629c7e69655909508a28e725aed04",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "b690cd5b34aa73e145b8ec2ac36a9c9d583c922eca3edbb7ae56c7b60dbab16f",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "ff5c0fdb9e0c984c803a99a4b1740915d03c9a8f582696a0f22f3de859dc8e44",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",

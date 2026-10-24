@@ -87,7 +87,9 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             [
                 "drawingml-owner-current",
                 "drawingml-theme-family-current",
+                "drawingml-theme-family-owner-limits-current",
                 "drawingml-ink-limits-current",
+                "drawingml-transform-limits-current",
             ],
         )
         self.assertEqual(len(manifest["owner_profiles"]), 4)

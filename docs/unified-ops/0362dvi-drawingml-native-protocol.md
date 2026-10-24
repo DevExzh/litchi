@@ -101,12 +101,19 @@ and parsed-owner checks. The 11728 baseline uses its explicit
 policy. The 11728 baseline nevertheless enables only the independent
 Package/Edit owner feature: that parent already has the current owner shape
 but still lacks `part::Limits`. The candidate enables the owner, Theme-part,
-and Ink-policy gates. This
+Theme-owner, Ink-policy, and transform-policy gates. This
 route is not conflated with the detached fragment owner pair.
 The Ink action reader has a third, independent
 `drawingml-ink-limits-current` gate: historical parents retain the
 one-argument reader, while the candidate passes `actions::Limits::DEFAULT`
 explicitly.
+The transform owner has a separate `drawingml-transform-limits-current` gate:
+historical `Package::from_xml` takes one argument, while the candidate passes
+`transform::Limits::DEFAULT` by reference.
+The Theme-family owner has its own
+`drawingml-theme-family-owner-limits-current` gate because historical parents
+already have the raw part limits while their detached `Package::from_xml`
+constructor remains unbounded.
 
 The adapter's capability matrix distinguishes production sink routes from
 Vec/String-only codecs. Bounded-sink rows call only the former (chart,
@@ -188,6 +195,19 @@ Each of those four source-bound checks completed with `generate_lockfile=0`
 and `check=0` in the review run.  The receipt is compile evidence only: it is
 not a fidelity, capability, or performance acceptance result, and a final
 candidate must be checked separately after source freeze.
+
+After the owner constructor adapters were split from the raw-part policy,
+the four historical parents were rechecked with receipts at
+`/tmp/dml-owner-fix-baselines.v2H8kL`: all four returned
+`generate_lockfile=0` and `check=0`.  That batch is bound to probe SHA-256
+`ff5c0fdb9e0c984c803a99a4b1740915d03c9a8f582696a0f22f3de859dc8e44` and
+compile-driver SHA-256
+`a8c35e098f7d480587b957aa9f63c1ce115a3807233669e80c4837918dc4ff76`.
+The candidate rerun at
+`/tmp/dml-compile-candidate.7mP4sQ/compile-04058-owner-fix.json` still
+returned Cargo `check=101` only from the uncomposed raw adapter arities; no
+owner-constructor diagnostic remained.  It remains a negative compile
+receipt until the raw adapter is composed.
 
 The final baseline receipt batch is retained outside the repository at
 `/tmp/dml-compile-baselines-final.6f9KpN`.  Its source-bound command identity is

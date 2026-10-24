@@ -20,7 +20,7 @@
       "preparation_receipt": "${DRAWINGML_CHART_PREPARATION}",
       "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
       "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "source_fence": "chart raw codec parent 2f7db7e; owner route is a separate 945eb1d6 endpoint",
       "record": "0362dvi §1 drawingml-chart-raw"
     },
@@ -32,7 +32,7 @@
       "preparation_receipt": "${DRAWINGML_DIAGRAM_PREPARATION}",
       "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
       "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "source_fence": "diagram raw codec parent 2f7db7e",
       "record": "0362dvi §2 drawingml-diagram-raw"
     },
@@ -44,7 +44,7 @@
       "preparation_receipt": "${DRAWINGML_TEXT_MEDIA_PREPARATION}",
       "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
       "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "source_fence": "text/media raw 5771380 / d2c420c; pre-change parent 2f7db7e",
       "record": "0362dvi §3 drawingml-text-media-raw"
     },
@@ -56,7 +56,7 @@
       "preparation_receipt": "${DRAWINGML_THEME_INK_PREPARATION}",
       "approved_baseline_revisions": ["996651b6b19717a0192dfd4144bccd367fb2ea44"],
       "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "raw_scope": "bulk",
       "source_fence": "theme and InkML bulk raw parent 996651b6 (production raw codec parent 16b3705)",
       "record": "0362dvi §4 drawingml-theme-ink"
@@ -69,7 +69,7 @@
       "preparation_receipt": "${DRAWINGML_GEOMETRY_PREPARATION}",
       "approved_baseline_revisions": ["2f7db7ee7fa01893e9099217fc4243687d196f63"],
       "baseline_features": ["drawingml-owner-current", "drawingml-theme-family-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "source_fence": "geometry/color/formatcode2/transform raw codec parent 2f7db7e; formatcode2 appears only in this lane",
       "record": "0362dvi §5 drawingml-geometry-color-formatcode2-transform"
     }
@@ -86,7 +86,7 @@
       "preparation_receipt": "${DRAWINGML_THEME_FAMILY_PREPARATION}",
       "approved_baseline_revisions": ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
       "baseline_features": ["drawingml-owner-current"],
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"],
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"],
       "source_fence": "theme-family raw codec parent 11728db; this is separate from the 996651b6 bulk endpoint",
       "record": "0362dvi §4 theme-family raw"
     }
@@ -104,7 +104,7 @@
       "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"],
       "source_fence": "chart Package/Edit owner transition 945eb1d6 -> final; no 2d330/f404 owner claim",
       "record": "0362dvi §6 chart owner",
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"]
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"]
     },
     {
       "id": "drawingml-theme-family-owner",
@@ -118,7 +118,7 @@
       "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"],
       "source_fence": "theme-family Package/Edit owner transition 945eb1d6 -> final; raw family uses 11728db",
       "record": "0362dvi §6 theme-family owner",
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"]
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"]
     },
     {
       "id": "drawingml-ink-actions-owner",
@@ -132,7 +132,7 @@
       "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"],
       "source_fence": "Ink actions Prepared/Edit owner transition 945eb1d6 -> final; O1f551 edit path is required",
       "record": "0362dvi §6 Ink actions owner",
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"]
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"]
     },
     {
       "id": "drawingml-transform-owner",
@@ -146,7 +146,7 @@
       "approved_baseline_revisions": ["945eb1d6b9ef6c56fa26c82e12758d38c1b9015d"],
       "source_fence": "transform Package/Edit owner transition 945eb1d6 -> final; no 2d330/f404 owner claim",
       "record": "0362dvi §6 transform owner",
-      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-ink-limits-current"]
+      "candidate_features": ["drawingml-owner-current", "drawingml-theme-family-current", "drawingml-theme-family-owner-limits-current", "drawingml-ink-limits-current", "drawingml-transform-limits-current"]
     }
   ],
   "paired": {

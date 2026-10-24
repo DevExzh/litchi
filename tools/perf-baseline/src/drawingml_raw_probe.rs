@@ -1952,11 +1952,9 @@ fn owner_prepare(fixture: &OwnerFixture) -> Result<OwnerPrepared, ProbeFailure> 
         OwnerRoute::DrawingmlChart => dml::chart::edit::Package::from_xml(fixture.source.clone())
             .map(OwnerPrepared::DrawingmlChart)
             .map_err(|error| owner_error(fixture.route, error)),
-        OwnerRoute::DrawingmlThemeFamily => {
-            dml::theme::family::Package::from_xml(fixture.source.clone())
-                .map(OwnerPrepared::DrawingmlThemeFamily)
-                .map_err(|error| owner_error(fixture.route, error))
-        },
+        OwnerRoute::DrawingmlThemeFamily => owner_theme_package(fixture.source.clone())
+            .map(OwnerPrepared::DrawingmlThemeFamily)
+            .map_err(|error| owner_error(fixture.route, error)),
         OwnerRoute::DrawingmlInkActions => {
             use dml::ink::actions::{Edit, EditOptions};
             let profile = owner_read_profile(&fixture.source)
@@ -1968,7 +1966,7 @@ fn owner_prepare(fixture: &OwnerFixture) -> Result<OwnerPrepared, ProbeFailure> 
                 .into_package();
             Ok(OwnerPrepared::DrawingmlInkActions(prepared))
         },
-        OwnerRoute::DrawingmlTransform => dml::transform::Package::from_xml(fixture.source.clone())
+        OwnerRoute::DrawingmlTransform => owner_transform_package(fixture.source.clone())
             .map(OwnerPrepared::DrawingmlTransform)
             .map_err(|error| owner_error(fixture.route, error)),
     }
@@ -1982,6 +1980,38 @@ fn owner_read_profile(source: &[u8]) -> dml::Result<dml::ink::actions::Profile> 
 #[cfg(feature = "drawingml-ink-limits-current")]
 fn owner_read_profile(source: &[u8]) -> dml::Result<dml::ink::actions::Profile> {
     dml::ink::actions::read_profile(source, dml::ink::actions::Limits::DEFAULT)
+}
+
+#[cfg(all(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-owner-limits-current"
+))]
+fn owner_theme_package(source: Vec<u8>) -> dml::Result<dml::theme::family::Package> {
+    dml::theme::family::Package::from_xml(source, dml::theme::family::Limits::DEFAULT)
+}
+
+#[cfg(all(
+    feature = "drawingml-owner-current",
+    not(feature = "drawingml-theme-family-owner-limits-current")
+))]
+fn owner_theme_package(source: Vec<u8>) -> dml::Result<dml::theme::family::Package> {
+    dml::theme::family::Package::from_xml(source)
+}
+
+#[cfg(all(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-transform-limits-current"
+))]
+fn owner_transform_package(source: Vec<u8>) -> dml::Result<dml::transform::Package> {
+    dml::transform::Package::from_xml(source, &dml::transform::Limits::DEFAULT)
+}
+
+#[cfg(all(
+    feature = "drawingml-owner-current",
+    not(feature = "drawingml-transform-limits-current")
+))]
+fn owner_transform_package(source: Vec<u8>) -> dml::Result<dml::transform::Package> {
+    dml::transform::Package::from_xml(source)
 }
 
 #[cfg(feature = "drawingml-owner-current")]
@@ -2009,7 +2039,7 @@ fn owner_commit(
             ))
         },
         OwnerRoute::DrawingmlThemeFamily => {
-            let package = dml::theme::family::Package::from_xml(fixture.source.clone())
+            let package = owner_theme_package(fixture.source.clone())
                 .map_err(|error| owner_error(fixture.route, error))?;
             let mut edit = package.edit();
             if changed {
@@ -2044,7 +2074,7 @@ fn owner_commit(
             ))
         },
         OwnerRoute::DrawingmlTransform => {
-            let package = dml::transform::Package::from_xml(fixture.source.clone())
+            let package = owner_transform_package(fixture.source.clone())
                 .map_err(|error| owner_error(fixture.route, error))?;
             let mut edit = package.edit();
             if changed {
@@ -2144,8 +2174,8 @@ fn owner_apply(
                 .map_err(|error| owner_error(route, error))
         },
         (OwnerRoute::DrawingmlThemeFamily, OwnerPatch::DrawingmlThemeFamily(patch)) => {
-            let package = dml::theme::family::Package::from_xml(source.to_vec())
-                .map_err(|error| owner_error(route, error))?;
+            let package =
+                owner_theme_package(source.to_vec()).map_err(|error| owner_error(route, error))?;
             let patch = if inverse {
                 patch.clone().inverse()
             } else {
@@ -2175,7 +2205,7 @@ fn owner_apply(
                 .map_err(|error| owner_error(route, error))
         },
         (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
-            let package = dml::transform::Package::from_xml(source.to_vec())
+            let package = owner_transform_package(source.to_vec())
                 .map_err(|error| owner_error(route, error))?;
             let patch = if inverse {
                 patch.clone().inverse()

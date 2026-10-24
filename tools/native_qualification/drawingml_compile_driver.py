@@ -27,7 +27,9 @@ SCHEMA = "litchi.drawingml.compile-preparation.v1"
 FEATURES = (
     "drawingml-owner-current",
     "drawingml-theme-family-current",
+    "drawingml-theme-family-owner-limits-current",
     "drawingml-ink-limits-current",
+    "drawingml-transform-limits-current",
 )
 REQUIRED_SOURCE_PATHS = (
     "Cargo.toml",
@@ -230,7 +232,9 @@ publish = false
 [features]
 drawingml-owner-current = []
 drawingml-theme-family-current = []
+drawingml-theme-family-owner-limits-current = []
 drawingml-ink-limits-current = []
+drawingml-transform-limits-current = []
 
 [lib]
 path = "src/lib.rs"
