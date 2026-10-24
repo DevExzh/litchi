@@ -73,10 +73,11 @@ overlays rather than one clean commit:
   and `slide_text.rs` (`5a45920ca3c5254c1bbd5392cb293115bfb8623d`).
   The Keynote test/Clippy and ops checks below ran on `K`, not on clean
   `88869b24b9`.
-* `H` was `K` plus the offline-regenerated standalone harness lockfile,
+* `H` was `K` plus the first offline-regenerated standalone harness lockfile,
   later committed by `8f747b7f0a` with blob
   `cc9461661455285e47a50d8ab08a573111a6f057`. The standalone harness checks
-  below ran on `H`.
+  below ran on that earlier `H`; they are retained as historical evidence, not
+  as validation of the corrected lockfile now in this tree.
 * `I` started at clean `8f747b7f0abe39ae9b5f098b0832b9b7967c2340` and had the
   one-line IWA test-fixture edit in `crates/litchi-iwa/src/package.rs`. That
   exact file is blob `f2834d280e9f5a3020848614c6e5f7a8c4fc5e6c` in final commit
@@ -84,10 +85,13 @@ overlays rather than one clean commit:
   ran on `I`, not on clean `8f747b7f0a`.
 
 Commit `178ef2ff3c` differs from `8f747b7f0a` only in that IWA test
-fixture and the receipt update then present. The Keynote, ops, harness source,
-and harness lock paths are byte-identical between those commits, so their
-`K`/`H` receipts apply to the final relevant source without an unnecessary
-rebuild. Raw logs
+fixture and the receipt update then present. The Keynote, ops, and harness
+source paths are byte-identical between those commits. The harness lock was
+then corrected in this tree from that broad refresh to a narrow offline graph
+repair: only the stale path-package dependency edges changed, while the
+baseline registry package versions were retained. Therefore the Keynote/ops
+`K` receipts still apply to their unchanged source; the standalone harness
+receipts require a rerun against the corrected lock. Raw logs
 remain outside the repository under
 `/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
 
@@ -121,10 +125,14 @@ cargo clippy --offline --locked --manifest-path tools/perf-baseline/unified-batc
   exit 0.
 ```
 
-The standalone harness lockfile was regenerated offline because its tracked
-lock predated the current workspace dependency graph; the resulting
-`tools/perf-baseline/unified-batch-closure/Cargo.lock` is included with this
-consumer migration. The lock-generation log is external:
+The standalone harness lockfile was corrected offline because its tracked lock
+predated the current workspace dependency graph. The corrected lock changes
+only the stale path-package edges (`smallvec`, `soapberry-zip`, `siphasher`,
+the `sha2 0.11.1` edge, and the missing `sha2` edge); it does not carry the
+unrelated registry upgrades from the first refresh. The corrected lock is
+included with this consumer migration and has sha256
+`95aed16c860cd6082cd50a39aabf29779b89bdb004c8263674e042d84a007870`.
+The earlier broad lock-generation log is external:
 `receipt-batch-harness-lock.log` (333 bytes, sha256
 `d9e77ab981e09f171390cc276310b53154d9a8e1c78508bcb1c3372a81ac49d4`).
 
@@ -182,6 +190,6 @@ The final assigned target tree was
 .cargo/config.toml                                      50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d
 rust-toolchain.toml                                     e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310
 Cargo.lock                                               6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da
-tools/perf-baseline/unified-batch-closure/Cargo.lock     9dc6098e4453a2df54d035e63b2ccd1e0ebf30da8a0cd06cb9e63655d5ce9d36
+tools/perf-baseline/unified-batch-closure/Cargo.lock     95aed16c860cd6082cd50a39aabf29779b89bdb004c8263674e042d84a007870
 .coord/keynote-lazy-entry/env.sh                         42d98d07d010d128109f1a2b1d4cf58e78788ce576579fe71d7a97be1d0c008c
 ```
