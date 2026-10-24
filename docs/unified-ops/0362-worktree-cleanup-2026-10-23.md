@@ -1339,3 +1339,26 @@ inodes and event times will differ. All source receipts bind the binaries to
 `f6fe430a4d19d94aa360c0e9ed03ebd757265225`; `49c25ef67f` is only the later
 checkout at deletion time. The corrected reproduction README is 4,277 bytes,
 SHA-256 `d138191537a51d4349e382fba5aeea50bccc40a359efece46b7e769a2afcdad7`.
+
+## Thirty-fifth cleanup: reviewed OPC protocol leaf
+
+The coordinator merged the reviewed OPC read-ahead protocol tip
+`80983c725d9b803f066545e05f8463a25de4120c` at `945eb1d6b9`, then removed
+only `uo2-final-opc-read-ahead-perf` with non-forced worktree removal.
+There were zero ignored or untracked payloads. The branch remains at its
+exact tip; ancestry, the absent worktree and the zero-payload manifest verify.
+The pending W8 leaf, frozen source and external targets were untouched.
+
+Evidence remains under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave35/`:
+
+- `manifest.json`: 11,174 bytes, SHA-256
+  `8d3b95bdcf8801bad2f4c55c883d389e5ea777cae31f2dec8b7957361cb5ec98`.
+- `receipt.json`: 20,058 bytes, SHA-256
+  `5ee533109c90daf7eb5ec399c6af9b0ed4e7112870a73a90448013503d558ca5`.
+- `restore.py`: 4,865 bytes, SHA-256
+  `8e0a25698e0425d7d89f849ae9ba107d4ba687b5e7607059059fee62a4e6494e`.
+
+This helper requires the worktree to be recreated before invocation; it has
+no `--dry-run` option. No payload restoration is needed for this empty leaf.
+No cache artifacts or measurements were deleted by this cleanup.
