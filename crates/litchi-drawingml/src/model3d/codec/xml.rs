@@ -39,6 +39,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
     let mut metadata = None;
     let mut root_depth = 0usize;
     let mut root_closed = false;
+    let mut nodes = 0usize;
 
     loop {
         let event_start = origin
@@ -55,6 +56,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
 
         match event {
             Event::Start(element) if metadata.is_none() && root_depth == 0 => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
                 let namespaces = declarations(&element, reader.decoder())?;
@@ -67,6 +69,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                 root_depth = 1;
             },
             Event::Empty(element) if metadata.is_none() && root_depth == 0 => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 require_root(&local, &namespace)?;
                 let namespaces = declarations(&element, reader.decoder())?;
@@ -79,19 +82,26 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                 root_closed = true;
             },
             Event::Start(element) if metadata.is_some() && root_depth == 1 => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let child_start = event_start;
-                let child_end =
-                    capture_namespace_element(&mut reader, origin, &mut buffer, limits)?;
+                let child_end = capture_namespace_element(
+                    &mut reader,
+                    origin,
+                    &mut buffer,
+                    limits,
+                    &mut nodes,
+                )?;
                 let raw = xml
                     .get(child_start..child_end)
                     .ok_or_else(|| invalid("model3d child range is outside the input"))?;
                 let metadata = metadata
                     .as_mut()
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
-                push_child(metadata, local, namespace, raw.to_vec(), limits)?;
+                push_child(metadata, local, namespace, raw, limits)?;
             },
             Event::Empty(element) if metadata.is_some() && root_depth == 1 => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let raw = xml
                     .get(event_start..event_end)
@@ -99,7 +109,7 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
                 let metadata = metadata
                     .as_mut()
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
-                push_child(metadata, local, namespace, raw.to_vec(), limits)?;
+                push_child(metadata, local, namespace, raw, limits)?;
             },
             Event::End(_) if metadata.is_some() && root_depth == 1 => {
                 root_depth = 0;
@@ -157,6 +167,7 @@ pub fn opaque(xml: &[u8], limits: Limits) -> Result<Inert> {
     let mut root = None;
     let mut root_start = 0usize;
     let mut root_end = 0usize;
+    let mut nodes = 0usize;
     loop {
         let start = origin
             .offset(reader.buffer_position())
@@ -171,12 +182,20 @@ pub fn opaque(xml: &[u8], limits: Limits) -> Result<Inert> {
             .ok_or_else(|| invalid("model3d fragment offset exceeds usize"))?;
         match event {
             Event::Start(element) if root.is_none() => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
-                root_end = capture_namespace_element(&mut reader, origin, &mut buffer, limits)?;
+                root_end = capture_namespace_element(
+                    &mut reader,
+                    origin,
+                    &mut buffer,
+                    limits,
+                    &mut nodes,
+                )?;
             },
             Event::Empty(element) if root.is_none() => {
+                count_node(&mut nodes, limits)?;
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
@@ -216,6 +235,13 @@ pub fn opaque(xml: &[u8], limits: Limits) -> Result<Inert> {
     let raw = xml
         .get(root_start..root_end)
         .ok_or_else(|| invalid("model3d inert fragment range is outside the input"))?;
+    if raw.len() > limits.max_fragment_bytes {
+        return Err(limit(
+            LimitKind::InertFragmentBytes,
+            raw.len(),
+            limits.max_fragment_bytes,
+        ));
+    }
     let value = Inert::from_wire(raw.to_vec(), local, namespace);
     crate::model3d::validation::validate_inert_fragment(&value)
         .map_err(|error| validation_error(&error))?;
@@ -263,7 +289,7 @@ fn push_child(
     metadata: &mut Metadata,
     local: String,
     namespace: String,
-    raw: Vec<u8>,
+    raw: &[u8],
     limits: Limits,
 ) -> Result<()> {
     if metadata.children.len() >= limits.max_children {
@@ -273,14 +299,21 @@ fn push_child(
             limits.max_children,
         ));
     }
+    if raw.len() > limits.max_fragment_bytes {
+        return Err(limit(
+            LimitKind::InertFragmentBytes,
+            raw.len(),
+            limits.max_fragment_bytes,
+        ));
+    }
     if local == "raster" && namespace == NAMESPACE {
         metadata.children.push(Child::Raster(parse_raster(
-            &raw,
+            raw,
             &metadata.namespaces,
             limits,
         )?));
     } else {
-        let value = Inert::from_wire(raw, local, namespace);
+        let value = Inert::from_wire(raw.to_vec(), local, namespace);
         crate::model3d::validation::validate_inert_fragment(&value)
             .map_err(|error| validation_error(&error))?;
         metadata.children.push(Child::Opaque(value));
@@ -332,14 +365,7 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<R
                 let raw = xml
                     .get(start..child_end)
                     .ok_or_else(|| invalid("model3d raster child range is outside the input"))?;
-                push_raster_child(
-                    &mut children,
-                    local,
-                    namespace,
-                    raw.to_vec(),
-                    &namespaces,
-                    limits,
-                )?;
+                push_raster_child(&mut children, local, namespace, raw, &namespaces, limits)?;
             },
             Event::Empty(element) if depth == 1 => {
                 let local = local_name(&element.name())?;
@@ -347,14 +373,7 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<R
                 let raw = xml
                     .get(start..end)
                     .ok_or_else(|| invalid("model3d raster child range is outside the input"))?;
-                push_raster_child(
-                    &mut children,
-                    local,
-                    namespace,
-                    raw.to_vec(),
-                    &namespaces,
-                    limits,
-                )?;
+                push_raster_child(&mut children, local, namespace, raw, &namespaces, limits)?;
             },
             Event::End(_) => {
                 depth = depth
@@ -397,7 +416,7 @@ fn push_raster_child(
     children: &mut Vec<RasterChild>,
     local: String,
     namespace: String,
-    raw: Vec<u8>,
+    raw: &[u8],
     namespaces: &[Namespace],
     limits: Limits,
 ) -> Result<()> {
@@ -408,10 +427,17 @@ fn push_raster_child(
             limits.max_raster_children,
         ));
     }
+    if raw.len() > limits.max_fragment_bytes {
+        return Err(limit(
+            LimitKind::InertFragmentBytes,
+            raw.len(),
+            limits.max_fragment_bytes,
+        ));
+    }
     if local == "blip" && namespace == NAMESPACE {
-        children.push(RasterChild::Blip(parse_blip(&raw, namespaces, limits)?));
+        children.push(RasterChild::Blip(parse_blip(raw, namespaces, limits)?));
     } else {
-        let value = Inert::from_wire(raw, local, namespace);
+        let value = Inert::from_wire(raw.to_vec(), local, namespace);
         crate::model3d::validation::validate_inert_fragment(&value)
             .map_err(|error| validation_error(&error))?;
         children.push(RasterChild::Opaque(value));
@@ -462,6 +488,13 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Bli
                         limits.max_children,
                     ));
                 }
+                if raw.len() > limits.max_fragment_bytes {
+                    return Err(limit(
+                        LimitKind::InertFragmentBytes,
+                        raw.len(),
+                        limits.max_fragment_bytes,
+                    ));
+                }
                 children.push(Inert::from_wire(raw.to_vec(), local, namespace));
             },
             Event::Empty(element) => {
@@ -475,6 +508,13 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Bli
                         LimitKind::ModelChildren,
                         children.len() + 1,
                         limits.max_children,
+                    ));
+                }
+                if raw.len() > limits.max_fragment_bytes {
+                    return Err(limit(
+                        LimitKind::InertFragmentBytes,
+                        raw.len(),
+                        limits.max_fragment_bytes,
                     ));
                 }
                 children.push(Inert::from_wire(raw.to_vec(), local, namespace));
@@ -814,9 +854,9 @@ fn capture_namespace_element<R: std::io::BufRead>(
     origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
     limits: Limits,
+    nodes: &mut usize,
 ) -> Result<usize> {
     let mut depth = 1usize;
-    let mut nodes = 0usize;
     loop {
         buffer.clear();
         let (_, event) = reader.read_resolved_event_into(buffer).map_err(xml_error)?;
@@ -832,16 +872,10 @@ fn capture_namespace_element<R: std::io::BufRead>(
                 if depth > limits.max_depth {
                     return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
                 }
-                nodes = nodes.saturating_add(1);
-                if nodes > limits.max_nodes {
-                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
-                }
+                count_node(nodes, limits)?;
             },
             Event::Empty(_) => {
-                nodes = nodes.saturating_add(1);
-                if nodes > limits.max_nodes {
-                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
-                }
+                count_node(nodes, limits)?;
             },
             Event::End(_) => {
                 depth = depth
@@ -864,6 +898,16 @@ fn capture_namespace_element<R: std::io::BufRead>(
     }
 }
 
+fn count_node(nodes: &mut usize, limits: Limits) -> Result<()> {
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| limit(LimitKind::XmlNodes, usize::MAX, limits.max_nodes))?;
+    if *nodes > limits.max_nodes {
+        return Err(limit(LimitKind::XmlNodes, *nodes, limits.max_nodes));
+    }
+    Ok(())
+}
+
 fn capture_plain_element<R: std::io::BufRead>(
     reader: &mut Reader<R>,
     origin: ReaderOrigin,
@@ -871,7 +915,6 @@ fn capture_plain_element<R: std::io::BufRead>(
     limits: Limits,
 ) -> Result<usize> {
     let mut depth = 1usize;
-    let mut nodes = 0usize;
     loop {
         buffer.clear();
         let event = reader
@@ -889,17 +932,8 @@ fn capture_plain_element<R: std::io::BufRead>(
                 if depth > limits.max_depth {
                     return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
                 }
-                nodes = nodes.saturating_add(1);
-                if nodes > limits.max_nodes {
-                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
-                }
             },
-            Event::Empty(_) => {
-                nodes = nodes.saturating_add(1);
-                if nodes > limits.max_nodes {
-                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
-                }
-            },
+            Event::Empty(_) => {},
             Event::End(_) => {
                 depth = depth
                     .checked_sub(1)

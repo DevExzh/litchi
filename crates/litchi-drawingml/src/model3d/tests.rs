@@ -62,6 +62,34 @@ fn rejects_invalid_sequence_and_duplicate_raster_blip() {
 }
 
 #[test]
+fn read_counts_root_and_direct_empty_children_once_operation_wide() {
+    let xml = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:objViewport/></m3d:model3d>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_nodes = 4;
+    assert!(matches!(
+        read(xml, limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::XmlNodes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn read_admits_an_opaque_child_before_copying_it() {
+    let xml = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:objViewport/><f:future xmlns:f="urn:future">retained</f:future></m3d:model3d>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_fragment_bytes = 16;
+    assert!(matches!(
+        read(xml, limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::InertFragmentBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
     let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     let graph = FixtureGraph;

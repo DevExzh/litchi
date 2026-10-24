@@ -237,12 +237,10 @@ pub fn read(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body
                 }
             },
             Event::Text(text) if depth > 0 => {
-                let decoded = text
+                let encoded = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
-                let decoded = quick_xml::escape::unescape(&decoded)
-                    .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
-                builder.text(&decoded)?;
+                builder.text_xml(&encoded)?;
             },
             Event::CData(text) if depth > 0 => {
                 let decoded = text
@@ -553,20 +551,54 @@ impl<'x> Builder<'x> {
     /// Returns [`Error::Limit`] when the kept text exceeds
     /// [`Limits::text_bytes`].
     pub fn text(&mut self, text: &str) -> Result<()> {
-        if self.skipped > 0 || self.frames.last() != Some(&Frame::Text) {
-            if !text
-                .trim_matches(|c| matches!(c, ' ' | '\n' | '\r' | '\t'))
-                .is_empty()
-            {
-                self.body.properties.has_unmodeled_content = true;
-            }
+        if !self.keeps_text() {
+            self.note_text_content(text);
             return Ok(());
         }
         self.charge_text(text.len())?;
+        self.append_text(text);
+        Ok(())
+    }
+
+    /// Read XML character data after checking its decoded size.
+    ///
+    /// XML entity expansion is intentionally accounted for in decoded UTF-8
+    /// bytes.  The budget check runs before `unescape` can allocate an
+    /// expanded `String`, while valid escaped text keeps its historical
+    /// semantic value.
+    fn text_xml(&mut self, encoded: &str) -> Result<()> {
+        let decoded_bytes = unescaped_text_len(encoded)?;
+        let keeps_text = self.keeps_text();
+        if keeps_text {
+            self.charge_text(decoded_bytes)?;
+        }
+        let decoded = quick_xml::escape::unescape(encoded)
+            .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
+        if keeps_text {
+            self.append_text(&decoded);
+        } else {
+            self.note_text_content(&decoded);
+        }
+        Ok(())
+    }
+
+    fn keeps_text(&self) -> bool {
+        self.skipped == 0 && self.frames.last() == Some(&Frame::Text)
+    }
+
+    fn append_text(&mut self, text: &str) {
         if let Some(run) = self.run.as_mut() {
             run.text.push_str(text);
         }
-        Ok(())
+    }
+
+    fn note_text_content(&mut self, text: &str) {
+        if !text
+            .trim_matches(|c| matches!(c, ' ' | '\n' | '\r' | '\t'))
+            .is_empty()
+        {
+            self.body.properties.has_unmodeled_content = true;
+        }
     }
 
     /// Finish the body.
@@ -1560,6 +1592,31 @@ fn decode<'v>(attribute: &Attribute<'v>, decoder: Decoder) -> Result<Cow<'v, str
         .map_err(|_error| {
             Error::Common(XmlError::Malformed("malformed text body attribute".into()))
         })
+}
+
+fn unescaped_text_len(encoded: &str) -> Result<usize> {
+    let mut total = 0usize;
+    let mut offset = 0usize;
+    while let Some(relative) = encoded[offset..].find('&') {
+        let ampersand = offset + relative;
+        total = total
+            .checked_add(ampersand.saturating_sub(offset))
+            .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+        let end = encoded[ampersand + 1..]
+            .find(';')
+            .map(|relative| ampersand + 1 + relative + 1)
+            .ok_or_else(|| Error::Xml("malformed text body XML".into()))?;
+        let entity = quick_xml::escape::unescape(&encoded[ampersand..end])
+            .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
+        total = total
+            .checked_add(entity.len())
+            .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+        offset = end;
+    }
+    total = total
+        .checked_add(encoded.len().saturating_sub(offset))
+        .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+    Ok(total)
 }
 
 fn invalid(message: impl Into<String>) -> Error {

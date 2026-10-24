@@ -10,7 +10,21 @@ use crate::Error;
 #[test]
 fn codec_rejects_an_incomplete_model_sequence() {
     let xml = br#"<am3d:model3d xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><am3d:spPr/><am3d:camera/></am3d:model3d>"#;
-    assert!(matches!(codec::read(xml), Err(Error::Drawing(_))));
+    assert!(matches!(
+        codec::read(xml, codec::Limits::DEFAULT),
+        Err(Error::Drawing(_))
+    ));
+}
+
+#[test]
+fn codec_policy_admits_input_before_namespace_preparation() {
+    let xml = br#"<am3d:model3d xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><am3d:spPr/></am3d:model3d>"#;
+    let limits = codec::Limits::new(8, 64, 64).expect("valid narrow policy");
+    assert!(matches!(
+        codec::read(xml, limits),
+        Err(Error::Limit { resource, .. }) if resource == "model3d XML bytes"
+    ));
+    assert!(codec::Limits::new(0, 1, 1).is_none());
 }
 
 #[test]

@@ -71,6 +71,18 @@ fn standalone_reads_keep_source_equality_and_exact_write() {
 }
 
 #[test]
+fn unchanged_contextual_write_preserves_raw_source() {
+    let source = format!(r#"<svgBlip xmlns="{NAMESPACE}"/>"#);
+    let value = read_contextual(source.as_bytes(), &NamespaceContext::empty())
+        .expect("contextual SVG blip");
+    assert_eq!(value.source(), None);
+    assert_eq!(
+        write(&value).expect("contextual source write"),
+        source.as_bytes()
+    );
+}
+
+#[test]
 fn changing_relationship_keeps_future_content() {
     let mut value = read(SVG_BLIP).expect("SVG blip fixture must parse");
     value
@@ -138,6 +150,20 @@ fn constructs_empty_svg_blip_with_typed_reference() {
             .windows(b"r:embed=\"rId1\"".len())
             .any(|window| window == b"r:embed=\"rId1\"")
     );
+}
+
+#[test]
+fn canonical_output_reports_the_active_limit() {
+    let value = SvgBlip::new(Reference::embedded("rId1").expect("relationship ID"))
+        .expect("valid SVG blip");
+    assert!(matches!(
+        write_contextual(&value, 1),
+        Err(litchi_drawingml::Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed,
+            maximum: 1,
+        }) if observed > 1
+    ));
 }
 
 #[test]

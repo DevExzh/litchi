@@ -390,6 +390,24 @@ fn limits_bound_text_nodes_depth_and_input() {
 }
 
 #[test]
+fn text_budget_preflights_decoded_entity_bytes() {
+    let xml = body(r#"<a:p><a:r><a:t>&#x1F600;</a:t></a:r></a:p>"#);
+    let exact = Limits::new(1 << 20, 64, 64, 4).unwrap();
+    let parsed = reader::read(xml.as_bytes(), NamespaceResolver::default(), exact)
+        .expect("decoded entity fits its byte budget");
+    assert_eq!(parsed.text(), "😀");
+
+    let short = Limits::new(1 << 20, 64, 64, 3).unwrap();
+    assert!(matches!(
+        reader::read(xml.as_bytes(), NamespaceResolver::default(), short),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::TextBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn rejects_fragments_that_are_not_one_element() {
     for xml in [
         String::new(),

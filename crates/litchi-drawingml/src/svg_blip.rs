@@ -946,6 +946,9 @@ pub fn read_contextual(xml: &[u8], context: &NamespaceContext, limits: Limits) -
 ///
 /// Returns an error when validation fails or the bounded output is too large.
 pub fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    if value.contextual.is_some() {
+        return write_contextual(value, limits);
+    }
     codec::write(value, limits)
 }
 
@@ -1579,9 +1582,6 @@ pub(crate) mod codec {
         *size = size
             .checked_add(addition)
             .ok_or_else(|| invalid("SVG blip output length overflows"))?;
-        if *size > MAX_XML_BYTES {
-            return Err(limit(LimitKind::OutputBytes, *size, MAX_XML_BYTES));
-        }
         Ok(())
     }
 
