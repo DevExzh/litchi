@@ -122,6 +122,57 @@ class OpcReadAheadGuardTests(unittest.TestCase):
         finally:
             GUARD.set_child_subreaper(bool(previous_subreaper))
 
+    def test_monitor_snapshot_failure_discovers_escaped_child_for_cleanup(self) -> None:
+        previous_subreaper = GUARD.set_child_subreaper(True)
+        original_snapshot = GUARD.proc_snapshot
+        process: subprocess.Popen[bytes] | None = None
+        cleanup_pgid: int | None = None
+        cleanup_owned: dict[int, int] = {}
+        cleanup_before: set[int] = set()
+        escaped_pid: int | None = None
+        try:
+            with tempfile.TemporaryDirectory(prefix="opc-guard-monitor-failure-", dir="/tmp") as raw:
+                root = Path(raw)
+                process, pgid, owned, before = spawn_fake(root, "escape")
+                cleanup_pgid, cleanup_owned, cleanup_before = pgid, dict(owned), set(before)
+                marker = root / "escape.pid"
+                deadline = time.monotonic() + 2
+                while not marker.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(marker.exists(), "escaped fake child did not start")
+                escaped_pid = int(marker.read_text(encoding="ascii"))
+
+                def failed_snapshot() -> dict[int, dict[str, object]]:
+                    raise GUARD.TimingError("synthetic first during-poll failure")
+
+                GUARD.proc_snapshot = failed_snapshot  # type: ignore[assignment]
+                GUARD.ensure_child_reaped(
+                    process,
+                    owned,
+                    pgid,
+                    False,
+                    runner_pid=os.getpid(),
+                    preexisting_pids=before,
+                )
+                GUARD.proc_snapshot = original_snapshot
+                self.assertEqual(process.wait(timeout=1), process.returncode)
+                self.assertNotIn(escaped_pid, GUARD.proc_snapshot())
+        finally:
+            GUARD.proc_snapshot = original_snapshot
+            if process is not None and cleanup_pgid is not None:
+                try:
+                    GUARD.ensure_child_reaped(
+                        process,
+                        cleanup_owned,
+                        cleanup_pgid,
+                        True,
+                        runner_pid=os.getpid(),
+                        preexisting_pids=cleanup_before,
+                    )
+                except (GUARD.TimingError, ProcessLookupError, OSError):
+                    pass
+            GUARD.set_child_subreaper(bool(previous_subreaper))
+
     def test_restricted_metadata_requires_nonheavy_nonlitchi_proof(self) -> None:
         self.assertTrue(GUARD.restricted_metadata_is_unrelated("systemd", ["/usr/lib/systemd/systemd"], False))
         self.assertFalse(GUARD.restricted_metadata_is_unrelated("python", [], False))

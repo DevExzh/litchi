@@ -11,8 +11,8 @@ The reviewed driver is:
 
 ```text
 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py
-bytes: 68267
-sha256: 2a34730f1265aa0ac2c1c8c9be2f33865cc806a06e024e99dbd6e2691a309ac0
+bytes: 73379
+sha256: db48dde4633f98d9ae9f39706c772af79462abf4d287f09264bfd0240435e4ae
 ```
 
 The guard now:
@@ -21,8 +21,10 @@ The guard now:
   parent, create its own session/process group, and install `PDEATHSIG`; it
   retains start-time identities across reparenting, explicitly reaps adopted
   zombies, and fails closed if group cleanup cannot prove that all owned
-  processes are gone.  The direct child is always waited/reaped even when a
-  monitor operation raises;
+  processes are gone.  Cleanup has an independent `/proc/*/stat` discovery
+  path for newly adopted children, protected by the pre-run PID set, so a
+  failed full monitor snapshot cannot strand a double-forked child.  The
+  direct child is always waited/reaped even when a monitor operation raises;
 - checks the deadline immediately after each polling wait, before accepting a
   normal child exit, and reports capture-thread join or capture-I/O failures;
 - treats normal `/proc` PID disappearance as expected, but fails closed on
@@ -60,7 +62,7 @@ The executable fake-child lifecycle suite is:
 
 ```text
 ./tools/test_opc_read_ahead_timing_guard.py -v
-4 tests passed
+5 tests passed
 ```
 
 No timing command was started because the host was concurrently running

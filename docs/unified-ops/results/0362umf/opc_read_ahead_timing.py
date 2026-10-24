@@ -338,6 +338,28 @@ def _proc_stat_fields(raw: str) -> list[str]:
     return right[1].split()
 
 
+def read_proc_identity(pid: int) -> dict[str, Any] | None:
+    """Read only identity fields for cleanup when the full monitor is broken."""
+    proc = Path("/proc") / str(pid)
+    try:
+        fields = _proc_stat_fields((proc / "stat").read_text(encoding="utf-8", errors="replace"))
+    except FileNotFoundError:
+        return None
+    except (PermissionError, OSError, ValueError) as error:
+        raise TimingError(f"cannot inspect cleanup identity /proc/{pid}: {error}") from error
+    try:
+        return {
+            "pid": pid,
+            "ppid": int(fields[1]),
+            "pgrp": int(fields[2]),
+            "session": int(fields[3]),
+            "starttime": int(fields[19]),
+            "state": fields[0],
+        }
+    except (IndexError, ValueError) as error:
+        raise TimingError(f"malformed cleanup identity /proc/{pid}/stat: {error}") from error
+
+
 def read_proc(pid: int) -> dict[str, Any] | None:
     proc = Path("/proc") / str(pid)
     try:
@@ -530,6 +552,72 @@ def refresh_owned(
     return owned
 
 
+def discover_cleanup_owned(
+    known: Mapping[int, int],
+    runner_pid: int,
+    preexisting_pids: set[int],
+    root_pgrp: int | None = None,
+    root_session: int | None = None,
+) -> dict[int, int]:
+    """Discover newly adopted descendants without the full monitor snapshot."""
+    try:
+        proc_entries = list(Path("/proc").iterdir())
+    except OSError as error:
+        raise TimingError(f"cannot enumerate /proc for cleanup: {error}") from error
+    identities: dict[int, dict[str, Any]] = {}
+    for item in proc_entries:
+        if not item.name.isdigit():
+            continue
+        pid = int(item.name)
+        if pid in preexisting_pids and pid not in known:
+            continue
+        entry = read_proc_identity(pid)
+        if entry is not None:
+            identities[pid] = entry
+    owned = dict(known)
+    changed = True
+    while changed:
+        changed = False
+        for pid, entry in identities.items():
+            if pid in owned or pid in preexisting_pids:
+                continue
+            if (
+                int(entry["ppid"]) in owned
+                or int(entry["ppid"]) == runner_pid
+                or (root_pgrp is not None and int(entry["pgrp"]) == root_pgrp)
+                or (root_session is not None and int(entry["session"]) == root_session)
+            ):
+                owned[pid] = int(entry["starttime"])
+                changed = True
+    return owned
+
+
+def independent_live_owned(owned: Mapping[int, int], *, root_pid: int | None = None) -> dict[int, int]:
+    """Check owned identities using only /proc stat, not the full monitor."""
+    result: dict[int, int] = {}
+    for pid, expected_start in owned.items():
+        entry = read_proc_identity(pid)
+        if entry is None:
+            continue
+        actual_start = int(entry["starttime"])
+        if actual_start != expected_start:
+            raise TimingError(f"refusing to treat reused owned PID {pid} as a child")
+        if entry.get("state") == "Z" and pid != root_pid:
+            try:
+                waited, _ = os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                result[pid] = expected_start
+                continue
+            except ProcessLookupError:
+                continue
+            except OSError as error:
+                raise TimingError(f"cannot reap owned zombie PID {pid}: {error}") from error
+            if waited == pid:
+                continue
+        result[pid] = expected_start
+    return result
+
+
 def is_heavy(entry: Mapping[str, Any]) -> bool:
     names = [str(entry.get("exe", "")), str(entry.get("comm", ""))]
     if any(guarded_process_name(value) for value in names):
@@ -682,12 +770,29 @@ def terminate_group(
     owned: Mapping[int, int],
     pgid: int,
     *,
+    runner_pid: int | None = None,
+    preexisting_pids: set[int] | None = None,
     grace_seconds: float = 5.0,
 ) -> bool:
+    cleanup_owned = dict(owned)
+
+    def refresh_cleanup_owned() -> None:
+        if runner_pid is None or preexisting_pids is None:
+            return
+        cleanup_owned.update(
+            discover_cleanup_owned(
+                cleanup_owned,
+                runner_pid,
+                preexisting_pids,
+                root_pgrp=pgid,
+                root_session=pgid,
+            )
+        )
+
     def signal_owned(kind: signal.Signals) -> None:
-        snapshot = proc_snapshot()
-        for pid, expected_start in owned.items():
-            entry = snapshot.get(pid)
+        refresh_cleanup_owned()
+        for pid, expected_start in cleanup_owned.items():
+            entry = read_proc_identity(pid)
             if entry is None:
                 continue
             if int(entry["starttime"]) != expected_start:
@@ -709,10 +814,12 @@ def terminate_group(
     signal_owned(signal.SIGTERM)
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
-        if process.poll() is not None and not process_group_exists(pgid) and not live_owned(owned, root_pid=process.pid):
+        refresh_cleanup_owned()
+        if process.poll() is not None and not process_group_exists(pgid) and not independent_live_owned(cleanup_owned, root_pid=process.pid):
             return forced
         time.sleep(0.05)
     forced = True
+    refresh_cleanup_owned()
     try:
         os.killpg(pgid, signal.SIGKILL)
     except ProcessLookupError:
@@ -726,10 +833,12 @@ def terminate_group(
         raise TimingError(f"child did not terminate after process-group cleanup: {process.pid}") from error
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
-        if not process_group_exists(pgid) and not live_owned(owned, root_pid=process.pid):
+        refresh_cleanup_owned()
+        if not process_group_exists(pgid) and not independent_live_owned(cleanup_owned, root_pid=process.pid):
             return forced
         time.sleep(0.05)
-    if process_group_exists(pgid) or live_owned(owned, root_pid=process.pid):
+    refresh_cleanup_owned()
+    if process_group_exists(pgid) or independent_live_owned(cleanup_owned, root_pid=process.pid):
         raise TimingError(f"descendant process group survived cleanup: {process.pid}")
     return forced
 
@@ -739,15 +848,29 @@ def ensure_child_reaped(
     owned: Mapping[int, int],
     pgid: int | None,
     forced_cleanup: bool,
+    *,
+    runner_pid: int | None = None,
+    preexisting_pids: set[int] | None = None,
 ) -> bool:
     """Always reap the direct child, even when monitoring raised an error."""
+    cleanup_owned = dict(owned)
+    if runner_pid is not None and preexisting_pids is not None:
+        cleanup_owned.update(discover_cleanup_owned(cleanup_owned, runner_pid, preexisting_pids, pgid, pgid))
+        if isinstance(owned, dict):
+            owned.update(cleanup_owned)
     cleanup_error: BaseException | None = None
     try:
         group_alive = pgid is not None and process_group_exists(pgid)
-        owned_alive = bool(live_owned(owned, root_pid=process.pid)) if pgid is not None else False
+        owned_alive = bool(independent_live_owned(cleanup_owned, root_pid=process.pid)) if pgid is not None else False
         if process.poll() is None or group_alive or owned_alive:
             if pgid is not None:
-                forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
+                forced_cleanup = terminate_group(
+                    process,
+                    cleanup_owned,
+                    pgid,
+                    runner_pid=runner_pid,
+                    preexisting_pids=preexisting_pids,
+                ) or forced_cleanup
             else:
                 process.terminate()
     except BaseException as error:
@@ -1229,12 +1352,25 @@ def run_child(
                 violations.append(f"child exceeded timeout: {timeout_seconds}s")
             if process.poll() is None or violations or timeout:
                 require(pgid is not None, "child process group identity was not retained")
-                forced_cleanup = terminate_group(process, owned, pgid)
+                forced_cleanup = terminate_group(
+                    process,
+                    owned,
+                    pgid,
+                    runner_pid=parent_pid,
+                    preexisting_pids=preexisting_pids,
+                )
             else:
                 process.wait(timeout=5)
         finally:
             if process is not None:
-                forced_cleanup = ensure_child_reaped(process, owned, pgid, forced_cleanup)
+                forced_cleanup = ensure_child_reaped(
+                    process,
+                    owned,
+                    pgid,
+                    forced_cleanup,
+                    runner_pid=parent_pid,
+                    preexisting_pids=preexisting_pids,
+                )
     if stdout_capture is not None:
         stdout_capture.join(timeout=5)
         if stdout_capture.is_alive():
@@ -1260,7 +1396,13 @@ def run_child(
     owned_seen.update(owned)
     live = live_owned(owned, root_pid=process.pid)
     if live or process_group_exists(pgid):
-        forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
+        forced_cleanup = terminate_group(
+            process,
+            owned,
+            pgid,
+            runner_pid=parent_pid,
+            preexisting_pids=preexisting_pids,
+        ) or forced_cleanup
         violations.append(f"child ownership survived normal exit: {sorted(live)}")
         after = proc_snapshot()
         after_load = load_average()
