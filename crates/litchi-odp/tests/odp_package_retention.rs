@@ -265,6 +265,9 @@ fn signed_policy_precedes_deferred_processing_instruction_validation() {
         .unwrap();
     let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
 
-    let error = source.edit().unwrap().commit().unwrap_err();
+    let error = match source.edit().unwrap().commit() {
+        Ok(_) => panic!("signed package with active processing instruction committed"),
+        Err(error) => error,
+    };
     assert!(error.to_string().contains("signed packages"));
 }
