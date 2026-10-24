@@ -66,8 +66,10 @@
         "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary-target/doc/litchi_drawingml.json",
         "bytes": 28010477,
         "sha256": "cb6a1b0e61511c7e4c486a58ada198fd546e1303f835ab0323232377af3adaea",
-        "collision_ids": [4040, 4041],
-        "nominal_error_enum_id": 3675
+        "collision_ids": [4035, 4036],
+        "requested_followup_use_ids": [4040, 4041],
+        "nominal_error_enum_id": 3675,
+        "proc_macro_error_id": 3677
       }
     },
     {
