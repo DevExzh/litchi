@@ -85,6 +85,46 @@ def policy_immutable_owners(crate: str, profiles=None) -> frozenset[tuple[str, .
     )
 
 
+def policy_delegated_globs(crate: str, profiles=None) -> frozenset[str]:
+    """Return all explicitly delegated foreign-glob crate names for ``crate``.
+
+    A facade may have more than one checked profile, and an all-features
+    rustdoc graph can contain a glob that is present only in one feature
+    profile.  Use the union so the inventory does not accidentally depend on
+    which profile happened to mention the glob.  ``Surface`` still refuses
+    every foreign glob outside this explicit set; delegation only transfers
+    the check to the delegated crate's own rustdoc inventory.
+    """
+    if profiles is None:
+        profiles = gate.checked_policy(gate.read_json(gate.POLICY))
+    return frozenset(
+        delegated
+        for profile in profiles
+        if profile["package"].replace("-", "_") == crate
+        for delegated in profile.get("delegated_globs", [])
+    )
+
+
+def missing_delegated_inputs(crates, profiles=None) -> dict[str, tuple[str, ...]]:
+    """Return policy-delegated crates absent from a multi-crate input set.
+
+    A facade's delegated glob is checked by the delegated crate's own
+    rustdoc.  Requiring that rustdoc input alongside the facade prevents a
+    partial command from presenting a facade as complete while silently
+    omitting the delegated surface.
+    """
+    available = {str(crate).replace("-", "_") for crate in crates}
+    if profiles is None:
+        profiles = gate.checked_policy(gate.read_json(gate.POLICY))
+    missing = {}
+    for crate in sorted(available):
+        delegated = policy_delegated_globs(crate, profiles)
+        absent = tuple(sorted(delegated - available))
+        if absent:
+            missing[crate] = absent
+    return missing
+
+
 def policy_owner_paths(surface: Inventory, crate: str,
                        immutable_owners=None) -> frozenset[tuple[str, ...]]:
     """Resolve policy owners and their public aliases by nominal identity.
@@ -126,9 +166,9 @@ def policy_owner_paths(surface: Inventory, crate: str,
 class Inventory(gate.Surface):
     """The gate's surface, plus the shortest public path of every item."""
 
-    def __init__(self, document, crate):
+    def __init__(self, document, crate, delegated_globs=frozenset()):
         self.items: dict[str, tuple[str, ...]] = {}
-        super().__init__(document, crate)
+        super().__init__(document, crate, delegated_globs)
 
     def walk(self, item_id, path, ancestors, *, exported):
         if item_id in self.index:
@@ -163,12 +203,20 @@ def target_family(method: str) -> str:
     return f"{name}::Edit via Package::edit_{name}() / apply_{name}(&Patch)"
 
 
-def rows(document, crate: str, result_rules=None, immutable_owners=None):
-    surface = Inventory(document, crate)
+def _rows(document, crate: str, result_rules=None, immutable_owners=None,
+          delegated_globs=None):
+    profiles = None
+    if result_rules is None or immutable_owners is None or delegated_globs is None:
+        profiles = gate.checked_policy(gate.read_json(gate.POLICY))
+    if delegated_globs is None:
+        delegated_globs = policy_delegated_globs(crate, profiles)
+    surface = Inventory(document, crate, delegated_globs)
     return_types = gate.ReturnTypes(surface)
+    if immutable_owners is None:
+        immutable_owners = policy_immutable_owners(crate, profiles)
     owners = policy_owner_paths(surface, crate, immutable_owners)
     if result_rules is None:
-        result_rules = [rule for profile in gate.checked_policy(gate.read_json(gate.POLICY))
+        result_rules = [rule for profile in profiles
                         if profile["package"].replace("-", "_") == crate
                         for rule in profile.get("result_methods", [])]
     verified_results = set()
@@ -274,6 +322,23 @@ def rows(document, crate: str, result_rules=None, immutable_owners=None):
             yield "unsafe_edit", text, "variant", "Refused(litchi_core::edit::Refusal)"
 
 
+def rows(document, crate: str, result_rules=None, immutable_owners=None,
+         delegated_globs=None):
+    """Yield unique debt rows while preserving distinct public paths.
+
+    Rustdoc can expose the same nominal item through both a public spelling
+    and an alias.  Those paths remain separate rows, but repeated emission of
+    the exact same tuple is not a second debt item and must not make the
+    inventory structurally ambiguous.
+    """
+    seen = set()
+    for row in _rows(document, crate, result_rules, immutable_owners,
+                     delegated_globs):
+        if row not in seen:
+            seen.add(row)
+            yield row
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -281,6 +346,27 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     print("crate\tcategory\tpath\tdetail\ttarget")
     try:
+        profiles = gate.checked_policy(gate.read_json(gate.POLICY))
+        # Parse each graph to obtain its root identity, retaining only those
+        # names before the sequential row pass.  This prepass still parses
+        # each full graph; the second pass remains sequential so the
+        # inventory does not retain all 1+ GiB of all-features JSON.
+        crates = []
+        for path in args.json:
+            document = gate.read_json(path)
+            root = str(document["root"])
+            crates.append(document["index"][root]["name"])
+        del document
+        missing = missing_delegated_inputs(crates, profiles)
+        if missing:
+            details = "; ".join(
+                f"{crate}: {', '.join(delegated)}"
+                for crate, delegated in sorted(missing.items())
+            )
+            raise InventoryError(
+                "delegated crate rustdoc input(s) missing; refusing partial inventory: "
+                + details
+            )
         for path in args.json:
             document = gate.read_json(path)
             # Captures may be renamed by profile or source revision. The crate
