@@ -74,6 +74,25 @@ def spawn_fake(root: Path, mode: str) -> tuple[subprocess.Popen[bytes], int, dic
     return process, pgid, owned, set(before)
 
 
+def wait_marker_pid(marker: Path, deadline: float) -> int:
+    """Wait for the escaped child to publish a complete identity marker."""
+    last_value = ""
+    while time.monotonic() < deadline:
+        try:
+            last_value = marker.read_text(encoding="ascii").strip()
+        except FileNotFoundError:
+            last_value = ""
+        if last_value:
+            try:
+                value = int(last_value)
+            except ValueError:
+                value = 0
+            if value > 0:
+                return value
+        time.sleep(0.01)
+    raise AssertionError(f"escaped fake child did not publish a PID: {last_value!r}")
+
+
 class OpcReadAheadGuardTests(unittest.TestCase):
     def test_monitor_failure_still_waits_and_reaps_direct_child(self) -> None:
         with tempfile.TemporaryDirectory(prefix="opc-guard-lifecycle-", dir="/tmp") as raw:
@@ -102,15 +121,12 @@ class OpcReadAheadGuardTests(unittest.TestCase):
                 process, pgid, owned, before = spawn_fake(root, "escape")
                 marker = root / "escape.pid"
                 deadline = time.monotonic() + 2
-                while not marker.exists() and time.monotonic() < deadline:
-                    time.sleep(0.01)
-                self.assertTrue(marker.exists(), "escaped fake child did not start")
+                escaped_pid = wait_marker_pid(marker, deadline)
                 current = GUARD.proc_snapshot()
                 owned = GUARD.refresh_owned(current, owned, process.pid, pgid, process.pid)
                 for pid, entry in current.items():
                     if pid not in before and int(entry.get("ppid", -1)) == os.getpid():
                         owned[pid] = int(entry["starttime"])
-                escaped_pid = int(marker.read_text(encoding="ascii"))
                 self.assertIn(escaped_pid, owned)
                 GUARD.ensure_child_reaped(process, owned, pgid, False)
                 self.assertEqual(process.wait(timeout=1), process.returncode)
@@ -137,10 +153,7 @@ class OpcReadAheadGuardTests(unittest.TestCase):
                 cleanup_pgid, cleanup_owned, cleanup_before = pgid, dict(owned), set(before)
                 marker = root / "escape.pid"
                 deadline = time.monotonic() + 2
-                while not marker.exists() and time.monotonic() < deadline:
-                    time.sleep(0.01)
-                self.assertTrue(marker.exists(), "escaped fake child did not start")
-                escaped_pid = int(marker.read_text(encoding="ascii"))
+                escaped_pid = wait_marker_pid(marker, deadline)
 
                 def failed_snapshot() -> dict[int, dict[str, object]]:
                     raise GUARD.TimingError("synthetic first during-poll failure")
