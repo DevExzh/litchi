@@ -88,8 +88,15 @@ The staged evidence-size and binary guards were empty. No target, executable,
 or evidence file is committed.
 
 The earlier standalone `unified-chart-add --offline --locked` failure is not
-relabelled as a pass here: its exact command, 298-byte log, SHA-256
-`408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a`, and the
-subsequent registry-preserving local-package lock repair are retained in
-`docs/unified-ops/results/0362dvb/drawingml-owner-policy.json`. That record's
-final standalone locked rerun passed after the minimal local-edge update.
+relabelled as a pass here. Its exact failed command was:
+
+```text
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target
+```
+
+It exited 101 with external log `unified-chart-check.log` (298 bytes,
+SHA-256 `408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a`).
+The subsequent registry-preserving local-package lock repair, its final
+standalone locked rerun, and all lock hashes remain in
+`docs/unified-ops/results/0362dvb/drawingml-owner-policy.json`; no registry
+version or checksum was upgraded.
