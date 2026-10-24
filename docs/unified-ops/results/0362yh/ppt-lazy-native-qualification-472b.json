@@ -1,0 +1,61 @@
+{
+  "schema": "litchi.ppt.lazy-native.qualification-receipt.v1",
+  "status": "correctness_allocation_preflight_passed",
+  "claim_scope": "correctness and allocator-instrumentation preflight only; no calibration, timing, ABBA, or performance acceptance claim",
+  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024",
+  "external_receipt": {"path": "qualification-receipt-472b670547-corrected.json", "bytes": 7646, "sha256": "fbe59be89acb3a588b659c217f05ddf3c6ac49cdbeee2dce03c821e469714db8"},
+  "candidate": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "head": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "status": "clean",
+    "lock": {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 57227,
+      "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+    },
+    "manifest": {
+      "path": "tools/native_qualification/manifests/ppt-lazy-edit.json",
+      "bytes": 6873,
+      "sha256": "2748bf8c56d6395b39ed2b189acbc3e37b7b22359a3e82b4b1f34389423850c6"
+    },
+    "probe_sources": [
+      {"path": "tools/perf-baseline/src/ppt_lazy_native.rs", "bytes": 24586, "sha256": "68d77fad390dc681ed248b2348b26f319d2e646d1f0b006796ecd89c49cae62e"},
+      {"path": "tools/perf-baseline/src/bin/ppt_lazy_native.rs", "bytes": 146, "sha256": "04df53920b036911e9002df152b9e07b1e0392ac6a1a545b285807108d808d12"},
+      {"path": "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs", "bytes": 203, "sha256": "661e94115adc418de1c25ee6dd5481e4399e43eee26e011a49d1fb9d1ce56201"},
+      {"path": "tools/perf-baseline/src/lib.rs", "bytes": 3088216, "sha256": "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"}
+    ]
+  },
+  "preparation": {
+    "baseline_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/baseline-8779-sparse-final-472b",
+    "candidate_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "receipt": {"path": "preparation-472b670547.json", "bytes": 12243, "sha256": "3d146ac64ad708ba65d0bb3d2bdc70f95c86463c6000ec0c07841b01c9a627cf"},
+    "log": {"path": "logs/preparation-472b670547.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "exit": 0},
+    "baseline_ref": "8779d059add6c90c74552801372c44f770db9f0f",
+    "baseline_tree": "27e0b56e2f8e3ab11b00c119604b5636f358dfe2",
+    "baseline_lock": {"bytes": 57158, "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"},
+    "baseline_reuse_basis": "472b preparation has the same baseline sparse ref/tree, lock, registration-before/after, fixture and probe hashes as the reviewed c796 preparation; only external source-root paths and candidate ref differ"
+  },
+  "build": {
+    "command_normal": "source /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/env.sh; export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-target; export TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-tmp; export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-target --bin ppt_lazy_native",
+    "command_allocator": "source /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/env.sh; export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-target; export TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-tmp; export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-target --bin ppt_lazy_native_alloc",
+    "environment": {"memory_cap": "LITCHI_MEM_MAX=20G", "cargo_build_jobs": "1", "cargo_incremental": "0", "cargo_net_offline": "true", "cargo_profile_release_debug": "0", "cpu_pin": "none", "toolchain": "rustc 1.95.0 (59807616e 2026-04-14), LLVM 22.1.2"},
+    "baseline_reuse": {
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024",
+      "basis": "fresh 472b preparation equals the reviewed c796 baseline preparation for the baseline ref/tree, lock, registration bytes, fixture/probe hashes, toolchain and build environment; the reused binaries were built and verified in the reviewed c796 packet",
+      "normal": {"exit": 0, "binary": {"path": "baseline-082-normal-target/release/ppt_lazy_native", "bytes": 12131056, "sha256": "ffcf3aebd0adca8ec26047f732e58026506829562cf51480056315a0a598416a"}, "target_bytes": 1314991296},
+      "allocator": {"exit": 0, "binary": {"path": "baseline-082-allocator-target/release/ppt_lazy_native_alloc", "bytes": 12138552, "sha256": "0d045e2c6a36e83d4d36fb9525b814849ec39b3d06a0e4fe02fcc9ed94cb85d7"}, "target_bytes": 1315001381}
+    },
+    "candidate_normal": {"exit": 0, "binary": {"path": "candidate-472b-normal-target/release/ppt_lazy_native", "bytes": 12371352, "sha256": "ac72404c98bf37f5a7b9433c01880547a4b34d24a8d346dc359ecc765770ff1a"}, "log": {"path": "logs/candidate-472b-normal-build.log", "bytes": 39797, "sha256": "ca7297042ecfc6cd212126ba8fe92eff78cd023cd4d4f5d658ebb0cc72fdd223"}, "target_bytes": 1324837127},
+    "candidate_allocator": {"exit": 0, "binary": {"path": "candidate-472b-allocator-target/release/ppt_lazy_native_alloc", "bytes": 12378664, "sha256": "1c69d5d7627a32a633147a33afafaf3c368cbc75a75306c3da079ce8495a8390"}, "log": {"path": "logs/candidate-472b-allocator-build.log", "bytes": 39797, "sha256": "5bca2dad0e894e48f8a55d7263f8d6f99147c6b686fd0f4e8f1b351e1754cea0"}, "target_bytes": 1324848960}
+  },
+  "verify": {
+    "command": "timeout 300s <binary> --mode verify",
+    "baseline_normal": {"exit": 0, "report": {"path": "verify-baseline-082-normal.json", "bytes": 12094, "sha256": "2daa5587982ac38c4a4068adc03a9c91798a4c98ce95b050e541069ed276d07c"}},
+    "baseline_allocator": {"exit": 0, "report": {"path": "verify-baseline-082-allocator.json", "bytes": 12091, "sha256": "a16a3ef18063f0ba31d379bba1022a6b38eeaba383b1d487683ff3b0a1f076f9"}, "allocation": "measured"},
+    "candidate_normal": {"exit": 0, "report": {"path": "verify-candidate-472b-normal.json", "bytes": 12094, "sha256": "2daa5587982ac38c4a4068adc03a9c91798a4c98ce95b050e541069ed276d07c"}, "stderr": {"path": "verify-candidate-472b-normal.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}},
+    "candidate_allocator": {"exit": 0, "report": {"path": "verify-candidate-472b-allocator.json", "bytes": 12091, "sha256": "a16a3ef18063f0ba31d379bba1022a6b38eeaba383b1d487683ff3b0a1f076f9"}, "stderr": {"path": "verify-candidate-472b-allocator.stderr", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}, "allocation": "measured"},
+    "validation": "qualification validator passes all four reports with 28 routes and 4 fixtures each; allocator status is measured; normalized baseline/candidate and normal/allocator route and fixture proofs are equal",
+    "quiet_window": "ready for separately authorized quiet-host calibration/timing/ABBA; none run here"
+  }
+}
