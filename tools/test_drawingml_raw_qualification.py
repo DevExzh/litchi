@@ -138,10 +138,13 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("PreparedValue", source)
         self.assertIn("semantic_changed_differs", source)
         self.assertIn("generated_fixture_parts", source)
+        self.assertIn("--preflight", source)
         self.assertIn("output_limit_attempt", source)
         self.assertIn("partial_output_allowed", source)
         self.assertIn("changed_output_exact", source)
         self.assertIn("source_edit_serialize", source)
+        self.assertIn('"string_output"', source)
+        self.assertIn('"vec_output"', source)
         self.assertIn("read(xml,scope,limits)", source)
         self.assertIn("write_contextual_to", source)
         self.assertIn("read_svg_contextual_value", source)
@@ -149,6 +152,23 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertNotIn("changed_readback_sha256", source)
         self.assertNotIn("FormattingSink", source)
         self.assertNotIn("lane adapter is not supplied until the final source freeze", source)
+
+        paired_source = (
+            ROOT / "tools/native_qualification/drawingml_raw_paired_runner.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("drawingml-fixture-preflight", paired_source)
+        self.assertIn("generated_fixture_parts", paired_source)
+        generic_source = (ROOT / "tools/native_qualification_runner.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('"event_kind": event_kind', generic_source)
+        self.assertIn('"measured": measured', generic_source)
+        self.assertIn("self._run_controls(identities)", generic_source)
+        record = (
+            ROOT / "docs/unified-ops/0362dvib-drawingml-native-raw-repair.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("contextual", record)
+        self.assertIn("standalone", record)
 
     def test_generated_fixture_identity_binds_all_three_byte_roles(self) -> None:
         parts = [

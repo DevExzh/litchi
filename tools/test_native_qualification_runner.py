@@ -608,6 +608,68 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(event["returncode"], 7)
             self.assertEqual(event["event_id"], "failed-child")
 
+    def test_control_handoff_is_compared_before_measurement_and_not_measured(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-qual-control-") as directory:
+            root = Path(directory)
+            helper = root / "control.py"
+            helper.write_text(
+                "import json, sys\n"
+                "output = sys.argv[sys.argv.index('--json') + 1]\n"
+                "with open(output, 'w', encoding='utf-8') as stream:\n"
+                "    json.dump({'measured': False, 'identity': 'same'}, stream)\n",
+                encoding="utf-8",
+            )
+            output = root / "output"
+            manifest = {
+                "schema": runner.SCHEMA,
+                "lane": "w5-legacy",
+                "output_dir": str(output),
+                "abba_order": list(runner.ABBA_ORDER),
+                "shared": {},
+                "legs": {
+                    "before": {
+                        "source_root": str(ROOT),
+                        "target_dir": str(root / "before"),
+                        "lock_paths": ["tools/perf-baseline/Cargo.lock"],
+                        "allow_dirty": True,
+                    },
+                    "after": {
+                        "source_root": str(ROOT),
+                        "target_dir": str(root / "after"),
+                        "lock_paths": ["tools/perf-baseline/Cargo.lock"],
+                        "allow_dirty": True,
+                    },
+                },
+                "controls": [{
+                    "id": "test-control",
+                    "compare": ["identity"],
+                    "programs": {
+                        leg: {
+                            "binary": str(Path(sys.executable).resolve()),
+                            "argv": [str(helper), "--json", "{output}"],
+                            "outputs": [f"{{output_dir}}/controls/{leg}.json"],
+                            "stdout": f"{{output_dir}}/controls/{leg}.stdout",
+                            "stderr": f"{{output_dir}}/controls/{leg}.stderr",
+                            "require_stdout": False,
+                        }
+                        for leg in ("before", "after")
+                    },
+                }],
+            }
+            safe = runner.SafeRunner(
+                manifest,
+                ROOT / "tools/native_qualification_runner.py",
+                "abba",
+                None,
+            )
+            safe.guard.require_quiet = lambda: None
+            safe.guard.offenders = lambda _allowed_root=None: []
+            identities = {leg: safe._identity(leg) for leg in ("before", "after")}
+            safe._run_controls(identities)
+            events = [json.loads(line) for line in (output / "events-abba.jsonl").read_text().splitlines()]
+            self.assertEqual([event["event_kind"] for event in events], ["control", "control"])
+            self.assertEqual([event["measured"] for event in events], [False, False])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,6 +23,15 @@ The probe now:
   including Vec/String routes, receives an actual refusal check; chart's
   bounded partial output is reported and checked against its cap. Diagram and
   Theme Family part rows are named source-edit-and-serialize operations;
+- runs an untimed fixture-preflight child for each source endpoint before any
+  warmup or ABBA child, comparing the source/changed/malformed generated
+  identities across baseline and candidate. These control events are retained
+  in the runner journal with `measured=false` and are excluded from measured
+  RSS/timing children. The SVG preflight intentionally uses a contextual
+  parsed value and contextual writer; ordinary sink, fidelity, and standalone
+  Vec/String routes intentionally use their standalone prepared values;
+  the existing post-run validator comparison across all qualified reports is
+  retained as a second handoff check;
 - passes the current typed limits through the `drawingml-raw-current`,
   `drawingml-theme-family-current`, and `drawingml-ink-limits-current`
   feature gates while preserving the historical one-argument baseline APIs.

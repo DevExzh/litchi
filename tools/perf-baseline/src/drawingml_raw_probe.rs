@@ -62,6 +62,7 @@ struct Arguments {
     target_ms: u64,
     minimum_ms: u64,
     output: PathBuf,
+    preflight: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -613,7 +614,7 @@ fn usage() -> &'static str {
     "usage: drawingml-raw-{native,allocator} --lane LANE --role ROLE \
      --endpoint raw|owner --owner-route ROUTE --raw-scope SCOPE --mode MODE --fixture PATH --source-revision SHA \
      --iterations N --warmups N \
-     --blocks N --samples N --target-ms N --minimum-ms N --json PATH"
+     --blocks N --samples N --target-ms N --minimum-ms N --json PATH [--preflight]"
 }
 
 fn invalid_argument(message: impl Into<String>) -> io::Error {
@@ -642,8 +643,16 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
     let mut target_ms = None;
     let mut minimum_ms = None;
     let mut output = None;
+    let mut preflight = false;
     let mut arguments = arguments;
     while let Some(argument) = arguments.next() {
+        if argument == "--preflight" {
+            if preflight {
+                return Err(invalid_argument("duplicate argument --preflight"));
+            }
+            preflight = true;
+            continue;
+        }
         let slot = match argument.as_str() {
             "--lane" => &mut lane,
             "--endpoint" => &mut endpoint,
@@ -704,6 +713,9 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
         return Err(invalid_argument(format!(
             "{expected_mode} binary requires --mode {expected_mode}"
         )));
+    }
+    if preflight && expected_mode != "normal" {
+        return Err(invalid_argument("--preflight is only supported by the normal binary"));
     }
     let fixture = PathBuf::from(fixture.ok_or_else(|| invalid_argument("--fixture is required"))?);
     if fixture.is_symlink() || !fixture.is_file() {
@@ -772,6 +784,7 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
         target_ms,
         minimum_ms,
         output,
+        preflight,
     })
 }
 
@@ -3960,6 +3973,8 @@ fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
             "operation_scope": match part.kind {
                 PartKind::Diagram | PartKind::ThemeFamilyPart => "source_edit_serialize",
                 PartKind::SvgBlip => "contextual_typed_writer",
+                PartKind::TextBody | PartKind::Geometry => "string_output",
+                PartKind::Theme | PartKind::Color => "vec_output",
                 _ => "typed_writer",
             },
         }));
@@ -4179,10 +4194,32 @@ fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, P
                 .filter(|part| matches!(part.kind, PartKind::Diagram | PartKind::ThemeFamilyPart))
                 .map(|part| part.id)
                 .collect::<Vec<_>>(),
+            "string_output_parts": case
+                .parts
+                .iter()
+                .filter(|part| matches!(part.kind, PartKind::TextBody | PartKind::Geometry))
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
+            "vec_output_parts": case
+                .parts
+                .iter()
+                .filter(|part| matches!(part.kind, PartKind::Theme | PartKind::Color))
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
             "typed_writer_parts": case
                 .parts
                 .iter()
-                .filter(|part| !matches!(part.kind, PartKind::Diagram | PartKind::ThemeFamilyPart))
+                .filter(|part| {
+                    !matches!(
+                        part.kind,
+                        PartKind::Diagram
+                            | PartKind::ThemeFamilyPart
+                            | PartKind::TextBody
+                            | PartKind::Geometry
+                            | PartKind::Theme
+                            | PartKind::Color
+                    )
+                })
                 .map(|part| part.id)
                 .collect::<Vec<_>>(),
         }),
@@ -4530,7 +4567,7 @@ fn allocator_report(
     }
 }
 
-fn write_report(path: &Path, report: &Report) -> io::Result<()> {
+fn write_json_value<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| invalid_argument("JSON output has no parent directory"))?;
@@ -4549,12 +4586,16 @@ fn write_report(path: &Path, report: &Report) -> io::Result<()> {
         )));
     }
     let bytes =
-        serde_json::to_vec_pretty(report).map_err(|error| io::Error::other(error.to_string()))?;
+        serde_json::to_vec_pretty(value).map_err(|error| io::Error::other(error.to_string()))?;
     let mut file = fs::File::create(&temporary)?;
     file.write_all(&bytes)?;
     file.write_all(b"\n")?;
     file.sync_all()?;
     fs::rename(temporary, path)
+}
+
+fn write_report(path: &Path, report: &Report) -> io::Result<()> {
+    write_json_value(path, report)
 }
 
 /// Run the real DrawingML adapter endpoint.
@@ -4586,6 +4627,32 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
     // source-generation drift cannot be mistaken for an endpoint speedup.
     let generated_fixture_parts = build_generated_fixture_parts(&case);
     let generated_fixture_sha256 = generated_fixture_identity(&generated_fixture_parts);
+    if arguments.preflight {
+        // This handoff is deliberately outside the measured protocol.  The
+        // paired runner compares source/changed/malformed identities from the
+        // two endpoint processes before it starts warmups or ABBA children.
+        // Keep the report small and free of timing/RSS rows so it cannot be
+        // mistaken for a measured child report.
+        let report = serde_json::json!({
+            "schema": "litchi.drawingml.raw.preflight.v1",
+            "status": "preflight",
+            "measured": false,
+            "qualification_claim": false,
+            "lane": arguments.lane,
+            "endpoint": arguments.endpoint,
+            "owner_route": arguments.owner_route,
+            "raw_scope": arguments.raw_scope,
+            "role": arguments.role,
+            "mode": arguments.mode,
+            "source_revision": arguments.source_revision,
+            "fixture_bytes": fixture_bytes.len(),
+            "fixture_sha256": sha256(&fixture_bytes),
+            "fixture_lane_identity_sha256": case.fixture_identity_sha256,
+            "generated_fixture_sha256": generated_fixture_sha256,
+            "generated_fixture_parts": generated_fixture_parts,
+        });
+        return write_json_value(&arguments.output, &report);
+    }
     let size_classes = if arguments.endpoint == "raw" {
         size_class_receipts(&case).map_err(|error| io::Error::other(error.message))?
     } else {

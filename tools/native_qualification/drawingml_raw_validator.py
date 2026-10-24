@@ -724,6 +724,10 @@ def _validate_rows(
                         if part_id in {"diagram-data-model", "theme-family-part"}
                         else "contextual_typed_writer"
                         if part_id == "svg-blip"
+                        else "string_output"
+                        if part_id in {"text-body", "geometry"}
+                        else "vec_output"
+                        if part_id in {"theme", "color"}
                         else "typed_writer"
                     )
                     _expect(
