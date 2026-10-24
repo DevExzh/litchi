@@ -1,0 +1,1520 @@
+{
+  "schema": "litchi.unified-ops.gate-correction.v1",
+  "accepted_as_full_gate": false,
+  "runtime_change": false,
+  "source_fix": "e1576fa6dcd9f856ddea0b0ec6b038cb6b076265",
+  "runner": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py",
+    "bytes": 32791,
+    "sha256": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372"
+  },
+  "attempts": [
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/state.json",
+        "bytes": 331995,
+        "sha256": "11ea9128d69d3eddac082e7cc39b47637b367e3a89379a044c287309ea7f8427"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/plan.json",
+        "bytes": 22286,
+        "sha256": "da3260d7263a2110538ff39790831318ef58acb6ffdae25b9bf61540bf904617"
+      },
+      "source": {
+        "commit": "b6732d02b241705ba153c1a2cb9ff03bf0a13f93",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": null,
+        "start_at": null,
+        "indexes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33,
+          34,
+          35,
+          36,
+          37,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          46,
+          47,
+          48,
+          49,
+          50,
+          51,
+          52
+        ],
+        "full_step_count": 53,
+        "partial": false
+      },
+      "status": "failed",
+      "rows": [
+        {
+          "index": 0,
+          "name": "fmt",
+          "attempt": "1792817356783307791-4164126",
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 70.76368618011475,
+          "status": "passed",
+          "target_bytes_after": 4706734564,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/00-fmt-attempt-1792817356783307791-4164126.log",
+          "post_exit": {
+            "target_bytes": 4706734564,
+            "samples": [
+              {
+                "at": 1792817427.3529096,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817427.5172093,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817427.6678011,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 1,
+          "name": "clippy-all-features",
+          "attempt": "1792817428729290812-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-py",
+            "--all-targets",
+            "--all-features",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 17.546980142593384,
+          "status": "passed",
+          "target_bytes_after": 4706734564,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/01-clippy-all-features-attempt-1792817428729290812-4164126.log",
+          "post_exit": {
+            "target_bytes": 4706734564,
+            "samples": [
+              {
+                "at": 1792817446.1630132,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817446.3237991,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817446.4935963,
+                "target_bytes": 4706734564,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 2,
+          "name": "clippy-ops-no-encryption",
+          "attempt": "1792817447620319004-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--features",
+            "doc,docx,ppt,pptx,xls,xlsx,xlsb,rtf,odt,ods,odp,oth,odm,odg,odc,odi,odb,odf-formula,odf-objects,pages,keynote,numbers,iwork-adapter,opc,markdown,formula,yaml,eval,test-support",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 369.43869376182556,
+          "status": "passed",
+          "target_bytes_after": 5024514848,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/02-clippy-ops-no-encryption-attempt-1792817447620319004-4164126.log",
+          "post_exit": {
+            "target_bytes": 5024514848,
+            "samples": [
+              {
+                "at": 1792817815.7164052,
+                "target_bytes": 5024514848,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817816.957484,
+                "target_bytes": 5024514848,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817817.1511188,
+                "target_bytes": 5024514848,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 3,
+          "name": "clippy-ops-",
+          "attempt": "1792817818486314403-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 19.93244743347168,
+          "status": "passed",
+          "target_bytes_after": 5031621579,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/03-clippy-ops--attempt-1792817818486314403-4164126.log",
+          "post_exit": {
+            "target_bytes": 5031621579,
+            "samples": [
+              {
+                "at": 1792817838.03019,
+                "target_bytes": 5031621579,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817838.1908712,
+                "target_bytes": 5031621579,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817838.3675447,
+                "target_bytes": 5031621579,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 4,
+          "name": "clippy-ops-xlsx",
+          "attempt": "1792817839485244037-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "xlsx",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 70.78931260108948,
+          "status": "passed",
+          "target_bytes_after": 5119378908,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/04-clippy-ops-xlsx-attempt-1792817839485244037-4164126.log",
+          "post_exit": {
+            "target_bytes": 5119378908,
+            "samples": [
+              {
+                "at": 1792817910.0143032,
+                "target_bytes": 5119378908,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817910.1757221,
+                "target_bytes": 5119378908,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817910.353475,
+                "target_bytes": 5119378908,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 5,
+          "name": "clippy-ops-pptx",
+          "attempt": "1792817911429533439-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "pptx",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 52.51651668548584,
+          "status": "passed",
+          "target_bytes_after": 5157457172,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/05-clippy-ops-pptx-attempt-1792817911429533439-4164126.log",
+          "post_exit": {
+            "target_bytes": 5157457172,
+            "samples": [
+              {
+                "at": 1792817963.353738,
+                "target_bytes": 5157457172,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817963.5198421,
+                "target_bytes": 5157457172,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792817963.6871328,
+                "target_bytes": 5157457172,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 6,
+          "name": "clippy-ops-docx",
+          "attempt": "1792817965030956829-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "docx",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 45.96633791923523,
+          "status": "passed",
+          "target_bytes_after": 5183724615,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/06-clippy-ops-docx-attempt-1792817965030956829-4164126.log",
+          "post_exit": {
+            "target_bytes": 5183724615,
+            "samples": [
+              {
+                "at": 1792818010.6226318,
+                "target_bytes": 5183724615,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818010.8129623,
+                "target_bytes": 5183724615,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818011.0069118,
+                "target_bytes": 5183724615,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 7,
+          "name": "clippy-ops-xls",
+          "attempt": "1792818012076338260-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "xls",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 43.261991024017334,
+          "status": "passed",
+          "target_bytes_after": 5222936832,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/07-clippy-ops-xls-attempt-1792818012076338260-4164126.log",
+          "post_exit": {
+            "target_bytes": 5222936832,
+            "samples": [
+              {
+                "at": 1792818054.9702547,
+                "target_bytes": 5222936832,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818055.1618109,
+                "target_bytes": 5222936832,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818055.3509293,
+                "target_bytes": 5222936832,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 8,
+          "name": "clippy-ops-xlsb",
+          "attempt": "1792818056445197119-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "xlsb",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 31.605366468429565,
+          "status": "passed",
+          "target_bytes_after": 5239387499,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/08-clippy-ops-xlsb-attempt-1792818056445197119-4164126.log",
+          "post_exit": {
+            "target_bytes": 5239387499,
+            "samples": [
+              {
+                "at": 1792818087.6819482,
+                "target_bytes": 5239387499,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818087.8787982,
+                "target_bytes": 5239387499,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818088.0782602,
+                "target_bytes": 5239387499,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 9,
+          "name": "clippy-ops-doc",
+          "attempt": "1792818089146447197-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "doc",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 29.985605001449585,
+          "status": "passed",
+          "target_bytes_after": 5256938874,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/09-clippy-ops-doc-attempt-1792818089146447197-4164126.log",
+          "post_exit": {
+            "target_bytes": 5256938874,
+            "samples": [
+              {
+                "at": 1792818118.8003902,
+                "target_bytes": 5256938874,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818119.0054483,
+                "target_bytes": 5256938874,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818119.2027998,
+                "target_bytes": 5256938874,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 10,
+          "name": "clippy-ops-ppt",
+          "attempt": "1792818120287634217-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "ppt",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 40.21712064743042,
+          "status": "passed",
+          "target_bytes_after": 5288731684,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/10-clippy-ops-ppt-attempt-1792818120287634217-4164126.log",
+          "post_exit": {
+            "target_bytes": 5288731684,
+            "samples": [
+              {
+                "at": 1792818160.0990558,
+                "target_bytes": 5288731684,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818160.3098674,
+                "target_bytes": 5288731684,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818160.514599,
+                "target_bytes": 5288731684,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 11,
+          "name": "clippy-ops-rtf",
+          "attempt": "1792818161616137373-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "rtf",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 31.215306282043457,
+          "status": "passed",
+          "target_bytes_after": 5329367905,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/11-clippy-ops-rtf-attempt-1792818161616137373-4164126.log",
+          "post_exit": {
+            "target_bytes": 5329367905,
+            "samples": [
+              {
+                "at": 1792818192.4728074,
+                "target_bytes": 5329367905,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818192.675819,
+                "target_bytes": 5329367905,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818192.8624525,
+                "target_bytes": 5329367905,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 12,
+          "name": "clippy-ops-odt",
+          "attempt": "1792818193969604347-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odt",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 53.775896310806274,
+          "status": "passed",
+          "target_bytes_after": 5355621762,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/12-clippy-ops-odt-attempt-1792818193969604347-4164126.log",
+          "post_exit": {
+            "target_bytes": 5355621762,
+            "samples": [
+              {
+                "at": 1792818247.1937509,
+                "target_bytes": 5355621762,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818247.3872023,
+                "target_bytes": 5355621762,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818247.5836096,
+                "target_bytes": 5355621762,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 13,
+          "name": "clippy-ops-ods",
+          "attempt": "1792818248849248558-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "ods",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 40.679152965545654,
+          "status": "passed",
+          "target_bytes_after": 5373330526,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/13-clippy-ops-ods-attempt-1792818248849248558-4164126.log",
+          "post_exit": {
+            "target_bytes": 5373330526,
+            "samples": [
+              {
+                "at": 1792818289.6678956,
+                "target_bytes": 5373330526,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818289.8673122,
+                "target_bytes": 5373330526,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818290.0927885,
+                "target_bytes": 5373330526,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 14,
+          "name": "clippy-ops-odp",
+          "attempt": "1792818291198021467-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odp",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 35.53527474403381,
+          "status": "passed",
+          "target_bytes_after": 5382432923,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/14-clippy-ops-odp-attempt-1792818291198021467-4164126.log",
+          "post_exit": {
+            "target_bytes": 5382432923,
+            "samples": [
+              {
+                "at": 1792818326.0249977,
+                "target_bytes": 5382432923,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818326.2503288,
+                "target_bytes": 5382432923,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818326.4729486,
+                "target_bytes": 5382432923,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 15,
+          "name": "clippy-ops-oth",
+          "attempt": "1792818328142264820-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "oth",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 29.904242515563965,
+          "status": "passed",
+          "target_bytes_after": 5389515825,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/15-clippy-ops-oth-attempt-1792818328142264820-4164126.log",
+          "post_exit": {
+            "target_bytes": 5389515825,
+            "samples": [
+              {
+                "at": 1792818357.9866312,
+                "target_bytes": 5389515825,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818358.2103596,
+                "target_bytes": 5389515825,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818358.4382162,
+                "target_bytes": 5389515825,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 16,
+          "name": "clippy-ops-odm",
+          "attempt": "1792818359662313713-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odm",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 26.094388008117676,
+          "status": "passed",
+          "target_bytes_after": 5395955617,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/16-clippy-ops-odm-attempt-1792818359662313713-4164126.log",
+          "post_exit": {
+            "target_bytes": 5395955617,
+            "samples": [
+              {
+                "at": 1792818385.279773,
+                "target_bytes": 5395955617,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818385.5085073,
+                "target_bytes": 5395955617,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818385.7499328,
+                "target_bytes": 5395955617,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 17,
+          "name": "clippy-ops-odg",
+          "attempt": "1792818386978218472-4164126",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odg",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101,
+          "seconds": 9.669663190841675,
+          "status": "failed",
+          "target_bytes_after": 5397529489,
+          "log_bytes": 464,
+          "log_sha256": "625cc18ad5689b85742bde97a751be19980c0c313c48da60f1d2308269935953",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/17-clippy-ops-odg-attempt-1792818386978218472-4164126.log",
+          "post_exit": {
+            "target_bytes": 5397529489,
+            "samples": [
+              {
+                "at": 1792818396.1793578,
+                "target_bytes": 5397529489,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818396.4144201,
+                "target_bytes": 5397529489,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818396.6554053,
+                "target_bytes": 5397529489,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/state.json",
+        "bytes": 41769,
+        "sha256": "52decffeaccab30582c767195a8cade6a1a8befc8d438a3800847fda1f6884be"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/plan.json",
+        "bytes": 21849,
+        "sha256": "10e8e5e3da2bef420f341366df4a44c0a861a8f95ccf02f8a4d9f80960e61abb"
+      },
+      "source": {
+        "commit": "cbbad7a7c02aafa4052d40eb45b541638a46b31a",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": [
+          "clippy-ops-odg",
+          "clippy-ops-odb"
+        ],
+        "start_at": null,
+        "indexes": [
+          17,
+          20
+        ],
+        "full_step_count": 53,
+        "partial": true
+      },
+      "status": "failed",
+      "rows": [
+        {
+          "index": 17,
+          "name": "clippy-ops-odg",
+          "attempt": "1792818872383015800-345201",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odg",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101,
+          "seconds": 19.72005295753479,
+          "status": "failed",
+          "target_bytes_after": 5402275136,
+          "log_bytes": 469,
+          "log_sha256": "0b7587642c186f97ccd41af31093ab19ef16159a686f7ca9270e21fd765db773",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/17-clippy-ops-odg-attempt-1792818872383015800-345201.log",
+          "post_exit": {
+            "target_bytes": 5402275136,
+            "samples": [
+              {
+                "at": 1792818891.7929628,
+                "target_bytes": 5402275136,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818892.019716,
+                "target_bytes": 5402275136,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792818892.228701,
+                "target_bytes": 5402275136,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "state": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/state.json",
+        "bytes": 250279,
+        "sha256": "e0cca1faf33e225c24b74765483b6ece89f24f4f9c2377aca2e6c889298cf004"
+      },
+      "plan": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/plan.json",
+        "bytes": 22120,
+        "sha256": "ee7dbb5183901a88fc2bd842075ca459d21191a4e1a6c81951652a9986b23406"
+      },
+      "source": {
+        "commit": "e1576fa6dcd9f856ddea0b0ec6b038cb6b076265",
+        "status": "",
+        "branch": "uo2/budget-validation",
+        "cargo_locks": {
+          "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+          "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+          "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+          "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+        }
+      },
+      "selection": {
+        "only": [
+          "clippy-ops-odg",
+          "clippy-ops-odc",
+          "clippy-ops-odi",
+          "clippy-ops-odb",
+          "clippy-ops-odf-formula",
+          "clippy-ops-pages",
+          "clippy-ops-keynote",
+          "clippy-ops-numbers"
+        ],
+        "start_at": null,
+        "indexes": [
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24
+        ],
+        "full_step_count": 53,
+        "partial": true
+      },
+      "status": "partial-passed",
+      "rows": [
+        {
+          "index": 17,
+          "name": "clippy-ops-odg",
+          "attempt": "1792819613279197751-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odg",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 6.024228572845459,
+          "status": "passed",
+          "target_bytes_after": 5402278628,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/17-clippy-ops-odg-attempt-1792819613279197751-502953.log",
+          "post_exit": {
+            "target_bytes": 5402278628,
+            "samples": [
+              {
+                "at": 1792819627.3323216,
+                "target_bytes": 5402278628,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819627.5729868,
+                "target_bytes": 5402278628,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819627.8002574,
+                "target_bytes": 5402278628,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 18,
+          "name": "clippy-ops-odc",
+          "attempt": "1792819628962184660-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odc",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 20.4713077545166,
+          "status": "passed",
+          "target_bytes_after": 5408134900,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/18-clippy-ops-odc-attempt-1792819628962184660-502953.log",
+          "post_exit": {
+            "target_bytes": 5408134900,
+            "samples": [
+              {
+                "at": 1792819648.9613035,
+                "target_bytes": 5408134900,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819649.1985297,
+                "target_bytes": 5408134900,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819649.4362614,
+                "target_bytes": 5408134900,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 19,
+          "name": "clippy-ops-odi",
+          "attempt": "1792819650566785454-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odi",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 28.154385089874268,
+          "status": "passed",
+          "target_bytes_after": 5414161816,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/19-clippy-ops-odi-attempt-1792819650566785454-502953.log",
+          "post_exit": {
+            "target_bytes": 5414161816,
+            "samples": [
+              {
+                "at": 1792819678.3131428,
+                "target_bytes": 5414161816,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819678.544106,
+                "target_bytes": 5414161816,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819678.7708478,
+                "target_bytes": 5414161816,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 20,
+          "name": "clippy-ops-odb",
+          "attempt": "1792819679858176589-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odb",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 22.49399495124817,
+          "status": "passed",
+          "target_bytes_after": 5420571813,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/20-clippy-ops-odb-attempt-1792819679858176589-502953.log",
+          "post_exit": {
+            "target_bytes": 5420571813,
+            "samples": [
+              {
+                "at": 1792819701.864391,
+                "target_bytes": 5420571813,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819702.1192894,
+                "target_bytes": 5420571813,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819702.3673563,
+                "target_bytes": 5420571813,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 21,
+          "name": "clippy-ops-odf-formula",
+          "attempt": "1792819703627574931-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odf-formula",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 24.103643655776978,
+          "status": "passed",
+          "target_bytes_after": 5426282273,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/21-clippy-ops-odf-formula-attempt-1792819703627574931-502953.log",
+          "post_exit": {
+            "target_bytes": 5426282273,
+            "samples": [
+              {
+                "at": 1792819727.4591875,
+                "target_bytes": 5426282273,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819727.709802,
+                "target_bytes": 5426282273,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819727.956434,
+                "target_bytes": 5426282273,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 22,
+          "name": "clippy-ops-pages",
+          "attempt": "1792819729086803576-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "pages",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 95.09189987182617,
+          "status": "passed",
+          "target_bytes_after": 5572752639,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/22-clippy-ops-pages-attempt-1792819729086803576-502953.log",
+          "post_exit": {
+            "target_bytes": 5572752639,
+            "samples": [
+              {
+                "at": 1792819822.926464,
+                "target_bytes": 5572752639,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819823.1757832,
+                "target_bytes": 5572752639,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819823.4254794,
+                "target_bytes": 5572752639,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 23,
+          "name": "clippy-ops-keynote",
+          "attempt": "1792819825341587191-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "keynote",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 44.10484576225281,
+          "status": "passed",
+          "target_bytes_after": 5594083858,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/23-clippy-ops-keynote-attempt-1792819825341587191-502953.log",
+          "post_exit": {
+            "target_bytes": 5594083858,
+            "samples": [
+              {
+                "at": 1792819868.9328458,
+                "target_bytes": 5594083858,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819869.1655066,
+                "target_bytes": 5594083858,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819869.4190843,
+                "target_bytes": 5594083858,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        },
+        {
+          "index": 24,
+          "name": "clippy-ops-numbers",
+          "attempt": "1792819870577166370-502953",
+          "command": [
+            "cargo",
+            "clippy",
+            "-q",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "numbers",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 34.52979040145874,
+          "status": "passed",
+          "target_bytes_after": 5613723699,
+          "log_bytes": 0,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/24-clippy-ops-numbers-attempt-1792819870577166370-502953.log",
+          "post_exit": {
+            "target_bytes": 5613723699,
+            "samples": [
+              {
+                "at": 1792819904.6704166,
+                "target_bytes": 5613723699,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819904.9154959,
+                "target_bytes": 5613723699,
+                "owned": [],
+                "builders": []
+              },
+              {
+                "at": 1792819905.1498804,
+                "target_bytes": 5613723699,
+                "owned": [],
+                "builders": []
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "operational_rejection": {
+    "note": "An IWA fixture generator used the gate checkout during the first e157 ODG attempt. The guard refused the overlap; after all owner jobs exited, the same frozen selection was resumed without policy changes.",
+    "correction": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-native-qualification-b673-20261024-owner-validation-provenance-rejection.json",
+      "bytes": 4910,
+      "sha256": "dd6b718eb604f8f8c47b2050e9b38d54270b221d34dc7ba0cf1f4513fb85d186"
+    }
+  }
+}
