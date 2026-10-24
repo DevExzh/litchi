@@ -2314,6 +2314,20 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
 }
 
 #[test]
+fn ordinary_cache_edit_defers_selector_resolution_and_retries_failure() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
+    let mut edit = workbook
+        .edit_pivot_cache(
+            PivotCacheSelector::Id(PivotCacheId(u32::MAX)),
+            PivotCacheFieldSelector::Ordinal(0),
+        )
+        .unwrap();
+    assert!(edit.before().is_err());
+    assert!(edit.before().is_err());
+}
+
+#[test]
 fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() {
     let fixture = Fixture::build(FixtureOptions::default());
     let original = crate::Package::from_bytes(&fixture.bytes).unwrap();
