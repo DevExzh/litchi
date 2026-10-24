@@ -137,8 +137,14 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             identity["identity_sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             identities[role] = identity
 
-        cargo_tool = Path(shutil.which("cargo") or os.sys.executable).resolve()
-        rustc_tool = Path(shutil.which("rustc") or os.sys.executable).resolve()
+        cargo_tool = Path(shutil.which("cargo") or os.sys.executable).absolute()
+        rustc_tool = Path(shutil.which("rustc") or os.sys.executable).absolute()
+        path_env = os.environ.get("PATH", "")
+        toolchain = {
+            "path_env": path_env,
+            "cargo": {**_record(cargo_tool), "resolved_path": str(cargo_tool.resolve()), "version": "fixture"},
+            "rustc": {**_record(rustc_tool), "resolved_path": str(rustc_tool.resolve()), "version": "fixture"},
+        }
         build_events = []
         builds: dict[str, object] = {}
         for key in runner.BUILD_KEYS:
@@ -173,7 +179,13 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
                 "source_identity_before": identities[role], "source_identity_after": identities[role],
                 "returncode": 0, "runner_error": None, "process_guard_violations": [],
                 "post_exit_descendants": [], "post_exit_offenders": [],
-                "environment": {"CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0", "LITCHI_MEM_MAX": "20G"},
+                "environment": {
+                    "CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0",
+                    "LITCHI_MEM_MAX": "20G", "PATH": path_env, "CARGO": str(cargo_tool),
+                    "RUSTC": str(rustc_tool), "RUSTC_WRAPPER": None, "RUSTC_WORKSPACE_WRAPPER": None,
+                    "CARGO_BUILD_RUSTC": None, "RUSTUP_TOOLCHAIN": None,
+                },
+                "toolchain": toolchain,
                 "stdout": _record(stdout), "stderr": _record(stderr), "outputs": outputs,
                 "target": {"path": str(target), "bytes_before": 0, "bytes_after": 0},
             }
@@ -189,10 +201,7 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             "runner": _record(Path(runner.__file__)), "limits": {"target_preflight_bytes": validator.TARGET_PREFLIGHT_BYTES, "target_hard_bytes": validator.TARGET_HARD_BYTES, "memory_bytes": validator.MEMORY_BYTES},
             "claim_scope": validator.CLAIM_FREE["build"], "target_root": str(target_root),
             "event_journal": {"path": str(build_events_path), "count": len(build_events), "event_ids": [e["event_id"] for e in build_events], "sha256": hashlib.sha256(json.dumps(build_events, sort_keys=True, separators=(",", ":")).encode()).hexdigest(), "file_sha256": hashlib.sha256(event_raw).hexdigest(), "bytes": len(event_raw)},
-            "toolchain": {
-                "cargo": {**_record(cargo_tool), "version": "fixture"},
-                "rustc": {**_record(rustc_tool), "version": "fixture"},
-            },
+            "toolchain": toolchain,
             "identities": identities, "builds": builds,
         }
         build_path = build_dir / "build-receipt.json"
@@ -292,7 +301,13 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
                 "source_identity_before": identities[role], "source_identity_after": identities[role],
                 "returncode": 0, "runner_error": None, "process_guard_violations": [],
                 "post_exit_descendants": [], "post_exit_offenders": [],
-                "environment": {"CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0", "LITCHI_MEM_MAX": "20G"},
+                "environment": {
+                    "CARGO_TARGET_DIR": str(target), "CARGO_BUILD_JOBS": "1", "CARGO_INCREMENTAL": "0",
+                    "LITCHI_MEM_MAX": "20G", "PATH": path_env, "CARGO": str(cargo_tool),
+                    "RUSTC": str(rustc_tool), "RUSTC_WRAPPER": None, "RUSTC_WORKSPACE_WRAPPER": None,
+                    "CARGO_BUILD_RUSTC": None, "RUSTUP_TOOLCHAIN": None,
+                },
+                "toolchain": toolchain,
                 "stdout": _record(stdout), "stderr": _record(stderr), "outputs": [],
                 "target": {"path": str(target), "bytes_before": 0, "bytes_after": 0},
             }
@@ -351,13 +366,33 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
         abba_path.write_text(json.dumps(abba_receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return {"manifest": manifest_path, "preparation": prep_path, "build": build_path, "abba": abba_path, "measurements": measurements_path}, runner.Path(runner.__file__) if False else Path(runner.__file__)
 
+    def _validate_fixture(self, paths: dict[str, Path], runner_path: Path) -> dict[str, object]:
+        pins = json.loads(paths["manifest"].read_text())["input_pins"]
+        with mock.patch.multiple(
+            preparation,
+            REVIEWED_PROBE_SHA256=pins["reviewed_probe_sha256"],
+            CANDIDATE_ADAPTER_SHA256=pins["candidate_adapter_sha256"],
+            CLONE_PROBE_SHA256=pins["clone_probe_sha256"],
+            ORACLE_SOURCE_SHA256=pins["oracle_source_sha256"],
+            LOCK_SHA256=pins["lock_sha256"],
+        ):
+            with mock.patch.multiple(
+                runner.preparation,
+                REVIEWED_PROBE_SHA256=pins["reviewed_probe_sha256"],
+                CANDIDATE_ADAPTER_SHA256=pins["candidate_adapter_sha256"],
+                CLONE_PROBE_SHA256=pins["clone_probe_sha256"],
+                ORACLE_SOURCE_SHA256=pins["oracle_source_sha256"],
+                LOCK_SHA256=pins["lock_sha256"],
+            ):
+                return validator.validate(
+                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
+                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
+                )
+
     def test_build_free_preparation_to_validator_round_trip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
             paths, runner_path = self._fixture(Path(directory))
-            result = validator.validate(
-                manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-            )
+            result = self._validate_fixture(paths, runner_path)
             self.assertEqual(result["status"], "validated")
 
     def test_rejects_mutated_immutable_build_receipt_hash(self) -> None:
@@ -367,10 +402,7 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             receipt["build_receipt_sha256"] = "0" * 64
             paths["abba"].write_text(json.dumps(receipt))
             with self.assertRaisesRegex(validator.ValidationError, "build receipt hash"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
 
     def test_rejects_build_feature_or_log_mutation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
@@ -379,20 +411,14 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             receipt["builds"]["after/normal"]["features"] = "legacy-owner-api"
             paths["build"].write_text(json.dumps(receipt))
             with self.assertRaisesRegex(validator.ValidationError, "features"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
 
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
             paths, runner_path = self._fixture(Path(directory))
             log = Path(directory) / "run/commands/before-normal.stdout"
             log.write_bytes(b"tampered\n")
             with self.assertRaisesRegex(validator.ValidationError, "stdout SHA-256"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
 
     def test_allocator_conservation_rejects_counter_mutation(self) -> None:
         header = "route\talloc_calls\talloc_bytes\tdealloc_calls\tdealloc_bytes\trealloc_calls\trealloc_old_bytes\trealloc_new_bytes\tbase_live_calls\tbase_live_bytes\tlive_calls\tlive_bytes\tpeak_calls\tpeak_bytes\tretained_packages\tretained_patches"
@@ -411,10 +437,7 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             artifact = Path(directory) / "run/oracle/before-normal/ole-source.bin"
             artifact.write_bytes(b"arbitrary replacement bytes")
             with self.assertRaisesRegex(validator.ValidationError, "oracle.before/normal.ole-source.bin SHA-256"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
 
     def test_rejects_oracle_report_without_journal_event_link(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
@@ -427,10 +450,25 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             receipt["measurements"]["bytes"] = _sha(paths["measurements"])[1]
             paths["abba"].write_text(json.dumps(receipt, sort_keys=True))
             with self.assertRaisesRegex(validator.ValidationError, "oracle.before/normal event ID differs"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
+
+    def test_rejects_manifest_route_policy_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            manifest = json.loads(paths["manifest"].read_text())
+            manifest["routes"][0] = "bogus"
+            paths["manifest"].write_text(json.dumps(manifest, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "manifest policy validation failed"):
+                self._validate_fixture(paths, runner_path)
+
+    def test_rejects_manifest_candidate_commit_policy_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            manifest = json.loads(paths["manifest"].read_text())
+            manifest["candidate_commit"] = "deadbeef"
+            paths["manifest"].write_text(json.dumps(manifest, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "manifest policy validation failed"):
+                self._validate_fixture(paths, runner_path)
 
     def test_rejects_build_artifact_outside_expected_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
@@ -442,10 +480,7 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             build["builds"]["before/normal"]["artifacts"]["probe"] = _record(misplaced)
             paths["build"].write_text(json.dumps(build, sort_keys=True))
             with self.assertRaisesRegex(validator.ValidationError, "artifact before/normal/probe path"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                self._validate_fixture(paths, runner_path)
 
     def test_rejects_cargo_argv_not_bound_to_toolchain_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
@@ -455,11 +490,32 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             _write(alternate, b"alternate cargo\n", executable=True)
             build["builds"]["before/normal"]["command"][0] = str(alternate)
             paths["build"].write_text(json.dumps(build, sort_keys=True))
-            with self.assertRaisesRegex(validator.ValidationError, "Cargo executable binding"):
-                validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+            with self.assertRaisesRegex(validator.ValidationError, "Cargo dispatch path"):
+                self._validate_fixture(paths, runner_path)
+
+    def test_rejects_rustc_executable_or_version_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            build = json.loads(paths["build"].read_text())
+            original = build["toolchain"]["rustc"]
+            alternate = Path(directory) / "alternate-rustc"
+            _write(alternate, Path(original["resolved_path"]).read_bytes(), executable=True)
+            build["toolchain"]["rustc"] = {
+                **_record(alternate),
+                "resolved_path": str(alternate.resolve()),
+                "version": original["version"],
+            }
+            paths["build"].write_text(json.dumps(build, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "build event before/normal environment differs"):
+                self._validate_fixture(paths, runner_path)
+
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            build = json.loads(paths["build"].read_text())
+            build["toolchain"]["rustc"]["version"] = "a different rustc identity"
+            paths["build"].write_text(json.dumps(build, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "build event before/normal toolchain identity"):
+                self._validate_fixture(paths, runner_path)
 
     def test_rejects_duplicate_allocator_route(self) -> None:
         header = "route\talloc_calls\talloc_bytes\tdealloc_calls\tdealloc_bytes\trealloc_calls\trealloc_old_bytes\trealloc_new_bytes\tbase_live_calls\tbase_live_bytes\tlive_calls\tlive_bytes\tpeak_calls\tpeak_bytes\tretained_packages\tretained_patches"

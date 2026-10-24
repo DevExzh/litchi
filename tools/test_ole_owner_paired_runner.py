@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from tools.native_qualification import ole_owner_paired_runner as runner
 
@@ -17,6 +18,55 @@ MANIFEST = ROOT / "tools/native_qualification/manifests/ole-owner.json"
 
 
 class OleOwnerPairedRunnerTests(unittest.TestCase):
+    def test_toolchain_ignores_ambient_overrides_and_binds_child_environment(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-toolchain-") as directory:
+            root = Path(directory)
+            path_bin = root / "path-bin"
+            path_bin.mkdir()
+            override_bin = root / "override-bin"
+            override_bin.mkdir()
+
+            def executable(path: Path, output: str) -> None:
+                path.write_text(f"#!/bin/sh\nprintf '%s\\n' '{output}'\n", encoding="utf-8")
+                path.chmod(0o755)
+
+            cargo = path_bin / "cargo"
+            rustc = path_bin / "rustc"
+            override_cargo = override_bin / "cargo-override"
+            override_rustc = override_bin / "rustc-override"
+            executable(cargo, "PATH-CARGO")
+            executable(rustc, "PATH-RUSTC")
+            executable(override_cargo, "OVERRIDE-CARGO")
+            executable(override_rustc, "OVERRIDE-RUSTC")
+
+            probe = object.__new__(runner.PairedRunner)
+            probe.driver_roots = {"before": root}
+            env = {
+                "PATH": str(path_bin),
+                "CARGO": str(override_cargo),
+                "RUSTC": str(override_rustc),
+                "RUSTC_WRAPPER": str(override_rustc),
+                "RUSTC_WORKSPACE_WRAPPER": str(override_rustc),
+                "CARGO_BUILD_RUSTC": str(override_rustc),
+                "RUSTUP_TOOLCHAIN": "override-toolchain",
+            }
+            toolchain = probe._toolchain(env)
+            self.assertEqual(toolchain["cargo"]["path"], str(cargo))
+            self.assertEqual(toolchain["rustc"]["path"], str(rustc))
+            self.assertEqual(toolchain["cargo"]["version"].strip(), "PATH-CARGO")
+            self.assertEqual(toolchain["rustc"]["version"].strip(), "PATH-RUSTC")
+            self.assertEqual(toolchain["path_env"], str(path_bin))
+
+            probe.toolchain = toolchain
+            probe.target_root = root / "targets"
+            with mock.patch.dict(runner.os.environ, env, clear=True):
+                child = probe._environment("before", "normal")
+            self.assertEqual(child["CARGO"], str(cargo))
+            self.assertEqual(child["RUSTC"], str(rustc))
+            self.assertEqual(child["PATH"], str(path_bin))
+            for key in ("RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC", "RUSTUP_TOOLCHAIN"):
+                self.assertNotIn(key, child)
+
     def test_manifest_binds_all_routes_and_fixed_resource_policy(self) -> None:
         document, digest = runner._load_manifest(MANIFEST)
         self.assertEqual(len(digest), 64)

@@ -20,6 +20,10 @@ import sys
 import struct
 from typing import Any, Mapping
 
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
 
 SCHEMA = "litchi.ole-owner-qualification.runner.v1"
 MANIFEST_SCHEMA = "litchi.ole-owner-qualification.manifest.v1"
@@ -144,6 +148,78 @@ def _hash_record(record: Mapping[str, Any], label: str) -> None:
     digest, size = _sha256(path)
     _same(record.get("sha256"), digest, f"{label} SHA-256")
     _same(record.get("bytes"), size, f"{label} byte count")
+
+
+def _validate_toolchain(toolchain: Mapping[str, Any]) -> None:
+    """Validate the selected tools and the PATH that selected them.
+
+    ``path`` is the exact absolute dispatcher passed to Cargo (important for
+    rustup's cargo/rustc symlinks); ``resolved_path`` is its underlying regular
+    file whose hash and size are attested.  The runner also removes compiler
+    wrappers and writes these values into every child event, so a changed
+    receipt cannot silently select another compiler.
+    """
+
+    path_env = toolchain.get("path_env")
+    if not isinstance(path_env, str) or not path_env:
+        raise ValidationError("build toolchain PATH is missing")
+    for name in ("cargo", "rustc"):
+        record = _mapping(toolchain.get(name), f"toolchain.{name}")
+        _hash_record(record, f"toolchain.{name}")
+        path_value = record.get("path")
+        resolved_value = record.get("resolved_path")
+        if not isinstance(path_value, str) or not Path(path_value).is_absolute():
+            raise ValidationError(f"toolchain.{name} path is not absolute")
+        if not isinstance(resolved_value, str) or not Path(resolved_value).is_absolute():
+            raise ValidationError(f"toolchain.{name} resolved path is not absolute")
+        _same(
+            _path(resolved_value, f"toolchain.{name} resolved path"),
+            _path(path_value, f"toolchain.{name} path"),
+            f"toolchain.{name} resolved path binding",
+        )
+        if not isinstance(record.get("version"), str) or not record["version"].strip():
+            raise ValidationError(f"toolchain.{name} version is missing")
+
+
+def _toolchain_environment(
+    toolchain: Mapping[str, Any], target: Path, label: str,
+) -> dict[str, Any]:
+    _validate_toolchain(toolchain)
+    cargo = _mapping(toolchain.get("cargo"), "toolchain.cargo")
+    rustc = _mapping(toolchain.get("rustc"), "toolchain.rustc")
+    return {
+        "CARGO_TARGET_DIR": str(target),
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "LITCHI_MEM_MAX": "20G",
+        "PATH": toolchain["path_env"],
+        "CARGO": cargo["path"],
+        "RUSTC": rustc["path"],
+        "RUSTC_WRAPPER": None,
+        "RUSTC_WORKSPACE_WRAPPER": None,
+        "CARGO_BUILD_RUSTC": None,
+        "RUSTUP_TOOLCHAIN": None,
+    }
+
+
+def _validate_manifest_policy(manifest_path: Path, manifest: Mapping[str, Any], manifest_hash: str) -> None:
+    """Use the runner's canonical policy parser before checking run evidence.
+
+    Keeping this call at the independent boundary prevents the validator from
+    silently drifting on routes, ABBA bounds, allocator policy, quiet limits,
+    or runtime candidate parameterization.  Preparation validation below then
+    binds that parameterization to the actual selected candidate worktree.
+    """
+
+    try:
+        from native_qualification import ole_owner_paired_runner as paired_runner
+        canonical, canonical_hash = paired_runner._load_manifest(manifest_path)
+    except ImportError as error:
+        raise ValidationError(f"manifest policy validator is unavailable: {error}") from error
+    except paired_runner.RunnerError as error:
+        raise ValidationError(f"manifest policy validation failed: {error}") from error
+    _same(canonical_hash, manifest_hash, "manifest policy file identity")
+    _same(canonical, manifest, "manifest policy document")
 
 
 def _events(path: Path, label: str) -> tuple[list[dict[str, Any]], str, int]:
@@ -447,7 +523,7 @@ def _source_identity(preparation: Mapping[str, Any], role: str) -> dict[str, Any
 
 def _expected_build_command(
     item: Mapping[str, Any], preparation: Mapping[str, Any], role: str, variant: str,
-    cargo_path: Path,
+    cargo_path: Path, cargo_dispatch_path: str,
 ) -> list[str]:
     command = item.get("command")
     if not isinstance(command, list) or not command:
@@ -455,6 +531,7 @@ def _expected_build_command(
     cargo = command[0]
     if not isinstance(cargo, str) or not cargo:
         raise ValidationError(f"builds.{role}/{variant} cargo executable is not explicit")
+    _same(cargo, cargo_dispatch_path, f"builds.{role}/{variant} Cargo dispatch path")
     _same(_path(cargo, f"builds.{role}/{variant} cargo executable"), cargo_path, f"builds.{role}/{variant} Cargo executable binding")
     endpoint = _mapping(
         preparation.get("baseline" if role == "before" else "candidate"),
@@ -488,11 +565,7 @@ def _validate_build(
     limits = _mapping(build.get("limits"), "build limits")
     _same(limits, {"target_preflight_bytes": TARGET_PREFLIGHT_BYTES, "target_hard_bytes": TARGET_HARD_BYTES, "memory_bytes": MEMORY_BYTES}, "build limits")
     toolchain = _mapping(build.get("toolchain"), "build toolchain")
-    for name in ("cargo", "rustc"):
-        record = _mapping(toolchain.get(name), f"toolchain.{name}")
-        _hash_record(record, f"toolchain.{name}")
-        if not isinstance(record.get("version"), str) or not record["version"].strip():
-            raise ValidationError(f"toolchain.{name} version is missing")
+    _validate_toolchain(toolchain)
     root = build_path.parent
     journal = _mapping(build.get("event_journal"), "build event journal")
     journal_path = _path(journal.get("path"), "build event journal")
@@ -519,8 +592,14 @@ def _validate_build(
         _same(item.get("variant"), variant, f"builds.{key} variant")
         expected_target = target_root / f"{role}-{variant}"
         _same(_path(item.get("target"), f"builds.{key} target"), expected_target, f"builds.{key} target")
-        cargo_path = _path(_mapping(toolchain.get("cargo"), "toolchain.cargo").get("path"), "toolchain.cargo path")
-        expected_command = _expected_build_command(item, preparation, role, variant, cargo_path)
+        cargo_record = _mapping(toolchain.get("cargo"), "toolchain.cargo")
+        cargo_dispatch_path = cargo_record.get("path")
+        if not isinstance(cargo_dispatch_path, str):
+            raise ValidationError("toolchain.cargo path is missing")
+        cargo_path = _path(cargo_dispatch_path, "toolchain.cargo path")
+        expected_command = _expected_build_command(
+            item, preparation, role, variant, cargo_path, cargo_dispatch_path,
+        )
         _same(item.get("command"), expected_command, f"builds.{key} command")
         event = events[BUILD_KEYS.index(key)]
         _same(event.get("phase"), "build", f"build event {key} phase")
@@ -540,17 +619,10 @@ def _validate_build(
         _same(event.get("runner_error"), None, f"build event {key} runner error")
         if event.get("process_guard_violations") or event.get("post_exit_descendants") or event.get("post_exit_offenders"):
             raise ValidationError(f"build event {key} was not quiet")
-        expected_environment = {
-            "CARGO_TARGET_DIR": _mapping(item, f"builds.{key}").get("target"),
-            "CARGO_BUILD_JOBS": "1",
-            "CARGO_INCREMENTAL": "0",
-            "LITCHI_MEM_MAX": "20G",
-        }
+        expected_environment = _toolchain_environment(toolchain, expected_target, f"build event {key}")
         environment = _mapping(event.get("environment"), f"build event {key} environment")
-        _same(environment.get("CARGO_TARGET_DIR"), expected_environment["CARGO_TARGET_DIR"], f"build event {key} target environment")
-        _same(environment.get("CARGO_BUILD_JOBS"), "1", f"build event {key} Cargo jobs")
-        _same(environment.get("CARGO_INCREMENTAL"), "0", f"build event {key} incremental policy")
-        _same(environment.get("LITCHI_MEM_MAX"), "20G", f"build event {key} memory limit")
+        _same(environment, expected_environment, f"build event {key} environment")
+        _same(event.get("toolchain"), toolchain, f"build event {key} toolchain identity")
         target = _mapping(event.get("target"), f"build event {key} target")
         _same(_path(target.get("path"), f"build event {key} target path"), expected_target, f"build event {key} target path")
         _validate_log(event, "stdout", root)
@@ -631,10 +703,13 @@ def _event_common(
     target = _mapping(event.get("target"), f"ABBA event {event_id} target")
     _same(_path(target.get("path"), f"ABBA event {event_id} target path"), expected_target, f"ABBA event {event_id} target path")
     environment = _mapping(event.get("environment"), f"ABBA event {event_id} environment")
-    _same(environment, {
-        "CARGO_TARGET_DIR": str(expected_target), "CARGO_BUILD_JOBS": "1",
-        "CARGO_INCREMENTAL": "0", "LITCHI_MEM_MAX": "20G",
-    }, f"ABBA event {event_id} environment")
+    toolchain = _mapping(build.get("toolchain"), "build toolchain")
+    _same(
+        environment,
+        _toolchain_environment(toolchain, expected_target, f"ABBA event {event_id}"),
+        f"ABBA event {event_id} environment",
+    )
+    _same(event.get("toolchain"), toolchain, f"ABBA event {event_id} toolchain identity")
     _validate_log(event, "stdout", output_root)
     _validate_log(event, "stderr", output_root)
 
@@ -1088,6 +1163,7 @@ def validate(
     manifest, manifest_hash, _ = _json(manifest_path, "manifest")
     _same(manifest.get("schema"), MANIFEST_SCHEMA, "manifest schema")
     _same(manifest.get("lane"), "w5-ole-owner", "manifest lane")
+    _validate_manifest_policy(manifest_path.resolve(), manifest, manifest_hash)
     manifest_allocator = _mapping(manifest.get("allocator"), "manifest allocator")
     _same(manifest_allocator.get("oracle_evidence_file"), "allocator.tsv", "manifest allocator evidence file")
     _same(manifest_allocator.get("oracle_evidence_fields"), list(ALLOCATOR_EVIDENCE_FIELDS), "manifest allocator evidence fields")

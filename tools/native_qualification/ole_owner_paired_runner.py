@@ -118,6 +118,19 @@ ALLOCATOR_EVIDENCE_FIELDS = (
     "retained_packages",
     "retained_patches",
 )
+EVENT_ENVIRONMENT_KEYS = (
+    "CARGO_TARGET_DIR",
+    "CARGO_BUILD_JOBS",
+    "CARGO_INCREMENTAL",
+    "LITCHI_MEM_MAX",
+    "PATH",
+    "CARGO",
+    "RUSTC",
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_RUSTC",
+    "RUSTUP_TOOLCHAIN",
+)
 ORACLE_FILES = (
     "ole-source.bin",
     "ole-noop.bin",
@@ -364,6 +377,11 @@ class PairedRunner:
         self.events_path = self.output / f"events-{phase}.jsonl"
         self.receipt_path = self.output / f"{phase}-receipt.json"
         self.recorded_events: list[dict[str, Any]] = []
+        # The build receipt is the authority for both phases.  ABBA must not
+        # rediscover compiler tools from the ambient environment, because a
+        # changed RUSTC/CARGO or wrapper would otherwise silently change the
+        # code being measured.
+        self.toolchain: dict[str, Any] | None = None
         self.host_dir = self.output / "host"
         self.driver_roots = {
             "before": _resolve(str(self.preparation["baseline"]["driver"]["root"])),
@@ -484,18 +502,59 @@ class PairedRunner:
             "oracle": target / "release" / "examples" / "ole_owner_oracle",
         }
 
+    @staticmethod
+    def _path_executable(name: str, env: Mapping[str, str]) -> tuple[Path, Path]:
+        """Return the absolute PATH entry and its resolved file identity.
+
+        Rustup installs ``cargo`` and ``rustc`` as symlinked dispatchers.  The
+        dispatcher path (including its basename) must be retained when it is
+        put in Cargo's environment; invoking the resolved ``rustup`` target as
+        ``RUSTC`` would change dispatch semantics.  The resolved target is
+        recorded separately and hashed, so both the child command and the
+        underlying executable are source-bound.
+        """
+
+        executable = shutil.which(name, path=env.get("PATH"))
+        if executable is None:
+            raise RunnerError(f"{name} is not available in build PATH")
+        path = Path(executable)
+        if not path.is_absolute():
+            path = Path.cwd() / path
+        path = path.absolute()
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as error:
+            raise RunnerError(f"{name} PATH executable cannot be resolved: {path}: {error}") from error
+        if not resolved.is_file():
+            raise RunnerError(f"{name} PATH executable is not a regular file: {resolved}")
+        return path, resolved
+
     def _toolchain(self, env: Mapping[str, str]) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        selected = {
+            name: self._path_executable(name, env)
+            for name in ("cargo", "rustc")
+        }
+        # Deliberately ignore ambient CARGO/RUSTC and both wrapper variables:
+        # PATH selection above is the reviewed input, and these explicit child
+        # values are what the build receipt and every event attest.
+        version_env = dict(env)
+        version_env["CARGO"] = str(selected["cargo"][0])
+        version_env["RUSTC"] = str(selected["rustc"][0])
+        for key in (
+            "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC",
+            "RUSTUP_TOOLCHAIN",
+        ):
+            version_env.pop(key, None)
+        values: dict[str, Any] = {"path_env": env.get("PATH", "")}
+        if not values["path_env"]:
+            raise RunnerError("build PATH is empty")
         for name, args in (("cargo", ["-V"]), ("rustc", ["-Vv"])):
-            executable = shutil.which(name, path=env.get("PATH"))
-            if executable is None:
-                raise RunnerError(f"{name} is not available in build PATH")
-            path = _resolve(executable)
-            digest, size = _sha256_file(path)
+            path, resolved = selected[name]
+            digest, size = _sha256_file(resolved)
             result = subprocess.run(
                 [str(path), *args],
                 cwd=str(self.driver_roots["before"]),
-                env=dict(env),
+                env=version_env,
                 check=False,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -505,6 +564,7 @@ class PairedRunner:
                 raise RunnerError(f"{name} identity command failed: {result.stderr.strip()}")
             values[name] = {
                 "path": str(path),
+                "resolved_path": str(resolved),
                 "bytes": size,
                 "sha256": digest,
                 "version": result.stdout,
@@ -512,11 +572,20 @@ class PairedRunner:
         return values
 
     def _environment(self, role: str, variant: str) -> dict[str, str]:
+        if self.toolchain is None:
+            raise RunnerError("toolchain identity is not loaded")
         env = dict(os.environ)
         env["CARGO_TARGET_DIR"] = str(self._target(role, variant))
         env["CARGO_BUILD_JOBS"] = "1"
         env["CARGO_INCREMENTAL"] = "0"
         env["LITCHI_MEM_MAX"] = "20G"
+        env["CARGO"] = str(self.toolchain["cargo"]["path"])
+        env["RUSTC"] = str(self.toolchain["rustc"]["path"])
+        for key in (
+            "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC",
+            "RUSTUP_TOOLCHAIN",
+        ):
+            env.pop(key, None)
         return env
 
     def _preexec(self):
@@ -715,9 +784,9 @@ class PairedRunner:
             "argv": list(argv),
             "cwd": str(cwd),
             "environment": {
-                key: env.get(key)
-                for key in ("CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL", "LITCHI_MEM_MAX")
+                key: env.get(key) for key in EVENT_ENVIRONMENT_KEYS
             },
+            "toolchain": self.toolchain,
             "source_identity_before": identity_before,
             "source_identity_sha256": identity_before["identity_sha256"],
             "source_identity_after": identity_after,
@@ -809,6 +878,7 @@ class PairedRunner:
         try:
             env = dict(os.environ)
             toolchain = self._toolchain(env)
+            self.toolchain = toolchain
             builds: dict[str, Any] = {}
             for role in ROLES:
                 for variant in VARIANTS:
@@ -893,6 +963,20 @@ class PairedRunner:
         if [event.get("event_id") for event in events] != expected_ids:
             raise RunnerError("build event journal order differs")
         builds = _require_mapping(receipt.get("builds"), "build receipt builds")
+        self.toolchain = dict(_require_mapping(receipt.get("toolchain"), "build receipt toolchain"))
+        if not isinstance(self.toolchain.get("path_env"), str) or not self.toolchain["path_env"]:
+            raise RunnerError("build receipt toolchain PATH is missing")
+        for name in ("cargo", "rustc"):
+            record = _require_mapping(self.toolchain.get(name), f"build receipt toolchain.{name}")
+            path = _resolve(str(record.get("path", "")))
+            resolved = _resolve(str(record.get("resolved_path", "")))
+            if path != resolved:
+                raise RunnerError(f"build receipt toolchain.{name} resolved path differs")
+            digest, size = _sha256_file(path)
+            if record.get("sha256") != digest or record.get("bytes") != size:
+                raise RunnerError(f"build receipt toolchain.{name} identity changed")
+            if not isinstance(record.get("version"), str) or not record["version"].strip():
+                raise RunnerError(f"build receipt toolchain.{name} version is missing")
         identities = _require_mapping(receipt.get("identities"), "receipt.identities")
         for role in ROLES:
             identity = self._source_identity(role)
@@ -923,10 +1007,12 @@ class PairedRunner:
                     raise RunnerError(f"build event identity or result differs for {key}")
                 expected_environment = {
                     name: self._environment(role, variant).get(name)
-                    for name in ("CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL", "LITCHI_MEM_MAX")
+                    for name in EVENT_ENVIRONMENT_KEYS
                 }
                 if event.get("environment") != expected_environment:
                     raise RunnerError(f"build environment differs for {key}")
+                if event.get("toolchain") != self.toolchain:
+                    raise RunnerError(f"build toolchain identity differs for {key}")
                 artifacts = _require_mapping(build.get("artifacts"), f"receipt.builds.{key}.artifacts")
                 expected = self._binary_paths(role, variant)
                 event_outputs = event.get("outputs")
