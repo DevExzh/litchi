@@ -43,6 +43,14 @@ The projection selects all features for `litchi-ops`, target
 `x86_64-unknown-linux-gnu`, release profile, and the complete 109-route
 workload.
 
+The future candidate endpoint is the separate clean detached worktree
+`/home/zhuhe/code/litchi-worktrees/uo2-w8-f6fe-native-endpoint`, at the same
+f6fe commit.  Its external `Cargo.lock` is 139,591 bytes with SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
+The earlier provenance-generation receipt used the gate checkout only to
+generate the already-recorded fixture/projection hashes; no future candidate
+build, validation or endpoint command uses that checkout.
+
 The build-free provenance test was run against the frozen candidate:
 
 ```text
@@ -168,6 +176,49 @@ an accepted compatibility strategy or chooses a final source whose manifests
 share the projection.  This receipt makes no qualification claim while that
 identity check is unresolved.
 
+## Matched build-graph overlay proposal
+
+The exact external proposal is retained at
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-f6fe-match-overlay`:
+
+| artifact | bytes | SHA-256 |
+|---|---:|---|
+| `manifest-example-overlay.patch` | 94,042 | `64e06bbcd282da4176edd7c38a9d8d806b916fa05799a0e440f020451399e5c8` |
+| `manifest-example-overlay-receipt.json` | 16,606 | `1c12f7055ca4edb57fb1a583a875531b03af94c5b8fb84335fa344ac37cc0bf0` |
+
+The allowlist is exact: root `Cargo.toml`;
+`crates/litchi-iwa-core/Cargo.toml`, `crates/litchi-odraw/Cargo.toml`,
+`crates/litchi-ops/Cargo.toml`, `crates/litchi-pages/Cargo.toml`,
+`crates/litchi-ppt/Cargo.toml`, `crates/litchi-xlsb/Cargo.toml`, and
+`crates/litchi-xlsx/Cargo.toml`; plus the three files newly named by those
+manifests: `crates/litchi-pages/examples/generate_footnote_fixture.rs`,
+`crates/litchi-ops/examples/xls_import_scaling.rs`, and
+`crates/litchi-ops/examples/odf_shared_triad_qualification.rs`.  The overlay
+contains no `crates/*/src/**` path.  Thus it changes the baseline build graph
+and auxiliary manifest targets only; it does not change the f2 runtime source
+implementation.  It must still be described as a compatibility-overlay
+baseline, not as pristine f2.
+
+The historical and candidate locks contain the same 586 package identities
+(name, version, source and checksum), with equality for every common package.
+The six local dependency-edge differences are exactly the manifest additions
+for `litchi-iwa-core`, `litchi-odraw`, `litchi-ops`, `litchi-ppt`,
+`litchi-xlsb`, and `litchi-xlsx`; the candidate lock is the lock both sides
+would use after applying this overlay.  The all-features selection, target,
+profile, workload and common resolved package identities are therefore
+explicitly checkable without changing `shared_identity`.
+
+The existing `litchi_w8_source_assembly.v1` shape can carry this as
+`overlay.kind = "compatibility"` with one patch artifact, but it cannot
+faithfully prove the proposal: it has no scope allowlist, runtime-source
+guard, lock-edge receipt, or matched-projection binding.  The current
+`w8_original_baseline.py` also intentionally rejects these manifest additions
+and permits only the corrected probe, adapter and lock.  A reviewed overlay
+requires a tool/schema extension (for example a v2 source-assembly overlay
+with scope, runtime guard, lock identity and projection identity fields).
+No tooling was changed while the f6fe gate is frozen; the proposal receipt
+records this as pending review.
+
 ## Commands ready after the pairing decision
 
 The following commands are recorded but intentionally not run in this lane.
@@ -178,7 +229,7 @@ freezes the paired source inputs and confirms no forbidden process overlap.
 
 ```sh
 LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
-CAND=/home/zhuhe/code/litchi-worktrees/uo2-budget-validation
+CAND=/home/zhuhe/code/litchi-worktrees/uo2-w8-f6fe-native-endpoint
 BASE_LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-b673
 F2="$BASE_LANE/f2-workspace"
 export PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH
@@ -221,7 +272,7 @@ python3 -B "$CAND/docs/unified-ops/results/0362h/validate.py" \
   "$LANE/validation/f6fe" \
   --source "$LANE/f6fe-source.tar" \
   --probe "$CAND/crates/litchi-ops/examples/file_w8_qualified_probe.rs" \
-  --lock "$LANE/Cargo.lock" \
+  --lock "$CAND/Cargo.lock" \
   --source-commit f6fe430a4d19d94aa360c0e9ed03ebd757265225 \
   --build-command "$CAND_BUILD"
 ```
@@ -231,7 +282,7 @@ not a build or timing step:
 
 ```sh
 LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
-CAND=/home/zhuhe/code/litchi-worktrees/uo2-budget-validation
+CAND=/home/zhuhe/code/litchi-worktrees/uo2-w8-f6fe-native-endpoint
 BASE_LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-b673
 F2="$BASE_LANE/f2-workspace"
 HIST=/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf
@@ -255,7 +306,7 @@ python3 "$CAND/tools/w8_file_provenance.py" endpoint \
 
 python3 "$CAND/tools/w8_file_provenance.py" endpoint \
   --binary "$LANE/target-f6fe/release/examples/file_w8_qualified_probe" \
-  --source "$LANE/f6fe-source.tar" --lock "$LANE/Cargo.lock" \
+  --source "$LANE/f6fe-source.tar" --lock "$CAND/Cargo.lock" \
   --probe "$CAND/crates/litchi-ops/examples/file_w8_qualified_probe.rs" \
   --fixture "$LANE/provenance/litchi_w8_fixture_descriptor.json" \
   --dependency-projection "$LANE/provenance/litchi_w8_dependency_projection.json" \
