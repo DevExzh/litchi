@@ -12,8 +12,9 @@
 
 ## 1. Frozen source pair and shared inputs
 
-The baseline is the parent of the repair. The candidate is the frozen reviewed
-merge, not the repair branch tip; the repair is an ancestor of that merge.
+Endpoint A is the frozen pre-repair baseline. Endpoint B is the frozen
+reviewed merge, not the repair branch tip; the repair is an ancestor of that
+merge.
 
 | endpoint | revision | role |
 |---|---|---|
@@ -66,6 +67,31 @@ report must also pass the existing harness checks: one payload load, unchanged
 source version, exact text oracle, physical-returned/input-byte agreement, and
 zero memory/object usage after package drop.
 
+The external verifier must validate the complete physical trace in every row;
+it must not accept only aggregate counters. The deterministic policy-specific
+oracles are the same for A and B:
+
+```text
+exact (19 calls, 3,966 requested/returned bytes):
+  (16793014, 22), (16791709, 46), (16791709, 1305), (0, 30),
+  (49, 363), (412, 16), (412, 16), (428, 30), (469, 234),
+  (703, 16), (703, 16), (2907, 30), (2965, 324), (3289, 16),
+  (3289, 16), (1420, 30), (1467, 1424), (2891, 16), (2891, 16)
+
+forward-start/4096 (3 calls, 5,445 requested/returned bytes):
+  (16793014, 22), (16791709, 1327), (0, 4096)
+```
+
+Each tuple is `(offset, requested)`; every returned count must equal its
+request and `short_reads` must be zero. Forward-start is checked against its
+three-range oracle, not against the exact arm's nineteen ranges. Within each
+arm, A1/A2 and B1/B2 must match the same oracle and each endpoint's transport
+histogram/totals must agree with its row trace. The forward source-read
+diagnostics additionally retain a 4,096-byte window and must report the
+existing 19 logical requests, 16 hits, 3 misses, 3 fills, 3,966 requested
+logical bytes and 5,445 returned physical bytes; exact has no source-read
+diagnostics.
+
 This is the ordinary `litchi-perf-baseline` binary only. Allocator-instrumented
 reports are a different build and are not mixed into this latency lane. If an
 allocator qualification is later requested, it gets a separate protocol and
@@ -83,8 +109,76 @@ CAND_TREE=/external/checkout-49c
 BASE_TARGET=/external/target-opc-ra-410bd
 CAND_TARGET=/external/target-opc-ra-49c
 EVIDENCE=/external/evidence-opc-ra-<unique-run>
+TMPROOT=/external/tmp/opc-ra-<unique-run>
+COORD_BIN=/home/zhuhe/code/litchi-worktrees/.coord/bin
 CPU=<one-idle-cpu>
 CPU_LOCK=/external/locks/opc-read-ahead.cpu.lock
+TARGET_LIMIT_BYTES=20000000000
+```
+
+The coordinator's capped Cargo shim must be first on `PATH`, and inherited
+gate-only controls must not leak into this lane. Before either build, run the
+following preflight. All paths named `EVIDENCE`, `TMPROOT`, and the two target
+directories are unique external paths, not checkout paths; an existing path is
+a hard failure rather than something to reuse:
+
+```sh
+set -euo pipefail
+export PATH="$COORD_BIN:$PATH"
+unset LITCHI_CAPPED LITCHI_BLESS RUSTFLAGS
+export LITCHI_MEM_MAX=20G
+export TMPDIR="$TMPROOT"
+export CARGO_BUILD_JOBS=1
+export RAYON_NUM_THREADS=1
+export CARGO_INCREMENTAL=0
+export CARGO_PROFILE_DEV_DEBUG=0
+export CARGO_PROFILE_TEST_DEBUG=0
+export CARGO_PROFILE_RELEASE_DEBUG=0
+export CARGO_PROFILE_RELEASE_LTO=false
+export CARGO_NET_OFFLINE=true
+export RUSTUP_TOOLCHAIN=1.95.0
+
+mkdir -p "$(dirname "$EVIDENCE")" "$(dirname "$TMPROOT")" "$(dirname "$CPU_LOCK")"
+test ! -e "$EVIDENCE" || { echo "EVIDENCE already exists: $EVIDENCE" >&2; exit 1; }
+test ! -e "$TMPROOT" || { echo "TMPDIR already exists: $TMPROOT" >&2; exit 1; }
+test ! -e "$BASE_TARGET" || { echo "target already exists: $BASE_TARGET" >&2; exit 1; }
+test ! -e "$CAND_TARGET" || { echo "target already exists: $CAND_TARGET" >&2; exit 1; }
+mkdir "$EVIDENCE" "$TMPROOT"
+mkdir "$EVIDENCE/forward" "$EVIDENCE/exact" "$EVIDENCE/host"
+```
+
+The `test ! -e` checks and single-component `mkdir` make a rerun fail closed;
+`mkdir -p` is used only for the already-allowed external parents. The same
+exported environment is used for both builds and all captures, and the full
+environment is copied into the external manifest.
+
+Capture the source, environment and command receipts before the build starts;
+these are inputs to the manifest rather than prose reconstructed after a run:
+
+```sh
+for pair in "baseline:$BASE_TREE" "candidate:$CAND_TREE"; do
+  name=${pair%%:*}
+  tree=${pair#*:}
+  {
+    printf 'endpoint=%s\n' "$name"
+    git -C "$tree" status --porcelain=v1
+    git -C "$tree" rev-parse HEAD
+    sha256sum "$tree/tools/perf-baseline/Cargo.toml" \
+      "$tree/tools/perf-baseline/Cargo.lock" \
+      "$tree/tools/perf-baseline/src/docx_managed_read_ahead.rs" \
+      "$tree/tools/perf-baseline/src/main.rs" "$tree/rust-toolchain.toml"
+    (cd "$tree" && rustc -Vv && cargo -V)
+  } > "$EVIDENCE/host/$name-source.txt"
+done
+env | LC_ALL=C sort > "$EVIDENCE/host/environment.txt"
+printf '%s\n' \
+  "env CARGO_TARGET_DIR=$BASE_TARGET cargo build --release --locked --offline --manifest-path $BASE_TREE/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline" \
+  "env CARGO_TARGET_DIR=$CAND_TARGET cargo build --release --locked --offline --manifest-path $CAND_TREE/tools/perf-baseline/Cargo.toml --bin litchi-perf-baseline" \
+  > "$EVIDENCE/host/build.argv"
+sha256sum "$EVIDENCE/host/baseline-source.txt" \
+  "$EVIDENCE/host/candidate-source.txt" \
+  "$EVIDENCE/host/environment.txt" "$EVIDENCE/host/build.argv" \
+  > "$EVIDENCE/host/input-receipts.sha256"
 ```
 
 Build each endpoint separately, with the same pinned toolchain, dependency
@@ -93,45 +187,74 @@ incremental or executable collision. `RUSTFLAGS` is deliberately empty and is
 recorded as such; changing it requires a new protocol revision.
 
 ```sh
-env -u RUSTFLAGS \
-  RUSTUP_TOOLCHAIN=1.95.0 CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 \
-  CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
-  CARGO_PROFILE_RELEASE_LTO=false CARGO_TARGET_DIR="$BASE_TARGET" \
+env CARGO_TARGET_DIR="$BASE_TARGET" \
   cargo build --release --locked --offline \
     --manifest-path "$BASE_TREE/tools/perf-baseline/Cargo.toml" \
-    --bin litchi-perf-baseline
+    --bin litchi-perf-baseline \
+    > "$EVIDENCE/host/build-baseline.log" 2>&1
 
-env -u RUSTFLAGS \
-  RUSTUP_TOOLCHAIN=1.95.0 CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 \
-  CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
-  CARGO_PROFILE_RELEASE_LTO=false CARGO_TARGET_DIR="$CAND_TARGET" \
+env CARGO_TARGET_DIR="$CAND_TARGET" \
   cargo build --release --locked --offline \
     --manifest-path "$CAND_TREE/tools/perf-baseline/Cargo.toml" \
-    --bin litchi-perf-baseline
+    --bin litchi-perf-baseline \
+    > "$EVIDENCE/host/build-candidate.log" 2>&1
 
 sha256sum "$BASE_TARGET/release/litchi-perf-baseline" \
           "$CAND_TARGET/release/litchi-perf-baseline"
 stat -c '%n %s' "$BASE_TARGET/release/litchi-perf-baseline" \
                  "$CAND_TARGET/release/litchi-perf-baseline"
+
+for target in "$BASE_TARGET" "$CAND_TARGET"; do
+  bytes=$(du -sb -- "$target" | awk '{print $1}')
+  printf '%s\t%s\n' "$target" "$bytes" >> "$EVIDENCE/target-bytes.tsv"
+  test "$bytes" -lt "$TARGET_LIMIT_BYTES" || {
+    echo "Cargo target exceeds 20 GB: $target ($bytes bytes)" >&2
+    exit 1
+  }
+done
+sha256sum "$EVIDENCE/host/build-baseline.log" "$EVIDENCE/host/build-candidate.log" \
+  > "$EVIDENCE/host/build-logs.sha256"
 ```
 
 Before capture, record `git status --porcelain=v1`, `git rev-parse HEAD`,
 `rustc -Vv`, `cargo -V`, the complete build argv, the five input hashes in
 §1, the selected environment variables, and the binary path/size/SHA-256 in
-the manifest. Do not use `cargo run`: the captured executable must be the
-hashed file above.
+the manifest. Hash the source/status/toolchain/environment/argv receipts and
+the two build logs into the external manifest. Do not use `cargo run`: the
+captured executable must be the hashed file above.
 
 The eight reports are captured serially under one advisory CPU lock. This is
 the complete order for each policy: baseline, candidate, candidate, baseline.
-The output directory must be new, and each selector invocation must receive a
-new output basename because the harness uses exclusive creation.
+The output directory is created by the fail-closed preflight above, and each
+selector invocation receives a new output basename because the harness uses
+exclusive creation.
+
+The lock alone is not the quiet-host proof. The capture wrapper records a
+process census and `/proc/loadavg` before the first leg, once per second while
+the ABBA child is alive, and after the last leg. The coordinator marks the
+run quiet only when all three views contain no unrelated Cargo/rustc/rustdoc,
+perf/valgrind/heaptrack, or second benchmark process; the selected CPU has no
+other CPU-bound process in the census; and the maximum one-minute load in the
+throughout samples is no more than one above the before sample. Otherwise the
+run is rejected and repeated under a quiet host. The census keeps the expected
+ABBA child, its `taskset`/shell/lock ancestry and the monitor itself as the
+only allowed process entries. The raw snapshots and monitor log are retained
+outside Git.
 
 ```sh
 set -euo pipefail
-mkdir -p "$EVIDENCE/forward" "$EVIDENCE/exact" "$(dirname "$CPU_LOCK")"
+host_snapshot() {
+  label=$1
+  {
+    date --iso-8601=ns
+    cat /proc/loadavg
+    ps -eo pid=,ppid=,psr=,pcpu=,stat=,comm=,args=
+  } > "$EVIDENCE/host/$label.txt"
+}
 
-(
-  flock -n 9
+run_legs() {
+  (
+    flock -n 9
 
   taskset -c "$CPU" "$BASE_TARGET/release/litchi-perf-baseline" \
     docx-managed-read-ahead --policy forward-start --window-bytes 4096 \
@@ -174,7 +297,34 @@ mkdir -p "$EVIDENCE/forward" "$EVIDENCE/exact" "$(dirname "$CPU_LOCK")"
     --samples 30 --warmup 3 \
     --source-revision 410bd99f00fdfb4161a94215710340f16ea536bb \
     --output "$EVIDENCE/exact/a2.json"
-) 9>"$CPU_LOCK"
+  ) 9>"$CPU_LOCK"
+}
+
+host_snapshot before
+run_legs > "$EVIDENCE/host/abba.stdout" 2> "$EVIDENCE/host/abba.stderr" &
+RUN_PID=$!
+(
+  while kill -0 "$RUN_PID" 2>/dev/null; do
+    {
+      date --iso-8601=ns
+      cat /proc/loadavg
+      ps -eo pid=,ppid=,psr=,pcpu=,stat=,comm=,args=
+      printf '\n'
+    } >> "$EVIDENCE/host/throughout.log"
+    sleep 1
+  done
+) &
+MONITOR_PID=$!
+set +e
+wait "$RUN_PID"
+RUN_STATUS=$?
+kill "$MONITOR_PID" 2>/dev/null
+wait "$MONITOR_PID" 2>/dev/null
+set -e
+host_snapshot after
+sha256sum "$EVIDENCE/host/abba.stdout" "$EVIDENCE/host/abba.stderr" \
+  > "$EVIDENCE/host/abba-logs.sha256"
+test "$RUN_STATUS" -eq 0
 ```
 
 The selector itself has no process-level output; the JSON reports are the
@@ -210,7 +360,15 @@ reports. Its schema is `docx-managed-read-ahead-abba-v1`:
       "revision": "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07",
       "tree": "...",
       "binary": {"path": "...", "bytes": 0, "sha256": "..."},
-      "inputs": {}, "toolchain": {}, "build": {}
+      "inputs": {
+        "tools/perf-baseline/Cargo.toml": "...",
+        "tools/perf-baseline/Cargo.lock": "...",
+        "tools/perf-baseline/src/docx_managed_read_ahead.rs": "...",
+        "tools/perf-baseline/src/main.rs": "...",
+        "rust-toolchain.toml": "..."
+      },
+      "toolchain": {"rustc_vv": "...", "cargo_v": "..."},
+      "build": {"argv": [], "environment": {}, "target_dir": "..."}
     }
   },
   "corpus": {
@@ -224,6 +382,20 @@ reports. Its schema is `docx-managed-read-ahead-abba-v1`:
     "delay_us": 0, "transfer_bytes_per_second": null,
     "abba": ["a1", "b1", "b2", "a2"],
     "cpu": 0, "cpu_lock": "...",
+    "target_limit_bytes": 20000000000,
+    "targets": {"baseline_bytes": 0, "candidate_bytes": 0},
+    "host": {
+      "before": "host/before.txt",
+      "throughout": "host/throughout.log",
+      "after": "host/after.txt",
+      "quiet": true,
+      "load_1m_max_delta": 0
+    },
+    "receipts": {
+      "target_bytes": "target-bytes.tsv",
+      "build_logs_sha256": "host/build-logs.sha256",
+      "abba_logs_sha256": "host/abba-logs.sha256"
+    },
     "arms": {
       "forward": {"policy": "forward_start", "window_bytes": 4096},
       "exact": {"policy": "exact", "window_bytes": null}
@@ -275,8 +447,11 @@ oracle, not just elapsed time. In particular:
 The summary reports p50, p95 and p99 elapsed nanoseconds for each leg, then
 compares `median(b1,b2)` with `median(a1,a2)` separately for forward-start and
 exact. The forward-start ratio is the repair qualification; the exact ratio is
-the regression control. It is descriptive until the coordinator records an
-acceptance budget. Do not pass these custom reports to the generic
+the regression control. This lane does not create or relax a performance
+budget: the existing coordinator budget applies unchanged. A repeatable
+regression beyond that budget in either arm is a failed qualification and must
+be repaired and remeasured; a descriptive ratio cannot be used to accept it.
+Do not pass these custom reports to the generic
 `tools/perf_abba_summary.py`: that tool requires the standard
 `litchi.perf-baseline` report schema and would not validate this selector's
 managed-source or physical-range oracle.
