@@ -33,7 +33,11 @@ fn reopen(file: &File, eager: bool) -> File {
 /// around it is re-rendered by every XLS write).
 fn stream(file: &File) -> Vec<u8> {
     let bytes = file.to_bytes().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 

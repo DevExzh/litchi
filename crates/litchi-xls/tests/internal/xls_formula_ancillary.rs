@@ -69,7 +69,7 @@ fn native_bytes() -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: &[u8]) -> Vec<u8> {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .expect("open CFB fixture")
         .open_stream(&["Workbook"])
         .expect("open Workbook stream")
@@ -405,8 +405,10 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
 }
 
 fn assert_non_workbook_streams_equal(before: &[u8], after: &[u8]) {
-    let mut source = OleFile::open(Cursor::new(before)).expect("source CFB");
-    let mut target = OleFile::open(Cursor::new(after)).expect("target CFB");
+    let mut source = OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())
+        .expect("source CFB");
+    let mut target = OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())
+        .expect("target CFB");
     let source_paths = source.list_streams();
     let target_paths = target.list_streams();
     assert_eq!(source_paths, target_paths);

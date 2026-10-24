@@ -503,7 +503,7 @@ fn authored_workbook_stream(records: &[u8]) -> Vec<u8> {
     let mut builder = litchi_xls::Builder::new();
     builder.add_worksheet("S").unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let eof = workbook.len() - 4;
     assert_eq!(&workbook[eof..], &[0x0A, 0x00, 0x00, 0x00]);
@@ -518,7 +518,11 @@ fn xls(sheet_records: &[Vec<u8>], storages: &[u32]) -> Vec<u8> {
     for id in storages {
         let name = format!("MBD{id:08X}");
         writer.create_storage(&[&name]).unwrap();
-        let mut nested = OleFile::open(Cursor::new(nested_cfb(&id.to_le_bytes()))).unwrap();
+        let mut nested = OleFile::open(
+            Cursor::new(nested_cfb(&id.to_le_bytes())),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let contents = nested.open_stream(&["CONTENTS"]).unwrap();
         writer
             .create_stream(&[&name, "CONTENTS"], &contents)
@@ -566,7 +570,11 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
         .unwrap();
     editor.remove_object(0, 1).unwrap();
     let bytes = editor.commit().unwrap().patch().after().to_vec();
-    let mut ole_file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole_file = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let workbook = ole_file.open_stream(&["Workbook"]).unwrap();
     assert!(
         workbook

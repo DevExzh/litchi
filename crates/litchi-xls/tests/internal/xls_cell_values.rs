@@ -307,8 +307,10 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
 }
 
 fn assert_other_streams_equal(before: &[u8], after: &[u8]) {
-    let mut source_ole = OleFile::open(Cursor::new(before)).expect("source CFB");
-    let mut target_ole = OleFile::open(Cursor::new(after)).expect("target CFB");
+    let mut source_ole = OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())
+        .expect("source CFB");
+    let mut target_ole = OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())
+        .expect("target CFB");
     let before_paths = source_ole.list_streams();
     let after_paths = target_ole.list_streams();
     assert_eq!(before_paths, after_paths);

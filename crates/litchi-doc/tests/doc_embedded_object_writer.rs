@@ -138,7 +138,11 @@ fn managed_objects_add_reorder_remove_and_reopen_transactionally() {
     );
     reopened.remove(22).unwrap();
     let bytes = reopened.finish().unwrap();
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(!ole.exists(&["ObjectPool", "_22"]));
     assert!(ole.exists(&["ObjectPool", "_11"]));
     let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();

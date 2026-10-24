@@ -1865,9 +1865,12 @@ fn build_ppt_text_batch_corpus(count: usize) -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-text-boxes",
             compression: "none",
             entry_count: count,
-            archive_member_count: litchi_cfb::OleFile::open(Cursor::new(archive.as_slice()))?
-                .list_directory_entries(&[])?
-                .len(),
+            archive_member_count: litchi_cfb::OleFile::open(
+                Cursor::new(archive.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )?
+            .list_directory_entries(&[])?
+            .len(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: (0..count)
                 .try_fold(0usize, |total, index| {
@@ -2049,7 +2052,8 @@ fn prepare_ppt_text_batch_with_limits(
 // routes have new names because the source corpus is identical but edit history
 // and output bytes differ above one inner chunk.
 fn ppt_text_batch_history_length(bytes: &[u8]) -> Result<usize, Box<dyn Error>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let current = ole.open_stream(&["Current User"])?;
     let document = ole.open_stream(&["PowerPoint Document"])?;
     let mut offset = litchi_ppt::CurrentUser::parse(&current)?.current_edit_offset() as usize;
@@ -2645,7 +2649,7 @@ fn optional_text_outcome<E: std::fmt::Display>(text: Result<Option<String>, E>) 
 /// property-set metadata.
 fn leaf_doc_open(path: &Path) -> Result<litchi_doc::Document, Box<dyn Error>> {
     let bytes = crate::ole2_range_source::read_bounded(path)?;
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
+    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let mut package = litchi_doc::raw::Reader::from_ole_file(ole)?;
     let document = package.document()?;
     std::hint::black_box(package.ole_file().get_metadata().map(Metadata::from).ok());

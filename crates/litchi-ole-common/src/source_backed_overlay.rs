@@ -51,7 +51,7 @@ impl SourceBackedOverlayPublisher {
         version: SourceVersion,
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_owned_with_limits(source, version, limits)?;
+        let cfb = SharedOleFile::open_owned(source, version, limits)?;
         Self::from_owned_cfb(cfb)
     }
 
@@ -64,7 +64,7 @@ impl SourceBackedOverlayPublisher {
         version: SourceVersion,
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_owned_vec_with_limits(source, version, limits)?;
+        let cfb = SharedOleFile::open_owned_vec(source, version, limits)?;
         Self::from_owned_cfb(cfb)
     }
 
@@ -85,7 +85,7 @@ impl SourceBackedOverlayPublisher {
         source: Arc<dyn ReadAt>,
         limits: SharedOleFileLimits,
     ) -> Result<Self, OverlayError> {
-        let cfb = SharedOleFile::open_with_limits(source, limits)?;
+        let cfb = SharedOleFile::open(source, limits)?;
         let max_entries = cfb.directory_entry_count();
         reject_protected_shared_container(
             &cfb,
@@ -220,7 +220,8 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
-        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"change");
         assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
     }
@@ -249,7 +250,8 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
-        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"beXXre");
         assert_eq!(ole.open_stream(&["Opaque"]).unwrap(), b"unchanged");
     }
@@ -301,6 +303,7 @@ mod tests {
             let shared = SharedOleFile::open_owned_vec(
                 Arc::new(bytes_for_shared(marker)),
                 SourceVersion::new(0x0182, 0),
+                SharedOleFileLimits::default(),
             )
             .unwrap();
             assert!(matches!(
@@ -323,7 +326,12 @@ mod tests {
             writer.create_stream(&["Target"], b"before").unwrap();
         });
         let shared = Arc::new(
-            SharedOleFile::open_owned_vec(Arc::new(bytes), SourceVersion::new(0x0183, 0)).unwrap(),
+            SharedOleFile::open_owned_vec(
+                Arc::new(bytes),
+                SourceVersion::new(0x0183, 0),
+                SharedOleFileLimits::default(),
+            )
+            .unwrap(),
         );
         let publisher = SourceBackedOverlayPublisher::from_shared(Arc::clone(&shared)).unwrap();
         assert!(Arc::ptr_eq(&publisher.shared(), &shared));
@@ -340,7 +348,8 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         plan.write_to(&mut output).unwrap();
-        let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(ole.open_stream(&["Target"]).unwrap(), b"BEfore");
     }
 }

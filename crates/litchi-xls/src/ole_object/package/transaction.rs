@@ -585,7 +585,7 @@ pub(crate) fn read_workbook(bytes: &[u8], limits: Limits) -> Result<(Vec<String>
             LimitKind::AggregateBytes.invalid_zero()
         });
     }
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let max_entries = limits
         .max_objects
         .saturating_mul(limits.max_storage_depth)

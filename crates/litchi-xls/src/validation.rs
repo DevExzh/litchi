@@ -289,7 +289,7 @@ pub fn validate_source(
     let cfb_limits = SharedOleFileLimits::new(input_ceiling)
         .and_then(|cfb_limits| cfb_limits.with_max_directory_bytes(directory_ceiling))
         .map_err(XlsValidationError::Ingress)?;
-    let shared = match SharedOleFile::open_with_limits(source.clone(), cfb_limits) {
+    let shared = match SharedOleFile::open(source.clone(), cfb_limits) {
         Ok(shared) => shared,
         Err(error) if is_directory_limit_error(&error) => {
             let statuses = blocked_ingress_statuses(

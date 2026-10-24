@@ -9,7 +9,9 @@ use litchi_xls::writer::{
 use litchi_xls::{PivotCacheItem, Visibility, raw::Reader};
 
 fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0usize;

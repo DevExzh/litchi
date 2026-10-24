@@ -175,7 +175,11 @@ fn check<'a>(
 }
 
 fn fat_stream_range_and_size(bytes: &[u8], name: &str) -> ((u64, u64), u64) {
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let entry = ole
         .list_directory_entries(&[])
         .unwrap()
@@ -432,7 +436,11 @@ fn encrypted_validation_does_not_read_powerpoint_document_payload() {
         &[record(0, 0, 0x2222, &vec![0xA5; 8 * 1024])],
         &[],
     );
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let document = ole
         .list_directory_entries(&[])
         .unwrap()

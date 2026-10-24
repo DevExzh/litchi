@@ -217,7 +217,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(2);
     };
     let file = File::open(&path)?;
-    let mut ole = OleFile::open(file)?;
+    let mut ole = OleFile::open(file, litchi_cfb::OleFileLimits::default())?;
 
     // Try primary PowerPoint Document stream
     let data = ole

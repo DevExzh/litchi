@@ -881,8 +881,11 @@ mod tests {
         use sha1::{Digest, Sha1};
         use std::fs::File;
 
-        let mut encrypted_ole =
-            OleFile::open(File::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap()).unwrap();
+        let mut encrypted_ole = OleFile::open(
+            File::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let mut document = encrypted_ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = encrypted_ole.open_stream(&["Current User"]).unwrap();
         let state = decrypt_powerpoint_document(

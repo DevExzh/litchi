@@ -478,7 +478,8 @@ fn encrypted_documents_refuse_writes_without_downgrade() {
 fn signed_compound(bytes: Vec<u8>) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source = OleFile::open(Cursor::new(bytes)).expect("open DOC source");
+    let mut source = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("open DOC source");
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let path = path.iter().map(String::as_str).collect::<Vec<_>>();

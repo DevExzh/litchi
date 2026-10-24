@@ -59,7 +59,8 @@ mod cfb {
         reason = "used by the signed suites of the legacy formats enabled"
     )]
     pub(super) fn signed(bytes: Vec<u8>) -> Vec<u8> {
-        let mut source = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let mut writer = OleWriter::new();
         for path in source.list_streams() {
             let path = path.iter().map(String::as_str).collect::<Vec<_>>();

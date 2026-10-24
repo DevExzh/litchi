@@ -35,12 +35,12 @@ fn rsa_signer() -> Signer {
 }
 
 fn verify(bytes: &[u8], format: Format) -> litchi_sign::Result<Vec<cfb::Report>> {
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     cfb::verify(&mut file, format, &Policy::strict())
 }
 
 fn signature_xml(bytes: &[u8]) -> (String, Vec<u8>) {
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let name = file.list_directory_entries(&["_xmlsignatures"]).unwrap()[0]
         .name
         .clone();
@@ -105,7 +105,8 @@ fn no_op_clear_and_resign_are_atomic_and_preserve_payload_streams() {
     editor.clear().unwrap();
     let cleared = editor.finish().unwrap();
     assert!(verify(&cleared, Format::Doc).unwrap().is_empty());
-    let mut file = OleFile::open(Cursor::new(cleared)).unwrap();
+    let mut file =
+        OleFile::open(Cursor::new(cleared), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(file.open_stream(&["Payload"]).unwrap(), b"preserve exactly");
 }
 
@@ -136,7 +137,8 @@ fn malformed_legacy_encrypted_and_resource_hostile_containers_are_rejected() {
     let limits = Limits::standard().signature_bytes(32).unwrap();
     let policy = Policy::strict().limits(limits.clone());
     assert_eq!(policy.limits_value(), &limits);
-    let mut file = OleFile::open(Cursor::new(signed)).unwrap();
+    let mut file =
+        OleFile::open(Cursor::new(signed), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(matches!(
         cfb::verify(&mut file, Format::Doc, &policy),
         Err(Error::Limit(_))

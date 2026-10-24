@@ -431,7 +431,10 @@ impl Edit {
             })
             .map(PivotCache::stream_id)
             .collect::<HashSet<_>>();
-        let mut input = OleFile::open(Cursor::new(self.original))?;
+        let mut input = OleFile::open(
+            Cursor::new(self.original),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         let paths = input.list_streams();
         let workbook_path = paths
             .iter()

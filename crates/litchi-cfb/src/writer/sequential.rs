@@ -19,6 +19,7 @@ use super::minifat::MiniFatBuilder;
 #[cfg(test)]
 use super::publish::path_identity;
 use super::{PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged};
+use crate::OleFileLimits;
 use crate::consts::{
     DIFSECT, ENDOFCHAIN, FATSECT, MAXREGSECT, RANGE_LOCK_SECTOR_V4, SECTOR_SIZE_V4,
 };
@@ -155,7 +156,7 @@ pub struct SequentialWriterOptions {
     /// Regular CFB sector size.  Only 512 and 4096 are valid.
     pub sector_size: usize,
     /// Finite semantic and output limits.
-    pub limits: SequentialWriterLimits,
+    limits: SequentialWriterLimits,
     /// Capacity of the one reusable source/publication buffer.
     pub publication_buffer_bytes: usize,
     /// Optional cooperative cancellation token.
@@ -192,11 +193,17 @@ impl SequentialWriterOptions {
         self
     }
 
-    /// Sets the finite limits.
+    /// Sets the finite limits, consuming the previous options value.
     #[must_use]
-    pub fn with_limits(mut self, limits: SequentialWriterLimits) -> Self {
+    pub fn limits(mut self, limits: SequentialWriterLimits) -> Self {
         self.limits = limits;
         self
+    }
+
+    /// Returns the finite limits retained by these options.
+    #[must_use]
+    pub const fn limits_value(&self) -> SequentialWriterLimits {
+        self.limits
     }
 
     /// Sets the reusable publication buffer capacity.
@@ -226,6 +233,7 @@ pub struct SequentialWriteReport {
     metadata_bytes: u64,
     stream_count: u64,
     publication_buffer_bytes: u64,
+    candidate_limits: OleFileLimits,
 }
 
 impl SequentialWriteReport {
@@ -287,18 +295,19 @@ fn validate_staged_candidate(
             progress: staged(),
             report,
         })?;
-    let validated = OleFile::open(candidate).map_err(|error| match error {
-        OleError::Io(source) => SequentialWriteError::Stage {
-            source,
-            progress: staged(),
-            report,
-        },
-        source => SequentialWriteError::CandidateValidation {
-            source,
-            progress: staged(),
-            report,
-        },
-    })?;
+    let validated =
+        OleFile::open(candidate, report.candidate_limits).map_err(|error| match error {
+            OleError::Io(source) => SequentialWriteError::Stage {
+                source,
+                progress: staged(),
+                report,
+            },
+            source => SequentialWriteError::CandidateValidation {
+                source,
+                progress: staged(),
+                report,
+            },
+        })?;
     // The writer generated every structure itself, so the candidate must be
     // conformant: a default read repair here would be a writer defect.
     validated
@@ -310,6 +319,13 @@ fn validate_staged_candidate(
         })?;
     drop(validated);
     Ok(())
+}
+
+fn candidate_validation_limits(
+    output_bytes: u64,
+    directory_bytes: u64,
+) -> Result<OleFileLimits, OleError> {
+    OleFileLimits::for_writer(output_bytes, directory_bytes)
 }
 
 /// Typed failures from the predeclared-layout writer.
@@ -1559,12 +1575,25 @@ impl<'a> SequentialOleWriter<'a> {
         let metadata_bytes = preflight.metadata_bytes;
         let publication_buffer_bytes =
             plan_buffer_size(self.options.publication_buffer_bytes, sector_size)?;
+        // The reader enforces its directory ceiling against the padded
+        // directory stream length, not the unpadded directory image.  Keep
+        // the candidate profile derived from this plan, but include the
+        // physical sector padding so ordinary one-stream plans do not fail
+        // their own post-publication validation under a 512-byte ceiling.
+        let directory_validation_bytes = preflight
+            .directory_sector_count
+            .checked_mul(u64::try_from(sector_size).unwrap_or(u64::MAX))
+            .ok_or_else(|| planning("CFB candidate directory bytes overflow"))?;
+        let candidate_limits =
+            candidate_validation_limits(output_bytes, directory_validation_bytes)
+                .map_err(SequentialWriteError::Planning)?;
         let report = SequentialWriteReport {
             output_bytes,
             payload_bytes,
             metadata_bytes,
             stream_count,
             publication_buffer_bytes: u64::try_from(publication_buffer_bytes).unwrap_or(u64::MAX),
+            candidate_limits,
         };
         let mut publication_buffer = Vec::new();
         publication_buffer
@@ -2387,6 +2416,19 @@ mod tests {
     }
 
     #[test]
+    fn candidate_validation_profile_tracks_v4_output_budget() {
+        let output = TWO_GIB_BYTES + 16 * 1024 * 1024;
+        let directory = 128 * 1024 * 1024;
+        let limits = candidate_validation_limits(output, directory).unwrap();
+        assert_eq!(limits.max_input_bytes(), output);
+        assert_eq!(limits.max_directory_bytes(), directory);
+        assert_eq!(
+            limits.max_allocation_table_bytes(),
+            OleFileLimits::MAX_ALLOCATION_TABLE_BYTES
+        );
+    }
+
+    #[test]
     fn physical_output_preserves_buffered_writes_and_inserts_only_the_lock_hole() {
         #[derive(Default)]
         struct Sink {
@@ -2634,7 +2676,8 @@ mod tests {
             }
         ));
         assert!(!temporary.unwrap().exists());
-        let mut parsed = OleFile::open(File::open(&destination).unwrap()).unwrap();
+        let mut parsed =
+            OleFile::open(File::open(&destination).unwrap(), OleFileLimits::default()).unwrap();
         assert_eq!(parsed.open_stream(&["Saved"]).unwrap(), b"saved");
         fs::remove_file(destination).unwrap();
     }

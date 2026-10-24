@@ -136,8 +136,8 @@ impl Seek for Bounded {
 /// Read only the bounded `EncryptionInfo` stream for password-free classification.
 pub(super) fn read_info(bytes: &[u8], limits: &Limits) -> Result<Vec<u8>> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
-        .map_err(map_reader_error)?;
+    let mut ole =
+        OleFile::open(Cursor::new(bytes), cfb_limits(limits)?).map_err(map_reader_error)?;
     let info_len = ole
         .stream_len(&["EncryptionInfo"])
         .map_err(map_reader_error)?;
@@ -234,8 +234,8 @@ pub(super) fn write(info: &[u8], encrypted: Vec<u8>, limits: &Limits) -> Result<
 /// Read and validate the two encryption streams from a bounded compound file.
 pub(super) fn read(bytes: Vec<u8>, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)> {
     Limits::bytes("compound input", bytes.len(), limits.max_input_bytes)?;
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(limits)?)
-        .map_err(map_reader_error)?;
+    let mut ole =
+        OleFile::open(Cursor::new(bytes), cfb_limits(limits)?).map_err(map_reader_error)?;
 
     let info_len = ole
         .stream_len(&["EncryptionInfo"])

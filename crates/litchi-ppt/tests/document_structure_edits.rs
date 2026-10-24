@@ -382,7 +382,8 @@ fn document_edits_compose_with_slide_moves_and_plan() {
 }
 
 fn signed(bytes: &[u8]) -> Vec<u8> {
-    let mut source = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut source =
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let names: Vec<&str> = path.iter().map(String::as_str).collect();

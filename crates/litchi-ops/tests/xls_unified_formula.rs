@@ -247,7 +247,11 @@ fn invalid_and_unsupported_formula_writes_are_typed_and_atomic() {
 
 #[test]
 fn formula_writes_are_refused_on_signed_workbooks() {
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(fixture())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(fixture()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     for path in ole.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

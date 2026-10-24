@@ -67,7 +67,11 @@ fn future_record_file() -> Vec<u8> {
 }
 
 fn workbook_records(file: &[u8]) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = OleFile::open(Cursor::new(file.to_vec())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(file.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0;

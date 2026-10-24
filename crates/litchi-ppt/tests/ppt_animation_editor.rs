@@ -178,7 +178,11 @@ fn with_signature(source: &[u8]) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::Cursor;
 
-    let mut source_file = OleFile::open(Cursor::new(source.to_vec())).unwrap();
+    let mut source_file = OleFile::open(
+        Cursor::new(source.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = OleWriter::new();
     for stream_path in source_file.list_streams() {
         let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();

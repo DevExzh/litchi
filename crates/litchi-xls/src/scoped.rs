@@ -40,7 +40,7 @@ const SIGNATURE_ENTRIES: [&str; 4] = [
 /// Whether the compound file `bytes` carries a document signature entry at
 /// its root.
 pub(crate) fn is_signed(bytes: &[u8]) -> Result<bool> {
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
+    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     Ok(SIGNATURE_ENTRIES.iter().any(|name| ole.exists(&[name])))
 }
 

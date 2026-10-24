@@ -40,8 +40,11 @@ fn workbook_bytes() -> Vec<u8> {
 }
 
 fn signed_workbook_bytes() -> Vec<u8> {
-    let mut ole =
-        litchi_cfb::OleFile::open(Cursor::new(workbook_bytes())).expect("open native XLS package");
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(workbook_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("open native XLS package");
     let workbook = ole
         .open_stream(&["Workbook"])
         .expect("open workbook stream");

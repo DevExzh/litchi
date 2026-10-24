@@ -89,7 +89,7 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         .unwrap();
     let bytes = editor.finish().unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     assert_eq!(ole.open_stream(&["Payload"]).unwrap(), payload);
     let summary = ole
         .property_set_stream(&["\u{0005}SummaryInformation"])
@@ -132,7 +132,11 @@ fn generated_property_sets_round_trip_all_office_value_families() {
             Ok(())
         })
         .unwrap();
-    let mut ole = OleFile::open(Cursor::new(editor.finish().unwrap())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(editor.finish().unwrap()),
+        OleFileLimits::default(),
+    )
+    .unwrap();
     let summary = ole
         .property_set_stream(&["\u{0005}SummaryInformation"])
         .unwrap();

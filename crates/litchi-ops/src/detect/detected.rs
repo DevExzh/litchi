@@ -354,7 +354,7 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
-        if let Ok(ole_file) = litchi_cfb::OleFile::open_with_limits(cursor, limits.cfb()) {
+        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor, limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
             // stream (record 0341).
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
@@ -463,7 +463,7 @@ pub(crate) fn detect_ooxml_smart<T: ZipTail>(
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
-        if let Ok(ole_file) = litchi_cfb::OleFile::open_with_limits(cursor, source_limits.cfb()) {
+        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor, source_limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
             // stream (record 0341).
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {

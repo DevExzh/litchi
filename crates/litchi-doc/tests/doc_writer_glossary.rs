@@ -262,7 +262,11 @@ fn attached_template_bytes(mutate: impl FnOnce(&mut [u8], usize)) -> Vec<u8> {
         .write_to(&mut source)
         .unwrap();
 
-    let mut source_ole = OleFile::open(Cursor::new(source.into_inner())).unwrap();
+    let mut source_ole = OleFile::open(
+        Cursor::new(source.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut word_document = source_ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = source_ole.open_stream(&["1Table"]).unwrap();
     let data_stream = source_ole.open_stream(&["Data"]).unwrap();
@@ -491,7 +495,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
     let mut output = Cursor::new(Vec::new());
     template.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let mut ole = OleFile::open(Cursor::new(&bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let data = ole.open_stream(&["Data"]).unwrap();
 

@@ -69,7 +69,11 @@ fn base_doc_with_text(text: &str) -> Vec<u8> {
 }
 
 fn doc_with_protected_storage(marker: &str) -> Vec<u8> {
-    let mut source = OleFile::open(Cursor::new(base_doc())).expect("base CFB");
+    let mut source = OleFile::open(
+        Cursor::new(base_doc()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("base CFB");
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

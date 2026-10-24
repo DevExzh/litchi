@@ -102,7 +102,7 @@ fn document_bytes() -> Vec<u8> {
 }
 
 fn exact_limits(bytes: &[u8]) -> SourceLimits {
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut max_entry_bytes = 0_usize;
     let mut aggregate_bytes = 0_usize;
     for index in 0..ole.directory_entry_count() {
@@ -129,7 +129,11 @@ fn exact_limits(bytes: &[u8]) -> SourceLimits {
 }
 
 fn document_with_extra_stream(name: &str, payload: &[u8]) -> Vec<u8> {
-    let mut source = OleFile::open(Cursor::new(document_bytes())).unwrap();
+    let mut source = OleFile::open(
+        Cursor::new(document_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let streams = source
         .list_streams()
         .into_iter()
@@ -456,12 +460,16 @@ fn opaque_and_metadata_streams_are_bounded_before_materialization() {
             )
             .unwrap_err(),
             litchi_doc::Package::from_ole_file_with_options(
-                OleFile::open(Cursor::new(bytes.clone())).unwrap(),
+                OleFile::open(
+                    Cursor::new(bytes.clone()),
+                    litchi_cfb::OleFileLimits::default(),
+                )
+                .unwrap(),
                 OpenOptions::default().source_limits(selected),
             )
             .unwrap_err(),
             Reader::from_ole_file_with_options(
-                OleFile::open(Cursor::new(bytes)).unwrap(),
+                OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap(),
                 OpenOptions::default().source_limits(selected),
             )
             .unwrap_err(),
@@ -479,13 +487,17 @@ fn opaque_and_metadata_streams_are_bounded_before_materialization() {
 fn already_parsed_ole_enforces_exact_package_limit() {
     let bytes = document_bytes();
     let exact = exact_limits(&bytes);
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(
         Reader::from_ole_file_with_options(ole, OpenOptions::default().source_limits(exact))
             .is_ok()
     );
 
-    let ole = OleFile::open(Cursor::new(&bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let error = Reader::from_ole_file_with_options(
         ole,
         OpenOptions::default().source_limits(limits(

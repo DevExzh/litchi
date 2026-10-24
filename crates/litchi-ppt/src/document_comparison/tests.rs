@@ -331,7 +331,8 @@ fn package_document_comparison_edits_refuse_changed_writes_to_signed_packages() 
     use std::io::Cursor;
 
     let source = package_with_review().to_bytes().unwrap();
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for stream_path in source_file.list_streams() {
         let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();

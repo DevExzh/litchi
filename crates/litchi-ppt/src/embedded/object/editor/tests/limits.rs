@@ -21,6 +21,7 @@ fn rejects_a_projected_incremental_stream_above_the_publication_limit() {
     let editor = Editor {
         original: Arc::from(vec![0u8; 8]),
         max_output_bytes: 15,
+        cfb_limits: litchi_cfb::OleFileLimits::default(),
         streams: Vec::new(),
         document_path: vec!["PowerPoint Document".into()],
         current_user_path: vec!["Current User".into()],

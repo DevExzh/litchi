@@ -6147,8 +6147,11 @@ mod tests {
     }
 
     fn doc_with_signature_stream(payload: &[u8]) -> Vec<u8> {
-        let mut source =
-            OleFile::open(Cursor::new(doc(&["alpha"]))).expect("fixture CFB should open");
+        let mut source = OleFile::open(
+            Cursor::new(doc(&["alpha"])),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("fixture CFB should open");
         let paths = source.list_streams();
         let mut writer = OleWriter::new();
         for path in paths {
@@ -7631,10 +7634,16 @@ mod tests {
             .expect("paragraph replacement should stage");
         let commit = edit.commit().expect("changed package should reopen");
 
-        let mut before =
-            OleFile::open(Cursor::new(source.bytes())).expect("source CFB should open");
-        let mut after =
-            OleFile::open(Cursor::new(commit.package().bytes())).expect("changed CFB should open");
+        let mut before = OleFile::open(
+            Cursor::new(source.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("source CFB should open");
+        let mut after = OleFile::open(
+            Cursor::new(commit.package().bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("changed CFB should open");
         let before_paths = before.list_streams();
         assert_eq!(after.list_streams(), before_paths);
         for path in before_paths {

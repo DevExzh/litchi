@@ -11649,6 +11649,33 @@
       ]
     },
     {
+      "id": "cfb",
+      "package": "litchi-cfb",
+      "default_features": false,
+      "features": [
+        "write"
+      ],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_cfb",
+          "replacement": "pass the typed limits to the canonical raw entry point; no public *_with_limits aliases (record 0362zad)",
+          "match": "suffix"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_cfb",
+          "replacement": "use limits(...) and limits_value() on SequentialWriterOptions; raw CFB entry points require typed limits (record 0362zad)"
+        },
+        {
+          "name": "update_stream",
+          "scope": "litchi_cfb::writer::OleWriter",
+          "replacement": "use create_stream; update_stream was a duplicate alias removed in record 0362zad"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "ole-common",
       "package": "litchi-ole-common",
       "default_features": false,

@@ -557,7 +557,8 @@ fn worksheet_records(workbook_stream: &[u8], bound: &BoundSheetRecord) -> Option
 }
 
 fn workbook_stream(bytes: &[u8]) -> Option<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).ok()?;
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).ok()?;
     ole.open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))
         .ok()

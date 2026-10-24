@@ -291,7 +291,11 @@ fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() 
         original
     );
 
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(written.clone())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(written.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     assert!(table.starts_with(prefix));
     drop(table);
@@ -312,7 +316,11 @@ fn package_editor_appends_only_the_new_range_and_publishes_reversible_patches() 
         .clear()
         .unwrap();
     let finished = cleared.snapshot().finish().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(finished)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(finished),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     assert_eq!(&word[154 + FIB_INDEX * 8..154 + FIB_INDEX * 8 + 8], &[0; 8]);
     let table = ole.open_stream(&["0Table"]).unwrap();

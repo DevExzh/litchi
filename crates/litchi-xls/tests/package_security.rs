@@ -67,7 +67,11 @@ fn plain_eager_and_source_owners_have_no_encryption_profile() {
     assert_eq!(package.encryption(), None);
     let bytes = package.to_bytes().unwrap();
     let cfb = Arc::new(
-        litchi_cfb::SharedOleFile::open(Arc::new(litchi_core::OwnedSource::new(bytes))).unwrap(),
+        litchi_cfb::SharedOleFile::open(
+            Arc::new(litchi_core::OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap(),
     );
     let workbook = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
         cfb,

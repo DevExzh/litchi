@@ -1553,7 +1553,10 @@ fn assert_pinned_corpora(opc: &super::Corpus, cfb: &super::Corpus) -> Result<(),
 }
 
 fn expected_cfb_output_digest(corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
-    let shared = SharedOleFile::open(Arc::new(super::OwnedSource::new(corpus.archive.clone())))?;
+    let shared = SharedOleFile::open(
+        Arc::new(super::OwnedSource::new(corpus.archive.clone())),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )?;
     let overlay = SameLengthStreamOverlay::new(
         vec![super::OLE_COMMON_TARGET.to_owned()],
         Arc::from(FILESYSTEM_OLE_COMMON_REPLACEMENT.to_vec()),
@@ -2532,7 +2535,10 @@ fn expected_digest_for_source(
             Ok(super::sha256_hex(&output))
         },
         Operation::CfbOverlaySave | Operation::CfbOwnedOverlaySave => {
-            let shared = SharedOleFile::open(Arc::new(super::OwnedSource::new(fs::read(source)?)))?;
+            let shared = SharedOleFile::open(
+                Arc::new(super::OwnedSource::new(fs::read(source)?)),
+                litchi_cfb::SharedOleFileLimits::default(),
+            )?;
             let overlay = SameLengthStreamOverlay::new(
                 vec![super::OLE_COMMON_TARGET.to_owned()],
                 Arc::from(FILESYSTEM_OLE_COMMON_REPLACEMENT.to_vec()),
@@ -5861,7 +5867,7 @@ fn run_cfb_overlay_save(
 ) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
     let open_started = Instant::now();
     let counter = Arc::new(CountingReadAt::new(Arc::new(FileSource::open(source)?)));
-    let shared = SharedOleFile::open(counter.clone())?;
+    let shared = SharedOleFile::open(counter.clone(), litchi_cfb::SharedOleFileLimits::default())?;
     let open_elapsed_ns = u64::try_from(open_started.elapsed().as_nanos())?;
     let after_open = counter.totals();
 
@@ -5907,7 +5913,11 @@ fn run_cfb_owned_overlay_save(
     let version = SourceVersion::new(CFB_FILE_OWNED_SOURCE_VERSION_ID, 0);
 
     let open_started = Instant::now();
-    let shared = SharedOleFile::open_owned(Arc::clone(&owned_source), version)?;
+    let shared = SharedOleFile::open_owned(
+        Arc::clone(&owned_source),
+        version,
+        litchi_cfb::SharedOleFileLimits::default(),
+    )?;
     let open_elapsed_ns = u64::try_from(open_started.elapsed().as_nanos())?;
 
     let plan_started = Instant::now();
@@ -6016,7 +6026,10 @@ fn verify_child_output(
             super::verify_opc_overlay_output(corpus, &output, &replacement)
         },
         Operation::CfbOverlaySave | Operation::CfbOwnedOverlaySave => {
-            let mut ole = OleFile::open(File::open(destination)?)?;
+            let mut ole = OleFile::open(
+                File::open(destination)?,
+                litchi_cfb::OleFileLimits::default(),
+            )?;
             if ole.list_streams().len() != corpus.manifest.entry_count
                 || ole.open_stream(&[super::OLE_COMMON_TARGET])?
                     != FILESYSTEM_OLE_COMMON_REPLACEMENT

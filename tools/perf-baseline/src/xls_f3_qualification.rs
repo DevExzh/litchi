@@ -897,8 +897,9 @@ fn verify_output(fixture: &Fixture, output: &[u8]) -> Result<()> {
 }
 
 fn verify_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<()> {
-    let mut source_ole = OleFile::open(Cursor::new(source))?;
-    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
+    let mut candidate_ole =
+        OleFile::open(Cursor::new(candidate), litchi_cfb::OleFileLimits::default())?;
     let mut source_paths = source_ole.list_streams();
     let mut candidate_paths = candidate_ole.list_streams();
     source_paths.sort();
@@ -1134,7 +1135,7 @@ fn require_refusal(
 }
 
 fn copy_streams(source: &[u8]) -> Result<OleWriter> {
-    let mut ole = OleFile::open(Cursor::new(source))?;
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
     let mut writer = OleWriter::new();
     let mut streams = ole.list_streams();
     streams.sort();
@@ -1212,7 +1213,7 @@ const EXPECTED_LEGACY_PROTECTED_REFUSAL: &str =
     "signed, encrypted, or DRM containers are not eligible for object editing";
 
 fn require_signed_marker(bytes: &[u8]) -> Result<()> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let mut pending = vec![Vec::<String>::new()];
     let mut signed_path = None;
     while let Some(path) = pending.pop() {
@@ -1241,7 +1242,7 @@ fn require_signed_marker(bytes: &[u8]) -> Result<()> {
 }
 
 fn require_encrypted_marker(bytes: &[u8]) -> Result<()> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let workbook = ole
         .open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))?;

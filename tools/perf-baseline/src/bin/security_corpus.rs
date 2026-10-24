@@ -1030,13 +1030,11 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
 }
 
 fn validate_cfb(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     match fixture.oracle {
         Oracle::Macro => {
-            let mut workbook = XlsReader::from_ole_file(OleFile::open_with_limits(
-                Cursor::new(bytes),
-                cfb_limits()?,
-            )?)?;
+            let mut workbook =
+                XlsReader::from_ole_file(OleFile::open(Cursor::new(bytes), cfb_limits()?)?)?;
             let metadata = workbook.vba_metadata();
             if !metadata.has_project_marker()
                 || !metadata.has_project_storage()
@@ -1141,7 +1139,7 @@ fn validate_encrypted_doc(
 }
 
 fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<&[u8]>>> {
-    let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     let limits = DocSourceLimits::builder()
         .max_input_bytes(MAX_INPUT_BYTES as usize)?
         .max_entry_bytes(MAX_INPUT_BYTES as usize)?
@@ -1176,7 +1174,7 @@ fn enforce_strict_data_spaces_oracle(
     if !profile.strict_data_spaces_refusal {
         return Ok(());
     }
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     if spaces::inspect(&mut ole).is_ok() {
         return Err(format!(
             "{} strict DataSpaces inspection unexpectedly accepted the zero-block graph",
@@ -1188,7 +1186,7 @@ fn enforce_strict_data_spaces_oracle(
 }
 
 fn read_cfb_stream(fixture: &Fixture, bytes: &[u8]) -> Result<Vec<u8>> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
     let wanted = match fixture.oracle {
         Oracle::Macro => "_VBA_PROJECT_CUR",
         Oracle::CfbBoundary | Oracle::EncryptedDoc { .. } => "WordDocument",
@@ -1727,7 +1725,7 @@ fn member_inventory(
             Ok((members, logical_bytes, "complete", total_entries))
         },
         ContainerKind::Cfb | ContainerKind::EncryptedCfb => {
-            let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
+            let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits()?)?;
             let paths = ole.list_streams();
             if paths.len() > MAX_MEMBERS {
                 return Err(format!("{} stream count exceeds bound", fixture.id).into());

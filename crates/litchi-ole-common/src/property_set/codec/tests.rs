@@ -62,8 +62,11 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
             Ok(section.add(2, Value::Lpstr("Title".into()))?)
         })
         .expect("summary edit");
-    let mut ole =
-        OleFile::open(Cursor::new(editor.finish().expect("edited CFB"))).expect("edited CFB opens");
+    let mut ole = OleFile::open(
+        Cursor::new(editor.finish().expect("edited CFB")),
+        OleFileLimits::default(),
+    )
+    .expect("edited CFB opens");
     assert_eq!(
         ole.open_stream(&["Nested", "\u{0005}SummaryInformation"])
             .expect("nested stream survives"),
@@ -109,7 +112,8 @@ fn reader_opens_a_guid_derived_binding_without_a_format_specific_path() {
     let mut cfb = Cursor::new(Vec::new());
     writer.write_to(&mut cfb).expect("CFB should serialize");
 
-    let mut ole = OleFile::open(Cursor::new(cfb.into_inner())).expect("CFB should open");
+    let mut ole = OleFile::open(Cursor::new(cfb.into_inner()), OleFileLimits::default())
+        .expect("CFB should open");
     let parsed = PropertySetReader::property_set(&mut ole, binding)
         .expect("binding reader should resolve the standard name");
     assert_eq!(
@@ -132,8 +136,11 @@ fn a_user_defined_edit_creates_a_typed_document_summary_section() {
             Ok(section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))?)
         })
         .expect("user-defined edit");
-    let mut ole =
-        OleFile::open(Cursor::new(editor.finish().expect("edited CFB"))).expect("edited CFB opens");
+    let mut ole = OleFile::open(
+        Cursor::new(editor.finish().expect("edited CFB")),
+        OleFileLimits::default(),
+    )
+    .expect("edited CFB opens");
     let stream = PropertySetReader::property_set(&mut ole, Binding::DocumentSummaryInformation)
         .expect("document summary stream");
     assert_eq!(stream.sections.len(), 2);

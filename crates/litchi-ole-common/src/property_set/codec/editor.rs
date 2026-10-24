@@ -17,6 +17,7 @@ use std::io::Cursor;
 /// Transactional editor for standard OLE Property Set streams.
 pub struct Edit {
     original: Vec<u8>,
+    cfb_limits: OleFileLimits,
     streams: Vec<(Vec<String>, Vec<u8>)>,
     staged: HashMap<Vec<String>, Option<Vec<u8>>>,
 }
@@ -32,7 +33,7 @@ impl Edit {
     /// allocated.
     pub fn new(bytes: Vec<u8>, limits: OleFileLimits) -> Result<Self, Error> {
         let streams = {
-            let mut ole = OleFile::open_with_limits(Cursor::new(bytes.as_slice()), limits)?;
+            let mut ole = OleFile::open(Cursor::new(bytes.as_slice()), limits)?;
             let max_entries = ole.directory_entry_count();
             reject_protected_container(
                 &ole,
@@ -50,6 +51,7 @@ impl Edit {
         };
         Ok(Self {
             original: bytes,
+            cfb_limits: limits,
             streams,
             staged: HashMap::new(),
         })
@@ -167,7 +169,7 @@ impl Edit {
         // (a Word document's `Word.Document.8` CLSID, for one) and lets the
         // writer reuse the source sector layout while the stream set still
         // matches; a source it cannot adopt is serialized from scratch.
-        writer.adopt_source_layout(&self.original)?;
+        writer.adopt_source_layout(&self.original, self.cfb_limits)?;
         let written_capacity = self
             .streams
             .len()

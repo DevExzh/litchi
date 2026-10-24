@@ -222,7 +222,8 @@ fn open_options(package: &Package) -> OpenOptions {
 }
 
 fn is_signed(bytes: &[u8]) -> Result<bool, Failure> {
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).map_err(PackageError::from)?;
+    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .map_err(PackageError::from)?;
     Ok(SIGNATURE_ENTRIES.iter().any(|name| ole.exists(&[name])))
 }
 

@@ -222,7 +222,7 @@ fn cfb_with_streams(streams: &[(&str, Vec<u8>)], storages: &[&str]) -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    SharedOleFile::open(source(bytes))
+    SharedOleFile::open(source(bytes), litchi_cfb::SharedOleFileLimits::default())
         .expect("CFB")
         .open_stream(&["Workbook"])
         .expect("Workbook stream")

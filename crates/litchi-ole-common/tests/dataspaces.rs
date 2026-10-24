@@ -51,7 +51,7 @@ fn rejects_oversized_dataspaces_stream_before_payload_io() {
         inner: Cursor::new(package_with_oversized_version()),
         reads: Arc::clone(&reads),
     };
-    let mut ole = OleFile::open(source).unwrap();
+    let mut ole = OleFile::open(source, litchi_cfb::OleFileLimits::default()).unwrap();
     reads.store(0, Ordering::Relaxed);
 
     assert!(matches!(
@@ -74,7 +74,7 @@ fn accepts_exact_and_under_dataspaces_stream_limits() {
         inner: Cursor::new(package_with_version(payload)),
         reads: Arc::clone(&reads),
     };
-    let mut ole = OleFile::open(source).unwrap();
+    let mut ole = OleFile::open(source, litchi_cfb::OleFileLimits::default()).unwrap();
     reads.store(0, Ordering::Relaxed);
 
     assert_eq!(
@@ -116,7 +116,7 @@ fn rejects_zero_and_above_ceiling_limits_before_lookup() {
         inner: Cursor::new(package_with_version(b"metadata")),
         reads: Arc::clone(&reads),
     };
-    let mut ole = OleFile::open(source).unwrap();
+    let mut ole = OleFile::open(source, litchi_cfb::OleFileLimits::default()).unwrap();
     reads.store(0, Ordering::Relaxed);
 
     assert!(matches!(

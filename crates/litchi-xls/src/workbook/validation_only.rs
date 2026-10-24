@@ -136,7 +136,7 @@ impl<R: Read + Seek> Reader<R> {
         kept: KeptCells,
         cfb_limits: OleFileLimits,
     ) -> Result<ValidationWorkbook<R>> {
-        let mut workbook = Self::empty(OleFile::open_with_limits(reader, cfb_limits)?);
+        let mut workbook = Self::empty(OleFile::open(reader, cfb_limits)?);
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&OpenOptions::default(), CellDecoding::Kept(&kept))?;
         Ok(ValidationWorkbook { workbook, kept })

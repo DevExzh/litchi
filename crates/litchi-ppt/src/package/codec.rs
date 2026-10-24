@@ -98,7 +98,7 @@ impl<R: Read + Seek> Reader<R> {
                 maximum: source_limits.max_package_bytes,
             });
         }
-        let ole = OleFile::open(reader)?;
+        let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())?;
 
         preflight_declared_streams(&ole, source_limits)?;
 
@@ -123,12 +123,12 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_cfb::OleFile;
+    /// use litchi_cfb::{OleFile, OleFileLimits};
     /// use litchi_ppt::raw::Reader;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("presentation.ppt")?;
-    /// let ole = OleFile::open(Cursor::new(bytes))?;
+    /// let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     /// let pkg = Reader::from_ole_file(ole)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

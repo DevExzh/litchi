@@ -610,7 +610,11 @@ impl Package {
     }
 
     pub(crate) fn render(&self) -> Result<Vec<u8>, Error> {
-        self.render_with_layout(None, SectorLayoutPolicy::default())
+        self.render_with_layout(
+            None,
+            SectorLayoutPolicy::default(),
+            OleFileLimits::default(),
+        )
     }
 
     /// Renders the package, optionally reusing `source`'s sector layout.
@@ -623,11 +627,12 @@ impl Package {
         &self,
         source: Option<&[u8]>,
         policy: SectorLayoutPolicy,
+        cfb_limits: OleFileLimits,
     ) -> Result<Vec<u8>, Error> {
         let mut writer = OleWriter::with_sector_size(self.sector_size)?;
         writer.set_sector_layout_policy(policy);
         if let Some(source) = source {
-            writer.adopt_source_layout(source)?;
+            writer.adopt_source_layout(source, cfb_limits)?;
         }
         // A missing class ID is an explicit clear for a source-backed render;
         // otherwise the source-layout planner would preserve the old bytes and
@@ -751,11 +756,8 @@ impl Package {
         let shared_limits = SharedOleFileLimits::new(cfb_limits.max_input_bytes())?
             .with_max_directory_bytes(cfb_limits.max_directory_bytes())?
             .with_max_allocation_table_bytes(cfb_limits.max_allocation_table_bytes())?;
-        let shared = match SharedOleFile::open_owned_vec_with_limits(
-            Arc::clone(source),
-            version,
-            shared_limits,
-        ) {
+        let shared = match SharedOleFile::open_owned_vec(Arc::clone(source), version, shared_limits)
+        {
             Ok(shared) => shared,
             Err(error) => return overlay_fallback(error.into()),
         };
@@ -779,7 +781,7 @@ impl Package {
             Ok(composed) => composed,
             Err(error) => return overlay_fallback(error),
         };
-        let candidate = match SharedOleFile::open_with_limits(Arc::new(composed), shared_limits) {
+        let candidate = match SharedOleFile::open(Arc::new(composed), shared_limits) {
             Ok(candidate) => candidate,
             Err(error) => return overlay_fallback(error.into()),
         };

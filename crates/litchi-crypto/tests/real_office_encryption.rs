@@ -27,7 +27,11 @@ fn fixture(path: &[&str]) -> PathBuf {
 }
 
 fn stream(path: &Path, name: &str) -> Vec<u8> {
-    let mut ole = OleFile::open(File::open(path).expect("open fixture")).expect("open OLE");
+    let mut ole = OleFile::open(
+        File::open(path).expect("open fixture"),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("open OLE");
     ole.open_stream(&[name]).expect("read fixture stream")
 }
 

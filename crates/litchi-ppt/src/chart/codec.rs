@@ -137,7 +137,7 @@ fn ensure_kind(book: &Book, expected: litchi_ograph::chart::Kind) -> Result<()> 
 }
 
 fn extract_excel_workbook(package: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
-    let mut cfb = OleFile::open(Cursor::new(package))?;
+    let mut cfb = OleFile::open(Cursor::new(package), litchi_cfb::OleFileLimits::default())?;
     let stream = {
         let entries = cfb.list_directory_entries(&[])?;
         check_limit(

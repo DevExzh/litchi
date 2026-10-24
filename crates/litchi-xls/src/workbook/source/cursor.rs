@@ -431,10 +431,11 @@ mod tests {
         builder.write_number(sheet, 0, 0, 1.0).unwrap();
         builder.write_number(sheet, 1, 0, 2.0).unwrap();
         let bytes = builder.build().unwrap().to_bytes().unwrap();
-        let mut stream = litchi_cfb::OleFile::open(Cursor::new(&bytes))
-            .unwrap()
-            .open_stream(&["Workbook"])
-            .unwrap();
+        let mut stream =
+            litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
+                .unwrap()
+                .open_stream(&["Workbook"])
+                .unwrap();
         // Swap the two Number records, which have the same length.
         let mut numbers = Vec::new();
         let mut offset = 0;

@@ -93,10 +93,7 @@ impl<R: Read + Seek> Reader<R> {
         source_limits: SourceLimits,
     ) -> Result<OleFile<R>> {
         preflight_source_len(&mut reader, source_limits)?;
-        Ok(OleFile::open_with_limits(
-            reader,
-            cfb_limits(source_limits)?,
-        )?)
+        Ok(OleFile::open(reader, cfb_limits(source_limits)?)?)
     }
 
     /// Validate the complete public DOC reader over an already-parsed OLE
@@ -136,12 +133,12 @@ impl<R: Read + Seek> Reader<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_cfb::OleFile;
+    /// use litchi_cfb::{OleFile, OleFileLimits};
     /// use litchi_doc::raw::Reader;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.doc")?;
-    /// let ole = OleFile::open(Cursor::new(bytes))?;
+    /// let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     /// let pkg = Reader::from_ole_file(ole)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -456,7 +453,7 @@ impl Reader<Cursor<Vec<u8>>> {
         source_limits: SourceLimits,
     ) -> Result<Reader<Cursor<Vec<u8>>>> {
         Self::validate_source_len(bytes.len(), source_limits)?;
-        let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(source_limits)?)?;
+        let ole = OleFile::open(Cursor::new(bytes), cfb_limits(source_limits)?)?;
         Reader::from_ole_file_with_options(ole, OpenOptions::default().source_limits(source_limits))
     }
 }
@@ -678,7 +675,7 @@ impl Package {
     pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
         let source_limits = options.source_limits_value();
         Reader::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)?;
-        let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits(source_limits)?)?;
+        let ole = OleFile::open(Cursor::new(bytes), cfb_limits(source_limits)?)?;
         let raw = Reader::from_ole_file_with_options(
             ole,
             OpenOptions::default().source_limits(source_limits),

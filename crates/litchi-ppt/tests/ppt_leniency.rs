@@ -1388,10 +1388,13 @@ fn container_repairs_join_the_open_time_report() {
     }
 
     let bytes = shrink_probe(conformant);
-    let container = litchi_cfb::OleFile::open(Cursor::new(bytes.clone()))
-        .unwrap()
-        .tolerance_report()
-        .clone();
+    let container = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap()
+    .tolerance_report()
+    .clone();
     assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
     let expected: Vec<_> = container
         .defects()

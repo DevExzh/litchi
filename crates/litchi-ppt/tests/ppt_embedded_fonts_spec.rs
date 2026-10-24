@@ -445,7 +445,8 @@ fn encrypted_ppt(password: &str) -> Vec<u8> {
 fn with_stream(source: Vec<u8>, path: &[&str], payload: &[u8]) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()
@@ -469,7 +470,8 @@ fn with_stream(source: Vec<u8>, path: &[&str], payload: &[u8]) -> Vec<u8> {
 fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()
@@ -509,7 +511,8 @@ fn with_inconsistent_save_with_fonts(source: Vec<u8>) -> Vec<u8> {
         offset += 8 + length;
     };
 
-    let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let streams = source_file
         .list_streams()
         .into_iter()

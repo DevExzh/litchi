@@ -417,8 +417,8 @@ impl SourceLayout {
     /// Returns the parser's own errors for a malformed artifact, and
     /// [`OleError::InvalidData`] when a declared chain or geometry cannot be
     /// represented.
-    pub(super) fn parse(source: &[u8]) -> Result<Self, OleError> {
-        let ole = OleFile::open(Cursor::new(source))?;
+    pub(super) fn parse(source: &[u8], limits: OleFileLimits) -> Result<Self, OleError> {
+        let ole = OleFile::open(Cursor::new(source), limits)?;
         // Layout reuse copies source metadata into the output, so only a
         // conformant source is adopted; one that opened through read repairs
         // (see `crate::leniency`) is serialized from scratch instead.
@@ -962,7 +962,7 @@ impl ReusePlan {
         let directory_length = u64::try_from(self.directory_image.len())
             .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
         let limits = OleFileLimits::for_writer(output_length, directory_length)?;
-        let check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        let check = OleFile::open(PlanCursor::new(self, streams), limits)?;
         check.require_conformant()?;
         let view = PlanView {
             plan: self,
@@ -991,7 +991,7 @@ impl ReusePlan {
         let directory_length = u64::try_from(self.directory_image.len())
             .map_err(|_error| invalid("CFB planned directory length exceeds u64"))?;
         let limits = OleFileLimits::for_writer(output_length, directory_length)?;
-        let mut check = OleFile::open_with_limits(PlanCursor::new(self, streams), limits)?;
+        let mut check = OleFile::open(PlanCursor::new(self, streams), limits)?;
         check.require_conformant()?;
         for stream in streams {
             let mut refs = Vec::new();

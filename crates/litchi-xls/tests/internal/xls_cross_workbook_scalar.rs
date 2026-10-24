@@ -253,11 +253,14 @@ fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
         litchi_xls::ole_object::Limits::default(),
     )
     .unwrap();
-    let target_opaque = OleFile::open(Cursor::new(target.bytes()))
-        .unwrap()
-        .open_stream(&["Opaque"])
-        .unwrap()
-        .to_vec();
+    let target_opaque = OleFile::open(
+        Cursor::new(target.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap()
+    .open_stream(&["Opaque"])
+    .unwrap()
+    .to_vec();
     let range =
         CellRange::new(Reference::new(0, 0).unwrap(), Reference::new(2, 2).unwrap()).unwrap();
 
@@ -301,10 +304,13 @@ fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
         &Value::Number(9.5)
     );
     assert_eq!(
-        OleFile::open(Cursor::new(copied.bytes()))
-            .unwrap()
-            .open_stream(&["Opaque"])
-            .unwrap(),
+        OleFile::open(
+            Cursor::new(copied.bytes()),
+            litchi_cfb::OleFileLimits::default()
+        )
+        .unwrap()
+        .open_stream(&["Opaque"])
+        .unwrap(),
         target_opaque.as_slice()
     );
     assert_eq!(donor.bytes(), donor_before.as_slice());
@@ -636,7 +642,11 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
 #[test]
 fn signed_cfb_is_refused_before_cross_workbook_transfer() {
     let donor = scalar_source();
-    let mut ole = OleFile::open(Cursor::new(donor.bytes())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(donor.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();

@@ -514,7 +514,11 @@ fn object_metadata_edit_changes_typed_fields_and_preserves_unknown_payload() {
     }));
     assert_eq!(object.storage_position(), Some(0x2A));
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole.open_stream(&["MBD0000002A", "Payload"]).unwrap(),
         b"raw embedded payload"
@@ -689,7 +693,11 @@ fn add_embedded_payload_binds_obj_and_mbd_and_preserves_opaque_streams() {
     );
     assert_eq!(formula.formula.len() % 2, 0);
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    let mut ole = OleFile::open(
+        Cursor::new(commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB should open");
     assert_eq!(
         ole.open_stream(&["UnrelatedRootStream"]).unwrap(),
         b"retain me"
@@ -769,7 +777,11 @@ fn replace_embedded_payload_retains_identity_and_replaces_only_selected_storage(
         matches!(value, ObjSubrecord::Unknown { kind: 0x7777, data } if data == &[0xB1, 0xA5])
     }));
 
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    let mut ole = OleFile::open(
+        Cursor::new(commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB should open");
     assert_eq!(
         ole.open_stream(&["MBD0000002A", "OpaqueStorage", "Payload"])
             .unwrap(),
@@ -794,7 +806,11 @@ fn remove_embedded_payload_removes_unreferenced_storage_and_is_reversible() {
         .expect("embedded object should be removable");
     let commit = transaction.commit_record().expect("commit should validate");
     assert!(commit.snapshot().objects(0).unwrap().is_empty());
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish())).expect("CFB should open");
+    let mut ole = OleFile::open(
+        Cursor::new(commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB should open");
     assert!(ole.open_stream(&["MBD0000002A"]).is_err());
     assert_eq!(
         commit
@@ -820,8 +836,11 @@ fn removing_one_of_two_shared_mbd_references_keeps_storage_until_last_owner() {
         .expect("first owner should be removable");
     let first_commit = first.commit_record().expect("first removal should commit");
     assert_eq!(first_commit.snapshot().objects(0).unwrap().len(), 1);
-    let mut first_ole = OleFile::open(Cursor::new(first_commit.snapshot().finish()))
-        .expect("first result should be a CFB");
+    let mut first_ole = OleFile::open(
+        Cursor::new(first_commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("first result should be a CFB");
     assert_eq!(
         first_ole.open_stream(&["MBD0000002A", "Payload"]).unwrap(),
         b"shared payload"
@@ -835,8 +854,11 @@ fn removing_one_of_two_shared_mbd_references_keeps_storage_until_last_owner() {
         .commit_record()
         .expect("second removal should commit");
     assert!(second_commit.snapshot().objects(0).unwrap().is_empty());
-    let mut second_ole = OleFile::open(Cursor::new(second_commit.snapshot().finish()))
-        .expect("second result should be a CFB");
+    let mut second_ole = OleFile::open(
+        Cursor::new(second_commit.snapshot().finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("second result should be a CFB");
     assert!(second_ole.open_stream(&["MBD0000002A"]).is_err());
 }
 

@@ -1219,7 +1219,11 @@ mod tests {
             "/../../test-data/poi/test-data/spreadsheet/Simple.xls"
         ))
         .unwrap();
-        let file = litchi_cfb::SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap();
+        let file = litchi_cfb::SharedOleFile::open(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let mut hint = file.chain_hint();
         let _cursor = file
             .stream_cursor_at_hinted(&["Workbook"], 0, &mut hint)

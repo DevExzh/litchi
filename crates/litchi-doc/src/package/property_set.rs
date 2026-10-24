@@ -686,7 +686,7 @@ impl crate::Package {
 }
 
 fn validate_host(bytes: &[u8]) -> PackageResult<()> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     if !ole.exists(&["WordDocument"]) {
         return Err(PackageError::InvalidFormat(
             "Not a valid Word document: WordDocument stream not found".to_string(),
@@ -696,7 +696,7 @@ fn validate_host(bytes: &[u8]) -> PackageResult<()> {
 }
 
 pub(crate) fn classify_host(bytes: &[u8]) -> PackageResult<EditProtection> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     let word = match ole.open_stream(&["WordDocument"]) {
         Ok(word) => word,
         Err(OleError::StreamNotFound) => return Ok(EditProtection::Unknown),
@@ -729,7 +729,7 @@ pub(crate) fn classify_host(bytes: &[u8]) -> PackageResult<EditProtection> {
 }
 
 fn read_stream(bytes: &[u8], binding: Binding) -> PackageResult<Option<Stream>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
         Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
@@ -882,7 +882,11 @@ mod tests {
             Some("after")
         );
 
-        let mut ole = OleFile::open(Cursor::new(edited.bytes().to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(edited.bytes().to_vec()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"
@@ -896,7 +900,8 @@ mod tests {
         let mut builder = crate::Builder::new();
         builder.add_paragraph("Body").unwrap();
         let written = builder.build().unwrap().to_bytes().unwrap();
-        let mut source = OleFile::open(Cursor::new(written.clone())).unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(written.clone()), OleFileLimits::default()).unwrap();
         let mut rebuilt = OleWriter::new();
         for path in source.list_streams() {
             let refs: Vec<&str> = path.iter().map(String::as_str).collect();

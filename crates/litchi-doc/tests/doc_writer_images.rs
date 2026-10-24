@@ -370,7 +370,11 @@ fn floating_picture_writes_valid_dgg_info() {
     let jpeg_bytes = jpeg_fixture();
     let (doc_bytes, _, _) = write_doc_with_inline_and_floating(&jpeg_bytes);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();

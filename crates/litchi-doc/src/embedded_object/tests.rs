@@ -514,7 +514,11 @@ fn snapshot_transactions_are_source_checked_and_preserve_opaque_object_data() {
         0x1000
     );
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(commit.snapshot().bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_77", "VendorMetadata"])
@@ -667,7 +671,11 @@ fn doc_ole2_stream_access_edits_atomically_and_preserves_host_metadata() {
         [0xCC, 0xDD]
     );
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(after.bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(after.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_77", "\u{1}CompObj"])
@@ -921,7 +929,11 @@ fn reference_selected_streams_reject_forged_and_ambiguous_targets_atomically() {
         Limits::default(),
     )
     .unwrap();
-    let ole_file = litchi_cfb::OleFile::open(Cursor::new(ambiguous.bytes())).unwrap();
+    let ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(ambiguous.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(
         ole_file
             .list_directory_entries(&[OBJECT_POOL])
@@ -1079,7 +1091,11 @@ fn replacing_a_storage_keeps_the_field_reference_and_reparses_opaque_payloads() 
     let commit = transaction.commit().unwrap();
     assert_eq!(commit.snapshot().objects().unwrap()[0].storage_id, 101);
 
-    let mut ole_file = litchi_cfb::OleFile::open(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let mut ole_file = litchi_cfb::OleFile::open(
+        Cursor::new(commit.snapshot().bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         ole_file
             .open_stream(&["ObjectPool", "_101", "VendorMetadata"])

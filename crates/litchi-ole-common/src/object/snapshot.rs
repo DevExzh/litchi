@@ -48,7 +48,7 @@ impl Probe {
         let limits = options.limits_value();
         let cfb_limits = options.cfb_limits_value();
         limits.validate()?;
-        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits)?;
         let signed = admit_readonly_container(
             &ole,
             "read-only signed probe",

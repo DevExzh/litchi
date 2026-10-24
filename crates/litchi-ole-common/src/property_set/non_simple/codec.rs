@@ -18,7 +18,7 @@ use std::io::{self, Seek, SeekFrom, Write};
 use std::sync::Arc;
 
 /// A stable positional adapter over the exact source allocation retained by a
-/// non-simple snapshot.  `SharedOleFile::open_with_limits` accepts this
+/// non-simple snapshot.  `SharedOleFile::open` accepts this
 /// adapter, allowing owner-specific CFB limits without copying an `Arc<[u8]>`
 /// into an unrelated `Vec<u8>`.
 #[derive(Debug)]
@@ -57,7 +57,7 @@ pub(crate) fn capture(source: Arc<[u8]>, limits: Limits) -> Result<Arc<State>, E
         bytes: Arc::clone(&source),
         version: SourceVersion::new(0x4f4c_4550_5300_0001, 0),
     });
-    let cfb = Arc::new(SharedOleFile::open_with_limits(source_adapter, cfb_limits)?);
+    let cfb = Arc::new(SharedOleFile::open(source_adapter, cfb_limits)?);
     let mut source_entries = Vec::new();
     source_entries
         .try_reserve(limits.max_directory_entries.min(1024))
@@ -1032,7 +1032,7 @@ fn preflight_render_output(
         state.limits.max_output_bytes,
     );
     let options = SequentialWriterOptions::default()
-        .with_limits(planner_limits)
+        .limits(planner_limits)
         .with_publication_buffer_bytes(512);
     let mut planner = SequentialOleWriter::with_options(options).map_err(map_sequential_error)?;
     planner.set_root_clsid(*contents.class_identifier.as_bytes());

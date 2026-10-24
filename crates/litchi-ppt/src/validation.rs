@@ -414,7 +414,7 @@ pub fn validate_source(
     }
 
     let cfb_limits = SharedOleFileLimits::new(input_limit).map_err(PptValidationError::Ingress)?;
-    let shared = match SharedOleFile::open_with_limits(source.clone(), cfb_limits) {
+    let shared = match SharedOleFile::open(source.clone(), cfb_limits) {
         Ok(shared) => shared,
         Err(error) if is_structural_cfb_error(&error) => {
             let report = cfb_rejection_report(&error, source_size, limits.report)?;

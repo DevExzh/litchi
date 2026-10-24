@@ -171,7 +171,9 @@ fn discrete_config(sheet: &str) -> PivotTableConfig {
 }
 
 fn cache_records(bytes: &[u8], id: u16) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole
         .open_stream(&["_SX_DB_CUR", &format!("{id:04X}")])
         .unwrap();
@@ -189,7 +191,9 @@ fn cache_records(bytes: &[u8], id: u16) -> Vec<(u16, Vec<u8>)> {
 }
 
 fn cache_stream(bytes: &[u8], id: u16) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     ole.open_stream(&["_SX_DB_CUR", &format!("{id:04X}")])
         .unwrap()
 }

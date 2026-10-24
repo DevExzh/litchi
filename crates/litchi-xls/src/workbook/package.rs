@@ -169,10 +169,7 @@ impl<R: Read + Seek> Reader<R> {
     ) -> Result<OleFile<R>> {
         preflight_source_len(&mut reader, source_limits)?;
         let cfb_limit = u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX);
-        Ok(OleFile::open_with_limits(
-            reader,
-            OleFileLimits::new(cfb_limit)?,
-        )?)
+        Ok(OleFile::open(reader, OleFileLimits::new(cfb_limit)?)?)
     }
 
     /// Validate a parsed CFB source under the XLS physical ingress policy.
@@ -767,7 +764,11 @@ mod source_limit_tests {
     #[test]
     fn exact_entry_and_aggregate_boundaries_include_opaque_streams() {
         let bytes = cfb_with_streams();
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let source_limits = limits(bytes.len(), 5, 10);
         assert_eq!(preflight_declared_streams(&ole, source_limits).unwrap(), 10);
         preflight_ole_file(&ole, source_limits).unwrap();
@@ -776,7 +777,11 @@ mod source_limit_tests {
     #[test]
     fn entry_limit_precedes_aggregate_limit() {
         let bytes = cfb_with_streams();
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let error = preflight_declared_streams(&ole, limits(bytes.len(), 4, 1)).unwrap_err();
         assert!(matches!(
             error,
@@ -791,7 +796,11 @@ mod source_limit_tests {
     #[test]
     fn aggregate_limit_accounts_for_opaque_and_nested_streams() {
         let bytes = cfb_with_streams();
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let error = preflight_declared_streams(&ole, limits(bytes.len(), 5, 9)).unwrap_err();
         assert!(matches!(
             error,
@@ -879,7 +888,7 @@ mod source_limit_tests {
             cursor: Cursor::new(bytes.clone()),
             reads: Arc::clone(&reads),
         };
-        let ole = OleFile::open(reader).unwrap();
+        let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default()).unwrap();
         let reads_after_cfb = reads.load(Ordering::Relaxed);
         let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
         let error = Reader::from_ole_file_with_options(
@@ -906,7 +915,7 @@ mod source_limit_tests {
             cursor: Cursor::new(bytes.clone()),
             reads: Arc::clone(&reads),
         };
-        let ole = OleFile::open(reader).unwrap();
+        let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default()).unwrap();
         let reads_after_cfb = reads.load(Ordering::Relaxed);
         let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
         let error = Reader::from_ole_file_or_password_required(

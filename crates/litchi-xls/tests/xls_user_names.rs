@@ -146,7 +146,11 @@ fn authored_workbook_stream() -> Vec<u8> {
         .unwrap()
         .write_to(&mut workbook_bytes)
         .unwrap();
-    let mut source = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
+    let mut source = OleFile::open(
+        Cursor::new(workbook_bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     source.open_stream(&["Workbook"]).unwrap()
 }
 
@@ -714,8 +718,16 @@ fn package_owner_preserves_unrelated_streams_and_directory_metadata() {
     edit.set_user_name(0, "Bob").unwrap();
     let target = edit.commit().unwrap().into_package().user_names().unwrap();
 
-    let mut source_ole = OleFile::open(Cursor::new(source_bytes)).unwrap();
-    let mut target_ole = OleFile::open(Cursor::new(target.finish())).unwrap();
+    let mut source_ole = OleFile::open(
+        Cursor::new(source_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
+    let mut target_ole = OleFile::open(
+        Cursor::new(target.finish()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         source_ole.open_stream(&["Unrelated"]).unwrap(),
         target_ole.open_stream(&["Unrelated"]).unwrap()

@@ -73,7 +73,9 @@ fn scoped(query: &str) -> litchi_core::selector::Query<'static> {
 }
 
 fn signed(bytes: &[u8]) -> Vec<u8> {
-    let mut source = litchi_cfb::OleFile::open(Cursor::new(bytes)).expect("open PPT");
+    let mut source =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .expect("open PPT");
     let mut writer = litchi_cfb::OleWriter::new();
     for path in source.list_streams() {
         let names: Vec<&str> = path.iter().map(String::as_str).collect();

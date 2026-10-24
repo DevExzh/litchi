@@ -69,7 +69,7 @@ fn authored_workbook_stream(records: &[u8]) -> Vec<u8> {
     let mut builder = litchi_xls::Builder::new();
     builder.add_worksheet("S").unwrap();
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let eof = workbook.len() - 4;
     assert_eq!(&workbook[eof..], &[0x0A, 0x00, 0x00, 0x00]);
@@ -97,7 +97,8 @@ fn xls_named(objects: &[OleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8> {
     for ((prefix, id), payload) in &payloads {
         let name = format!("{prefix}{id:08X}");
         writer.create_storage(&[&name]).unwrap();
-        let mut nested = OleFile::open(Cursor::new(payload)).unwrap();
+        let mut nested =
+            OleFile::open(Cursor::new(payload), litchi_cfb::OleFileLimits::default()).unwrap();
         let contents = nested.open_stream(&["CONTENTS"]).unwrap();
         writer
             .create_stream(&[&name, "CONTENTS"], &contents)
@@ -127,7 +128,11 @@ fn removes_shared_storage_only_after_last_reference() {
         .unwrap();
     editor.remove_object(0, 1).unwrap();
     let bytes = editor.commit().unwrap().patch().after().to_vec();
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(ole.exists(&["MBD0000002A"]));
     let mut editor = litchi_xls::Package::from_bytes(&bytes)
         .unwrap()
@@ -135,7 +140,7 @@ fn removes_shared_storage_only_after_last_reference() {
         .unwrap();
     editor.remove_object(0, 2).unwrap();
     let bytes = editor.commit().unwrap().patch().after().to_vec();
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(!ole.exists(&["MBD0000002A"]));
 }
 
@@ -164,7 +169,7 @@ fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
             .collect::<Vec<_>>(),
         vec![2, 1]
     );
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(ole.exists(&["MBD00000002"]));
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     assert!(

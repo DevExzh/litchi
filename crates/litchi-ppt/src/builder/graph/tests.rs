@@ -131,7 +131,8 @@ fn replacement_is_atomic_and_retains_ograph_host_streams() {
     let output_workbook = parsed.workbook().expect("Workbook");
     assert_eq!(output_workbook.chart().as_bytes(), replacement);
 
-    let mut cfb = OleFile::open(Cursor::new(&output)).expect("open replacement CFB");
+    let mut cfb = OleFile::open(Cursor::new(&output), litchi_cfb::OleFileLimits::default())
+        .expect("open replacement CFB");
     assert_eq!(
         cfb.open_stream(&[COMP_OBJ]).expect("CompObj"),
         b"component object"

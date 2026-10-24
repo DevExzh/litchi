@@ -1876,7 +1876,8 @@ mod tests {
         use litchi_cfb::{OleFile, OleWriter};
         use std::io::Cursor;
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -1901,7 +1902,8 @@ mod tests {
         use litchi_cfb::{OleFile, OleWriter};
         use std::io::Cursor;
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()

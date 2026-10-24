@@ -86,7 +86,11 @@ fn base_doc() -> Vec<u8> {
 }
 
 fn root_stream_start(bytes: &[u8], name: &str) -> (u32, u64) {
-    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("DOC CFB should open");
+    let ole = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("DOC CFB should open");
     let entry = ole
         .list_directory_entries(&[])
         .expect("DOC root directory should open")
@@ -263,7 +267,11 @@ fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
     // protection, so the producer fixture is edited as checked in.
     let source = std::fs::read(source_path).expect("DOC fixture should exist");
     let table_name = {
-        let ole = OleFile::open(Cursor::new(source.clone())).expect("DOC CFB should open");
+        let ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("DOC CFB should open");
         ole.list_directory_entries(&[])
             .expect("DOC root directory should open")
             .into_iter()

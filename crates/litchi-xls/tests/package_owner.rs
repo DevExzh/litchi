@@ -36,7 +36,7 @@ fn authored_package() -> Vec<u8> {
 
 fn signed_package() -> Vec<u8> {
     let source = authored_package();
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
@@ -49,7 +49,7 @@ fn signed_package() -> Vec<u8> {
 }
 
 fn exact_source_limits(bytes: &[u8]) -> SourceLimits {
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let mut largest_entry = 0_usize;
     let mut aggregate = 0_usize;
     for index in 0..ole.directory_entry_count() {
@@ -210,7 +210,9 @@ fn eager_owner_preserves_exact_bytes_and_projection_outlives_package_clone() {
 #[test]
 fn source_adoption_is_lazy_and_retains_the_original_cfb_identity() {
     let source = Arc::new(CountingReadAt::new(fixture("ole/xls/Simple.xls")));
-    let cfb = Arc::new(SharedOleFile::open(source.clone()).unwrap());
+    let cfb = Arc::new(
+        SharedOleFile::open(source.clone(), litchi_cfb::SharedOleFileLimits::default()).unwrap(),
+    );
     let workbook = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
         cfb.clone(),
         SourceBackedLimits::default(),
@@ -382,7 +384,9 @@ fn unlocked_encrypted_owner_refuses_ordinary_publication_without_clobbering_dest
 #[test]
 fn atomic_source_change_after_staging_leaves_destination_untouched() {
     let source = Arc::new(CountingReadAt::new(fixture("ole/xls/Simple.xls")));
-    let cfb = Arc::new(SharedOleFile::open(source.clone()).unwrap());
+    let cfb = Arc::new(
+        SharedOleFile::open(source.clone(), litchi_cfb::SharedOleFileLimits::default()).unwrap(),
+    );
     let workbook = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
         cfb,
         SourceBackedLimits::default(),
@@ -546,7 +550,7 @@ fn primary_retains_narrow_object_profile_through_commit_inverse_and_explicit_wid
     use litchi_xls::package::edit::EditOptions;
     let bytes = authored_package();
     let source = Package::from_bytes(&bytes).unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     let maximum = ole.open_stream(&["Workbook"]).unwrap().len() as u64;
     let limits = litchi_ole_common::object::Limits {
         max_stream_size: maximum,
@@ -753,7 +757,7 @@ fn primary_default_followup_retains_explicit_wider_profile() {
 
     let maximum = 3 * 1024 * 1024 * 1024;
     let cfb = Arc::new(
-        SharedOleFile::open_with_limits(
+        SharedOleFile::open(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             litchi_cfb::SharedOleFileLimits::new(maximum).unwrap(),
         )
@@ -839,7 +843,7 @@ fn primary_transfer_uses_package_donor_and_is_reversible() {
 // The narrow native transfer closure refuses REFRESHALL even when false.
 // Build the same dependency-free fixture used by xls_cross_workbook_scalar.
 fn scalar_transfer_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(authored_package())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(authored_package()), OleFileLimits::default()).unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0;
     let removed = loop {
@@ -1001,7 +1005,9 @@ fn transformed_byte_handoff_retains_native_policies_and_source_fences() {
     assert!(litchi_xls::raw::package_from_replacement_bytes(&source, oversized).is_err());
 
     let changing = Arc::new(CountingReadAt::new(bytes.clone()));
-    let cfb = Arc::new(SharedOleFile::open(changing.clone()).unwrap());
+    let cfb = Arc::new(
+        SharedOleFile::open(changing.clone(), litchi_cfb::SharedOleFileLimits::default()).unwrap(),
+    );
     let read_limits = SourceBackedLimits {
         max_text_cells: 3,
         max_query_index_bytes: 0,

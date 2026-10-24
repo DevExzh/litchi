@@ -688,7 +688,10 @@ impl Payload {
     /// file, or contains a malformed MS-OVBA project.
     pub fn read(bytes: Vec<u8>, limits: &Limits) -> Result<Self, Error> {
         check_limit(LimitKind::CfbBytes, bytes.len(), limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         let project = crate::project::Project::open(&mut ole, &[], limits)?;
         project.validate_payload(limits)?;
         let _ = project.project_wm(limits)?;
@@ -734,7 +737,10 @@ impl Payload {
         writer: &mut OleWriter,
         project_root_path: &[&str],
     ) -> Result<(), Error> {
-        let mut source = OleFile::open(Cursor::new(self.bytes.as_slice()))?;
+        let mut source = OleFile::open(
+            Cursor::new(self.bytes.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         for source_path in source.list_streams() {
             let is_vba_stream =
                 source_path.len() == 2 && source_path[0].eq_ignore_ascii_case(VBA_STORAGE_NAME);
@@ -1159,7 +1165,8 @@ mod tests {
         );
 
         let bytes = binary.into_bytes();
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(
             ole.open_stream(&["VBA", VERSION_PROJECT_STREAM_NAME])
                 .unwrap(),
@@ -1250,7 +1257,7 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         bytes.set_position(0);
-        let mut ole = OleFile::open(bytes).unwrap();
+        let mut ole = OleFile::open(bytes, litchi_cfb::OleFileLimits::default()).unwrap();
         let project =
             crate::project::Project::open(&mut ole, &["_VBA_PROJECT_CUR"], &Limits::default())
                 .unwrap();
@@ -1277,7 +1284,11 @@ mod tests {
             expected.extend_from_slice(&0u16.to_le_bytes());
         }
         expected.extend_from_slice(&0u16.to_le_bytes());
-        let mut ole = OleFile::open(Cursor::new(binary.bytes())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(binary.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&[PROJECT_WM_STREAM_NAME]).unwrap(),
             expected
@@ -1333,7 +1344,11 @@ mod tests {
             .reference(Reference::opaque(0x7f00, [9, 8, 7, 6]))
             .module(Module::standard("Module1", ""));
         let binary = builder.finish(&Limits::default()).unwrap();
-        let mut ole = OleFile::open(Cursor::new(binary.bytes())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(binary.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let project = crate::project::Project::open(&mut ole, &[], &Limits::default()).unwrap();
         let references = project.references();
         assert_eq!(references.len(), 5);
@@ -1517,7 +1532,8 @@ mod tests {
         replacement_path: &[&str],
         replacement: &[u8],
     ) -> Vec<u8> {
-        let mut source = OleFile::open(Cursor::new(payload)).unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(payload), litchi_cfb::OleFileLimits::default()).unwrap();
         let mut writer = OleWriter::new();
         for path in source.list_streams() {
             let components: Vec<&str> = path.iter().map(String::as_str).collect();
@@ -1544,7 +1560,8 @@ mod tests {
     }
 
     fn remove_stream_with_suffix(payload: &[u8], suffix: &str) -> Vec<u8> {
-        let mut source = OleFile::open(Cursor::new(payload)).unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(payload), litchi_cfb::OleFileLimits::default()).unwrap();
         let mut writer = OleWriter::new();
         for path in source.list_streams() {
             if path
@@ -1644,7 +1661,11 @@ mod tests {
             "a matching workspace window with the required separator is valid"
         );
 
-        let mut source = OleFile::open(Cursor::new(payload.bytes())).unwrap();
+        let mut source = OleFile::open(
+            Cursor::new(payload.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let compressed_dir = source.open_stream(&["VBA", DIR_STREAM_NAME]).unwrap();
         let mut dir = codec::decode(&compressed_dir, &limits).unwrap();
         dir.extend_from_slice(&[0xaa, 0xbb]);
@@ -1726,7 +1747,11 @@ mod tests {
             .description("quoted \"description\"\twith DEL \u{7f}")
             .module(Module::standard("1 Module", ""));
         let arbitrary_payload = arbitrary_identifier.finish(&limits).unwrap();
-        let mut arbitrary_ole = OleFile::open(Cursor::new(arbitrary_payload.bytes())).unwrap();
+        let mut arbitrary_ole = OleFile::open(
+            Cursor::new(arbitrary_payload.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let arbitrary_project =
             crate::project::Project::open(&mut arbitrary_ole, &[], &limits).unwrap();
         assert_eq!(arbitrary_project.modules()[0].name(), "1 Module");
@@ -1746,7 +1771,11 @@ mod tests {
             .description("valid \"description")
             .finish(&limits)
             .unwrap();
-        let mut quoted_ole = OleFile::open(Cursor::new(quoted.bytes())).unwrap();
+        let mut quoted_ole = OleFile::open(
+            Cursor::new(quoted.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let quoted_project = crate::project::Project::open(&mut quoted_ole, &[], &limits).unwrap();
         assert!(
             quoted_project
@@ -1817,7 +1846,11 @@ mod tests {
             .designer_frame("Form1", frame.as_bytes().to_vec())
             .finish(&Limits::default())
             .unwrap();
-        let mut ole = OleFile::open(Cursor::new(payload.bytes())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(payload.bytes()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let project = crate::project::Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.designer_frames().len(), 1);
         assert!(

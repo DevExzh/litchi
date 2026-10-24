@@ -23,7 +23,7 @@ fn fixture(name: &str) -> Package {
 /// compound file around it is re-rendered).
 fn stream(package: &Package) -> Vec<u8> {
     let bytes = package.to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 
@@ -33,7 +33,7 @@ fn fresh() -> Package {
 
 fn signed() -> Package {
     let source = fresh().to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();

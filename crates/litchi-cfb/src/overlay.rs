@@ -5,6 +5,7 @@
 //! the composed artifact is reopened through the normal CFB parser before a
 //! sink can observe a byte.
 
+use crate::SharedOleFileLimits;
 use crate::consts::{ENDOFCHAIN, MAXREGSECT, STGTY_STREAM};
 use crate::file::{OleError, OleFile, ParsedOleIndex};
 use crate::shared::SharedOleFile;
@@ -515,6 +516,7 @@ pub(crate) struct SourceSnapshot {
     pub(crate) version: SourceVersion,
     pub(crate) length: u64,
     pub(crate) source_is_owned_immutable: bool,
+    pub(crate) limits: SharedOleFileLimits,
 }
 
 impl SourceSnapshot {
@@ -759,6 +761,7 @@ impl SharedOleFile {
             version: self.expected_version,
             length: self.index.file_size,
             source_is_owned_immutable: self.source_is_owned_immutable,
+            limits: self.limits,
         }
     }
 
@@ -932,6 +935,11 @@ impl ValidatedOverlayPlan {
     #[must_use]
     pub const fn target_fingerprint(&self) -> ArtifactFingerprint {
         self.target_fingerprint
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn source_limits_for_test(&self) -> SharedOleFileLimits {
+        self.source.limits
     }
 
     /// Rebind this checked overlay to an independently opened source with the
@@ -1317,7 +1325,7 @@ fn empty_splice_identity(source: &SourceSnapshot) -> Result<ArtifactFingerprint,
     // ADR 0003's proof that the composed candidate parses. It is retained for
     // the empty splice list too, because it is the only observation that
     // re-reads the CFB index against the bytes the scan above covered.
-    SharedOleFile::open(candidate).map_err(OverlayError::from)?;
+    SharedOleFile::open(candidate, source.limits).map_err(OverlayError::from)?;
     Ok(source_fingerprint)
 }
 
@@ -1354,7 +1362,7 @@ where
         target_fingerprint,
     ));
     let candidate_source: Arc<dyn ReadAt> = view.clone();
-    let candidate = SharedOleFile::open(candidate_source)
+    let candidate = SharedOleFile::open(candidate_source, source.limits)
         .map_err(OverlayError::from)
         .map_err(E::from)?;
     // Bracket caller-specific preconditions with complete fingerprints. This
@@ -1630,7 +1638,7 @@ fn validate_composed_artifact(
 ) -> Result<(), OverlayError> {
     source.ensure_length()?;
     let cursor = OverlayCursor::new(source, spans);
-    let mut candidate = OleFile::open(cursor)?;
+    let mut candidate = OleFile::open(cursor, source.limits.to_ole_file_limits()?)?;
     source.ensure_length()?;
     for selection in selections {
         let refs = path_refs(&selection.path)?;

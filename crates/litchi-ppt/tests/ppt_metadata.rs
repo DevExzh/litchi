@@ -38,7 +38,7 @@ fn fresh() -> Builder {
 }
 
 fn root_clsid(bytes: &[u8]) -> String {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .root_entry()
         .unwrap()
@@ -73,7 +73,11 @@ fn builder_metadata_reads_back() {
             .unwrap()
             .contains("Slide text")
     );
-    let mut ole = OleFile::open(Cursor::new(package.to_bytes().unwrap())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(package.to_bytes().unwrap()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let custom = ole.get_metadata().unwrap().custom_properties;
     assert_eq!(custom.get("Reviewed"), Some(&Value::Bool(true)));
 }
@@ -145,7 +149,11 @@ fn metadata_transaction_fills_the_fixed_blank_streams() {
     assert_metadata(&edited);
     let bytes = edited.to_bytes().unwrap();
     assert_eq!(root_clsid(&bytes), root_clsid(&source));
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         document_summary::Snapshot::from_stream(
             &ole.property_set(Binding::DocumentSummaryInformation)

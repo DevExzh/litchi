@@ -147,7 +147,11 @@ fn header_text_box_round_trips_through_doc_reader() {
     assert_eq!(main_positions[0].spa.shape_id, MAIN_BOX_SPID);
 
     // Both drawing layers extract: the header text box and the main one.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let header_box = shapes
         .iter()
@@ -164,7 +168,11 @@ fn header_text_box_round_trips_through_doc_reader() {
     assert_eq!(main_box.shape_type, Kind::TextBox);
     assert_eq!(main_box.text.as_deref(), Some("Main box\r"));
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         extract_shape_text(&mut ole).unwrap(),
         "Main box\r\nWatermark\rDraft\r"
@@ -178,7 +186,11 @@ fn header_text_box_writes_two_drawing_layers() {
     const RECORD_DG_CONTAINER: u16 = 0xF002;
 
     let doc_bytes = write_doc_with_header_text_box();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();

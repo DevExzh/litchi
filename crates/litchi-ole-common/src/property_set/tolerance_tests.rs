@@ -158,7 +158,7 @@ fn malformed_mbcs_and_utf16_strings_decode_lossily_and_are_recorded() {
     // Reading through the compound file yields the same metadata, but the
     // editor refuses to write the substituted text back as the source.
     let bytes = compound_file(&faulted);
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("Ti\u{fffd}"));
     let mut editor = Edit::new(bytes, OleFileLimits::default()).unwrap();
@@ -246,7 +246,7 @@ fn unterminated_strings_are_read_to_their_declared_size_and_recorded() {
         .update(Binding::SummaryInformation, |_| Ok(()))
         .unwrap();
     let rewritten = editor.finish().unwrap();
-    let mut ole = OleFile::open(Cursor::new(rewritten)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(rewritten), OleFileLimits::default()).unwrap();
     let reparsed = PropertySetReader::property_set(&mut ole, Binding::SummaryInformation).unwrap();
     assert!(reparsed.tolerance_report().is_clean());
     assert_eq!(reparsed, parsed);
@@ -384,7 +384,11 @@ fn one_malformed_property_is_dropped_and_the_rest_stay_readable() {
             value
         }),
     ]);
-    let mut ole = OleFile::open(Cursor::new(compound_file(&summary))).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(compound_file(&summary)),
+        OleFileLimits::default(),
+    )
+    .unwrap();
     let metadata = PropertySetReader::get_metadata(&mut ole).unwrap();
     assert_eq!(metadata.title.as_deref(), Some("kept"));
     assert_eq!(metadata.subject, None);

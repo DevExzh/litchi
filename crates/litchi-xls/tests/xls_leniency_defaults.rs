@@ -66,7 +66,7 @@ impl Stream {
             .unwrap()
             .write_to(&mut Cursor::new(&mut bytes))
             .unwrap();
-        let stream = OleFile::open(Cursor::new(&bytes))
+        let stream = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .open_stream(&["Workbook"])
             .unwrap();
@@ -1050,10 +1050,13 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     let package = shrink_probe(conformant);
     // The container report, in discovery order: the over-long chain, then
     // the two sectors it carries past the declared size.
-    let container = OleFile::open(Cursor::new(package.clone()))
-        .unwrap()
-        .tolerance_report()
-        .clone();
+    let container = OleFile::open(
+        Cursor::new(package.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap()
+    .tolerance_report()
+    .clone();
     assert!(container.contains(litchi_cfb::AllocationDefect::ChainLongerThanSize));
     let expected = container
         .defects()
@@ -1063,7 +1066,7 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     let workbook = assert_repairs(&package, &expected);
     assert_eq!(workbook.sheets()[0].name(), "Sheet1");
     // The eager path built from an already-opened container folds it too.
-    let ole = OleFile::open(Cursor::new(package)).unwrap();
+    let ole = OleFile::open(Cursor::new(package), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = Reader::from_ole_file(ole).unwrap();
     assert_eq!(workbook.tolerance_report().defects().len(), expected.len());
 }

@@ -2096,7 +2096,10 @@ fn validate_custom_xml_promotion(store: Option<&Store>, irm: Option<&Irm>) -> Re
 ///
 /// Returns [`Error`] when the bytes are not a valid OLE container or its `DataSpaces` graph cannot be read or validated.
 pub fn inspect_bytes(bytes: &[u8]) -> Result<Option<Graph>, Error> {
-    let mut ole = OleFile::open(std::io::Cursor::new(bytes))?;
+    let mut ole = OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     inspect(&mut ole)
 }
 
@@ -2828,10 +2831,15 @@ mod tests {
     #[test]
     fn ooxml_read_compatibility_accepts_native_header_quirks_only() {
         let bytes = encryption_package_with_quirks(true, true, false);
-        let mut strict = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let mut strict = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert!(inspect(&mut strict).is_err());
 
-        let mut compatible = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut compatible =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let graph = inspect_ooxml(&mut compatible).unwrap().unwrap();
         assert_eq!(graph.transforms.len(), 1);
         assert_eq!(
@@ -2847,7 +2855,8 @@ mod tests {
     #[test]
     fn ooxml_read_compatibility_does_not_skip_reserved_field_validation() {
         let bytes = encryption_package_with_quirks(true, true, true);
-        let mut compatible = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut compatible =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         assert!(inspect_ooxml(&mut compatible).is_err());
     }
 
@@ -3012,7 +3021,11 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
-        let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let graph = inspect(&mut ole).unwrap().unwrap();
         let irm = graph.irm.unwrap();
         assert_eq!(irm.document_kind, DocumentKind::Ooxml);
@@ -3110,7 +3123,11 @@ mod tests {
         litchi_ole_common::custom_xml::write(&mut writer, &store).unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
-        let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert!(inspect(&mut ole).is_err());
 
         let unspecified = Store::default();
@@ -3119,7 +3136,11 @@ mod tests {
 
     #[test]
     fn snapshot_noop_replays_exact_dataspaces_source() {
-        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
         let commit = snapshot.edit().commit().unwrap();
 
@@ -3133,7 +3154,8 @@ mod tests {
     fn snapshot_rejects_oversized_opaque_stream_before_materialization() {
         let oversized = vec![0u8; MAX_STREAM_BYTES + 1];
         let bytes = editable_package_with_extra_stream(Some(&oversized));
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         assert!(matches!(
             Snapshot::from_ole(&mut ole),
             Err(Error::Ole(OleError::LimitExceeded {
@@ -3146,7 +3168,11 @@ mod tests {
 
     #[test]
     fn transaction_changes_definition_and_rejects_stale_patch_sources() {
-        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
         let mut transaction = snapshot.edit();
         transaction
@@ -3174,7 +3200,11 @@ mod tests {
         // A separately opened package with the same DataSpaces content is a
         // valid replay target.  The patch is source-content bound, not tied
         // to the original snapshot allocation.
-        let mut equal_ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let mut equal_ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let equal_source = Snapshot::from_ole(&mut equal_ole).unwrap().unwrap();
         assert_eq!(
             commit.patch().apply(&equal_source).unwrap(),
@@ -3189,7 +3219,11 @@ mod tests {
 
     #[test]
     fn package_rebuild_preserves_unrelated_streams_and_empty_storages() {
-        let mut ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
         let mut transaction = snapshot.edit();
         transaction
@@ -3204,7 +3238,11 @@ mod tests {
         let mut rebuilt = Cursor::new(Vec::new());
         commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
 
-        let mut output = OleFile::open(Cursor::new(rebuilt.into_inner())).unwrap();
+        let mut output = OleFile::open(
+            Cursor::new(rebuilt.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             output.open_stream(&["Payload"]).unwrap(),
             b"protected-but-inert"
@@ -3235,7 +3273,11 @@ mod tests {
 
     #[test]
     fn encryption_metadata_edit_does_not_touch_encrypted_payload() {
-        let mut ole = OleFile::open(Cursor::new(encryption_package())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(encryption_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let snapshot = Snapshot::from_ole(&mut ole).unwrap().unwrap();
         let mut transaction = snapshot.edit();
         transaction
@@ -3254,7 +3296,11 @@ mod tests {
         );
         let mut rebuilt = Cursor::new(Vec::new());
         commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
-        let mut output = OleFile::open(Cursor::new(rebuilt.into_inner())).unwrap();
+        let mut output = OleFile::open(
+            Cursor::new(rebuilt.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             output.open_stream(&["EncryptedPackage"]).unwrap(),
             b"encrypted-payload"

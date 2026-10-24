@@ -224,7 +224,11 @@ fn add_form_control_is_typed_atomic_and_lossless() {
     assert_eq!(editor.form_controls(0).unwrap().len(), 2);
 
     let bytes = editor.finish().expect("transaction should finish");
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).expect("CFB should reopen");
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB should reopen");
     let workbook = ole
         .open_stream(&["Workbook"])
         .expect("Workbook stream should remain present");
@@ -238,7 +242,8 @@ fn add_form_control_is_typed_atomic_and_lossless() {
         .add_form_control(0, second_authored.clone())
         .expect("second typed control should be authored");
     let bytes = editor.finish().expect("second transaction should finish");
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("second CFB should reopen");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("second CFB should reopen");
     let workbook = ole
         .open_stream(&["Workbook"])
         .expect("second Workbook stream should remain present");

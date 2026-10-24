@@ -1203,7 +1203,7 @@ fn run_eager_sample(
         file: File::open(&input.staged_path)?,
         metrics: Arc::clone(&metrics),
     };
-    let ole = OleFile::open(reader)?;
+    let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())?;
     let cfb_open_ns = duration_ns(cfb_started.elapsed());
     let cfb_metrics = metrics.snapshot();
 

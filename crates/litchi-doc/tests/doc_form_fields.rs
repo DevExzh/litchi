@@ -60,7 +60,11 @@ const DROPDOWN_OFFSET: u32 = 12509;
 #[test]
 fn parses_ffdata_from_the_data_stream() {
     let path = fixture(TRAVEL_FORM);
-    let mut ole = OleFile::open(File::open(&path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let data_stream = ole.open_stream(&["Data"]).unwrap();
 
     let nil_picf = NilPicfAndBinData::parse_at(&data_stream, CHECKBOX_OFFSET).unwrap();

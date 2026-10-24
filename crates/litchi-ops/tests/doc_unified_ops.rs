@@ -30,7 +30,8 @@ fn paragraph_text(file: &File, path: &str) -> String {
 fn signed_compound(bytes: Vec<u8>) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source = OleFile::open(Cursor::new(bytes)).expect("open DOC source");
+    let mut source = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("open DOC source");
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let path = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -291,7 +292,11 @@ fn doc_changed_candidate_retains_stream_limits_and_original_bytes() {
     use litchi_doc::{SourceLimitKind, SourceLimits};
 
     let bytes = multi_paragraph_doc();
-    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let sizes = ole
         .list_streams()
         .iter()
@@ -446,7 +451,11 @@ fn signed_doc_requires_explicit_unsign_before_text_write() {
         .set("/body/p[1]", props! { "text" => "authorized" })
         .expect("write after explicit unsign");
     let output = edited.to_bytes().expect("publish unsigned DOC");
-    let ole = litchi_cfb::OleFile::open(Cursor::new(output.clone())).expect("open output DOC");
+    let ole = litchi_cfb::OleFile::open(
+        Cursor::new(output.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("open output DOC");
     assert!(!ole.exists(&["_signatures"]));
     assert_eq!(
         paragraph_text(&open_bytes(output).unwrap(), "/body/p[1]"),

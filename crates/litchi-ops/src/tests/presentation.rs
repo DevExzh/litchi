@@ -238,7 +238,11 @@ mod native_ppt_path {
         use litchi_cfb::{OleFile, OleWriter};
 
         let read = |relative: &str| {
-            OleFile::open(Cursor::new(std::fs::read(test_data(relative)).unwrap())).unwrap()
+            OleFile::open(
+                Cursor::new(std::fs::read(test_data(relative)).unwrap()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap()
         };
         let mut doc = read("ole/doc/documentProperties.doc");
         let mut ppt = read("ole/ppt/SampleShow.ppt");

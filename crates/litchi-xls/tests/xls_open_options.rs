@@ -62,7 +62,8 @@ fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
+    let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
+        .unwrap();
     let sizes: Vec<_> = (0..ole.directory_entry_count())
         .filter_map(|index| ole.directory_entry_by_sid(u32::try_from(index).unwrap()))
         .filter(|entry| entry.entry_type == litchi_cfb::consts::STGTY_STREAM)
@@ -80,7 +81,8 @@ fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
     let options = OpenOptions::new().source_limits(limits);
     Reader::new_with_options(Cursor::new(&bytes), options).unwrap();
     Reader::from_ole_file_with_options(ole, options).unwrap();
-    let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
+    let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
+        .unwrap();
     assert!(
         Reader::from_ole_file_or_password_required(ole, options)
             .unwrap()

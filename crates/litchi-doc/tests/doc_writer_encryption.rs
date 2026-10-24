@@ -50,7 +50,7 @@ fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {
 }
 
 fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-    let mut ole = OleFile::open(Cursor::new(file)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(file), litchi_cfb::OleFileLimits::default()).unwrap();
     (
         ole.open_stream(&["WordDocument"]).unwrap(),
         ole.open_stream(&["1Table"]).unwrap(),

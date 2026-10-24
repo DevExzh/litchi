@@ -309,7 +309,10 @@ fn reserve_summary(
 pub(crate) fn build_rk_mulrk_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     let archive = super::xls_f3_corpus::build_rk_mulrk_fixture()?;
 
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&["Workbook"])?;
     if archive_member_count != OPAQUE_STREAM_COUNT + 2 {
@@ -1073,7 +1076,7 @@ fn require_encrypted_refusal(
 }
 
 fn require_signed_marker(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let mut pending = vec![Vec::<String>::new()];
     let mut signed_path = None;
     while let Some(path) = pending.pop() {
@@ -1102,7 +1105,7 @@ fn require_signed_marker(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>>
 }
 
 fn require_encrypted_marker(bytes: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let workbook = ole
         .open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))?;
@@ -1160,7 +1163,10 @@ fn source_with_stream(
     path: &[&str],
     payload: &[u8],
 ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut source = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let mut source = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let mut writer = OleWriter::new();
     let mut streams = source.list_streams();
     streams.sort();
@@ -1175,7 +1181,10 @@ fn source_with_stream(
 }
 
 fn macro_fixture(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut source = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let mut source = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let mut writer = OleWriter::new();
     let mut streams = source.list_streams();
     streams.sort();

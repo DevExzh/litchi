@@ -424,7 +424,7 @@ impl Package {
     pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
         let cfb_limits =
             litchi_cfb::OleFileLimits::new(options.source_limits_value().max_input_bytes() as u64)?;
-        let mut ole_file = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
+        let mut ole_file = OleFile::open(Cursor::new(bytes), cfb_limits)?;
         crate::raw::preflight_ole_file(&ole_file, options.source_limits_value())?;
         let signed = has_signature(&ole_file);
         let metadata = eager_metadata(&mut ole_file);
@@ -634,7 +634,7 @@ impl Package {
                         .source()
                         .map(SharedOleFile::limits)
                         .ok_or(Error::InvalidData("source-backed XLS package lost its CFB"))?;
-                    let cfb = Arc::new(SharedOleFile::open_with_limits(
+                    let cfb = Arc::new(SharedOleFile::open(
                         Arc::new(litchi_core::OwnedSource::new(bytes)),
                         cfb_limits,
                     )?);
@@ -663,7 +663,10 @@ impl Package {
             match &self.inner.state {
                 PackageState::Eager { reader, .. } => {
                     let data = reader.get_ref().get_ref();
-                    let mut ole = OleFile::open(Cursor::new(data.as_slice()))?;
+                    let mut ole = OleFile::open(
+                        Cursor::new(data.as_slice()),
+                        litchi_cfb::OleFileLimits::default(),
+                    )?;
                     let name = if ole.exists(&["Workbook"]) {
                         "Workbook"
                     } else {

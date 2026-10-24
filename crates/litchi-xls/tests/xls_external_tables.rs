@@ -249,7 +249,11 @@ fn feature11_xml_source_round_trips_typed_mapping() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let mut package = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut package = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let xml_streams = package
         .list_streams()
         .into_iter()

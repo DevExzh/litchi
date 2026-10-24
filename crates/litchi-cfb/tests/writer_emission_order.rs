@@ -205,7 +205,11 @@ fn serialize(sector_size: usize, reverse_insertion: bool) -> Vec<u8> {
 }
 
 fn assert_round_trip(bytes: &[u8]) {
-    let mut file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let mut file = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(file.open_stream(&["Tiny"]).unwrap(), tiny_payload());
     assert_eq!(file.open_stream(&["Large"]).unwrap(), large_payload());
 }
@@ -222,7 +226,11 @@ fn serialize_with_tiny_len(
 }
 
 fn assert_round_trip_with_tiny_len(bytes: &[u8], tiny_len: usize) {
-    let mut file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let mut file = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         file.open_stream(&["Tiny"]).unwrap(),
         payload(0x11, tiny_len)

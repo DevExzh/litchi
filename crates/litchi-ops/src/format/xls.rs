@@ -643,7 +643,11 @@ mod tests {
             max_input_bytes: Some(maximum),
             ..OpenOptions::default()
         };
-        let ole = OleFile::open(Cursor::new(fixture("Simple.xls"))).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(fixture("Simple.xls")),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let LegacyOpen::Opened(xls) = Xls::from_ole_file(ole, &options, None).unwrap() else {
             panic!("unencrypted fixture");
         };
@@ -787,7 +791,10 @@ mod tests {
     fn byte_route_matches_the_eager_leaf_reader() {
         let mut opened = 0_usize;
         for name in corpus() {
-            let Ok(mut leaf) = OleFile::open(Cursor::new(fixture(&name))) else {
+            let Ok(mut leaf) = OleFile::open(
+                Cursor::new(fixture(&name)),
+                litchi_cfb::OleFileLimits::default(),
+            ) else {
                 continue;
             };
             let metadata = leaf.get_metadata().map(Metadata::from).unwrap_or_default();
@@ -1264,7 +1271,7 @@ mod tests {
         // A BIFF5 workbook: the eager reader reads it, the source owner does
         // not. The byte route must keep reading it.
         let source = Arc::new(litchi_core::OwnedSource::new(fixture("Simple.xls")));
-        let mut stream = SharedOleFile::open(source)
+        let mut stream = SharedOleFile::open(source, litchi_cfb::SharedOleFileLimits::default())
             .unwrap()
             .open_stream(&["Workbook"])
             .unwrap();

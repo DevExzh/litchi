@@ -58,7 +58,7 @@ impl WorkbookLayout {
 }
 
 pub(super) fn validate(bytes: &[u8], limits: Limits) -> Result<ValidatedPackage> {
-    let mut cfb = OleFile::open(Cursor::new(bytes))?;
+    let mut cfb = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let entries = cfb.list_directory_entries(&[])?;
     check_limit(
         crate::LimitKind::RootEntries,

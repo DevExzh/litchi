@@ -49,7 +49,11 @@ fn apache_poi_associated_strings_integrate_and_round_trip_exactly() {
     assert_eq!(integrated.author(), "Ross Johnson");
     assert_eq!(integrated.last_revised_by(), "Ross Johnson");
 
-    let mut ole = OleFile::open(File::open(path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {

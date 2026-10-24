@@ -186,7 +186,11 @@ fn text_boxes_round_trip_text_and_shapes() {
     assert_eq!(box_spa.wrap, ShapeTextWrap::Square);
 
     // The drawing layer reports the boxes as text boxes with their colors.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     assert_eq!(shapes.len(), 4);
     let first = shapes
@@ -210,7 +214,11 @@ fn text_boxes_round_trip_text_and_shapes() {
         .unwrap();
     assert_eq!(rectangle.shape_type, Kind::Rectangle);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         extract_shape_text(&mut ole).unwrap(),
         "First box\r\nHello\rWorld\r"
@@ -225,7 +233,11 @@ fn text_boxes_write_valid_client_textbox_links() {
     const RECORD_CLIENT_TEXTBOX: u16 = 0xF00D;
 
     let doc_bytes = write_doc_with_text_boxes(&jpeg_fixture());
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();

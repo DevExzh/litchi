@@ -88,8 +88,12 @@ impl Edit {
             .unwrap_or_else(Collection::empty);
         // A signed package opens for staging; only a changed commit is
         // refused, since it would invalidate the signature.
-        let inner = Editor::open_admitting_signature(self.base.bytes()?.to_vec(), source.clone())
-            .map_err(scoped::publication("embedded_object.edit"))?;
+        let inner = Editor::open_admitting_signature(
+            self.base.bytes()?.to_vec(),
+            source.clone(),
+            self.base.cfb_limits()?,
+        )
+        .map_err(scoped::publication("embedded_object.edit"))?;
         Ok(State { source, inner })
     }
 
@@ -106,8 +110,12 @@ impl Edit {
                 .map_err(Failure::from)?
                 .ole_objects()?
                 .unwrap_or_else(Collection::empty);
-            let inner = Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
-                .map_err(scoped::publication("embedded_object.edit"))?;
+            let inner = Editor::open_admitting_signature(
+                base.bytes()?.to_vec(),
+                source.clone(),
+                base.cfb_limits()?,
+            )
+            .map_err(scoped::publication("embedded_object.edit"))?;
             Ok::<State, Failure>(State { source, inner })
         })
     }
@@ -228,9 +236,12 @@ impl Edit {
                     .map_err(Failure::from)?
                     .ole_objects()?
                     .unwrap_or_else(Collection::empty);
-                let inner =
-                    Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
-                        .map_err(scoped::publication("embedded_object.edit"))?;
+                let inner = Editor::open_admitting_signature(
+                    base.bytes()?.to_vec(),
+                    source.clone(),
+                    base.cfb_limits()?,
+                )
+                .map_err(scoped::publication("embedded_object.edit"))?;
                 Ok::<State, Failure>(State { source, inner })
             })
             .map_err(Error::from)?;

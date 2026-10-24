@@ -25,7 +25,7 @@ fn fixture(texts: &[&str]) -> Vec<u8> {
 }
 
 fn with_stream(source: Vec<u8>, path: &[&str], data: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for stream in ole.list_streams() {
         let names: Vec<&str> = stream.iter().map(String::as_str).collect();
@@ -91,8 +91,16 @@ fn text_edits_publish_replay_and_invert_exactly() {
         let output = streamed(published);
         assert_eq!(output, published.to_bytes().unwrap());
         assert_eq!(output.len(), bytes.len());
-        let mut original = OleFile::open(Cursor::new(bytes.clone())).unwrap();
-        let mut rewritten = OleFile::open(Cursor::new(output.clone())).unwrap();
+        let mut original = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let mut rewritten = OleFile::open(
+            Cursor::new(output.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             rewritten.open_stream(&["UnrelatedPayload"]).unwrap(),
             original.open_stream(&["UnrelatedPayload"]).unwrap()

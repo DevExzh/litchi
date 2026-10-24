@@ -286,7 +286,7 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
     })?;
     let before_macro_digest = macro_stream_digest(&bytes)?;
 
-    let mut workbook = XlsReader::from_ole_file(OleFile::open_with_limits(
+    let mut workbook = XlsReader::from_ole_file(OleFile::open(
         Cursor::new(bytes.clone()),
         security_ole_limits()?,
     )?)?;
@@ -508,7 +508,7 @@ fn security_object_limits() -> ObjectLimits {
 }
 
 fn open_doc_package(bytes: &[u8]) -> Result<DocReader<Cursor<Vec<u8>>>, Box<dyn Error>> {
-    let ole = OleFile::open_with_limits(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
+    let ole = OleFile::open(Cursor::new(bytes.to_vec()), security_ole_limits()?)?;
     Ok(DocReader::from_ole_file_with_options(
         ole,
         OpenOptions::default().source_limits(security_doc_limits()?),
@@ -580,7 +580,7 @@ fn format_relationship(owner: &str, relationship: &litchi_opc::Relationship) -> 
 }
 
 fn macro_stream_digest(bytes: &[u8]) -> Result<String, Box<dyn Error>> {
-    let mut ole = OleFile::open_with_limits(Cursor::new(bytes), security_ole_limits()?)?;
+    let mut ole = OleFile::open(Cursor::new(bytes), security_ole_limits()?)?;
     let mut streams = BTreeMap::new();
     for path in ole.list_streams() {
         if !path

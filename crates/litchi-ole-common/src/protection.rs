@@ -258,7 +258,11 @@ mod tests {
     #[test]
     fn raw_and_shared_guards_charge_directory_entries() {
         let bytes = cfb_with_two_streams();
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let error =
             reject_protected_container(&ole, "test", Limits { max_entries: 1 }).unwrap_err();
         assert!(matches!(
@@ -270,8 +274,12 @@ mod tests {
             }
         ));
 
-        let shared =
-            SharedOleFile::open_owned_vec(Arc::new(bytes), SourceVersion::new(0x0359, 1)).unwrap();
+        let shared = SharedOleFile::open_owned_vec(
+            Arc::new(bytes),
+            SourceVersion::new(0x0359, 1),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let error = reject_protected_shared_container(&shared, "test", Limits { max_entries: 1 })
             .unwrap_err();
         assert!(matches!(

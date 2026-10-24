@@ -417,7 +417,11 @@ fn package_edit_replays_typed_graph_metadata_and_opaque_streams() {
     assert_eq!(after.caches()[0].value(), chart::ValueRef::Number(2.5));
     assert_eq!(after.unknown().len(), 1);
 
-    let mut cfb = litchi_cfb::OleFile::open(Cursor::new(output.as_bytes())).expect("CFB");
+    let mut cfb = litchi_cfb::OleFile::open(
+        Cursor::new(output.as_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB");
     assert_eq!(cfb.open_stream(&[COMP_OBJ]).expect("CompObj"), [0xCA, 0xFE]);
     assert_eq!(cfb.open_stream(&[OLE]).expect("Ole"), [0xBA, 0xBE, 0x01]);
     assert_ne!(output.as_bytes(), source.as_slice());

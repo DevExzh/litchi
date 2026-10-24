@@ -43,7 +43,9 @@ fn write(writer: &mut Builder) -> Vec<u8> {
 }
 
 fn view_records(bytes: &[u8]) -> Vec<Record> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let (document, _) = Record::parse(&stream, 0).unwrap();
     let doc_info = document

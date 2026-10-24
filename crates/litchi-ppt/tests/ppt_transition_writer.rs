@@ -26,7 +26,9 @@ fn write(writer: &mut Builder) -> Vec<u8> {
 /// Payloads of every `SSSlideInfoAtom` (record type 1017) found in the Slide
 /// containers (record type 1006) of the written presentation, in slide order.
 fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let mut payloads = Vec::new();
     let mut offset = 0;

@@ -219,7 +219,8 @@ fn signed_opc(plain: &[u8]) -> Vec<u8> {
 fn signed_compound_file(plain: Vec<u8>) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source = OleFile::open(Cursor::new(plain)).unwrap();
+    let mut source =
+        OleFile::open(Cursor::new(plain), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let path = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -508,7 +509,11 @@ fn assert_unsigned_output(format: FileFormat, output: &[u8], expected: &str, wha
         },
         #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
         FileFormat::Doc | FileFormat::Ppt | FileFormat::Xls => {
-            let ole = litchi_cfb::OleFile::open(Cursor::new(output)).unwrap();
+            let ole = litchi_cfb::OleFile::open(
+                Cursor::new(output),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
             assert!(!ole.exists(&["_signatures"]), "{what}: legacy signature");
             assert!(
                 !ole.directory_exists(&["_xmlsignatures"]),

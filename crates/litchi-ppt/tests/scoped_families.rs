@@ -938,7 +938,8 @@ fn signed(source: &Package) -> Package {
     use std::io::Cursor;
 
     let bytes = source.to_bytes().unwrap();
-    let mut source_file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut source_file =
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for stream_path in source_file.list_streams() {
         let refs = stream_path.iter().map(String::as_str).collect::<Vec<_>>();

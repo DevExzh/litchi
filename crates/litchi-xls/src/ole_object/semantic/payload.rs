@@ -50,7 +50,10 @@ impl EmbeddedPayload {
                 LimitKind::ObjectBytes.exceeded(compound_file.len() as u64, limits.max_object_size)
             );
         }
-        OleFile::open(Cursor::new(compound_file.as_slice()))?;
+        OleFile::open(
+            Cursor::new(compound_file.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         Ok(Self {
             compound_file: Arc::from(compound_file),
         })
@@ -99,7 +102,7 @@ pub(crate) fn validate_compound_file_for_publication(
         return Err(LimitKind::AggregateBytes.invalid_zero());
     }
 
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     // A supplied payload is one selected object.  Match the common
     // `capture_object` ceiling rather than the aggregate package product, and
     // preflight it before nested capture so a wide fan-out cannot allocate

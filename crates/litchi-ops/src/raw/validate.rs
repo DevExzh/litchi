@@ -190,8 +190,12 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(feature = "doc")]
         FileFormat::Doc => {
             let bytes = file.to_bytes()?;
-            litchi_cfb::validate_source(Arc::new(litchi_core::OwnedSource::new(bytes)))
-                .map_err(Error::Cfb)?
+            litchi_cfb::validate_source(
+                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                litchi_cfb::SharedOleFileLimits::default(),
+                ValidationLimits::default(),
+            )
+            .map_err(Error::Cfb)?
         },
         #[cfg(feature = "rtf")]
         FileFormat::Rtf => rtf(&file.to_bytes()?)?,

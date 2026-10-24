@@ -1053,9 +1053,12 @@ impl Presentation {
         };
         let storage = storage_ref.check_stored_limit(limits.max_stored_bytes)?;
         let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(Cursor::new(cfb.as_ref()))
-            .map_err(litchi_vba::Error::from)
-            .map_err(crate::VbaProjectError::from)?;
+        let mut ole = OleFile::open(
+            Cursor::new(cfb.as_ref()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .map_err(litchi_vba::Error::from)
+        .map_err(crate::VbaProjectError::from)?;
         litchi_vba::project::Project::open(&mut ole, &[], &limits.project)
             .map(Some)
             .map_err(Into::into)

@@ -332,7 +332,8 @@ pub(crate) fn cfb_inventory(
     candidates: &[&[&str]],
     label: &str,
 ) -> Result<(Vec<Vec<String>>, usize, Vec<String>, Vec<u8>), Box<dyn Error>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(archive))?;
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(archive), litchi_cfb::OleFileLimits::default())?;
     let streams = ole.list_streams();
     let sector_size = ole.sector_size();
     let path = candidates
@@ -700,7 +701,10 @@ pub(crate) fn build_ppt_corpus(path: &Path) -> Result<Ole2Corpus, Box<dyn Error>
 /// selectors that record adds read `.doc` fixtures through it.
 pub(crate) fn classify(path: &Path) -> Result<Format, Box<dyn Error>> {
     let archive = read_bounded(path)?;
-    let ole = litchi_cfb::OleFile::open(Cursor::new(archive.as_slice()))?;
+    let ole = litchi_cfb::OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let word = ole.exists(&["WordDocument"]);
     let workbook = ole.exists(&["Workbook"]) || ole.exists(&["Book"]);
     let document = ole.exists(&["PowerPoint Document"])

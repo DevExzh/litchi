@@ -134,7 +134,8 @@ fn replace_hyperlink_with_media(document: &[u8]) -> Vec<u8> {
 
 fn generated_media_deck() -> Vec<u8> {
     let unsigned = generated_deck_with_optional_hyperlink(true);
-    let mut source = OleFile::open(Cursor::new(&unsigned)).expect("open generated media CFB");
+    let mut source = OleFile::open(Cursor::new(&unsigned), litchi_cfb::OleFileLimits::default())
+        .expect("open generated media CFB");
     let document = source
         .open_stream(&["PowerPoint Document"])
         .expect("read generated document stream");
@@ -163,7 +164,8 @@ fn generated_media_deck() -> Vec<u8> {
 }
 
 fn stream_map(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("open CFB");
+    let mut ole =
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).expect("open CFB");
     ole.list_streams()
         .into_iter()
         .map(|path| {
@@ -176,7 +178,8 @@ fn stream_map(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
 
 fn signed_cfb(unsigned: &[u8], nested_signature_storage: bool) -> Vec<u8> {
     let generated_streams = stream_map(unsigned);
-    let mut source = OleFile::open(Cursor::new(unsigned)).expect("open generated CFB");
+    let mut source = OleFile::open(Cursor::new(unsigned), litchi_cfb::OleFileLimits::default())
+        .expect("open generated CFB");
     let mut writer = OleWriter::new();
     let streams = source.list_streams();
 

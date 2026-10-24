@@ -207,7 +207,11 @@ fn primitive_shapes_round_trip_through_doc_reader() {
 fn primitive_shapes_extract_with_type_geometry_and_colors() {
     let doc_bytes = write_doc_with_shapes(&jpeg_fixture());
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
 
     // The drawing group exposes the floating picture frame and the three
@@ -257,7 +261,11 @@ fn genuine_word_floating_pictures_extract_from_dgg_info() {
     // live in the table-stream OfficeArtContent (fcDggInfo).
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/doc/FloatingPictures.doc");
-    let mut ole = litchi_cfb::OleFile::open(std::fs::File::open(path).unwrap()).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::fs::File::open(path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
 
     assert_eq!(shapes.len(), 4);
@@ -287,7 +295,11 @@ fn document_with_only_shapes_has_no_picture_data() {
     assert_eq!(document.text().unwrap(), "shapes only\r\u{8}\r");
     assert_eq!(document.shape_positions().len(), 1);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     assert_eq!(shapes.len(), 1);
     assert_eq!(shapes[0].shape_type, Kind::Rectangle);

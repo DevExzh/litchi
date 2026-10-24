@@ -43,7 +43,7 @@ fn rejects_powerpoint_document_storage_before_package_publication() {
         Err(Error::InvalidFormat(message)) if message.contains("is not a stream")
     ));
 
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let from_ole_file = Reader::from_ole_file(ole);
     assert!(matches!(
         from_ole_file,

@@ -1019,7 +1019,7 @@ fn run_cfb_sample(config: &Config, corpus: &Corpus, sample: usize) -> AnyResult<
         config.source_delay_us,
     ));
     let source_for_reader: Arc<dyn ReadAt> = source.clone();
-    let file = SharedOleFile::open_with_limits(source_for_reader, SharedOleFileLimits::default())?;
+    let file = SharedOleFile::open(source_for_reader, SharedOleFileLimits::default())?;
     let session: SharedOleBulkRead<'_> = file.bulk_read(context.clone());
     let names: Vec<String> = corpus
         .members
@@ -1547,9 +1547,8 @@ mod tests {
         let corpus = build_corpus(Shape::Small).expect("corpus");
         let source = Arc::new(ReadCountingSource::new(corpus.cfb_bytes.clone()));
         let source_for_reader: Arc<dyn ReadAt> = source.clone();
-        let file =
-            SharedOleFile::open_with_limits(source_for_reader, SharedOleFileLimits::default())
-                .expect("open CFB source");
+        let file = SharedOleFile::open(source_for_reader, SharedOleFileLimits::default())
+            .expect("open CFB source");
         source.reads.store(0, Ordering::Relaxed);
 
         let root = Budget::root(
