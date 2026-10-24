@@ -127,98 +127,160 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
     def test_recheck_binds_actual_manifest_lock_probe_and_binary_bytes(self):
         with tempfile.TemporaryDirectory(prefix="ppt-lazy-recheck-") as temporary:
             outer = Path(temporary)
-            root = outer / "candidate"
-            root.mkdir()
-            subprocess.run(["git", "-C", str(root), "init", "--quiet"], check=True)
-            subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
-            subprocess.run(["git", "-C", str(root), "config", "user.name", "PPT test"], check=True)
-            lock = root / "tools" / "perf-baseline" / "Cargo.lock"
-            lock.parent.mkdir(parents=True)
-            lock.write_bytes(b"lock-v1")
-            probe = root / "probe.rs"
-            probe.write_bytes(b"probe-v1")
-            subprocess.run(["git", "-C", str(root), "add", "tools/perf-baseline/Cargo.lock", "probe.rs"], check=True)
-            subprocess.run(["git", "-C", str(root), "commit", "--quiet", "-m", "fixture"], check=True)
 
-            target = outer / "normal-target" / "release"
-            allocator_target = outer / "allocator-target" / "release"
-            target.mkdir(parents=True)
-            allocator_target.mkdir(parents=True)
-            normal = target / "ppt_lazy_native"
-            allocator = allocator_target / "ppt_lazy_native_alloc"
-            normal.write_bytes(b"normal-binary-v1")
-            allocator.write_bytes(b"allocator-binary-v1")
-            os.chmod(normal, 0o755)
-            os.chmod(allocator, 0o755)
+            def make_endpoint(name):
+                root = outer / name
+                root.mkdir()
+                subprocess.run(["git", "-C", str(root), "init", "--quiet"], check=True)
+                subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+                subprocess.run(["git", "-C", str(root), "config", "user.name", "PPT test"], check=True)
+                lock = root / "tools" / "perf-baseline" / "Cargo.lock"
+                lock.parent.mkdir(parents=True)
+                lock.write_bytes(f"{name}-lock-v1".encode())
+                probe = root / "probe.rs"
+                probe.write_bytes(f"{name}-probe-v1".encode())
+                subprocess.run(["git", "-C", str(root), "add", "tools/perf-baseline/Cargo.lock", "probe.rs"], check=True)
+                subprocess.run(["git", "-C", str(root), "commit", "--quiet", "-m", "fixture"], check=True)
+
+                target = outer / f"{name}-normal-target" / "release"
+                allocator_target = outer / f"{name}-allocator-target" / "release"
+                target.mkdir(parents=True)
+                allocator_target.mkdir(parents=True)
+                normal = target / "ppt_lazy_native"
+                allocator = allocator_target / "ppt_lazy_native_alloc"
+                normal.write_bytes(f"{name}-normal-binary-v1".encode())
+                allocator.write_bytes(f"{name}-allocator-binary-v1".encode())
+                os.chmod(normal, 0o755)
+                os.chmod(allocator, 0o755)
+
+                def git(*args):
+                    return subprocess.run(
+                        ["git", "-C", str(root), *args],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout.strip()
+
+                lock_identity = protocol._identity(lock)
+                probe_identity = protocol._identity(probe)
+                return {
+                    "endpoint": {
+                        "name": name,
+                        "raw": {
+                            "lock": {
+                                "path": "tools/perf-baseline/Cargo.lock",
+                                "bytes": lock_identity["bytes"],
+                                "sha256": lock_identity["sha256"],
+                            },
+                            "normal_binary": protocol._identity(normal),
+                            "allocator_binary": protocol._identity(allocator),
+                        },
+                        "root": root,
+                        "head": git("rev-parse", "HEAD"),
+                        "tree": git("rev-parse", "HEAD^{tree}"),
+                        "target_dir": target.parent,
+                        "allocator_target_dir": allocator_target.parent,
+                    },
+                    "lock": lock,
+                    "probe": probe,
+                    "probe_spec": {
+                        "path": "probe.rs",
+                        "bytes": probe_identity["bytes"],
+                        "sha256": probe_identity["sha256"],
+                    },
+                    "normal": normal,
+                    "allocator": allocator,
+                }
+
+            candidate = make_endpoint("candidate")
+            baseline = make_endpoint("baseline")
 
             manifest_path = outer / "manifest.json"
             manifest_path.write_bytes(b'{"manifest":"v1"}\n')
             manifest_identity = protocol._identity(manifest_path)
-            git = lambda *args: subprocess.run(
-                ["git", "-C", str(root), *args],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            lock_identity = protocol._identity(lock)
-            lock_spec = {
-                "path": "tools/perf-baseline/Cargo.lock",
-                "bytes": lock_identity["bytes"],
-                "sha256": lock_identity["sha256"],
-            }
-            probe_identity = protocol._identity(probe)
-            probe_spec = {
-                "path": "probe.rs",
-                "bytes": probe_identity["bytes"],
-                "sha256": probe_identity["sha256"],
-            }
-            normal_spec = protocol._identity(normal)
-            allocator_spec = protocol._identity(allocator)
-            raw = {
-                "lock": lock_spec,
-                "normal_binary": normal_spec,
-                "allocator_binary": allocator_spec,
-            }
-            endpoint = {
-                "name": "candidate",
-                "raw": raw,
-                "root": root,
-                "head": git("rev-parse", "HEAD"),
-                "tree": git("rev-parse", "HEAD^{tree}"),
-                "target_dir": target.parent,
-                "allocator_target_dir": allocator_target.parent,
-            }
             protocol._recheck(
-                endpoint,
-                [probe_spec],
+                candidate["endpoint"],
+                [candidate["probe_spec"]],
                 manifest_path,
                 manifest_identity,
-                "before_timing",
+                "before_candidate",
+            )
+            protocol._recheck(
+                baseline["endpoint"],
+                [],
+                manifest_path,
+                manifest_identity,
+                "before_baseline",
             )
 
             manifest_path.write_bytes(b'{"manifest":"tampered"}\n')
             with self.assertRaises(protocol.RunFailure):
-                protocol._recheck(endpoint, [probe_spec], manifest_path, manifest_identity, "after_manifest_mutation")
-            manifest_path.write_bytes(b'{"manifest":"v1"}\n')
-
-            probe.write_bytes(b"probe-tampered")
-            with self.assertRaises(protocol.RunFailure):
-                protocol._recheck(endpoint, [probe_spec], manifest_path, manifest_identity, "after_probe_mutation")
-            probe.write_bytes(b"probe-v1")
-
-            lock.write_bytes(b"lock-tampered")
-            with self.assertRaises(protocol.RunFailure):
-                protocol._check_lock(lock_spec, "candidate.lock", root)
-            lock.write_bytes(b"lock-v1")
-
-            normal.write_bytes(b"normal-binary-tampered")
-            with self.assertRaises(protocol.RunFailure):
                 protocol._recheck(
-                    endpoint,
-                    [probe_spec],
+                    candidate["endpoint"],
+                    [candidate["probe_spec"]],
                     manifest_path,
                     manifest_identity,
-                    "after_binary_mutation",
+                    "after_manifest_mutation",
+                )
+            manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+
+            candidate["probe"].write_bytes(b"candidate-probe-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    candidate["endpoint"],
+                    [candidate["probe_spec"]],
+                    manifest_path,
+                    manifest_identity,
+                    "after_probe_mutation",
+                )
+            candidate["probe"].write_bytes(b"candidate-probe-v1")
+
+            candidate["lock"].write_bytes(b"candidate-lock-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._check_lock(candidate["endpoint"]["raw"]["lock"], "candidate.lock", candidate["endpoint"]["root"])
+            candidate["lock"].write_bytes(b"candidate-lock-v1")
+
+            candidate["normal"].write_bytes(b"candidate-normal-binary-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    candidate["endpoint"],
+                    [candidate["probe_spec"]],
+                    manifest_path,
+                    manifest_identity,
+                    "after_candidate_normal_binary_mutation",
+                )
+            candidate["normal"].write_bytes(b"candidate-normal-binary-v1")
+
+            candidate["allocator"].write_bytes(b"candidate-allocator-binary-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    candidate["endpoint"],
+                    [candidate["probe_spec"]],
+                    manifest_path,
+                    manifest_identity,
+                    "after_candidate_allocator_binary_mutation",
+                )
+            candidate["allocator"].write_bytes(b"candidate-allocator-binary-v1")
+
+            baseline["normal"].write_bytes(b"baseline-normal-binary-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    baseline["endpoint"],
+                    [],
+                    manifest_path,
+                    manifest_identity,
+                    "after_baseline_normal_binary_mutation",
+                )
+            baseline["normal"].write_bytes(b"baseline-normal-binary-v1")
+
+            baseline["allocator"].write_bytes(b"baseline-allocator-binary-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    baseline["endpoint"],
+                    [],
+                    manifest_path,
+                    manifest_identity,
+                    "after_baseline_allocator_binary_mutation",
                 )
 
     def test_manifest_rejects_nonfinite_numeric_limits_and_wrong_lock_path(self):
