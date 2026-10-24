@@ -1,0 +1,32 @@
+{
+  "source": "83a0ace78bfaf2cf6e14aa066b27e6657366a811",
+  "command": [
+    "python3",
+    "-B",
+    "-m",
+    "unittest",
+    "tools.test_check_api_glossary",
+    "tools.test_api_debt_inventory",
+    "tools.test_validate_api_disposition",
+    "tools.test_final_api_inventory",
+    "tools.test_w8_file_provenance",
+    "tools.test_w8_original_baseline",
+    "tools.test_w8_projection_policy",
+    "tools.test_officecli_corpus",
+    "tools.test_officecli_capability_delta",
+    "tools.test_no_3rdparty_references",
+    "tools.test_check_crate_boundaries",
+    "tools.test_non_iwork_gate",
+    "tools.test_unified_bench_matrix",
+    "tools.test_check_iwork_leaf_public_api"
+  ],
+  "started": "2026-10-24T09:22:55.878835+00:00",
+  "seconds": 48.20980750999297,
+  "exit_code": 0,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-tooling-83a0ace78b.log",
+  "bytes": 633734,
+  "sha256": "f12da526f0dea17c39c98e30ae086495a0726e546a1ba6f8a64f881e9d048a22",
+  "tests_passed": 1428,
+  "test_runner_seconds": 46.721,
+  "scope": "14 registered tooling modules; no full runtime gate claim"
+}

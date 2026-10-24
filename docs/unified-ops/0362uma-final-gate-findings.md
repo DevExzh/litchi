@@ -137,3 +137,10 @@ the resolver repair and review.
 These are required engineering corrections. No performance regression,
 capability loss or API-contract debt is accepted as an exception. Only the
 comprehensive redaction audit in memo item 22 remains deferred.
+
+The failed aggregate capture remains immutable. Subsequent reviewed tooling
+repairs (0362ul1 and 0362ul3) enable complete diagnostic enumeration, with
+foreign-definition coverage and nominal identities checked before suppressing
+duplicate boundary findings. Source review then identifies further required
+engineering, recorded in 0362ul5. The full gate must therefore bind the next
+assembled source rather than treating the historical 49c capture as closure.
