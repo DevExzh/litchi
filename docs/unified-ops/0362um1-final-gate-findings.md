@@ -1,4 +1,4 @@
-# 0362um — final gate findings and required repairs
+# 0362um1 — final gate findings and required repairs
 
 The full gate on `f6fe430a4d19d94aa360c0e9ed03ebd757265225` passed
 formatting, combined strict consumers and every per-format strict profile:
@@ -8,7 +8,7 @@ both runner processes had exited and no Cargo process still used the gate
 checkout or target. The operations step did not finalize a result row.
 This is an interrupted, failing attempt, not a full gate pass.
 
-[The retained receipt](results/0362um/interrupted-full-gate.json) binds the
+[The retained receipt](results/0362um1/interrupted-full-gate.json) binds the
 plan/state, all 25 completed steps and the five existing operations-test
 chunk logs. It preserves the partial results without assigning a successful
 status to the unfinished step.
@@ -25,12 +25,33 @@ remains unchanged. In particular, blessed report generation must never use
 a test executable compiled for that checkout: its manifest path is embedded
 in the executable.
 
-A separate selected diagnostic run continues the remaining checks using
-state directory
-`.coord/final-acceptance-2026-10-24/remaining-diagnostics-f6fe430a4d`.
-It does not overwrite the interrupted attempt or establish full acceptance.
+Separate selected diagnostic runs retain the remaining observations without
+overwriting the interrupted attempt. [Their reduced receipt](results/0362um1/selected-diagnostics.json)
+binds all completed steps, external state/plan/log identities, source/locks,
+runner policy and individual test chunks. The coordinator verified the
+recorded log sizes and hashes.
+
+- The facade suite completed with 208 passed and one failed test. The failure
+  happened at Unix socket fixture creation: the gate's long `TMPDIR` exceeded
+  `SUN_LEN`, before the library opened the input. Reviewed correction 0362un1
+  uses a short temporary parent for all three socket fixtures. Each focused
+  test passes with a deliberately 167-character `TMPDIR`; production behavior
+  and assertions are unchanged.
+- Core tests pass: 332 tests and doctests, with no failures or ignored cases.
+  The iWork leaf API, non-iWork boundary and static corpus disposition checks
+  also pass on the frozen source.
+- The tooling suite runs 1,360 tests and returns four failures: the upstream
+  reference scanner matches ODG path-rejection literals, two iWork table-merge
+  topology rules still expect eager constructors, and diagnostic evidence is
+  missing from the benchmark index. The rules and evidence classifications
+  require repair; the failures are not waived.
+
+The final observed target size is 18,446,285,179 bytes, below the 20-GB cap.
+Every completed step retains stable post-exit observations with no remaining
+owned builders. These selected results do not establish full acceptance.
 Once the required corrections are reviewed and composed, a fresh complete
-gate is required on the new source.
+gate is required on the new source. This record uses suffix `0362um1` to
+distinguish it from the pre-existing 0362um OPC consumer record.
 
 The final inventory review also found that its owner-name heuristic omitted
 policy-declared immutable owners with other names. That is an inventory
