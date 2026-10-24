@@ -105,6 +105,7 @@ class DispositionValidationTests(unittest.TestCase):
                 "litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache::SlideNodeBuildCacheEdit",
                 "litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit",
                 "litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit",
             )
         ]
         schema_paths = (
@@ -169,6 +170,18 @@ class DispositionValidationTests(unittest.TestCase):
             (
                 "WIRE_SCHEMA", "litchi-iwa-protos", "mut_owner",
                 "litchi_iwa_protos::tswp::UndoTransaction",
+            ),
+            (
+                "WIRE_REQUEST", "litchi-iwa-protos", "edit_type",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::CommentStorageTableReferenceEdit",
+            ),
+            (
+                "WIRE_REQUEST", "litchi-iwa-protos", "edit_type",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEditAlias",
+            ),
+            (
+                "WIRE_REQUEST", "litchi-iwa-protos", "mut_owner",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit",
             ),
             (
                 "WIRE_SCHEMA", "litchi-iwa-protos", "edit_type",

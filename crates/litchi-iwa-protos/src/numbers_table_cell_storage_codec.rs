@@ -5466,27 +5466,6 @@ pub fn rewrite_data_store_control_cell_spec_table(
     plan.execute(limits)
 }
 
-/// Explicit `Reference`-suffix aliases used by package owners that prefer
-/// naming the wire transition rather than the semantic table route.
-pub type PreparedDataStoreControlCellSpecTableReferenceRewrite<'source> =
-    PreparedDataStoreControlCellSpecTableRewrite<'source>;
-
-pub fn prepare_data_store_control_cell_spec_table_reference_rewrite<'source>(
-    source: &'source [u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<PreparedDataStoreControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
-    prepare_data_store_control_cell_spec_table_rewrite(source, edit, options)
-}
-
-pub fn rewrite_data_store_control_cell_spec_table_reference(
-    source: &[u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
-    rewrite_data_store_control_cell_spec_table(source, edit, options)
-}
-
 /// Prepared DataStore field-19 insertion/replacement.
 pub type PreparedDataStoreCommentStorageTableRewrite<'source> =
     PreparedDataStoreControlCellSpecTableRewrite<'source>;
@@ -5691,25 +5670,6 @@ pub fn rewrite_table_model_control_cell_spec_table(
     let plan = prepare_table_model_control_cell_spec_table_rewrite(source, edit, options)?;
     let limits = plan.requirements().exact_limits();
     plan.execute(limits)
-}
-
-pub type PreparedTableModelControlCellSpecTableReferenceRewrite<'source> =
-    PreparedTableModelControlCellSpecTableRewrite<'source>;
-
-pub fn prepare_table_model_control_cell_spec_table_reference_rewrite<'source>(
-    source: &'source [u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<PreparedTableModelControlCellSpecTableReferenceRewrite<'source>, DecodeError> {
-    prepare_table_model_control_cell_spec_table_rewrite(source, edit, options)
-}
-
-pub fn rewrite_table_model_control_cell_spec_table_reference(
-    source: &[u8],
-    edit: ControlCellSpecTableReferenceEdit,
-    options: DecodeOptions,
-) -> Result<(Vec<u8>, StorageReferenceRewriteReport), DecodeError> {
-    rewrite_table_model_control_cell_spec_table(source, edit, options)
 }
 
 /// Prepared TableModel field-4/DataStore field-19 insertion/replacement.

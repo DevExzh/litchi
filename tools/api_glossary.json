@@ -24478,6 +24478,45 @@
           "ok": "litchi_odraw::prop::picture::Commit"
         }
       ]
+    },
+    {
+      "id": "iwa-protos-wire-codecs",
+      "package": "litchi-iwa-protos",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "PreparedDataStoreControlCellSpecTableReferenceRewrite",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use PreparedDataStoreControlCellSpecTableRewrite (record 0362ul14)"
+        },
+        {
+          "name": "prepare_data_store_control_cell_spec_table_reference_rewrite",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use prepare_data_store_control_cell_spec_table_rewrite (record 0362ul14)"
+        },
+        {
+          "name": "rewrite_data_store_control_cell_spec_table_reference",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use rewrite_data_store_control_cell_spec_table (record 0362ul14)"
+        },
+        {
+          "name": "PreparedTableModelControlCellSpecTableReferenceRewrite",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use PreparedTableModelControlCellSpecTableRewrite (record 0362ul14)"
+        },
+        {
+          "name": "prepare_table_model_control_cell_spec_table_reference_rewrite",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use prepare_table_model_control_cell_spec_table_rewrite (record 0362ul14)"
+        },
+        {
+          "name": "rewrite_table_model_control_cell_spec_table_reference",
+          "scope": "litchi_iwa_protos::numbers_table_cell_storage_codec",
+          "replacement": "use rewrite_table_model_control_cell_spec_table (record 0362ul14)"
+        }
+      ],
+      "families": []
     }
   ]
 }

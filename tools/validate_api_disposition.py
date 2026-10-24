@@ -13,7 +13,7 @@ Accepted decisions are:
 * ``BUILDER_DRAFT`` — a proven authoring builder is intentionally mutable;
 * ``SUBSTRATE_TRANSPORT`` — only a transport-only CFB/ZIP substrate row;
 * ``AST_VALUE`` — only the two reviewed Formula AST value methods;
-* ``WIRE_REQUEST`` — only the six reviewed IWA codec request values;
+* ``WIRE_REQUEST`` — only the seven reviewed IWA codec request values;
 * ``WIRE_SCHEMA`` — only the reviewed generated IWA protobuf schema values;
 * ``RAW_READER_METHOD`` — only the 38 current raw DOC/PPT/XLS Reader methods;
 * ``COMPOSITION_DESCRIPTOR`` — only the four exact SubEdit composition values;
@@ -71,6 +71,8 @@ SEMANTIC_ROWS = {
          "litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit"),
         ("litchi-iwa-protos", "edit_type",
          "litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit"),
     }),
     "WIRE_SCHEMA": frozenset({
         ("litchi-iwa-protos", category, path)
