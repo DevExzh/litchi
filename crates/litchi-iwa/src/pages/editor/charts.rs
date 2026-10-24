@@ -104,7 +104,7 @@ pub struct BodyChartInfo {
 
 /// Result of removing a body chart and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedPagesBodyChart {
+pub struct RemovedBodyChart {
     pub chart: BodyChartInfo,
 }
 
@@ -607,7 +607,7 @@ impl Draft {
     }
 
     /// Remove a body chart, its attachment, and any crate-owned private styles.
-    pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyChart> {
+    pub fn remove_body_chart(&mut self, drawable_object_id: u64) -> Result<RemovedBodyChart> {
         let mut source = body_chart_graph(self, drawable_object_id)?;
         source.info.arrangement = arrangement::focused_chart_arrangement_at(
             self,
@@ -701,7 +701,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesBodyChart { chart: source.info })
+        Ok(RemovedBodyChart { chart: source.info })
     }
 
     fn update_body_chart(

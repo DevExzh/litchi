@@ -11,7 +11,7 @@ pub struct DrawableTextInfo {
 
 /// Result of removing a body-anchored Pages text box.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemovedPagesTextBox {
+pub struct RemovedTextBox {
     pub text: DrawableTextInfo,
     /// UTF-16 body position formerly occupied by the object-replacement character.
     pub anchor_character_index: u32,

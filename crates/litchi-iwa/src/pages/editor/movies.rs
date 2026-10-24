@@ -45,7 +45,7 @@ pub struct MovieInfo {
 
 /// Result of removing one body-anchored Pages movie and its private graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedPagesMovie {
+pub struct RemovedMovie {
     pub movie: MovieInfo,
     /// Assets culled because the removed movie held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -526,7 +526,7 @@ impl Draft {
     }
 
     /// Remove a body movie, its attachment/private graph, and unshared assets.
-    pub fn remove_body_movie(&mut self, drawable_object_id: u64) -> Result<RemovedPagesMovie> {
+    pub fn remove_body_movie(&mut self, drawable_object_id: u64) -> Result<RemovedMovie> {
         let source = body_movie_graph(self, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -604,7 +604,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesMovie {
+        Ok(RemovedMovie {
             movie: source.info,
             removed_data_identifiers,
         })

@@ -73,7 +73,7 @@ impl SheetMovieOptions {
 
 /// Result of removing one sheet-owned movie and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedNumbersSheetMovie {
+pub struct RemovedSheetMovie {
     pub movie: SheetMovieInfo,
     /// Assets culled because the removed movie held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -570,7 +570,7 @@ impl Draft {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<RemovedNumbersSheetMovie> {
+    ) -> Result<RemovedSheetMovie> {
         let source = movie_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -654,7 +654,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedNumbersSheetMovie {
+        Ok(RemovedSheetMovie {
             movie: source.info,
             removed_data_identifiers,
         })

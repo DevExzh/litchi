@@ -17921,6 +17921,91 @@
           "replacement": "use litchi_iwa::pages::TableCellVerticalAlignment; no redundant format prefix inside a per-format module (ADR 0034, record 0352)"
         },
         {
+          "name": "RemovedKeynoteTextBox",
+          "scope": "litchi_iwa::keynote",
+          "replacement": "use litchi_iwa::keynote::RemovedTextBox; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedKeynoteSlideChart",
+          "scope": "litchi_iwa::keynote",
+          "replacement": "use litchi_iwa::keynote::RemovedSlideChart; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedKeynoteSlideImage",
+          "scope": "litchi_iwa::keynote",
+          "replacement": "use litchi_iwa::keynote::RemovedSlideImage; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedKeynoteSlideShape",
+          "scope": "litchi_iwa::keynote",
+          "replacement": "use litchi_iwa::keynote::RemovedSlideShape; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedKeynoteSlideTable",
+          "scope": "litchi_iwa::keynote",
+          "replacement": "use litchi_iwa::keynote::RemovedSlideTable; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersTextBox",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedTextBox; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersSheetAudio",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedSheetAudio; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersSheetChart",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedSheetChart; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersSheetImage",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedSheetImage; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersSheetMovie",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedSheetMovie; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedNumbersSheetShape",
+          "scope": "litchi_iwa::numbers",
+          "replacement": "use litchi_iwa::numbers::RemovedSheetShape; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesAudio",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedAudio; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesBodyShape",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedBodyShape; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesBodyChart",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedBodyChart; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesImage",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedImage; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesMovie",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedMovie; no redundant format prefix (record 0362ul48)"
+        },
+        {
+          "name": "RemovedPagesTextBox",
+          "scope": "litchi_iwa::pages",
+          "replacement": "use litchi_iwa::pages::RemovedTextBox; no redundant format prefix (record 0362ul48)"
+        },
+        {
           "name": "IWork",
           "scope": "litchi_iwa",
           "replacement": "the host's types live in focused modules with unprefixed names: litchi_iwa::Package (was IWorkPackage), comments::Draft (IWorkDrawableCommentEditor), media::Draft (IWorkMediaEditor), text::Draft (IWorkTextEditor) (record 0361)",

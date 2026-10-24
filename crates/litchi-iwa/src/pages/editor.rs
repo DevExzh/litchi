@@ -100,7 +100,7 @@ const PAGES_DOCUMENT_ROOT_FIELD_MULTIPLIER: usize = 8;
 const PAGES_DOCUMENT_ROOT_WORK_MULTIPLIER: usize = 64;
 
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind, Template};
-pub use types::{DrawableTextInfo, RemovedPagesTextBox, SectionInfo};
+pub use types::{DrawableTextInfo, RemovedTextBox, SectionInfo};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HeaderFooterLocation {
@@ -2252,7 +2252,7 @@ impl Draft {
     }
 
     /// Remove a body-anchored Pages text box and its private object graph.
-    pub fn remove_text_box(&mut self, drawable_object_id: u64) -> Result<RemovedPagesTextBox> {
+    pub fn remove_text_box(&mut self, drawable_object_id: u64) -> Result<RemovedTextBox> {
         let graph = self.text_box_graph(drawable_object_id)?;
         let text = self
             .drawable_text_storages()?
@@ -2306,7 +2306,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesTextBox {
+        Ok(RemovedTextBox {
             text,
             anchor_character_index: graph.anchor_character_index,
         })
@@ -5380,11 +5380,11 @@ mod tables;
 mod text_box_create;
 mod types;
 
-pub use audio::{AudioInfo, RemovedPagesAudio};
-pub use body_shapes::{BodyShapeInfo, RemovedPagesBodyShape};
-pub use charts::{BodyChartInfo, RemovedPagesBodyChart};
-pub use images::{ImageInfo, RemovedPagesImage};
-pub use movies::{MovieInfo, RemovedPagesMovie};
+pub use audio::{AudioInfo, RemovedAudio};
+pub use body_shapes::{BodyShapeInfo, RemovedBodyShape};
+pub use charts::{BodyChartInfo, RemovedBodyChart};
+pub use images::{ImageInfo, RemovedImage};
+pub use movies::{MovieInfo, RemovedMovie};
 pub use tables::{
     CellValue, Table, TableCellConditionalHighlightInfo, TableCellInset, TableCellInsets,
     TableCellLayout, TableCellParagraphList, TableCellParagraphListBullet,

@@ -354,11 +354,11 @@ pub(crate) fn apply_numbers_fixture(
 }
 
 pub use semantic::*;
-pub use sheet_audio::{RemovedNumbersSheetAudio, SheetAudioInfo, SheetAudioOptions};
-pub use sheet_charts::{RemovedNumbersSheetChart, SheetChartInfo};
-pub use sheet_images::{RemovedNumbersSheetImage, SheetImageInfo, SheetImageOptions};
-pub use sheet_movies::{RemovedNumbersSheetMovie, SheetMovieInfo, SheetMovieOptions};
-pub use sheet_shapes::{RemovedNumbersSheetShape, SheetShapeInfo};
+pub use sheet_audio::{RemovedSheetAudio, SheetAudioInfo, SheetAudioOptions};
+pub use sheet_charts::{RemovedSheetChart, SheetChartInfo};
+pub use sheet_images::{RemovedSheetImage, SheetImageInfo, SheetImageOptions};
+pub use sheet_movies::{RemovedSheetMovie, SheetMovieInfo, SheetMovieOptions};
+pub use sheet_shapes::{RemovedSheetShape, SheetShapeInfo};
 use storage::*;
 pub(crate) use table_cells::TableCellBatch;
 pub(crate) use table_duplicate::{duplicate_attached_table_graph_in_package, duplicate_table_name};

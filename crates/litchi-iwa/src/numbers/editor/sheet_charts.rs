@@ -108,7 +108,7 @@ pub struct SheetChartInfo {
 
 /// Result of removing a standalone chart and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedNumbersSheetChart {
+pub struct RemovedSheetChart {
     pub chart: SheetChartInfo,
 }
 
@@ -601,7 +601,7 @@ impl Draft {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<RemovedNumbersSheetChart> {
+    ) -> Result<RemovedSheetChart> {
         let source_arrangement = arrangement::focused_chart_arrangement_for_drawable(
             self,
             sheet_id,
@@ -703,7 +703,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedNumbersSheetChart { chart: source.info })
+        Ok(RemovedSheetChart { chart: source.info })
     }
 
     fn update_sheet_chart(

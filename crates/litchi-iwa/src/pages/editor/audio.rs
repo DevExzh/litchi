@@ -41,7 +41,7 @@ pub struct AudioInfo {
 
 /// Result of removing one body-anchored Pages audio clip and its private graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedPagesAudio {
+pub struct RemovedAudio {
     pub audio: AudioInfo,
     /// Assets culled because the removed clip held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -428,7 +428,7 @@ impl Draft {
     }
 
     /// Remove body audio, its attachment/private graph, and unshared asset.
-    pub fn remove_body_audio(&mut self, drawable_object_id: u64) -> Result<RemovedPagesAudio> {
+    pub fn remove_body_audio(&mut self, drawable_object_id: u64) -> Result<RemovedAudio> {
         let source = body_audio_graph(self, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -506,7 +506,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesAudio {
+        Ok(RemovedAudio {
             audio: source.info,
             removed_data_identifiers,
         })

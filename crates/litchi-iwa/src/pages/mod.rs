@@ -32,8 +32,8 @@ pub(crate) mod editor;
 pub use creation::Builder;
 pub use editor::{
     AudioInfo, BodyChartInfo, BodyShapeInfo, CellValue, Draft, DrawableTextInfo, ImageInfo,
-    MovieInfo, RemovedPagesAudio, RemovedPagesBodyChart, RemovedPagesBodyShape, RemovedPagesImage,
-    RemovedPagesMovie, RemovedPagesTextBox, SectionInfo, Table, TableCellConditionalHighlightInfo,
+    MovieInfo, RemovedAudio, RemovedBodyChart, RemovedBodyShape, RemovedImage, RemovedMovie,
+    RemovedTextBox, SectionInfo, Table, TableCellConditionalHighlightInfo,
     TableCellInset, TableCellInsets, TableCellLayout, TableCellParagraphList,
     TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
     TableCellParagraphListIndentation, TableCellParagraphListLabelColor,

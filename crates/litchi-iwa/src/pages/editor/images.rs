@@ -42,7 +42,7 @@ pub struct ImageInfo {
 
 /// Result of removing a body-anchored Pages image.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedPagesImage {
+pub struct RemovedImage {
     pub image: ImageInfo,
     /// Assets culled because the removed image held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -506,7 +506,7 @@ impl Draft {
     pub fn remove_body_image(
         &mut self,
         drawable_object_id: DrawableId,
-    ) -> Result<RemovedPagesImage> {
+    ) -> Result<RemovedImage> {
         let raw_drawable_object_id = drawable_object_id.get();
         let source = body_image_graph(self, raw_drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
@@ -583,7 +583,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesImage {
+        Ok(RemovedImage {
             image: source.info,
             removed_data_identifiers,
         })
@@ -776,7 +776,7 @@ mod tests {
         let _: fn(&mut Draft, DrawableId, usize) -> Result<ImageInfo> = Draft::duplicate_body_image;
         let _: fn(&mut Draft, DrawableId, &[u8]) -> Result<Vec<u8>> =
             Draft::replace_body_image_data;
-        let _: fn(&mut Draft, DrawableId) -> Result<RemovedPagesImage> = Draft::remove_body_image;
+        let _: fn(&mut Draft, DrawableId) -> Result<RemovedImage> = Draft::remove_body_image;
     }
 
     #[test]

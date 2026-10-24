@@ -55,7 +55,7 @@ pub struct SlideShapeInfo {
 
 /// Result of removing an ordinary shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedKeynoteSlideShape {
+pub struct RemovedSlideShape {
     pub shape: SlideShapeInfo,
 }
 
@@ -942,7 +942,7 @@ impl Draft {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteSlideShape> {
+    ) -> Result<RemovedSlideShape> {
         let source = shape_graph(self, slide_index, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -980,7 +980,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedKeynoteSlideShape { shape: source.info })
+        Ok(RemovedSlideShape { shape: source.info })
     }
 }
 
