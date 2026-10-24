@@ -1089,25 +1089,33 @@ impl Edit {
         if this.base.is_signed() {
             return Err(Error::Signed);
         }
-        let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
-        let name = workbook_stream_name(&before)?;
-        let package = ObjectPackage::open_with_options(
-            before.to_vec(),
-            ObjectOpenOptions::new()
-                .targets(Targets::default())
-                .limits(ObjectLimits::default()),
-        )
-        .map_err(|error| Error::Records(error.into()))?;
-        let mut editor = package
-            .edit()
+        let result = (|| -> Result<(Arc<[u8]>, Vec<u8>)> {
+            let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
+            let name = workbook_stream_name(&before)?;
+            let package = ObjectPackage::open_with_options(
+                before.to_vec(),
+                ObjectOpenOptions::new()
+                    .targets(Targets::default())
+                    .limits(ObjectLimits::default()),
+            )
             .map_err(|error| Error::Records(error.into()))?;
-        editor
-            .put_stream_shared(&[name.to_owned()], Arc::from(this.stream))
-            .map_err(|error| Error::Records(error.into()))?;
-        let committed = editor
-            .commit()
-            .map_err(|error| Error::Records(error.into()))?;
-        let rendered = committed.package().source_shared().as_ref().clone();
+            let mut editor = package
+                .edit()
+                .map_err(|error| Error::Records(error.into()))?;
+            editor
+                .put_stream_shared(&[name.to_owned()], Arc::from(this.stream))
+                .map_err(|error| Error::Records(error.into()))?;
+            let committed = editor
+                .commit()
+                .map_err(|error| Error::Records(error.into()))?;
+            let rendered = committed.package().source_shared().as_ref().clone();
+            Ok((before, rendered))
+        })();
+        // Rendering or candidate construction can fail after the leading
+        // source check. Prefer a concurrent source change over that error;
+        // successful publication is fenced again by `republish` below.
+        this.base.ensure_source_fence()?;
+        let (before, rendered) = result?;
         let after: Arc<[u8]> = Arc::from(rendered.as_slice());
         let package = crate::package::republish(&this.base, rendered)?;
         Ok(Commit {
