@@ -22,7 +22,8 @@
         "$OLE_BASELINE_REVISION",
         "$OLE_CANDIDATE_REVISION",
         "$OLE_TARGET_ROOT/before",
-        "$OLE_TARGET_ROOT/after"
+        "$OLE_TARGET_ROOT/after",
+        "{manifest_path}"
       ],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],

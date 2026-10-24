@@ -23,7 +23,8 @@
         "$RTF_BASELINE_REVISION",
         "$RTF_CANDIDATE_REVISION",
         "$RTF_TARGET_ROOT/before",
-        "$RTF_TARGET_ROOT/after"
+        "$RTF_TARGET_ROOT/after",
+        "{manifest_path}"
       ],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],

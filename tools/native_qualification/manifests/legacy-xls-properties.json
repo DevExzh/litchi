@@ -22,7 +22,8 @@
         "$XLS_BASELINE_REVISION",
         "$XLS_CANDIDATE_REVISION",
         "$XLS_TARGET_ROOT/before",
-        "$XLS_TARGET_ROOT/after"
+        "$XLS_TARGET_ROOT/after",
+        "{manifest_path}"
       ],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],

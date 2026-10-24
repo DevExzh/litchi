@@ -408,6 +408,9 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
 def prepare(lane: str, manifest: Path, before: Path, after: Path, output: Path) -> None:
     _expect(lane in LANES, f"unknown legacy lane: {lane}")
     spec = LANES[lane]
+    _reject_symlink_components(manifest, "qualification manifest")
+    _expect(manifest.is_absolute(), "qualification manifest path must be absolute")
+    _expect(not manifest.is_symlink(), f"qualification manifest path is symlinked: {manifest}")
     manifest = manifest.resolve()
     manifest_digest, manifest_bytes = _sha256(manifest)
     try:

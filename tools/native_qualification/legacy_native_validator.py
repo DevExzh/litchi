@@ -35,7 +35,6 @@ HASH = re.compile(r"^[0-9a-f]{64}$")
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER_PATH = ROOT / "tools/native_qualification_runner.py"
 PREPARER_PATH = ROOT / "tools/native_qualification/prepare_legacy_native_inputs.py"
-MANIFEST_DIR = ROOT / "tools/native_qualification/manifests"
 
 REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
     "legacy-rtf": {
@@ -336,6 +335,9 @@ def _identity_file_map(identity: dict[str, Any], label: str) -> dict[str, dict[s
 def _validate_preparation_receipt(
     receipt: dict[str, Any], lane: str, manifest_path: Path, identities: dict[str, Any]
 ) -> dict[str, Any]:
+    manifest_data = _read_json(manifest_path)
+    _expect(manifest_data.get("schema") == SCHEMA, "qualification manifest schema mismatch")
+    _expect(manifest_data.get("lane") == lane, "qualification manifest lane mismatch")
     preparation = receipt.get("preparation")
     _expect(isinstance(preparation, dict), "build receipt preparation binding is missing")
     normalized_preparation = _validate_hash_record(preparation, "preparation receipt")
@@ -361,7 +363,8 @@ def _validate_preparation_receipt(
     _expect(reviewed.get("lock_relative_path") == spec["lock_relative"], "preparation lock binding differs")
     _expect(tuple(reviewed.get("fixture_relative_paths", ())) == tuple(spec["fixture_relatives"]), "preparation fixture binding differs")
     for leg in ("before", "after"):
-        _expect(reviewed.get("allowed_dirty_paths") == json.loads((MANIFEST_DIR / f"{lane}.json").read_text(encoding="utf-8")).get("legs", {}).get(leg, {}).get("allowed_dirty_paths"), f"preparation dirty-path allow-list differs for {leg}")
+        expected_dirty = manifest_data.get("legs", {}).get(leg, {}).get("allowed_dirty_paths")
+        _expect(reviewed.get("allowed_dirty_paths") == expected_dirty, f"preparation dirty-path allow-list differs for {leg}")
     for leg in ("before", "after"):
         prepared_identity = prepared.get("identities", {}).get(leg)
         receipt_identity = identities.get(leg)
@@ -490,6 +493,7 @@ def _validate_build_receipt(
     candidate: str,
     before_target: Path,
     after_target: Path,
+    manifest_path: Path,
 ) -> tuple[dict[str, Any], dict[tuple[int, int, str], dict[str, Any]]]:
     receipt_path = output_dir / "build-receipt.json"
     receipt = _read_json(receipt_path)
@@ -507,7 +511,12 @@ def _validate_build_receipt(
         },
         "build receipt limits are not the fixed qualification caps",
     )
-    manifest_path = (MANIFEST_DIR / f"{lane}.json").resolve()
+    _expect(manifest_path.is_absolute(), "qualification manifest path must be absolute")
+    _reject_symlink_components(manifest_path, "qualification manifest")
+    manifest_path = manifest_path.resolve()
+    manifest_data = _read_json(manifest_path)
+    _expect(manifest_data.get("schema") == SCHEMA, "qualification manifest schema mismatch")
+    _expect(manifest_data.get("lane") == lane, "qualification manifest lane mismatch")
     manifest_record = receipt.get("manifest")
     _expect(isinstance(manifest_record, dict) and manifest_record.get("path") == str(manifest_path), "build receipt manifest path is not source-bound")
     manifest_hash, _ = _sha256(manifest_path)
@@ -754,13 +763,14 @@ def validate_directory(
     candidate: str,
     before_target: Path,
     after_target: Path,
+    manifest_path: Path,
 ) -> dict[str, Any]:
     _expect(lane in CONTRACTS, f"unknown legacy native lane: {lane}")
     contract = CONTRACTS[lane]
     _expect(baseline == contract["baseline"], f"{lane} baseline is not the original source fence")
     _expect(FULL_SHA.fullmatch(candidate) is not None and candidate != baseline, "candidate must be a distinct full source SHA")
     receipt_info, events = _validate_build_receipt(
-        output_dir, lane, contract, baseline, candidate, before_target, after_target
+        output_dir, lane, contract, baseline, candidate, before_target, after_target, manifest_path
     )
     reports: list[dict[str, Any]] = []
     for block in range(1, int(contract["blocks"]) + 1):
@@ -802,7 +812,7 @@ def validate_directory(
         "source_lock_probe_binary_identity": receipt_info["identities"],
         "preparation_receipt": receipt_info["preparation"],
         "source_binding": {
-            "manifest": str((MANIFEST_DIR / f"{lane}.json").resolve()),
+            "manifest": str(manifest_path.resolve()),
             "runner": str(RUNNER_PATH),
             "preparer": str(PREPARER_PATH),
             "reviewed_probe_sha256": REVIEWED_INPUTS[lane]["probe_sha256"],
@@ -825,10 +835,10 @@ def validate_directory(
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 6:
+    if len(argv) != 7:
         print(
             "usage: legacy_native_validator.py OUTPUT_DIR LANE BASELINE_SHA "
-            "CANDIDATE_SHA BEFORE_TARGET AFTER_TARGET",
+            "CANDIDATE_SHA BEFORE_TARGET AFTER_TARGET MANIFEST_PATH",
             file=sys.stderr,
         )
         return 2
@@ -840,6 +850,7 @@ def main(argv: list[str]) -> int:
             argv[3],
             Path(argv[4]),
             Path(argv[5]),
+            Path(argv[6]),
         )
         destination = Path(argv[0]) / "summary.json"
         _expect(not destination.exists() and not destination.is_symlink(), "summary.json already exists")
