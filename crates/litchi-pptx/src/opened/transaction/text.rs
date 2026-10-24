@@ -133,12 +133,17 @@ impl Edit {
         change: &TextChange<'_>,
     ) -> Result<()> {
         let selected_slide = self.resolve_slide(slide)?;
-        let max_text_bytes = self.source.limits.max_text_bytes();
+        let (max_text_bytes, presentation_name) = {
+            let source = self.source_ref()?;
+            (
+                source.limits.max_text_bytes(),
+                source.presentation_name.clone(),
+            )
+        };
         let max_output_bytes = crate::shape::Limits::DEFAULT.output_bytes();
         let (part_name, candidate) = match body {
             TextBody::Notes { .. } => {
-                let source =
-                    crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+                let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
                 let Some(note) = source.as_ref().and_then(|source| {
                     source
                         .slides()

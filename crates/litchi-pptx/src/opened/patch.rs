@@ -867,22 +867,51 @@ impl Patch {
                 resource: "opened-presentation durable patch",
                 source,
             })?;
-        output.extend_from_slice(MAGIC);
-        put_bytes32(&mut output, self.presentation_name.as_str().as_bytes())?;
-        put_optional_relationship_delta(&mut output, self.root.as_ref())?;
-        put_u32(&mut output, self.deltas.len())?;
-        for delta in &self.deltas {
-            put_bytes32(&mut output, delta.name.as_str().as_bytes())?;
-            put_optional_state(&mut output, delta.before.as_ref())?;
-            put_optional_state(&mut output, delta.after.as_ref())?;
+        self.encode_into(&mut output)?;
+        if output.len() == length {
+            return Ok(output);
         }
-        self.metadata.encode(&mut output)?;
-        if output.len() != length {
+
+        // The wire length is cached because normal publication is immutable.
+        // Tests in this module also deliberately forge a patch by editing its
+        // private metadata, though, and that mutation cannot invalidate the
+        // cache.  Recompute only on this exceptional mismatch so ordinary
+        // serialization keeps the one-pass, cached fast path.
+        let fresh_length = self.encoded_len_uncached()?;
+        if fresh_length > self.limits.max_patch_bytes() {
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: self.limits.max_patch_bytes(),
+            });
+        }
+        output.clear();
+        output
+            .try_reserve_exact(fresh_length)
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation durable patch",
+                source,
+            })?;
+        self.encode_into(&mut output)?;
+        if output.len() != fresh_length {
             return Err(invalid(
                 "opened-presentation durable patch length changed during encoding",
             ));
         }
         Ok(output)
+    }
+
+    fn encode_into(&self, output: &mut Vec<u8>) -> Result<()> {
+        output.extend_from_slice(MAGIC);
+        put_bytes32(output, self.presentation_name.as_str().as_bytes())?;
+        put_optional_relationship_delta(output, self.root.as_ref())?;
+        put_u32(output, self.deltas.len())?;
+        for delta in &self.deltas {
+            put_bytes32(output, delta.name.as_str().as_bytes())?;
+            put_optional_state(output, delta.before.as_ref())?;
+            put_optional_state(output, delta.after.as_ref())?;
+        }
+        self.metadata.encode(output)?;
+        Ok(())
     }
 
     /// Parse a stable durable patch under caller-selected finite limits.

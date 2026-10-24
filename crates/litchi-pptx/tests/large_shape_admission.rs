@@ -12,7 +12,7 @@ fn ten_thousand_text_boxes_admit_an_eager_native_edit() {
     let bytes = builder.build().unwrap().to_bytes().unwrap();
     let source = Package::from_bytes(&bytes).unwrap();
     let mut edit = source.edit().unwrap();
-    assert_eq!(edit.slides().len(), 1);
+    assert_eq!(edit.slides().unwrap().len(), 1);
     assert_eq!(
         edit.set_shape_texts(
             0_usize,

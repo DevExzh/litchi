@@ -18,7 +18,7 @@ pub use modern_comments::ModernCommentChange;
 pub use smartart::SmartArtParts;
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock, Weak};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use quick_xml::events::Event;
@@ -45,10 +45,12 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 /// while staging.
 #[derive(Clone)]
 pub struct Edit {
-    source: Snapshot,
-    working: OpcPackage,
+    source: Option<Snapshot>,
+    lazy: Option<LazySource>,
+    working: Working,
     slides: Vec<Slide>,
-    slide_name_index: SlideNameIndex,
+    slide_name_index: Option<SlideNameIndex>,
+    state_ready: bool,
     /// Slide payloads this transaction read back as a complete scene when it
     /// staged them, by part name.
     ///
@@ -64,12 +66,82 @@ pub struct Edit {
     planned: Option<(Snapshot, Patch)>,
 }
 
+/// The edit-only state retained by [`Package::edit`](crate::Package::edit)
+/// before the first operation needs a validated opened snapshot. Keeping this
+/// separate from [`Snapshot`] is important: a lazy edit may be dropped
+/// without parsing the slide catalog, notes, names, or the complete package
+/// fingerprint, while explicit read projections remain eager and fallible.
+#[derive(Clone)]
+struct LazySource {
+    package: Arc<OpcPackage>,
+    limits: super::Limits,
+    physical_source_provenance: bool,
+    owner_state: Arc<crate::package::OpenedOwnerState>,
+    parent_digests: Option<Arc<super::PartDigests>>,
+    digest_sink: Arc<OnceLock<Arc<super::PartDigests>>>,
+    release_retained_mce: bool,
+}
+
+/// Copy-on-write graph state for an edit. A detached edit keeps the source's
+/// `Arc` until an operation actually needs a mutable graph; this covers both
+/// `Package::edit` and `Snapshot::edit` without traversing the OPC part map in
+/// their constructors.
+#[derive(Clone)]
+enum Working {
+    Deferred(Arc<OpcPackage>),
+    Owned(Box<OpcPackage>),
+}
+
+impl Working {
+    fn new(package: Arc<OpcPackage>) -> Self {
+        Self::Deferred(package)
+    }
+
+    fn into_owned(self) -> OpcPackage {
+        match self {
+            Self::Owned(package) => *package,
+            Self::Deferred(package) => match Arc::try_unwrap(package) {
+                Ok(package) => package,
+                Err(package) => package.as_ref().clone(),
+            },
+        }
+    }
+}
+
+impl std::ops::Deref for Working {
+    type Target = OpcPackage;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Deferred(package) => package.as_ref(),
+            Self::Owned(package) => package,
+        }
+    }
+}
+
+impl std::ops::DerefMut for Working {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        loop {
+            match self {
+                Self::Owned(package) => return package,
+                Self::Deferred(package) => {
+                    let package = package.as_ref().clone();
+                    *self = Self::Owned(Box::new(package));
+                },
+            }
+        }
+    }
+}
+
 impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("source", &self.source)
-            .field("slide_count", &self.slides.len())
+            .field("captured", &self.source.is_some())
+            .field(
+                "slide_count",
+                &self.state_ready.then_some(self.slides.len()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -77,13 +149,111 @@ impl std::fmt::Debug for Edit {
 impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
-            working: source.package.as_ref().clone(),
-            slides: source.slides.clone(),
-            slide_name_index: source.slide_name_index.clone(),
+            working: Working::new(Arc::clone(&source.package)),
+            slides: Vec::new(),
+            slide_name_index: None,
+            state_ready: false,
             scene_read: HashMap::new(),
             planned: None,
-            source,
+            source: Some(source),
+            lazy: None,
         }
+    }
+
+    /// Construct an edit without capturing the presentation. The first
+    /// operation that needs semantic state calls [`Self::ensure_ready`].
+    pub(crate) fn new_lazy(
+        package: Arc<OpcPackage>,
+        limits: super::Limits,
+        physical_source_provenance: bool,
+        owner_state: Arc<crate::package::OpenedOwnerState>,
+        digest_sink: Arc<OnceLock<Arc<super::PartDigests>>>,
+    ) -> Self {
+        let parent_digests = digest_sink.get().cloned();
+        Self {
+            working: Working::new(Arc::clone(&package)),
+            slides: Vec::new(),
+            slide_name_index: None,
+            state_ready: false,
+            scene_read: HashMap::new(),
+            planned: None,
+            source: None,
+            lazy: Some(LazySource {
+                package,
+                limits,
+                physical_source_provenance,
+                owner_state,
+                parent_digests,
+                digest_sink,
+                release_retained_mce: false,
+            }),
+        }
+    }
+
+    /// Materialize the existing validated opened-presentation state exactly
+    /// once. An error leaves the lazy source intact, so a caller can retry a
+    /// failed operation without observing a partially initialized edit.
+    fn ensure_ready(&mut self) -> Result<()> {
+        if self.source.is_some() && self.state_ready {
+            return Ok(());
+        }
+        if let Some(source) = self.source.as_ref() {
+            self.slides = source.slides.as_ref().clone();
+            self.slide_name_index = Some(source.slide_name_index.as_ref().clone());
+            self.state_ready = true;
+            return Ok(());
+        }
+        let Some(lazy) = self.lazy.take() else {
+            return Err(invalid(
+                "opened-presentation edit source state is unavailable",
+            ));
+        };
+        let captured = match lazy.parent_digests.as_deref() {
+            Some(parent) => super::model::capture_with_parent_digests(
+                &lazy.package,
+                lazy.limits,
+                lazy.physical_source_provenance,
+                parent,
+            ),
+            None => super::model::capture_with_provenance(
+                &lazy.package,
+                lazy.limits,
+                lazy.physical_source_provenance,
+            ),
+        };
+        let mut snapshot = match captured {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                self.lazy = Some(lazy);
+                return Err(error);
+            },
+        };
+        snapshot.owner_state = Arc::clone(&lazy.owner_state);
+        if lazy.release_retained_mce {
+            snapshot.release_retained_mce();
+        }
+        if lazy.digest_sink.get().is_none()
+            && let Ok(projected) = snapshot.part_digests.project(lazy.package.as_ref())
+        {
+            let _kept = lazy.digest_sink.set(Arc::new(projected));
+        }
+        self.slides = snapshot.slides.as_ref().clone();
+        self.slide_name_index = Some(snapshot.slide_name_index.as_ref().clone());
+        self.state_ready = true;
+        self.source = Some(snapshot);
+        Ok(())
+    }
+
+    /// Borrow the currently staged graph, or the immutable source graph before
+    /// the first mutation has required a private working copy.
+    fn working_ref(&self) -> Result<&OpcPackage> {
+        Ok(&self.working)
+    }
+
+    fn source_ref(&self) -> Result<&Snapshot> {
+        self.source
+            .as_ref()
+            .ok_or_else(|| invalid("opened-presentation edit source state is unavailable"))
     }
 
     /// Record that the payload now staged for `part_name` was read back as a
@@ -104,30 +274,37 @@ impl Edit {
     }
 
     /// Immutable source root for this transaction.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
+    #[must_use = "use the source snapshot or handle its error"]
+    pub fn source(&mut self) -> Result<&Snapshot> {
+        self.ensure_ready()?;
+        self.source_ref()
     }
 
     /// Slides in the transaction's currently staged order.
-    #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        &self.slides
+    #[must_use = "use the staged slides or handle its error"]
+    pub fn slides(&mut self) -> Result<&[Slide]> {
+        self.ensure_ready()?;
+        Ok(&self.slides)
     }
 
     /// Aggregate charged bytes held by the source snapshot's optional MCE
     /// projection table. Cloned snapshots may report the same shared charge,
     /// so per-owner values are not additive physical-memory measurements.
-    #[must_use]
-    pub fn retained_mce_bytes(&self) -> usize {
-        self.source.retained_mce_bytes()
+    #[must_use = "use the retained byte count or handle its error"]
+    pub fn retained_mce_bytes(&mut self) -> Result<usize> {
+        self.ensure_ready()?;
+        Ok(self.source_ref()?.retained_mce_bytes())
     }
 
     /// Release this transaction's source reference to retained transformed
     /// slide projections. Its staged package and semantic edits are unchanged;
     /// snapshot clones may keep the shared table alive.
     pub fn release_retained_mce(&mut self) {
-        self.source.release_retained_mce();
+        if let Some(source) = self.source.as_mut() {
+            source.release_retained_mce();
+        } else if let Some(lazy) = self.lazy.as_mut() {
+            lazy.release_retained_mce = true;
+        }
     }
 
     /// Insert an empty slide at a checked zero-based position using an exact
@@ -155,16 +332,17 @@ impl Edit {
         position: litchi_core::Position,
         layout_name: &str,
     ) -> Result<Slide> {
-        let current = capture(
-            &self.working,
-            self.source.limits,
-            self.source.physical_source_provenance,
-        )?;
+        self.ensure_ready()?;
+        let (limits, physical_source_provenance) = {
+            let source = self.source_ref()?;
+            (source.limits, source.physical_source_provenance)
+        };
+        let current = capture(&self.working, limits, physical_source_provenance)?;
         let patch = super::insert::plan(&current, position.get(), layout_name)?;
         let (working, published) = super::patch::apply_to_new(
             &self.working,
             &patch,
-            self.source.physical_source_provenance,
+            physical_source_provenance,
             &current.part_digests,
         )?;
         let selected = published
@@ -172,9 +350,9 @@ impl Edit {
             .get(position.get())
             .cloned()
             .ok_or_else(|| invalid("slide insertion lost its checked position"))?;
-        self.working = working;
-        self.slides = published.slides;
-        self.slide_name_index = published.slide_name_index;
+        self.working = Working::Owned(Box::new(working));
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         Ok(selected)
     }
 
@@ -189,6 +367,7 @@ impl Edit {
         from: impl Into<crate::slide::Selector<'s>>,
         to: litchi_core::Position,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let from = self.resolve_slide_position(from.into())?;
         let to = to.get();
         if to >= self.slides.len() {
@@ -212,6 +391,7 @@ impl Edit {
         left: impl Into<crate::slide::Selector<'a>>,
         right: impl Into<crate::slide::Selector<'b>>,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let left = self.resolve_slide_position(left.into())?;
         let right = self.resolve_slide_position(right.into())?;
         if left == right {
@@ -227,6 +407,7 @@ impl Edit {
     /// All selectors resolve against the same currently staged order. They
     /// must name every slide exactly once; raw slide IDs remain internal.
     pub fn reorder_slides(&mut self, selectors: &[crate::slide::Selector<'_>]) -> Result<bool> {
+        self.ensure_ready()?;
         if selectors.len() != self.slides.len() {
             return Err(invalid(
                 "slide order must select every staged slide exactly once",
@@ -246,7 +427,8 @@ impl Edit {
                     crate::slide::Selector::from(*position)
                 },
             };
-            order.push(self.slides[self.resolve_slide_position(selector)?].id);
+            let position = self.resolve_slide_position(selector)?;
+            order.push(self.slides[position].id);
         }
         self.reorder_slide_ids(&order)
     }
@@ -276,6 +458,7 @@ impl Edit {
         ordered_ids: &[u32],
         moved: Option<usize>,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         if ordered_ids.len() == self.slides.len()
             && ordered_ids
                 .iter()
@@ -284,7 +467,8 @@ impl Edit {
         {
             return Ok(false);
         }
-        let main = self.working.get_part(&self.source.presentation_name)?;
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let main = self.working.get_part(&presentation_name)?;
         let xml = super::xml::reorder_slides(main.blob(), &self.slides, ordered_ids)?;
         let sectioned = match moved {
             Some(position) => super::sections::place(&xml, ordered_ids, position)?,
@@ -308,11 +492,9 @@ impl Edit {
             );
         }
         let slide_name_index = SlideNameIndex::build(&reordered)?;
-        self.working
-            .get_part_mut(&self.source.presentation_name)?
-            .set_blob(xml);
+        self.working.get_part_mut(&presentation_name)?.set_blob(xml);
         self.slides = reordered;
-        self.slide_name_index = slide_name_index;
+        self.slide_name_index = Some(slide_name_index);
         Ok(true)
     }
 
@@ -331,30 +513,35 @@ impl Edit {
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
     ) -> Result<Slide> {
-        let snapshot = capture(
-            &self.working,
-            self.source.limits,
-            self.source.physical_source_provenance,
-        )?;
+        self.ensure_ready()?;
+        let (limits, physical_source_provenance) = {
+            let source = self.source_ref()?;
+            (source.limits, source.physical_source_provenance)
+        };
+        let snapshot = capture(&self.working, limits, physical_source_provenance)?;
         let plan = snapshot.plan_slide_removal(slide)?;
         let selected = plan.source().clone();
         let published = super::remove_plan::apply_patch(
             &mut self.working,
             plan.patch(),
-            self.source.physical_source_provenance,
+            physical_source_provenance,
         )?;
-        self.slides = published.slides;
-        self.slide_name_index = published.slide_name_index;
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         Ok(selected)
     }
 
     /// Record a staged plan's publication when it was this edit's first
     /// change, so commit can publish it without capturing it again.
     fn record_plan(&mut self, source_revision: [u8; 32], published: Snapshot, patch: &Patch) {
-        self.slides = published.slides.clone();
-        self.slide_name_index = published.slide_name_index.clone();
-        self.planned = (source_revision == self.source.revision && self.planned.is_none())
-            .then(|| (published, patch.clone()));
+        self.slides = published.slides.as_ref().clone();
+        self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
+        self.planned = (self
+            .source
+            .as_ref()
+            .is_some_and(|source| source.revision == source_revision)
+            && self.planned.is_none())
+        .then(|| (published, patch.clone()));
     }
 
     /// Stage a source-bound same-package whole-slide copy plan
@@ -372,18 +559,21 @@ impl Edit {
     /// policy refusal, or an error for a candidate graph that no longer
     /// applies exactly.
     pub fn stage_slide_copy(&mut self, plan: &crate::slide_copy::Plan) -> Result<()> {
-        self.source
-            .owner_state
-            .ensure_plain_mutation("stage_slide_copy")?;
+        self.ensure_ready()?;
+        let (physical_source_provenance, owner_state) = {
+            let source = self.source_ref()?;
+            (
+                source.physical_source_provenance,
+                Arc::clone(&source.owner_state),
+            )
+        };
+        owner_state.ensure_plain_mutation("stage_slide_copy")?;
         if super::package_fingerprint(&self.working)? != plan.source_revision() {
             return Err(Error::PatchConflict);
         }
-        let mut snapshot = super::apply(
-            &mut self.working,
-            plan.patch(),
-            self.source.physical_source_provenance,
-        )?;
-        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        let mut snapshot =
+            super::apply(&mut self.working, plan.patch(), physical_source_provenance)?;
+        snapshot.owner_state = owner_state;
         self.record_plan(plan.source_revision(), snapshot, plan.patch());
         Ok(())
     }
@@ -402,15 +592,21 @@ impl Edit {
     /// policy refusal, or an error for a candidate graph that no longer
     /// applies exactly.
     pub fn stage_slide_removal(&mut self, plan: &crate::slide_removal::Plan) -> Result<()> {
-        self.source
-            .owner_state
-            .ensure_plain_mutation("stage_slide_removal")?;
+        self.ensure_ready()?;
+        let (physical_source_provenance, owner_state) = {
+            let source = self.source_ref()?;
+            (
+                source.physical_source_provenance,
+                Arc::clone(&source.owner_state),
+            )
+        };
+        owner_state.ensure_plain_mutation("stage_slide_removal")?;
         let mut snapshot = super::remove_plan::apply_patch(
             &mut self.working,
             plan.patch(),
-            self.source.physical_source_provenance,
+            physical_source_provenance,
         )?;
-        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        snapshot.owner_state = owner_state;
         let source_revision = plan.patch().source_revision();
         self.record_plan(source_revision, snapshot, plan.patch().opened_patch());
         Ok(())
@@ -448,27 +644,34 @@ impl Edit {
         source: &crate::Package,
         plan: &crate::cross_slide_copy::Plan,
     ) -> Result<()> {
-        if !source.physical_source_provenance || !self.source.physical_source_provenance {
+        self.ensure_ready()?;
+        let (physical_source_provenance, owner_state, destination_digests) = {
+            let destination = self.source_ref()?;
+            (
+                destination.physical_source_provenance,
+                Arc::clone(&destination.owner_state),
+                Arc::clone(&destination.part_digests),
+            )
+        };
+        if !source.physical_source_provenance || !physical_source_provenance {
             return Err(Error::slide_copy_refused(
                 crate::SlideCopyRefusal::UnknownPhysicalMember,
             ));
         }
         source.ensure_plain_mutation("stage_cross_slide_copy")?;
-        self.source
-            .owner_state
-            .ensure_plain_mutation("stage_cross_slide_copy")?;
+        owner_state.ensure_plain_mutation("stage_cross_slide_copy")?;
         let mut snapshot = super::cross_copy_plan::apply_plan(
             source.opc()?,
             &mut self.working,
             plan,
             source.physical_source_provenance,
-            self.source.physical_source_provenance,
+            physical_source_provenance,
             super::cross_copy_plan::LiveDigests {
                 source: source.part_digest_memo(),
-                destination: Some(&self.source.part_digests),
+                destination: Some(destination_digests.as_ref()),
             },
         )?;
-        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        snapshot.owner_state = owner_state;
         let source_revision = plan.destination_revision();
         self.record_plan(source_revision, snapshot, plan.patch().opened_patch());
         Ok(())
@@ -511,7 +714,7 @@ impl Edit {
             owner.blob(),
             span,
             text,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
         )?;
         let staged = crate::shape::Scene::read(&xml)?;
         let staged_shape = staged.shape(key)?;
@@ -589,6 +792,7 @@ impl Edit {
         name: Option<&str>,
         hidden: Option<bool>,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         if name.is_none() && hidden.is_none() {
             return Ok(false);
         }
@@ -626,7 +830,7 @@ impl Edit {
             .set_blob(xml);
         if let Some((slides, index)) = renamed {
             self.slides = slides;
-            self.slide_name_index = index;
+            self.slide_name_index = Some(index);
         }
         Ok(true)
     }
@@ -668,7 +872,8 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let main = self.working.get_part(&self.source.presentation_name)?;
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let main = self.working.get_part(&presentation_name)?;
         let (xml, changed) = crate::presentation::transition::stage(
             owner.blob(),
             main.blob(),
@@ -709,7 +914,7 @@ impl Edit {
         let (xml, changed) = super::xml::stage_shape_texts(
             owner.blob(),
             replacements,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -744,7 +949,7 @@ impl Edit {
         let (xml, changed) = super::stage_shape_text_chunks(
             owner.blob(),
             chunks,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -775,7 +980,7 @@ impl Edit {
         let (xml, changed) = super::properties::stage_shape_properties(
             owner.blob(),
             replacements,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -815,7 +1020,7 @@ impl Edit {
         let (xml, changed) = super::stage_text_properties(
             owner.blob(),
             edits,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -876,7 +1081,7 @@ impl Edit {
         let (xml, changed) = super::stage_text_property_chunks(
             owner.blob(),
             chunks,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
             changes,
         )?;
@@ -905,7 +1110,7 @@ impl Edit {
         let (xml, changed) = super::stage_shape_property_chunks(
             owner.blob(),
             chunks,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -939,7 +1144,7 @@ impl Edit {
             bounds,
             shape_id,
             conformance,
-            self.source.limits,
+            self.source_ref()?.limits,
         )?;
         self.append_checked_shape(&selected, shape_id, fragment.as_bytes())?;
         Ok(shape_id)
@@ -993,16 +1198,16 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide.into())?;
         validate_bounds(bounds, "picture")?;
-        validate_shape_text(name.as_ref(), self.source.limits, "picture name")?;
+        validate_shape_text(name.as_ref(), self.source_ref()?.limits, "picture name")?;
         if resource.data.is_empty() {
             return Err(invalid(
                 "opened-presentation picture resource cannot be empty",
             ));
         }
-        if resource.data.len() > self.source.limits.max_patch_bytes() {
+        if resource.data.len() > self.source_ref()?.limits.max_patch_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::PatchBytes,
-                maximum: self.source.limits.max_patch_bytes(),
+                maximum: self.source_ref()?.limits.max_patch_bytes(),
             });
         }
         if !resource.content_type.starts_with("image/") {
@@ -1170,10 +1375,10 @@ impl Edit {
             if !included_roots.insert(root_index) {
                 continue;
             }
-            if included_roots.len() > self.source.limits.max_parts() {
+            if included_roots.len() > self.source_ref()?.limits.max_parts() {
                 return Err(Error::EditLimit {
                     kind: crate::opened::LimitKind::Parts,
-                    maximum: self.source.limits.max_parts(),
+                    maximum: self.source_ref()?.limits.max_parts(),
                 });
             }
             let root = source_roots
@@ -1229,7 +1434,7 @@ impl Edit {
             source.package.as_ref(),
             &self.working,
             roots,
-            self.source.limits.max_parts(),
+            self.source_ref()?.limits.max_parts(),
         )?;
         let mut candidate = self.working.clone();
         publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
@@ -1301,7 +1506,8 @@ impl Edit {
         edits: &[super::TextAssignment<'_>],
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
-        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1319,7 +1525,7 @@ impl Edit {
         let (xml, changed) = super::stage_text_properties(
             note.xml(),
             edits,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
         )?;
         if let Some(xml) = xml {
@@ -1372,7 +1578,8 @@ impl Edit {
         changes: Option<&mut Vec<bool>>,
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide)?;
-        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1390,7 +1597,7 @@ impl Edit {
         let (xml, changed) = super::stage_text_property_chunks(
             note.xml(),
             chunks,
-            self.source.limits.max_text_bytes(),
+            self.source_ref()?.limits.max_text_bytes(),
             crate::shape::Limits::DEFAULT.output_bytes(),
             changes,
         )?;
@@ -1418,13 +1625,14 @@ impl Edit {
     ) -> Result<bool> {
         let selected_slide = self.resolve_slide(slide.into())?;
         let text = text.as_ref();
-        if text.len() > self.source.limits.max_text_bytes() {
+        if text.len() > self.source_ref()?.limits.max_text_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::TextBytes,
-                maximum: self.source.limits.max_text_bytes(),
+                maximum: self.source_ref()?.limits.max_text_bytes(),
             });
         }
-        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
         let note = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1462,7 +1670,8 @@ impl Edit {
 
     /// Read the staged notes of `slide` back and require `text`.
     fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
-        let staged = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
+        let presentation_name = self.source_ref()?.presentation_name.clone();
+        let staged = crate::notes::load_snapshot(&self.working, &presentation_name)?
             .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
         let staged_note = staged
             .slides()
@@ -1490,6 +1699,7 @@ impl Edit {
     ///
     /// Returns an error when the catalog or its attachment graph is invalid.
     pub fn put_table_styles(&mut self, styles: crate::table::style::List) -> Result<bool> {
+        self.ensure_ready()?;
         crate::table::style::put(&mut self.working, styles)
     }
 
@@ -1505,6 +1715,7 @@ impl Edit {
     ///
     /// Returns an error when the existing attachment graph is unsafe.
     pub fn remove_table_styles(&mut self) -> Result<Option<crate::table::style::List>> {
+        self.ensure_ready()?;
         crate::table::style::remove(&mut self.working)
     }
 
@@ -1528,7 +1739,13 @@ impl Edit {
         let scene = crate::shape::Scene::read(owner.blob())?;
         let shape_id = next_shape_id(&scene, "table")?;
         let conformance = crate::media_parts::document_conformance(owner.blob())?;
-        let fragment = table_fragment(cells, bounds, shape_id, conformance, self.source.limits)?;
+        let fragment = table_fragment(
+            cells,
+            bounds,
+            shape_id,
+            conformance,
+            self.source_ref()?.limits,
+        )?;
         let _table = crate::table::Table::from_graphic_frame(fragment.as_bytes())?;
         let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
         let staged = crate::shape::Scene::read(&xml)?;
@@ -1576,6 +1793,7 @@ impl Edit {
         use litchi_drawingml::chart::chartex;
         use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
+        self.ensure_ready()?;
         if bounds.2 <= 0 || bounds.3 <= 0 {
             return Err(invalid("chart frame extents must be positive"));
         }
@@ -1673,7 +1891,7 @@ impl Edit {
     /// Returns an error for a missing slide or shape, a shape that is not a
     /// chart frame, or a broken chart relationship.
     pub fn chart<'s, 'k>(
-        &self,
+        &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
@@ -1782,6 +2000,7 @@ impl Edit {
     ///
     /// Returns an error when the master/layout graph cannot be extended safely.
     pub fn add_slide_master(&mut self) -> Result<crate::master_layout::AuthoredSlideMaster> {
+        self.ensure_ready()?;
         crate::master_layout::validate_master_layout_graph(&self.working)?;
         crate::master_layout::add_slide_master(&mut self.working)
     }
@@ -1804,6 +2023,7 @@ impl Edit {
         name: &str,
         placeholders: &[crate::master_layout::PlaceholderSpec],
     ) -> Result<crate::master_layout::AuthoredSlideLayout> {
+        self.ensure_ready()?;
         crate::master_layout::validate_master_layout_graph(&self.working)?;
         crate::master_layout::add_slide_layout(&mut self.working, master, kind, name, placeholders)
     }
@@ -1820,6 +2040,7 @@ impl Edit {
     ///
     /// Returns an error when the layout is still used or its graph is malformed.
     pub fn remove_slide_layout(&mut self, layout: &PackURI) -> Result<()> {
+        self.ensure_ready()?;
         crate::master_layout::validate_master_layout_graph(&self.working)?;
         crate::master_layout::remove_slide_layout(&mut self.working, layout)
     }
@@ -1840,6 +2061,7 @@ impl Edit {
         author: crate::comments::Author,
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
+        self.ensure_ready()?;
         crate::comments::add_presentation_comment_author(&mut self.working, author, conformance)
     }
 
@@ -1915,6 +2137,7 @@ impl Edit {
         &mut self,
         author: crate::modern_comments::Author,
     ) -> Result<crate::modern_comments::AuthorPart> {
+        self.ensure_ready()?;
         let mut candidate = self.working.clone();
         let result = crate::modern_comments::add_modern_comment_author(&mut candidate, author)?;
         crate::modern_comments::load_modern_comment_graph(&candidate)?;
@@ -1939,6 +2162,7 @@ impl Edit {
         author_id: &str,
         replacement: crate::modern_comments::Author,
     ) -> Result<bool> {
+        self.ensure_ready()?;
         let mut candidate = self.working.clone();
         let result = crate::modern_comments::replace_modern_comment_author(
             &mut candidate,
@@ -1963,6 +2187,7 @@ impl Edit {
     /// Returns an error while any modeled comment/reply still references the
     /// author or when the graph is malformed.
     pub fn remove_modern_comment_author(&mut self, author_id: &str) -> Result<bool> {
+        self.ensure_ready()?;
         let mut candidate = self.working.clone();
         let result =
             crate::modern_comments::remove_modern_comment_author(&mut candidate, author_id)?;
@@ -1986,6 +2211,7 @@ impl Edit {
         &mut self,
         ordered_author_ids: &[String],
     ) -> Result<Vec<crate::modern_comments::Author>> {
+        self.ensure_ready()?;
         let mut candidate = self.working.clone();
         let result = crate::modern_comments::reorder_modern_comment_authors(
             &mut candidate,
@@ -2312,7 +2538,7 @@ impl Edit {
             source.package.as_ref(),
             &self.working,
             &root,
-            self.source.limits.max_parts(),
+            self.source_ref()?.limits.max_parts(),
         )?;
         let mut candidate = self.working.clone();
         publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
@@ -2343,19 +2569,26 @@ impl Edit {
     /// for a changed commit over a signed package, and an error if a
     /// dependency changed, the patch exceeds bounds, or the complete staged
     /// package cannot be captured as a coherent snapshot.
-    pub fn commit(self) -> Result<Commit> {
-        if let Some((snapshot, patch)) = self.planned
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_ready()?;
+        let source = self
+            .source
+            .take()
+            .ok_or_else(|| invalid("opened-presentation edit source state is unavailable"))?;
+        let planned = self.planned.take();
+        if let Some((snapshot, patch)) = planned
             && super::model::packages_equal(&self.working, snapshot.package.as_ref())
         {
             // The staged graph is exactly the candidate a plan published as
             // this edit's first change: its validated snapshot and patch stand.
-            let package = crate::Package::from_opened_candidate(self.working, &snapshot);
+            let package =
+                crate::Package::from_opened_candidate(self.working.into_owned(), &snapshot);
             return Ok(Commit::new(package, snapshot, patch));
         }
         let mut working = self.working;
         compact_changed_slides(
             &mut working,
-            self.source.package.as_ref(),
+            source.package.as_ref(),
             &self.slides,
             &self.scene_read,
         )?;
@@ -2363,24 +2596,22 @@ impl Edit {
         // the source snapshot, so the source memo answers every part the
         // transaction did not rewrite; the rewritten ones miss and are hashed.
         let (revision, digests) =
-            super::model::package_fingerprint_with_memo(&working, Some(&self.source.part_digests))?;
-        if revision != self.source.revision {
-            refuse_signed_change(self.source.package.as_ref(), &working)?;
+            super::model::package_fingerprint_with_memo(&working, Some(&source.part_digests))?;
+        if revision != source.revision {
+            refuse_signed_change(source.package.as_ref(), &working)?;
         }
         let patch = Patch::capture(
-            self.source.package.as_ref(),
+            source.package.as_ref(),
             &working,
-            self.source.presentation_name.clone(),
-            self.source.limits,
+            source.presentation_name.clone(),
+            source.limits,
         )?;
         if patch.is_noop() {
-            let package = crate::Package::from_opened_candidate(
-                self.source.package.as_ref().clone(),
-                &self.source,
-            );
+            let package =
+                crate::Package::from_opened_candidate(source.package.as_ref().clone(), &source);
             return Ok(Commit {
                 package: Arc::new(package),
-                snapshot: self.source,
+                snapshot: source,
                 patch,
             });
         }
@@ -2390,15 +2621,15 @@ impl Edit {
         // rewritten ones are rescanned; every other validation still runs.
         let mut snapshot = super::model::capture_with_revision_and_digests_and_mce(
             &working,
-            self.source.limits,
-            self.source.physical_source_provenance,
+            source.limits,
+            source.physical_source_provenance,
             revision,
             digests,
-            self.source.retained_mce.as_deref(),
-            Some(self.source.slide_roots.as_ref()),
+            source.retained_mce.as_deref(),
+            Some(source.slide_roots.as_ref()),
         )?;
-        snapshot.owner_state = Arc::clone(&self.source.owner_state);
-        let package = crate::Package::from_opened_candidate(working, &snapshot);
+        snapshot.owner_state = Arc::clone(&source.owner_state);
+        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot);
         Ok(Commit {
             package: Arc::new(package),
             snapshot,
@@ -2438,10 +2669,15 @@ impl Edit {
         Ok(())
     }
 
-    fn resolve_slide_position(&self, selector: crate::slide::Selector<'_>) -> Result<usize> {
+    fn resolve_slide_position(&mut self, selector: crate::slide::Selector<'_>) -> Result<usize> {
+        self.ensure_ready()?;
         let position = match selector {
             crate::slide::Selector::Position(position) => position.get(),
-            crate::slide::Selector::Name(name) => self.slide_name_index.position(&name)?,
+            crate::slide::Selector::Name(name) => self
+                .slide_name_index
+                .as_ref()
+                .ok_or_else(|| invalid("opened-presentation slide names are unavailable"))?
+                .position(&name)?,
         };
         if position >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
@@ -2452,7 +2688,8 @@ impl Edit {
         Ok(position)
     }
 
-    fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<Slide> {
+    fn resolve_slide(&mut self, key: crate::slide::Selector<'_>) -> Result<Slide> {
+        self.ensure_ready()?;
         match key {
             crate::slide::Selector::Position(position) => {
                 let index = position.get();
@@ -2464,9 +2701,11 @@ impl Edit {
                         len: self.slides.len(),
                     })
             },
-            crate::slide::Selector::Name(name) => {
-                self.slide_name_index.resolve(&self.slides, &name)
-            },
+            crate::slide::Selector::Name(name) => self
+                .slide_name_index
+                .as_ref()
+                .ok_or_else(|| invalid("opened-presentation slide names are unavailable"))?
+                .resolve(&self.slides, &name),
         }
     }
 }
@@ -3768,7 +4007,7 @@ mod compaction_tests {
         let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let mut witnessed = 0usize;
-        for slide in &snapshot.slides {
+        for slide in snapshot.slides.as_ref() {
             let xml = snapshot.package.get_part(&slide.part_name)?.blob();
             let compacted = super::super::xml::compact_changed_slide_xml(xml)?;
             if compacted.root_unchanged {

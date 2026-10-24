@@ -30,10 +30,10 @@ fn deck() -> Vec<u8> {
         builder.presentation().unwrap().add_slide().unwrap();
     }
     let package = builder.build().unwrap();
-    let ids: Vec<u32> = package
-        .edit()
-        .unwrap()
+    let mut edit = package.edit().unwrap();
+    let ids: Vec<u32> = edit
         .slides()
+        .unwrap()
         .iter()
         .map(|slide| slide.id())
         .collect();
@@ -67,10 +67,10 @@ fn deck() -> Vec<u8> {
 
 /// Section membership as slide positions (in the presentation order).
 fn membership(package: &mut Package) -> Vec<Vec<usize>> {
-    let ids: Vec<u32> = package
-        .edit()
-        .unwrap()
+    let mut edit = package.edit().unwrap();
+    let ids: Vec<u32> = edit
         .slides()
+        .unwrap()
         .iter()
         .map(|slide| slide.id())
         .collect();

@@ -163,7 +163,7 @@ impl Edit {
     /// Returns an error for a missing slide or shape, a shape that is not a
     /// SmartArt frame, or broken diagram relationships.
     pub fn smartart<'s, 'k>(
-        &self,
+        &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<SmartArtParts> {

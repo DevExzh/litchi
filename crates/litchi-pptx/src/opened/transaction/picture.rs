@@ -141,10 +141,11 @@ impl Edit {
                 "opened-presentation picture resource cannot be empty",
             ));
         }
-        if resource.data.len() > self.source.limits.max_patch_bytes() {
+        let max_patch_bytes = self.source_ref()?.limits.max_patch_bytes();
+        if resource.data.len() > max_patch_bytes {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::PatchBytes,
-                maximum: self.source.limits.max_patch_bytes(),
+                maximum: max_patch_bytes,
             });
         }
         if !resource.content_type.starts_with("image/") {

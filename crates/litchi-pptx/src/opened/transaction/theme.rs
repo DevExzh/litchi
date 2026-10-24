@@ -17,7 +17,7 @@ impl Edit {
     ///
     /// ```
     /// let source = litchi_pptx::Package::new()?;
-    /// let edit = source.edit()?;
+    /// let mut edit = source.edit()?;
     /// assert!(edit.theme()?.is_some());
     /// # Ok::<(), litchi_pptx::Error>(())
     /// ```
@@ -25,11 +25,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a malformed presentation graph or theme part.
-    pub fn theme(&self) -> Result<Option<Theme>> {
-        let Some(name) = crate::shape::theme::presentation_theme(&self.working)? else {
+    pub fn theme(&mut self) -> Result<Option<Theme>> {
+        self.ensure_ready()?;
+        let working = self.working_ref()?;
+        let Some(name) = crate::shape::theme::presentation_theme(working)? else {
             return Ok(None);
         };
-        crate::shape::theme::load(&self.working, name.as_str()).map(Some)
+        crate::shape::theme::load(working, name.as_str()).map(Some)
     }
 
     /// Replace the presentation theme's color scheme (`a:clrScheme`),
@@ -58,6 +60,7 @@ impl Edit {
     /// invalid, or the source scheme holds content the typed model cannot
     /// carry (it is then left untouched).
     pub fn set_theme_colors(&mut self, colors: &Palette) -> Result<bool> {
+        self.ensure_ready()?;
         let name = self.theme_name()?;
         let current = crate::shape::theme::load(&self.working, name.as_str())?;
         if same_palette(&current.colors, colors) {
@@ -87,6 +90,7 @@ impl Edit {
     /// invalid, or the source scheme holds content the typed model cannot
     /// carry (it is then left untouched).
     pub fn set_theme_fonts(&mut self, fonts: &FontSet) -> Result<bool> {
+        self.ensure_ready()?;
         let name = self.theme_name()?;
         if crate::shape::theme::load(&self.working, name.as_str())?.fonts == *fonts {
             return Ok(false);

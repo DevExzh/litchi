@@ -504,9 +504,12 @@ fn modern_comments_replies_and_master_layout_paths_match_source_and_eager() {
 fn eager_set_still_admits_the_native_graph_for_empty_and_equal_properties() {
     let bytes = presentation::bytes_with_malformed_tail();
     let native = litchi_pptx::Package::from_bytes(&bytes).unwrap();
+    let mut edit = native
+        .edit()
+        .expect("deferred native edit construction must remain infallible");
     assert!(
-        native.edit().is_err(),
-        "native edit must reject the malformed tail"
+        edit.slides().is_err(),
+        "the first native semantic use must reject the malformed tail"
     );
     let eager = files(bytes)[1].clone();
     let before = eager.to_bytes().unwrap();

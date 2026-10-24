@@ -39,7 +39,8 @@ pub struct Package {
     /// allocations, so every entry names and retains an allocation `opc`
     /// holds, and every mutation that publishes no opened-presentation
     /// snapshot still empties it.
-    pub(crate) part_digests: std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>,
+    pub(crate) part_digests:
+        std::sync::Arc<std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     /// Limits of the encrypted container this package was opened under,
@@ -177,17 +178,25 @@ impl Package {
     }
 
     /// Start one detached [`Edit`](crate::opened::Edit) under explicit edit
-    /// options; see [`Self::edit`].
+    /// options; see [`Self::edit`]. Capture of the opened presentation is
+    /// deferred until the edit first needs its source state.
     ///
     /// # Errors
     ///
-    /// Returns an error under the same conditions as
+    /// The constructor itself does not parse the presentation. The first
+    /// operation, source getter, or commit reports the same errors as
     /// [`Self::opened_presentation_with_options`].
     pub fn edit_with_options(
         &self,
         options: crate::opened::EditOptions,
     ) -> Result<crate::opened::Edit> {
-        Ok(self.opened_presentation_with_options(options)?.edit())
+        Ok(crate::opened::Edit::new_lazy(
+            std::sync::Arc::clone(&self.opc),
+            options.limits_value(),
+            self.physical_source_provenance,
+            std::sync::Arc::new(self.opened_owner_state()),
+            std::sync::Arc::clone(&self.part_digests),
+        ))
     }
 
     pub(crate) fn opened_presentation_with_limits(
@@ -235,11 +244,11 @@ impl Package {
     /// # }
     /// ```
     ///
-    /// # Errors
-    ///
-    /// Returns an error under the same conditions as [`Self::opened_presentation`].
+    /// Capture is deferred until the edit first needs its source state. The
+    /// first operation, source getter, or commit reports any malformed
+    /// presentation or exceeded edit bound.
     pub fn edit(&self) -> Result<crate::opened::Edit> {
-        Ok(self.opened_presentation()?.edit())
+        self.edit_with_options(crate::opened::EditOptions::default())
     }
 
     /// Publish a slide-removal plan's durable patch, or a replayed one, to a
@@ -436,7 +445,7 @@ impl Package {
             opc: opc.into(),
             physical_source_provenance: self.physical_source_provenance,
             tolerance: self.tolerance.clone(),
-            part_digests: std::sync::OnceLock::new(),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
@@ -464,7 +473,7 @@ impl Package {
             opc: std::sync::Arc::new(opc),
             physical_source_provenance: snapshot.physical_source_provenance,
             tolerance: state.tolerance.clone(),
-            part_digests: std::sync::OnceLock::new(),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             #[cfg(feature = "encryption")]
             encryption: state.encryption,
             #[cfg(feature = "encryption")]
@@ -841,9 +850,9 @@ impl Package {
     /// facade retains no payload its own graph does not hold. A projection that
     /// cannot allocate leaves the memo empty, which only costs a later hash.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
-        self.part_digests = std::sync::OnceLock::new();
+        self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
         if let Some(memo) = Self::memo_for(&self.opc, snapshot) {
-            self.part_digests = std::sync::OnceLock::from(memo);
+            let _kept = self.part_digests.set(memo);
         }
     }
 

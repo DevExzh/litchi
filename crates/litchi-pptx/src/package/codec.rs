@@ -174,7 +174,7 @@ impl Package {
 
         Ok(Self {
             opc: std::sync::Arc::new(package),
-            part_digests: std::sync::OnceLock::new(),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: false,
             tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
@@ -296,7 +296,7 @@ impl Package {
             crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
         Ok(Self {
             opc: std::sync::Arc::new(opc),
-            part_digests: std::sync::OnceLock::new(),
+            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance,
             tolerance,
             #[cfg(feature = "encryption")]

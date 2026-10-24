@@ -2436,6 +2436,40 @@ impl Edit {
     pub fn commit(mut self) -> Result<Commit> {
         self.working.check()?;
         let max_patch_bytes = self.max_patch_bytes;
+        // A refused operation leaves the working package untouched.  A
+        // no-op commit must still be publishable even when the caller's
+        // selected patch ceiling is smaller than the durable envelope's
+        // framing: no retained change is being emitted in this case.
+        if self.working.topology.is_none()
+            && self.changes.is_empty()
+            && self.working.root.as_bytes() == self.source.root.as_bytes()
+            && self.working.order.as_ref() == self.source.order.as_ref()
+        {
+            let before_root = self.source.root.clone();
+            let before_order = self.source.order.clone();
+            let after_root = self.working.root.clone();
+            let after_order = self.working.order.clone();
+            let Edit {
+                source,
+                working,
+                changes,
+                shape_removals,
+                ..
+            } = self;
+            let patch = Patch {
+                shape_removals,
+                data: PatchData::Local {
+                    source,
+                    before_root,
+                    before_order,
+                    after_root,
+                    after_order,
+                    changes: changes.into(),
+                },
+                encoded_len_cache: Arc::new(OnceLock::new()),
+            };
+            return Ok(commit_of(working, patch));
+        }
         if self.working.topology.is_some() {
             let source = self.source;
             let topology_budget =

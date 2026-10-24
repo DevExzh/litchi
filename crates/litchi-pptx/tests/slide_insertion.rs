@@ -79,7 +79,7 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
             .unwrap();
         let second = edit.insert_slide(Position::new(0), &layout).unwrap();
         let third = edit.insert_slide(Position::new(2), &layout).unwrap();
-        assert_eq!(edit.slides().len(), 3);
+        assert_eq!(edit.slides().unwrap().len(), 3);
         assert_ne!(first.id(), second.id());
         assert_ne!(second.id(), third.id());
         let (changed, patch) = edit.commit().unwrap().into_parts();
