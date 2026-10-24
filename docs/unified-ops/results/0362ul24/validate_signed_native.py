@@ -70,6 +70,7 @@ FINAL_ONLY = frozenset(
 
 ORIGINS = {"Opc", "Cfb"}
 CRYPTO_STATUS = "not_performed"
+NATIVE_FORMATS = frozenset({"DOCX", "PPTX", "XLSX", "XLSB", "DOC", "PPT", "XLS"})
 
 
 def sha256(path: Path) -> str:
@@ -283,10 +284,20 @@ def validate_route(
     if capability == "capability_missing":
         if endpoint == "final" or route not in FINAL_ONLY:
             raise ValueError(f"{route}: required capability missing on {endpoint}")
+        for row in rows:
+            _common_fixture_checks(row, route)
+            if (
+                row.get("status") != "capability_missing"
+                or row.get("refusal_kind") != "ProtectedDocument"
+                or row.get("refusal_code") != "document_protected"
+                or row.get("signed_before") is not True
+            ):
+                raise ValueError(f"{route}: baseline gap lacks its typed refusal proof")
         return {"route": route, "status": "capability_missing", "endpoint": endpoint}
     native = value.get("native_preflight")
     if not isinstance(native, list) or not native:
         raise ValueError(f"{route}: direct native preflight is missing")
+    native_formats: set[str] = set()
     for native_row in native:
         if not isinstance(native_row, dict):
             raise ValueError(f"{route}: native preflight row is not an object")
@@ -297,10 +308,18 @@ def validate_route(
             "unsupported_signed_source",
         }:
             raise ValueError(f"{route}: invalid native preflight disposition")
+        if format_name in native_formats:
+            raise ValueError(f"{route}: duplicate native preflight format {format_name}")
+        native_formats.add(format_name)
         if format_name in {"DOC", "PPT"} and status != "unsupported_signed_source":
             raise ValueError(f"{route}: {format_name} signed source should refuse direct source edit")
         if format_name not in {"DOC", "PPT"} and status != "exact_noop":
             raise ValueError(f"{route}: {format_name} direct native no-op was not proven")
+    if native_formats != NATIVE_FORMATS:
+        raise ValueError(
+            f"{route}: direct native preflight covers {sorted(native_formats)}, "
+            f"expected {sorted(NATIVE_FORMATS)}"
+        )
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError(f"{route}: fixture row is not an object")
@@ -329,6 +348,8 @@ def validate_route(
                 )
             if row.get("re_marked_signed") is not False:
                 raise ValueError(f"{route}: unsigned negative re-marked a signature")
+            if row.get("recipient_signed_after") is not True or row.get("output_published") is not False:
+                raise ValueError(f"{route}: patch conflict did not preserve the signed recipient")
             continue
         if route.endswith("/source_freshness"):
             if (
@@ -337,6 +358,11 @@ def validate_route(
                 or row.get("code") != "io_error"
             ):
                 raise ValueError(f"{route}: source fence is not SourceChanged/io_error")
+            checked_hash(row.get("source_mutated_sha256"), f"{route}: mutated source")
+            if row.get("source_mutated_sha256") == row.get("source_sha256"):
+                raise ValueError(f"{route}: source fence did not mutate the source")
+            if row.get("output_published") is not False:
+                raise ValueError(f"{route}: source fence published output")
             continue
         if route.endswith("/budget"):
             if (
@@ -347,6 +373,8 @@ def validate_route(
                 raise ValueError(f"{route}: budget refusal is not typed")
             if row.get("source_after_sha256") != row.get("source_sha256"):
                 raise ValueError(f"{route}: budget refusal changed source bytes")
+            if row.get("limit_kind") != "operations":
+                raise ValueError(f"{route}: budget refusal lacks its typed limit kind")
             continue
         if row.get("status") != "ok":
             raise ValueError(f"{route}: available route has non-ok fixture result")
@@ -362,18 +390,26 @@ def validate_route(
                 raise ValueError(f"{route}: signed no-op changed bytes or signature state")
             if row.get("output_equals_source") is not True:
                 raise ValueError(f"{route}: signed no-op lacks exact byte proof")
+            if row.get("source_after_sha256") != row.get("source_sha256"):
+                raise ValueError(f"{route}: signed no-op changed its source endpoint")
         elif route.endswith("/noop_write"):
             if (
-                row.get("signed_after") is not True
+                row.get("diagnostics_changed") is not False
+                or row.get("patch_noop") is not True
+                or row.get("signed_after") is not True
                 or row.get("output_sha256") != row.get("source_sha256")
             ):
-                raise ValueError(f"{route}: signed publication changed bytes/state")
+                raise ValueError(f"{route}: signed publication changed no-op/state proof")
             if (
                 row.get("stream_bounded") is not True
                 or not isinstance(row.get("max_write_bytes"), int)
                 or row["max_write_bytes"] <= 0
             ):
                 raise ValueError(f"{route}: publication is not bounded")
+            if row.get("output_equals_source") is not True:
+                raise ValueError(f"{route}: signed publication lacks exact byte proof")
+            if row.get("source_after_sha256") != row.get("source_sha256"):
+                raise ValueError(f"{route}: signed publication changed its source endpoint")
         elif route.endswith("/noop_replay"):
             if row.get("patch_noop") is not True or row.get("replay_base_match") is not True:
                 raise ValueError(f"{route}: replay lacks content-bound no-op proof")
@@ -382,12 +418,20 @@ def validate_route(
                 or row.get("output_sha256") != row.get("source_sha256")
             ):
                 raise ValueError(f"{route}: replay changed signed publication")
+            if row.get("output_equals_source") is not True:
+                raise ValueError(f"{route}: replay lacks exact byte proof")
         elif route.endswith("/unsign_write"):
             if row.get("signed_after") is not False or row.get("signature_parts_absent") is not True:
                 raise ValueError(f"{route}: unsign output retains signature state/parts")
             if row.get("semantic_changed") is not True or row.get("output_equals_source") is not False:
                 raise ValueError(f"{route}: unsign route did not publish a real change")
+            if row.get("target_changed") is not True:
+                raise ValueError(f"{route}: unsign route did not change the native target")
             checked_hash(row.get("output_sha256"), f"{route}: output")
+            if row.get("stream_sha256") != row.get("output_sha256"):
+                raise ValueError(f"{route}: bounded stream digest differs from output")
+            if row.get("stream_bounded") is not True:
+                raise ValueError(f"{route}: unsign publication is not bounded")
             if row.get("signed_clone_still_refuses") is not True:
                 raise ValueError(f"{route}: signed clone lost protection")
     return {"route": route, "status": "ok", "endpoint": endpoint, "fixtures": len(rows)}

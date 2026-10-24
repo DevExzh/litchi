@@ -12,7 +12,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use litchi_core::OwnedSource;
-use litchi_ops::transaction::{EditOptions, SemanticLimits};
+use litchi_ops::error::Source;
+use litchi_ops::transaction::{EditOptions, Error as TransactionError, LimitKind, SemanticLimits};
 use litchi_ops::{Code, File, Props, open, open_bytes};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -347,9 +348,31 @@ fn endpoint_file(file: &File, facade: bool) -> File {
         return file.clone();
     }
     let File::Signed(signed) = file else {
-        panic!("signed endpoint has no facade");
+        // `Signed::unsign(self)` consumes the wrapper and returns its
+        // underlying owner.  There is no second signed wrapper to unwrap on
+        // the post-authorization path; both public spellings therefore use
+        // that returned owner after the explicit consume.
+        return file.clone();
     };
     signed.file().clone()
+}
+
+fn signature_parts_absent(fixture: &Fixture, bytes: &[u8]) -> bool {
+    match fixture.origin.as_str() {
+        "Opc" => {
+            let package =
+                litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+                    .expect("unsigned OPC output");
+            !package.is_signed()
+        },
+        "Cfb" => {
+            let ole =
+                litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+                    .expect("unsigned CFB output");
+            !ole.exists(&["_signatures"]) && !ole.directory_exists(&["_xmlsignatures"])
+        },
+        other => panic!("unknown signature origin {other}"),
+    }
 }
 
 fn signed_row(fixture: &Fixture, file: &File) -> Value {
@@ -509,14 +532,12 @@ fn native_preflight(fixtures: &[Fixture]) -> Vec<Value> {
     fixtures.iter().map(direct_native_noop).collect()
 }
 
-fn no_op_commit(fixture: &Fixture, facade: bool) -> Value {
+fn no_op_commit(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let file = open_signed(fixture);
     let endpoint = endpoint_file(&file, facade);
     let value = property_value(&endpoint, fixture);
-    let commit = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
-        .expect("signed exact no-op edit");
-    let output = commit.file().to_bytes().expect("signed no-op output");
+    let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
+    let output = commit.file().to_bytes()?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
     row["diagnostics_changed"] = json!(commit.diagnostics().changed());
@@ -524,24 +545,22 @@ fn no_op_commit(fixture: &Fixture, facade: bool) -> Value {
     row["signed_after"] = json!(commit.file().is_signed());
     row["output_sha256"] = json!(digest(&output));
     row["output_equals_source"] = json!(output == fixture.signed);
-    row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("source bytes")));
-    row
+    row["source_after_sha256"] = json!(digest(&endpoint.to_bytes()?));
+    Ok(row)
 }
 
-fn bounded_write(file: &File) -> (String, usize, usize, usize) {
+fn bounded_write(file: &File) -> litchi_ops::Result<(String, usize, usize, usize)> {
     let mut stream = StreamDigest::new();
-    file.write_to(&mut stream).expect("bounded publication");
-    stream.finish()
+    file.write_to(&mut stream)?;
+    Ok(stream.finish())
 }
 
-fn no_op_write(fixture: &Fixture, facade: bool) -> Value {
+fn no_op_write(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let file = open_signed(fixture);
     let endpoint = endpoint_file(&file, facade);
     let value = property_value(&endpoint, fixture);
-    let commit = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
-        .expect("signed exact no-op edit");
-    let (output_sha256, bytes, writes, max_write_bytes) = bounded_write(commit.file());
+    let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
+    let (output_sha256, bytes, writes, max_write_bytes) = bounded_write(commit.file())?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
     row["patch_noop"] = json!(commit.patch().is_noop());
@@ -554,23 +573,18 @@ fn no_op_write(fixture: &Fixture, facade: bool) -> Value {
     row["bytes"] = json!(bytes);
     row["writes"] = json!(writes);
     row["max_write_bytes"] = json!(max_write_bytes);
-    row
+    Ok(row)
 }
 
-fn no_op_replay(fixture: &Fixture, facade: bool) -> Value {
+fn no_op_replay(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let file = open_signed(fixture);
     let endpoint = endpoint_file(&file, facade);
     let value = property_value(&endpoint, fixture);
-    let commit = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
-        .expect("signed exact no-op edit");
+    let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
     let reopened = open_signed(fixture);
     let recipient = endpoint_file(&reopened, facade);
-    let replayed = commit
-        .patch()
-        .apply(&recipient)
-        .expect("signed no-op replay");
-    let output = replayed.to_bytes().expect("replayed bytes");
+    let replayed = commit.patch().apply(&recipient)?;
+    let output = replayed.to_bytes()?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
     row["patch_noop"] = json!(commit.patch().is_noop());
@@ -578,7 +592,7 @@ fn no_op_replay(fixture: &Fixture, facade: bool) -> Value {
     row["signed_after"] = json!(replayed.is_signed());
     row["output_sha256"] = json!(digest(&output));
     row["output_equals_source"] = json!(output == fixture.signed);
-    row
+    Ok(row)
 }
 
 fn changed_refusal(fixture: &Fixture, facade: bool) -> Value {
@@ -600,7 +614,7 @@ fn changed_refusal(fixture: &Fixture, facade: bool) -> Value {
     row
 }
 
-fn unsigned_negative(fixture: &Fixture, facade: bool) -> Value {
+fn unsigned_negative(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let file = open_signed(fixture);
     let signed = match &file {
         File::Signed(signed) => signed.clone(),
@@ -615,16 +629,19 @@ fn unsigned_negative(fixture: &Fixture, facade: bool) -> Value {
         .patch()
         .apply(&endpoint_file(&file, facade))
         .expect_err("unsigned no-op patch must conflict with signed publication");
+    let recipient = endpoint_file(&file, facade);
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("PatchConflict");
     row["code"] = json!(error.code().as_str());
     row["re_marked_signed"] = json!(false);
+    row["recipient_signed_after"] = json!(recipient.is_signed());
+    row["output_published"] = json!(false);
     assert_eq!(error.code(), Code::InvalidInput);
-    row
+    Ok(row)
 }
 
-fn source_freshness(fixture: &Fixture, facade: bool) -> Value {
+fn source_freshness(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let suffix = match fixture.format.as_str() {
         "DOCX" => "docx",
         "PPTX" => "pptx",
@@ -646,66 +663,86 @@ fn source_freshness(fixture: &Fixture, facade: bool) -> Value {
         suffix
     ));
     fs::write(&path, &fixture.signed).expect("source freshness fixture");
-    let opened = open(&path).expect("path-backed signed source");
+    let opened = open(&path)?;
     let endpoint = endpoint_file(&opened, facade);
     let value = property_value(&endpoint, fixture);
     let patch = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
-        .expect("source freshness no-op")
+        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?
         .patch()
         .clone();
     let mut changed = fixture.signed.clone();
     changed[0] ^= 1;
-    fs::write(&path, changed).expect("mutate source fixture");
+    fs::write(&path, &changed).expect("mutate source fixture");
     let error = patch.apply(&endpoint).expect_err("source freshness fence");
     let _ = fs::remove_file(&path);
     let mut row = signed_row(fixture, &opened);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("SourceChanged");
     row["code"] = json!(error.code().as_str());
+    row["source_mutated_sha256"] = json!(digest(&changed));
+    row["output_published"] = json!(false);
     assert_eq!(error.code(), Code::IoError);
-    row
+    Ok(row)
+}
+
+fn limit_kind_name(kind: LimitKind) -> &'static str {
+    match kind {
+        LimitKind::Operations => "operations",
+        LimitKind::SnapshotBytes => "snapshot_bytes",
+        LimitKind::ExpandedTargets => "expanded_targets",
+        LimitKind::StagedBytes => "staged_bytes",
+        _ => "unknown",
+    }
 }
 
 fn budget(fixture: &Fixture, facade: bool) -> Value {
     let file = open_signed(fixture);
     let endpoint = endpoint_file(&file, facade);
     let limits = SemanticLimits::builder()
-        .max_operations(0)
-        .expect("zero-operation limit")
+        .max_operations(1)
+        .expect("one-operation limit")
         .build()
         .expect("semantic limits");
     let options = EditOptions::new().semantic_limits(limits);
     let value = property_value(&endpoint, fixture);
     let error = endpoint
         .edit_with_options(options, |edit| {
+            edit.set(fixture.target.as_str(), props(fixture, &value))?;
             edit.set(fixture.target.as_str(), props(fixture, &value))
         })
-        .expect_err("zero-operation limit");
+        .expect_err("one-operation limit");
+    let limit_kind = match error.leaf() {
+        Source::Transaction(TransactionError::Limit { kind, .. }) => limit_kind_name(*kind),
+        other => panic!("budget refusal was not a transaction limit: {other:?}"),
+    };
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("LimitExceeded");
     row["code"] = json!(error.code().as_str());
+    row["limit_kind"] = json!(limit_kind);
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("budget source")));
     assert_eq!(error.code(), Code::LimitExceeded);
+    assert_eq!(limit_kind, "operations");
     row
 }
 
-fn route_operation(route: &str, fixture: &Fixture) -> Value {
+fn route_operation(route: &str, fixture: &Fixture) -> litchi_ops::Result<Value> {
     let facade = route.starts_with("signed_facade/");
     match route {
         "signed_leaf/noop_commit" | "signed_facade/noop_commit" => no_op_commit(fixture, facade),
         "signed_leaf/noop_write" | "signed_facade/noop_write" => no_op_write(fixture, facade),
         "signed_leaf/noop_replay" | "signed_facade/noop_replay" => no_op_replay(fixture, facade),
-        "signed_leaf/refusal" | "signed_facade/refusal" => changed_refusal(fixture, facade),
+        "signed_leaf/refusal" | "signed_facade/refusal" => Ok(changed_refusal(fixture, facade)),
         "signed_leaf/unsigned_negative" | "signed_facade/unsigned_negative" => {
             unsigned_negative(fixture, facade)
         },
         "signed_leaf/source_freshness" | "signed_facade/source_freshness" => {
             source_freshness(fixture, facade)
         },
-        "signed_leaf/budget" | "signed_facade/budget" => budget(fixture, facade),
-        "signed_leaf/unsign_write" | "signed_facade/unsign_write" => unsign_write(fixture, facade),
+        "signed_leaf/budget" | "signed_facade/budget" => Ok(budget(fixture, facade)),
+        "signed_leaf/unsign_write" | "signed_facade/unsign_write" => {
+            Ok(unsign_write(fixture, facade))
+        },
         other => panic!("unknown signed route {other}"),
     }
 }
@@ -720,8 +757,22 @@ fn capability_missing(route: &str, fixture: &Fixture, error: &str) -> Value {
         "source_sha256": fixture.source_sha256,
         "status": "capability_missing",
         "error": error,
+        "refusal_kind": "ProtectedDocument",
+        "refusal_code": "document_protected",
         "signed_before": true,
     })
+}
+
+fn baseline_gap_route(route: &str) -> bool {
+    matches!(
+        route,
+        "signed_leaf/noop_commit"
+            | "signed_facade/noop_commit"
+            | "signed_leaf/noop_write"
+            | "signed_facade/noop_write"
+            | "signed_leaf/noop_replay"
+            | "signed_facade/noop_replay"
+    )
 }
 
 fn unsign_write(fixture: &Fixture, facade: bool) -> Value {
@@ -739,13 +790,17 @@ fn unsign_write(fixture: &Fixture, facade: bool) -> Value {
         .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &changed)))
         .expect("authorized changed edit");
     let output = commit.file().to_bytes().expect("authorized output");
-    let (stream_sha256, bytes, writes, max_write_bytes) = bounded_write(commit.file());
+    let (stream_sha256, bytes, writes, max_write_bytes) =
+        bounded_write(commit.file()).expect("authorized bounded publication");
     let reopened = open_bytes(output.clone()).expect("authorized output reopens");
+    let signature_parts_absent = signature_parts_absent(fixture, &output);
+    let target_after = property_value(&reopened, fixture);
     let mut row = signed_row(fixture, &signed_clone);
     row["status"] = json!("ok");
     row["signed_after"] = json!(reopened.is_signed());
-    row["signature_parts_absent"] = json!(!reopened.is_signed());
-    row["semantic_changed"] = json!(output != fixture.signed);
+    row["signature_parts_absent"] = json!(signature_parts_absent);
+    row["semantic_changed"] = json!(target_after == changed);
+    row["target_changed"] = json!(target_after == changed);
     row["output_sha256"] = json!(digest(&output));
     row["stream_sha256"] = json!(stream_sha256);
     row["bytes"] = json!(bytes);
@@ -758,6 +813,9 @@ fn unsign_write(fixture: &Fixture, facade: bool) -> Value {
             .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &changed)))
             .is_err()
     );
+    assert!(signature_parts_absent);
+    assert_eq!(target_after, changed);
+    assert_ne!(output, fixture.signed);
     row
 }
 
@@ -875,29 +933,24 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
                 route_operation(route, fixture)
             }));
             match result {
-                Ok(row) => rows.push(row),
-                Err(_)
+                Ok(Ok(row)) => rows.push(row),
+                Ok(Err(error))
                     if endpoint() == "before"
-                        && matches!(
-                            route,
-                            "signed_leaf/noop_commit"
-                                | "signed_facade/noop_commit"
-                                | "signed_leaf/noop_write"
-                                | "signed_facade/noop_write"
-                                | "signed_leaf/noop_replay"
-                                | "signed_facade/noop_replay"
-                                | "signed_leaf/unsign_write"
-                                | "signed_facade/unsign_write"
-                        ) =>
+                        && baseline_gap_route(route)
+                        && error.code() == Code::DocumentProtected =>
                 {
                     capability = "capability_missing";
                     rows.push(capability_missing(
                         route,
                         fixture,
-                        "old endpoint refused signed capability",
+                        "old endpoint returned the typed protected-document refusal",
                     ));
                 },
-                Err(_) => panic!("signed route {route} failed preflight"),
+                Ok(Err(error)) => panic!(
+                    "signed route {route} failed preflight with {}",
+                    error.code()
+                ),
+                Err(_) => panic!("signed route {route} panicked during preflight"),
             }
         }
         let native = if capability == "available" {

@@ -62,8 +62,14 @@ def route_row(route: str, **overrides: object) -> dict:
         "replay_base_match": True,
         "signature_parts_absent": False,
         "semantic_changed": False,
+        "target_changed": False,
         "signed_clone_still_refuses": True,
         "source_after_sha256": "a" * 64,
+        "source_mutated_sha256": "d" * 64,
+        "output_published": False,
+        "recipient_signed_after": True,
+        "limit_kind": "operations",
+        "stream_sha256": "c" * 64,
         "refusal_kind": "ProtectedDocument",
         "code": "document_protected",
         "re_marked_signed": False,
@@ -74,8 +80,10 @@ def route_row(route: str, **overrides: object) -> dict:
                 "signed_after": False,
                 "signature_parts_absent": True,
                 "semantic_changed": True,
+                "target_changed": True,
                 "output_equals_source": False,
                 "output_sha256": "c" * 64,
+                "stream_sha256": "c" * 64,
             }
         )
     if route.endswith("/unsigned_negative"):
@@ -122,6 +130,15 @@ def receipt(route: str, **overrides: object) -> dict:
         ],
     }
     value.update(overrides)
+    if value["capability"] == "capability_missing":
+        value["fixtures"] = [
+            route_row(
+                route,
+                status="capability_missing",
+                refusal_kind="ProtectedDocument",
+                refusal_code="document_protected",
+            )
+        ]
     return value
 
 

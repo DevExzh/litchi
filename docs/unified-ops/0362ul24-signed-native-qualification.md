@@ -64,6 +64,11 @@ intentional public leaf/facade pairing and does not pretend that the wrapper
 is a direct format-crate `Package` benchmark. The direct native package
 checks listed in §4 are separate correctness preflights.
 
+For `unsign_write`, `Signed::unsign(self)` necessarily consumes the signed
+wrapper and returns its underlying owner. The leaf and facade labels both
+exercise that returned public owner after the explicit consume; they do not
+invent a second wrapper or claim that `Signed::file()` can consume itself.
+
 | route | operation | required correctness proof | baseline f2 status | timing status |
 |---|---|---|---|---|
 | `signed_leaf/noop_commit` | native same-value setter through `Signed::file().edit(...)` | `diagnostics.changed = false`; patch is native no-op; output remains signed and byte-identical | `unsupported/refused` if the old source cannot admit signed no-op; never time an error as a pass | final-only until a semantically identical before route exists |
@@ -72,8 +77,8 @@ checks listed in §4 are separate correctness preflights.
 | `signed_facade/noop_replay` | apply facade no-op patch to independently reopened signed facade | same as leaf, including wrapper/origin and bytes | `unsupported/refused` | final-only |
 | `signed_leaf/refusal` | real native change on signed leaf | `RefusalKind::ProtectedDocument`, fixed reason/code; source bytes unchanged; no output publication | correctness only; an expected refusal is not a timed success | correctness only |
 | `signed_facade/refusal` | real native change on signed facade | same refusal and no publication | correctness only | correctness only |
-| `signed_leaf/unsign_write` | consume `Signed::unsign`, changed native setter, stream `write_to` | unsigned result; signature graph/streams absent; changed semantic marker present; reopen is unsigned; source clone still refuses | `unsupported/refused` (old source has no explicit authorization route) | final-only |
-| `signed_facade/unsign_write` | same through facade-owned signed handle, then write | same byte/signature/source proof; facade source clone remains protected | `unsupported/refused` | final-only |
+| `signed_leaf/unsign_write` | consume `Signed::unsign`, changed native setter, stream `write_to` | unsigned result; signature graph/streams absent; changed semantic marker present; reopen is unsigned; source clone still refuses | existing explicit `Signed::unsign` route is paired only when this proof passes; a failed old route is a preflight failure, not a timed refusal | matched when the old route passes the same proof; otherwise visible as an unsupported final-only route |
+| `signed_facade/unsign_write` | same through facade-owned signed handle, then write | same byte/signature/source proof; facade source clone remains protected | existing explicit `Signed::unsign` route; same proof and pairing rule as the leaf | matched when the old route passes the same proof; otherwise visible as an unsupported final-only route |
 | `signed_leaf/unsigned_negative` | apply an authorized unsigned no-op patch to signed recipient | `PatchConflict`, classified `invalid_input`; no signature re-marking | not applicable | correctness only |
 | `signed_facade/unsigned_negative` | facade counterpart | same | not applicable | correctness only |
 | `signed_leaf/source_freshness` | path-backed signed no-op/replay after external source mutation | `SourceChanged`, classified `io_error`; no publication | not applicable | correctness only |
