@@ -41,10 +41,19 @@ class ProjectionPolicyTests(unittest.TestCase):
     def test_reviewed_policy_and_fixed_pair(self) -> None:
         value = policy.load_reviewed_policy()
         self.assertEqual(value, policy._policy_summary())
+        self.assertEqual(value["before_features"], list(policy.BEFORE_FEATURES))
+        self.assertEqual(value["features"], list(policy.FEATURES))
+        self.assertNotEqual(policy.BEFORE_FEATURES, policy.FEATURES)
         proof = policy.validate_projection_pair(self.before, self.after)
         self.assertEqual(proof["registry_package_count"], 518)
         self.assertTrue(proof["registry_identities_checksums_dependencies_equal"])
         self.assertEqual(len(proof["local_edge_differences"]), 6)
+
+    def test_before_feature_overlay_is_rejected(self) -> None:
+        changed = copy.deepcopy(self.before)
+        changed["features"]["selected"] = list(policy.FEATURES)
+        with self.assertRaises(policy.ProjectionPolicyError):
+            policy.validate_projection_pair(changed, self.after)
 
     def test_policy_bytes_are_registered_and_canonical(self) -> None:
         path = policy.ROOT / policy.POLICY_RELATIVE
@@ -547,6 +556,7 @@ class PairAnalyzerTests(unittest.TestCase):
             FIXTURE_SHA256=fixture_row["sha256"],
             TARGET="test-target",
             PROFILE="release",
+            BEFORE_FEATURES=("all",),
             FEATURES=("all",),
             TOOLCHAIN_SHA256=fixed_inputs["before"]["toolchain"]["sha256"],
             load_reviewed_policy=lambda: {
@@ -565,7 +575,7 @@ class PairAnalyzerTests(unittest.TestCase):
         build = {
             "target": "test-target",
             "profile": "release",
-            "features": ["all"],
+            "features": {"before": ["all"], "after": ["all"]},
             "toolchain_sha256": fake_policy.TOOLCHAIN_SHA256,
         }
         receipt_value = {

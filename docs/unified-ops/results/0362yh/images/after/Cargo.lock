@@ -2799,6 +2799,7 @@ dependencies = [
  "litchi-rtf",
  "litchi-sheet-text",
  "litchi-sign",
+ "litchi-vba",
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",

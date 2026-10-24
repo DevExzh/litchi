@@ -245,7 +245,10 @@ def check_original_to_final_shared(
     expected_build = {
         "target": policy.TARGET,
         "profile": policy.PROFILE,
-        "features": list(policy.FEATURES),
+        "features": {
+            "before": list(policy.BEFORE_FEATURES),
+            "after": list(policy.FEATURES),
+        },
         "toolchain_sha256": policy.TOOLCHAIN_SHA256,
     }
     try:

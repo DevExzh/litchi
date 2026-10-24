@@ -11,6 +11,8 @@ same workload and dependency resolution:
   hash plus the parsed recipe;
 * ``dependency`` projects the supplied lockfile, package manifests, feature
   selection, target and toolchain into a canonical JSON object; and
+* ``build-receipt`` hashes the completed binary, compiler and cargo shim and
+  writes the complete post-build receipt consumed by ``endpoint``; and
 * ``endpoint`` writes the runner's endpoint manifest from real artifact
   hashes.
 
@@ -602,8 +604,22 @@ def verified_build_receipt(
         raise fail("build receipt toolchain differs from endpoint toolchain")
     if value.get("features") != features or value.get("target") != target or value.get("profile") != profile:
         raise fail("build receipt build selection differs from dependency projection")
-    if not isinstance(value.get("build_command"), str) or not value["build_command"].strip():
+    build_command = value.get("build_command")
+    if not isinstance(build_command, str) or not build_command.strip():
         raise fail("build receipt has no build command")
+    # Older reviewed receipts predate explicit shim binding.  New receipts
+    # produced by ``build-receipt`` carry the cargo artifact and therefore get
+    # the stronger command/identity check here as well.
+    cargo_value = value.get("cargo")
+    if cargo_value is not None:
+        if not isinstance(cargo_value, dict) or not isinstance(cargo_value.get("path"), str):
+            raise fail("build receipt cargo shim artifact is incomplete")
+        cargo_path = safe_location(Path(cargo_value["path"]), "build receipt cargo shim")
+        actual_cargo = artifact(cargo_path)
+        same_artifact(actual_cargo, cargo_value, "build receipt cargo shim")
+        if not os.access(cargo_path, os.X_OK):
+            raise fail("build receipt cargo shim is not executable")
+        _check_build_command(build_command, target, profile, cargo_path)
     compiler_artifacts = value.get("compiler_artifacts")
     if not isinstance(compiler_artifacts, list) or not compiler_artifacts:
         raise fail("build receipt has no compiler artifact hashes")
@@ -612,6 +628,148 @@ def verified_build_receipt(
             raise fail(f"build receipt compiler artifact {index} is incomplete")
         same_artifact(artifact(Path(compiler_artifact.get("path", ""))), compiler_artifact, f"build receipt compiler artifact {index}")
     return value
+
+
+def _check_build_command(command: str, target: str, profile: str, cargo: Path) -> str:
+    command = command.strip()
+    if not command:
+        raise fail("build receipt requires a nonempty build command")
+    required = ("CARGO_BUILD_JOBS=1", "CARGO_TARGET_DIR=", "--offline", "--locked", f"--target {target}")
+    missing = [marker for marker in required if marker not in command]
+    if profile == "release":
+        if "--release" not in command:
+            missing.append("--release")
+    elif f"--profile {profile}" not in command:
+        missing.append(f"--profile {profile}")
+    if str(cargo.resolve()) not in command:
+        missing.append(str(cargo.resolve()))
+    if missing:
+        raise fail(f"build receipt command is missing reviewed flags or cargo shim: {missing!r}")
+    return command
+
+
+def write_build_receipt(args: argparse.Namespace) -> dict[str, Any]:
+    """Create and immediately validate a complete post-build receipt.
+
+    This is deliberately separate from ``endpoint``: the build stage creates
+    the receipt immediately after the binary exists, while the endpoint stage
+    later binds it to the untimed 109-route validation receipt.  Every source,
+    lock, manifest, projection, compiler and cargo-shim artifact is hashed
+    here; no caller-supplied metadata is accepted as an identity.
+    """
+    workspace = safe_location(args.workspace, "workspace")
+    workspace_manifest_path = safe_location(args.workspace_manifest, "workspace manifest")
+    package_manifest_path = safe_location(args.package_manifest, "package manifest")
+    if workspace_manifest_path != workspace / "Cargo.toml":
+        raise fail("workspace manifest is not the supplied workspace Cargo.toml")
+    if package_manifest_path != workspace / PACKAGE_MANIFEST_RELATIVE:
+        raise fail(f"package manifest must be {PACKAGE_MANIFEST_RELATIVE} within the workspace")
+    probe_path = safe_location(args.probe, "probe")
+    if probe_path != workspace / PROBE_RELATIVE:
+        raise fail(f"probe must be {PROBE_RELATIVE} within the workspace")
+    fixture_path = safe_location(args.fixture, "fixture descriptor")
+    _fixture_value, _routes = verified_fixture(probe_path, fixture_path)
+    fixture_artifact = artifact(fixture_path)
+    probe_artifact = artifact(probe_path)
+    source_artifact = artifact(safe_location(args.source, "source archive"))
+    source_commit = checked_commit(args.source_commit, "source commit")
+    source_assembly_path = safe_location(args.source_assembly, "source assembly")
+    source_assembly_artifact = artifact(source_assembly_path)
+    verified_source_assembly(source_assembly_path, source_artifact, source_commit)
+    lock_artifact = artifact(safe_location(args.lock, "lockfile"))
+    workspace_manifest = artifact(workspace_manifest_path)
+    package_manifest = artifact(package_manifest_path)
+    toolchain = artifact(safe_location(args.toolchain, "toolchain"))
+    binary_path = safe_location(args.binary, "binary")
+    binary_artifact = artifact(binary_path)
+    if not os.access(binary_path, os.X_OK):
+        raise fail(f"binary is not executable: {binary_path}")
+    projection_args = argparse.Namespace(
+        workspace=workspace,
+        package_manifest=package_manifest_path,
+        lock=args.lock,
+        toolchain=args.toolchain,
+        probe=probe_path,
+        fixture=fixture_path,
+        features=args.features,
+        all_features=args.all_features,
+        target=args.target,
+        profile=args.profile,
+    )
+    projection, projection_artifact = verified_projection(args.dependency_projection, projection_args)
+    features = {
+        "package": projection["features"]["package"],
+        "selected": projection["features"]["selected"],
+        "all_features": projection["features"]["all_features"],
+    }
+    cargo_path = safe_location(args.cargo, "cargo shim")
+    cargo_artifact = artifact(cargo_path)
+    if not os.access(cargo_path, os.X_OK):
+        raise fail(f"cargo shim is not executable: {cargo_path}")
+    compiler_artifacts: list[dict[str, Any]] = []
+    compiler_names: set[str] = set()
+    for declaration in args.compiler_artifacts:
+        if "=" not in declaration:
+            raise fail("compiler artifact must use NAME=PATH")
+        name, raw_path = declaration.split("=", 1)
+        name = name.strip()
+        if not name or not raw_path:
+            raise fail("compiler artifact NAME=PATH is incomplete")
+        if name in compiler_names:
+            raise fail(f"compiler artifact is duplicated: {name}")
+        compiler_names.add(name)
+        compiler_path = safe_location(Path(raw_path), f"compiler artifact {name}")
+        compiler_artifact = artifact(compiler_path)
+        if not os.access(compiler_path, os.X_OK):
+            raise fail(f"compiler artifact is not executable: {compiler_path}")
+        compiler_artifacts.append({"name": name, **compiler_artifact})
+    if not compiler_artifacts:
+        raise fail("build receipt requires at least one compiler artifact")
+    command = _check_build_command(args.build_command, args.target, args.profile, cargo_path)
+    value = {
+        "schema": "litchi_w8_build_receipt.v1",
+        "status": "complete",
+        "source_commit": source_commit,
+        "source_archive": source_artifact,
+        "source_assembly": source_assembly_artifact,
+        "binary": binary_artifact,
+        "lock": lock_artifact,
+        "probe": probe_artifact,
+        "fixture": fixture_artifact,
+        "dependency_projection_sha256": projection_artifact["sha256"],
+        "workspace_manifest_sha256": workspace_manifest["sha256"],
+        "package_manifest_sha256": package_manifest["sha256"],
+        "toolchain_sha256": toolchain["sha256"],
+        "features": features,
+        "target": args.target,
+        "profile": args.profile,
+        "cargo": cargo_artifact,
+        "build_command": command,
+        "compiler_artifacts": compiler_artifacts,
+    }
+    output = safe_location(args.output, "build receipt", output=True)
+    if output.exists() or output.is_symlink():
+        raise fail(f"refusing to overwrite existing output: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{os.getpid()}.tmp")
+    if temporary.exists() or temporary.is_symlink():
+        raise fail(f"refusing to reuse temporary output: {temporary}")
+    try:
+        temporary.write_bytes(canonical(value))
+        verified_build_receipt(
+            temporary, source_commit, source_artifact, source_assembly_artifact,
+            binary_artifact, lock_artifact, probe_artifact, fixture_artifact,
+            projection_artifact["sha256"], workspace_manifest, package_manifest,
+            toolchain, features, args.target, args.profile,
+        )
+        os.replace(temporary, output)
+    except Exception:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    return artifact(output)
 
 
 def endpoint_manifest(args: argparse.Namespace) -> dict[str, Any]:
@@ -722,6 +880,20 @@ def parser() -> argparse.ArgumentParser:
     assembly.add_argument("--overlay-patch", type=Path)
     assembly.add_argument("--description", required=True)
     assembly.add_argument("--output", required=True, type=Path)
+    build_receipt = commands.add_parser("build-receipt", help="write and validate a complete post-build receipt")
+    for name in (
+        "source", "source-assembly", "binary", "lock", "probe", "fixture",
+        "dependency-projection", "workspace", "workspace-manifest",
+        "package-manifest", "toolchain", "cargo", "output",
+    ):
+        build_receipt.add_argument(f"--{name}", required=True, type=Path)
+    build_receipt.add_argument("--source-commit", required=True)
+    build_receipt.add_argument("--compiler-artifact", dest="compiler_artifacts", action="append", required=True)
+    build_receipt.add_argument("--build-command", required=True)
+    build_receipt.add_argument("--feature", dest="features", action="append", default=[])
+    build_receipt.add_argument("--all-features", action="store_true")
+    build_receipt.add_argument("--target", required=True)
+    build_receipt.add_argument("--profile", default="release")
     endpoint = commands.add_parser("endpoint", help="write a W8 endpoint manifest")
     for name in (
         "binary", "source", "lock", "probe", "fixture", "dependency-projection",
@@ -745,6 +917,8 @@ def main(argv: list[str] | None = None) -> int:
         result = write_new(args.output, dependency_projection(args))
     elif args.command == "source":
         result = write_new(args.output, source_assembly(args))
+    elif args.command == "build-receipt":
+        result = write_build_receipt(args)
     else:
         result = write_new(args.output, endpoint_manifest(args))
     print(json.dumps(result, sort_keys=True))

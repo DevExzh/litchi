@@ -42,15 +42,15 @@ PACKAGE_NAME = "litchi-ops"
 POLICY_RELATIVE = Path("docs/unified-ops/results/0362yh/original-to-final-policy.json")
 POLICY_SCHEMA = "litchi_w8_original_to_final_projection_policy.v1"
 PAIR_SCHEMA = "litchi_w8_original_to_final_pair.v1"
-POLICY_VERSION = "0362yh-v1"
+POLICY_VERSION = "0362yh-472b-v1"
 
 # Filled after the reviewed policy file is assembled.  A fixed digest is
 # deliberate: an arbitrary policy path or edited JSON cannot become an
 # accepted graph rule merely by being passed on the command line.
-REVIEWED_POLICY_SHA256 = "afb0d053a98ddb3d26d50d1d90944aab0fcc6c536c2cd99024162d49642d3d7f"
+REVIEWED_POLICY_SHA256 = "e56d549c733629ac73492a3511a45a1ed6a4cec97f1a4705ceea4ba9b67d97d2"
 
 BASELINE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
-FINAL_COMMIT = "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07"
+FINAL_COMMIT = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
 TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
@@ -60,6 +60,18 @@ FIXTURE_BYTES = 4_231
 TOOLCHAIN_SHA256 = "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
 
 FEATURES = (
+    "default", "doc", "docx", "encryption", "eval", "formula",
+    "iwork-adapter", "keynote", "markdown", "numbers", "odb", "odc",
+    "odf-formula", "odf-objects", "odg", "odi", "odm", "odp", "ods",
+    "odt", "opc", "oth", "pages", "ppt", "pptx", "rtf", "sign", "test-support",
+    "xls", "xlsb", "xlsx", "yaml",
+)
+
+# The immutable f2 workspace predates the final `sign` facade feature.  Keep
+# that side-specific all-features selection explicit: comparing both sides to
+# the final list would silently require a production-manifest overlay in the
+# historical endpoint, which is outside the reviewed consumer-only adapter.
+BEFORE_FEATURES = (
     "default", "doc", "docx", "encryption", "eval", "formula",
     "iwork-adapter", "keynote", "markdown", "numbers", "odb", "odc",
     "odf-formula", "odf-objects", "odg", "odi", "odm", "odp", "ods",
@@ -116,7 +128,7 @@ LOCAL_EDGE_DELTAS: tuple[dict[str, Any], ...] = (
             "litchi-odm", "litchi-odp", "litchi-ods", "litchi-odt", "litchi-ograph",
             "litchi-ole-common", "litchi-ooxml-common", "litchi-opc", "litchi-oth",
             "litchi-pages", "litchi-ppt", "litchi-pptx", "litchi-rtf",
-            "litchi-sheet-text", "litchi-sign", "litchi-xls", "litchi-xlsb",
+            "litchi-sheet-text", "litchi-sign", "litchi-vba", "litchi-xls", "litchi-xlsb",
             "litchi-xlsx", "memchr", "proptest", "quick-xml 0.41.0", "serde",
             "serde-saphyr", "serde_json", "sha2 0.11.1", "soapberry-zip", "tempfile",
             "unicode-normalization", "zip",
@@ -192,12 +204,12 @@ FIXED_INPUTS: dict[str, dict[str, Any]] = {
     },
     "after": {
         "source_commit": FINAL_COMMIT,
-        "source": {"bytes": 6_630_123_520, "sha256": "127d81f130c6782c9329844b0992adb5b76b5f5e7d5258f3d95d1360e620db10"},
+        "source": {"bytes": 6_634_147_840, "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"},
         "workspace_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/Cargo.toml", "bytes": 10_672, "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"},
-        "package_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/litchi-ops.Cargo.toml", "bytes": 13_489, "sha256": "b22e9ff3a31366cd0bf85bd0d65b8add84cb89c612535ae905ea578b9a0eaf1d"},
+        "package_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/litchi-ops.Cargo.toml", "bytes": 13_718, "sha256": "004d3b3cba8c035d209665a76c9cfe3932f12a9c198a4aea9fa314ef8ebb3a39"},
         "toolchain": {"path": "docs/unified-ops/results/0362yh/images/after/rust-toolchain.toml", "bytes": 86, "sha256": TOOLCHAIN_SHA256},
-        "lock": {"path": "docs/unified-ops/results/0362yh/images/after/Cargo.lock", "bytes": 139_591, "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"},
-        "projection": {"path": "docs/unified-ops/results/0362yh/images/after/projection.json", "bytes": 146_453, "sha256": "586cbbe06a8591322488a9650bbc098ad4b9f2f137c95e2ea80617728cbcd2e5"},
+        "lock": {"path": "docs/unified-ops/results/0362yh/images/after/Cargo.lock", "bytes": 139_606, "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"},
+        "projection": {"path": "docs/unified-ops/results/0362yh/images/after/projection.json", "bytes": 146_621, "sha256": "2964946c802881909d5aaeea427fb32e85d0657f0987185ce21ff29e84c0d686"},
         "source_assembly": {"overlay_kind": "none"},
     },
 }
@@ -379,6 +391,7 @@ def _policy_summary() -> dict[str, Any]:
         "target": TARGET,
         "profile": PROFILE,
         "features": list(FEATURES),
+        "before_features": list(BEFORE_FEATURES),
         "probe": {"bytes": PROBE_BYTES, "sha256": PROBE_SHA256},
         "fixture": {"bytes": FIXTURE_BYTES, "sha256": FIXTURE_SHA256, "route_count": 109},
         "registry": {"count": REGISTRY_PACKAGE_COUNT, "checksums_and_dependencies": True},
@@ -499,11 +512,12 @@ def validate_projection_pair(before: dict[str, Any], after: dict[str, Any]) -> d
     """Validate two already-loaded projections against the fixed graph rule."""
     if before.get("schema") != "litchi_w8_dependency_projection.v1" or after.get("schema") != "litchi_w8_dependency_projection.v1":
         raise fail("projection schema is not the reviewed W8 projection")
+    expected_features = {"before": BEFORE_FEATURES, "after": FEATURES}
     for side, projection in (("before", before), ("after", after)):
         fixed = _load_fixed_projection(side)
         if projection != fixed:
             raise fail(f"{side} projection does not match the reviewed fixed pre/post image")
-        if projection.get("features") != {"package": "litchi-ops", "selected": list(FEATURES), "all_features": True}:
+        if projection.get("features") != {"package": "litchi-ops", "selected": list(expected_features[side]), "all_features": True}:
             raise fail(f"{side} feature selection differs from the reviewed all-features set")
         build = projection.get("build")
         if not isinstance(build, dict) or build.get("target") != TARGET or build.get("profile") != PROFILE:
@@ -694,7 +708,10 @@ def _receipt_from_validated(policy: dict[str, Any], before: object, after: objec
         "build": {
             "target": TARGET,
             "profile": PROFILE,
-            "features": list(FEATURES),
+            "features": {
+                "before": list(BEFORE_FEATURES),
+                "after": list(FEATURES),
+            },
             "toolchain_sha256": TOOLCHAIN_SHA256,
         },
         "projection": projection_delta,
