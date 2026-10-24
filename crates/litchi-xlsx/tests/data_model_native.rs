@@ -27,8 +27,9 @@ fn unknown_model_profile_is_retained_on_package_write() {
             feature: "XLDM header version"
         })
     ));
+    let mut edit = package.edit_data_model().unwrap();
     assert!(matches!(
-        package.edit_data_model(),
+        edit.before(),
         Err(Error::Unsupported {
             feature: "XLDM header version"
         })
@@ -753,7 +754,8 @@ fn native_workbook_relationship_compatibility_has_exact_owner_and_target() {
         rels.add_relationship(reltype.into(), target.into(), edge_id.clone(), external);
         let package = Package::from_opc(changed).unwrap();
         assert!(package.data_model().is_err());
-        assert!(package.edit_data_model().is_err());
+        let mut edit = package.edit_data_model().unwrap();
+        assert!(edit.before().is_err());
     }
     let mut duplicate = source.clone();
     duplicate
@@ -1092,7 +1094,8 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
         let before = raw.clone();
         let package = Package::from_opc(raw).unwrap();
         if case == 2 {
-            assert!(package.edit_data_model().is_err());
+            let mut edit = package.edit_data_model().unwrap();
+            assert!(edit.before().is_err());
         } else {
             let mut edit = package.edit_data_model().unwrap();
             edit.remove().unwrap();
