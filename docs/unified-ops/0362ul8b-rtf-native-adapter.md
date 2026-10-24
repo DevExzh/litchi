@@ -10,7 +10,7 @@ coordinator's composed gate remains required.
 
 The active probe is
 `tools/perf-baseline/examples/refusal_contract_bench.rs`, SHA-256
-`54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908` at both
+`0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81` at both
 legs.  It is a consumer-only adapter selected by standalone package features:
 
 | leg | feature | native refusal API | `Package::apply` result | lock SHA-256 |
@@ -28,7 +28,7 @@ current lock was copied into the baseline.
 
 The live current workspace example is separately kept at
 `crates/litchi-rtf/examples/refusal_contract_bench.rs`, SHA-256
-`51d98d9dffe628acf9236929fc6952e05982911280149dcd18399d45d4972485`.  It is
+`1726acb58953ae3f57d9b74207f75678a3bcc7ac4c993443aac5583d3943f791`.  It is
 not substituted into the paired baseline adapter because the 86d baseline has
 no such workspace example; the standalone probe remains the only paired source
 for the native-era comparison.  Its locked current-crate check used the
@@ -91,28 +91,28 @@ validation=passed, native_error_api=litchi_rtf::edit::Error::Refused(Refusal), a
 ```
 
 The candidate locked-check log is retained outside the checkout at
-`.coord/rtf-probe-compile/adapter-current-check-locked.log` (SHA-256
-`bcce8c4403778d68ed4b82507bf8a740d963c3ebc076be246caac13f56fbea5e`); the
-candidate check-only log is `adapter-current-check-only.log` (SHA-256
-`46f0b0539e5c86cb1a8b47d3cd37bfaec850b51b0b82c979a72d14f6deebd81c`).  The
-baseline equivalents are `adapter-baseline-check-locked.log` (SHA-256
-`72131d35df8d9815e5b9545782526578dabbef6f8a363d4eb84282e02ed22937`) and
-`adapter-baseline-check-only.log` (SHA-256
-`37ffb1e7eac667dace125663a9171dc3b07d8398dd3de32d72777ab0065fac34`).  The
+`.coord/rtf-probe-compile/adapter-current-replay-check-locked.log` (SHA-256
+`af85ce854be3c52fc68baa257d3e0d70cd99db90c7360f0d341de54547dd8d94`); the
+candidate check-only log is `adapter-current-replay-check-only.log` (SHA-256
+`1085023a13a390e62f118723aa027ee94c59b93c3ad3e44386f7272cbf8fb837`).  The
+baseline equivalents are `adapter-baseline-replay-check-locked.log` (SHA-256
+`99863097f62e7fd1740a37a1d0489d0bf9ee53d2a449018535c51e358d3fbb06`) and
+`adapter-baseline-replay-check-only.log` (SHA-256
+`7bcca6000bf75c8581302c55799a2b862a810da5ce8f91f1888a6ecf266e700a`).  The
 live current workspace locked-check log is
-`adapter-live-current-check-locked-4100.log` (SHA-256
-`75d3102d079b32969ec0e06aa084cc597cef5c3b1101940584f46cd058727d7c`), and
-the check-only log is `adapter-live-current-check-only.log` (SHA-256
-`37c15e50a03a2646be3ed12f3743fd06e913f5963bc46db43846d27a2058701d`).  Its
-direct route receipt is `adapter-live-current-routes.jsonl` (8 lines, SHA-256
-`7636523062a48b9754c7e70d84c3ee0cd3a2aaca958ed0f4f02efa977b68203f`), with
+`adapter-live-current-replay-check-locked-4100.log` (SHA-256
+`1b0d91f7779f50a10ec7232c342376a61d22e99958b0a7aadde901f1d62395db`), and
+the check-only log is `adapter-live-current-replay-check-only.log` (SHA-256
+`53848e28c8db3b55b909c1e4bbb6b5a0c3671bd8bbca4b894ca75c4bc4dd9dc8`).  Its
+direct route receipt is `adapter-live-current-replay-routes.jsonl` (8 lines, SHA-256
+`46adfffc73c3a11b11f0b22df075cfc2afcae5fab00ed1eed06e3e8cb7ce7f3e`), with
 empty stderr SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 The paired direct route receipts are
-`adapter-current-routes.jsonl` (8 lines, SHA-256
-`997050b07053de66506a09356e6a6e00e27201debf76d454d67b2317f1dbacfa`) and
-`adapter-baseline-routes.jsonl` (8 lines, SHA-256
-`54950867a81ba001466f2d9b7515653559b51e410b2cc194767576fec152fc37`); both
+`adapter-current-replay-routes.jsonl` (8 lines, SHA-256
+`c8442ad0a5cf5000e5345799b180e83bec7eca67cec2db6da4feaae731abadb3`) and
+`adapter-baseline-replay-routes.jsonl` (8 lines, SHA-256
+`7c0fb500634900f03d368257a496ef9f38eb10fefe266a68caf927b85a531afd`); both
 stderr streams were empty (the empty-stream SHA-256 is
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).
 Each route receipt contains exactly these eight scenarios:
@@ -120,12 +120,15 @@ Each route receipt contains exactly these eight scenarios:
 `open_1k`, `noop_1k`, `text_commit_1k`, `text_commit_save_1k`, `replay_1k`,
 `tail_commit_1k`, `unsupported_content`, `protected_commit`.
 
-Correctness checks run outside the timing loops: exact reopen, commit output,
-replay output, inverse replay, tail-output reopen, unsupported-source
-unchanged bytes, and protected-source unchanged bytes.  The normal timing
-loops only execute the operation and black-box its result; they do not assert
-refusal kind or reason inside a timed sample.  `--check-only` emits no timing
-claim.
+Correctness checks run outside the timing loops: expected source text, actual
+replacement with the remainder preserved, explicit no-op byte equality, exact
+changed-output reopen, replay output, inverse replay, tail semantic append
+with prior content preserved, unsupported-source unchanged bytes, and
+protected-source unchanged bytes.  The timed replay route now black-boxes the
+native `Package`/`Commit` result without serializing it; serialization remains
+only in the outside-clock fidelity checks.  Other timing loops likewise only
+execute the operation and black-box its result; they do not assert refusal kind
+or reason inside a timed sample.  `--check-only` emits no timing claim.
 
 ## Protocol and gate coverage
 

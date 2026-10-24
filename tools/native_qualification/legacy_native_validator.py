@@ -42,8 +42,8 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
         "probe_relative": "tools/perf-baseline/examples/refusal_contract_bench.rs",
         "lock_relative": "tools/perf-baseline/Cargo.lock",
         "probe_sha256": {
-            "before": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
-            "after": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
+            "before": "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81",
+            "after": "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81",
         },
         "lock_sha256": {
             "before": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
@@ -51,7 +51,7 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
         },
         "adapter": {
             "relative_path": "tools/perf-baseline/examples/refusal_contract_bench.rs",
-            "probe_sha256": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
+            "probe_sha256": "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81",
             "manifest_relative_path": "tools/perf-baseline/Cargo.toml",
             "manifest_sha256": {
                 "before": "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676",
@@ -71,7 +71,7 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
             },
             "live_current_probe": {
                 "relative_path": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
-                "sha256": "51d98d9dffe628acf9236929fc6952e05982911280149dcd18399d45d4972485",
+                "sha256": "1726acb58953ae3f57d9b74207f75678a3bcc7ac4c993443aac5583d3943f791",
                 "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
                 "lock_source": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock",
                 "api": "current litchi-rtf workspace example; not part of the baseline adapter source",

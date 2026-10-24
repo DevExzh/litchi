@@ -34,6 +34,10 @@ fn measure(name: &str, mut run: impl FnMut(), iterations: u32, contract: &str) {
     );
 }
 
+fn expected_source_text() -> String {
+    format!("{}end", "seed\n".repeat(1000))
+}
+
 fn package_bytes(package: &Package) -> Vec<u8> {
     package.to_bytes().unwrap()
 }
@@ -47,7 +51,11 @@ fn tail_committed_bytes(commit: &litchi_rtf::tail_append::Commit) -> Vec<u8> {
 }
 
 fn replay_bytes(source: &Package, patch: &litchi_rtf::edit::Patch) -> Vec<u8> {
-    committed_bytes(&source.apply(patch).unwrap())
+    committed_bytes(&replay_once(source, patch))
+}
+
+fn replay_once(source: &Package, patch: &litchi_rtf::edit::Patch) -> litchi_rtf::edit::Commit {
+    source.apply(patch).unwrap()
 }
 
 fn assert_reopen_exact(bytes: &[u8]) {
@@ -87,18 +95,32 @@ fn run_correctness_checks(
 ) {
     let source_bytes = package_bytes(source);
     let protected_bytes = package_bytes(protected);
+    let expected_source_text = expected_source_text();
+    let expected_changed_text = expected_source_text.replacen("seed", "tail", 1);
 
     // Exact reopen, commit publication, replay, inverse replay, and the
     // untouched source artifacts are correctness checks outside every clock.
+    assert_eq!(source.text(), expected_source_text);
     assert_reopen_exact(&source_bytes);
+    let changed_bytes = committed_bytes(changed);
+    assert_eq!(changed.package().text(), expected_changed_text);
+    assert_reopen_exact(&changed_bytes);
+    let replayed_bytes = replay_bytes(source, changed.patch());
+    assert_eq!(replayed_bytes, changed_bytes);
     assert_eq!(
-        committed_bytes(changed),
-        replay_bytes(source, changed.patch())
+        Package::parse(std::str::from_utf8(&replayed_bytes).unwrap())
+            .unwrap()
+            .text(),
+        expected_changed_text
     );
     assert_eq!(
         replay_bytes(changed.package(), &changed.patch().inverse()),
         source_bytes
     );
+
+    let noop = source.edit().commit().unwrap();
+    assert_eq!(package_bytes(noop.package()), source_bytes);
+    assert_eq!(noop.package().text(), expected_source_text);
 
     let mut unsupported_check = source.edit();
     assert_unsupported(
@@ -129,7 +151,17 @@ fn main() {
     let mut tail_edit = source.edit_tail_append(TailSelector::Body);
     tail_edit.append_text_paragraphs(&["tail"]).unwrap();
     let tail_commit = tail_edit.commit().unwrap();
-    assert_reopen_exact(&tail_committed_bytes(&tail_commit));
+    let tail_bytes = tail_committed_bytes(&tail_commit);
+    let expected_source_text = expected_source_text();
+    let expected_tail_text = format!("{expected_source_text}\ntail\n");
+    assert_eq!(tail_commit.package().text(), expected_tail_text);
+    assert_reopen_exact(&tail_bytes);
+    assert_eq!(
+        Package::parse(std::str::from_utf8(&tail_bytes).unwrap())
+            .unwrap()
+            .text(),
+        expected_tail_text
+    );
 
     if std::env::args().any(|arg| arg == "--check-only") {
         println!(
@@ -177,7 +209,7 @@ fn main() {
     measure(
         "replay_1k",
         || {
-            black_box(replay_bytes(&source, changed.patch()));
+            black_box(replay_once(&source, changed.patch()));
         },
         100,
         "\"outcome\":\"ok\",\"fidelity\":\"exact\"",
