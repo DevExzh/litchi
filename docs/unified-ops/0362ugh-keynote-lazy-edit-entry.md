@@ -98,12 +98,46 @@ consumer migration. The lock-generation log is external:
 `receipt-batch-harness-lock.log` (333 bytes, sha256
 `d9e77ab981e09f171390cc276310b53154d9a8e1c78508bcb1c3372a81ac49d4`).
 
-The full `litchi-iwa` test run was also attempted with
-`cargo test --offline --locked -p litchi-iwa --all-features -j 1` and reached
-1695 passed / 1 failed. Its sole failure is the pre-existing assertion in
-`package::tests::package_edit_rejects_limit_exceeding_stage_atomically`: the
-test expects `total size` although the replacement payload first violates the
-4-byte per-member limit and the implementation correctly reports `member`.
-It is unrelated to Keynote and is not changed in this lane. Raw evidence is
-external at `receipt-iwa-test.log` (171661 bytes, sha256
-`cc2a859f1dd4b9f67327c76f791d316767581039806ca49e788cab95d356c0d2`).
+## Baseline diagnosis and gate repair
+
+The initial IWA result was not accepted as a baseline exception. A clean
+detached checkout at `c3f56b7a9d39973a079f3bcdeb5fe2cd74a2deaa` reproduced the
+same focused failure with Rust `1.95.0`, the same root `.cargo/config.toml`,
+the same offline lock (`Cargo.lock`, 139592 bytes, sha256
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`), and
+the same all-feature command:
+
+```text
+cargo test --offline --locked -p litchi-iwa --all-features package::tests::package_edit_rejects_limit_exceeding_stage_atomically -- --nocapture
+  receipt-iwa-baseline-focused.log (1033 bytes, sha256 182ed0a2761f2afab8adee25722d841c1e2f4871b9af3bc285ef18917d67beb7)
+  test result: FAILED. 0 passed; 1 failed; 1695 filtered out.
+  panic: assertion failed: error.to_string().contains("total size")
+```
+
+The failure was a test-fixture defect, not a production behavior to waive:
+the test used both `max_entry_bytes = 4` and `max_total_bytes = 4`, then
+expected a five-byte replacement to reach the aggregate check. The narrow
+repair changes only that test's per-member ceiling to 5, retaining the
+aggregate ceiling at 4. The five-byte replacement now exercises the intended
+total-size refusal without weakening the assertion or changing production
+code.
+
+After the repair, focused and full IWA validation passed from source
+`8f747b7f0abe39ae9b5f098b0832b9b7967c2340`:
+
+```text
+cargo test --offline --locked -p litchi-iwa --all-features package::tests::package_edit_rejects_limit_exceeding_stage_atomically -- --nocapture
+  receipt-iwa-focused-repaired.log (5715 bytes, sha256 668e5c2b1b6d3ec191e83f2423ef2550ca9751b66479d59e5d20e065a9bd2a63)
+  focused test: 1 passed; 0 failed; 1695 filtered out.
+
+cargo test --offline --locked -p litchi-iwa --all-features -j 1
+  receipt-iwa-test-repaired.log (183373 bytes, sha256 ce9dbbb8c21f43680c526d293751bb00a33eda777eaa575801473797f2c9eb82)
+  1696 unit tests, all integration targets, and 8 doctests passed; 0 failed.
+
+cargo clippy --offline --locked -p litchi-iwa --all-targets --all-features -j 1 -- -D warnings
+  receipt-iwa-clippy-repaired.log (169 bytes, sha256 70e961835c0ace8172902a789c97d73c6148ff972f002fa858b6bd06234b049d)
+  exit 0.
+```
+
+All raw logs remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
