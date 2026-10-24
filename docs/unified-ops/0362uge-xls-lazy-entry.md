@@ -64,11 +64,11 @@ an original mutation is reported as typed `SourceChanged` rather than target
 I/O. Focused source-backed tests cover comment/visibility commit, write,
 replay and inverse freshness plus primary handoff edit/replay.
 
-The broad all-target XLS suite was started under the capped target but
-intentionally interrupted when these review blockers were reported; its
-partial external log is diagnostic only. Full XLS tests, all-target/all-feature
-Clippy, and affected facade/native consumer checks remain pending a fresh
-coordinator slot. No native timing or qualification claim is made here.
+The broad all-target XLS suite was first started under the capped target but
+intentionally interrupted when these review blockers were reported; that
+partial external log remains diagnostic only. The final isolated suite,
+Clippy, and affected facade consumer checks are recorded below. No native
+timing or qualification claim is made here.
 
 The follow-up also keeps the recipient's original source fence when an
 equal-content cross-copy patch is rebased, and primary package guards
@@ -77,3 +77,40 @@ public source-backed commit/replay regressions assert the documented
 `litchi_xls::Error::Io` boundary; output and read projections retain their
 typed source-change assertions. Chart and pivot retry tests verify a failed
 lazy capture does not consume the editor's private source state.
+
+## Final isolated validation
+
+The final source tip is `b8ed2d46bbd06e2434b5b829b594698ed80fdb89`.
+The admission regression is an internal test over a dynamic composed target;
+it verifies that an in-flight target error is promoted to the retained
+original owner's typed `SourceChanged` refusal. It passed 1/1. The focused
+integration run passed `package_owner` 23/23 and `source_backed` 84/84.
+The all-target/all-feature XLS run passed 1,870 tests in 100 test suites, with
+one intentionally ignored test. Strict all-target/all-feature Clippy passed;
+the `litchi-ops` all-target/all-feature check passed; and the XLS OLE metadata
+consumer test passed 4/4.
+
+Commands, using the assigned one-job capped offline/locked environment:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/env.sh
+cargo test -p litchi-xls --lib package::edit::tests::capture_source_guard_promotes_target_error_to_original_source_changed --locked --offline
+cargo test -p litchi-xls --all-features --test source_backed --test package_owner --locked --offline
+cargo test -p litchi-xls --all-targets --all-features --locked --offline
+cargo clippy -p litchi-xls --all-targets --all-features --locked --offline -- -D warnings
+cargo check -p litchi-ops --all-targets --all-features --locked --offline
+cargo test -p litchi-ops --all-features --test ole_metadata --locked --offline
+```
+
+External receipt logs (not committed) and SHA-256:
+
+```text
+admission-unit-b8ed.log         418 B     1373bd43bc1b26dece7323288772e14859e13a30972ce56d13221bf71b848a04
+focused-source-owner-b8ed.log   8,385 B  da96b55d28b4bf293d73baf8e2b917319bb1ddd0440479f74dd1322b3ea1b676
+full-xls-suite-b8ed.log         169,179 B 5a972ee4e8b2c5f43146ffaff70d1a201a27d13c21ca47df900a44d818a12359
+clippy-xls-all-targets-b8ed.log 269 B     0f2a6da43584c091d0e1e0847463e7adf1bd62c37964700e8a1110f7dc1e6455
+check-ops-all-targets-b8ed.log  269 B     2fa2e5e506cda33bd5977cf7717de30ab0a9d2fcf03710b2cd6ff672e8427eb2
+ops-xls-ole-metadata-b8ed.log   784 B     acb4f39cba2b76d8ff32beb77f404143c19eee81b425493e4bb817721329d8ab
+```
+
+The target directory was `/home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/target` and measured 4,553,717,719 bytes after validation. No benchmark, native ABBA, or qualification claim is made.
