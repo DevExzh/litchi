@@ -714,3 +714,44 @@ python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/qua
 External `.coord/docx-runtime` and all `.coord/odg-joined*` targets and evidence
 remain untouched. Active sparse correction leaves and protected measurement
 worktrees were excluded from this cleanup.
+
+## Fifteenth cleanup, 2026-10-24
+
+After reviewed source integration at `3676e21cfa`, the clean, inactive DOC
+lazy-entry worktree was removed without force. Branch `uo2/doc-lazy-entry`
+remains at `2a5a7c3facebf8b7d7598170953353e83caee5e8`. Its apparent checkout
+size was 314,138,078 bytes. The ignored 139,591-byte Cargo.lock was moved to
+external quarantine; SHA-256 is
+`76340b069df633ff1c63c98e93e8b10c1e7711164ca2515f490872142ab46c72`.
+The external DOC target and logs remain unchanged. The coordinator verified
+ancestry, retained ref, removed path, receipt identities and quarantined bytes.
+
+The receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/fifteenth-wave/receipt.md`
+(SHA-256 `9daa8a99f905b8d4372146d3038f4d8755c58e167d68e1023eb13d8a5589480c`).
+The adjacent manifest has SHA-256
+`6793d485b5dfacc3f0e184a83cc7509d1d722a746785f053181af5a6634a6772`;
+`restore.py` recreates the ignored file after restoring the retained branch.
+
+ODB/ODM was rechecked as clean and merged, but a live search still held its
+evidence files. That worktree was left intact pending the search owner's
+confirmation and a fresh handle audit. No measurement artifacts, targets,
+branch refs or incomplete source worktrees were deleted.
+
+## Sixteenth cleanup, 2026-10-24
+
+After the owners stopped their stale searches, a fresh handle audit found no
+users of the clean, merged ODB/ODM leaf. It was removed without force; branch
+`uo2/odb-odm-lazy-entry` remains at
+`dba6b055603ae7ff0b7b488ea41510a8f1a164ab`. The apparent checkout size was
+6,263,385,091 bytes. Three ignored files totaling 205,680 bytes are preserved
+in external quarantine with their hashes and restore instructions. The
+coordinator independently verified the files, receipt, ancestry, retained ref
+and removed-path absence. The external target/log root remains unchanged.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/sixteenth-wave/receipt.md`
+(SHA-256 `540b65f860ad6764acfb4fd70b6b50bf0f5632a8f775d2f1c4484baf040f1c9e`).
+The adjacent manifest has SHA-256
+`4c2d6760f6722120286db58fd290a250d3a2d74ec02de3f5ddf067c3985ae0f5`.
+`restore.py` restores the three ignored files after worktree recreation.

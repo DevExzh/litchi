@@ -3068,3 +3068,53 @@ See [0063](0063-source-pptx-modern-comments.md).
   Source integration remains staging. The final full gate, all-68 inventory,
   corpus replay, glossary closure and native qualification remain required.
   Comprehensive redaction audit 22 is the only deferral. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, DOC/ODS integration and constructor returns):
+  Main integration reaches `0c2357755f`. Reviewed DOC lazy entry and its complete
+  consumer migration merge at `cf7def80df`. Ordinary edits preserve Send/Sync;
+  profiled edits retain borrowed observers across failed opens and honor the
+  selected protection policy. Facade budget propagation and standalone
+  profiling consumers are migrated. The coordinator verified 1,445 default
+  tests across 50 result blocks, 1,223 profiled tests, strict default/profiled
+  Clippy, the DOC facade check and both profiling-tool checks. Record 0362ugd-a
+  binds clean tested sources and the exact committed two-file consumer overlay.
+
+  ODS resource admission follow-up 0362ugca merges at `3676e21cfa`. The resource
+  census stays cold through open/edit/drop/shared handoff; first staging,
+  commit and replay retain checks before candidate retention/publication.
+  Final source `1fdfcdcdba` passes 1,768 tests and strict all-target/all-feature
+  Clippy under pinned Rust 1.95. The coordinator verified all raw-log hashes,
+  result blocks and actual root configuration. These receipts establish source
+  correctness, not native performance acceptance.
+
+  The ordinary XLSX audit found additional eager pivot, graph, object and
+  catalog constructors. Records 0362ugn–0362ugq divide those corrections among
+  separate workers. The source-backed packet at `02684ae108` passes 2,542 tests
+  and strict Clippy after the slicer failures were reproduced on the unchanged
+  baseline and repaired. Later ordinary catalog changes have separate review
+  and validation pending. DOCX's full lazy-entry source slice is committed for
+  review. No source freeze or constructor-cost exception is claimed.
+
+  Review continues to return concrete defects. Numbers still needs retained
+  selector/traversal budget accounting and standalone fuzz consumers. Keynote
+  needs selector allocation admission and a minimal standalone lock update;
+  broad unrelated dependency upgrades are rejected. Its IWA fixture failure
+  was reproduced on the clean baseline and narrowly repaired. PPT's native
+  source fence now has a deterministic in-flight mutation proof, including a
+  positive control; runtime validation is queued. Pages, PPTX, XLSB and ODP
+  have source corrections under review or capped validation. Four owned Cargo
+  slots remain the limit; foreign jobs are not disturbed.
+
+  Fifteenth cleanup removes the clean, merged DOC source leaf without force,
+  retaining its branch. Apparent checkout size was 314,138,078 bytes; its
+  139,591-byte ignored lockfile is hash-quarantined with restore instructions.
+  The coordinator verified the receipt and file identities. Targets and logs
+  remain external and unchanged. After stale owned searches exited, a fresh
+  audit also permitted ODB/ODM removal as cleanup sixteen: 6,263,385,091
+  apparent bytes, with three ignored files totaling 205,680 bytes quarantined.
+  Its branch, target and logs remain; all receipt identities were verified.
+
+  Source integration remains staging. Final full gates, all-68 inventory
+  dispositions, corpus replay, glossary closure and native qualification remain
+  required. Comprehensive redaction audit 22 is the only deferral. Nothing is
+  pushed.
