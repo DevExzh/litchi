@@ -95,9 +95,23 @@ cargo fmt --all --check
 
 The external retained logs and per-command resource receipts are under
 `/home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/validation-52ed/`.
-Their manifest is `metadata.after.txt`, SHA-256
-`a6ada7d0447acb8a8f2a5fa78e55a392604be031db0901f18ae641191d247054` (2,706
-bytes). The command receipt files are:
+The raw `metadata.after.txt` remains unchanged at 3,043 bytes, SHA-256
+`31319dc48ed32444af2e9513d3d0b8841fdec357d016bfb90214bf3c61750794`. Its
+intermediate self-entry reports the earlier 2,706-byte state and hash
+`a6ada7d0447acb8a8f2a5fa78e55a392604be031db0901f18ae641191d247054`; that
+self-entry was written before the remaining entries were appended and is not
+the final binding. The authoritative separate manifest is
+`metadata.final-manifest.txt`, which excludes itself to avoid self-reference:
+2,954 bytes, SHA-256
+`cc120b976a98b40526ad5f16c96d36025fabb3a3b0b146f092d74433fe8b49f6`.
+It binds the immutable logs, receipts and both before/after metadata files.
+The corrected pre-target-size metadata is retained as
+`metadata.before.corrected.txt` (220 bytes, SHA-256
+`843214e4c5810d8650c987c8e3c90b0c455b2ab3b98d5dd9682604823c3efcf8`); the
+earlier 684-byte `metadata.before.txt` is retained as a diagnostic because its
+first target-size command had a quoting typo.
+
+The command receipt files are:
 
 | Receipt | Bytes | SHA-256 |
 | --- | ---: | --- |
