@@ -21,6 +21,7 @@ missing source cannot be represented by metadata alone.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator, Mapping
 import hashlib
 import importlib.util
 import json
@@ -209,20 +210,79 @@ class ProjectionPolicyError(RuntimeError):
 _VALIDATION_TOKEN = object()
 
 
-class _ValidatedEndpoint(dict[str, Any]):
+class _FrozenMap(Mapping[str, Any]):
+    """Recursively immutable mapping used by the endpoint capability."""
+
+    __slots__ = ("_items",)
+
+    def __init__(self, value: Mapping[str, Any]) -> None:
+        object.__setattr__(self, "_items", tuple((key, _freeze(item)) for key, item in value.items()))
+
+    def __getitem__(self, key: str) -> Any:
+        for item_key, item in self._items:
+            if item_key == key:
+                return item
+        raise KeyError(key)
+
+    def __iter__(self) -> Iterator[str]:
+        return (key for key, _item in self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, _FrozenMap):
+        return value
+    if isinstance(value, Mapping):
+        return _FrozenMap(value)
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(item) for item in value)
+    return value
+
+
+def _thaw(value: Any) -> Any:
+    if isinstance(value, _FrozenMap):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
+class _ValidatedEndpoint(Mapping[str, Any]):
     """Opaque fields returned only by the full W8 endpoint validator."""
 
-    __slots__ = ("_token",)
+    __slots__ = ("_fields", "_token")
 
     def __init__(self, fields: dict[str, Any], token: object) -> None:
         if token is not _VALIDATION_TOKEN:
             raise TypeError("validated endpoint objects are created by the endpoint validator")
-        super().__init__(fields)
-        self._token = token
+        object.__setattr__(self, "_fields", _freeze(fields))
+        object.__setattr__(self, "_token", token)
+
+    def __getitem__(self, key: str) -> Any:
+        return self._fields[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._fields)
+
+    def __len__(self) -> int:
+        return len(self._fields)
+
+    def __setattr__(self, _name: str, _value: Any) -> None:
+        raise TypeError("validated endpoint fields are immutable")
+
+    def public(self) -> dict[str, Any]:
+        """Return a detached copy for the qualification manifest only."""
+        return _thaw(self._fields)
 
 
 def _make_validated_endpoint(fields: dict[str, Any]) -> _ValidatedEndpoint:
     return _ValidatedEndpoint(fields, _VALIDATION_TOKEN)
+
+
+def endpoint_public_fields(fields: object) -> dict[str, Any]:
+    return _require_validated(fields, "endpoint").public()
 
 
 def _runner_module() -> Any:
@@ -473,13 +533,13 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: str) -> None:
+def _check_fields_fixed(endpoint: dict[str, Any], fields: Mapping[str, Any], side: str) -> None:
     """Check a runner-validated endpoint, including a fresh source hash."""
     expected = FIXED_INPUTS[side]
     if endpoint.get("schema") != "litchi_file_endpoint.v1":
         raise fail(f"{side} endpoint schema is invalid")
     manifest = fields.get("manifest")
-    if not isinstance(manifest, dict) or not isinstance(manifest.get("path"), str):
+    if not isinstance(manifest, Mapping) or not isinstance(manifest.get("path"), str):
         raise fail(f"{side} runner fields have no endpoint manifest identity")
     actual_manifest = artifact(Path(manifest["path"]))
     if (actual_manifest["bytes"], actual_manifest["sha256"]) != (manifest.get("bytes"), manifest.get("sha256")):
@@ -493,7 +553,7 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
         fixed = expected.get(name)
         if fixed is None:
             fixed = {"bytes": PROBE_BYTES, "sha256": PROBE_SHA256} if name == "probe" else {"bytes": FIXTURE_BYTES, "sha256": FIXTURE_SHA256}
-        if not isinstance(actual, dict) or (actual.get("bytes"), actual.get("sha256")) != (fixed["bytes"], fixed["sha256"]):
+        if not isinstance(actual, Mapping) or (actual.get("bytes"), actual.get("sha256")) != (fixed["bytes"], fixed["sha256"]):
             raise fail(f"{side} {name} differs from the reviewed endpoint identity")
     if fields.get("dependency_projection_sha256") != expected["projection"]["sha256"]:
         raise fail(f"{side} dependency projection is not the reviewed fixed image")
@@ -520,7 +580,7 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
                 raise fail(f"{side} {name} artifact identity is stale")
             return row
         field = fields.get(name, {})
-        if not isinstance(field, dict) or (row.get("bytes"), row.get("sha256")) != (field.get("bytes"), field.get("sha256")):
+        if not isinstance(field, Mapping) or (row.get("bytes"), row.get("sha256")) != (field.get("bytes"), field.get("sha256")):
             raise fail(f"{side} endpoint {name} identity differs from the runner fields")
         actual = artifact(Path(row["path"]))
         if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):

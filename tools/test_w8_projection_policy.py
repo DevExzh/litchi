@@ -102,6 +102,31 @@ class ProjectionPolicyTests(unittest.TestCase):
                     policy.ROOT / policy.POLICY_RELATIVE, receipt, {}, {}
                 )
 
+    def test_validated_endpoint_cannot_replace_or_mutate_nested_fields(self) -> None:
+        fields = policy._make_validated_endpoint({
+            "manifest": {"path": "/original/endpoint.json"},
+            "binary": {"path": "/original/binary"},
+        })
+        with self.assertRaises(TypeError):
+            fields["manifest"] = {"path": "/forged/endpoint.json"}
+        with self.assertRaises(TypeError):
+            fields["manifest"]["path"] = "/forged/endpoint.json"
+        detached = policy.endpoint_public_fields(fields)
+        detached["manifest"]["path"] = "/detached/copy.json"
+        self.assertEqual(fields["manifest"]["path"], "/original/endpoint.json")
+
+    def test_validator_factory_result_retains_original_manifest_identity(self) -> None:
+        class FakeRunner:
+            @staticmethod
+            def endpoint_manifest(path: Path, binary: Path, label: str) -> dict[str, object]:
+                return {"manifest": {"path": str(path)}, "routes": ["docx/open_get"]}
+
+        with mock.patch.object(policy, "_runner_module", return_value=FakeRunner()):
+            fields = policy.validate_endpoint_manifest(Path("original.json"), Path("original"), "before")
+        with self.assertRaises(TypeError):
+            fields["manifest"] = {"path": "forged.json"}
+        self.assertEqual(fields["manifest"]["path"], str(Path("original.json").resolve()))
+
     def test_pair_receipt_binds_metadata_and_route_order(self) -> None:
         expected = {
             "schema": policy.PAIR_SCHEMA,

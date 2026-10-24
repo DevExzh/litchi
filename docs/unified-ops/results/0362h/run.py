@@ -711,6 +711,8 @@ def main() -> int:
             "workload": pair["workload"],
             "build": pair["build"],
         }
+    before_provenance = pair_policy.endpoint_public_fields(before_endpoint) if pair_policy is not None else before_endpoint
+    after_provenance = pair_policy.endpoint_public_fields(after_endpoint) if pair_policy is not None else after_endpoint
     guard(out, "initial")
     before_routes, before_route_receipt = routes(before, out, args.cpu, "before")
     after_routes, after_route_receipt = routes(after, out, args.cpu, "after")
@@ -732,8 +734,8 @@ def main() -> int:
         "headroom": HEADROOM,
         "guard": "full /proc comm+cmdline+exe snapshots before/after and every 100ms; only this runner and the child subtree are exempt",
         "provenance": {
-            "before": before_endpoint,
-            "after": after_endpoint,
+            "before": before_provenance,
+            "after": after_provenance,
             "shared": shared,
         },
         "status": "running",
