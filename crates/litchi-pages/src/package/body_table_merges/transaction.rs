@@ -47,7 +47,10 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     fn resolve(&mut self) -> Result<(), Error> {
         if self.target.is_none() {
-            let mut budget = transaction_budget(self.source)?;
+            let mut budget = match self.budget.take() {
+                Some(budget) => budget,
+                None => transaction_budget(self.source)?,
+            };
             let target = match self
                 .selector
                 .resolve_with_budget(self.source, &mut budget)
@@ -1007,11 +1010,11 @@ mod budget_tests {
             .budget
             .as_mut()
             .expect("a failed lazy resolution retains its wire budget");
-        budget.maximum_payload_work = budget.payload_work;
+        budget.exhaust_payload_work_for_test();
         assert!(matches!(
             edit.regions(),
             Err(Error::Limit {
-                kind: LimitKind::PayloadBytes,
+                kind: LimitKind::WireWork,
                 ..
             })
         ));

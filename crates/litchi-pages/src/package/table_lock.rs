@@ -2758,6 +2758,11 @@ impl WireBudget {
         Ok(())
     }
 
+    #[cfg(test)]
+    pub(crate) fn exhaust_payload_work_for_test(&mut self) {
+        self.payload_work = self.maximum_payload_work;
+    }
+
     pub(crate) fn charge_payload_references(&mut self, amount: usize) -> Result<(), Error> {
         self.charge_wire_work(amount)?;
         Self::charge_counter(

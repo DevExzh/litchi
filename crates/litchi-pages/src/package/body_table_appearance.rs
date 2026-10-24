@@ -209,7 +209,10 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     fn resolve(&mut self) -> Result<(), Error> {
         if self.target.is_none() {
-            let mut budget = TransactionBudget::new(self.source)?;
+            let mut budget = match self.budget.take() {
+                Some(budget) => budget,
+                None => TransactionBudget::new(self.source)?,
+            };
             let selector = match &self.selector {
                 table_lock::OwnedBodyTableSelector::Name(name) => BodyTableSelector::Name(name),
                 table_lock::OwnedBodyTableSelector::Position(position) => {

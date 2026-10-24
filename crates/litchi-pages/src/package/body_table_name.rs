@@ -1873,11 +1873,11 @@ mod tests {
             .budget
             .as_mut()
             .expect("a failed lazy resolution retains its wire budget");
-        budget.maximum_payload_work = budget.payload_work;
+        budget.exhaust_payload_work_for_test();
         assert!(matches!(
             edit.path(),
             Err(Error::Limit {
-                kind: LimitKind::PayloadBytes,
+                kind: LimitKind::WireWork,
                 ..
             })
         ));
