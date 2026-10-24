@@ -1944,11 +1944,14 @@ impl Edit {
             chart_targets(&self.working, &selected.part_name, shape.into())?;
         let current = self.working.get_part(&chart_name)?.content_type();
         if current == litchi_drawingml::chart::chartex::CONTENT_TYPE {
-            litchi_drawingml::chart::chartex::read(&xml)
+            litchi_drawingml::chart::chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
                 .map_err(|error| drawing_error(error, "replacement chart XML"))?;
         } else {
-            litchi_drawingml::chart::reader::read(&xml[..])
-                .map_err(|error| drawing_error(error, "replacement chart XML"))?;
+            litchi_drawingml::chart::reader::read(
+                &xml[..],
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(|error| drawing_error(error, "replacement chart XML"))?;
         }
         let chart_changed = self.working.get_part(&chart_name)?.blob() != xml.as_slice();
         let workbook_change = match (workbook, workbook_name) {

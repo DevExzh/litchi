@@ -1281,12 +1281,16 @@ impl Summary {
     /// Read a chart part: a `c:chartSpace`, or an extended `cx:chartSpace`.
     pub(crate) fn read(xml: &[u8]) -> Result<Self> {
         if litchi_drawingml::chart::chartex::is_chartex(xml) {
-            let parsed = litchi_drawingml::chart::chartex::read(xml)
-                .map_err(|error| parsed(error, "chart part"))?;
+            let parsed = litchi_drawingml::chart::chartex::read(
+                xml,
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(|error| parsed(error, "chart part"))?;
             return Ok(Self::of_extended(parsed.spec));
         }
-        let chart = litchi_drawingml::chart::reader::read(xml)
-            .map_err(|error| parsed(error, "chart part"))?;
+        let chart =
+            litchi_drawingml::chart::reader::read(xml, &litchi_drawingml::chart::Limits::DEFAULT)
+                .map_err(|error| parsed(error, "chart part"))?;
         Ok(Self::of(chart))
     }
 
@@ -1959,9 +1963,12 @@ impl ChartEdit {
     /// Rebuild the part from the edited spec, after checking that the part
     /// is exactly what its spec writes (so the rebuild loses nothing).
     fn apply_rebuild(self, xml: &[u8], embedded: bool) -> Result<Option<Edited>> {
-        let parsed = litchi_drawingml::chart::authoring::read(xml)
-            .map_err(|error| parsed(error, "chart part"))?;
-        if !parsed.is_authored(xml) {
+        let parsed = litchi_drawingml::chart::authoring::read(
+            xml,
+            &litchi_drawingml::chart::Limits::DEFAULT,
+        )
+        .map_err(|error| parsed(error, "chart part"))?;
+        if !parsed.is_authored(xml, &litchi_drawingml::chart::Limits::DEFAULT) {
             return Err(not_authored("chart"));
         }
         let mut spec = self.rebuild.unwrap_or_else(|| parsed.spec.clone());
@@ -2067,7 +2074,9 @@ fn missing_series(property: &'static str) -> Error {
 /// from it so the workbook keeps matching the chart's caches.
 pub(crate) fn embedded_spec(xml: &[u8]) -> Option<Spec> {
     use litchi_drawingml::chart::authoring::Binding;
-    let chart = litchi_drawingml::chart::reader::read(xml).ok()?;
+    let chart =
+        litchi_drawingml::chart::reader::read(xml, &litchi_drawingml::chart::Limits::DEFAULT)
+            .ok()?;
     let summary = Summary::of(chart.clone());
     let variant = summary.variant?;
     let mut spec = Spec::new(variant).with_binding(Binding::sheet("Sheet1"));

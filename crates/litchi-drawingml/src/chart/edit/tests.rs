@@ -110,7 +110,10 @@ fn stale_and_invalid_edits_are_rejected_atomically() {
 fn series_colors_replace_insert_and_clear_fills() {
     use crate::chart::authoring::{Kind, Series, Spec, Variant};
     let color = |xml: &[u8]| {
-        crate::chart::authoring::read(xml).unwrap().spec.series()[0]
+        crate::chart::authoring::read(xml, &crate::chart::Limits::DEFAULT)
+            .unwrap()
+            .spec
+            .series()[0]
             .color
             .clone()
     };
@@ -145,8 +148,11 @@ fn series_colors_replace_insert_and_clear_fills() {
         let xml = edit.commit().unwrap().into_package().xml_bytes().to_vec();
         assert_eq!(color(&xml).as_deref(), Some("445566"), "{kind:?}");
         // The edited part reads as the authored chart of the new color.
-        let parsed = crate::chart::authoring::read(&xml).unwrap();
-        assert!(parsed.is_authored(&xml), "{kind:?}");
+        let parsed = crate::chart::authoring::read(&xml, &crate::chart::Limits::DEFAULT).unwrap();
+        assert!(
+            parsed.is_authored(&xml, &crate::chart::Limits::DEFAULT),
+            "{kind:?}"
+        );
     }
 }
 

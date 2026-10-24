@@ -131,14 +131,17 @@ pub(crate) fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                 saw_text = true;
                 in_text = true;
             },
-            Ok(Event::Text(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
-            Ok(Event::CData(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
+            Ok(Event::Text(e)) if in_text => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
+            Ok(Event::CData(e)) if in_text => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"t" => {
                 in_text = false;

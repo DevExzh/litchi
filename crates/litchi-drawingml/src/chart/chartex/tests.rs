@@ -33,13 +33,16 @@ fn every_family_round_trips_through_its_spec() {
             assert_eq!(xml, spec.to_xml(external).unwrap(), "deterministic");
             let text = String::from_utf8(xml.clone()).unwrap();
             assert!(text.contains(r#"<cx:chartSpace "#), "{kind:?}");
-            let chart = read(&xml).unwrap();
+            let chart = read(&xml, &Limits::DEFAULT).unwrap();
             assert_eq!(chart.spec.variant().kind, kind);
             assert_eq!(chart.external_data.as_deref(), external);
             assert_eq!(chart.spec.title(), Some("Title & <more>"));
             assert_eq!(chart.spec.series().len(), spec.series().len());
             assert_eq!(chart.spec.series()[0].values, spec.series()[0].values);
-            assert!(chart.is_authored(&xml), "{kind:?} {binding:?}\n{text}");
+            assert!(
+                chart.is_authored(&xml, &Limits::DEFAULT),
+                "{kind:?} {binding:?}\n{text}"
+            );
             assert_eq!(chart.spec.binding(), &binding, "{kind:?}");
         }
     }
@@ -70,8 +73,8 @@ fn formatting_survives_the_round_trip() {
         .with_value_axis_title("Cash")
         .with_appearance(appearance.clone());
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     let got = chart.spec.appearance();
     assert_eq!(got.increase_color.as_deref(), Some("00AA00"));
     assert_eq!(got.decrease_color.as_deref(), Some("C00000"));
@@ -95,8 +98,8 @@ fn formatting_survives_the_round_trip() {
     };
     let spec = sample(Kind::Histogram).with_appearance(appearance);
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     assert_eq!(chart.spec.appearance().bins.unwrap().count, Some(4));
 
     let spec = sample(Kind::Treemap).with_appearance(Appearance {
@@ -105,8 +108,8 @@ fn formatting_survives_the_round_trip() {
         ..Appearance::default()
     });
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     assert_eq!(chart.spec.appearance().colors.len(), 3);
 
     let spec = sample(Kind::BoxWhisker).with_appearance(Appearance {
@@ -114,7 +117,11 @@ fn formatting_survives_the_round_trip() {
         ..Appearance::default()
     });
     let xml = spec.to_xml(None).unwrap();
-    assert!(read(&xml).unwrap().is_authored(&xml));
+    assert!(
+        read(&xml, &Limits::DEFAULT)
+            .unwrap()
+            .is_authored(&xml, &Limits::DEFAULT)
+    );
 }
 
 #[test]
@@ -147,18 +154,22 @@ fn invalid_extended_specs_are_refused() {
 #[test]
 fn foreign_parts_read_but_are_not_authored() {
     let xml = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><cx:chartData><cx:data id="0"><cx:numDim type="val"><cx:lvl ptCount="2"><cx:pt idx="0">1</cx:pt><cx:pt idx="1">2</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:title><cx:tx><cx:rich><a:p><a:r><a:t>Rich</a:t></a:r></a:p></cx:rich></cx:tx></cx:title><cx:plotArea><cx:plotAreaRegion><cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"#;
-    let chart = read(xml).unwrap();
+    let chart = read(xml, &Limits::DEFAULT).unwrap();
     assert_eq!(chart.spec.variant().kind, Kind::Funnel);
     assert_eq!(chart.spec.title(), Some("Rich"));
     assert_eq!(chart.spec.series()[0].values, [1.0, 2.0]);
-    assert!(!chart.is_authored(xml));
-    assert!(read(b"<c:chartSpace xmlns:c=\"urn:x\"/>").is_err());
-    assert!(read(b"<cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData/><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"regionMap\"/></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>").is_err());
+    assert!(!chart.is_authored(xml, &Limits::DEFAULT));
+    assert!(read(b"<c:chartSpace xmlns:c=\"urn:x\"/>", &Limits::DEFAULT,).is_err());
+    assert!(read(
+        b"<cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData/><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"regionMap\"/></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>",
+        &Limits::DEFAULT,
+    )
+    .is_err());
 }
 
 #[test]
 fn companion_parts_are_valid_chart_styles() {
-    let style = crate::chart::style::parse(&style_xml()).unwrap();
+    let style = crate::chart::style::parse(&style_xml(), &Limits::DEFAULT).unwrap();
     assert_eq!(style.info().entries.len(), 30);
-    crate::chart::style::parse_color(&colors_xml()).unwrap();
+    crate::chart::style::parse_color(&colors_xml(), &Limits::DEFAULT).unwrap();
 }

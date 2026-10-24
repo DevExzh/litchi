@@ -369,9 +369,14 @@ impl Edit<Package> {
             return Err(invalid());
         }
         if extended {
-            chartex::read(&xml).map_err(drawing_error)?;
+            chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
+                .map_err(drawing_error)?;
         } else {
-            litchi_drawingml::chart::reader::read(&xml[..]).map_err(drawing_error)?;
+            litchi_drawingml::chart::reader::read(
+                &xml[..],
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(drawing_error)?;
         }
         let mut replaced = Vec::new();
         if current.as_slice() != xml.as_slice() {
@@ -649,9 +654,9 @@ mod tests {
             .chart_xml(charts[0].relationship_id())
             .unwrap()
             .unwrap();
-        let parsed = authoring::read(&classic).unwrap();
+        let parsed = authoring::read(&classic, &litchi_drawingml::chart::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.spec.variant().kind, Kind::Column);
-        assert!(parsed.is_authored(&classic));
+        assert!(parsed.is_authored(&classic, &litchi_drawingml::chart::Limits::DEFAULT,));
         let source = crate::source_backed::Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             source

@@ -390,7 +390,7 @@ impl Document {
 
 pub(crate) fn read(xml: &[u8]) -> Result<crate::chart::Chart> {
     Document::parse(xml)?;
-    reader::read(Cursor::new(xml))
+    reader::read(Cursor::new(xml), &crate::chart::Limits::DEFAULT)
 }
 
 pub(crate) fn set_style(xml: &[u8], style: Option<u32>) -> Result<Vec<u8>> {

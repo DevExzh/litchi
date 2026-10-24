@@ -41,9 +41,7 @@ impl Package {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: Chart) -> Result<Self> {
         let mut xml = Vec::new();
-        crate::chart::writer::write(&mut xml, &value).map_err(|error| {
-            Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
-        })?;
+        crate::chart::writer::write(&mut xml, &value, &crate::chart::Limits::DEFAULT)?;
         drop(value);
         Self::from_xml(xml)
     }

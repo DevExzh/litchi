@@ -77,13 +77,24 @@ fn extracts_and_canonically_emits_powerpoint_chart_through_shared_drawingml() {
         &fixture("ooxml/pptx/pie-chart.pptx"),
         "/ppt/charts/chart1.xml",
     );
-    let chart = drawingml_reader::read(chart_xml.as_slice())
-        .expect("real PowerPoint chart must parse through shared DrawingML");
+    let chart = drawingml_reader::read(
+        chart_xml.as_slice(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("real PowerPoint chart must parse through shared DrawingML");
     assert!(!chart.plot_area.type_groups.is_empty());
 
     let mut emitted = Vec::new();
-    drawingml_writer::write(&mut emitted, &chart)
-        .expect("real PowerPoint chart must serialize through shared DrawingML");
+    drawingml_writer::write(
+        &mut emitted,
+        &chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("real PowerPoint chart must serialize through shared DrawingML");
     assert_minimal_xml(&emitted);
-    drawingml_reader::read(emitted.as_slice()).expect("canonical chart XML must reparse");
+    drawingml_reader::read(
+        emitted.as_slice(),
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .expect("canonical chart XML must reparse");
 }

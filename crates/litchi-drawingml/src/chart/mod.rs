@@ -70,7 +70,11 @@
 //!
 //! // Write to XML
 //! let mut xml_output = Vec::new();
-//! litchi_drawingml::chart::writer::write(&mut xml_output, &chart)?;
+//! litchi_drawingml::chart::writer::write(
+//!     &mut xml_output,
+//!     &chart,
+//!     &litchi_drawingml::chart::Limits::DEFAULT,
+//! )?;
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
@@ -82,6 +86,7 @@ pub mod data;
 pub mod edit;
 pub mod extension;
 pub mod legend;
+mod limits;
 pub mod model;
 pub mod plot_area;
 pub mod reader;
@@ -97,6 +102,7 @@ pub use data::{
 };
 pub use edit::{Commit, DataLabelFlag, Diagnostics, Edit, LimitKind, Package, Patch};
 pub use legend::Legend;
+pub use limits::Limits;
 pub use model::{
     Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,
     HeaderFooter, PageMargins, PageOrientation, PageSetup, PictureFormat, PictureOptions,

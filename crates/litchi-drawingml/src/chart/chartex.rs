@@ -25,13 +25,13 @@
 //!     .with_categories(["Start", "Q1", "Q2", "End"])
 //!     .with_series(Series::new("Cash", vec![100.0, -30.0, 50.0, 0.0]));
 //! let xml = spec.to_xml(None)?;
-//! let chart = chartex::read(&xml)?;
+//! let chart = chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)?;
 //! assert_eq!(chart.spec.variant().kind, Kind::Waterfall);
-//! assert!(chart.is_authored(&xml));
+//! assert!(chart.is_authored(&xml, &litchi_drawingml::chart::Limits::DEFAULT));
 //! # Ok::<(), litchi_drawingml::Error>(())
 //! ```
 
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
@@ -39,6 +39,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
 use quick_xml::reader::NsReader;
 
+use crate::chart::Limits;
 use crate::chart::authoring::{
     Appearance, Binding, Bins, Kind, Labels, ParentLabels, Parsed, QuartileMethod, Series, Spec,
     Variant, column_name,
@@ -72,25 +73,84 @@ const RELATIONSHIPS_NS: &str =
 const STRICT_RELATIONSHIPS_NS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const STYLE_NS: &str = "http://schemas.microsoft.com/office/drawing/2012/chartStyle";
 
-/// The largest `ChartEx` part [`read`] accepts.
-pub const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
-const MAX_NODES: usize = 400_000;
-const MAX_DEPTH: usize = 64;
+/// A formatting sink that refuses to grow beyond the caller's output budget.
+/// The ChartEx writer is intentionally streaming at the formatting boundary:
+/// it does not first build an unbounded `String` and only then compare its
+/// length with the active policy.
+struct BoundedXml {
+    inner: String,
+    maximum: usize,
+    attempted: usize,
+    exceeded: bool,
+}
 
-fn escape(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for character in text.chars() {
-        match character {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            other => out.push(other),
+impl BoundedXml {
+    fn new(maximum: usize) -> Self {
+        Self {
+            inner: String::with_capacity(4096.min(maximum)),
+            maximum,
+            attempted: 0,
+            exceeded: false,
         }
     }
-    out
+
+    fn push_str(&mut self, value: &str) {
+        let _ = self.write_str(value);
+    }
+
+    fn finish(self) -> Result<Vec<u8>> {
+        if self.exceeded {
+            Err(Error::limit(
+                crate::LimitKind::OutputBytes,
+                self.attempted,
+                self.maximum,
+            ))
+        } else {
+            Ok(self.inner.into_bytes())
+        }
+    }
 }
+
+impl fmt::Write for BoundedXml {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        let attempted = self.attempted.saturating_add(value.len());
+        self.attempted = attempted;
+        if attempted > self.maximum {
+            self.exceeded = true;
+            return Err(fmt::Error);
+        }
+        self.inner.push_str(value);
+        Ok(())
+    }
+}
+
+/// XML-escape text directly into the bounded formatting sink.  Returning an
+/// owned escaped `String` first would let a small output policy be bypassed by
+/// a large text value before the sink sees its first byte.
+struct Escaped<'a>(&'a str);
+
+impl fmt::Display for Escaped<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut start = 0usize;
+        for (index, character) in self.0.char_indices() {
+            let replacement = match character {
+                '&' => "&amp;",
+                '<' => "&lt;",
+                '>' => "&gt;",
+                '"' => "&quot;",
+                '\'' => "&apos;",
+                _ => continue,
+            };
+            formatter.write_str(&self.0[start..index])?;
+            formatter.write_str(replacement)?;
+            start = index + character.len_utf8();
+        }
+        formatter.write_str(&self.0[start..])
+    }
+}
+
+/// The largest `ChartEx` part [`read`] accepts.
+pub const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
 
 /// An `a:solidFill` of `RRGGBB` or `AARRGGBB`.
 fn solid_fill(color: &str) -> String {
@@ -185,7 +245,7 @@ fn gap(value: u32) -> String {
 
 /// A chart or axis title, as rich text (`cx:tx/cx:rich`): the form
 /// applications other than Excel read as well.
-fn write_title(xml: &mut String, chart: bool, title: &str) {
+fn write_title(xml: &mut BoundedXml, chart: bool, title: &str) {
     let _ = write!(
         xml,
         r#"<cx:title{}><cx:tx><cx:rich><a:bodyPr/><a:p><a:r><a:t>{}</a:t></a:r></a:p></cx:rich></cx:tx></cx:title>"#,
@@ -194,31 +254,31 @@ fn write_title(xml: &mut String, chart: bool, title: &str) {
         } else {
             ""
         },
-        escape(title)
+        Escaped(title)
     );
 }
 
-fn write_level_text(xml: &mut String, points: &[String]) {
+fn write_level_text(xml: &mut BoundedXml, points: &[String]) {
     let _ = write!(xml, r#"<cx:lvl ptCount="{}">"#, points.len());
     for (index, point) in points.iter().enumerate() {
-        let _ = write!(xml, r#"<cx:pt idx="{index}">{}</cx:pt>"#, escape(point));
+        let _ = write!(xml, r#"<cx:pt idx="{index}">{}</cx:pt>"#, Escaped(point));
     }
     xml.push_str("</cx:lvl>");
 }
 
-fn write_data(xml: &mut String, spec: &Spec, index: usize, series: &Series) {
+fn write_data(xml: &mut BoundedXml, spec: &Spec, index: usize, series: &Series) {
     let _ = write!(xml, r#"<cx:data id="{index}">"#);
     if has_categories(spec) {
         xml.push_str(r#"<cx:strDim type="cat">"#);
         if let Some(formula) = spec.reference(0, 1, spec.categories().len()) {
-            let _ = write!(xml, "<cx:f>{}</cx:f>", escape(&formula));
+            let _ = write!(xml, "<cx:f>{}</cx:f>", Escaped(&formula));
         }
         write_level_text(xml, spec.categories());
         xml.push_str("</cx:strDim>");
     }
     xml.push_str(r#"<cx:numDim type="val">"#);
     if let Some(formula) = spec.reference(index + 1, 1, series.values.len()) {
-        let _ = write!(xml, "<cx:f>{}</cx:f>", escape(&formula));
+        let _ = write!(xml, "<cx:f>{}</cx:f>", Escaped(&formula));
     }
     let _ = write!(
         xml,
@@ -231,7 +291,7 @@ fn write_data(xml: &mut String, spec: &Spec, index: usize, series: &Series) {
     xml.push_str("</cx:lvl></cx:numDim></cx:data>");
 }
 
-fn write_labels(xml: &mut String, labels: &Labels) {
+fn write_labels(xml: &mut BoundedXml, labels: &Labels) {
     if !(labels.value || labels.category || labels.series || labels.percent) {
         return;
     }
@@ -248,7 +308,7 @@ fn write_labels(xml: &mut String, labels: &Labels) {
     );
 }
 
-fn write_layout(xml: &mut String, spec: &Spec) {
+fn write_layout(xml: &mut BoundedXml, spec: &Spec) {
     let appearance = spec.appearance();
     match spec.variant().kind {
         Kind::Waterfall => {
@@ -318,7 +378,7 @@ fn write_layout(xml: &mut String, spec: &Spec) {
     }
 }
 
-fn write_series(xml: &mut String, spec: &Spec, index: usize, series: &Series) {
+fn write_series(xml: &mut BoundedXml, spec: &Spec, index: usize, series: &Series) {
     let kind = spec.variant().kind;
     let appearance = spec.appearance();
     let _ = write!(
@@ -329,12 +389,12 @@ fn write_series(xml: &mut String, spec: &Spec, index: usize, series: &Series) {
     );
     xml.push_str("<cx:tx><cx:txData>");
     if let Some(formula) = spec.reference(index + 1, 0, 0) {
-        let _ = write!(xml, "<cx:f>{}</cx:f>", escape(&formula));
+        let _ = write!(xml, "<cx:f>{}</cx:f>", Escaped(&formula));
     }
     let _ = write!(
         xml,
         "<cx:v>{}</cx:v></cx:txData></cx:tx>",
-        escape(&series.name)
+        Escaped(&series.name)
     );
     let single = spec.series().len() == 1 && appearance.colors.len() > 1;
     let color = series
@@ -366,7 +426,7 @@ fn write_series(xml: &mut String, spec: &Spec, index: usize, series: &Series) {
     xml.push_str("</cx:series>");
 }
 
-fn write_axes(xml: &mut String, spec: &Spec) {
+fn write_axes(xml: &mut BoundedXml, spec: &Spec) {
     let kind = spec.variant().kind;
     let appearance = spec.appearance();
     match kind {
@@ -421,23 +481,28 @@ fn write_axes(xml: &mut String, spec: &Spec) {
     }
 }
 
-/// Write the `cx:chartSpace` part of an extended spec (see
-/// [`Spec::to_xml`]).
-pub(crate) fn write(spec: &Spec, external_data: Option<&str>) -> Result<Vec<u8>> {
+/// Write a ChartEx part under a caller-selected resource policy.
+pub(crate) fn write_with_limits(
+    spec: &Spec,
+    external_data: Option<&str>,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     spec.validate()?;
+    limits.validate_spec_for_chart(spec)?;
     let kind = spec.variant().kind;
     if !kind.is_extended() {
         return Err(Error::Invalid(
             "only an extended chart is written as a chartex part".into(),
         ));
     }
-    let mut xml = String::with_capacity(4096);
+    let mut xml = BoundedXml::new(limits.max_output_bytes);
     let _ = write!(
         xml,
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cx:chartSpace xmlns:a="{DRAWING_NS}" xmlns:r="{RELATIONSHIPS_NS}" xmlns:cx="{NAMESPACE}"><cx:chartData>"#
     );
     if let Some(id) = external_data {
-        let _ = write!(xml, r#"<cx:externalData r:id="{}"/>"#, escape(id));
+        let _ = write!(xml, r#"<cx:externalData r:id="{}"/>"#, Escaped(id));
     }
     for (index, series) in spec.series().iter().enumerate() {
         write_data(&mut xml, spec, index, series);
@@ -474,7 +539,7 @@ pub(crate) fn write(spec: &Spec, external_data: Option<&str>) -> Result<Vec<u8>>
         );
     }
     xml.push_str("</cx:chart></cx:chartSpace>");
-    Ok(xml.into_bytes())
+    xml.finish()
 }
 
 /// Whether a chart part's root element is a `cx:chartSpace` (an extended
@@ -659,39 +724,81 @@ impl Node {
 
     /// The text of a `cx:tx` (or `cx:title`): its `txData/v`, or the runs
     /// of its rich text.
-    fn text_body(&self) -> Option<(Option<String>, String)> {
-        let tx = self.child("tx")?;
+    fn text_body(&self, limits: Limits) -> Result<Option<(Option<String>, String)>> {
+        let Some(tx) = self.child("tx") else {
+            return Ok(None);
+        };
         if let Some(data) = tx.child("txData") {
             let formula = data.child("f").map(|f| f.text.clone());
-            return Some((formula, data.child("v").map(|v| v.text.clone())?));
+            let Some(value) = data.child("v").map(|v| v.text.clone()) else {
+                return Ok(None);
+            };
+            return Ok(Some((formula, value)));
         }
-        let rich = tx.child("rich")?;
+        let Some(rich) = tx.child("rich") else {
+            return Ok(None);
+        };
         let mut text = String::new();
-        collect_runs(rich, &mut text);
-        Some((None, text))
+        collect_runs(rich, &mut text, limits)?;
+        Ok(Some((None, text)))
     }
 }
 
-fn collect_runs(node: &Node, out: &mut String) {
+fn collect_runs(node: &Node, out: &mut String, limits: Limits) -> Result<()> {
     for child in &node.children {
         if child.drawing && child.name == "t" {
+            let length = out.len().checked_add(child.text.len()).ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::ChartTextBytes,
+                    usize::MAX,
+                    limits.max_text_bytes,
+                )
+            })?;
+            if length > limits.max_text_bytes {
+                return Err(Error::limit(
+                    crate::LimitKind::ChartTextBytes,
+                    length,
+                    limits.max_text_bytes,
+                ));
+            }
             out.push_str(&child.text);
         } else {
-            collect_runs(child, out);
+            collect_runs(child, out, limits)?;
         }
     }
+    Ok(())
+}
+
+fn append_text(node: &mut Node, text: &str, limits: Limits) -> Result<()> {
+    let length = node.text.len().checked_add(text.len()).ok_or_else(|| {
+        Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            usize::MAX,
+            limits.max_text_bytes,
+        )
+    })?;
+    if length > limits.max_text_bytes {
+        return Err(Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            length,
+            limits.max_text_bytes,
+        ));
+    }
+    node.text.push_str(text);
+    Ok(())
 }
 
 fn attribute_name(attribute: &quick_xml::events::attributes::Attribute<'_>) -> String {
     String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned()
 }
 
-fn parse_tree(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_XML_BYTES {
+fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
+    let maximum = limits.max_chartex_bytes.min(MAX_XML_BYTES);
+    if xml.len() > maximum {
         return Err(Error::limit(
             crate::LimitKind::ChartexPartBytes,
             xml.len(),
-            MAX_XML_BYTES,
+            maximum,
         ));
     }
     let mut reader = NsReader::from_reader(xml);
@@ -705,6 +812,34 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             ResolveResult::Bound(namespace) => namespace.as_ref().to_vec(),
             _ => Vec::new(),
         };
+        let mut attribute_count = 0usize;
+        // Admit the complete raw attribute budget before decoding values into
+        // owned strings. The checked iterator below retains the codec's
+        // duplicate/namespace validation behavior.
+        for item in element.unchecked_attributes() {
+            let item = item.map_err(|error| Error::Xml(error.to_string()))?;
+            attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::XmlAttributes,
+                    usize::MAX,
+                    limits.max_xml_attributes,
+                )
+            })?;
+            if attribute_count > limits.max_xml_attributes {
+                return Err(Error::limit(
+                    crate::LimitKind::XmlAttributes,
+                    attribute_count,
+                    limits.max_xml_attributes,
+                ));
+            }
+            if item.value.len() > limits.max_attribute_value_bytes {
+                return Err(Error::limit(
+                    crate::LimitKind::AttributeValueBytes,
+                    item.value.len(),
+                    limits.max_attribute_value_bytes,
+                ));
+            }
+        }
         let mut attributes = Vec::new();
         for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
@@ -736,35 +871,49 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
         match reader.read_event()? {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or_else(|| {
-                    Error::limit(crate::LimitKind::ChartexXmlNodes, usize::MAX, MAX_NODES)
+                    Error::limit(
+                        crate::LimitKind::ChartexXmlNodes,
+                        usize::MAX,
+                        limits.max_chartex_nodes,
+                    )
                 })?;
-                if nodes > MAX_NODES {
+                if nodes > limits.max_chartex_nodes {
                     return Err(Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
                         nodes,
-                        MAX_NODES,
+                        limits.max_chartex_nodes,
                     ));
                 }
                 let depth = stack.len().checked_add(1).ok_or_else(|| {
-                    Error::limit(crate::LimitKind::ChartexXmlDepth, usize::MAX, MAX_DEPTH)
+                    Error::limit(
+                        crate::LimitKind::ChartexXmlDepth,
+                        usize::MAX,
+                        limits.max_chartex_depth,
+                    )
                 })?;
-                if depth > MAX_DEPTH {
+                if depth > limits.max_chartex_depth {
                     return Err(Error::limit(
                         crate::LimitKind::ChartexXmlDepth,
                         depth,
-                        MAX_DEPTH,
+                        limits.max_chartex_depth,
                     ));
                 }
                 let node = open(&reader, &element)?;
                 stack.push(node);
             },
             Event::Empty(element) => {
-                nodes += 1;
-                if nodes > MAX_NODES {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::ChartexXmlNodes,
+                        usize::MAX,
+                        limits.max_chartex_nodes,
+                    )
+                })?;
+                if nodes > limits.max_chartex_nodes {
                     return Err(Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
                         nodes,
-                        MAX_NODES,
+                        limits.max_chartex_nodes,
                     ));
                 }
                 let node = open(&reader, &element)?;
@@ -784,10 +933,24 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             },
             Event::Text(text) => {
                 if let Some(node) = stack.last_mut() {
+                    let raw_length = node.text.len().checked_add(text.len()).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::ChartTextBytes,
+                            usize::MAX,
+                            limits.max_text_bytes,
+                        )
+                    })?;
+                    if raw_length > limits.max_text_bytes {
+                        return Err(Error::limit(
+                            crate::LimitKind::ChartTextBytes,
+                            raw_length,
+                            limits.max_text_bytes,
+                        ));
+                    }
                     let text = text
                         .xml_content(XmlVersion::Implicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?;
-                    node.text.push_str(&text);
+                    append_text(node, &text, limits)?;
                 }
             },
             Event::GeneralRef(reference) => {
@@ -806,12 +969,27 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                                 .to_owned()
                         },
                     };
-                    node.text.push_str(&resolved);
+                    append_text(node, &resolved, limits)?;
                 }
             },
             Event::CData(data) => {
                 if let Some(node) = stack.last_mut() {
-                    node.text.push_str(&String::from_utf8_lossy(&data));
+                    let raw_length = node.text.len().checked_add(data.len()).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::ChartTextBytes,
+                            usize::MAX,
+                            limits.max_text_bytes,
+                        )
+                    })?;
+                    if raw_length > limits.max_text_bytes {
+                        return Err(Error::limit(
+                            crate::LimitKind::ChartTextBytes,
+                            raw_length,
+                            limits.max_text_bytes,
+                        ));
+                    }
+                    let text = String::from_utf8_lossy(&data);
+                    append_text(node, &text, limits)?;
                 }
             },
             Event::Eof => break,
@@ -860,14 +1038,13 @@ struct Data {
     value_formula: Option<String>,
 }
 
-fn level_points(level: &Node) -> Vec<(usize, String)> {
+fn level_points(level: &Node) -> impl Iterator<Item = (usize, String)> + '_ {
     level
         .all("pt")
         .filter_map(|pt| Some((pt.attribute("idx")?.parse().ok()?, pt.text.clone())))
-        .collect()
 }
 
-fn read_data(node: &Node) -> Data {
+fn read_data(node: &Node, limits: Limits, total_points: &mut usize) -> Result<Data> {
     let mut data = Data::default();
     if let Some(dimension) = node
         .all("strDim")
@@ -878,8 +1055,14 @@ fn read_data(node: &Node) -> Data {
             let count = level
                 .attribute("ptCount")
                 .and_then(|count| count.parse::<usize>().ok())
-                .unwrap_or(0)
-                .min(crate::chart::authoring::MAX_POINTS);
+                .unwrap_or(0);
+            if count > limits.max_categories {
+                return Err(Error::limit(
+                    crate::LimitKind::ChartCategories,
+                    count,
+                    limits.max_categories,
+                ));
+            }
             data.categories = vec![String::new(); count];
             for (index, text) in level_points(level) {
                 if let Some(slot) = data.categories.get_mut(index) {
@@ -897,8 +1080,29 @@ fn read_data(node: &Node) -> Data {
             let count = level
                 .attribute("ptCount")
                 .and_then(|count| count.parse::<usize>().ok())
-                .unwrap_or(0)
-                .min(crate::chart::authoring::MAX_POINTS);
+                .unwrap_or(0);
+            if count > limits.max_points {
+                return Err(Error::limit(
+                    crate::LimitKind::ChartPoints,
+                    count,
+                    limits.max_points,
+                ));
+            }
+            let total = total_points.checked_add(count).ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::ChartPoints,
+                    usize::MAX,
+                    limits.max_total_points,
+                )
+            })?;
+            if total > limits.max_total_points {
+                return Err(Error::limit(
+                    crate::LimitKind::ChartPoints,
+                    total,
+                    limits.max_total_points,
+                ));
+            }
+            *total_points = total;
             data.values = vec![0.0; count];
             for (index, text) in level_points(level) {
                 if let (Some(slot), Ok(value)) = (data.values.get_mut(index), text.trim().parse()) {
@@ -907,7 +1111,7 @@ fn read_data(node: &Node) -> Data {
             }
         }
     }
-    data
+    Ok(data)
 }
 
 /// The binding a value reference (`Sheet1!$B$2:$B$6`) implies for the
@@ -956,8 +1160,9 @@ fn label_position(text: &str) -> Option<DataLabelPosition> {
 /// Returns [`Error::Xml`] for malformed XML, [`Error::Invalid`] for a part
 /// that is not a `cx:chartSpace` or whose series family has no authoring
 /// form (a region map), and [`Error::Limit`] past [`MAX_XML_BYTES`].
-pub fn read(xml: &[u8]) -> Result<Parsed> {
-    let root = parse_tree(xml)?;
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Parsed> {
+    let limits = limits.validate()?;
+    let root = parse_tree(xml, limits)?;
     let chart_data = root
         .child("chartData")
         .ok_or_else(|| Error::Invalid("the chartex part has no chart data".into()))?;
@@ -965,15 +1170,24 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
         .child("externalData")
         .and_then(|data| data.attribute("r:id"))
         .map(str::to_owned);
+    let data_count = chart_data.all("data").count();
+    if data_count > limits.max_series {
+        return Err(Error::limit(
+            crate::LimitKind::ChartSeries,
+            data_count,
+            limits.max_series,
+        ));
+    }
+    let mut total_points = 0usize;
     let data: Vec<(String, Data)> = chart_data
         .all("data")
         .map(|node| {
-            (
+            Ok((
                 node.attribute("id").unwrap_or("0").to_owned(),
-                read_data(node),
-            )
+                read_data(node, limits, &mut total_points)?,
+            ))
         })
-        .collect();
+        .collect::<Result<_>>()?;
     let chart = root
         .child("chart")
         .ok_or_else(|| Error::Invalid("the chartex part has no chart".into()))?;
@@ -983,14 +1197,22 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
     let region = plot_area
         .child("plotAreaRegion")
         .ok_or_else(|| Error::Invalid("the chartex chart has no plot region".into()))?;
-    let all_series: Vec<&Node> = region.all("series").collect();
-    let pareto = all_series
-        .iter()
-        .any(|series| series.attribute("layoutId") == Some("paretoLine"));
-    let series_nodes: Vec<&Node> = all_series
-        .into_iter()
-        .filter(|series| series.attribute("layoutId") != Some("paretoLine"))
-        .collect();
+    let mut pareto = false;
+    let mut series_nodes = Vec::new();
+    for series in region.all("series") {
+        if series.attribute("layoutId") == Some("paretoLine") {
+            pareto = true;
+            continue;
+        }
+        if series_nodes.len() >= limits.max_series {
+            return Err(Error::limit(
+                crate::LimitKind::ChartSeries,
+                series_nodes.len() + 1,
+                limits.max_series,
+            ));
+        }
+        series_nodes.push(series);
+    }
     let first = series_nodes
         .first()
         .ok_or_else(|| Error::Invalid("the chartex chart has no series".into()))?;
@@ -1009,7 +1231,12 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
         },
     };
     let mut spec = Spec::new(Variant::new(kind)).with_legend(None);
-    if let Some((_, title)) = chart.child("title").and_then(Node::text_body) {
+    if let Some((_, title)) = chart
+        .child("title")
+        .map(|node| node.text_body(limits))
+        .transpose()?
+        .flatten()
+    {
         spec = spec.with_title(title);
     }
     let data_of = |node: &Node| {
@@ -1036,7 +1263,7 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
                 .as_deref()
                 .and_then(|formula| binding_of(formula, 0));
         }
-        let (_, name) = node.text_body().unwrap_or((None, String::new()));
+        let (_, name) = node.text_body(limits)?.unwrap_or((None, String::new()));
         let values = data.map(|data| data.values.clone()).unwrap_or_default();
         let mut built = Series::new(name, values);
         if let Some(color) = fill_color(node) {
@@ -1069,6 +1296,14 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
     if series.len() == 1
         && let Some(node) = series_nodes.first()
     {
+        let point_count = node.all("dataPt").count();
+        if point_count > limits.max_points {
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                point_count,
+                limits.max_points,
+            ));
+        }
         let mut points: Vec<(usize, String)> = node
             .all("dataPt")
             .filter_map(|point| Some((point.attribute("idx")?.parse().ok()?, fill_color(point)?)))
@@ -1081,7 +1316,12 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
             if let Some(gap) = number(scaling, "gapWidth") {
                 appearance.gap_width = Some((gap * 100.0).round() as u32);
             }
-            if let Some((_, title)) = axis.child("title").and_then(Node::text_body) {
+            if let Some((_, title)) = axis
+                .child("title")
+                .map(|node| node.text_body(limits))
+                .transpose()?
+                .flatten()
+            {
                 spec = spec.with_category_axis_title(title);
             }
         } else if let Some(scaling) = axis.child("valScaling") {
@@ -1093,7 +1333,12 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
             appearance.axis_min = number(scaling, "min");
             appearance.major_unit = number(scaling, "majorUnit");
             appearance.hide_gridlines = axis.child("majorGridlines").is_none();
-            if let Some((_, title)) = axis.child("title").and_then(Node::text_body) {
+            if let Some((_, title)) = axis
+                .child("title")
+                .map(|node| node.text_body(limits))
+                .transpose()?
+                .flatten()
+            {
                 spec = spec.with_value_axis_title(title);
             }
         }
@@ -1129,6 +1374,7 @@ pub fn read(xml: &[u8]) -> Result<Parsed> {
     if let Some(binding) = binding {
         spec = spec.with_binding(binding);
     }
+    limits.validate_spec_for_chart(&spec)?;
     Ok(Parsed {
         spec,
         external_data,

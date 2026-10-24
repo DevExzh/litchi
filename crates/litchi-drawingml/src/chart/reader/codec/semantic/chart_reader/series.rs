@@ -10,6 +10,7 @@ use super::{
 };
 
 pub(crate) fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Series>> {
+    reader.begin_series()?;
     let mut series = Series::new(0);
     let mut saw_index = false;
     let mut saw_order = false;
@@ -843,18 +844,21 @@ pub(crate) fn parse_label_text<R: BufRead>(
                 saw_text = true;
                 in_text = true;
             },
-            Ok(Event::Text(value)) if in_text => text.push_str(
+            Ok(Event::Text(value)) if in_text => reader.append_text(
+                &mut text,
                 &value
                     .decode()
                     .map_err(|error| Error::Xml(error.to_string()))?,
-            ),
-            Ok(Event::CData(value)) if in_text => text.push_str(
+            )?,
+            Ok(Event::CData(value)) if in_text => reader.append_text(
+                &mut text,
                 &value
                     .decode()
                     .map_err(|error| Error::Xml(error.to_string()))?,
-            ),
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
                 in_text = false;
@@ -1334,6 +1338,7 @@ pub(crate) fn parse_string_data<R: BufRead>(
                 data.source_ref = Some(DataSourceRef::new(formula));
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pt" => {
+                reader.admit_category_point()?;
                 if let Some(text) = parse_point_text(reader)? {
                     data.values.push(text);
                 }
@@ -1367,6 +1372,7 @@ pub(crate) fn parse_numeric_data<R: BufRead>(
                 data.format_code = Some(parse_text_element(reader, b"formatCode")?);
             },
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"pt" => {
+                reader.admit_numeric_point()?;
                 if let Some(val) = parse_point_value(reader)? {
                     data.values.push(val);
                 }
@@ -1480,22 +1486,21 @@ pub(crate) fn parse_series_title_rich_text<R: BufRead>(
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"t" => {
                 in_text = true;
             },
-            Ok(Event::Text(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
-            Ok(Event::CData(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
+            Ok(Event::Text(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
+            Ok(Event::CData(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
                 in_text = false;
@@ -1529,22 +1534,21 @@ pub(crate) fn parse_text_element<R: BufRead>(
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
-            Ok(Event::Text(value)) => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
-            Ok(Event::CData(value)) => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
+            Ok(Event::Text(value)) => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
+            Ok(Event::CData(value)) => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == end_name => break,
             Ok(Event::Start(ref element) | Event::Empty(ref element))
@@ -1579,14 +1583,17 @@ pub(crate) fn parse_point_text<R: BufRead>(
             Ok(Event::Start(ref e)) if e.local_name().as_ref() == b"v" => {
                 in_v = true;
             },
-            Ok(Event::Text(e)) if in_v => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
-            Ok(Event::CData(e)) if in_v => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
+            Ok(Event::Text(e)) if in_v => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
+            Ok(Event::CData(e)) if in_v => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_v => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"v" => {
                 in_v = false;

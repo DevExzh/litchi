@@ -156,15 +156,18 @@ fn main() -> Outcome<()> {
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
             let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
-            let axis = litchi_drawingml::chart::reader::read(snapshot.xml_bytes())?
-                .plot_area
-                .axes
-                .iter()
-                .find_map(|axis| match axis {
-                    litchi_drawingml::chart::Axis::Value(axis) => Some(axis.common.axis_id),
-                    _ => None,
-                })
-                .ok_or("a value axis")?;
+            let axis = litchi_drawingml::chart::reader::read(
+                snapshot.xml_bytes(),
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )?
+            .plot_area
+            .axes
+            .iter()
+            .find_map(|axis| match axis {
+                litchi_drawingml::chart::Axis::Value(axis) => Some(axis.common.axis_id),
+                _ => None,
+            })
+            .ok_or("a value axis")?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_axis_title(
                 axis,

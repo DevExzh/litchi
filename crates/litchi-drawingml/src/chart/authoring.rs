@@ -31,7 +31,10 @@
 //!     .with_series(Series::new("East", vec![120.0, 135.0, 148.0]))
 //!     .with_legend(Some(LegendPosition::Bottom));
 //! let xml = spec.to_xml(None)?;
-//! let chart = litchi_drawingml::chart::reader::read(&xml[..])?;
+//! let chart = litchi_drawingml::chart::reader::read(
+//!     &xml[..],
+//!     &litchi_drawingml::chart::Limits::DEFAULT,
+//! )?;
 //! assert_eq!(Variant::of(&chart), Some(Variant::new(Kind::Column)));
 //! # Ok::<(), litchi_drawingml::Error>(())
 //! ```
@@ -656,6 +659,10 @@ impl Spec {
     #[must_use]
     pub fn series_kinds(&self) -> &[Kind] {
         &self.series_kinds
+    }
+
+    pub(crate) fn series_references(&self) -> &[(usize, String, Option<String>)] {
+        &self.series_references
     }
 
     /// The same spec as another variant, keeping its data and formatting.
@@ -1674,16 +1681,26 @@ impl Spec {
     ///
     /// Returns the errors of [`Self::validate`] and of the chart writer.
     pub fn to_xml(&self, external_data: Option<&str>) -> Result<Vec<u8>> {
+        self.to_xml_with_policy(external_data, &crate::chart::Limits::DEFAULT)
+    }
+
+    pub(crate) fn to_xml_with_policy(
+        &self,
+        external_data: Option<&str>,
+        limits: &crate::chart::Limits,
+    ) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
+        limits.validate_spec_for_chart(self)?;
         if self.variant.kind.is_extended() {
-            return crate::chart::chartex::write(self, external_data);
+            return crate::chart::chartex::write_with_limits(self, external_data, &limits);
         }
         let mut chart = self.to_chart()?;
         if external_data.is_some() {
             chart.external_data = Some(crate::chart::model::ExternalData::pending());
         }
-        let mut xml = Vec::with_capacity(4096);
-        crate::chart::writer::write_with_rels(&mut xml, &chart, external_data, None)
-            .map_err(Error::Io)?;
+        limits.validate_chart(&chart)?;
+        let mut xml = Vec::with_capacity(4096.min(limits.max_output_bytes));
+        crate::chart::writer::write_with_rels(&mut xml, &chart, &limits, external_data, None)?;
         Ok(xml)
     }
 }

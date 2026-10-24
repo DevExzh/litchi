@@ -9,6 +9,7 @@
 //! otherwise simplify.
 
 use super::{Appearance, Binding, Kind, Labels, Series, Spec, Variant};
+use crate::chart::Limits;
 use crate::chart::axis::Axis;
 use crate::chart::data::TitleText;
 use crate::chart::model::{Chart, ShapeProperties};
@@ -33,8 +34,17 @@ impl Parsed {
     /// two parts read as the same chart (so a part that a source-preserving
     /// edit retouched still counts).
     #[must_use]
-    pub fn is_authored(&self, xml: &[u8]) -> bool {
-        let Ok(rebuilt) = self.spec.to_xml(self.external_data.as_deref()) else {
+    pub fn is_authored(&self, xml: &[u8], limits: &Limits) -> bool {
+        let Ok(limits) = limits.validate() else {
+            return false;
+        };
+        if limits.validate_spec_for_chart(&self.spec).is_err() {
+            return false;
+        }
+        let Ok(rebuilt) = self
+            .spec
+            .to_xml_with_policy(self.external_data.as_deref(), &limits)
+        else {
             return false;
         };
         if rebuilt == xml {
@@ -44,11 +54,12 @@ impl Parsed {
             return false;
         }
         let normalized = |xml: &[u8]| -> Option<Vec<u8>> {
-            let chart = crate::chart::reader::read(xml).ok()?;
+            let chart = crate::chart::reader::read(xml, &limits).ok()?;
             let mut out = Vec::new();
             crate::chart::writer::write_with_rels(
                 &mut out,
                 &chart,
+                &limits,
                 self.external_data.as_deref(),
                 None,
             )
@@ -70,10 +81,10 @@ impl Parsed {
 ///     .with_categories(["Q1", "Q2"])
 ///     .with_series(Series::new("East", vec![1.0, 2.0]).with_color("4472C4"));
 /// let xml = spec.to_xml(None)?;
-/// let parsed = authoring::read(&xml)?;
+/// let parsed = authoring::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)?;
 /// assert_eq!(parsed.spec.variant().kind, Kind::Bar);
 /// assert_eq!(parsed.spec.series()[0].color.as_deref(), Some("4472C4"));
-/// assert!(parsed.is_authored(&xml));
+/// assert!(parsed.is_authored(&xml, &litchi_drawingml::chart::Limits::DEFAULT));
 /// # Ok::<(), litchi_drawingml::Error>(())
 /// ```
 ///
@@ -81,19 +92,21 @@ impl Parsed {
 ///
 /// Returns the chart reader's errors, and [`Error::Invalid`] for a chart
 /// with no authoring form (a surface, bar-of-pie or region-map chart).
-pub fn read(xml: &[u8]) -> Result<Parsed> {
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Parsed> {
     if crate::chart::chartex::is_chartex(xml) {
-        return crate::chart::chartex::read(xml);
+        return crate::chart::chartex::read(xml, limits);
     }
-    let chart = crate::chart::reader::read(xml)?;
+    let chart = crate::chart::reader::read(xml, limits)?;
     let external_data = chart
         .external_data
         .as_ref()
         .and_then(|data| data.relationship_id.clone());
-    Ok(Parsed {
+    let parsed = Parsed {
         spec: of_chart(&chart)?,
         external_data,
-    })
+    };
+    limits.validate_spec_for_chart(&parsed.spec)?;
+    Ok(parsed)
 }
 
 fn title_text(title: Option<&TitleText>) -> Option<String> {

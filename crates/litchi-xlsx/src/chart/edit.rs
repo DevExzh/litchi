@@ -816,11 +816,14 @@ fn free_name(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<PackURI
 /// Validate a chart part; `true` for an extended (`cx:chartSpace`) one.
 fn check_chart(xml: &[u8]) -> Result<bool> {
     LimitKind::ChartBytes.check(xml.len())?;
+    let mut drawing_limits = litchi_drawingml::chart::Limits::DEFAULT;
+    drawing_limits.max_input_bytes = MAX_CHART_BYTES.min(drawing_limits.max_input_bytes);
+    drawing_limits.max_output_bytes = MAX_CHART_BYTES.min(drawing_limits.max_output_bytes);
     if chartex::is_chartex(xml) {
-        chartex::read(xml)?;
+        chartex::read(xml, &drawing_limits)?;
         return Ok(true);
     }
-    litchi_drawingml::chart::reader::read(xml)?;
+    litchi_drawingml::chart::reader::read(xml, &drawing_limits)?;
     Ok(false)
 }
 

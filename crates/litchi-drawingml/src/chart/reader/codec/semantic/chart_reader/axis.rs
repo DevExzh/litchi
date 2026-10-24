@@ -678,22 +678,21 @@ pub(crate) fn parse_display_units_label<R: BufRead>(
                 saw_text = true;
                 in_text = true;
             },
-            Ok(Event::Text(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
-            Ok(Event::CData(value)) if in_text => {
-                text.push_str(
-                    &value
-                        .decode()
-                        .map_err(|error| Error::Xml(error.to_string()))?,
-                );
-            },
+            Ok(Event::Text(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
+            Ok(Event::CData(value)) if in_text => reader.append_text(
+                &mut text,
+                &value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"t" => {
                 in_text = false;

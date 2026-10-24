@@ -5701,7 +5701,9 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     let (xml, workbook) = edit.chart(0_usize, position)?;
     let workbook = workbook.expect("embedded workbook");
     assert!(workbook.starts_with(b"PK"));
-    let parsed = litchi_drawingml::chart::reader::read(&xml[..]).expect("chart");
+    let parsed =
+        litchi_drawingml::chart::reader::read(&xml[..], &litchi_drawingml::chart::Limits::DEFAULT)
+            .expect("chart");
     assert_eq!(Variant::of(&parsed), Some(Variant::new(Kind::Column)));
     assert!(parsed.external_data.is_some());
     // Identical bytes are an exact no-op; a new title changes only the chart part.
@@ -5887,9 +5889,10 @@ fn extended_charts_are_chartex_parts_with_their_companions() -> Result<()> {
     let mut edit = root.edit();
     let (xml, workbook) = edit.chart(0_usize, position)?;
     assert!(workbook.expect("embedded workbook").starts_with(b"PK"));
-    let parsed = authoring::read(&xml).map_err(|error| Error::Invalid(error.to_string()))?;
+    let parsed = authoring::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
+        .map_err(|error| Error::Invalid(error.to_string()))?;
     assert_eq!(parsed.spec.variant().kind, Kind::Waterfall);
-    assert!(parsed.is_authored(&xml));
+    assert!(parsed.is_authored(&xml, &litchi_drawingml::chart::Limits::DEFAULT,));
     // A rebuilt part replaces the old one; a classic part does not.
     let retitled = parsed
         .spec
