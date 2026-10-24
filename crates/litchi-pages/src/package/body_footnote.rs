@@ -754,7 +754,8 @@ fn commit_resolved(
     let Some(after) = after else {
         return publish_rewrite(source, position, None, Some(&resolved.before));
     };
-    let after = after.as_ref();
+    let after_arc = after;
+    let after = after_arc.as_ref();
     if after == before {
         return noop_commit(source, position, Some(&resolved.before));
     }
@@ -783,7 +784,7 @@ fn commit_resolved(
             target_fingerprint,
             position,
             before: Some(Arc::clone(&resolved.before)),
-            after: Some(Arc::clone(after)),
+            after: Some(Arc::clone(after_arc)),
         },
         diagnostics: Diagnostics::published(1),
     })
