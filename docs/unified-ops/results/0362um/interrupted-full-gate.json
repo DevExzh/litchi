@@ -1,0 +1,393 @@
+{
+  "schema": "litchi.final-gate.interrupted-attempt.v1",
+  "source_commit": "f6fe430a4d19d94aa360c0e9ed03ebd757265225",
+  "source": {
+    "commit": "f6fe430a4d19d94aa360c0e9ed03ebd757265225",
+    "status": "",
+    "branch": "uo2/budget-validation",
+    "cargo_locks": {
+      "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "tools/perf-baseline/Cargo.lock": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184",
+      "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+      "crates/litchi-core/fuzz/Cargo.lock": "395413860f3740a461efa0273b823449323b7860956e9c01cd1c6b1d654eccf2",
+      "crates/litchi-ops/fuzz/Cargo.lock": "10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a",
+      "crates/litchi/fuzz/Cargo.lock": "c499d5efe6bba3991672c52f75f78a39a294a5b80e98f62a6ee2bb28dd2a2eb6"
+    }
+  },
+  "full_gate_complete": false,
+  "attempt_status": "interrupted before tests-ops row finalized",
+  "observation": {
+    "utc": "2026-10-24 06:02:22 UTC",
+    "exec_session": 64850,
+    "session_status": "Unknown process id",
+    "runner_pid": 621101,
+    "test_runner_pid": 699266,
+    "runner_and_test_runner_proc_entries_absent": true,
+    "budget_cargo_processes_absent": true
+  },
+  "state": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/state.json",
+    "bytes": 398172,
+    "sha256": "47dd78063ad3092c831cc46b22215c31663ea50c714d6a9c5675d2f893b5b485"
+  },
+  "plan": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/plan.json",
+    "bytes": 22111,
+    "sha256": "12f49cd0259a1fa1e5e5b706e32722b55f0e1bf7b9b9ec1ea302db17ebe8894b"
+  },
+  "completed_steps": [
+    {
+      "name": "fmt",
+      "status": "passed",
+      "seconds": 71.01750016212463,
+      "target_bytes_after": 5613723699,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/00-fmt-attempt-1792820308788292500-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-all-features",
+      "status": "passed",
+      "seconds": 155.14597058296204,
+      "target_bytes_after": 5613723838,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/01-clippy-all-features-attempt-1792820381025844537-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-no-encryption",
+      "status": "passed",
+      "seconds": 110.4247133731842,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/02-clippy-ops-no-encryption-attempt-1792820537377173919-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-",
+      "status": "passed",
+      "seconds": 4.860048770904541,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/03-clippy-ops--attempt-1792820648984797460-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-xlsx",
+      "status": "passed",
+      "seconds": 6.308216333389282,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/04-clippy-ops-xlsx-attempt-1792820655028403507-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-pptx",
+      "status": "passed",
+      "seconds": 7.297663450241089,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/05-clippy-ops-pptx-attempt-1792820662471656798-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-docx",
+      "status": "passed",
+      "seconds": 8.132802486419678,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/06-clippy-ops-docx-attempt-1792820670949454257-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-xls",
+      "status": "passed",
+      "seconds": 4.819872617721558,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/07-clippy-ops-xls-attempt-1792820680261149372-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-xlsb",
+      "status": "passed",
+      "seconds": 3.3831679821014404,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/08-clippy-ops-xlsb-attempt-1792820686396701210-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-doc",
+      "status": "passed",
+      "seconds": 3.5479965209960938,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/09-clippy-ops-doc-attempt-1792820690926455156-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-ppt",
+      "status": "passed",
+      "seconds": 3.55338191986084,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/10-clippy-ops-ppt-attempt-1792820695656337226-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-rtf",
+      "status": "passed",
+      "seconds": 3.25799822807312,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/11-clippy-ops-rtf-attempt-1792820700355304434-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odt",
+      "status": "passed",
+      "seconds": 3.7067480087280273,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/12-clippy-ops-odt-attempt-1792820704771157148-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-ods",
+      "status": "passed",
+      "seconds": 4.851050138473511,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/13-clippy-ops-ods-attempt-1792820709663885849-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odp",
+      "status": "passed",
+      "seconds": 3.255866527557373,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/14-clippy-ops-odp-attempt-1792820715663038480-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-oth",
+      "status": "passed",
+      "seconds": 3.2578928470611572,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/15-clippy-ops-oth-attempt-1792820720061888975-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odm",
+      "status": "passed",
+      "seconds": 3.411526679992676,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/16-clippy-ops-odm-attempt-1792820724500223204-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odg",
+      "status": "passed",
+      "seconds": 4.516926288604736,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/17-clippy-ops-odg-attempt-1792820729031281586-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odc",
+      "status": "passed",
+      "seconds": 2.9589335918426514,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/18-clippy-ops-odc-attempt-1792820734667587457-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odi",
+      "status": "passed",
+      "seconds": 3.831258773803711,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/19-clippy-ops-odi-attempt-1792820738827302586-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odb",
+      "status": "passed",
+      "seconds": 3.586995840072632,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/20-clippy-ops-odb-attempt-1792820743844998151-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-odf-formula",
+      "status": "passed",
+      "seconds": 3.426868200302124,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/21-clippy-ops-odf-formula-attempt-1792820748647837802-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-pages",
+      "status": "passed",
+      "seconds": 4.170057535171509,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/22-clippy-ops-pages-attempt-1792820753292519710-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-keynote",
+      "status": "passed",
+      "seconds": 2.8650195598602295,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/23-clippy-ops-keynote-attempt-1792820758671781930-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-ops-numbers",
+      "status": "passed",
+      "seconds": 3.8236026763916016,
+      "target_bytes_after": 5613723931,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/24-clippy-ops-numbers-attempt-1792820762707049858-621101.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "partial_ops_test_logs": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/ops-tests/0000.log",
+      "bytes": 419028,
+      "sha256": "4f8d0c54b071da8b8d99d7df5c72301b162600f42e31ec21305e8ddbb5bf8118",
+      "suite_summaries": [
+        "test result: FAILED. 1003 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.08s"
+      ],
+      "failure_lines": [
+        {
+          "line": 824,
+          "text": "test format::xls::tests::nested_fenced_reads_share_the_outer_check ... FAILED"
+        },
+        {
+          "line": 1475,
+          "text": "thread 'format::xls::tests::nested_fenced_reads_share_the_outer_check' (764591) panicked at crates/litchi-ops/src/format/xls.rs:1137:9:"
+        },
+        {
+          "line": 1485,
+          "text": "test result: FAILED. 1003 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.08s"
+        }
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/ops-tests/0001.log",
+      "bytes": 347441,
+      "sha256": "83b097e1623d91ed8f9635d1ad5f83ddd122764e3431216663b8064741456fec",
+      "suite_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.20s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 159.36s"
+      ],
+      "failure_lines": [
+        {
+          "line": 518,
+          "text": "test open_empty_edit_save_is_byte_identical ... FAILED"
+        },
+        {
+          "line": 525,
+          "text": "thread 'open_empty_edit_save_is_byte_identical' (790341) panicked at crates/litchi-ops/tests/corpus_fidelity.rs:1368:9:"
+        },
+        {
+          "line": 533,
+          "text": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 159.36s"
+        }
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/ops-tests/0002.log",
+      "bytes": 351079,
+      "sha256": "874bc3b79adf84129608c5d80cae9eed242bf96aad5de4612dcdf7da170f5006",
+      "suite_summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 34.03s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.51s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s",
+        "test result: ok. 11 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.63s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.70s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+      ],
+      "failure_lines": [
+        {
+          "line": 430,
+          "text": "test crud_checklist_per_format ... FAILED"
+        },
+        {
+          "line": 439,
+          "text": "thread 'crud_checklist_per_format' (867047) panicked at crates/litchi-ops/tests/crud_matrix.rs:2997:9:"
+        },
+        {
+          "line": 447,
+          "text": "test result: FAILED. 0 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 34.03s"
+        }
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/ops-tests/0003.log",
+      "bytes": 349156,
+      "sha256": "a0a5d4e7620f92506f2755eea456854af19c2e469850c3d8155900bb24ef9c42",
+      "suite_summaries": [
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.80s",
+        "test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.57s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s"
+      ],
+      "failure_lines": [
+        {
+          "line": 518,
+          "text": "test unlocked_encrypted_input_refuses_without_dropping_publication_protection ... FAILED"
+        },
+        {
+          "line": 525,
+          "text": "thread 'unlocked_encrypted_input_refuses_without_dropping_publication_protection' (878010) panicked at crates/litchi-ops/tests/docx_transactions.rs:691:25:"
+        },
+        {
+          "line": 532,
+          "text": "test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s"
+        }
+      ]
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d/ops-tests/0004.log",
+      "bytes": 349667,
+      "sha256": "a74e8e8e9577438f182dd87ccc9cae15fd879f477179543452b7535a4c465509",
+      "suite_summaries": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.01s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s",
+        "test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.45s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s"
+      ],
+      "failure_lines": []
+    }
+  ],
+  "followup": "Focused repair leaves investigate four failures. Separate selected remaining-diagnostics-f6fe430a4d run preserves existing logs; neither run is full acceptance."
+}
