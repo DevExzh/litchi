@@ -23,15 +23,22 @@ fixture bytes/SHA-256: 43520 / f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13
 ~~~
 
 The accepted build setup is the pinned gate-local Cargo wrapper, not the old
-`.coord/w8-file/env.sh` environment file. The coordinator-selected supervisor
-manifest must bind these wrapper paths and hashes; the shell must not replace
-them through an inherited `PATH`:
+`.coord/w8-file/env.sh` environment file. The reviewed target/process
+supervisor is the tracked `0362ul29` `run_safe_gate.py`; its selected PPT step
+must bind these wrapper paths and hashes. The shell must not replace them
+through an inherited `PATH`:
 
 ~~~text
-wrapper: /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin/cargo
+wrapper: docs/unified-ops/results/0362ul29/tooling/bin/cargo
 wrapper SHA-256: 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d
 inner memory-capped shim: /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
 inner shim SHA-256: 1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8
+target/process supervisor: docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py
+supervisor SHA-256: f5aed3b04da2ce0463caebb42a2fed4976edd3170ea8a7e9a6c6cd74d0d51e54
+reference compile command: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/compile-command.txt
+reference compile command SHA-256: 81ab917ba0447718932a08dcb5e0ef1062fc0bda41d2aa4df48a5127019807b1
+reference compile receipt: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/receipt.json
+reference compile receipt SHA-256: ef1fc17ff1e95bab311bacc130e06dfeb292fcf86090a3d61c5071bc6b4c4f3a
 ~~~
 
 The existing reviewed outer process boundary is also retained rather than
@@ -42,12 +49,16 @@ boundary: /home/zhuhe/code/litchi-worktrees/uo2-docx-ink-final-handoff/tools/ink
 bytes/SHA-256: 17630 / 1bc982f4495a16c30ac4ca2779351aec1e420781a6d6cb7c2b1f33ccff88fede
 host-process adapter: docs/unified-ops/results/0362g/ppt_host_process_guard.py
 adapter SHA-256: 08c73174304061beeaf778df763be3507befd8200db72a8617a5d8ddc42e12b8
-accepted compile-supervisor protocol: tools/native_qualification_runner.py
-reviewed handoff-tool SHA-256: 23e1c8384723d203b685d742ce788a2c35158081d310c82c37faa7ef6277338b
-final-source supervisor hash: must be freshly rebound after 0362ul39/source freeze
+final-source supervisor/wrapper hashes: must be freshly rebound after
+0362ul39/source freeze
 ~~~
 
-Its accepted boundary is generic argv infrastructure. It binds a systemd
+The accepted `run_safe_gate.py` binds the target and process policy: target
+preflight at 18,000,000,000 bytes, live guard at 19,000,000,000 bytes, the
+20,000,000,000-byte hard limit, post-exit stabilization, one Cargo job, 20-GB
+memory, zero swap and owned-process guards. Its tracked wrapper supplies the
+offline Cargo environment. The outer Ink boundary remains generic argv
+infrastructure and binds a systemd
 scope to `MemoryMax=20,000,000,000`, zero swap, a phase deadline, `TasksMax`,
 and `KillMode=control-group`; its child sets `RLIMIT_FSIZE=1,000,000,000`,
 disables core dumps, polls aggregate output and TMP trees, and kills the
@@ -158,38 +169,39 @@ PY
 
 ## Corrected guarded build and probe oracle
 
-The earlier direct Cargo blocks are retired. The pinned Cargo shim supplies a
-20-GB memory scope but does not enforce the 20,000,000,000-byte target-tree
-limit, so it is not a candidate-build supervisor by itself. The candidate
-build and the seven correctness commands must run through the accepted
-`tools/native_qualification_runner.py` supervision protocol (or its current
-coordinator-registered PPT adapter), which records source/lock identity and
-enforces target preflight (19,200,000,000 bytes), live target checks, the
-20,000,000,000-byte hard limit, post-exit stabilization, one Cargo job,
-20-GB memory and process guards. No `env.sh` or direct Cargo invocation may
-replace that supervisor.
+The earlier direct Cargo blocks are retired. The candidate build and the seven
+correctness commands must run through the accepted `run_safe_gate.py` step,
+which records source/lock identity and enforces target preflight, live target
+checks, the hard target limit, post-exit stabilization, one Cargo job, 20-GB
+memory and process guards. No `env.sh` or direct Cargo invocation may replace
+that supervisor.
 
-The source repair 0362ul39 must register a PPT manifest/adapter with that
-existing supervisor before execution. The current generic runner has no PPT
-lane, so this is an explicit blocker rather than an invented direct command.
-The future command shape (with the final-source supervisor and manifest hashes
-filled by the rebind receipt) is:
+The source repair 0362ul39 must register a PPT step in the existing
+`run_safe_gate.py` plan before execution. The current plan has no PPT
+selection, so this is an explicit blocker rather than an invented direct
+command. The future command shape (with the final-source supervisor and step
+hashes filled by the rebind receipt) is:
 
 ~~~sh
 set -eu
 SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-SUPERVISOR="$SOURCE/tools/native_qualification_runner.py"
-MANIFEST=/external/ppt-final-source-472b670547/ppt-scoped-native.json
-test -f "$SUPERVISOR"; test -f "$MANIFEST"
+SUPERVISOR="$SOURCE/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py"
+RUN_ROOT=/external/ppt-final-source-472b670547
+STATE="$RUN_ROOT/ppt-state"
+TARGET="$RUN_ROOT/target"
+PPT_STEP=ppt-final-source-472b670547
+test ! -e "$RUN_ROOT"
+mkdir -p "$RUN_ROOT"
+test -f "$SUPERVISOR"; test -d "$(dirname "$STATE")"; test ! -e "$TARGET"
 test "$(sha256sum "$SOURCE/crates/litchi-ppt/examples/scoped_patch_probe.rs" | cut -d' ' -f1)" = 0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549
 unset LITCHI_CAPPED LITCHI_BLESS
-python3 "$SUPERVISOR" --manifest "$MANIFEST" --phase build
+python3 "$SUPERVISOR" --root "$SOURCE" --target "$TARGET" --state "$STATE" --only "$PPT_STEP"
 ~~~
 
-The coordinator-selected manifest must bind the final source HEAD/tree,
+The coordinator-selected step/state must bind the final source HEAD/tree,
 `4100…` lock, probe and fixture, fresh external target/output/TMP paths, and
-the exact release probe artifact. Its correctness phase must retain these
-unchanged argv selectors with `RUST_TEST_THREADS=1` and
+the exact release probe artifact. Its correctness command list must retain
+these unchanged argv selectors with `RUST_TEST_THREADS=1` and
 `--test-threads=1`:
 
 ~~~text
@@ -385,11 +397,11 @@ protected references and their 0362j allocation facts remain unchanged.
 
 1. Source repair 0362ul39 must materialize the PPT adapter in the final source,
    add the outside-clock changed-target/path receipt, and rebind the source,
-   supervisor, manifest, probe, fixture and adapter hashes. The current
+   supervisor, step/state, probe, fixture and adapter hashes. The current
    472b checkout does not yet satisfy those bindings.
 2. The candidate build, current-source correctness/preflight, bounded native
    ABBA and bounded allocation receipts do not yet exist. The registered PPT
-   manifest must exercise the seven correctness selectors with
+   registered PPT step must exercise the seven correctness selectors with
    `RUST_TEST_THREADS=1`, `--test-threads=1`, target pre/live/post checks and
    fresh output/TMP paths.
 3. The lock policy check must pass with candidate `4100…` and references
