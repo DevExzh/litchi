@@ -157,6 +157,16 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 os.environ["XLSX_PREPARATION_RECEIPT"] = str(root / "output" / "preparation.json")
                 with self.assertRaisesRegex(runner.RunnerError, "outside the fresh output"):
                     runner.load_manifest(ROOT / "tools/native_qualification/manifests/w4-xlsx-raw.json")
+                for leg in ("before", "after"):
+                    for field in ("source_root", "target_dir"):
+                        receipt = Path(manifest["legs"][leg][field]) / "preparation.json"
+                        with self.subTest(leg=leg, field=field):
+                            os.environ["XLSX_PREPARATION_RECEIPT"] = str(receipt)
+                            reason = "outside source worktrees" if field == "source_root" else "pairwise"
+                            with self.assertRaisesRegex(runner.RunnerError, reason):
+                                runner.load_manifest(
+                                    ROOT / "tools/native_qualification/manifests/w4-xlsx-raw.json"
+                                )
             finally:
                 for key, value in old.items():
                     if value is None:

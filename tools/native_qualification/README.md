@@ -15,6 +15,23 @@ The two manifests preserve the recorded workloads and order:
   `legacy_w5_probe` for each leg, 31 rounds, `LITCHI_PROBE_BATCH_ROUNDS=7`,
   and the same ABBA order.
 
+The legacy format preparation manifests reuse this same guarded runner:
+
+- `manifests/legacy-rtf.json` binds the existing RTF refusal probe to five
+  guarded ABBA blocks and the eight-route validator;
+- `manifests/legacy-ole-properties.json` binds the existing OLE property
+  probe's `read` and `edit` routes with 20 warmups and 500 retained samples;
+- `manifests/legacy-xls-properties.json` binds the existing
+  `ole_metadata_bench` executable and its tracked DOC/XLS/PPT fixtures to the
+  derived pre-lazy XLS source parent.
+
+These manifests require full source/candidate paths, locks, and candidate SHAs
+from the coordinator.  Their route/output, identity, quiet-host and cap
+checks are implemented by `legacy_native_validator.py`; the validator keeps
+allocator instrumentation as a separate non-claimable phase.  The complete
+source-fence and future execution recipe is recorded in
+`docs/unified-ops/0362ul8-legacy-native-protocol.md`.
+
 Before a final build, prepare the historical source consumers in external
 worktrees.  The accepted W5 baseline is `7afba5f146aa1a16eba73ebed2144dd041b33fb5`;
 the accepted W4b baseline is the synthetic merge tree
