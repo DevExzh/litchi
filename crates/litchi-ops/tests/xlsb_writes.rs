@@ -726,15 +726,15 @@ fn unsupported_reencryption_does_not_publish_plaintext() {
 
 #[test]
 fn worksheet_names_cannot_collide_with_chart_tabs() {
+    use litchi_xlsb::builder::chart::{Anchor, Chart};
     use litchi_xlsb::builder::{self, Builder};
-    use litchi_xlsb::chart::{Anchor as ChartAnchor, Chart};
     let chart = Chart::bar_chart_with_cache(
         "Sales",
         "Data!$A$1:$A$2",
         &["North", "South"],
         "Data!$B$1:$B$2",
         &[42.0, 55.0],
-        ChartAnchor::new(0, 0, 10, 20),
+        Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
     let mut writer = Builder::new();

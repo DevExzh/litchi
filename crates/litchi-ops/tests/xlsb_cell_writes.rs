@@ -69,8 +69,8 @@ fn named_fixture() -> Vec<u8> {
 }
 
 fn chart_first_fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::chart::{Anchor, Chart};
     use litchi_xlsb::builder::{self, Builder};
-    use litchi_xlsb::chart::{Anchor, Chart};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",

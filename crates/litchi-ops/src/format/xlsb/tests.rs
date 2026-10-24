@@ -274,8 +274,8 @@ fn workbook_trait_surface_matches_across_owner_states() {
 // --- Builder-built workbooks (xlsb_facade.rs) -----------------------------
 
 fn mixed_chart_tabs() -> Vec<u8> {
+    use xlsb::builder::chart::{Anchor, Chart};
     use xlsb::builder::{self, Builder};
-    use xlsb::chart::{Anchor, Chart};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",

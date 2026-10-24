@@ -5,7 +5,7 @@
 //! boundary. This example therefore writes the source data and validates the
 //! four typed chart placements without inventing a worksheet mutation API.
 
-use litchi_xlsx::chart::{Anchor, Chart};
+use litchi_xlsx::builder::chart::{Anchor, Chart};
 use litchi_xlsx::{Number, Package};
 use std::env;
 use std::error::Error;

@@ -218,12 +218,12 @@ pub struct EmbeddedChart {
     /// (MS-XLSB 2.1.7.5 defers to ISO/IEC 29500-1:2016 section 21.2).
     pub chart: litchi_drawingml::chart::Chart,
     /// Embedded or linked external-data payload declared by the chart.
-    pub external_data_part: Option<crate::chart::ExternalDataPart>,
+    pub external_data_part: Option<crate::builder::chart::ExternalDataPart>,
     /// Chart user-shapes XML and its directly related inert resources.
-    pub user_shapes_part: Option<crate::chart::UserShapesPart>,
+    pub user_shapes_part: Option<crate::builder::chart::UserShapesPart>,
     /// Other relationships owned by the Chart part, including resources
     /// referenced by preserved extension fragments.
-    pub additional_relationships: Vec<crate::chart::Relationship>,
+    pub additional_relationships: Vec<crate::builder::chart::Relationship>,
 }
 
 fn invalid(message: &'static str) -> Error {

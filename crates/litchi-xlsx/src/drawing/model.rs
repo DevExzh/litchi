@@ -4,7 +4,7 @@
 //! needed to resolve drawing relationships. Full shape and text semantics stay
 //! with [`crate::shapes`] and reuse the neutral `DrawingML` text-body model.
 
-use super::super::chart::Anchor;
+use super::super::builder::chart::Anchor;
 use litchi_spreadsheet_drawing::shape::Anchor as DrawingAnchor;
 
 use crate::error::{Result, allocation};

@@ -19,7 +19,7 @@
     reason = "DrawingML authoring uses checked object IDs, offsets, sizes, and relationship identities"
 )]
 
-use crate::chart::Chart;
+use crate::builder::chart::Chart;
 use crate::package::error::{Error, Result};
 use crate::writer::Image;
 use crate::writer::shape::{ConnectionShapeSpec, Emitter, GroupSpec, ShapeSpec};

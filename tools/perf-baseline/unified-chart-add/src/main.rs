@@ -130,7 +130,7 @@ fn corpus(format: FileFormat, count: usize) -> Result<Vec<u8>> {
                 let row = u32::try_from(index * 16)?;
                 edit.add(
                     0,
-                    &litchi_xlsx::chart::Anchor::new(0, row, 8, row + 15),
+                    &litchi_xlsx::builder::chart::Anchor::new(0, row, 8, row + 15),
                     &format!("Chart {}", index + 1),
                     &xml,
                 )?;
@@ -186,7 +186,7 @@ fn native_once(owner: &Native, count: usize) -> Result<Native> {
             let mut edit = base.edit_charts()?;
             edit.add(
                 0,
-                &litchi_xlsx::chart::Anchor::new(0, row, 8, row + 15),
+                &litchi_xlsx::builder::chart::Anchor::new(0, row, 8, row + 15),
                 "Sales",
                 &xml,
             )?;
@@ -242,7 +242,10 @@ fn chart_path(format: FileFormat) -> &'static str {
 }
 
 fn unified_set(file: &File, format: FileFormat) -> Result<File> {
-    Ok(file.set(chart_path(format), litchi_ops::props! { "title" => "Revenue" })?)
+    Ok(file.set(
+        chart_path(format),
+        litchi_ops::props! { "title" => "Revenue" },
+    )?)
 }
 
 fn native_bytes(owner: &mut Native) -> Result<Vec<u8>> {

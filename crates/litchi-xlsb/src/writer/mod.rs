@@ -70,8 +70,6 @@ pub(crate) mod bin_range;
 )]
 pub(crate) mod data_validation;
 
-// Re-export main types for public API
-pub use crate::chart::{Anchor as ChartAnchor, Chart};
 pub use crate::external_link::{
     AreaReference, CachedValue, CellLocation, CellReference, DdeItem, DefinedName, ErrorValue,
     Kind, Link, MAX_XLSB_EXTERNAL_CACHE_COLUMNS, MAX_XLSB_EXTERNAL_CACHE_ROWS,

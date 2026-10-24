@@ -11,13 +11,13 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
-use litchi_xlsb::builder::{self, Builder, ChartAnchor, Image, ImageFormat};
+use litchi_xlsb::builder::chart::{Anchor, Chart, ExternalDataPart};
+use litchi_xlsb::builder::{self, Builder, Image, ImageFormat};
 use litchi_xlsb::builder::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, LimitKind, Patch};
 use litchi_xlsb::cell_values::{
     CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
 };
-use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::package::{PackageError, SharedString, SharedStringRun};
@@ -560,7 +560,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     let image = Image::new(
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
-        ChartAnchor::new(0, 3, 2, 7),
+        Anchor::new(0, 3, 2, 7),
         &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid image")
@@ -643,7 +643,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .edit()
         .expect("image transfer edit");
     transfer
-        .transfer_image(&reopened, 0, 0, 0, ChartAnchor::new(3, 4, 6, 9))
+        .transfer_image(&reopened, 0, 0, 0, Anchor::new(3, 4, 6, 9))
         .expect("dependency-closed image transfer");
     let transfer_commit = transfer.commit().expect("image transfer commit");
     publish_structure_patch(&mut transfer_target, transfer_commit.patch());
@@ -659,7 +659,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     let appended = Image::new(
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
-        ChartAnchor::new(7, 4, 9, 8),
+        Anchor::new(7, 4, 9, 8),
         &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid appended image")
@@ -814,7 +814,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         "Transferred chart",
         "Source!$A$1:$A$2",
         "Source!$B$1:$B$2",
-        ChartAnchor::new(0, 0, 7, 12),
+        Anchor::new(0, 0, 7, 12),
     )
     .expect("chart")
     .with_external_data_part(
@@ -839,7 +839,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
             Image::new(
                 GIF_1X1.to_vec(),
                 ImageFormat::Gif,
-                ChartAnchor::new(8, 1, 10, 4),
+                Anchor::new(8, 1, 10, 4),
                 &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
             )
             .expect("target image")
@@ -902,7 +902,8 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .external_data_part
         .as_ref()
         .expect("transferred embedded workbook");
-    let litchi_xlsb::chart::ExternalDataTarget::Embedded { data, .. } = &external.target else {
+    let litchi_xlsb::builder::chart::ExternalDataTarget::Embedded { data, .. } = &external.target
+    else {
         panic!("chart external data should stay embedded")
     };
     assert_eq!(data, b"PK exact chart workbook");

@@ -3183,3 +3183,28 @@ a required argument.
 | `detect::ooxml::{detect_zip_format, try_detect_zip_format, detect_zip_format_from_reader, try_detect_zip_format_from_reader}` taking `&SourceLimits` | adopted (0362); the aliases `detect_ooxml_format`, `detect_ooxml_format_from_bytes` and their limit forms deleted (banned) |
 | `format::docx::Docx::section_inventory(&section::Limits)` | adopted (0362); `section_inventory_with_limits` merged |
 | `litchi_doc::{body_text, source_backed}::Refusal::kind` | adopted (0362) |
+
+## Spreadsheet chart authoring placement (record 0362zab)
+
+Record 0351 §2.1.7 treats a freshly authored chart as a builder draft, not
+as a read-only package projection. The shared chart model is therefore
+published under the focused `builder` module, and both spreadsheet hosts
+expose the same nested `builder::chart` paths. The re-exports are the same
+definitions; no wrapper or compatibility alias was added.
+
+| Name | Status |
+|---|---|
+| `litchi_spreadsheet_drawing::chart::builder::{Chart, Series, Anchor, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart}` | adopted (0362zab §2.1.7); shared chart authoring values |
+| `litchi_xlsx::builder::chart::{Chart, Series, Anchor, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart}` | adopted (0362zab §2.1.7); canonical XLSX authoring paths |
+| `litchi_xlsb::builder::chart::{Chart, Series, Anchor, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart}` | adopted (0362zab §2.1.7); canonical XLSB authoring paths |
+| `litchi_{xlsx,xlsb}::chart::{Chart, Series, Anchor, ExternalDataPart, ExternalDataTarget, Relationship, Target, UserShapesPart}` | deleted (0362zab §2.1.7); `chart::read` and `chart::write` remain codec entry points |
+| `litchi_xlsx::drawing::Chart` and XLSB drawing/package projections | retained (0362zab §2.1.7); read-only projections remain distinct from authoring drafts |
+
+The XLSX and XLSB glossary profiles ban every removed direct child of their
+`chart` modules and point to the corresponding `builder::chart` path. The
+builder paths are not listed as immutable owners: the authoring values retain
+their existing construction and serialization behavior, while package and
+projection owners retain their immutable API. All examples, tests, facade
+consumers and performance harness imports were migrated in the same change.
+
+See [0362zab](unified-ops/0362zab-spreadsheet-chart-builder.md).

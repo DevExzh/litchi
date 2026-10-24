@@ -108,7 +108,7 @@ pub struct Worksheet {
     /// Losslessly preserved PivotTable definition parts hosted on this sheet.
     pub(crate) pivot_table_views: Vec<crate::pivot_view::Part>,
     /// Typed DrawingML charts anchored on this sheet.
-    pub(crate) charts: Vec<crate::chart::Chart>,
+    pub(crate) charts: Vec<crate::builder::chart::Chart>,
     /// Typed image parts anchored in the same Drawings part.
     pub(crate) images: Vec<crate::writer::Image>,
     /// Cached sum of encoded image bytes for constant-time safety checks.
@@ -980,7 +980,7 @@ impl Worksheet {
     /// relationship in the binary `BrtDrawing` record. Pivot charts are
     /// resolved against PivotTable views attached to this workbook at save
     /// time.
-    pub fn add_chart(&mut self, chart: crate::chart::Chart) -> Result<()> {
+    pub fn add_chart(&mut self, chart: crate::builder::chart::Chart) -> Result<()> {
         if self.charts.len() >= crate::package::drawing_write::MAX_CHARTS_PER_SHEET {
             return Err(Error::InvalidFormula(
                 "worksheet chart count exceeds the safety limit",
@@ -992,12 +992,12 @@ impl Worksheet {
     }
 
     /// Typed DrawingML charts in drawing order.
-    pub fn charts(&self) -> &[crate::chart::Chart] {
+    pub fn charts(&self) -> &[crate::builder::chart::Chart] {
         &self.charts
     }
 
     /// Remove one chart by drawing order.
-    pub fn remove_chart(&mut self, index: usize) -> Result<crate::chart::Chart> {
+    pub fn remove_chart(&mut self, index: usize) -> Result<crate::builder::chart::Chart> {
         if index >= self.charts.len() {
             return Err(Error::InvalidFormula(
                 "chart index is out of bounds for charts",

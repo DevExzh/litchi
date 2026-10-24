@@ -23,7 +23,7 @@
 //! ```
 //! use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
 //! use litchi_xlsx::Package;
-//! use litchi_xlsx::chart::Anchor;
+//! use litchi_xlsx::builder::chart::Anchor;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let package = Package::new()?;
@@ -56,7 +56,7 @@ pub use crate::Error;
 use crate::Package;
 use crate::error::invalid;
 
-use super::Anchor;
+use crate::builder::chart::Anchor;
 use litchi_drawingml::chart::chartex;
 
 type Result<T> = std::result::Result<T, Error>;

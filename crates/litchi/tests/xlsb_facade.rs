@@ -52,8 +52,8 @@ fn mixed_chart_tabs_with_sparkline_bytes() -> Vec<u8> {
 }
 
 fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
+    use xlsb::builder::chart::{Anchor, Chart};
     use xlsb::builder::{self, Builder};
-    use xlsb::chart::{Anchor, Chart};
     use xlsb::sparkline::{Color as SparkColor, Colors, Group, Groups, Location, Sparkline};
 
     let chart = Chart::bar_chart_with_cache(
@@ -117,8 +117,8 @@ fn all_worksheet_bytes() -> Vec<u8> {
 }
 
 fn chart_first_tabs_bytes() -> Vec<u8> {
+    use xlsb::builder::chart::{Anchor, Chart};
     use xlsb::builder::{self, Builder};
-    use xlsb::chart::{Anchor, Chart};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",

@@ -17,8 +17,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits};
+use litchi_xlsb::builder::chart::{Anchor, Chart};
 use litchi_xlsb::builder::{self, Builder};
-use litchi_xlsb::chart::{Anchor, Chart};
 
 use crate::File;
 use crate::error::{Code, Result};
