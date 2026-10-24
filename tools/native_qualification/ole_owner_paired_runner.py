@@ -579,6 +579,7 @@ class PairedRunner:
         env["CARGO_BUILD_JOBS"] = "1"
         env["CARGO_INCREMENTAL"] = "0"
         env["LITCHI_MEM_MAX"] = "20G"
+        env["PATH"] = str(self.toolchain["path_env"])
         env["CARGO"] = str(self.toolchain["cargo"]["path"])
         env["RUSTC"] = str(self.toolchain["rustc"]["path"])
         for key in (

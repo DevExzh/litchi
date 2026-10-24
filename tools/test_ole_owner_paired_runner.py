@@ -59,7 +59,8 @@ class OleOwnerPairedRunnerTests(unittest.TestCase):
 
             probe.toolchain = toolchain
             probe.target_root = root / "targets"
-            with mock.patch.dict(runner.os.environ, env, clear=True):
+            ambient_after_selection = {**env, "PATH": str(override_bin)}
+            with mock.patch.dict(runner.os.environ, ambient_after_selection, clear=True):
                 child = probe._environment("before", "normal")
             self.assertEqual(child["CARGO"], str(cargo))
             self.assertEqual(child["RUSTC"], str(rustc))
