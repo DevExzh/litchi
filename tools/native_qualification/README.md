@@ -143,3 +143,59 @@ JSON under its historical name, and run the real lane `analyze.py` as a
 fail-closed validator producing `summary.json`; W5's adapter preserves the
 analyzer's full parsed result in its `analysis` field.  A nonempty stdout
 stream alone is never accepted.
+
+## W5 OLE owner/history qualification
+
+The standalone OLE owner protocol is `manifests/ole-owner.json`,
+`prepare_ole_owner_inputs.py`, and `ole_owner_paired_runner.py`.  Preparation
+is source-only: it requires a clean `0ce4bb8b61f03a1e5497633f51b954e76f98aa8c`
+baseline, a clean coordinator-selected candidate commit, the immutable
+`ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a` probe, the
+reviewed explicit-CFB-limits candidate adapter, the fixed clone probe, and the
+fixed W5 lock.  It writes two external Cargo drivers; no production file is
+copied into the baseline tree.  The candidate commit is deliberately supplied
+at preparation time so this protocol cannot silently qualify a historical
+candidate.
+
+The preparation command (all paths are external to both source worktrees) is:
+
+```sh
+python3 tools/native_qualification/prepare_ole_owner_inputs.py \
+  --baseline-root "$OLE_BEFORE_SOURCE" \
+  --candidate-root "$OLE_AFTER_SOURCE" \
+  --candidate-ref "$OLE_AFTER_REF" \
+  --reviewed-probe /external/inputs/ole_w5_probe-ad4c.rs \
+  --clone-probe /external/inputs/ole_package_clone_probe.rs \
+  --lock /external/inputs/Cargo.lock \
+  --drivers-root /external/native-final/ole-owner-drivers \
+  --output /external/native-final/ole-owner-preparation.json
+```
+
+After coordinator review of that receipt, the build phase creates four fresh
+normal/allocator targets and records every Cargo event, source identity, lock,
+driver input, toolchain and executable hash.  The ABBA phase calibrates all
+eleven routes and both clone sizes to a 500 ms target, rejects every leg below
+250 ms, runs five `before,after,after,before` blocks on a pinned CPU, and then
+runs the paired non-claimable allocator capture for ordinary property reads and
+edits, XLS cells/staging, and the 128-step DOC/XLS retained histories.  It
+checks host quietness before/after and every 100 ms during each child and keeps
+the fixed 19.2 GB preflight, 20 GB target and 20 GB address-space limits:
+
+```sh
+python3 tools/native_qualification/ole_owner_paired_runner.py \
+  --manifest tools/native_qualification/manifests/ole-owner.json \
+  --preparation /external/native-final/ole-owner-preparation.json \
+  --output /external/native-final/ole-owner-run1 \
+  --target-root /external/native-final/ole-owner-targets/run1 \
+  --phase build --cpu "$CPU"
+
+python3 tools/native_qualification/ole_owner_paired_runner.py \
+  --manifest tools/native_qualification/manifests/ole-owner.json \
+  --preparation /external/native-final/ole-owner-preparation.json \
+  --output /external/native-final/ole-owner-run1 \
+  --target-root /external/native-final/ole-owner-targets/run1 \
+  --phase abba --cpu "$CPU"
+```
+
+The measurements and receipts remain external evidence.  The runner's output
+is evidence for coordinator review, not a performance acceptance claim.
