@@ -47,7 +47,7 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
         },
         "lock_sha256": {
             "before": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
-            "after": "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39",
+            "after": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
         },
         "adapter": {
             "relative_path": "tools/perf-baseline/examples/refusal_contract_bench.rs",
@@ -55,7 +55,7 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
             "manifest_relative_path": "tools/perf-baseline/Cargo.toml",
             "manifest_sha256": {
                 "before": "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676",
-                "after": "60cde3ec148b08d81806d0b15740808c37ecbc9eed8ecf3f4d32e20ce8631a49",
+                "after": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
             },
             "features": {
                 "before": "rtf-legacy-api",
