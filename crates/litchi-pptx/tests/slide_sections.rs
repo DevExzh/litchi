@@ -30,13 +30,8 @@ fn deck() -> Vec<u8> {
         builder.presentation().unwrap().add_slide().unwrap();
     }
     let package = builder.build().unwrap();
-    let ids: Vec<u32> = package
-        .edit()
-        .unwrap()
-        .slides()
-        .iter()
-        .map(|slide| slide.id())
-        .collect();
+    let mut edit = package.edit().unwrap();
+    let ids: Vec<u32> = edit.slides().iter().map(|slide| slide.id()).collect();
     let bytes = package.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     let mut writer = StreamingArchiveWriter::new();
@@ -67,13 +62,8 @@ fn deck() -> Vec<u8> {
 
 /// Section membership as slide positions (in the presentation order).
 fn membership(package: &mut Package) -> Vec<Vec<usize>> {
-    let ids: Vec<u32> = package
-        .edit()
-        .unwrap()
-        .slides()
-        .iter()
-        .map(|slide| slide.id())
-        .collect();
+    let mut edit = package.edit().unwrap();
+    let ids: Vec<u32> = edit.slides().iter().map(|slide| slide.id()).collect();
     let bytes = package.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     let xml = String::from_utf8(archive.read("ppt/presentation.xml").unwrap()).unwrap();
