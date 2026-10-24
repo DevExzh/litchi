@@ -47,6 +47,34 @@ pub mod incomplete {
 pub enum Selector { Name, Id }
 pub mod domain { pub struct Id; pub struct ReadLimits; }
 pub struct ReadLimits;
+pub struct SourceLimits;
+pub use SourceLimits as PublicSourceLimits;
+pub struct RawParser;
+impl RawParser {
+    pub fn parse(data: &[u8], offset: usize, limits: &SourceLimits) {
+        let _ = (data, offset, limits);
+    }
+    pub fn parse_document(&self, data: &[u8], limits: &PublicSourceLimits) {
+        let _ = (data, limits);
+    }
+    pub fn parse_without_limits(data: &[u8], offset: usize) {
+        let _ = (data, offset);
+    }
+}
+pub fn parse_free(data: &[u8], limits: &PublicSourceLimits) {
+    let _ = (data, limits);
+}
+pub use litchi_core::limits::Limits as PublicExternalLimits;
+pub fn parse_external(data: &[u8], limits: &litchi_core::limits::Limits) {
+    let _ = (data, limits);
+}
+pub fn parse_external_reexport(data: &[u8], limits: &PublicExternalLimits) {
+    let _ = (data, limits);
+}
+pub struct Limits;
+pub fn parse_unrelated(data: &[u8], limits: &Limits) {
+    let _ = (data, limits);
+}
 pub struct Fields { pub old_field: u8, secret_field: u8 }
 pub enum Variants { Named { old_variant_field: u8 } }
 pub trait Contract {
@@ -233,13 +261,14 @@ pub mod edit {
 }
 pub mod patch { pub struct Patch<Mode>(pub Mode); }
 pub mod unrelated { pub struct Commit<P, T>(pub P, pub T); }
+pub mod limits { pub struct Limits; }
 '''
 
 
 def profile(**changes):
     value = {
         "id": "fixture", "package": "fixture", "default_features": False,
-        "features": [], "banned_names": [], "families": [],
+        "features": [], "banned_names": [], "families": [], "required_signatures": [],
     }
     value.update(changes)
     return value
@@ -274,6 +303,23 @@ class PolicyTests(unittest.TestCase):
             {"version": 1, "profiles": [profile(immutable_owners=["other::Owner"])]},
             {"version": 1, "profiles": [profile(immutable_owners=["fixture::Owner", "fixture::Owner"])]},
             {"version": 1, "profiles": [profile(result_methods="yes")]},
+            {"version": 1, "profiles": [profile(required_signatures="yes")]},
+            {"version": 1, "profiles": [profile(required_signatures=[{
+                "method": 7, "inputs": ["data"], "limits_argument": "data",
+                "limits_type": "fixture::SourceLimits",
+            }])]},
+            {"version": 1, "profiles": [profile(required_signatures=[{
+                "method": "fixture::RawParser::parse", "inputs": ["data", 1],
+                "limits_argument": "data", "limits_type": "fixture::SourceLimits",
+            }])]},
+            {"version": 1, "profiles": [profile(required_signatures=[{
+                "method": "fixture::RawParser::parse", "inputs": ["data"],
+                "limits_argument": "data", "limits_type": None,
+            }])]},
+            {"version": 1, "profiles": [profile(required_signatures=[{
+                "method": "fixture::RawParser::parse", "inputs": ["data"],
+                "limits_argument": "missing", "limits_type": "fixture::SourceLimits",
+            }])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "Commit"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Package"}])]},
@@ -359,6 +405,74 @@ class RustdocTests(unittest.TestCase):
     def check(self, *names, scope="fixture", families=()):
         return gate.violations(self.document, profile(
             banned_names=[ban(n, scope) for n in names], families=list(families)))
+
+    def test_required_signature_policy_is_checked_by_input_names_and_limit_type(self):
+        surface = gate.Surface(self.document, "fixture")
+        self.assertEqual(
+            surface.receivers[("fixture", "RawParser", "parse_document")], "&self"
+        )
+        self.assertNotIn(("fixture", "RawParser", "parse"), surface.receivers)
+        self.assertNotIn(("fixture", "parse_free"), surface.receivers)
+        associated = {
+            "method": "fixture::RawParser::parse",
+            "inputs": ["data", "offset", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "fixture::SourceLimits",
+        }
+        receiver = {
+            "method": "fixture::RawParser::parse_document",
+            "inputs": ["self", "data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "fixture::PublicSourceLimits",
+        }
+        free = {
+            "method": "fixture::parse_free",
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "fixture::PublicSourceLimits",
+        }
+        external = {
+            "method": "fixture::parse_external",
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "litchi_core::limits::Limits",
+        }
+        external_reexport = {
+            "method": "fixture::parse_external_reexport",
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "fixture::PublicExternalLimits",
+        }
+        rows = [associated, receiver, free, external, external_reexport]
+        self.assertTrue(gate.checked_policy({
+            "version": 1,
+            "profiles": [profile(required_signatures=rows)],
+        }))
+        self.assertEqual(gate.violations(self.document, profile(required_signatures=rows)), [])
+        for changed in (
+            {**associated, "inputs": ["data", "offset"]},
+            {**associated, "limits_argument": "offset"},
+            {**associated, "limits_type": "fixture::ReadLimits"},
+            {**associated, "method": "fixture::RawParser::parse_without_limits"},
+            {**receiver, "inputs": ["data", "limits"]},
+            {**external, "limits_type": "fixture::Limits"},
+            {**external, "limits_type": "litchi_core::other::Limits"},
+        ):
+            with self.subTest(changed=changed):
+                failures = gate.violations(self.document, profile(required_signatures=[changed]))
+                self.assertEqual(len(failures), 1, failures)
+
+        # A canonical dependency path is not accepted when rustdoc exposes
+        # two unrelated nominal identities at that spelling.  This protects
+        # the external form from becoming a final-component/name match.
+        ambiguous = copy.deepcopy(self.document)
+        ambiguous["paths"]["duplicate-external-limits"] = {
+            "crate_id": 88,
+            "path": ["litchi_core", "limits", "Limits"],
+            "kind": "struct",
+        }
+        failures = gate.violations(ambiguous, profile(required_signatures=[external]))
+        self.assertEqual(len(failures), 1, failures)
 
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
         document = copy.deepcopy(self.document)
