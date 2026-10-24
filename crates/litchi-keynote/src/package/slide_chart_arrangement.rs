@@ -23,7 +23,7 @@
 
 use std::fmt;
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{
@@ -41,6 +41,7 @@ use litchi_iwa_protos::chart_arrangement_codec::{
 use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::slide_chart_title::{
     ChartSelection, Error as ChartTitleError, select_chart, select_chart_with_budget, select_charts,
 };
@@ -85,6 +86,8 @@ pub enum LimitKind {
     RetainedBytes,
     /// Temporary candidate bytes required by the lazy codec.
     ScratchBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -105,6 +108,7 @@ impl fmt::Display for LimitKind {
             Self::ArrangementBytes => "chart arrangement bytes",
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -211,22 +215,25 @@ impl From<Refusal> for Error {
 /// snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    slide_position: Position,
-    chart_position: Position,
-    chart_identifier: u64,
-    slide_identifier: u64,
-    before: ChartArrangement,
-    after: ChartArrangement,
+    slide: OwnedSlideSelector,
+    chart: OwnedChartSelector,
+    selection: OnceLock<(ChartSelection, ChartArrangement)>,
+    after: Option<ChartArrangement>,
+    locked: Option<bool>,
+    constrain_proportions: Option<bool>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("slide_position", &self.slide_position)
-            .field("chart_position", &self.chart_position)
-            .field("before", &self.before)
-            .field("after", &self.after)
+            .field("has_selection", &self.selection.get().is_some())
+            .field(
+                "has_staged",
+                &(self.after.is_some()
+                    || self.locked.is_some()
+                    || self.constrain_proportions.is_some()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -237,48 +244,87 @@ impl<'a> Edit<'a> {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Self, Error> {
-        let selection = select_chart(source, slide_selector.into(), chart_selector.into(), true)
-            .map_err(map_chart_title_error)?;
-        let before = read_selected_arrangement(source, &selection)?;
+        let maximum_selector_bytes = source.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Self {
             source,
-            slide_position: selection.slide_position,
-            chart_position: selection.chart_position,
-            chart_identifier: selection.chart_identifier,
-            slide_identifier: selection.slide_identifier,
-            before,
-            after: before,
+            slide,
+            chart,
+            selection: OnceLock::new(),
+            after: None,
+            locked: None,
+            constrain_proportions: None,
         })
     }
 
+    fn resolve(&self) -> Result<&(ChartSelection, ChartArrangement), Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let selection = select_chart(
+            self.source,
+            self.slide.as_selector(),
+            self.chart.as_selector(),
+            true,
+        )
+        .map_err(map_chart_title_error)?;
+        let before = read_selected_arrangement(self.source, &selection)?;
+        let _ = self.selection.set((selection, before));
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
     /// Return the selected semantic slide position.
-    #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.slide_position
+    #[must_use = "handle the deferred chart-arrangement result"]
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.slide_position)
     }
 
     /// Return the selected semantic chart position within its slide.
-    #[must_use]
-    pub const fn chart_position(&self) -> Position {
-        self.chart_position
+    #[must_use = "handle the deferred chart-arrangement result"]
+    pub fn chart_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.0.chart_position)
     }
 
-    /// Return the arrangement observed when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> ChartArrangement {
-        self.before
+    /// Return the arrangement observed when this edit first resolves.
+    #[must_use = "handle the deferred chart-arrangement result"]
+    pub fn before(&self) -> Result<ChartArrangement, Error> {
+        Ok(self.resolve()?.1)
     }
 
     /// Return the arrangement staged for publication.
-    #[must_use]
-    pub const fn after(&self) -> ChartArrangement {
-        self.after
+    #[must_use = "handle the deferred chart-arrangement result"]
+    pub fn after(&self) -> Result<ChartArrangement, Error> {
+        if let Some(after) = self.after {
+            return Ok(after);
+        }
+        let mut after = self.resolve()?.1;
+        if let Some(locked) = self.locked {
+            after = after.with_locked(locked);
+        }
+        if let Some(constrain_proportions) = self.constrain_proportions {
+            after = after.with_constrain_proportions(constrain_proportions);
+        }
+        Ok(after)
     }
 
     /// Stage a complete replacement of the chart Arrange-panel state.
     #[must_use]
-    pub const fn set(mut self, arrangement: ChartArrangement) -> Self {
-        self.after = arrangement;
+    pub fn set(mut self, arrangement: ChartArrangement) -> Self {
+        self.after = Some(arrangement);
+        self.locked = None;
+        self.constrain_proportions = None;
         self
     }
 
@@ -287,8 +333,12 @@ impl<'a> Edit<'a> {
     /// Requesting `false` preserves an already-absent proto2 field, so an
     /// effective false-to-false edit can remain an exact byte no-op.
     #[must_use]
-    pub const fn set_locked(mut self, locked: bool) -> Self {
-        self.after = self.after.with_locked(locked);
+    pub fn set_locked(mut self, locked: bool) -> Self {
+        if let Some(after) = self.after {
+            self.after = Some(after.with_locked(locked));
+        } else {
+            self.locked = Some(locked);
+        }
         self
     }
 
@@ -298,28 +348,28 @@ impl<'a> Edit<'a> {
     /// Requesting `false` preserves an already-absent proto2 field, so an
     /// effective false-to-false edit can remain an exact byte no-op.
     #[must_use]
-    pub const fn set_constrain_proportions(mut self, constrain_proportions: bool) -> Self {
-        self.after = self.after.with_constrain_proportions(constrain_proportions);
+    pub fn set_constrain_proportions(mut self, constrain_proportions: bool) -> Self {
+        if let Some(after) = self.after {
+            self.after = Some(after.with_constrain_proportions(constrain_proportions));
+        } else {
+            self.constrain_proportions = Some(constrain_proportions);
+        }
         self
     }
 
     /// Validate and atomically publish the staged immutable candidate.
     pub fn commit(self) -> Result<Commit, Error> {
+        let (source_selection, before) = self.resolve()?.clone();
+        let after = self.after()?;
+        let slide_position = source_selection.slide_position;
+        let chart_position = source_selection.chart_position;
+        let chart_identifier = source_selection.chart_identifier;
+        let slide_identifier = source_selection.slide_identifier;
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
-        if self.before == self.after {
-            let source_selection = select_chart(
-                self.source,
-                SlideSelector::position(self.slide_position),
-                ChartSelector::index(self.chart_position.get()),
-                true,
-            )
-            .map_err(map_chart_title_error)?;
+        if before == after {
             let current = read_selected_arrangement(self.source, &source_selection)?;
-            if source_selection.chart_identifier != self.chart_identifier
-                || source_selection.slide_identifier != self.slide_identifier
-                || current != self.before
-            {
+            if current != before {
                 return Err(Error::InvalidSource);
             }
             self.source.validate().map_err(map_read_error)?;
@@ -327,12 +377,12 @@ impl<'a> Edit<'a> {
                 package: self.source.snapshot(),
                 patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
-                    slide_position: self.slide_position,
-                    chart_position: self.chart_position,
-                    chart_identifier: self.chart_identifier,
-                    slide_identifier: self.slide_identifier,
-                    before: self.before,
-                    after: self.after,
+                    slide_position,
+                    chart_position,
+                    chart_identifier,
+                    slide_identifier,
+                    before,
+                    after,
                     source_payload: None,
                     target_payload: None,
                 },
@@ -351,8 +401,8 @@ impl<'a> Edit<'a> {
             .map_err(map_axis_support_error)?;
         let source_selection = select_chart_with_budget(
             self.source,
-            SlideSelector::position(self.slide_position),
-            ChartSelector::index(self.chart_position.get()),
+            SlideSelector::position(slide_position),
+            ChartSelector::index(chart_position.get()),
             true,
             &mut budget,
         )
@@ -362,20 +412,20 @@ impl<'a> Edit<'a> {
             &source_selection,
             &mut budget,
         )?;
-        if source_selection.chart_identifier != self.chart_identifier
-            || source_selection.slide_identifier != self.slide_identifier
-            || current != self.before
+        if source_selection.chart_identifier != chart_identifier
+            || source_selection.slide_identifier != slide_identifier
+            || current != before
         {
             return Err(Error::InvalidSource);
         }
         let source_payload = copy_payload_with_budget(source_payload_bytes, &mut budget)?;
         let rewritten =
-            rewrite_chart_arrangement(self.source, &source_selection, self.after, &mut budget)?;
+            rewrite_chart_arrangement(self.source, &source_selection, after, &mut budget)?;
         verify_chart_candidate(
             self.source,
             &rewritten.package,
             &source_selection,
-            self.after,
+            after,
             rewritten.selected_payload.as_ref(),
             &mut budget,
         )?;
@@ -384,17 +434,28 @@ impl<'a> Edit<'a> {
             package: rewritten.package,
             patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
-                slide_position: self.slide_position,
-                chart_position: self.chart_position,
-                chart_identifier: self.chart_identifier,
-                slide_identifier: self.slide_identifier,
-                before: self.before,
-                after: self.after,
+                slide_position,
+                chart_position,
+                chart_identifier,
+                slide_identifier,
+                before,
+                after,
                 source_payload: Some(source_payload),
                 target_payload: Some(rewritten.selected_payload),
             },
             diagnostics: Diagnostics::published(),
         })
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
@@ -630,6 +691,11 @@ impl Package {
 
     /// Start an exact immutable edit of one selected chart's Arrange-panel
     /// state.
+    ///
+    /// Entry retains only the source and the archive-free selectors. Chart
+    /// graph selection and arrangement decoding are deferred until a value is
+    /// read, an aspect is staged, or the edit is committed. Selector names are
+    /// admitted against the package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_arrangement<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
@@ -1795,7 +1861,8 @@ fn axis_support_budget_error(error: Error) -> AxisSupportError {
                     LimitKind::WireWork => chart_axis_support::AxisSupportLimitKind::WireWork,
                     LimitKind::ArrangementBytes
                     | LimitKind::RetainedBytes
-                    | LimitKind::ScratchBytes => {
+                    | LimitKind::ScratchBytes
+                    | LimitKind::SelectorBytes => {
                         chart_axis_support::AxisSupportLimitKind::TotalBytes
                     },
                     LimitKind::Allocations => unreachable!(),
@@ -1882,6 +1949,7 @@ fn map_chart_title_limit(kind: super::slide_chart_title::LimitKind) -> LimitKind
         ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
         ChartTitleLimitKind::Slides => LimitKind::Slides,
         ChartTitleLimitKind::References => LimitKind::References,
+        ChartTitleLimitKind::SelectorBytes => LimitKind::SelectorBytes,
         ChartTitleLimitKind::WireFields => LimitKind::WireFields,
         ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
         ChartTitleLimitKind::WireWork => LimitKind::WireWork,

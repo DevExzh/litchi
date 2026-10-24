@@ -181,6 +181,11 @@ pub(super) fn map_chart_title_error(error: super::slide_chart_title::Error) -> A
                 ChartTitleLimitKind::TextStorages => AxisSupportLimitKind::TextStorages,
                 ChartTitleLimitKind::TextFragments => AxisSupportLimitKind::TextFragments,
                 ChartTitleLimitKind::TextBytes => AxisSupportLimitKind::TextBytes,
+                // Selector admission is performed by the public edit entry;
+                // the shared graph proof has no separate retained-selector
+                // ledger, so preserve its semantic text-byte classification
+                // if a future caller forwards this dimension here.
+                ChartTitleLimitKind::SelectorBytes => AxisSupportLimitKind::TextBytes,
                 ChartTitleLimitKind::WireFields => AxisSupportLimitKind::WireFields,
                 ChartTitleLimitKind::WireNesting => AxisSupportLimitKind::WireNesting,
                 ChartTitleLimitKind::WireWork => AxisSupportLimitKind::WireWork,

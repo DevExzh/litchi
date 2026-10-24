@@ -301,9 +301,11 @@ fn selector_first_chart_title_transaction_is_exact_and_reversible() -> TestResul
 
     let source = exact_bytes(&package)?;
     let edit = package.edit_slide_chart_title("Charts", "Revenue")?;
-    assert_eq!(edit.slide_position(), Position::new(0));
-    assert_eq!(edit.chart_position(), Position::new(0));
-    assert_eq!(edit.before(), Some("Revenue"));
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.slide_position()?, Position::new(0));
+    assert_eq!(edit.chart_position()?, Position::new(0));
+    assert_eq!(edit.before()?, Some("Revenue"));
+    assert!(format!("{edit:?}").contains("has_selection: true"));
     let commit = edit.set("Revenue by region")?.commit()?;
     assert_eq!(
         commit.package().slide_chart_title(0usize, 0usize)?,
@@ -564,17 +566,23 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
         ))
     ));
     assert!(matches!(
-        package.edit_slide_chart_title("Missing", 0usize),
+        package
+            .edit_slide_chart_title("Missing", 0usize)
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::Refused(
             litchi_keynote::chart::title::Refusal::SlideNameNotFound
         ))
     ));
     assert!(matches!(
-        package.edit_slide_chart_title(0usize, 4usize),
+        package
+            .edit_slide_chart_title(0usize, 4usize)
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::Refused(litchi_keynote::chart::title::Refusal::ChartPositionNotFound { position })) if position == Position::new(4)
     ));
     assert!(matches!(
-        package.edit_slide_chart_title(0usize, ChartSelector::name("")),
+        package
+            .edit_slide_chart_title(0usize, ChartSelector::name(""))
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::Refused(
             litchi_keynote::chart::title::Refusal::EmptyChartName
         ))
@@ -601,7 +609,9 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
     ));
     let duplicate_source = exact_bytes(&duplicate)?;
     assert!(matches!(
-        duplicate.edit_slide_chart_title(0usize, ChartSelector::name("Revenue")),
+        duplicate
+            .edit_slide_chart_title(0usize, ChartSelector::name("Revenue"))
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::Refused(
             litchi_keynote::chart::title::Refusal::AmbiguousSelector
         ))
@@ -683,7 +693,9 @@ fn chart_title_rejects_shared_title_standin_ownership() -> TestResult<()> {
         Err(ChartTitleError::InvalidSource)
     ));
     assert!(matches!(
-        package.edit_slide_chart_title(0usize, 0usize),
+        package
+            .edit_slide_chart_title(0usize, 0usize)
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);
@@ -721,7 +733,9 @@ fn chart_title_rejects_shared_non_style_ownership() -> TestResult<()> {
         Err(ChartTitleError::InvalidSource)
     ));
     assert!(matches!(
-        package.edit_slide_chart_title(0usize, 0usize),
+        package
+            .edit_slide_chart_title(0usize, 0usize)
+            .and_then(|edit| edit.commit()),
         Err(ChartTitleError::InvalidSource)
     ));
     assert_eq!(exact_bytes(&package)?, before);

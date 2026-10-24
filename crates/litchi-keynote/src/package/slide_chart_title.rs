@@ -17,7 +17,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Position;
 use litchi_iwa_archive::{
@@ -41,6 +41,7 @@ use litchi_iwa_protos::keynote_chart_title_codec::{
 use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::{
     Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SemanticLimitKind, SlideRecord,
     unique_payload,
@@ -97,6 +98,8 @@ pub enum LimitKind {
     WireWork,
     /// UTF-8 bytes in one visible chart title.
     TitleBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -117,6 +120,7 @@ impl fmt::Display for LimitKind {
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
             Self::TitleBytes => "chart title bytes",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -221,22 +225,17 @@ impl From<Refusal> for Error {
 /// One mutable chart-title value staged against an immutable package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    slide_position: Position,
-    chart_position: Position,
-    chart_identifier: u64,
-    non_style_identifier: u64,
-    slide_identifier: u64,
-    before: Option<String>,
-    after: Option<String>,
+    slide: OwnedSlideSelector,
+    chart: OwnedChartSelector,
+    selection: OnceLock<ChartSelection>,
+    after: Option<Option<String>>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("slide_position", &self.slide_position)
-            .field("chart_position", &self.chart_position)
-            .field("has_before", &self.before.is_some())
+            .field("has_selection", &self.selection.get().is_some())
             .field("has_after", &self.after.is_some())
             .finish_non_exhaustive()
     }
@@ -248,43 +247,68 @@ impl<'a> Edit<'a> {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Self, Error> {
-        let selection = select_chart(source, slide_selector.into(), chart_selector.into(), true)?;
-        let before = selection.title;
-        let after = before.as_deref().map(copy_title).transpose()?;
+        let maximum_selector_bytes = source.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Self {
             source,
-            slide_position: selection.slide_position,
-            chart_position: selection.chart_position,
-            chart_identifier: selection.chart_identifier,
-            non_style_identifier: selection.non_style_identifier,
-            slide_identifier: selection.slide_identifier,
-            before,
-            after,
+            slide,
+            chart,
+            selection: OnceLock::new(),
+            after: None,
         })
     }
 
+    fn resolve(&self) -> Result<&ChartSelection, Error> {
+        if let Some(selection) = self.selection.get() {
+            return Ok(selection);
+        }
+        let selection = select_chart(
+            self.source,
+            self.slide.as_selector(),
+            self.chart.as_selector(),
+            true,
+        )?;
+        let _ = self.selection.set(selection);
+        self.selection.get().ok_or(Error::InvalidSource)
+    }
+
     /// Return the selected semantic slide position.
-    #[must_use]
-    pub const fn slide_position(&self) -> Position {
-        self.slide_position
+    #[must_use = "handle the deferred chart-title result"]
+    pub fn slide_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.slide_position)
     }
 
     /// Return the selected semantic chart position within its slide.
-    #[must_use]
-    pub const fn chart_position(&self) -> Position {
-        self.chart_position
+    #[must_use = "handle the deferred chart-title result"]
+    pub fn chart_position(&self) -> Result<Position, Error> {
+        Ok(self.resolve()?.chart_position)
     }
 
-    /// Borrow the visible title observed when this edit began.
-    #[must_use]
-    pub fn before(&self) -> Option<&str> {
-        self.before.as_deref()
+    /// Borrow the visible title observed when this edit first resolves.
+    #[must_use = "handle the deferred chart-title result"]
+    pub fn before(&self) -> Result<Option<&str>, Error> {
+        Ok(self.resolve()?.title.as_deref())
     }
 
     /// Borrow the title staged for publication.
-    #[must_use]
-    pub fn after(&self) -> Option<&str> {
-        self.after.as_deref()
+    #[must_use = "handle the deferred chart-title result"]
+    pub fn after(&self) -> Result<Option<&str>, Error> {
+        if let Some(value) = self.after.as_ref() {
+            return Ok(value.as_deref());
+        }
+        Ok(self.resolve()?.title.as_deref())
     }
 
     /// Stage a visible chart title.
@@ -293,53 +317,61 @@ impl<'a> Edit<'a> {
     /// caller may pass either a borrowed string slice or an owned `String`
     /// without changing the transaction's source ownership or wire behavior.
     pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, Error> {
-        self.after = Some(copy_title(title.as_ref())?);
+        self.after = Some(Some(copy_title(title.as_ref())?));
         Ok(self)
     }
 
     /// Stage removal of the visible chart title.
     pub fn clear(mut self) -> Result<Self, Error> {
-        self.after = None;
+        self.after = Some(None);
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
     pub fn commit(self) -> Result<Commit, Error> {
+        let source_selection = self.resolve()?.clone();
+        let before = source_selection.title.clone();
+        let after = self.after.unwrap_or_else(|| before.clone());
+        let slide_position = source_selection.slide_position;
+        let chart_position = source_selection.chart_position;
+        let chart_identifier = source_selection.chart_identifier;
+        let non_style_identifier = source_selection.non_style_identifier;
+        let slide_identifier = source_selection.slide_identifier;
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let mut budget = ChartGraphScanBudget::new(self.source)?;
         budget
             .charge_selection_scans(self.source, true)
             .map_err(map_axis_support_error)?;
-        let source_selection = select_chart_with_budget(
+        let source_selection_with_budget = select_chart_with_budget(
             self.source,
-            SlideSelector::position(self.slide_position),
-            ChartSelector::index(self.chart_position.get()),
+            SlideSelector::position(slide_position),
+            ChartSelector::index(chart_position.get()),
             true,
             &mut budget,
         )
         .map_err(map_axis_support_error)?;
-        if source_selection.chart_identifier != self.chart_identifier
-            || source_selection.non_style_identifier != self.non_style_identifier
-            || source_selection.slide_identifier != self.slide_identifier
-            || source_selection.title != self.before
+        if source_selection_with_budget.chart_identifier != chart_identifier
+            || source_selection_with_budget.non_style_identifier != non_style_identifier
+            || source_selection_with_budget.slide_identifier != slide_identifier
+            || source_selection_with_budget.title != before
         {
             return Err(Error::InvalidSource);
         }
 
-        if self.before == self.after {
+        if before == after {
             self.source.validate().map_err(map_read_error)?;
             return Ok(Commit {
                 package: self.source.snapshot(),
                 patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
-                    slide_position: self.slide_position,
-                    chart_position: self.chart_position,
-                    chart_identifier: self.chart_identifier,
-                    non_style_identifier: self.non_style_identifier,
-                    slide_identifier: self.slide_identifier,
-                    before: self.before,
-                    after: self.after,
+                    slide_position,
+                    chart_position,
+                    chart_identifier,
+                    non_style_identifier,
+                    slide_identifier,
+                    before,
+                    after,
                     deleted_previews: 0,
                     preview_count: 0,
                     target_requires_invalidated_previews: false,
@@ -357,8 +389,8 @@ impl<'a> Edit<'a> {
         validate_chart_title_reference_metadata(self.source, &mut budget)?;
         let rewrite = rewrite_chart_title(
             self.source,
-            &source_selection,
-            self.after.as_deref(),
+            &source_selection_with_budget,
+            after.as_deref(),
             &mut budget,
         )?;
         rewrite.package.validate().map_err(map_read_error)?;
@@ -369,25 +401,25 @@ impl<'a> Edit<'a> {
             .map_err(map_axis_support_error)?;
         let candidate_selection = select_chart_with_budget(
             &rewrite.package,
-            SlideSelector::position(self.slide_position),
-            ChartSelector::index(self.chart_position.get()),
+            SlideSelector::position(slide_position),
+            ChartSelector::index(chart_position.get()),
             true,
             &mut budget,
         )
         .map_err(map_axis_support_error)?;
-        if candidate_selection.chart_identifier != self.chart_identifier
-            || candidate_selection.non_style_identifier != self.non_style_identifier
-            || candidate_selection.slide_identifier != self.slide_identifier
-            || candidate_selection.title != self.after
+        if candidate_selection.chart_identifier != chart_identifier
+            || candidate_selection.non_style_identifier != non_style_identifier
+            || candidate_selection.slide_identifier != slide_identifier
+            || candidate_selection.title != after
         {
             return Err(Error::Verification);
         }
         verify_chart_candidate(
             self.source,
             &rewrite.package,
-            self.slide_position,
-            self.chart_position,
-            self.after.as_deref(),
+            slide_position,
+            chart_position,
+            after.as_deref(),
             &rewrite.selected_message,
             true,
             &mut budget,
@@ -404,13 +436,13 @@ impl<'a> Edit<'a> {
             package,
             patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
-                slide_position: self.slide_position,
-                chart_position: self.chart_position,
-                chart_identifier: self.chart_identifier,
-                non_style_identifier: self.non_style_identifier,
-                slide_identifier: self.slide_identifier,
-                before: self.before,
-                after: self.after,
+                slide_position,
+                chart_position,
+                chart_identifier,
+                non_style_identifier,
+                slide_identifier,
+                before,
+                after,
                 deleted_previews,
                 preview_count: deleted_previews,
                 target_requires_invalidated_previews: true,
@@ -419,6 +451,17 @@ impl<'a> Edit<'a> {
             },
             diagnostics: Diagnostics::published(deleted_previews),
         })
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
@@ -638,6 +681,11 @@ impl Package {
     }
 
     /// Start an exact immutable edit of one selected chart title.
+    ///
+    /// Entry retains only the source and the archive-free selectors. Chart
+    /// graph selection and title decoding are deferred until a value is read
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_title<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,

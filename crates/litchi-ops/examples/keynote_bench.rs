@@ -492,7 +492,7 @@ fn main() {
                         let mut edit = package
                             .edit_slide_text(SlideSelector::index(1), Role::Body)
                             .unwrap();
-                        let (span, replacement) = span(edit.text(), final_body);
+                        let (span, replacement) = span(edit.text().unwrap(), final_body);
                         edit.replace(span, replacement).unwrap();
                         edit.commit().unwrap()
                     };
@@ -535,7 +535,7 @@ fn main() {
                         let mut edit = package
                             .edit_slide_text(SlideSelector::index(1), Role::Body)
                             .unwrap();
-                        let (span, replacement) = span(edit.text(), final_body);
+                        let (span, replacement) = span(edit.text().unwrap(), final_body);
                         edit.replace(span, replacement).unwrap();
                         edit.commit().unwrap()
                     };

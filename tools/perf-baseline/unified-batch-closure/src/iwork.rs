@@ -129,7 +129,7 @@ fn keynote(counts: &[usize]) -> Result<Vec<Case<'static>>> {
     let file = leak(litchi_ops::open_bytes(bytes)?);
     fn leaf(native: &Package, final_body: &str) -> Result<Package> {
         let mut edit = native.edit_slide_text(SlideSelector::index(1), Role::Body)?;
-        let (span, replacement) = span(edit.text(), final_body)?;
+        let (span, replacement) = span(edit.text()?, final_body)?;
         edit.replace(span, replacement)?;
         Ok(edit.commit()?.into_package())
     }

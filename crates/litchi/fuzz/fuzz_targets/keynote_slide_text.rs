@@ -172,12 +172,15 @@ fn exercise_operation(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
-    black_box((edit.position(), edit.role(), edit.text(), edit.span()));
+    let Ok(text) = edit.text().map(str::to_owned) else {
+        return;
+    };
+    black_box((edit.position(), edit.role(), &text, edit.span()));
 
     let replacement = replacement(data);
-    let length = edit.text().encode_utf16().count();
-    let first = scalar_boundary(edit.text(), usize::try_from(read_u32(data, 2)).unwrap_or(0));
-    let second = scalar_boundary(edit.text(), usize::try_from(read_u32(data, 6)).unwrap_or(0));
+    let length = text.encode_utf16().count();
+    let first = scalar_boundary(&text, usize::try_from(read_u32(data, 2)).unwrap_or(0));
+    let second = scalar_boundary(&text, usize::try_from(read_u32(data, 6)).unwrap_or(0));
     let (start, end) = if first <= second {
         (first, second)
     } else {
@@ -354,6 +357,9 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
     let Ok(mut edit) = package.edit_slide_text(SlideSelector::index(0), role) else {
         return;
     };
+    let Ok(text) = edit.text().map(str::to_owned) else {
+        return;
+    };
 
     match control(data, 10) % 4 {
         0 => {
@@ -362,7 +368,7 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
             }
         },
         1 => {
-            let beyond = edit.text().encode_utf16().count().saturating_add(1);
+            let beyond = text.encode_utf16().count().saturating_add(1);
             if let Ok(span) = TextSpan::from_utf16_indexes(beyond, beyond)
                 && let Err(error) = edit.delete(span)
             {
@@ -370,7 +376,7 @@ fn exercise_staging_error(package: &Package, role: Kind, data: &[u8]) {
             }
         },
         2 => {
-            if let Some(position) = split_surrogate_position(edit.text()) {
+            if let Some(position) = split_surrogate_position(&text) {
                 if let Err(error) = edit.insert(position, "x") {
                     observe_error(error);
                 }

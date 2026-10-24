@@ -177,7 +177,15 @@ fn exercise_package(package: &Package, data: &[u8]) {
             return;
         },
     };
-    assert_eq!(edit.before(), before.as_deref());
+    let observed_before = match edit.before() {
+        Ok(value) => value.map(str::to_owned),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+            return;
+        },
+    };
+    assert_eq!(observed_before, before);
     let command = control(data, 1) % 4;
     let hidden_or_absent_clear = before.is_none() && matches!(command, 0 | 2);
     let edit = match command {
@@ -198,7 +206,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
             return;
         },
     };
-    let after = edit.after().map(str::to_owned);
+    let after = match edit.after() {
+        Ok(value) => value.map(str::to_owned),
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source_bytes);
+            return;
+        },
+    };
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -396,15 +411,19 @@ fn exercise_malformed_packages() {
         if let Err(error) = named_title {
             observe_redacted(error, PRIVATE_SELECTOR);
         }
-        let edit = package.edit_slide_chart_title(0usize, 0usize);
+        let edit = package
+            .edit_slide_chart_title(0usize, 0usize)
+            .and_then(|edit| edit.commit());
         assert!(edit.is_err(), "malformed chart edit was staged");
         if let Err(error) = edit {
             observe_error(error);
         }
-        let named_edit = package.edit_slide_chart_title(
-            SlideSelector::name("Charts"),
-            ChartSelector::name(PRIVATE_SELECTOR),
-        );
+        let named_edit = package
+            .edit_slide_chart_title(
+                SlideSelector::name("Charts"),
+                ChartSelector::name(PRIVATE_SELECTOR),
+            )
+            .and_then(|edit| edit.commit());
         assert!(
             named_edit.is_err(),
             "malformed chart edit was staged through named selectors"

@@ -1243,7 +1243,8 @@ impl Pending {
                             .map_err(error)
                             .map_err(at)?;
                         if let Some((span, replacement)) =
-                            minimal_span(edit.text(), &value).map_err(at)?
+                            minimal_span(edit.text().map_err(error).map_err(at)?, &value)
+                                .map_err(at)?
                         {
                             edit.replace(span, replacement).map_err(error).map_err(at)?;
                         }

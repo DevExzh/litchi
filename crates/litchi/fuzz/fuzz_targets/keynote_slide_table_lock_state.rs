@@ -172,13 +172,29 @@ fn exercise_noop(
             return;
         },
     };
-    assert_eq!(edit.before(), before);
+    let observed_before = match edit.before() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_before, before);
     if before == State::Locked {
         edit.lock();
     } else {
         edit.unlock();
     }
-    assert_eq!(edit.state(), before);
+    let observed_state = match edit.state() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
+    assert_eq!(observed_state, before);
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -222,7 +238,14 @@ fn exercise_changed(
     } else {
         edit.lock();
     }
-    let after = edit.state();
+    let after = match edit.state() {
+        Ok(value) => value,
+        Err(error) => {
+            observe_error(error);
+            assert_eq!(package_bytes(package), source);
+            return;
+        },
+    };
     assert_ne!(after, before);
     let commit = match edit.commit() {
         Ok(commit) => commit,
@@ -286,7 +309,10 @@ fn exercise_selector_failures(package: &Package, source: &[u8]) {
         SlideSelector::name(PRIVATE_SLIDE_NAME),
     ] {
         observe_result(package.slide_table_lock_state(selector, TableSelector::index(0)));
-        if let Err(error) = package.edit_slide_table_lock_state(selector, TableSelector::index(0)) {
+        if let Err(error) = package
+            .edit_slide_table_lock_state(selector, TableSelector::index(0))
+            .and_then(|edit| edit.commit())
+        {
             observe_error(error);
         }
     }

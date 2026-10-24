@@ -844,7 +844,9 @@ fn title_body_reads_are_role_distinct_and_preserve_absent_vs_empty() -> TestResu
     assert_ne!(package.show()?.slides()[0].name(), Some(TITLE));
 
     assert!(matches!(
-        package.edit_slide_body("Existing Empty"),
+        package
+            .edit_slide_body("Existing Empty")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::Refused(
             litchi_keynote::slide::text::Refusal::TextStorageNotFound { role: Kind::Body }
         ))
@@ -934,7 +936,9 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
     let mismatch = with_title_storage_topology(&bytes, Some(TITLE_STORAGE), Some(BODY_STORAGE))?;
     let mismatch_package = Package::from_bytes(&mismatch)?;
     assert!(matches!(
-        mismatch_package.edit_slide_title("Agenda"),
+        mismatch_package
+            .edit_slide_title("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(
             SlideTextError::Refused(litchi_keynote::slide::text::Refusal::DependentContent)
                 | SlideTextError::InvalidSource
@@ -945,7 +949,9 @@ fn deprecated_storage_must_duplicate_the_mandatory_owned_storage() -> TestResult
     let deprecated_only = with_title_storage_topology(&bytes, None, Some(TITLE_STORAGE))?;
     let deprecated_only_package = Package::from_bytes(&deprecated_only)?;
     assert!(matches!(
-        deprecated_only_package.edit_slide_title("Agenda"),
+        deprecated_only_package
+            .edit_slide_title("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::InvalidSource)
     ));
     assert_eq!(deprecated_only_package.exact_bytes(), deprecated_only);
@@ -1045,9 +1051,11 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
 
     let span = TextSpan::from_utf16_indexes(7, 9)?;
     let mut edit = package.edit_slide_title("Agenda")?;
-    assert_eq!(edit.position(), Position::new(0));
+    assert!(format!("{edit:?}").contains("has_snapshot: false"));
+    assert_eq!(edit.position()?, Position::new(0));
     assert_eq!(edit.role(), Kind::Title);
-    assert_eq!(edit.text(), TITLE);
+    assert_eq!(edit.text()?, TITLE);
+    assert!(format!("{edit:?}").contains("has_snapshot: true"));
     edit.replace(span, "東京😀")?;
     assert_eq!(edit.span(), Some(span));
     let commit = edit.commit()?;
@@ -1101,7 +1109,7 @@ fn selector_first_utf16_operations_cover_both_roles() -> TestResult<()> {
     let cleared = clear.commit()?;
     assert_eq!(cleared.package().slide_body("Agenda")?, Some(String::new()));
     let mut refill = cleared.package().edit_slide_body("Agenda")?;
-    assert_eq!(refill.text(), "");
+    assert_eq!(refill.text()?, "");
     refill.set("Restored body")?;
     assert_eq!(
         refill.commit()?.package().slide_body("Agenda")?,
@@ -1117,13 +1125,17 @@ fn utf16_boundaries_selector_and_staging_errors_leave_source_unchanged() -> Test
     let source_snapshot = package.exact_bytes();
 
     assert!(matches!(
-        package.edit_slide_title("Missing"),
+        package
+            .edit_slide_title("Missing")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::Refused(
             litchi_keynote::slide::text::Refusal::SlideNameNotFound
         ))
     ));
     assert!(matches!(
-        package.edit_slide_text(SlideSelector::index(2), Kind::Title),
+        package
+            .edit_slide_text(SlideSelector::index(2), Kind::Title)
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::Refused(litchi_keynote::slide::text::Refusal::SlidePositionNotFound { position })) if position == Position::new(2)
     ));
 
@@ -1442,7 +1454,9 @@ fn duplicate_slide_names_are_typed_as_ambiguous_without_affecting_positions() ->
         ))
     ));
     assert!(matches!(
-        package.edit_slide_body("Agenda"),
+        package
+            .edit_slide_body("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::Refused(
             litchi_keynote::slide::text::Refusal::AmbiguousSelector
         ))
@@ -1499,7 +1513,9 @@ fn explicit_placeholder_kinds_are_role_checked_for_both_roles() -> TestResult<()
             let contradictory = with_placeholder_kind(&bytes, owner, Some(kind))?;
             let package = Package::from_bytes(&contradictory)?;
             assert!(matches!(
-                package.edit_slide_text("Agenda", role),
+                package
+                    .edit_slide_text("Agenda", role)
+                    .and_then(|edit| edit.commit()),
                 Err(SlideTextError::Refused(
                     litchi_keynote::slide::text::Refusal::DependentContent
                 ))
@@ -1541,7 +1557,9 @@ fn duplicate_body_payload_and_field_path_ownership_fail_closed() -> TestResult<(
     })?;
     let package = Package::from_bytes(&duplicate_body_payload)?;
     assert!(matches!(
-        package.edit_slide_body("Agenda"),
+        package
+            .edit_slide_body("Agenda")
+            .and_then(|edit| edit.commit()),
         Err(SlideTextError::InvalidSource)
     ));
     assert_eq!(package.exact_bytes(), duplicate_body_payload);
@@ -1761,7 +1779,9 @@ fn malformed_and_aliased_role_graphs_fail_closed() -> TestResult<()> {
 
     for malformed_bytes in malformed {
         let package = Package::from_bytes(&malformed_bytes)?;
-        let result = package.edit_slide_title(SlideSelector::index(0));
+        let result = package
+            .edit_slide_title(SlideSelector::index(0))
+            .and_then(|edit| edit.commit());
         assert!(
             matches!(result, Err(SlideTextError::InvalidSource)),
             "unexpected malformed slide-text result: {result:?}"

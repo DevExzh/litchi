@@ -658,10 +658,12 @@ fn arrangement_defaults_and_selectors_cover_all_boolean_combinations() -> TestRe
 fn arrangement_edit_exposes_only_semantic_positions_and_values() -> TestResult<()> {
     let package = Package::from_bytes(&base_source()?)?;
     let edit = package.edit_slide_chart_arrangement("Charts", "Revenue")?;
-    assert_eq!(edit.slide_position(), Position::new(0));
-    assert_eq!(edit.chart_position(), Position::new(0));
-    assert_eq!(edit.before(), ChartArrangement::default());
-    assert_eq!(edit.after(), ChartArrangement::default());
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.slide_position()?, Position::new(0));
+    assert_eq!(edit.chart_position()?, Position::new(0));
+    assert_eq!(edit.before()?, ChartArrangement::default());
+    assert_eq!(edit.after()?, ChartArrangement::default());
+    assert!(format!("{edit:?}").contains("has_selection: true"));
 
     let debug = format!("{edit:?}");
     for identifier in CHARTS.into_iter().chain(TITLES).chain(CHART_NON_STYLES) {
@@ -946,6 +948,7 @@ fn arrangement_selectors_fail_closed_for_missing_names_positions_and_ambiguity()
     let before = exact_bytes(&duplicate)?;
     let error = duplicate
         .edit_slide_chart_arrangement(0usize, ChartSelector::name("Revenue"))
+        .and_then(|edit| edit.commit())
         .expect_err("duplicate chart names must be ambiguous");
     assert!(matches!(
         error,
@@ -983,6 +986,7 @@ fn arrangement_wire_validation_rejects_duplicate_wrong_noncanonical_and_invalid_
         assert!(
             package
                 .edit_slide_chart_arrangement(0usize, 0usize)
+                .and_then(|edit| edit.commit())
                 .is_err(),
             "malformed {kind} source unexpectedly opened for mutation"
         );
@@ -1004,6 +1008,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
         let before = exact_bytes(&package)?;
         let error = package
             .edit_slide_chart_arrangement(0usize, 0usize)
+            .and_then(|edit| edit.commit())
             .expect_err("ambiguous or malformed chart graph must fail closed");
         assert!(matches!(error, ChartArrangementError::InvalidSource));
         error_is_redacted(&error);
@@ -1015,6 +1020,7 @@ fn arrangement_graph_ambiguity_and_ownership_guards_are_atomic() -> TestResult<(
     let before = exact_bytes(&package)?;
     let error = package
         .edit_slide_chart_arrangement(0usize, 0usize)
+        .and_then(|edit| edit.commit())
         .expect_err("foreign chart ownership must fail closed");
     assert!(matches!(error, ChartArrangementError::InvalidSource));
     error_is_redacted(&error);

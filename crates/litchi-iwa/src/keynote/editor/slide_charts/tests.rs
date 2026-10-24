@@ -104,7 +104,7 @@ fn clear_chart_title<'chart>(
 ) -> bool {
     let package = focused_package(editor);
     let edit = package.edit_slide_chart_title(0usize, selector).unwrap();
-    let changed = edit.before().is_some();
+    let changed = edit.before().unwrap().is_some();
     let commit = edit.clear().unwrap().commit().unwrap();
     *editor = Draft::from_bytes(&focused_bytes(commit.package())).unwrap();
     changed
@@ -538,6 +538,7 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
     assert!(
         focused_package(&editor)
             .edit_slide_chart_title(0usize, ChartSelector::name("cost"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(editor.to_bytes().unwrap(), before_case_mismatch);
@@ -551,6 +552,7 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
     assert!(
         focused_package(&editor)
             .edit_slide_chart_title(0usize, ChartSelector::name("cost"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(
@@ -570,6 +572,7 @@ fn chart_name_selectors_match_titles_exactly_and_reject_ambiguity() {
     assert!(
         focused_package(&editor)
             .edit_slide_chart_title(0usize, ChartSelector::name("Cost"))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert!(

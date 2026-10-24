@@ -2242,7 +2242,7 @@ mod tests {
 
     #[test]
     fn package_edit_rejects_limit_exceeding_stage_atomically() -> crate::Result<()> {
-        let limits = PackageLimits::new(1, 4, 4)?;
+        let limits = PackageLimits::new(1, 5, 4)?;
         let mut package = empty_package_with_limits(limits);
         package.insert_entry("Data/asset", vec![1, 2, 3, 4])?;
         let source = package.clone();

@@ -575,6 +575,7 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
     assert!(
         package
             .edit_slide_table_lock_state(SlideSelector::index(0), TableSelector::index(0))
+            .and_then(|edit| edit.commit())
             .is_err()
     );
     assert_eq!(exact_bytes(&package)?, before);
@@ -828,9 +829,11 @@ fn lock_and_unlock_are_exact_source_bound_local_and_reversible() -> TestResult {
     let source = synthetic_package([None, Some(false), Some(true)])?;
     let package = Package::from_bytes(&source)?;
     let mut edit = package.edit_slide_table_lock_state("Tables", TableSelector::index(0))?;
-    assert_eq!(edit.before(), State::Unlocked);
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.before()?, State::Unlocked);
+    assert!(format!("{edit:?}").contains("has_selection: true"));
     edit.lock();
-    assert_eq!(edit.state(), State::Locked);
+    assert_eq!(edit.state()?, State::Locked);
     let commit = edit.commit()?;
     assert_eq!(
         commit.package().slide_table_lock_state(0usize, 0usize)?,
@@ -888,7 +891,7 @@ fn unlock_round_trip_preserves_explicit_false_and_inverse() -> TestResult {
     let source = synthetic_package([Some(true), Some(false), None])?;
     let package = Package::from_bytes(&source)?;
     let mut edit = package.edit_slide_table_lock_state(0usize, 0usize)?;
-    assert_eq!(edit.before(), State::Locked);
+    assert_eq!(edit.before()?, State::Locked);
     edit.unlock();
     let commit = edit.commit()?;
     assert_eq!(
@@ -993,7 +996,9 @@ fn lock_state_limits_fail_before_publication_and_keep_source_exact() -> TestResu
         Err(SlideTableLockStateError::Limit { .. })
     ));
     assert!(matches!(
-        package.edit_slide_table_lock_state(0usize, 0usize),
+        package
+            .edit_slide_table_lock_state(0usize, 0usize)
+            .and_then(|edit| edit.commit()),
         Err(SlideTableLockStateError::Limit { .. })
     ));
     assert_eq!(exact_bytes(&package)?, before);

@@ -352,6 +352,10 @@ fn map_title_limit_kind(kind: ChartTitleLimitKind) -> LimitKind {
         ChartTitleLimitKind::TextStorages => LimitKind::TextStorages,
         ChartTitleLimitKind::TextFragments => LimitKind::TextFragments,
         ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => LimitKind::TextBytes,
+        // Metadata reads use the shared graph proof, which has no separate
+        // retained-selector dimension. Keep this impossible forwarding path
+        // in the semantic text-byte class rather than exposing native detail.
+        ChartTitleLimitKind::SelectorBytes => LimitKind::TextBytes,
         ChartTitleLimitKind::WireFields => LimitKind::WireFields,
         ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
         ChartTitleLimitKind::WireWork => LimitKind::WireWork,

@@ -1171,7 +1171,9 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let appearance = package.slide_table_appearance(0usize, 0usize)?;
     let edit = package.edit_slide_table_appearance(0usize, 0usize)?;
-    assert_eq!(edit.before(), appearance);
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    assert_eq!(edit.before()?, appearance);
+    assert!(format!("{edit:?}").contains("has_selection: true"));
     let commit = edit.set(appearance).commit()?;
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());
