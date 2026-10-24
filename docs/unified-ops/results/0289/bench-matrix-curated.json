@@ -3066,6 +3066,74 @@
   {
    "record": "0362umb",
    "reason": "Documentation-consumer repair and source-bound doctest/compiler validation only. The 19 ODP examples retain their assertions; command runtime and RSS are validation provenance, not a leaf-versus-unified performance measurement."
+  },
+  {
+   "record": "0359qha",
+   "reason": "Final DOC body-toggle performance protocol and static validator only. The committed scripts prepare a future external native packet and explicitly claim no native or profiler result, so this evidence has no leaf-versus-unified measurement rows."
+  },
+  {
+   "record": "0362dv",
+   "reason": "DrawingML family source-policy closure and correctness receipts only; the retained follow-up JSON has no leaf-versus-unified timing or allocation pair."
+  },
+  {
+   "record": "0362dva",
+   "reason": "DrawingML action-return source repair and validation only; no paired benchmark measurement is recorded."
+  },
+  {
+   "record": "0362dvb",
+   "reason": "DrawingML consumer classification, owner-policy and raw-limit source repairs with validation receipts only; no leaf-versus-unified performance pair is claimed."
+  },
+  {
+   "record": "0362dvda",
+   "reason": "DrawingML Theme/Ink source return and validation receipt only; no paired timing or allocation measurement is recorded."
+  },
+  {
+   "record": "0362dvid",
+   "reason": "DrawingML compile/preflight and protocol-composition diagnostics only. Candidate compile receipts contain no paired leaf-versus-unified operation measurement."
+  },
+  {
+   "record": "0362dvie",
+   "reason": "DrawingML native qualification plan and harness-isolation tooling only; the plan is not a native result and makes no performance acceptance claim."
+  },
+  {
+   "record": "0362dvifb",
+   "reason": "Six-lane DrawingML current-candidate correctness/fidelity diagnostics only. The receipt explicitly has no baseline, ABBA, allocator or performance claim, so it contributes no leaf-versus-unified rows."
+  },
+  {
+   "record": "0362dvih",
+   "reason": "DrawingML composed Clippy and tooling checks only; no paired benchmark measurement is recorded."
+  },
+  {
+   "record": "0362dvj",
+   "reason": "DrawingML composed source/consumer review and validation receipts only; no leaf-versus-unified timing or allocation pair is claimed."
+  },
+  {
+   "record": "0362dvk",
+   "reason": "DrawingML rustdoc and source-link repair receipts only; no runtime or paired performance measurement is recorded."
+  },
+  {
+   "record": "0362dvla",
+   "reason": "DrawingML bounded-attribute source repair and coordinator checks only; no leaf-versus-unified performance pair is present."
+  },
+  {
+   "record": "0362ugjac",
+   "reason": "PPT lazy fixture-preparation and composed Python validation only; the receipt explicitly contains no native measurement."
+  },
+  {
+   "record": "0362ugjad",
+   "reason": "PPT lazy correctness-review and composed Python validation only; the receipt explicitly contains no timing measurement."
+  },
+  {
+   "record": "0362umf",
+   "reason": "OPC read-ahead timing-driver source and guard protocol only; the committed directory contains the driver, not an executed leaf-versus-unified result."
+  },
+  {
+   "record": "0362umfc",
+   "reason": "OPC read-ahead final packet is explicitly prepared-only with timing_claim=none; it contains no paired benchmark rows."
+  },
+  {
+   "record": "0362zada",
+   "reason": "CFB VBA fallback/chart workspace correctness checks only; no leaf-versus-unified timing or allocation measurement is recorded."
   }
  ]
 }
