@@ -478,14 +478,13 @@ fn edit_limits_and_dirty_state_refuse_before_publication() {
         })
     ));
     assert_eq!(save(&mut package), original);
-    assert!(
-        package
-            .edit_ink_with_options(EditOptions {
-                max_package_bytes: 1,
-                ..EditOptions::default()
-            })
-            .is_err()
-    );
+    let too_small_package = package
+        .edit_ink_with_options(EditOptions {
+            max_package_bytes: 1,
+            ..EditOptions::default()
+        })
+        .unwrap();
+    assert!(too_small_package.inventory().is_err());
     assert!(
         package
             .edit_ink_with_options(EditOptions {
