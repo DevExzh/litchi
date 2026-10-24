@@ -1,0 +1,16 @@
+{
+  "source_revision": "47ea67dc442b8d6ab3c26a5f371c543d7cc2a9ee",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_drawingml_compile_driver",
+    "tools.test_drawingml_raw_qualification",
+    "tools.test_native_qualification_runner"
+  ],
+  "exit_code": 0,
+  "seconds": 7.822150848005549,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-harness-isolation/tooling.log",
+  "log_bytes": 373,
+  "log_sha256": "5cd5c50842b6305ce128a9fb128cf468653f8ebe45d87402a138b6b5be2334aa"
+}
