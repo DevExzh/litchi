@@ -4269,6 +4269,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   files to exact 472b source; full paired preparation still requires baseline
   rebinding and review before a build grant. The original failure is seven
   arity errors plus one missing-fixture error, rather than eight arity errors.
-  Generic build-leasing cleanup and the W8 ABBA execution wrapper remain under
-  review. These returns preserve the every-consumer and performance requirements;
-  only audit 22 is deferred, and nothing is pushed.
+  Generic build-leasing cleanup passes independent review and merges at
+  `53c8056ece`. It checks process identities before admitting descendants,
+  captures children through final cleanup and fails closed on monitoring
+  errors. Restricted process metadata is allowed only when readable identity
+  fields prove the process is outside the protected scope. The composed
+  integration passes 76 native-runner/paired tests and 26 signed-protocol
+  tests. Fresh build permits and manifests are still required before any
+  concurrent qualification build.
+
+  The gate retry's first ops library chunk passes all 1,012 tests and advances
+  to integration tests; the full ops row and remaining selections are still
+  running. The W8 ABBA execution wrapper remains under review. These returns
+  preserve the every-consumer and performance requirements; only audit 22 is
+  deferred, and nothing is pushed.
