@@ -352,6 +352,34 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             after = root / "after"
             baseline_crud = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
             candidate_crud = baseline_crud + "// candidate API body\n"
+            candidate_probe = "".join(
+                [
+                    "fn first() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                    "fn second() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                    "fn third() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                ]
+            )
 
             def git(repo: Path, *args: str) -> str:
                 result = subprocess.run(
@@ -373,7 +401,8 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 crud_path.write_text(crud, encoding="utf-8")
                 probe_path = repo / source_prep.W4B_PROBE
                 probe_path.parent.mkdir(parents=True, exist_ok=True)
-                probe_path.write_text("fn main() {}\n", encoding="utf-8")
+                if repo == after:
+                    probe_path.write_text(candidate_probe, encoding="utf-8")
                 git(repo, "add", ".")
                 git(repo, "commit", "--quiet", "-m", "source pair")
 
@@ -381,6 +410,13 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with mock.patch.object(source_prep, "W4B_BASE_TREE", baseline_tree):
                 prepared = source_prep._prepare_w4b(before, after)
 
+            adapted_probe = (before / source_prep.W4B_PROBE).read_text(encoding="utf-8")
+            self.assertEqual(adapted_probe.count(".resolve()"), 0)
+            self.assertEqual(adapted_probe.count('.expect("worksheet");'), 3)
+            self.assertEqual(
+                prepared["overlays"][0]["adaptation"],
+                "recorded three-call historical selector-resolution translation",
+            )
             adapted = (before / source_prep.W4B_CRUD).read_text(encoding="utf-8")
             self.assertEqual(adapted, source_prep._adapt_w4b_crud(baseline_crud))
             crud_overlay = prepared["overlays"][1]
