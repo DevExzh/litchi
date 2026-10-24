@@ -42,15 +42,15 @@ PACKAGE_NAME = "litchi-ops"
 POLICY_RELATIVE = Path("docs/unified-ops/results/0362yh/original-to-final-policy.json")
 POLICY_SCHEMA = "litchi_w8_original_to_final_projection_policy.v1"
 PAIR_SCHEMA = "litchi_w8_original_to_final_pair.v1"
-POLICY_VERSION = "0362yh-c796-v1"
+POLICY_VERSION = "0362yh-472b-v1"
 
 # Filled after the reviewed policy file is assembled.  A fixed digest is
 # deliberate: an arbitrary policy path or edited JSON cannot become an
 # accepted graph rule merely by being passed on the command line.
-REVIEWED_POLICY_SHA256 = "978d9c1b4eff2281295dca10b3b54b9fb93df1e07af7f342eb9cbfb865aae9b9"
+REVIEWED_POLICY_SHA256 = "e56d549c733629ac73492a3511a45a1ed6a4cec97f1a4705ceea4ba9b67d97d2"
 
 BASELINE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
-FINAL_COMMIT = "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b"
+FINAL_COMMIT = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
 TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
@@ -204,7 +204,7 @@ FIXED_INPUTS: dict[str, dict[str, Any]] = {
     },
     "after": {
         "source_commit": FINAL_COMMIT,
-        "source": {"bytes": 6_633_830_400, "sha256": "65dc3102703cf9b4941003450440ac079bf74f269072f491cbce572e020bf9d8"},
+        "source": {"bytes": 6_634_147_840, "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"},
         "workspace_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/Cargo.toml", "bytes": 10_672, "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"},
         "package_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/litchi-ops.Cargo.toml", "bytes": 13_718, "sha256": "004d3b3cba8c035d209665a76c9cfe3932f12a9c198a4aea9fa314ef8ebb3a39"},
         "toolchain": {"path": "docs/unified-ops/results/0362yh/images/after/rust-toolchain.toml", "bytes": 86, "sha256": TOOLCHAIN_SHA256},

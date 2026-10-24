@@ -22,21 +22,25 @@
         "sha256": "3e05d33946c7a9a2fea5c84cda33c799fbf8cd3c92fbcf890812736641ed01cd"
       }
     },
+    "production_tree": {
+      "files": 459676,
+      "sha256": "23e332254abb024cbf9b038b8219b861e363fe474423bccc6122c3183b4d1437"
+    },
     "projection": {
       "bytes": 145931,
       "sha256": "b070ddb516a0223f9f21509de6564c7c5690d26e955047a922d4d837b7522335"
     }
   },
   "candidate": {
-    "source_commit": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+    "source_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "source_archive": {
-      "bytes": 6633830400,
-      "sha256": "65dc3102703cf9b4941003450440ac079bf74f269072f491cbce572e020bf9d8"
+      "bytes": 6634147840,
+      "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"
     },
     "source_assembly": {
       "overlay": "none",
       "bytes": 480,
-      "sha256": "cd7922dec26fdd6fb5508041be542cf61d5df2c8f1521bdeef4c9500905a7f92"
+      "sha256": "db01f0577ace4d69d170d3bdfffe07351ea01a9ddd989a321e7bef39e274b47d"
     },
     "lock": {
       "bytes": 139606,

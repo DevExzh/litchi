@@ -2,7 +2,7 @@
 
 This record defines the reviewed protocol rebind for comparing the historical
 f2 before endpoint with the candidate production source at
-`c796d0acc24c7c6e6fd08980b9e31af6bb86b18b`.  The ordinary W8 runner remains
+`472b6705475b073e7fe08f6e11ee17fb1e29f838`.  The ordinary W8 runner remains
 strict shared identity: `shared_identity()` still requires identical
 projection, lock, probe and fixture identities.  The exception is opt-in via
 `--original-to-final-policy` and `--original-to-final-receipt`; it does not
@@ -11,13 +11,13 @@ alter that generic path.
 The checked-in policy is
 `docs/unified-ops/results/0362yh/original-to-final-policy.json` (7,609 bytes,
 SHA-256
-`978d9c1b4eff2281295dca10b3b54b9fb93df1e07af7f342eb9cbfb865aae9b9`).  It
+`e56d549c733629ac73492a3511a45a1ed6a4cec97f1a4705ceea4ba9b67d97d2`).  It
 pins:
 
 - original commit `f2bbbc8d07ab5da26c180f1ff74813d39f632d54` and final commit
-  `c796d0acc24c7c6e6fd08980b9e31af6bb86b18b` (candidate production pin);
-- the candidate source archive (`6,633,830,400` bytes,
-  `65dc3102703cf9b4941003450440ac079bf74f269072f491cbce572e020bf9d8`),
+  `472b6705475b073e7fe08f6e11ee17fb1e29f838` (candidate production pin);
+- the candidate source archive (`6,634,147,840` bytes,
+  `44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274`),
   assembled without a production overlay;
 - the exact target, release profile, toolchain, all-features selection,
   corrected probe (`75,035` bytes), fixture (`4,231` bytes), and 109-route
@@ -56,14 +56,21 @@ The reduced build-free rebind receipt is
 `results/0362yh/final-source-preparation.json`.  It records the regenerated
 candidate fixture/projection, the exact six local graph additions, and the
 stale f2 endpoint and b673 candidate-lock inputs that are explicitly rejected.
+The completed immutable-f2 closure receipt is external at
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-c796-final-prep/provenance/original-baseline-assembly.json`:
+it verifies 459,676 production files, tree SHA
+`23e332254abb024cbf9b038b8219b861e363fe474423bccc6122c3183b4d1437`, the
+139,441-byte historical lock, and the reviewed 153,482-byte consumer-only
+adapter patch.  Its source archive and all generated artifacts remain outside
+the repository.
 The executable, build-free-to-native handoff is
-`results/0362yh/c796-qualification-commands.sh`; it keeps targets, binaries,
+`results/0362yh/472b-qualification-commands.sh`; it keeps targets, binaries,
 receipts and ABBA output external, uses one offline locked build job, invokes
 the complete untimed validator and pair receipt before guarded ABBA, and
 fails closed for allocator because this probe has no allocator variant.
 
 This is a protocol/provenance record only.  It performs no Cargo build, native
-qualification, timing run, or inventory acceptance.  The `c796` source remains
+qualification, timing run, or inventory acceptance.  The `472b` source remains
 a candidate production pin until the final source inventory review, endpoint
 builds, untimed validation, pair receipt, and native ABBA review complete.
 
@@ -77,4 +84,6 @@ module. All three registered W8 modules now run 40 tests, including rejection
 of source, projection and lock tampering. The reviewed packet merges at
 `54398757b8`; these are synthetic analyzer tests, not native measurements.
 
-Any receipt or binary made for 49c is stale and must not be relabeled as c796.
+The prior c796 protocol packet is preserved by commit `83da60ed68`; its
+external source archive is historical and must not be relabeled.  Any receipt
+or binary made for 49c or c796 is stale and must not be relabeled as 472b.
