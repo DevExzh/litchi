@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let authored = Family::new("Office\tFamily & <Variant>\r\n", ID, VID)?;
     fs::write(
         evidence.join("caller-authored.xml"),
-        family::write(&authored)?,
+        family::write(&authored, family::Limits::DEFAULT)?,
     )?;
 
     let snapshot = Package::from_xml(fs::read(fixture)?)?;

@@ -909,7 +909,7 @@ fn run_codec_read(fixture: &Fixture) -> Result<Sample> {
     reset_alloc();
     let before = AllocSnapshot::now();
     let started = Instant::now();
-    let parsed = codec::read(input)?;
+    let parsed = codec::read(input, codec::Limits::DEFAULT)?;
     black_box(&parsed);
     let elapsed_ns = elapsed_ns(started);
     let allocation = before.delta(AllocSnapshot::now());

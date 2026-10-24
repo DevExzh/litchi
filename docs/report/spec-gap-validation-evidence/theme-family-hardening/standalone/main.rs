@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     write_output(&output_dir, "native.xml", &native)?;
 
     let native_fragment = native_family_fragment(&native);
-    let parsed = part::read(&native)?;
+    let parsed = part::read(&native, part::Limits::DEFAULT)?;
     let native_family = parsed.family().ok_or("native family missing")?.clone();
     assert_eq!(
         parsed.family_profile(),
@@ -68,7 +68,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     changed.set_name("Audit Edited Theme")?;
     let updated = parsed.replace_family(&changed, part::Limits::DEFAULT)?;
     assert_eq!(
-        part::read(&updated)?.family().map(family::Family::name),
+        part::read(&updated, part::Limits::DEFAULT)?
+            .family()
+            .map(family::Family::name),
         Some("Audit Edited Theme")
     );
     let changed_fragment = replace_once(
@@ -104,7 +106,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .windows(b"<a:ext/".len())
                 .any(|window| window == b"<a:ext/")
     );
-    assert!(part::read(&removed)?.family().is_none());
+    assert!(
+        part::read(&removed, part::Limits::DEFAULT)?
+            .family()
+            .is_none()
+    );
     write_output(&output_dir, "removed.xml", &removed)?;
     cases.push(Case {
         name: "native_removal_closes_semantically_empty_wrappers".to_owned(),
@@ -112,7 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let added = part::add_family(&removed, &native_family, part::Limits::DEFAULT)?;
-    let added_snapshot = part::read(&added)?;
+    let added_snapshot = part::read(&added, part::Limits::DEFAULT)?;
     assert_eq!(
         added_snapshot.family_profile(),
         Some(part::ExtensionProfile::Normative)
@@ -129,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut bom = b"\xEF\xBB\xBF".to_vec();
     bom.extend_from_slice(&native_fragment);
-    let bom_family = family::read(&bom)?;
+    let bom_family = family::read(&bom, family::Limits::DEFAULT)?;
     let bom_added = part::add_family_with_uri(
         &removed,
         &bom_family,
@@ -137,7 +143,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         part::Limits::DEFAULT,
     )?;
     assert!(!bom_added.windows(3).any(|window| window == b"\xEF\xBB\xBF"));
-    assert!(part::read(&bom_added)?.family().is_some());
+    assert!(
+        part::read(&bom_added, part::Limits::DEFAULT)?
+            .family()
+            .is_some()
+    );
     cases.push(Case {
         name: "standalone_bom_is_stripped_before_embedding".to_owned(),
         detail: format!("bytes={}; embedded_bom_count=0", bom_added.len()),
@@ -147,13 +157,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>{}",
         String::from_utf8_lossy(&native_fragment)
     );
-    let declaration_family = family::read(declaration.as_bytes())?;
+    let declaration_family = family::read(declaration.as_bytes(), family::Limits::DEFAULT)?;
     assert!(part::add_family(&removed, &declaration_family, part::Limits::DEFAULT).is_err());
     let pi = format!(
         "<?future data?>{}",
         String::from_utf8_lossy(&native_fragment)
     );
-    assert!(family::read(pi.as_bytes()).is_err());
+    assert!(family::read(pi.as_bytes(), family::Limits::DEFAULT).is_err());
     cases.push(Case {
         name: "standalone_declaration_and_processing_instruction_policy".to_owned(),
         detail: "declaration_parses_but_embedding_refuses; actual_pi_refused".to_owned(),
@@ -164,12 +174,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     )
     .into_bytes();
     let opaque_theme = replace_once(&native, &native_fragment, &opaque);
-    let opaque_snapshot = part::read(&opaque_theme)?;
+    let opaque_snapshot = part::read(&opaque_theme, part::Limits::DEFAULT)?;
     let opaque_replacement = family::Family::new("Opaque Edited", OFFICE_ID, OFFICE_VID)?;
-    let opaque_edited = opaque_snapshot.replace_family(
-        &opaque_replacement,
-        part::Limits::DEFAULT,
-    )?;
+    let opaque_edited =
+        opaque_snapshot.replace_family(&opaque_replacement, part::Limits::DEFAULT)?;
     assert!(
         opaque_edited
             .windows(b"<!-- opaque <?x -->".len())
@@ -181,7 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .any(|window| window == b"<![CDATA[<?x]]>")
     );
     assert_eq!(
-        part::read(&opaque_edited)?
+        part::read(&opaque_edited, part::Limits::DEFAULT)?
             .family()
             .map(family::Family::name),
         Some("Opaque Edited")
@@ -199,7 +207,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let empty_prefix_family = format!(
         r#"<thm15:themeFamily xmlns:thm15="{FAMILY_NAMESPACE}" xmlns:x="" x:y="z" name="Office Theme" id="{OFFICE_ID}" vid="{OFFICE_VID}"/>"#
     );
-    assert!(family::read(empty_prefix_family.as_bytes()).is_err());
+    assert!(family::read(empty_prefix_family.as_bytes(), family::Limits::DEFAULT).is_err());
     assert!(
         part::read(&replace_once(
             &native,
@@ -211,7 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let default_xml_family = format!(
         r#"<thm15:themeFamily xmlns:thm15="{FAMILY_NAMESPACE}" xmlns="{XML_NAMESPACE}" name="Office Theme" id="{OFFICE_ID}" vid="{OFFICE_VID}"/>"#
     );
-    assert!(family::read(default_xml_family.as_bytes()).is_err());
+    assert!(family::read(default_xml_family.as_bytes(), family::Limits::DEFAULT).is_err());
     assert!(
         part::read(&replace_once(
             &native,
@@ -225,13 +233,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         b"<a:theme xmlns:a=",
         format!(r#"<a:theme xmlns="{XML_NAMESPACE}" xmlns:a="#).as_bytes(),
     );
-    assert!(part::read(&invalid_root).is_err());
+    assert!(part::read(&invalid_root, part::Limits::DEFAULT).is_err());
     let oversized_prefix = format!("p{}", "x".repeat(family::MAX_NAMESPACE_BYTES + 1));
     let oversized_prefix_family = format!(
         r#"<thm15:themeFamily xmlns:thm15="{FAMILY_NAMESPACE}" xmlns:{oversized_prefix}="urn:litchi:oversized-prefix" name="Office Theme" id="{OFFICE_ID}" vid="{OFFICE_VID}"/>"#
     );
     assert_namespace_prefix_limit(
-        family::read(oversized_prefix_family.as_bytes()),
+        family::read(oversized_prefix_family.as_bytes(), family::Limits::DEFAULT),
         "standalone oversized namespace prefix",
     );
     assert_namespace_prefix_limit(
@@ -246,7 +254,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let exact_prefix_family = format!(
         r#"<thm15:themeFamily xmlns:thm15="{FAMILY_NAMESPACE}" xmlns:{exact_prefix}="urn:litchi:exact-prefix" name="Office Theme" id="{OFFICE_ID}" vid="{OFFICE_VID}"/>"#
     );
-    assert!(family::read(exact_prefix_family.as_bytes()).is_ok());
+    assert!(family::read(exact_prefix_family.as_bytes(), family::Limits::DEFAULT).is_ok());
     assert!(
         part::read(&replace_once(
             &native,
@@ -301,7 +309,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 format!("<a:extLst>{container}</a:extLst>").as_bytes(),
             )
         };
-        assert!(part::read(&invalid).is_err(), "accepted malformed {label}");
+        assert!(
+            part::read(&invalid, part::Limits::DEFAULT).is_err(),
+            "accepted malformed {label}"
+        );
         assert!(
             part::add_family(&invalid, &native_family, part::Limits::DEFAULT).is_err(),
             "add accepted malformed {label}"
@@ -322,7 +333,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         String::from_utf8_lossy(&native_fragment)
     );
     let mce_source = insert_before_root_close(&removed, mce.as_bytes());
-    let mce_snapshot = part::read(&mce_source)?;
+    let mce_snapshot = part::read(&mce_source, part::Limits::DEFAULT)?;
     assert!(mce_snapshot.family().is_none());
     assert!(
         mce_snapshot
@@ -333,9 +344,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
             .is_err()
     );
-    assert!(mce_snapshot
-        .replace_family(&changed, part::Limits::DEFAULT)
-        .is_err());
+    assert!(
+        mce_snapshot
+            .replace_family(&changed, part::Limits::DEFAULT)
+            .is_err()
+    );
     assert!(mce_snapshot.remove_family(part::Limits::DEFAULT).is_err());
     assert_eq!(mce_snapshot.xml_bytes(), mce_source.as_slice());
     cases.push(Case {
@@ -356,12 +369,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     assert!(part::remove_family(&native, part::Limits::new(removed.len() - 1)).is_err());
     assert!(part::remove_family(&native, part::Limits::new(removed.len())).is_ok());
-    assert!(part::add_family(
-        &removed,
-        &native_family,
-        part::Limits::new(added.len() - 1),
-    )
-    .is_err());
+    assert!(
+        part::add_family(&removed, &native_family, part::Limits::new(added.len() - 1),).is_err()
+    );
     assert!(part::add_family(&removed, &native_family, part::Limits::new(added.len())).is_ok());
     cases.push(Case {
         name: "caller_specific_output_caps".to_owned(),
