@@ -175,7 +175,14 @@ fn exercise_operation(package: &Package, role: Kind, data: &[u8]) {
     let Ok(text) = edit.text().map(str::to_owned) else {
         return;
     };
-    black_box((edit.position(), edit.role(), &text, edit.span()));
+    let position = match edit.position() {
+        Ok(position) => position,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    black_box((position, edit.role(), &text, edit.span()));
 
     let replacement = replacement(data);
     let length = text.encode_utf16().count();
