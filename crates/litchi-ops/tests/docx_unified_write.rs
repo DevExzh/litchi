@@ -630,7 +630,7 @@ fn signed_unretained_and_stale_sources_are_refused_with_typed_errors() {
 }
 
 #[test]
-fn empty_assignments_keep_security_policy_and_are_a_retained_noop() {
+fn empty_assignments_keep_security_policy_and_signed_noops_are_retained() {
     let original = open_source();
     let unchanged = original
         .set("/body/p[1]", Props::new())
@@ -645,10 +645,17 @@ fn empty_assignments_keep_security_policy_and_are_a_retained_noop() {
         "/../../test-data/poi/test-data/xmldsign/hello-world-signed.docx"
     );
     let signed = litchi_ops::open(signed_path).expect("signed fixture");
-    let signed_error = signed
+    let signed_bytes = signed.to_bytes().expect("signed source bytes");
+    let signed_noop = signed
         .set("/body/p[1]", Props::new())
-        .expect_err("an empty assignment must not bypass signature protection");
-    assert_code(signed_error, Code::DocumentProtected);
+        .expect("an empty assignment is a signed exact no-op");
+    assert!(signed_noop.is_signed());
+    assert_eq!(signed_noop.to_bytes().expect("signed no-op bytes"), signed_bytes);
+    let invalid_target = litchi_ops::open(signed_path).expect("signed fixture for target check");
+    let target_error = invalid_target
+        .set("/body/p[999]", Props::new())
+        .expect_err("an invalid target must not be hidden by signed no-op handling");
+    assert_code(target_error, Code::PathNotFound);
 
     let unretained =
         litchi_ops::open_bytes_with(fixture(), &OpenOptions::new().retain_source(false))
