@@ -115,6 +115,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 "XLSX_BEFORE_SOURCE": str(ROOT),
                 "XLSX_AFTER_SOURCE": str(root / "after-source"),
                 "XLSX_TARGET_ROOT": str(root / "targets"),
+                "XLSX_PREPARATION_RECEIPT": str(root / "preparation.json"),
                 "XLSX_BEFORE_REVISION": "0befb112d96d2409e6f40c9abfeb4813665905ad",
                 "XLSX_AFTER_REVISION": "1" * 40,
             }
@@ -145,6 +146,10 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     manifest["legs"]["after"]["programs"][0]["argv"][4],
                     environment["XLSX_AFTER_REVISION"],
                 )
+                runner._validate_xlsx_raw_workload(manifest)
+                manifest["validators"][0]["argv"][-1] = str(root / "other-receipt.json")
+                with self.assertRaisesRegex(runner.RunnerError, "bind its reports"):
+                    runner._validate_xlsx_raw_workload(manifest)
             finally:
                 for key, value in old.items():
                     if value is None:

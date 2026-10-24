@@ -14,7 +14,12 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Mapping
+
+try:
+    from .prepare_xlsx_raw_inputs import validate_preparation_receipt
+except ImportError:  # direct execution by the guarded runner
+    from prepare_xlsx_raw_inputs import validate_preparation_receipt
 
 
 SCHEMA = "litchi.xlsx.raw-identity-lifecycle.v2"
@@ -28,6 +33,17 @@ CASE_NAMES = (
     "small_multi_cache",
     "large_multipart_multi_cache",
 )
+CASE_SPECS = {
+    "small_single": {"extra_parts": 0, "extra_part_bytes": 0, "cache_count": 1},
+    "large_multipart_single": {"extra_parts": 16, "extra_part_bytes": 512 * 1024, "cache_count": 1},
+    "small_multi_cache": {"extra_parts": 0, "extra_part_bytes": 0, "cache_count": 8},
+    "large_multipart_multi_cache": {"extra_parts": 16, "extra_part_bytes": 512 * 1024, "cache_count": 8},
+}
+WORKBOOK_PART = "/xl/workbook.xml"
+CONTENT_TYPES = {
+    "slicer": "application/vnd.ms-excel.slicerCache+xml",
+    "timeline": "application/vnd.ms-excel.TimelineCache+xml",
+}
 OPERATION_NAMES = (
     "slicer_insert",
     "timeline_insert",
@@ -104,6 +120,31 @@ def _validate_samples(samples: Any, *, expected_status: str, location: str, iter
                 )
 
 
+def _validate_decode_counters(value: Any, location: str) -> None:
+    _expect(
+        isinstance(value, list)
+        and len(value) == 2
+        and all(isinstance(item, int) and item >= 0 for item in value),
+        f"{location} decode counters are invalid",
+    )
+
+
+def _expected_native_identity(case: Mapping[str, Any], operation: str) -> list[str]:
+    family = "slicer" if operation.startswith("slicer") else "timeline"
+    replacing = operation.endswith("replace")
+    count = 1 if replacing else int(case["cache_count"])
+    if replacing:
+        prefix = "rIdExistingRawProbe"
+        path = f"/xl/{family}Caches/existing-raw-probe.xml"
+    else:
+        prefix = "rIdRawProbe"
+        path = f"/xl/{family}Caches/raw-probe-{{index}}.xml"
+    return [
+        f"{prefix if replacing else f'{prefix}{index}'}:{path if replacing else path.format(index=index)}:{CONTENT_TYPES[family]}"
+        for index in range(count)
+    ]
+
+
 def _validate_report(
     path: Path,
     *,
@@ -141,11 +182,15 @@ def _validate_report(
     for case_index, case in enumerate(cases):
         location = f"{path}:cases[{case_index}]"
         _expect(isinstance(case, dict), f"{location} is not an object")
-        for field in ("extra_parts", "extra_part_bytes", "cache_count"):
-            _expect(isinstance(case.get(field), int) and case[field] >= 0, f"{location}.{field} is invalid")
+        expected_case = CASE_SPECS[case["name"]]
+        for field, expected in expected_case.items():
+            _expect(case.get(field) == expected, f"{location}.{field} workload mismatch")
         for phase in ("open", "first_read"):
             phase_value = case.get(phase)
             _expect(isinstance(phase_value, dict), f"{location}.{phase} is missing")
+            expected_operation = "owned_open" if phase == "open" else "first_selected_read"
+            _expect(phase_value.get("operation") == expected_operation, f"{location}.{phase} operation mismatch")
+            _expect(phase_value.get("selected_part") == WORKBOOK_PART, f"{location}.{phase} selected part mismatch")
             elapsed = phase_value.get("elapsed_ns")
             _expect(
                 isinstance(elapsed, list)
@@ -159,6 +204,7 @@ def _validate_report(
                 location=f"{location}.{phase}.allocation_samples",
                 iterations=5,
             )
+            _validate_decode_counters(phase_value.get("decode_counters_after"), f"{location}.{phase}")
         operations = case.get("operations")
         _expect(isinstance(operations, list), f"{location}.operations is missing")
         _expect([operation.get("operation") for operation in operations] == list(OPERATION_NAMES), f"{location}: operation order mismatch")
@@ -170,7 +216,10 @@ def _validate_report(
             for field in ("base_sha256", "output_sha256"):
                 value = operation.get(field)
                 _expect(isinstance(value, str) and len(value) == 64, f"{operation_location}.{field} is invalid")
-            _expect(isinstance(operation.get("native_identity"), list) and operation["native_identity"], f"{operation_location}.native_identity is missing")
+            _expect(
+                operation.get("native_identity") == _expected_native_identity(case, operation["operation"]),
+                f"{operation_location}.native_identity mismatch",
+            )
             _expect(
                 all(isinstance(identity, str) and identity for identity in operation["native_identity"]),
                 f"{operation_location}.native_identity is invalid",
@@ -185,6 +234,12 @@ def _validate_report(
                 and all(isinstance(value, int) and value >= 0 for value in operation["elapsed_ns"]),
                 f"{operation_location}.elapsed_ns is invalid",
             )
+            for field in (
+                "decode_counters_before",
+                "decode_counters_before_publication",
+                "decode_counters_after",
+            ):
+                _validate_decode_counters(operation.get(field), f"{operation_location}.{field}")
             _validate_samples(
                 operation.get("allocation_samples"),
                 expected_status="measured" if route == "alloc" else "unavailable",
@@ -209,6 +264,9 @@ def validate_directory(
     candidate_revision: str,
     before_target: Path,
     after_target: Path,
+    before_source: Path,
+    after_source: Path,
+    preparation_receipt: Path,
 ) -> dict[str, Any]:
     """Validate all eight reports produced by the paired four-leg ABBA run."""
 
@@ -219,6 +277,15 @@ def validate_directory(
         and candidate_revision != BASELINE_REVISION,
         "candidate revision must be a distinct 40-character hexadecimal revision",
     )
+    try:
+        validate_preparation_receipt(
+            preparation_receipt,
+            baseline_root=before_source,
+            candidate_root=after_source,
+            candidate_revision=candidate_revision,
+        )
+    except (OSError, ValueError) as error:
+        raise ValidationError(f"preparation receipt validation failed: {error}") from error
     reports: list[dict[str, Any]] = []
     expected_paths: set[Path] = set()
     for index, leg in enumerate(ABBA_ORDER, start=1):
@@ -252,10 +319,11 @@ def validate_directory(
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 5:
+    if len(argv) != 8:
         print(
             "usage: xlsx_raw_identity_validator.py OUTPUT_DIR BASELINE_REVISION "
-            "CANDIDATE_REVISION BEFORE_TARGET AFTER_TARGET",
+            "CANDIDATE_REVISION BEFORE_TARGET AFTER_TARGET BEFORE_SOURCE "
+            "AFTER_SOURCE PREPARATION_RECEIPT",
             file=sys.stderr,
         )
         return 2
@@ -264,6 +332,9 @@ def main(argv: list[str]) -> int:
     candidate_revision = argv[2]
     before_target = Path(argv[3])
     after_target = Path(argv[4])
+    before_source = Path(argv[5])
+    after_source = Path(argv[6])
+    preparation_receipt = Path(argv[7])
     try:
         summary = validate_directory(
             output_dir,
@@ -271,6 +342,9 @@ def main(argv: list[str]) -> int:
             candidate_revision,
             before_target,
             after_target,
+            before_source,
+            after_source,
+            preparation_receipt,
         )
         summary_path = output_dir / "summary.json"
         _expect(not summary_path.exists() and not summary_path.is_symlink(), "summary.json already exists")

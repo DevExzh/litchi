@@ -16,7 +16,10 @@
         "$XLSX_BEFORE_REVISION",
         "$XLSX_AFTER_REVISION",
         "$XLSX_TARGET_ROOT/before",
-        "$XLSX_TARGET_ROOT/after"
+        "$XLSX_TARGET_ROOT/after",
+        "$XLSX_BEFORE_SOURCE",
+        "$XLSX_AFTER_SOURCE",
+        "$XLSX_PREPARATION_RECEIPT"
       ],
       "cwd": "{output_dir}",
       "outputs": ["{output_dir}/summary.json"],
@@ -24,6 +27,7 @@
     }
   ],
   "shared": {
+    "preparation_receipt": "$XLSX_PREPARATION_RECEIPT",
     "probe_paths": [
       "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml",
       "tools/perf-baseline/unified-xlsx-raw-identity/src/lib.rs",

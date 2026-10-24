@@ -41,6 +41,11 @@ import time
 import tomllib
 from typing import Any, Iterable, Mapping, Sequence
 
+from native_qualification.prepare_xlsx_raw_inputs import (
+    BASELINE_REVISION,
+    validate_preparation_receipt,
+)
+
 
 SCHEMA = "litchi.native-qualification.v1"
 ABBA_ORDER = ("before", "after", "after", "before")
@@ -243,9 +248,17 @@ def _source_identity(spec: Mapping[str, Any], shared: Mapping[str, Any]) -> dict
     fixture_values = [*shared.get("fixture_paths", []), *spec.get("fixture_paths", [])]
     probes = [_resolve_path(str(value), base=root) for value in probe_values]
     fixtures = [_resolve_path(str(value), base=root) for value in fixture_values]
+    preparation_value = shared.get("preparation_receipt")
+    preparation = None
+    if preparation_value is not None:
+        preparation = _resolve_path(str(preparation_value))
+        if not preparation.is_file() or preparation.is_symlink():
+            raise RunnerError(f"preparation receipt is missing or symlinked: {preparation}")
     identity_paths = [*locks, *probes, *fixtures]
+    if preparation is not None:
+        identity_paths.append(preparation)
     files = _hash_paths(identity_paths) if identity_paths else {"sha256": _sha256_bytes(b""), "files": []}
-    return {
+    identity = {
         "source_root": str(root),
         "head": head,
         "tree": tree,
@@ -259,6 +272,9 @@ def _source_identity(spec: Mapping[str, Any], shared: Mapping[str, Any]) -> dict
         "identity_sha256": files["sha256"],
         "identity_files": files["files"],
     }
+    if preparation is not None:
+        identity["preparation_receipt"] = str(preparation)
+    return identity
 
 
 def _expand_environment(value: Any) -> Any:
@@ -501,6 +517,7 @@ def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
         if [program["id"] for program in programs] != expected_program_ids:
             raise RunnerError(f"{leg} does not preserve paired XLSX raw programs")
         expected_variant = "original" if leg == "before" else "candidate"
+        leg_revision: str | None = None
         for route, program in zip(("alloc", "native"), programs):
             expected_argv = [
                 "xlsx-raw-identity",
@@ -519,11 +536,17 @@ def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
             # the revision's 40-hex shape is intentionally left flexible for
             # the final assembled candidate.
             actual = program["argv"]
-            if actual[:4] != expected_argv[:4] or actual[5:] != expected_argv[5:]:
+            if len(actual) != len(expected_argv) or actual[:4] != expected_argv[:4] or actual[5:] != expected_argv[5:]:
                 raise RunnerError(f"{leg}/{route} does not preserve the XLSX raw probe arguments")
             revision = actual[4]
             if len(revision) != 40 or not all(char in "0123456789abcdefABCDEF" for char in revision):
                 raise RunnerError(f"{leg}/{route} must carry a 40-character source revision")
+            if leg == "before" and revision != BASELINE_REVISION:
+                raise RunnerError(f"{leg}/{route} must report the original 0bef revision")
+            if leg_revision is None:
+                leg_revision = revision
+            elif revision != leg_revision:
+                raise RunnerError(f"{leg}/{route} does not use the same source revision as its paired route")
             if program.get("outputs") != [f"{{output_dir}}/xlsx-raw-{route}-{{leg}}-{{index}}.json"]:
                 raise RunnerError(f"{leg}/{route} does not use its dedicated XLSX raw JSON output")
             if program.get("stdout") != f"{{output_dir}}/xlsx-raw-{route}-{{leg}}-{{index}}.stdout":
@@ -534,10 +557,47 @@ def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
                 raise RunnerError(f"{leg}/{route} must write its report through --json, not stdout")
 
     validators = data.get("validators", [])
+    preparation_receipt = data.get("shared", {}).get("preparation_receipt")
+    if not isinstance(preparation_receipt, str) or not preparation_receipt:
+        raise RunnerError("XLSX raw lane needs a preparation receipt")
     if len(validators) != 1 or validators[0].get("id") != "xlsx-raw-identity":
         raise RunnerError("XLSX raw lane needs exactly one xlsx-raw-identity validator")
-    if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
+    validator = validators[0]
+    if validator.get("outputs") != ["{output_dir}/summary.json"]:
         raise RunnerError("XLSX raw validator must write summary.json in the output directory")
+    expected_validator_argv = [
+        "python3",
+        str(validator.get("script")),
+        "{output_dir}",
+        data["legs"]["before"]["programs"][0]["argv"][4],
+        data["legs"]["after"]["programs"][0]["argv"][4],
+        data["legs"]["before"]["target_dir"],
+        data["legs"]["after"]["target_dir"],
+        data["legs"]["before"]["source_root"],
+        data["legs"]["after"]["source_root"],
+        preparation_receipt,
+    ]
+    if validator.get("argv") != expected_validator_argv:
+        raise RunnerError("XLSX raw validator must bind its reports to both source legs and the preparation receipt")
+    if validator.get("cwd") != "{output_dir}":
+        raise RunnerError("XLSX raw validator must run from the output directory")
+
+
+def _validate_xlsx_preparation_manifest(data: Mapping[str, Any]) -> None:
+    shared = data["shared"]
+    receipt = Path(str(shared["preparation_receipt"]))
+    before_root = Path(str(data["legs"]["before"]["source_root"])).resolve(strict=False)
+    after_root = Path(str(data["legs"]["after"]["source_root"])).resolve(strict=False)
+    candidate_revision = str(data["legs"]["after"]["programs"][0]["argv"][4])
+    try:
+        validate_preparation_receipt(
+            receipt,
+            baseline_root=before_root,
+            candidate_root=after_root,
+            candidate_revision=candidate_revision,
+        )
+    except (OSError, ValueError) as error:
+        raise RunnerError(f"XLSX preparation receipt validation failed: {error}") from error
 
 
 def _render(value: str, context: Mapping[str, Any]) -> str:
@@ -762,6 +822,8 @@ class SafeRunner:
                 f"output already contains {phase} receipt/journal; choose a fresh output_dir: {self.output}"
             )
         self.shared = manifest.get("shared", {})
+        if manifest.get("lane") == "w4-xlsx-raw":
+            _validate_xlsx_preparation_manifest(manifest)
         self.recorded_events: list[dict[str, Any]] = []
 
     def _context(self, leg: str, index: int, *, output: Path | None = None) -> dict[str, Any]:
