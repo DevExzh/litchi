@@ -208,7 +208,7 @@ def _adapt_w4b_crud(baseline_crud: str) -> str:
 
 
 def _adapt_w4b_probe(candidate_probe: str) -> str:
-    """Translate the three lazy-selector calls for the historical W4b API."""
+    """Translate the candidate-only calls for the historical W4b API."""
 
     # The candidate's edit_cell_values returns a lazy Edit and therefore
     # exposes Edit::resolve. The fixed synthetic baseline resolves the
@@ -236,6 +236,17 @@ def _adapt_w4b_probe(candidate_probe: str) -> str:
         )
     if ".resolve()" in translated:
         raise PreparationError("W4b baseline probe retained a candidate-only resolve call")
+    if candidate_probe.count("commit.into_file()") != 1:
+        raise PreparationError(
+            "W4b probe must contain exactly one candidate commit into_file call"
+        )
+    translated = translated.replace(
+        "black_box(commit.into_file());",
+        "black_box(commit.file);",
+        1,
+    )
+    if "commit.into_file()" in translated:
+        raise PreparationError("W4b baseline probe retained a candidate-only commit accessor")
     return translated
 
 
@@ -253,7 +264,9 @@ def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
     probe = _write_text_exact(before / W4B_PROBE, probe_text, after / W4B_PROBE)
     probe["candidate_sha256"] = _sha256(after / W4B_PROBE)[0]
     probe["candidate_bytes"] = len(probe_source.encode("utf-8"))
-    probe["adaptation"] = "recorded three-call historical selector-resolution translation"
+    probe["adaptation"] = (
+        "recorded three-call historical selector-resolution and commit-field translations"
+    )
 
     crud_source = after / W4B_CRUD
     crud_destination = before / W4B_CRUD

@@ -327,11 +327,16 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 "            .expect(\"worksheet resolution\")\n",
                 "            .expect(\"worksheet\");\n",
                 "}\n",
+                "fn commit_result(commit: litchi_ops::transaction::Commit) {\n",
+                "    black_box(commit.into_file());\n",
+                "}\n",
             ]
         )
         adapted = source_prep._adapt_w4b_probe(candidate)
         self.assertEqual(adapted.count(".resolve()"), 0)
         self.assertEqual(adapted.count('.expect("worksheet");'), 3)
+        self.assertNotIn("commit.into_file()", adapted)
+        self.assertIn("commit.file", adapted)
         with self.assertRaisesRegex(source_prep.PreparationError, "exactly three"):
             source_prep._adapt_w4b_probe(candidate.replace(".resolve()", "", 1))
 
@@ -378,6 +383,9 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     "        .expect(\"worksheet resolution\")\n",
                     "        .expect(\"worksheet\");\n",
                     "}\n",
+                    "fn commit_result(commit: litchi_ops::transaction::Commit) {\n",
+                    "    black_box(commit.into_file());\n",
+                    "}\n",
                 ]
             )
 
@@ -415,7 +423,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(adapted_probe.count('.expect("worksheet");'), 3)
             self.assertEqual(
                 prepared["overlays"][0]["adaptation"],
-                "recorded three-call historical selector-resolution translation",
+                "recorded three-call historical selector-resolution and commit-field translations",
             )
             adapted = (before / source_prep.W4B_CRUD).read_text(encoding="utf-8")
             self.assertEqual(adapted, source_prep._adapt_w4b_crud(baseline_crud))
