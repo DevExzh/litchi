@@ -859,7 +859,8 @@ impl HostState {
         let baseline_family_xml = baseline_family
             .as_ref()
             .and_then(|value| value.source().map(ToOwned::to_owned));
-        let baseline_theme_without_family = family_part::remove_family(snapshot.source_xml())?;
+        let baseline_theme_without_family =
+            family_part::remove_family(snapshot.source_xml(), family_part::Limits::DEFAULT)?;
         let target_family = (operation == Operation::Add).then(|| fixture.family.clone());
         let updated_family =
             (operation == Operation::Update).then(|| fixture.updated_family.clone());
@@ -1088,7 +1089,7 @@ fn run_host_transaction(_fixture: &Fixture, state: &mut HostState) -> Result<Sam
                 .is_some_and(|actual| actual == expected.as_slice())
         }),
         _ => {
-            family_part::remove_family(forward.source_xml())?
+            family_part::remove_family(forward.source_xml(), family_part::Limits::DEFAULT)?
                 == state.baseline_theme_without_family.as_slice()
         },
     };

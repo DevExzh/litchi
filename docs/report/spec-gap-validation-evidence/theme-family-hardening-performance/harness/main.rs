@@ -244,7 +244,7 @@ impl Inputs {
         let family = snapshot.family().ok_or("native fixture has no family")?.clone();
         let mut updated = family.clone();
         updated.set_name(MAX_NAME)?;
-        let family_free = part::remove_family(&native)?;
+        let family_free = part::remove_family(&native, part::Limits::DEFAULT)?;
         let unknown_32 = unknown_theme(&family_free, 32, 200)?;
         let unknown_1000 = unknown_theme(&family_free, 1000, 200)?;
         let fragment = raw_family_fragment(&native)?;
@@ -344,25 +344,25 @@ fn operation(inputs: &Inputs, lane: &str) -> Result<(bool, bool)> {
             Ok((true, parsed.family().is_some()))
         },
         "native_replace" => {
-            let output = part::replace_family_with_limit(
+            let output = part::replace_family(
                 &inputs.native,
                 &inputs.updated,
-                part::MAX_XML_BYTES,
+                part::Limits::DEFAULT,
             )?;
             let parsed = part::read(&output)?;
             Ok((true, parsed.family().is_some_and(|f| f.name() == MAX_NAME)))
         },
         "native_remove" => {
-            let output = part::remove_family_with_limit(&inputs.native, part::MAX_XML_BYTES)?;
+            let output = part::remove_family(&inputs.native, part::Limits::DEFAULT)?;
             let parsed = part::read(&output)?;
             Ok((true, parsed.family().is_none()))
         },
         "native_add" => {
-            let output = part::add_family_with_uri_limit(
+            let output = part::add_family_with_uri(
                 &inputs.family_free,
                 &inputs.family,
                 part::NATIVE_EXTENSION_URI,
-                part::MAX_XML_BYTES,
+                part::Limits::DEFAULT,
             )?;
             let parsed = part::read(&output)?;
             Ok((true, parsed.family().is_some()))
@@ -376,8 +376,8 @@ fn operation(inputs: &Inputs, lane: &str) -> Result<(bool, bool)> {
             Ok((true, parsed.family().is_none()))
         },
         "duplicate" => Ok((false, part::read(&inputs.duplicate).is_ok())),
-        "limit_replace" => Ok((false, part::replace_family_with_limit(&inputs.native, &inputs.updated, 1).is_ok())),
-        "limit_add" => Ok((false, part::add_family_with_uri_limit(&inputs.family_free, &inputs.family, part::NATIVE_EXTENSION_URI, 1).is_ok())),
+        "limit_replace" => Ok((false, part::replace_family(&inputs.native, &inputs.updated, part::Limits::new(1)).is_ok())),
+        "limit_add" => Ok((false, part::add_family_with_uri(&inputs.family_free, &inputs.family, part::NATIVE_EXTENSION_URI, part::Limits::new(1)).is_ok())),
         other => Err(format!("unknown lane {other}").into()),
     }
 }
