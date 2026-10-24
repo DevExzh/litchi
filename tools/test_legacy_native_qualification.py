@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -157,6 +158,135 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             for leg in ("before", "after"):
                 self.assertTrue(data["legs"][leg]["allow_dirty"])
                 self.assertTrue(data["legs"][leg]["allowed_dirty_paths"])
+
+    def test_all_legacy_manifests_load_with_reviewed_workload_features(self) -> None:
+        prefixes = {
+            "RTF": "legacy-rtf",
+            "OLE": "legacy-ole-properties",
+            "XLS": "legacy-xls-properties",
+        }
+        with tempfile.TemporaryDirectory(prefix="legacy-native-manifest-load-") as directory:
+            root = Path(directory)
+            environment = {
+                "LITCHI_COORD_BIN": str(root / "coord-bin"),
+                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
+            }
+            for prefix in prefixes:
+                environment.update(
+                    {
+                        f"{prefix}_NATIVE_QUAL_OUTPUT": str(root / f"{prefix.lower()}-output"),
+                        f"{prefix}_BEFORE_SOURCE": str(root / f"{prefix.lower()}-before"),
+                        f"{prefix}_AFTER_SOURCE": str(root / f"{prefix.lower()}-after"),
+                        f"{prefix}_TARGET_ROOT": str(root / f"{prefix.lower()}-targets"),
+                        f"{prefix}_NATIVE_TMP": str(root / f"{prefix.lower()}-tmp"),
+                        f"{prefix}_NATIVE_PREPARATION_RECEIPT": str(root / f"{prefix.lower()}-preparation.json"),
+                        f"{prefix}_BASELINE_REVISION": "0" * 40,
+                        f"{prefix}_CANDIDATE_REVISION": "1" * 40,
+                    }
+                )
+            old = {key: os.environ.get(key) for key in environment}
+            try:
+                os.environ.update(environment)
+                for prefix, lane in prefixes.items():
+                    manifest = ROOT / "tools/native_qualification/manifests" / f"{lane}.json"
+                    loaded = runner.load_manifest(manifest)
+                    self.assertEqual(loaded["lane"], lane)
+                    if lane == "legacy-ole-properties":
+                        self.assertEqual(
+                            loaded["legs"]["before"]["build"][0]["argv"][7],
+                            "current-owner-api,legacy-property-api",
+                        )
+                        self.assertEqual(
+                            loaded["legs"]["after"]["build"][0]["argv"][7],
+                            "current-owner-api,current-property-api",
+                        )
+            finally:
+                for key, value in old.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+    def test_preparer_identity_matches_runner_on_real_git_checkout(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-identity-roundtrip-") as directory:
+            root = Path(directory) / "source"
+            root.mkdir()
+            lock = root / "Cargo.lock"
+            probe = root / "probe.rs"
+            lock.write_text("lock\n", encoding="utf-8")
+            probe.write_text("probe\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.name", "legacy-test"], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-qm", "identity fixture"], check=True)
+            probe_hash = hashlib.sha256(probe.read_bytes()).hexdigest()
+            spec = {
+                "lock": "Cargo.lock",
+                "probe": "probe.rs",
+                "fixtures": [],
+                "allowed_dirty": [],
+                "probe_sha256": {"before": probe_hash, "after": probe_hash},
+            }
+            prepared = preparation._source_identity(root, "legacy-rtf", "before", spec)
+            observed = runner._source_identity(
+                {
+                    "source_root": str(root),
+                    "allow_dirty": False,
+                    "lock_paths": ["Cargo.lock"],
+                    "probe_paths": ["probe.rs"],
+                },
+                {"probe_paths": [], "fixture_paths": []},
+            )
+            for key in (
+                "source_root",
+                "head",
+                "tree",
+                "source_tree_sha256",
+                "clean",
+                "status_paths",
+                "status_sha256",
+                "diff_sha256",
+                "identity_sha256",
+                "lock_paths",
+                "probe_paths",
+                "fixture_paths",
+                "identity_files",
+            ):
+                self.assertEqual(prepared[key], observed[key], key)
+
+    def test_legacy_preparation_receipt_is_external_and_disjoint(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-preparation-paths-") as directory:
+            root = Path(directory)
+            environment = {
+                "RTF_NATIVE_QUAL_OUTPUT": str(root / "output"),
+                "RTF_BEFORE_SOURCE": str(root / "before"),
+                "RTF_AFTER_SOURCE": str(root / "after"),
+                "RTF_TARGET_ROOT": str(root / "targets"),
+                "RTF_NATIVE_TMP": str(root / "tmp"),
+                "RTF_BASELINE_REVISION": "0" * 40,
+                "RTF_CANDIDATE_REVISION": "1" * 40,
+                "LITCHI_COORD_BIN": str(root / "coord-bin"),
+                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
+            }
+            old = {key: os.environ.get(key) for key in environment}
+            try:
+                os.environ.update(environment)
+                manifest = ROOT / "tools/native_qualification/manifests/legacy-rtf.json"
+                for receipt in (
+                    root / "before" / "receipt.json",
+                    root / "targets" / "before" / "receipt.json",
+                    root / "output" / "receipt.json",
+                ):
+                    os.environ["RTF_NATIVE_PREPARATION_RECEIPT"] = str(receipt)
+                    with self.assertRaisesRegex(runner.RunnerError, "outside|pairwise disjoint"):
+                        runner.load_manifest(manifest)
+            finally:
+                for key, value in old.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
 
     def test_validator_rejects_fabricated_five_block_receipt_without_provenance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="legacy-native-rft-") as directory:

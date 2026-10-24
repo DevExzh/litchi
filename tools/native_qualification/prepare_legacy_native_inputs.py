@@ -266,6 +266,23 @@ def _identity_file(root: Path, relative: str) -> dict[str, Any]:
     return {"path": str(path), "relative": relative, "bytes": size, "sha256": digest}
 
 
+def _identity_digest(files: list[dict[str, Any]]) -> str:
+    """Use the runner's one-separator-per-field identity framing exactly."""
+
+    digest = hashlib.sha256()
+    entries = [
+        (Path(record["path"]).name, record)
+        for record in files
+    ]
+    for relative, record in sorted(entries, key=lambda item: (str(Path(item[1]["path"]).parent), item[0])):
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(record["bytes"]).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(record["sha256"]))
+    return digest.hexdigest()
+
+
 def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> dict[str, Any]:
     root = root.resolve()
     _expect(root.is_dir(), f"source root is not a directory: {root}")
@@ -293,14 +310,6 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
             _expect(probe_record["sha256"] == OLE_BASELINE_ADAPTER_RECIPE["adapted_sha256"], "OLE baseline must use the reviewed public-owner/legacy-property adapter")
         else:
             _expect(probe_record["sha256"] == OLE_ADAPTER_RECIPE["after_sha256"], "OLE candidate must use only the reviewed consumer adapter")
-    file_digest = hashlib.sha256()
-    for record in sorted(files, key=lambda item: (str(Path(item["path"]).parent), Path(item["path"]).name)):
-        relative = Path(record["path"]).name
-        file_digest.update(relative.encode("utf-8"))
-        file_digest.update(b"\0")
-        file_digest.update(str(record["bytes"]).encode("ascii"))
-        file_digest.update(b"\0")
-        file_digest.update(bytes.fromhex(record["sha256"]))
     return {
         "source_root": str(root),
         "head": head,
@@ -316,7 +325,7 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
         "lock_paths": [str((root / spec["lock"]).resolve())],
         "probe_paths": [str((root / spec["probe"]).resolve())],
         "fixture_paths": [str((root / value).resolve()) for value in spec["fixtures"]],
-        "identity_sha256": file_digest.hexdigest(),
+        "identity_sha256": _identity_digest(files),
         "identity_files": files,
     }
 

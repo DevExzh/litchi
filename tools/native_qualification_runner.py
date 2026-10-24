@@ -322,6 +322,12 @@ def load_manifest(path: Path) -> dict[str, Any]:
         raise RunnerError("shared must be an object")
     output = _resolve_path(str(data.get("output_dir", "")))
     source_roots: list[Path] = []
+    preparation_receipt: Path | None = None
+    if str(data.get("lane", "")).startswith("legacy-"):
+        value = data.get("preparation_receipt")
+        if not isinstance(value, str) or not value:
+            raise RunnerError("legacy lane must bind a source-preparation receipt")
+        preparation_receipt = _resolve_path(value)
     for leg, spec in data["legs"].items():
         if not isinstance(spec, dict):
             raise RunnerError(f"legs.{leg} must be an object")
@@ -369,15 +375,17 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if before_ids != after_ids:
         raise RunnerError("before and after program order must match")
     targets = [_resolve_path(str(data["legs"][leg]["target_dir"])) for leg in ("before", "after")]
-    _ensure_disjoint(
-        {
-            "source_before": source_roots[0],
-            "source_after": source_roots[1],
-            "target_before": targets[0],
-            "target_after": targets[1],
-            "output": output,
-        }
-    )
+    disjoint_paths = {
+        "source_before": source_roots[0],
+        "source_after": source_roots[1],
+        "target_before": targets[0],
+        "target_after": targets[1],
+        "output": output,
+    }
+    if preparation_receipt is not None:
+        _ensure_external(preparation_receipt, source_roots, "preparation_receipt")
+        disjoint_paths["preparation_receipt"] = preparation_receipt
+    _ensure_disjoint(disjoint_paths)
     shared = data["shared"]
     for key in ("probe_paths", "fixture_paths"):
         if not isinstance(shared.get(key, []), list):
@@ -549,7 +557,7 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
             ],
             "stdout": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.csv",
             "stderr": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.stderr",
-            "features": {"before": "legacy-owner-api,legacy-property-api", "after": "current-api"},
+            "features": {"before": "current-owner-api,legacy-property-api", "after": "current-owner-api,current-property-api"},
             "blocks": 1,
         },
         "legacy-xls-properties": {
