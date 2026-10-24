@@ -1324,11 +1324,6 @@ fn replacement_root_namespace_range(
                     return Err(invalid("theme source has an unsupported namespace"));
                 };
                 if current == counterpart {
-                    if prefix != Some(b"a".as_slice()) {
-                        return Err(invalid(
-                            "theme replacement cross-conformance namespace uses an unrewritable prefix",
-                        ));
-                    }
                     return Ok(Some(range));
                 }
                 return Err(invalid(
@@ -1372,6 +1367,189 @@ struct SourceStats {
 struct ReplacementFrame {
     local: Vec<u8>,
     opaque: bool,
+    prefix: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Default)]
+struct ReplacementSemantics {
+    palette_slots: u16,
+    palette_values: [u8; Slot::ALL.len()],
+    font_faces: [bool; 2],
+    font_face_fields: [[bool; 3]; 2],
+}
+
+fn replacement_slot_index(local: &[u8]) -> Option<usize> {
+    let token = std::str::from_utf8(local).ok()?;
+    let slot = Slot::from_token(token)?;
+    Slot::ALL.iter().position(|candidate| *candidate == slot)
+}
+
+fn replacement_semantic_open(
+    semantics: &mut ReplacementSemantics,
+    target: &[u8],
+    stack: &[ReplacementFrame],
+    local: &[u8],
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    if stack.is_empty() {
+        let name = attr(element, b"name", decoder, limits)?
+            .ok_or_else(|| invalid("theme replacement scheme lacks name"))?;
+        let kind = if target == b"clrScheme" {
+            "color palette"
+        } else {
+            "font set"
+        };
+        validate_name(kind, &name)?;
+        return Ok(());
+    }
+    let parent = stack.last().expect("checked non-empty replacement stack");
+    if parent.opaque {
+        return Ok(());
+    }
+    if target == b"clrScheme" {
+        if parent.local.as_slice() == b"clrScheme" {
+            let Some(index) = replacement_slot_index(local) else {
+                return Ok(());
+            };
+            let bit = 1_u16 << index;
+            if semantics.palette_slots & bit != 0 {
+                return Err(invalid("color scheme replacement has a duplicate slot"));
+            }
+            semantics.palette_slots |= bit;
+            return Ok(());
+        }
+        let Some(index) = replacement_slot_index(&parent.local) else {
+            return Ok(());
+        };
+        if semantics.palette_values[index] != 0 {
+            return Err(invalid("color scheme replacement slot has multiple values"));
+        }
+        let value = match local {
+            b"srgbClr" => {
+                let value = attr(element, b"val", decoder, limits)?
+                    .ok_or_else(|| invalid("replacement srgbClr lacks val"))?;
+                Color::rgb(&value)?
+            },
+            b"sysClr" => {
+                let kind = attr(element, b"val", decoder, limits)?
+                    .and_then(|value| System::from_token(&value))
+                    .ok_or_else(|| invalid("replacement sysClr has an unknown val"))?;
+                let last = attr(element, b"lastClr", decoder, limits)?;
+                Color::system(kind, last.as_deref())?
+            },
+            _ => return Ok(()),
+        };
+        let _ = value;
+        semantics.palette_values[index] = 1;
+    } else if target == b"fontScheme" {
+        if parent.local.as_slice() == b"fontScheme" {
+            let index = match local {
+                b"majorFont" => 0,
+                b"minorFont" => 1,
+                _ => return Ok(()),
+            };
+            if semantics.font_faces[index] {
+                return Err(invalid("font scheme replacement has a duplicate face"));
+            }
+            semantics.font_faces[index] = true;
+            return Ok(());
+        }
+        let Some(face_index) = (match parent.local.as_slice() {
+            b"majorFont" => Some(0),
+            b"minorFont" => Some(1),
+            _ => None,
+        }) else {
+            return Ok(());
+        };
+        let field_index = match local {
+            b"latin" => 0,
+            b"ea" => 1,
+            b"cs" => 2,
+            b"font" => {
+                let code = attr(element, b"script", decoder, limits)?
+                    .ok_or_else(|| invalid("replacement script face lacks script"))?;
+                if code.is_empty()
+                    || code.chars().count() > 16
+                    || !code.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                {
+                    return Err(invalid("replacement script code is invalid"));
+                }
+                let typeface = attr(element, b"typeface", decoder, limits)?
+                    .ok_or_else(|| invalid("replacement script face lacks typeface"))?;
+                validate_name("replacement script typeface", &typeface)?;
+                return Ok(());
+            },
+            _ => return Ok(()),
+        };
+        if semantics.font_face_fields[face_index][field_index] {
+            return Err(invalid("font face replacement has a duplicate field"));
+        }
+        semantics.font_face_fields[face_index][field_index] = true;
+        let typeface = attr(element, b"typeface", decoder, limits)?;
+        if field_index == 0 {
+            let typeface =
+                typeface.ok_or_else(|| invalid("replacement latin face lacks typeface"))?;
+            validate_name("replacement latin typeface", &typeface)?;
+        } else if let Some(typeface) = typeface {
+            validate_xml_text("replacement typeface", &typeface)?;
+            if typeface.chars().count() > 256 {
+                return Err(invalid("replacement typeface exceeds 256 characters"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn replacement_semantic_close(
+    semantics: &ReplacementSemantics,
+    target: &[u8],
+    local: &[u8],
+    parent: Option<&ReplacementFrame>,
+) -> Result<()> {
+    if target == b"clrScheme" {
+        if local == b"clrScheme" && parent.is_none() {
+            let expected = (1_u16 << Slot::ALL.len()) - 1;
+            if semantics.palette_slots != expected
+                || semantics.palette_values.iter().any(|count| *count != 1)
+            {
+                return Err(invalid(
+                    "color scheme replacement must contain every slot exactly once",
+                ));
+            }
+        } else if parent
+            .is_some_and(|frame| !frame.opaque && frame.local.as_slice() == b"clrScheme")
+            && replacement_slot_index(local).is_some()
+        {
+            let index = replacement_slot_index(local).expect("checked slot");
+            if semantics.palette_values[index] != 1 {
+                return Err(invalid(
+                    "color scheme replacement slot must contain one color value",
+                ));
+            }
+        }
+    } else if target == b"fontScheme" {
+        if local == b"fontScheme" && parent.is_none() {
+            if semantics.font_faces != [true, true]
+                || semantics.font_face_fields.iter().any(|fields| !fields[0])
+            {
+                return Err(invalid(
+                    "font scheme replacement must contain major and minor latin faces",
+                ));
+            }
+        } else if let Some(parent) = parent
+            && !parent.opaque
+            && parent.local.as_slice() == b"fontScheme"
+            && matches!(local, b"majorFont" | b"minorFont")
+        {
+            let index = usize::from(local == b"minorFont");
+            if !semantics.font_face_fields[index][0] {
+                return Err(invalid("font face replacement lacks a latin face"));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_replacement_fragment(
@@ -1395,6 +1573,7 @@ fn validate_replacement_fragment(
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_namespace_declarations);
     let mut stack: Vec<ReplacementFrame> = Vec::new();
+    let mut semantics = ReplacementSemantics::default();
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
@@ -1429,6 +1608,14 @@ fn validate_replacement_fragment(
                     !root_seen,
                     target,
                     source_namespace,
+                    stack
+                        .first()
+                        .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                        || (!root_seen
+                            && element
+                                .name()
+                                .prefix()
+                                .is_some_and(|prefix| prefix.as_ref() == b"a")),
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
@@ -1438,7 +1625,19 @@ fn validate_replacement_fragment(
                 }
                 let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
                 let opaque = parent_opaque
-                    || !replacement_element_is_drawingml(&namespace, &element, source_namespace);
+                    || !replacement_element_is_drawingml(
+                        &namespace,
+                        &element,
+                        source_namespace,
+                        stack
+                            .first()
+                            .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                            || (!root_seen
+                                && element
+                                    .name()
+                                    .prefix()
+                                    .is_some_and(|prefix| prefix.as_ref() == b"a")),
+                    );
                 validate_replacement_scheme_element(
                     target,
                     &stack,
@@ -1446,6 +1645,23 @@ fn validate_replacement_fragment(
                     &element,
                     source_namespace,
                     opaque,
+                    stack
+                        .first()
+                        .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                        || (!root_seen
+                            && element
+                                .name()
+                                .prefix()
+                                .is_some_and(|prefix| prefix.as_ref() == b"a")),
+                    limits,
+                )?;
+                replacement_semantic_open(
+                    &mut semantics,
+                    target,
+                    &stack,
+                    element.local_name().as_ref(),
+                    &element,
+                    reader.decoder(),
                     limits,
                 )?;
                 if stack.len() >= limits.max_depth {
@@ -1457,7 +1673,14 @@ fn validate_replacement_fragment(
                 }
                 max_depth = max_depth.max(stack.len() + 1);
                 root_seen = true;
-                stack.push(ReplacementFrame { local, opaque });
+                stack.push(ReplacementFrame {
+                    local,
+                    opaque,
+                    prefix: element
+                        .name()
+                        .prefix()
+                        .map(|prefix| prefix.into_inner().to_vec()),
+                });
             },
             Event::Empty(element) => {
                 nodes = nodes
@@ -1475,6 +1698,14 @@ fn validate_replacement_fragment(
                     !root_seen,
                     target,
                     source_namespace,
+                    stack
+                        .first()
+                        .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                        || (!root_seen
+                            && element
+                                .name()
+                                .prefix()
+                                .is_some_and(|prefix| prefix.as_ref() == b"a")),
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
@@ -1483,7 +1714,19 @@ fn validate_replacement_fragment(
                 }
                 let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
                 let opaque = parent_opaque
-                    || !replacement_element_is_drawingml(&namespace, &element, source_namespace);
+                    || !replacement_element_is_drawingml(
+                        &namespace,
+                        &element,
+                        source_namespace,
+                        stack
+                            .first()
+                            .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                            || (!root_seen
+                                && element
+                                    .name()
+                                    .prefix()
+                                    .is_some_and(|prefix| prefix.as_ref() == b"a")),
+                    );
                 validate_replacement_scheme_element(
                     target,
                     &stack,
@@ -1491,7 +1734,30 @@ fn validate_replacement_fragment(
                     &element,
                     source_namespace,
                     opaque,
+                    stack
+                        .first()
+                        .is_some_and(|frame| frame.prefix.as_deref() == Some(b"a".as_slice()))
+                        || (!root_seen
+                            && element
+                                .name()
+                                .prefix()
+                                .is_some_and(|prefix| prefix.as_ref() == b"a")),
                     limits,
+                )?;
+                replacement_semantic_open(
+                    &mut semantics,
+                    target,
+                    &stack,
+                    element.local_name().as_ref(),
+                    &element,
+                    reader.decoder(),
+                    limits,
+                )?;
+                replacement_semantic_close(
+                    &semantics,
+                    target,
+                    element.local_name().as_ref(),
+                    stack.last(),
                 )?;
                 if 1 > limits.max_depth {
                     return Err(limit(LimitKind::XmlDepth, 1, limits.max_depth));
@@ -1511,6 +1777,7 @@ fn validate_replacement_fragment(
                 if local.local.as_slice() != element.local_name().as_ref() {
                     return Err(invalid("theme replacement closing element does not match"));
                 }
+                replacement_semantic_close(&semantics, target, &local.local, stack.last())?;
                 if stack.is_empty() {
                     root_closed = true;
                 }
@@ -1664,6 +1931,7 @@ fn validate_replacement_namespace(
     root: bool,
     target: &[u8],
     source_namespace: &[u8],
+    allow_unknown_a: bool,
     opaque_parent: bool,
 ) -> Result<()> {
     if opaque_parent && !root {
@@ -1704,7 +1972,7 @@ fn validate_replacement_namespace(
             "theme replacement modeled child has a cross-family namespace",
         )),
         ResolveResult::Bound(_) => Ok(()),
-        ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => Ok(()),
+        ResolveResult::Unknown(prefix) if allow_unknown_a && prefix.as_slice() == b"a" => Ok(()),
         ResolveResult::Unbound if !root && element.name().prefix().is_none() => Ok(()),
         ResolveResult::Unbound if root && element.name().prefix().is_none() => {
             Err(invalid("theme replacement root has no DrawingML namespace"))
@@ -1720,6 +1988,7 @@ fn replacement_element_is_drawingml(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
     source_namespace: &[u8],
+    allow_unknown_a: bool,
 ) -> bool {
     match namespace {
         ResolveResult::Bound(Namespace(value)) => {
@@ -1729,7 +1998,7 @@ fn replacement_element_is_drawingml(
                 || (*value == STRICT_NAMESPACE.as_bytes()
                     && source_namespace == NAMESPACE.as_bytes())
         },
-        ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => true,
+        ResolveResult::Unknown(prefix) if allow_unknown_a && prefix.as_slice() == b"a" => true,
         ResolveResult::Unbound if element.name().prefix().is_none() => false,
         _ => false,
     }
@@ -1742,10 +2011,12 @@ fn validate_replacement_scheme_element(
     element: &BytesStart<'_>,
     source_namespace: &[u8],
     opaque: bool,
+    allow_unknown_a: bool,
     limits: Limits,
 ) -> Result<()> {
     let local = element.local_name();
-    let drawingml = replacement_element_is_drawingml(namespace, element, source_namespace);
+    let drawingml =
+        replacement_element_is_drawingml(namespace, element, source_namespace, allow_unknown_a);
     if opaque {
         if !drawingml
             && !stack.last().is_some_and(|frame| frame.opaque)
@@ -1781,18 +2052,10 @@ fn validate_replacement_scheme_element(
             &[]
         } else if is_color_replacement_value(local.as_ref(), parent) {
             match local.as_ref() {
-                b"srgbClr" | b"schemeClr" | b"prstClr" => &[b"val"],
+                b"srgbClr" => &[b"val"],
                 b"sysClr" => &[b"val", b"lastClr"],
-                b"scrgbClr" => &[b"r", b"g", b"b"],
                 _ => &[b"val"],
             }
-        } else if is_color_replacement_value_name(parent) {
-            if !is_color_replacement_transform(local.as_ref()) {
-                return Err(invalid(
-                    "color value contains an unsupported replacement child",
-                ));
-            }
-            &[b"val"]
         } else {
             return Err(invalid(
                 "color scheme contains an unsupported replacement child",
@@ -1808,8 +2071,8 @@ fn validate_replacement_scheme_element(
             &[]
         } else if matches!(parent, b"majorFont" | b"minorFont") {
             match local.as_ref() {
-                b"latin" | b"ea" | b"cs" => &[b"typeface", b"panose"],
-                b"font" => &[b"script", b"typeface", b"panose"],
+                b"latin" | b"ea" | b"cs" => &[b"typeface"],
+                b"font" => &[b"script", b"typeface"],
                 _ => {
                     return Err(invalid(
                         "font face contains an unsupported replacement child",
@@ -1836,27 +2099,7 @@ fn is_color_replacement_slot(local: &[u8]) -> bool {
 }
 
 fn is_color_replacement_value_name(local: &[u8]) -> bool {
-    matches!(
-        local,
-        b"srgbClr" | b"sysClr" | b"scrgbClr" | b"schemeClr" | b"prstClr"
-    )
-}
-
-fn is_color_replacement_transform(local: &[u8]) -> bool {
-    matches!(
-        local,
-        b"tint"
-            | b"shade"
-            | b"alpha"
-            | b"red"
-            | b"green"
-            | b"blue"
-            | b"hue"
-            | b"sat"
-            | b"lum"
-            | b"gamma"
-            | b"invGamma"
-    )
+    matches!(local, b"srgbClr" | b"sysClr")
 }
 
 fn ensure_replacement_attributes(
@@ -1936,6 +2179,7 @@ fn validate_replacement_attributes(
     limits: Limits,
 ) -> Result<()> {
     let mut count = 0usize;
+    let mut expanded = Vec::<(Vec<u8>, Vec<u8>)>::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count = count
@@ -1953,6 +2197,28 @@ fn validate_replacement_attributes(
         }
         let is_namespace = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        if !is_namespace {
+            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            let namespace = match namespace {
+                ResolveResult::Bound(Namespace(value)) => value.to_vec(),
+                ResolveResult::Unbound => Vec::new(),
+                ResolveResult::Unknown(prefix) => {
+                    return Err(invalid(format!(
+                        "theme replacement attribute uses an undeclared namespace prefix '{}',",
+                        String::from_utf8_lossy(prefix.as_ref())
+                    )));
+                },
+            };
+            let local = local.as_ref().to_vec();
+            if expanded.iter().any(|(seen_namespace, seen_local)| {
+                seen_namespace == &namespace && seen_local == &local
+            }) {
+                return Err(invalid(
+                    "theme replacement has duplicate expanded attributes",
+                ));
+            }
+            expanded.push((namespace, local));
+        }
         // Namespace bindings have their own structural budget.  Do not charge
         // the selected scalar/attribute-value budget for a binding URI: a
         // narrow value policy applies to modeled attribute values, while the
@@ -2492,6 +2758,18 @@ mod tests {
         super::encode_palette_fragment(value, Limits::DEFAULT)
     }
 
+    fn valid_palette_fragment() -> Vec<u8> {
+        encode_palette_fragment(&palette()).unwrap()
+    }
+
+    fn valid_fonts_fragment() -> Vec<u8> {
+        encode_fonts_fragment(
+            &FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos")),
+            Limits::DEFAULT,
+        )
+        .unwrap()
+    }
+
     fn palette() -> Palette {
         Slot::ALL
             .into_iter()
@@ -2709,12 +2987,21 @@ mod tests {
             )
             .is_err()
         );
-        assert!(replace_scheme(
-            &original,
-            b"clrScheme",
-            br#"<a:clrScheme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><x:ext xmlns:x="urn:foreign"><x:item/></x:ext></a:clrScheme>"#
-        )
-        .is_ok());
+        let mut with_opaque = String::from_utf8(valid_palette_fragment()).unwrap();
+        with_opaque = with_opaque.replacen(
+            "</a:clrScheme>",
+            "<x:ext xmlns:x=\"urn:foreign\"><x:item/></x:ext></a:clrScheme>",
+            1,
+        );
+        let patched = replace_scheme(&original, b"clrScheme", with_opaque.as_bytes()).unwrap();
+        assert_eq!(read(&patched).unwrap().colors, palette());
+        let undeclared_attribute = with_opaque.replace("<x:item/>", "<x:item y:flag=\"1\"/>");
+        assert!(replace_scheme(&original, b"clrScheme", undeclared_attribute.as_bytes(),).is_err());
+        let duplicate_expanded = with_opaque.replace(
+            "<x:ext xmlns:x=\"urn:foreign\">",
+            "<x:ext xmlns:x=\"urn:foreign\" xmlns:y=\"urn:foreign\" x:flag=\"1\" y:flag=\"2\">",
+        );
+        assert!(replace_scheme(&original, b"clrScheme", duplicate_expanded.as_bytes(),).is_err());
         assert!(
             replace_scheme(
                 &original,
@@ -2763,16 +3050,10 @@ mod tests {
         let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
         let original =
             String::from_utf8(encode_part("Office", &palette(), &fonts).unwrap()).unwrap();
+        let replacement = valid_palette_fragment();
         let with_unknown_child =
             original.replacen("</a:clrScheme>", "<a:extLst/></a:clrScheme>", 1);
-        assert!(
-            replace_scheme(
-                with_unknown_child.as_bytes(),
-                b"clrScheme",
-                b"<a:clrScheme/>"
-            )
-            .is_err()
-        );
+        assert!(replace_scheme(with_unknown_child.as_bytes(), b"clrScheme", &replacement).is_err());
 
         let with_unknown_attribute = original.replacen(
             "<a:clrScheme name=\"Office\">",
@@ -2783,7 +3064,7 @@ mod tests {
             replace_scheme(
                 with_unknown_attribute.as_bytes(),
                 b"clrScheme",
-                b"<a:clrScheme/>"
+                &replacement
             )
             .is_err()
         );
@@ -2797,7 +3078,7 @@ mod tests {
             replace_scheme(
                 with_foreign_namespace.as_bytes(),
                 b"clrScheme",
-                b"<a:clrScheme/>"
+                &replacement
             )
             .is_err()
         );
@@ -2811,7 +3092,7 @@ mod tests {
             replace_scheme(
                 with_cross_family_namespace.as_bytes(),
                 b"clrScheme",
-                b"<a:clrScheme/>"
+                &replacement
             )
             .is_err()
         );
@@ -2825,7 +3106,7 @@ mod tests {
             replace_scheme(
                 with_matching_namespace.as_bytes(),
                 b"clrScheme",
-                b"<a:clrScheme/>"
+                &replacement
             )
             .is_ok()
         );
@@ -2973,20 +3254,25 @@ mod tests {
 
         let mut value_limits = Limits::DEFAULT;
         value_limits.max_attribute_value_bytes = 16;
+        let short_replacement = String::from_utf8(valid_palette_fragment())
+            .unwrap()
+            .replacen("name=\"Office\"", "name=\"a&amp;bcde\"", 1);
         assert!(
             super::replace_scheme(
                 &original,
                 b"clrScheme",
-                br#"<a:clrScheme name="a&amp;bcde"/>"#,
+                short_replacement.as_bytes(),
                 value_limits,
             )
             .is_ok()
         );
+        let long_replacement =
+            short_replacement.replace("name=\"a&amp;bcde\"", "name=\"a&amp;bcdefghijklmnopq\"");
         assert!(matches!(
             super::replace_scheme(
                 &original,
                 b"clrScheme",
-                br#"<a:clrScheme name="a&amp;bcdefghijklmnopq"/>"#,
+                long_replacement.as_bytes(),
                 value_limits,
             ),
             Err(Error::Limit {
@@ -2995,5 +3281,67 @@ mod tests {
                 maximum: 16,
             }) if observed > 16
         ));
+    }
+
+    #[test]
+    fn scheme_replacement_requires_complete_supported_state() {
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let original = encode_part("Office", &palette(), &fonts).unwrap();
+        let complete = String::from_utf8(valid_palette_fragment()).unwrap();
+        let missing_slot = complete.replacen(
+            "<a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1>",
+            "",
+            1,
+        );
+        assert!(replace_scheme(&original, b"clrScheme", missing_slot.as_bytes()).is_err());
+        let duplicate_slot = complete.replacen(
+            "</a:clrScheme>",
+            "<a:dk1><a:srgbClr val=\"FFFFFF\"/></a:dk1></a:clrScheme>",
+            1,
+        );
+        assert!(replace_scheme(&original, b"clrScheme", duplicate_slot.as_bytes()).is_err());
+        let empty_color =
+            complete.replacen("<a:srgbClr val=\"4F81BD\"/>", "<a:srgbClr val=\"\"/>", 1);
+        assert!(replace_scheme(&original, b"clrScheme", empty_color.as_bytes()).is_err());
+        let unsupported_color = complete.replacen(
+            "<a:srgbClr val=\"4F81BD\"/>",
+            "<a:schemeClr val=\"accent1\"/>",
+            1,
+        );
+        assert!(replace_scheme(&original, b"clrScheme", unsupported_color.as_bytes(),).is_err());
+
+        let complete_fonts = String::from_utf8(valid_fonts_fragment()).unwrap();
+        let incomplete_fonts = complete_fonts.replacen("<a:latin typeface=\"Aptos\"/>", "", 1);
+        assert!(replace_scheme(&original, b"fontScheme", incomplete_fonts.as_bytes(),).is_err());
+        let empty_font_name = complete_fonts.replacen("name=\"Office\"", "name=\"\"", 1);
+        assert!(replace_scheme(&original, b"fontScheme", empty_font_name.as_bytes(),).is_err());
+    }
+
+    #[test]
+    fn scheme_replacement_normalizes_default_and_arbitrary_prefixes() {
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let original = encode_part("Office", &palette(), &fonts).unwrap();
+        let strict = String::from_utf8(original)
+            .unwrap()
+            .replacen(NAMESPACE, STRICT_NAMESPACE, 1);
+        let generated = String::from_utf8(valid_palette_fragment()).unwrap();
+        let default_prefix = generated.replace("<a:", "<").replace("</a:", "</").replace(
+            "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
+            "xmlns=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
+        );
+        let patched_default =
+            replace_scheme(strict.as_bytes(), b"clrScheme", default_prefix.as_bytes()).unwrap();
+        assert_eq!(read(&patched_default).unwrap().colors, palette());
+
+        let arbitrary_prefix = generated
+            .replace("<a:", "<d:")
+            .replace("</a:", "</d:")
+            .replace(
+                "xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
+                "xmlns:d=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
+            );
+        let patched_arbitrary =
+            replace_scheme(strict.as_bytes(), b"clrScheme", arbitrary_prefix.as_bytes()).unwrap();
+        assert_eq!(read(&patched_arbitrary).unwrap().colors, palette());
     }
 }
