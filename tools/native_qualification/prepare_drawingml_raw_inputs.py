@@ -46,11 +46,11 @@ ADAPTER_PATHS = (
 STATIC_REVIEWED_ADAPTER_SHA256 = {
     "tools/perf-baseline/Cargo.toml": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
     "tools/perf-baseline/src/lib.rs": "c5408e963310ddd7abf9bf810777f0279acec89cb854ee1368b0770b5fe5323f",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "d1f2d6a9420ec25bb95a8dea16d8a8a5ae82911051e4b34ca0b23556ebb353be",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "1916e6940b00f719883805e9d1a4567f7947c8cc74c1e37b05b46115dc6f220a",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
-    "tools/native_qualification/drawingml_raw_validator.py": "1e956a4e0619f2b3340609265e8a39a595fa356ad10772fa95b49410c6beba16",
+    "tools/native_qualification/drawingml_raw_validator.py": "ef1319b3bef23dfe06719ddd4c1259e2b72e42b760a99960d3ad772562b4ef57",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 

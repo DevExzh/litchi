@@ -186,6 +186,15 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("output_limit_attempt", source)
         self.assertIn("partial_output_allowed", source)
         self.assertIn("changed_output_exact", source)
+        self.assertIn("owner_native_commit", source)
+        self.assertIn("owner_native_replay", source)
+        self.assertIn("owner_native_commit_output", source)
+        self.assertIn("owner_native_replay_output", source)
+        self.assertIn("owner_native_stale_refusal", source)
+        self.assertIn("owner_operation_path", source)
+        self.assertIn("result_serialized_outside_clock", source)
+        self.assertIn("Prepared::edit", source)
+        self.assertIn("OwnerSemanticReceipt", source)
         self.assertIn("source_edit_serialize", source)
         self.assertIn('"string_output"', source)
         self.assertIn('"vec_output"', source)
@@ -215,6 +224,31 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("contextual", record)
         self.assertIn("standalone", record)
+
+    def test_owner_semantic_proof_requires_mutation_and_remainder_identity(self) -> None:
+        hashes = {
+            "source_semantic_sha256": "a" * 64,
+            "noop_semantic_sha256": "a" * 64,
+            "changed_semantic_sha256": "b" * 64,
+            "forward_semantic_sha256": "b" * 64,
+            "inverse_semantic_sha256": "a" * 64,
+            "source_rest_semantic_sha256": "c" * 64,
+            "changed_rest_semantic_sha256": "c" * 64,
+            "expected_mutation": "chart.title=DrawingML qualification mutation",
+            "mutation_verified": True,
+            "unchanged_remainder": True,
+        }
+        self.assertEqual(
+            validator._validate_owner_semantic_proof(
+                {"semantic": hashes}, Path("owner-proof.json")
+            ),
+            hashes,
+        )
+        invalid = dict(hashes, mutation_verified=False)
+        with self.assertRaisesRegex(ValueError, "mutation/remainder proof"):
+            validator._validate_owner_semantic_proof(
+                {"semantic": invalid}, Path("owner-proof.json")
+            )
 
     def test_generated_fixture_identity_binds_all_three_byte_roles(self) -> None:
         parts = [
