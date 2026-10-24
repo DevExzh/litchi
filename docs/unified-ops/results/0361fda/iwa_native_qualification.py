@@ -2049,6 +2049,15 @@ def _ratios_equal(values: list[dict[str, Any]]) -> None:
 def _allocation_abba_equal(values: list[dict[str, Any]]) -> None:
     if len(values) != len(ALLOCATION_ORDER):
         raise QualificationError("allocation packet does not contain one ABBA value per leg")
+    for value in values:
+        if not isinstance(value, Mapping):
+            raise QualificationError("allocation packet contains a malformed probe value")
+        for key in ALLOCATION_METRICS:
+            metric = value.get(key)
+            if type(metric) is not int or metric < 0:
+                raise QualificationError(f"allocation packet has an invalid metric {key}")
+        if value["peak"] < value["retained"]:
+            raise QualificationError("allocation packet peak is below retained bytes")
     _ratios_equal(values)
     for key in ALLOCATION_METRICS:
         if values[0][key] != values[3][key] or values[1][key] != values[2][key]:
