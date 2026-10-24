@@ -612,7 +612,8 @@ impl Package {
 
     /// Admit edited bytes under this package's retained read policy.
     pub(crate) fn republish_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
-        match self.inner.policy {
+        ensure_source_fence(&self.inner)?;
+        let result = match self.inner.policy {
             RetainedPolicy::Eager {
                 source_limits,
                 leniency,
@@ -641,7 +642,8 @@ impl Package {
                 )?;
                 Self::from_source(workbook)
             },
-        }
+        };
+        finish_source_fence(&self.inner, result)
     }
 
     /// The Workbook stream (`Workbook`, or `Book` from older producers), read

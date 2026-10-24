@@ -67,3 +67,21 @@ worksheet-feature test passed 1/1. Their raw logs remain outside the checkout:
 strict Clippy, and affected `litchi-ops` checks remain queued. No native
 qualification, benchmark, or performance claim is made here; no binary or
 large evidence artifact belongs in this record.
+
+The publication boundary now has a second, version-only original-source fence:
+`Package::republish_bytes` checks it after candidate admission, so a render or
+admission error cannot hide a concurrent source change. Property-set rendering
+also fences after `PropertySetEdit::finish` and before returning either its
+success or error, without another package-byte capture. Metadata republishing
+uses this same boundary; worksheet-feature changed commits and replay already
+route through it. The deterministic dynamic-source regressions cover both
+property-set render and candidate publication refusal. The focused command was:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+cargo test -p litchi-xls --test package_owner --locked --offline property_set_ -- --nocapture
+```
+
+It passed 2/2; the external 592-byte log is
+`/home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/property-fence-tests.log`
+(SHA-256 `8fcb989656654c47369b24f62ad43b3c5f4ec57bd5370777e01bdf46f56bdfdd`).

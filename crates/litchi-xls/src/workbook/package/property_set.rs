@@ -429,17 +429,25 @@ impl Edit {
             .source
             .take()
             .ok_or(Error::InvalidData("a property-set edit lost its source"))?;
-        let editor = match this.editor.take() {
-            Some(editor) => editor,
-            None => {
-                let before = source.bytes().to_vec();
-                return Ok((Patch::new(before.clone(), before), false));
-            },
-        };
-        let before = source.bytes().to_vec();
-        let bytes = editor.finish().map_err(crate::Error::from)?;
-        let changed = bytes != before;
-        Ok((Patch::new(before, bytes), changed))
+        let result = (|| {
+            let editor = match this.editor.take() {
+                Some(editor) => editor,
+                None => {
+                    let before = source.bytes().to_vec();
+                    return Ok((Patch::new(before.clone(), before), false));
+                },
+            };
+            let before = source.bytes().to_vec();
+            let bytes = editor.finish().map_err(crate::Error::from)?;
+            let changed = bytes != before;
+            Ok((Patch::new(before, bytes), changed))
+        })();
+        // Rendering can fail after the leading source check. Prefer a
+        // concurrent source change over either a render error or success.
+        if let Some(base) = this.base.as_ref() {
+            base.ensure_source_fence()?;
+        }
+        result
     }
 }
 

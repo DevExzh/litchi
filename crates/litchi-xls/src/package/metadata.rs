@@ -32,12 +32,11 @@
 use std::fmt;
 use std::sync::Arc;
 
-use litchi_cfb::{OleError, SharedOleFile};
+use litchi_cfb::OleError;
 use litchi_ole_common::property_set::SummaryProperties;
 use litchi_ole_common::property_set::summary_properties::MetadataError;
 
-use super::{Error as PackageError, Package, RetainedPolicy};
-use crate::OpenOptions;
+use super::{Error as PackageError, Package};
 use crate::workbook::package::property_set;
 
 /// A metadata transaction limit dimension.
@@ -410,46 +409,7 @@ fn transaction_error(error: crate::package::Error) -> Error {
 
 /// Admit edited bytes under the source package's retained policy.
 fn republish(source: &Package, bytes: Vec<u8>) -> Result<Package> {
-    if source.is_signed() {
-        return Err(Error::Protected);
-    }
-    match source.inner.policy {
-        RetainedPolicy::Eager {
-            source_limits,
-            leniency,
-            compatibility_profile,
-        } => Ok(Package::from_owned_bytes(
-            bytes,
-            OpenOptions::default()
-                .source_limits(source_limits)
-                .leniency(leniency)
-                .compatibility_profile(compatibility_profile),
-        )?),
-        RetainedPolicy::Source { limits, leniency } => {
-            let cfb_limits =
-                source
-                    .source()
-                    .map(SharedOleFile::limits)
-                    .ok_or(PackageError::InvalidData(
-                        "source-backed XLS package lost its CFB",
-                    ))?;
-            let cfb = Arc::new(
-                SharedOleFile::open_with_limits(
-                    Arc::new(litchi_core::OwnedSource::new(bytes)),
-                    cfb_limits,
-                )
-                .map_err(PackageError::Cfb)?,
-            );
-            let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
-                cfb,
-                crate::SourceBackedOptions::default()
-                    .limits(limits)
-                    .leniency(leniency),
-            )
-            .map_err(PackageError::Source)?;
-            Ok(Package::from_source(workbook)?)
-        },
-    }
+    crate::package::republish(source, bytes).map_err(Error::Package)
 }
 
 #[cfg(test)]
