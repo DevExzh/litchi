@@ -2228,7 +2228,7 @@ fn source_backed_comments_fence_commit_output_replay_and_inverse() {
     edit.replace(
         litchi_xls::cell_values::Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
-        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
     )
     .unwrap();
     source.bump();
@@ -2239,7 +2239,7 @@ fn source_backed_comments_fence_commit_output_replay_and_inverse() {
     edit.replace(
         litchi_xls::cell_values::Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
-        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
     )
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -2269,14 +2269,14 @@ fn source_backed_comments_fence_commit_output_replay_and_inverse() {
 fn source_backed_visibility_fences_commit_output_replay_and_inverse() {
     let (source, workbook) = deferred_visibility_fixture();
     let mut edit = workbook.edit_sheet_visibility().unwrap();
-    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Visible"))
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Other"))
         .unwrap();
     source.bump();
     assert!(matches!(edit.commit(), Err(litchi_xls::Error::Io(_))));
 
     let (source, workbook) = deferred_visibility_fixture();
     let mut edit = workbook.edit_sheet_visibility().unwrap();
-    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Visible"))
+    edit.hide(litchi_xls::sheet_visibility::Selector::Name("Other"))
         .unwrap();
     let commit = edit.commit().unwrap();
     let target = commit.package().clone();
@@ -2309,7 +2309,7 @@ fn source_backed_cross_copy_replay_retains_recipient_fence_for_output() {
     edit.replace(
         litchi_xls::cell_values::Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
-        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed!").unwrap(),
     )
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -2342,8 +2342,14 @@ fn lazy_chart_and_pivot_editors_can_retry_after_capture_failure() {
     let package = Package::from_source(workbook).unwrap();
     let mut charts = package.edit_charts().unwrap();
     source.bump();
-    assert!(matches!(charts.charts(), Err(litchi_xls::Error::Io(_))));
-    assert!(matches!(charts.charts(), Err(litchi_xls::Error::Io(_))));
+    assert!(matches!(
+        charts.charts(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
+    assert!(matches!(
+        charts.charts(),
+        Err(litchi_xls::Error::Internal(_))
+    ));
 
     let (source, workbook) = deferred_visibility_fixture();
     let package = Package::from_source(workbook).unwrap();
@@ -2351,11 +2357,11 @@ fn lazy_chart_and_pivot_editors_can_retry_after_capture_failure() {
     source.bump();
     assert!(matches!(
         pivots.worksheet_count(),
-        Err(litchi_xls::Error::Io(_))
+        Err(litchi_xls::Error::Internal(_))
     ));
     assert!(matches!(
         pivots.worksheet_count(),
-        Err(litchi_xls::Error::Io(_))
+        Err(litchi_xls::Error::Internal(_))
     ));
 }
 
