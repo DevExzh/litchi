@@ -45,9 +45,9 @@
           "sha256": "8bf4e6704cedf230a8b0e94a796f956757d1c2f07ced255716b68060788a36fb"
         },
         {
-          "bytes": 54653,
+          "bytes": 54780,
           "path": "crates/litchi-pages/tests/body_footnote.rs",
-          "sha256": "56b7062bae16a99a63bae1a7d17b39e8a089fdd67ef7977fe2ec5fe5ee19f8e0"
+          "sha256": "3c6a522976632130d4e32a792fbf3c7baaa725f152f423115552b4d32f7c988f"
         }
       ]
     },
