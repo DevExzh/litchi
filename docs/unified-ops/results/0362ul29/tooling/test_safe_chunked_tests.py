@@ -428,6 +428,66 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             self.assertTrue(samples)
             self.assertTrue(all(value >= 0 for value in samples))
 
+    def test_ownership_excludes_runner_and_ancestors_from_group_matches(self) -> None:
+        """A step's process group must not make its coordinator owned."""
+        with tempfile.TemporaryDirectory(prefix="safe-gate-ownership-ancestry-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            target.mkdir()
+            runner_pid = os.getpid()
+            ancestor_pid = runner_pid + 10_000_001
+
+            def row(pid: int, ppid: int, pgrp: int, start_time: int, executable: str, cwd: Path) -> dict:
+                return {
+                    "pid": pid,
+                    "ppid": ppid,
+                    "pgrp": pgrp,
+                    "session": pgrp,
+                    "start_time": start_time,
+                    "executable": executable,
+                    "cwd": str(cwd),
+                    "command": executable,
+                }
+
+            root_pid = runner_pid + 10_000_002
+            child_pid = runner_pid + 10_000_003
+            shared_pgrp = root_pid
+            launch = {
+                ancestor_pid: row(ancestor_pid, 1, shared_pgrp, 1, "cargo", directory),
+                runner_pid: row(runner_pid, ancestor_pid, shared_pgrp, 2, "python3", directory),
+                root_pid: row(root_pid, runner_pid, shared_pgrp, 3, "python3", directory),
+                child_pid: row(child_pid, root_pid, shared_pgrp, 4, "python3", directory),
+            }
+            ownership = runner.new_ownership(root_pid, directory, target, launch, launch)
+
+            owned = runner.owned_processes(root_pid, launch, ownership)
+            owned_pids = {item["pid"] for item in owned}
+            self.assertEqual(owned_pids, {root_pid, child_pid})
+            builders = runner.owned_builders(root_pid, directory, target, launch, ownership)
+            self.assertNotIn(ancestor_pid, {item["pid"] for item in builders})
+
+    def test_run_step_reports_fake_child_failure_without_self_attribution(self) -> None:
+        """A genuine failed child remains a failed row, not a runner leak."""
+        with tempfile.TemporaryDirectory(prefix="safe-gate-failed-child-") as raw:
+            directory = Path(raw)
+            root = directory / "source"
+            root.mkdir()
+            target = directory / "target"
+            target.mkdir()
+            script = root / "fail.py"
+            script.write_text("import sys; print('intentional failure', flush=True); sys.exit(7)\n", encoding="utf-8")
+            source = {"commit": "fixture", "status": "", "branch": "fixture", "cargo_locks": {}}
+            step = runner.direct("fake-failure", [sys.executable, str(script)])
+
+            with (
+                mock.patch.object(runner, "preflight", return_value={}),
+                mock.patch.object(runner, "source_state", return_value=source),
+            ):
+                result = runner.run_step(step, root, target, directory, source, 0, 1, "fixture")
+
+            self.assertEqual(result["exit"], 7)
+            self.assertIn("intentional failure", (directory / "00-fake-failure-attempt-fixture.log").read_text(encoding="utf-8"))
+
     def test_unexpected_guard_exception_kills_fake_command_and_records_failure(self) -> None:
         with tempfile.TemporaryDirectory(prefix="safe-gate-guard-exception-") as raw:
             directory = Path(raw)
