@@ -442,8 +442,10 @@ fn insert_before_root_close(source: &[u8], insertion: &[u8]) -> Vec<u8> {
 
 fn assert_namespace_prefix_limit<T>(result: litchi_drawingml::Result<T>, label: &str) {
     match result {
-        Err(litchi_drawingml::Error::Limit { resource, .. })
-            if resource.contains("namespace prefix") => {},
+        Err(litchi_drawingml::Error::Limit {
+            kind: litchi_drawingml::LimitKind::NamespacePrefixBytes,
+            ..
+        }) => {},
         Err(error) => panic!("{label} returned the wrong error: {error:?}"),
         Ok(_) => panic!("{label} was accepted"),
     }
