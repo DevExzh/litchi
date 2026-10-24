@@ -112,7 +112,12 @@ fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
         .save_encrypted(&path, PASSWORD, Mode::Standard)
         .unwrap();
     let encrypted = Package::open_with_password(&path, PASSWORD).unwrap();
-    assert!(encrypted.edit().is_err());
+    assert!(
+        encrypted
+            .edit()
+            .and_then(|edit| edit.commit().map(|_| ()))
+            .is_err()
+    );
     let shared = encrypted.clone();
     assert_eq!(shared.encryption(), Some(Mode::Standard));
     assert!(shared.apply(noop.patch()).is_err());

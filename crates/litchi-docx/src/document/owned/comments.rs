@@ -248,7 +248,7 @@ impl Edit<Package> {
         range: Option<(Position, Position)>,
         comment: &NewComment,
     ) -> Result<u32> {
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let part = self.related_part(comments_relationship(strict))?;
         let current = match &part {
             Some((name, _)) => Some(
@@ -264,7 +264,7 @@ impl Edit<Package> {
         let id = part_ids
             .iter()
             .copied()
-            .chain(self.inner.max_comment_marker_id()?)
+            .chain(self.inner_mut()?.max_comment_marker_id()?)
             .max()
             .map_or(Ok(0), |maximum| {
                 maximum.checked_add(1).ok_or(Error::Refused {
@@ -272,8 +272,13 @@ impl Edit<Package> {
                     reason: Refusal::InvalidPropertyValue,
                 })
             })?;
-        self.inner
-            .anchor_comment_at(paragraph, range, id, comment.start_after, !comment.range)?;
+        self.inner_mut()?.anchor_comment_at(
+            paragraph,
+            range,
+            id,
+            comment.start_after,
+            !comment.range,
+        )?;
         // Replies and resolution (record 0345): the comment's paragraph
         // takes a fresh identifier, which `commentsExtended` keys on.
         let threaded = comment.parent.is_some() || comment.done.is_some();
@@ -349,7 +354,7 @@ impl Edit<Package> {
     /// Returns [`Refusal::BlockNotFound`] for an unknown comment, or a
     /// typed error for a malformed part.
     pub fn remove_comment(&mut self, id: u32) -> Result<&mut Self> {
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let (name, _) =
             self.related_part(comments_relationship(strict))?
                 .ok_or(Error::Refused {
@@ -369,7 +374,7 @@ impl Edit<Package> {
         let mut updated = xml[..start].to_vec();
         updated.extend_from_slice(&xml[end..]);
         self.replace_part(&name, updated)?;
-        self.inner.strip_comment_markers(id)?;
+        self.inner_mut()?.strip_comment_markers(id)?;
         if !paragraph_ids.is_empty() {
             self.strip_modern_entries(&paragraph_ids)?;
         }
@@ -425,7 +430,7 @@ impl Edit<Package> {
         {
             return Err(invalid_value());
         }
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let not_found = || Error::Refused {
             position: 0,
             reason: Refusal::BlockNotFound,

@@ -306,7 +306,7 @@ impl Edit<Package> {
             return Ok(false);
         }
         if !replaced.is_empty() {
-            self.inner.stage_graph_change(
+            self.inner_mut()?.stage_graph_change(
                 Arc::new(GraphChange {
                     relationships: Arc::new([]),
                     parts: Arc::new([]),
@@ -316,10 +316,12 @@ impl Edit<Package> {
             )?;
         }
         if let Some(addition) = addition {
-            self.inner.stage_graph_change(Arc::new(addition), true)?;
+            self.inner_mut()?
+                .stage_graph_change(Arc::new(addition), true)?;
         }
         if let Some(removal) = removal {
-            self.inner.stage_graph_change(Arc::new(removal), false)?;
+            self.inner_mut()?
+                .stage_graph_change(Arc::new(removal), false)?;
         }
         Ok(true)
     }
@@ -338,7 +340,11 @@ impl Edit<Package> {
         let located = self
             .locate_smartart(data_relationship_id)?
             .ok_or_else(not_found)?;
-        if self.inner.remove_smartart_drawings(data_relationship_id)? == 0 {
+        if self
+            .inner_mut()?
+            .remove_smartart_drawings(data_relationship_id)?
+            == 0
+        {
             return Err(not_found());
         }
         let mut relationships = vec![
@@ -359,7 +365,8 @@ impl Edit<Package> {
         }
         relationships.dedup();
         let removal = self.removal(relationships, &names)?;
-        self.inner.stage_graph_change(Arc::new(removal), false)?;
+        self.inner_mut()?
+            .stage_graph_change(Arc::new(removal), false)?;
         Ok(())
     }
 
@@ -529,11 +536,11 @@ impl Edit<Package> {
         }
         smartart.spec.validate().map_err(|_| invalid())?;
         let id = self
-            .inner
+            .inner_mut()?
             .max_drawing_id()?
             .map_or(Some(1), |maximum| maximum.checked_add(1))
             .ok_or_else(invalid)?;
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let base = self.main_folder()?;
         let used = self.part_names()?;
         let number = (1_usize..)
@@ -608,7 +615,7 @@ impl Edit<Package> {
             .clone()
             .unwrap_or_else(|| format!("SmartArt {id}"));
         // The drawing first: a refused target stages nothing.
-        self.inner.insert_smartart_markup_at(
+        self.inner_mut()?.insert_smartart_markup_at(
             paragraph,
             at,
             [&ids[0], &ids[1], &ids[2], &ids[3]],
@@ -620,7 +627,7 @@ impl Edit<Package> {
                 description,
             },
         )?;
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: relationships.into(),
                 parts: parts.into(),

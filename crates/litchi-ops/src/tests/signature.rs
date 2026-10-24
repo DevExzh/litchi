@@ -338,7 +338,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             // Append a paragraph: Office's signed fixture keeps its only
             // paragraph in structure the text transaction does not rewrite.
             let mut edit = package.edit().unwrap();
-            let count = edit.source().paragraph_count();
+            let count = edit.source().unwrap().paragraph_count();
             edit.insert_paragraph(Position::new(count), MARKER).unwrap();
             let commit = edit.commit().unwrap();
             let package = package.apply(commit.patch()).unwrap().into_package();

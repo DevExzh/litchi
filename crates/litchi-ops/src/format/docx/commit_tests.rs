@@ -51,8 +51,10 @@ fn open(eager: bool) -> Docx {
 
 fn xml(handle: &Docx) -> Vec<u8> {
     match handle.edit().unwrap() {
-        crate::format::docx::DocxEditor::Edit(edit) => edit.source().xml_bytes().to_vec(),
-        crate::format::docx::DocxEditor::Source(edit) => edit.source().xml_bytes().to_vec(),
+        crate::format::docx::DocxEditor::Edit(edit) => edit.source().unwrap().xml_bytes().to_vec(),
+        crate::format::docx::DocxEditor::Source(edit) => {
+            edit.source().unwrap().xml_bytes().to_vec()
+        },
         crate::format::docx::DocxEditor::Unsigned(package) => {
             package.document_snapshot().unwrap().xml_bytes().to_vec()
         },

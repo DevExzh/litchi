@@ -714,8 +714,8 @@ fn build_candidate(
     let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
         .edit_plain_paragraph_copy()?;
-    if edit.projected().paragraph_count() != count || edit.projected().xml_bytes() != source_xml_bytes
-    {
+    let projected = edit.projected()?;
+    if projected.paragraph_count() != count || projected.xml_bytes() != source_xml_bytes {
         return Err("DOCX source snapshot differs from generated main XML".into());
     }
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
@@ -723,7 +723,7 @@ fn build_candidate(
     let candidate_xml = commit
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         .to_vec();
     let effect = commit.patch().effect_report();
@@ -733,7 +733,7 @@ fn build_candidate(
     let replayed_xml = replayed
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         .to_vec();
     let replay_verified = replayed_xml == candidate_xml;
@@ -743,7 +743,7 @@ fn build_candidate(
     let inverse_verified = inverse_replayed
         .package()
         .edit_plain_paragraph_copy()?
-        .projected()
+        .projected()?
         .xml_bytes()
         == source_xml_bytes;
     let canonical = durable.to_bytes(limits)? == wire;
@@ -1043,10 +1043,7 @@ fn run_phase_iteration(corpus: &Corpus) -> BenchResult<(PhaseLifecycleSample, Ph
             .as_ref()
             .map_or(ReadObservation::default(), |source| source.reads()),
         || {
-            let mut edit = state
-                .snapshot
-                .take()
-                .ok_or("phase stage has no snapshot")?;
+            let mut edit = state.snapshot.take().ok_or("phase stage has no snapshot")?;
             edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
             state.edit = Some(edit);
             Ok(state
@@ -1373,11 +1370,10 @@ mod tests {
         let archive = source_archive(&xml, 0).expect("archive");
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(archive));
         let package = source_backed::Package::from_read_at(source).expect("package");
-        let package = package
-            .with_semantic_limits(
-                litchi_docx::SemanticLimits::default()
-                    .paragraph_copy(limits_for(2, xml.len()).unwrap()),
-            );
+        let package = package.with_semantic_limits(
+            litchi_docx::SemanticLimits::default()
+                .paragraph_copy(limits_for(2, xml.len()).unwrap()),
+        );
         let mut edit = package.edit_plain_paragraph_copy().expect("edit");
         edit.copy_plain_paragraph(Position::new(0), Position::new(2))
             .expect("first operation");

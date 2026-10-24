@@ -226,21 +226,21 @@ impl Run {
             WorkEdit::Source(edit) => edit.remaining_operations(),
         }
     }
-    fn projected(&self) -> &litchi_docx::document::Snapshot {
+    fn projected(&self) -> Result<litchi_docx::document::Snapshot> {
         match &self.edit {
             WorkEdit::Eager(edit) => edit.projected(),
             WorkEdit::Source(edit) => edit.projected(),
         }
     }
-    pub(crate) fn snapshot_bytes(&self) -> usize {
+    pub(crate) fn snapshot_bytes(&self) -> Result<usize> {
         let source = match &self.edit {
             WorkEdit::Eager(edit) => edit.source(),
             WorkEdit::Source(edit) => edit.source(),
-        };
-        source
+        }?;
+        Ok(source
             .xml_bytes()
             .len()
-            .saturating_add(self.projected().xml_bytes().len())
+            .saturating_add(self.projected()?.xml_bytes().len()))
     }
     /// A staging failure poisons the caller transaction or discards its whole
     /// isolated item; no partially staged command can be published.
@@ -254,9 +254,9 @@ impl Run {
             self.items
                 .try_reserve(1)
                 .map_err(|source| crate::transaction::Error::Allocation { source })?;
-            let before = self.projected().clone();
+            let before = self.projected()?;
             plan.stage(&mut self.edit)?;
-            let changed = before.xml_bytes() != self.projected().xml_bytes();
+            let changed = before.xml_bytes() != self.projected()?.xml_bytes();
             if let Selection::Body(WriteSelection::Paragraph(position)) = plan.target.selection
                 && plan
                     .assignments
@@ -463,7 +463,7 @@ mod tests {
     fn failure_probes_keep_the_run_snapshot_budget() {
         let (base, items) = fixture();
         let run = Run::new(&base).unwrap();
-        let budget = run.snapshot_bytes().saturating_sub(1);
+        let budget = run.snapshot_bytes().unwrap().saturating_sub(1);
         let error = match replay_with_snapshot_budget(&base, &items, budget) {
             Ok(_) => panic!("an over-budget replay probe was admitted"),
             Err(error) => error,

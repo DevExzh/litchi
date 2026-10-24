@@ -1239,7 +1239,12 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
             OpcError::ManagedPackageMaterialization
         )))
     ));
-    assert!(owner.edit().is_err());
+    assert!(
+        owner
+            .edit()
+            .and_then(|edit| edit.commit().map(|_| ()))
+            .is_err()
+    );
     drop(donor);
     drop(owner);
     assert!(budget.used(litchi_core::Resource::Memory) > 0);

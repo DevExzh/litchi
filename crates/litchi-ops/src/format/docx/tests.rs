@@ -71,9 +71,20 @@ fn open_path(path: &std::path::Path, options: &OpenOptions) -> Docx {
 #[track_caller]
 fn retained_source(docx: &Docx) -> litchi_docx::document::Snapshot {
     match docx.edit() {
-        Ok(DocxEditor::Edit(edit)) => edit.source().clone(),
-        Ok(DocxEditor::Source(edit)) => edit.source().clone(),
+        Ok(DocxEditor::Edit(edit)) => edit.source().unwrap().clone(),
+        Ok(DocxEditor::Source(edit)) => edit.source().unwrap().clone(),
         other => panic!("expected a main-document edit, got {other:?}"),
+    }
+}
+
+/// Force the leaf projection after the facade's lazy editor constructor. The
+/// facade still classifies the leaf refusal as a unified DOCX error, but the
+/// document admission now belongs to the first editor operation.
+fn admit_editor_source(docx: &Docx) -> Result<(), Error> {
+    match docx.edit()? {
+        DocxEditor::Edit(edit) => edit.source().map(|_| ()).map_err(Error::from),
+        DocxEditor::Source(edit) => edit.source().map(|_| ()).map_err(Error::from),
+        DocxEditor::Unsigned(_) => Ok(()),
     }
 }
 
@@ -424,8 +435,8 @@ fn editor_admits_word_markup_compatibility_on_both_owners() {
         let source = open_bytes(bytes, &OpenOptions::new()).unwrap();
         let eager_edit = retained_source(&eager);
         let source_edit = match source.edit() {
-            Ok(DocxEditor::Edit(edit)) => edit.source().clone(),
-            Ok(DocxEditor::Source(edit)) => edit.source().clone(),
+            Ok(DocxEditor::Edit(edit)) => edit.source().unwrap().clone(),
+            Ok(DocxEditor::Source(edit)) => edit.source().unwrap().clone(),
             other => panic!("{name}: {other:?}"),
         };
         assert!(source_edit.paragraph_count() > 0, "{name}");
@@ -451,7 +462,7 @@ fn editor_refuses_alternate_content_on_both_owners() {
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
     assert!(!source.text().unwrap().contains("FALLBACK"));
     for docx in [&source, &eager] {
-        let error = docx.edit().unwrap_err();
+        let error = admit_editor_source(docx).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
         assert_eq!(error.format(), Some(FileFormat::Docx));
         assert!(

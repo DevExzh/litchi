@@ -724,6 +724,8 @@ impl Docx {
     /// `retain_source(false)`, or when an unlocked encrypted document would
     /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
     /// when the source changed; and the leaf's typed failures otherwise.
+    /// Leaf document admission is deferred until its first projection,
+    /// mutation or commit.
     pub(crate) fn edit(&self) -> Result<DocxEditor> {
         self.edit_with_options(litchi_docx::document::EditOptions::default())
     }

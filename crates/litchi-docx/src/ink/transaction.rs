@@ -1,6 +1,7 @@
 //! Source-checked annotation authoring and reversible package publication.
 
 use crate::ink::LimitKind;
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use litchi_core::Position;
@@ -124,7 +125,7 @@ struct State {
 /// resource identities are allocated only inside the source-bound commit.
 pub struct Edit {
     source: Package,
-    base: Arc<State>,
+    base: RefCell<Option<Arc<State>>>,
     removals: Vec<usize>,
     additions: Vec<Addition>,
     replacements: Vec<Replacement>,
@@ -155,6 +156,39 @@ pub(crate) enum SemanticIntent {
 }
 
 impl Edit {
+    fn materialize(&self) -> Result<Arc<State>> {
+        if let Some(base) = self.base.borrow().as_ref() {
+            return Ok(Arc::clone(base));
+        }
+        self.source.ensure_story_opc_current("edit_ink")?;
+        let package = self.source.opc_package();
+        let mut total = 0usize;
+        for part in package.try_iter_parts() {
+            let part = part?;
+            total = total
+                .checked_add(part.blob().len())
+                .ok_or_else(|| Error::Invalid("DOCX Ink edit source size overflow".into()))?;
+            bound(
+                LimitKind::EditPackageBytes,
+                total,
+                self.limits.max_package_bytes,
+            )?;
+        }
+        let snapshot = super::package::load(package, self.limits.inventory)?;
+        let binding = Binding::capture(package, self.limits.inventory)?;
+        let state = Arc::new(State {
+            package: self.source.shared_opc_package(),
+            binding,
+            snapshot,
+        });
+        *self.base.borrow_mut() = Some(Arc::clone(&state));
+        Ok(state)
+    }
+
+    pub(super) fn base_state(&self) -> Result<Arc<State>> {
+        self.materialize()
+    }
+
     fn take_semantic_intent(&mut self) -> Result<Arc<Vec<SemanticIntent>>> {
         let count = self.operation_count();
         let mut intents = Vec::new();
@@ -204,10 +238,10 @@ struct Replacement {
 }
 
 impl Edit {
-    /// Borrow the immutable annotation inventory used by every selector.
+    /// Return the immutable annotation inventory used by every selector.
     #[must_use]
-    pub fn inventory(&self) -> &Snapshot {
-        &self.base.snapshot
+    pub fn inventory(&self) -> Result<Snapshot> {
+        Ok(self.base_state()?.snapshot.clone())
     }
 
     /// Append a new annotation run to a paragraph in the base story snapshot.
@@ -276,7 +310,7 @@ impl Edit {
         fallback: Option<FallbackImage>,
     ) -> Result<bool> {
         let annotation =
-            self.base.snapshot.get(position).ok_or_else(|| {
+            self.base_state()?.snapshot.get(position).ok_or_else(|| {
                 Error::Invalid("DOCX Ink annotation selector is out of range".into())
             })?;
         if self.removals.binary_search(&position.get()).is_ok() {
@@ -361,7 +395,7 @@ impl Edit {
     ///
     /// Returns an error for a missing annotation or an exhausted operation limit.
     pub fn remove(&mut self, position: Position) -> Result<bool> {
-        if self.base.snapshot.get(position).is_none() {
+        if self.base_state()?.snapshot.get(position).is_none() {
             return Err(Error::Invalid(
                 "DOCX Ink annotation selector is out of range".into(),
             ));
@@ -414,6 +448,7 @@ impl Edit {
     /// Resolve the staged operations into a source-checked patch without
     /// publishing it.
     pub(crate) fn plan(mut self) -> Result<Planned> {
+        let base = self.base_state()?;
         if !self.additions.is_empty() || !self.replacements.is_empty() {
             return authoring::commit(self);
         }
@@ -421,8 +456,8 @@ impl Edit {
             let intent = self.take_semantic_intent()?;
             return Ok(Planned {
                 patch: Patch {
-                    before: Arc::clone(&self.base),
-                    after: self.base,
+                    before: Arc::clone(&base),
+                    after: base,
                     changes: Arc::new(Vec::new()),
                     reversed: false,
                     limits: self.limits,
@@ -430,17 +465,16 @@ impl Edit {
                 },
             });
         }
-        let stories =
-            crate::package::story::capture(&self.base.package, self.limits.inventory.stories)?;
+        let stories = crate::package::story::capture(&base.package, self.limits.inventory.stories)?;
         let mut changes = Vec::new();
-        let mut candidate = self.base.package.as_ref().clone();
+        let mut candidate = base.package.as_ref().clone();
         let mut ordinal = 0usize;
         let mut staged_bytes = 0usize;
         for story in stories.stories() {
             let hosts = host::capture(story.source(), stories.dialect(), self.limits.inventory)?;
             let mut edits = Vec::new();
             for entry in hosts {
-                if !is_annotation(&self.base.package, story.part(), &entry.anchor)? {
+                if !is_annotation(&base.package, story.part(), &entry.anchor)? {
                     continue;
                 }
                 let selected = self.removals.binary_search(&ordinal).is_ok();
@@ -470,7 +504,7 @@ impl Edit {
             if edits.is_empty() {
                 continue;
             }
-            let before = self.base.package.source_xml_part(story.part())?;
+            let before = base.package.source_xml_part(story.part())?;
             let initial_charge = before
                 .bytes()
                 .len()
@@ -500,7 +534,7 @@ impl Edit {
             previous_refs.sort_unstable();
             let mut remaining_refs = host::reference_values(after.bytes(), self.limits.inventory)?;
             remaining_refs.sort_unstable();
-            let owner = self.base.package.get_part(story.part())?;
+            let owner = base.package.get_part(story.part())?;
             let mut removed_ids = Vec::new();
             for relationship in owner.rels().iter() {
                 if previous_refs
@@ -547,7 +581,7 @@ impl Edit {
                 graph: GraphChange::Removal(graph),
             });
         }
-        if ordinal != self.base.snapshot.annotations().len() {
+        if ordinal != base.snapshot.annotations().len() {
             return Err(Error::Invalid(
                 "DOCX Ink host inventory diverged from its source snapshot".into(),
             ));
@@ -567,7 +601,7 @@ impl Edit {
         });
         Ok(Planned {
             patch: Patch {
-                before: self.base,
+                before: base,
                 after,
                 changes: Arc::new(changes),
                 reversed: false,
@@ -725,7 +759,10 @@ impl Package {
     /// Start an isolated annotation edit from this package's active inventory.
     ///
     /// # Errors
-    /// Returns an error for dirty state, invalid ownership/XML, or resource limits.
+    /// Returns an error only when the retained package-level Ink limits are
+    /// invalid. Source freshness, ownership/XML admission and resource limits
+    /// are checked on the first inventory, selector-dependent operation or
+    /// commit, when the source state is materialized.
     pub fn edit_ink(&self) -> Result<Edit> {
         self.edit_ink_with_options(EditOptions {
             inventory: self.semantic_limits().ink_value(),
@@ -736,30 +773,14 @@ impl Package {
     /// Start an annotation edit with explicit source and operation bounds.
     ///
     /// # Errors
-    /// Returns an error for invalid limits, dirty state, malformed data or limits.
+    /// Returns an error for invalid limits. Dirty state, malformed data and
+    /// source/resource limits are checked on the first inventory,
+    /// selector-dependent operation or commit.
     pub fn edit_ink_with_options(&self, limits: EditOptions) -> Result<Edit> {
         let limits = limits.validate()?;
-        self.ensure_story_opc_current("edit_ink")?;
-        let package = self.opc_package();
-        let mut total = 0usize;
-        // The bound is over actual payload bytes, so every part is decoded
-        // here (ADR 0030).
-        for part in package.try_iter_parts() {
-            let part = part?;
-            total = total
-                .checked_add(part.blob().len())
-                .ok_or_else(|| Error::Invalid("DOCX Ink edit source size overflow".into()))?;
-            bound(LimitKind::EditPackageBytes, total, limits.max_package_bytes)?;
-        }
-        let snapshot = super::package::load(package, limits.inventory)?;
-        let binding = Binding::capture(package, limits.inventory)?;
         Ok(Edit {
             source: self.clone(),
-            base: Arc::new(State {
-                package: self.shared_opc_package(),
-                binding,
-                snapshot,
-            }),
+            base: RefCell::new(None),
             removals: Vec::new(),
             additions: Vec::new(),
             replacements: Vec::new(),

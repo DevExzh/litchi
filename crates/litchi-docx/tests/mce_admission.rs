@@ -150,7 +150,7 @@ fn managed(bytes: &[u8]) -> (Budget, CancellationSource, source_backed::Package)
 /// The edit record 0008's probe made: replace the text of the first
 /// paragraph the grammar accepts, or append one paragraph when none is.
 fn first_edit<P: Clone>(edit: &mut Edit<P>) {
-    let count = edit.source().paragraph_count();
+    let count = edit.source().unwrap().paragraph_count();
     for position in 0..count {
         if edit
             .replace_paragraph_text(Position::new(position), "UO-0011 replaced")

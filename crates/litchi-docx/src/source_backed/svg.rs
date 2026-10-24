@@ -7,6 +7,8 @@
 //! package; writing it adds or removes the SVG parts and relationships and
 //! rewrites the main story.
 
+use std::cell::{RefCell, RefMut};
+
 use crate::Result;
 use crate::source_backed::deferred::{Change, source_family};
 use crate::source_backed::svg_lifecycle::{BatchEdit as RecordEdit, BatchPatch as RecordPatch};
@@ -91,7 +93,8 @@ impl std::fmt::Display for LimitKind {
 /// [`Self::commit`] returns a new package.
 pub struct Edit<'a> {
     package: &'a Package,
-    inner: RecordEdit<'a>,
+    selectors: Vec<PictureSelector>,
+    inner: RefCell<Option<RecordEdit<'a>>>,
 }
 
 impl std::fmt::Debug for Edit<'_> {
@@ -101,6 +104,33 @@ impl std::fmt::Debug for Edit<'_> {
 }
 
 impl<'a> Edit<'a> {
+    fn materialize(&self) -> Result<RecordEdit<'a>> {
+        self.package.edit_svg_record(self.selectors.clone())
+    }
+
+    fn ensure_inner(&self) -> Result<()> {
+        let mut inner = self.inner.borrow_mut();
+        if inner.is_none() {
+            *inner = Some(self.materialize()?);
+        }
+        Ok(())
+    }
+
+    fn inner_mut(&self) -> Result<RefMut<'_, RecordEdit<'a>>> {
+        self.ensure_inner()?;
+        Ok(self.inner.borrow_mut())
+    }
+
+    fn into_inner(mut self) -> Result<RecordEdit<'a>> {
+        if self.inner.get_mut().is_none() {
+            let inner = self.materialize()?;
+            *self.inner.get_mut() = Some(inner);
+        }
+        self.inner.into_inner().ok_or_else(|| {
+            crate::Error::internal("svg.edit", "SVG edit materializer is unavailable")
+        })
+    }
+
     /// The package the edit is staged over.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -109,14 +139,28 @@ impl<'a> Edit<'a> {
 
     /// The selected pictures before the edit.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        self.inner.source()
+    pub fn source(&self) -> Result<Snapshot> {
+        self.ensure_inner()?;
+        Ok(self
+            .inner
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| crate::Error::internal("svg.edit", "SVG source is unavailable"))?
+            .source()
+            .clone())
     }
 
     /// The selected pictures with the staged changes.
     #[must_use]
-    pub const fn projected(&self) -> &Snapshot {
-        self.inner.projected()
+    pub fn projected(&self) -> Result<Snapshot> {
+        self.ensure_inner()?;
+        Ok(self
+            .inner
+            .borrow()
+            .as_ref()
+            .ok_or_else(|| crate::Error::internal("svg.edit", "SVG projection is unavailable"))?
+            .projected()
+            .clone())
     }
 
     /// Attach an SVG payload to a selected picture; returns whether it
@@ -130,7 +174,7 @@ impl<'a> Edit<'a> {
         selector: impl Into<PictureSelector>,
         input: impl Into<Input<'b>>,
     ) -> Result<bool> {
-        self.inner.attach_svg(selector, input)
+        self.inner_mut()?.attach_svg(selector, input)
     }
 
     /// Attach with explicit identities after all checks.
@@ -143,7 +187,7 @@ impl<'a> Edit<'a> {
         selector: impl Into<PictureSelector>,
         request: &AttachmentReplacement,
     ) -> Result<bool> {
-        self.inner.attach(selector, request)
+        self.inner_mut()?.attach(selector, request)
     }
 
     /// Detach a selected picture's SVG, keeping its raster.
@@ -152,7 +196,7 @@ impl<'a> Edit<'a> {
     ///
     /// Returns an error for an unselected picture.
     pub fn detach_svg(&mut self, selector: impl Into<PictureSelector>) -> Result<bool> {
-        self.inner.detach_svg(selector)
+        self.inner_mut()?.detach_svg(selector)
     }
 
     /// Commit the staged changes as a new source-backed package.
@@ -162,15 +206,18 @@ impl<'a> Edit<'a> {
     /// Returns a typed closure, graph, signature or source error before any
     /// output.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.inner.commit()?;
+        let this = self;
+        let package = this.package;
+        let commit = this.into_inner()?.commit()?;
         let operations = commit.diagnostics().operations();
-        commit_change(self.package, SvgChange(commit.patch().clone(), operations))
+        commit_change(package, SvgChange(commit.patch().clone(), operations))
     }
 }
 
 impl Package {
-    /// Stage one atomic SVG change spanning `selectors`. The drawing and
-    /// relationship inventory are read once.
+    /// Stage one atomic SVG change spanning `selectors`. The selectors are
+    /// retained without reading drawing payloads; the drawing and relationship
+    /// inventory are read once by the first operation, projection or commit.
     ///
     /// # Errors
     ///
@@ -180,9 +227,29 @@ impl Package {
         I: IntoIterator<Item = S>,
         S: Into<PictureSelector>,
     {
+        let selector_limit = self
+            .physical_package()?
+            .read_limits()
+            .max_total_relationships();
+        let mut selected = Vec::new();
+        for selector in selectors {
+            if selected.len() >= selector_limit {
+                return Err(crate::Error::Invalid(
+                    "SVG lifecycle selector count exceeds the bounded batch limit".into(),
+                ));
+            }
+            selected
+                .try_reserve(1)
+                .map_err(|source| crate::Error::Allocation {
+                    resource: "DOCX SVG lifecycle selectors",
+                    source,
+                })?;
+            selected.push(selector.into());
+        }
         Ok(Edit {
             package: self,
-            inner: self.edit_svg_record(selectors)?,
+            selectors: selected,
+            inner: RefCell::new(None),
         })
     }
 

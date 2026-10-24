@@ -160,7 +160,7 @@ impl Edit<Package> {
         at: Option<Position>,
         note: &NewNote,
     ) -> Result<u32> {
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         let part = self.related_part(kind.relationship(strict))?;
         let current = match &part {
             Some((name, _)) => self
@@ -193,7 +193,7 @@ impl Edit<Package> {
         } else {
             part_scan::splice(&current, root.close, root.close, &markup)
         };
-        self.inner.insert_run_markup_at(paragraph, at, |prefix| {
+        self.inner_mut()?.insert_run_markup_at(paragraph, at, |prefix| {
             let q = |local: &str| qualified(prefix, local);
             Ok(format!(
                 r#"<{r}><{rpr}><{rstyle} {val}="{style}"/></{rpr}><{reference} {id_attribute}="{id}"/></{r}>"#,
@@ -324,14 +324,14 @@ impl Edit<Package> {
         let element = &tree.elements[note];
         let updated = part_scan::splice(&xml, element.start, element.end, &[]);
         self.replace_part(&name, updated)?;
-        self.inner
+        self.inner_mut()?
             .strip_note_references(kind.reference().as_bytes(), i64::from(id))?;
         Ok(self)
     }
 
     pub(super) fn notes_part(&self, kind: NoteKind) -> Result<(String, Vec<u8>)> {
         let (name, _) = self
-            .related_part(kind.relationship(self.inner.is_strict()))?
+            .related_part(kind.relationship(self.is_strict()?))?
             .ok_or_else(not_found)?;
         let xml = self
             .part_payload(&name)?

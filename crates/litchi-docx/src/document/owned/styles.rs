@@ -30,8 +30,7 @@ impl Edit<Package> {
     ///
     /// Returns a package-graph error, or a malformed-part error.
     pub fn style_catalog(&self) -> Result<Option<Catalog>> {
-        let Some((name, _)) = self.related_part(styles_relationship(self.inner.is_strict()))?
-        else {
+        let Some((name, _)) = self.related_part(styles_relationship(self.is_strict()?))? else {
             return Ok(None);
         };
         let Some(payload) = self.part_payload(&name)? else {
@@ -64,7 +63,7 @@ impl Edit<Package> {
     /// Returns [`Refusal::InvalidPropertyValue`] for an empty or taken
     /// identifier, or a typed error for a malformed part.
     pub fn add_style(&mut self, style: &NewStyle) -> Result<&mut Self> {
-        let strict = self.inner.is_strict();
+        let strict = self.is_strict()?;
         if style.id().is_empty() {
             return Err(invalid_value());
         }
@@ -138,8 +137,7 @@ impl Edit<Package> {
 
     /// The styles part's name and catalog, staged changes included.
     fn style_part(&self) -> Result<Option<(String, Catalog)>> {
-        let Some((name, _)) = self.related_part(styles_relationship(self.inner.is_strict()))?
-        else {
+        let Some((name, _)) = self.related_part(styles_relationship(self.is_strict()?))? else {
             return Ok(None);
         };
         let payload = self

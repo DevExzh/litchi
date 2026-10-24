@@ -128,7 +128,7 @@ fn selectors_skip_generic_content_and_batch_removal_handles_distinct_ids_sharing
     let original = PackageWriter::to_bytes(&opc).unwrap();
     let mut package = open(&opc);
     let mut edit = package.edit_ink().unwrap();
-    assert_eq!(edit.inventory().annotations().len(), 2);
+    assert_eq!(edit.inventory().unwrap().annotations().len(), 2);
     edit.remove(Position::new(1)).unwrap();
     edit.remove(Position::new(0)).unwrap();
     let commit = {

@@ -43,14 +43,24 @@ enum DocumentPatchSource {
 }
 
 impl Package {
+    fn materialize_edit(
+        package: &Self,
+        options: crate::document::EditOptions,
+    ) -> Result<crate::document::transaction::Edit, crate::document::Error> {
+        package
+            .document_snapshot_with_options(Some(&options))
+            .map(|snapshot| snapshot.edit())
+    }
+
     /// Start the ordinary immutable main-document edit directly from this
-    /// opened package. The edit retains this source; `commit()` returns a new
-    /// package without mutating the caller.
+    /// opened package. The edit retains this source; its first operation,
+    /// projection or `commit()` performs the fallible document admission, and
+    /// a successful commit returns a new package without mutating the caller.
     ///
     /// # Errors
     ///
-    /// Returns a typed snapshot error when package state is stale, malformed,
-    /// or outside the document transaction bounds.
+    /// Admission errors are returned by the first operation, projection or
+    /// commit, when package state is stale, malformed, or outside the bounds.
     pub fn edit(&self) -> Result<crate::document::Edit, crate::document::Error> {
         self.edit_with_options(crate::document::EditOptions::default())
     }
@@ -61,10 +71,11 @@ impl Package {
         &self,
         options: crate::document::EditOptions,
     ) -> Result<crate::document::Edit, crate::document::Error> {
-        self.document_snapshot_with_options(Some(&options))
-            .map(|snapshot| {
-                crate::document::Edit::new(self.clone(), snapshot.edit()).with_options(options)
-            })
+        Ok(crate::document::Edit::deferred(
+            self.clone(),
+            options,
+            Self::materialize_edit,
+        ))
     }
 
     /// Start a bounded composition tied to this package's complete artifact.

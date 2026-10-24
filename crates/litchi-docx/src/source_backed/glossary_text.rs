@@ -6,6 +6,8 @@
 //! stages an [`Edit`] whose commit returns a new source-backed package;
 //! writing it rewrites only the selected story part.
 
+use std::cell::{RefCell, RefMut};
+
 use litchi_core::Position;
 
 use crate::source_backed::Package;
@@ -56,7 +58,9 @@ pub use crate::source_backed::story_text::LimitKind;
 /// [`Self::commit`] returns a new package.
 pub struct Edit {
     package: Package,
-    inner: record::GlossaryBatchEdit,
+    selector: GlossaryBatchSelector,
+    limits: record::Limits,
+    inner: RefCell<Option<record::GlossaryBatchEdit>>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -66,6 +70,38 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn materialize(&self) -> Result<record::GlossaryBatchEdit, Error> {
+        self.package
+            .glossary_text_batch_snapshot_bounded(self.selector.clone(), self.limits)?
+            .edit_engine()
+    }
+
+    fn ensure_inner(&self) -> Result<(), Error> {
+        let mut inner = self.inner.borrow_mut();
+        if inner.is_none() {
+            *inner = Some(self.materialize()?);
+        }
+        Ok(())
+    }
+
+    fn inner_mut(&self) -> Result<RefMut<'_, record::GlossaryBatchEdit>, Error> {
+        self.ensure_inner()?;
+        Ok(self.inner.borrow_mut())
+    }
+
+    fn into_inner(mut self) -> Result<record::GlossaryBatchEdit, Error> {
+        if self.inner.get_mut().is_none() {
+            let inner = self.materialize()?;
+            *self.inner.get_mut() = Some(inner);
+        }
+        self.inner.into_inner().ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "glossary_text.edit",
+                "glossary-text edit materializer is unavailable",
+            ))
+        })
+    }
+
     /// The package the edit is staged over.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -78,7 +114,7 @@ impl Edit {
     ///
     /// Returns a projection error.
     pub fn projected(&self) -> Result<record::GlossaryBatchSnapshot, Error> {
-        self.inner.projected()
+        self.inner_mut()?.projected()
     }
 
     /// Replace all text in one direct paragraph of one selected entry.
@@ -92,7 +128,7 @@ impl Edit {
         position: Position,
         authored_text: impl AsRef<str>,
     ) -> Result<&mut Self, Error> {
-        self.inner
+        self.inner_mut()?
             .replace_paragraph_text(entry_index, position, authored_text)?;
         Ok(self)
     }
@@ -104,8 +140,10 @@ impl Edit {
     /// Returns a typed source, topology, output-limit or signature error
     /// before any output.
     pub fn commit(self) -> Result<Commit, Error> {
-        let patch = self.inner.finish()?;
-        commit_change(&self.package, GlossaryTextChange(patch))
+        let this = self;
+        let package = this.package.clone();
+        let patch = this.into_inner()?.finish()?;
+        commit_change(&package, GlossaryTextChange(patch))
     }
 }
 
@@ -114,11 +152,15 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the errors of [`Self::glossary_text_batch_snapshot`].
+    /// The selected entries are admitted on the first operation, projection
+    /// or commit, under the package's retained story limits.
     pub fn edit_glossary_text_batch(&self, selector: GlossaryBatchSelector) -> Result<Edit, Error> {
+        let limits = self.semantic_limits.story_text_value();
         Ok(Edit {
             package: self.clone(),
-            inner: self.glossary_text_batch_snapshot(selector)?.edit_engine()?,
+            selector,
+            limits,
+            inner: RefCell::new(None),
         })
     }
 

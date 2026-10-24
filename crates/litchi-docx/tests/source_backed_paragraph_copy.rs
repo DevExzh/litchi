@@ -62,6 +62,13 @@ fn open(source: Vec<u8>) -> source_backed::Package {
     source_backed::Package::from_read_at(read_at).unwrap()
 }
 
+fn admit_copy(source: Vec<u8>) -> Result<(), Error> {
+    open(source)
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .map(|_| ())
+}
+
 fn reopened_texts(bytes: Vec<u8>) -> Vec<String> {
     Package::from_reader(io::Cursor::new(bytes))
         .unwrap()
@@ -278,7 +285,7 @@ fn copies_exact_fragment_at_first_middle_and_last_source_order_slots() {
         let source = bytes(&fixture(MAIN, document(&["alpha", "beta", "gamma"])));
         let package = open(source);
         let mut edit = package.edit_plain_paragraph_copy().unwrap();
-        let snapshot = edit.projected();
+        let snapshot = edit.projected().unwrap();
         let selected = snapshot
             .xml_bytes()
             .windows(b"<w:p><w:r><w:t>beta</w:t></w:r></w:p>".len())
@@ -287,7 +294,7 @@ fn copies_exact_fragment_at_first_middle_and_last_source_order_slots() {
         assert_eq!(selected, 1);
         edit.copy_plain_paragraph(Position::new(1), Position::new(before))
             .unwrap();
-        let projected = edit.projected();
+        let projected = edit.projected().unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(commit.patch().effect_report().copied_paragraphs, 1);
         assert_eq!(
@@ -477,12 +484,12 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     let source = bytes(&fixture(MAIN, document(&["a", "b"])));
     let package = open(source.clone());
     let mut edit = package.edit_plain_paragraph_copy().unwrap();
-    let original = edit.projected();
+    let original = edit.projected().unwrap();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(2), Position::new(0)),
         Err(Error::OutOfBounds { kind: "source", .. })
     ));
-    assert_eq!(edit.projected().xml_bytes(), original.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(3)),
         Err(Error::OutOfBounds {
@@ -490,10 +497,10 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), original.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
-    let once = edit.projected().xml_bytes().to_vec();
+    let once = edit.projected().unwrap().xml_bytes().to_vec();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(1)),
         Err(Error::Limit {
@@ -501,7 +508,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), once);
+    assert_eq!(edit.projected().unwrap().xml_bytes(), once);
 
     let paragraph_limited = Limits::new(1024, 1, 100, 8, 2048, 4096).unwrap();
     assert!(matches!(
@@ -509,7 +516,8 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().paragraph_copy(paragraph_limited)
             )
-            .edit_plain_paragraph_copy(),
+            .edit_plain_paragraph_copy()
+            .and_then(|edit| edit.projected().map(|_| ())),
         Err(Error::Limit {
             kind: LimitKind::Paragraphs,
             ..
@@ -520,7 +528,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(output_limited))
         .edit_plain_paragraph_copy()
         .unwrap();
-    let original = edit.projected();
+    let original = edit.projected().unwrap();
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::Limit {
@@ -528,7 +536,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             ..
         })
     ));
-    assert_eq!(edit.projected().xml_bytes(), original.xml_bytes());
+    assert_eq!(edit.projected().unwrap().xml_bytes(), original.xml_bytes());
 
     let durable_limited = Limits::new(1024, 4, 100, 8, 2048, 128).unwrap();
     let mut edit = open(bytes(&fixture(MAIN, document(&["a"]))))
@@ -565,7 +573,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(external).edit_plain_paragraph_copy(),
+        admit_copy(external),
         Err(Error::Refused(Refusal::ExternalRelationship))
     ));
 
@@ -585,7 +593,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(custom_xml).edit_plain_paragraph_copy(),
+        admit_copy(custom_xml),
         Err(Error::Refused(Refusal::UnsupportedDependency))
     ));
 
@@ -607,7 +615,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
                 false,
             );
         assert!(matches!(
-            open(bytes(&package)).edit_plain_paragraph_copy(),
+            admit_copy(bytes(&package)),
             Err(Error::Refused(Refusal::UnsupportedDependency))
         ));
     }
@@ -625,7 +633,7 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         bytes(&package)
     };
     assert!(matches!(
-        open(signed).edit_plain_paragraph_copy(),
+        admit_copy(signed),
         Err(Error::Refused(Refusal::SignatureInfrastructure))
     ));
 
@@ -636,13 +644,13 @@ fn relationships_dependencies_signatures_macros_and_paths_are_refused() {
         .set_content_type(ct::WML_DOCUMENT_MACRO_MAIN.to_owned())
         .unwrap();
     assert!(matches!(
-        open(bytes(&macro_package)).edit_plain_paragraph_copy(),
+        admit_copy(bytes(&macro_package)),
         Err(Error::Refused(Refusal::MacroEnabled))
     ));
 
     let hostile_path = bytes(&fixture("word/sub/document.xml", document(&["plain"])));
     assert!(matches!(
-        open(hostile_path).edit_plain_paragraph_copy(),
+        admit_copy(hostile_path),
         Err(Error::Refused(Refusal::MainDocumentShape))
     ));
 }
@@ -686,7 +694,7 @@ fn structured_paragraphs_sections_and_hostile_namespaces_are_refused() {
     ];
     for xml in cases {
         assert!(matches!(
-            open(bytes(&fixture(MAIN, xml.into_bytes()))).edit_plain_paragraph_copy(),
+            admit_copy(bytes(&fixture(MAIN, xml.into_bytes()))),
             Err(Error::Refused(
                 Refusal::ComplexDocument | Refusal::ComplexParagraph
             ))
@@ -725,6 +733,7 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
             .edit_plain_paragraph_copy()
             .unwrap()
             .projected()
+            .unwrap()
             .paragraph_count(),
         1
     );
@@ -737,6 +746,7 @@ fn strict_and_ordinary_producer_namespace_declarations_are_supported() {
             .edit_plain_paragraph_copy()
             .unwrap()
             .projected()
+            .unwrap()
             .paragraph_count(),
         1
     );
@@ -749,7 +759,7 @@ fn empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous() {
     let mut edit = open(bytes(&fixture(MAIN, empty_body)))
         .edit_plain_paragraph_copy()
         .unwrap();
-    assert_eq!(edit.projected().paragraph_count(), 0);
+    assert_eq!(edit.projected().unwrap().paragraph_count(), 0);
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::OutOfBounds { kind: "source", .. })
@@ -762,7 +772,7 @@ fn empty_body_and_empty_or_sole_paragraph_slots_are_unambiguous() {
         let mut edit = package.edit_plain_paragraph_copy().unwrap();
         edit.copy_plain_paragraph(Position::new(0), Position::new(before))
             .unwrap();
-        let projected = edit.projected();
+        let projected = edit.projected().unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(projected.paragraph_count(), 2);
         assert_eq!(commit.patch().effect_report().copied_bytes, b"<w:p/>".len());
@@ -788,7 +798,7 @@ fn enforced_protection_is_refused() {
             .unwrap()
             .relate_to("settings.xml", rt::SETTINGS);
         assert!(matches!(
-            open(bytes(&package)).edit_plain_paragraph_copy(),
+            admit_copy(bytes(&package)),
             Err(Error::Refused(Refusal::Protection))
         ));
     }

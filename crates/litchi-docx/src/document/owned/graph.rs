@@ -50,7 +50,7 @@ impl Edit<Package> {
         target: &str,
     ) -> Result<String> {
         let id = self.next_relationship_id()?;
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([TransferRelationship {
                     id: id.clone(),
@@ -124,7 +124,7 @@ impl Edit<Package> {
         };
         PackURI::new(name.clone()).map_err(crate::Error::Invalid)?;
         let id = self.next_relationship_id()?;
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([TransferRelationship {
                     id: id.clone(),
@@ -157,7 +157,7 @@ impl Edit<Package> {
         if before.as_slice() == payload.as_slice() {
             return Ok(self);
         }
-        self.inner.stage_graph_change(
+        self.inner_mut()?.stage_graph_change(
             Arc::new(GraphChange {
                 relationships: Arc::new([]),
                 parts: Arc::new([]),
@@ -184,18 +184,20 @@ impl Edit<Package> {
         if let Ok(part) = self.package.opc_package().get_part(&uri) {
             current = Some(part.blob_arc());
         }
-        for (change, forward) in self.inner.staged_graph_changes() {
-            if !forward {
-                continue;
+        self.inner_ref(|inner| {
+            for (change, forward) in inner.staged_graph_changes() {
+                if !forward {
+                    continue;
+                }
+                for part in change.parts.iter().filter(|part| part.name == name) {
+                    current = Some(Arc::clone(&part.blob));
+                }
+                for part in change.replaced.iter().filter(|part| part.name == name) {
+                    current = Some(Arc::clone(&part.after));
+                }
             }
-            for part in change.parts.iter().filter(|part| part.name == name) {
-                current = Some(Arc::clone(&part.blob));
-            }
-            for part in change.replaced.iter().filter(|part| part.name == name) {
-                current = Some(Arc::clone(&part.after));
-            }
-        }
-        Ok(current)
+            current
+        })
     }
 
     /// The name and relationship identifier of the main part's first related
@@ -220,21 +222,23 @@ impl Edit<Package> {
                 .to_owned();
             return Ok(Some((name, relationship.r_id().to_owned())));
         }
-        for (change, forward) in self.inner.staged_graph_changes() {
-            if !forward {
-                continue;
-            }
-            for relationship in change
-                .relationships
-                .iter()
-                .filter(|relationship| relationship.relationship_type == relationship_type)
-            {
-                if let Some(part) = change.parts.first() {
-                    return Ok(Some((part.name.clone(), relationship.id.clone())));
+        self.inner_ref(|inner| {
+            for (change, forward) in inner.staged_graph_changes() {
+                if !forward {
+                    continue;
+                }
+                for relationship in change
+                    .relationships
+                    .iter()
+                    .filter(|relationship| relationship.relationship_type == relationship_type)
+                {
+                    if let Some(part) = change.parts.first() {
+                        return Some((part.name.clone(), relationship.id.clone()));
+                    }
                 }
             }
-        }
-        Ok(None)
+            None
+        })
     }
 
     /// Insert a hyperlink holding `run` into the paragraph at `paragraph`,
@@ -281,7 +285,7 @@ impl Edit<Package> {
     ) -> Result<Position> {
         let relationship = match target {
             HyperlinkTarget::Url(url) => {
-                Some(self.add_external_relationship(self.hyperlink_relationship(), url)?)
+                Some(self.add_external_relationship(self.hyperlink_relationship()?, url)?)
             },
             HyperlinkTarget::Anchor(_) => None,
         };
@@ -289,8 +293,13 @@ impl Edit<Package> {
             HyperlinkTarget::Anchor(anchor) => Some(anchor.as_str()),
             HyperlinkTarget::Url(_) => None,
         };
-        self.inner
-            .insert_hyperlink_markup_at(paragraph, at, relationship.as_deref(), anchor, run)
+        self.inner_mut()?.insert_hyperlink_markup_at(
+            paragraph,
+            at,
+            relationship.as_deref(),
+            anchor,
+            run,
+        )
     }
 
     /// Point the hyperlink at `hyperlink` to `target`, replacing its
@@ -307,7 +316,7 @@ impl Edit<Package> {
     ) -> Result<&mut Self> {
         let relationship = match target {
             HyperlinkTarget::Url(url) => {
-                Some(self.add_external_relationship(self.hyperlink_relationship(), url)?)
+                Some(self.add_external_relationship(self.hyperlink_relationship()?, url)?)
             },
             HyperlinkTarget::Anchor(_) => None,
         };
@@ -315,18 +324,18 @@ impl Edit<Package> {
             HyperlinkTarget::Anchor(anchor) => Some(anchor.as_str()),
             HyperlinkTarget::Url(_) => None,
         };
-        self.inner
+        self.inner_mut()?
             .retarget_hyperlink_at(hyperlink, relationship.as_deref(), anchor)?;
         Ok(self)
     }
 
     /// The hyperlink relationship type of the document's conformance.
-    fn hyperlink_relationship(&self) -> &'static str {
-        if self.inner.is_strict() {
+    fn hyperlink_relationship(&self) -> Result<&'static str> {
+        Ok(if self.is_strict()? {
             STRICT_HYPERLINK_RELATIONSHIP
         } else {
             HYPERLINK_RELATIONSHIP
-        }
+        })
     }
 
     /// The folder of the main document part, with a trailing slash.
@@ -348,10 +357,12 @@ impl Edit<Package> {
             .iter_parts()
             .map(|part| part.partname().as_str().to_owned())
             .collect();
-        for (change, _) in self.inner.staged_graph_changes() {
-            names.extend(change.parts.iter().map(|part| part.name.clone()));
-        }
-        Ok(names)
+        self.inner_ref(|inner| {
+            for (change, _) in inner.staged_graph_changes() {
+                names.extend(change.parts.iter().map(|part| part.name.clone()));
+            }
+            names
+        })
     }
 
     /// The first `rIdN` the main part and the staged changes do not use.
@@ -373,14 +384,16 @@ impl Edit<Package> {
             .iter()
             .map(|relationship| relationship.r_id().to_owned())
             .collect();
-        for (change, _) in self.inner.staged_graph_changes() {
-            used.extend(
-                change
-                    .relationships
-                    .iter()
-                    .map(|relationship| relationship.id.clone()),
-            );
-        }
+        self.inner_ref(|inner| {
+            for (change, _) in inner.staged_graph_changes() {
+                used.extend(
+                    change
+                        .relationships
+                        .iter()
+                        .map(|relationship| relationship.id.clone()),
+                );
+            }
+        })?;
         let mut index = used.len() + 1;
         let mut ids = Vec::with_capacity(count);
         while ids.len() < count {

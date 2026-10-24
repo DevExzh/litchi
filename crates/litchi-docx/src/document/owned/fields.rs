@@ -25,7 +25,7 @@ impl<P: Clone> Edit<P> {
     ///
     /// Returns an XML error for malformed markup.
     pub fn fields(&self) -> Result<Fields> {
-        self.inner.fields()
+        self.inner_ref(|inner| inner.fields())?
     }
 
     /// Apply `updates` planned over [`Self::fields`] of this edit; see
@@ -36,7 +36,7 @@ impl<P: Clone> Edit<P> {
     /// As [`super::super::raw::Tree::refresh_fields`]. Source-backed
     /// edits refuse it as an unmanaged-only operation.
     pub fn refresh_fields(&mut self, fields: &Fields, updates: &[Update]) -> Result<Outcome> {
-        self.inner.refresh_fields(fields, updates)
+        self.inner_mut()?.refresh_fields(fields, updates)
     }
 
     /// Insert a bookmark into the paragraph at `paragraph`; see
@@ -66,7 +66,8 @@ impl<P: Clone> Edit<P> {
         name: &str,
         text: Option<&str>,
     ) -> Result<i64> {
-        self.inner.insert_bookmark_at(paragraph, at, name, text)
+        self.inner_mut()?
+            .insert_bookmark_at(paragraph, at, name, text)
     }
 
     /// Insert a complex field into the paragraph at `paragraph`; see
@@ -82,7 +83,7 @@ impl<P: Clone> Edit<P> {
         instruction: &str,
         result: Option<&str>,
     ) -> Result<Position> {
-        self.inner
+        self.inner_mut()?
             .insert_field_at(paragraph, at, instruction, result)
     }
 }

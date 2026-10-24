@@ -186,8 +186,8 @@ fn body_indexes_follow_effective_revisions_and_keep_old_values() {
     );
 }
 
-/// One source revision's unmanaged transaction snapshot is scanned once and
-/// shared by every edit and commit started from it (record 0305), and an
+/// One source revision's unmanaged transaction snapshot is scanned on first
+/// use, shared by every edit and commit started from it (record 0305), and an
 /// edit from the memo publishes what an edit from a fresh scan publishes.
 #[test]
 fn unmanaged_edits_share_one_transaction_snapshot() {
@@ -197,8 +197,10 @@ fn unmanaged_edits_share_one_transaction_snapshot() {
     ));
     let package = Package::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
     let first = package.edit().unwrap();
+    assert!(package.main_snapshot.lock().unwrap().is_none());
+    let _ = first.source().unwrap();
     let held = package.main_snapshot.lock().unwrap().clone();
-    let held = held.expect("the first edit memoizes its snapshot");
+    let held = held.expect("the first projection memoizes its snapshot");
     let raw = held.xml_bytes().to_vec();
     let lineage = package.physical_package().unwrap().source_lineage();
     let version = package
@@ -222,7 +224,10 @@ fn unmanaged_edits_share_one_transaction_snapshot() {
         "other bytes are never served from the memo"
     );
     let second = package.edit().unwrap();
-    assert_eq!(first.source().xml_bytes(), second.source().xml_bytes());
+    assert_eq!(
+        first.source().unwrap().xml_bytes(),
+        second.source().unwrap().xml_bytes()
+    );
     let mut edit = second;
     edit.replace_paragraph_text(Position::new(1), "gamma")
         .unwrap();
@@ -266,13 +271,14 @@ fn committed_handles_share_one_effective_transaction_snapshot() {
         assert!(committed.effective.is_some());
         assert!(committed.main_snapshot.lock().unwrap().is_none());
         let mut edit = committed.edit().unwrap();
+        let source = edit.source().unwrap();
         let held = committed
             .main_snapshot
             .lock()
             .unwrap()
             .clone()
-            .expect("the effective edit memoizes its snapshot");
-        assert_eq!(held.xml_bytes(), edit.source().xml_bytes());
+            .expect("the first effective projection memoizes its snapshot");
+        assert_eq!(held.xml_bytes(), source.xml_bytes());
         let topology = committed.effective.as_ref().unwrap();
         let effective = topology.main_document_part().unwrap().data().unwrap();
         assert_eq!(held.xml_bytes(), effective.as_bytes());
