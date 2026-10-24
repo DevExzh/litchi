@@ -4042,3 +4042,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   excluded from final baseline qualification. The released build slot goes to
   actual OPC/DOCX report-rename compilation and glossary checks. Full gate,
   actual corpus replay and paired performance acceptance remain active.
+
+- Coordinator correctness handoff (2026-10-24):
+  Independent review accepts the exact c796 DrawingML release build and all
+  ten current native correctness reports. All artifact identities and native
+  semantic checks pass, as do thirteen protocol tests. Record 0362dvii merges
+  at `5affb487cf`; its four true historical baseline preparations validate all
+  ten profiles with the accepted 52ed/4100/eac862 locks. Historical builds and
+  paired performance runs remain unexecuted, and generated-lock diagnostics
+  are excluded.
+
+  The OLE paired runner refuses its build phase before Cargo because unrelated
+  builders are active. The failed receipt is retained; fresh retry roots are
+  ready for a globally exclusive build window. An available slot alone does
+  not satisfy that runner's guard. The OPC/DOCX rename is undergoing actual
+  validation, the full gate continues, and PPT builds remain active. Nothing
+  is pushed.
+
+- Coordinator glossary repair (2026-10-24):
+  OPC ArtifactStreamReport and every DOCX consumer merge at `472b670547`, with
+  no alias, layout or streaming-behavior change. The exact old-name bans and
+  six corrected soapberry office scopes remain enforced. Independent review
+  verifies the 4100 lock, all source and log hashes, nine OPC stream tests,
+  one DOCX consumer test, all-target/all-feature compilation, and fresh OPC,
+  DOCX and soapberry glossary checks. Record 0362ul19 binds the actual passes.
+
+  A new all-68 capture is assigned to immutable 472b source. The c796 full gate
+  has passed formatting and all twenty-four Clippy profiles; its remaining
+  tests, isolated documentation and actual corpus verification continue.
+  Native preparations must bind the final source before performance acceptance.
+
+  Independent property-packet review finds an executable manifest-identity
+  mismatch: preparation accepts an external final manifest while the legacy
+  build validator requires its canonical in-tree path. Return 0362ul8e is
+  correcting the shared preparer/validator contract, including RTF, without
+  weakening source or workload checks. Source-only preparation is not promoted
+  to native acceptance. Only redaction audit 22 is deferred. Nothing is pushed.
