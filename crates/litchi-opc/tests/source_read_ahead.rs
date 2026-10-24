@@ -1216,6 +1216,142 @@ fn retained_source_artifact_does_not_pin_the_read_ahead_window() {
     assert_eq!(saved, archive_bytes());
 }
 
+#[test]
+fn retained_source_artifact_streams_after_its_last_package_owner_drops() {
+    let source_bytes = archive_bytes();
+    let (current_artifact, original_artifact, proof) = {
+        let package = read_ahead_package(
+            Arc::new(OwnedSource::new(source_bytes.clone())),
+            SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+        );
+        package
+            .part(&uri(DOCUMENT_URI))
+            .expect("document part must be present")
+            .data()
+            .expect("document payload must decode");
+        let diagnostics = package
+            .source_read_diagnostics()
+            .expect("diagnostics must be readable")
+            .expect("read-ahead diagnostics must be enabled");
+        assert!(diagnostics.retained_window_bytes > 0);
+
+        let current_artifact = package.source_artifact();
+        let original_artifact = package.source_artifact();
+        let proof = SourceArtifactRestoreProof {
+            current_len: current_artifact.len(),
+            current_sha256: current_artifact
+                .fingerprint()
+                .expect("current artifact must fingerprint"),
+            original_len: original_artifact.len(),
+            original_sha256: original_artifact
+                .fingerprint()
+                .expect("original artifact must fingerprint"),
+        };
+        (current_artifact, original_artifact, proof)
+    };
+
+    let recipient = read_ahead_package(
+        Arc::new(OwnedSource::new(source_bytes.clone())),
+        SourceReadPolicy::exact(),
+    );
+    let mut output = Vec::new();
+    recipient
+        .restore_streamed_artifact_to_stream(
+            &current_artifact,
+            &original_artifact,
+            proof,
+            original_artifact.len() + 1,
+            &mut output,
+            None,
+        )
+        .expect("dropped-package artifacts must stream through the checked admission path");
+    assert_eq!(output, source_bytes);
+}
+
+#[test]
+fn a_live_package_clone_keeps_the_read_ahead_window_until_the_last_clone_drops() {
+    let (budget, context) = managed_context(8 * 1024 * 1024, u64::MAX);
+    let package = managed_read_ahead_package(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+        context,
+    );
+    let clone = package.clone();
+    package
+        .part(&uri(DOCUMENT_URI))
+        .expect("document part must be present")
+        .data()
+        .expect("document payload must decode");
+    let diagnostics = clone
+        .source_read_diagnostics()
+        .expect("clone diagnostics must be readable")
+        .expect("clone must retain read-ahead diagnostics");
+    assert!(diagnostics.retained_window_bytes > 0);
+    assert!(budget.used(Resource::Memory) > 0);
+
+    drop(package);
+    assert!(
+        budget.used(Resource::Memory) > 0,
+        "a live clone must retain the bounded read-ahead allocation"
+    );
+    drop(clone);
+    assert_eq!(
+        budget.used(Resource::Memory),
+        0,
+        "the read-ahead allocation must release with the last package clone"
+    );
+}
+
+#[test]
+fn dropped_artifact_freshness_precedes_restore_and_fingerprint() {
+    let source = VersionedSource::new(archive_bytes());
+    let package = read_ahead_package(
+        source.clone(),
+        SourceReadPolicy::forward_start(4096).expect("window policy must be valid"),
+    );
+    package
+        .part(&uri(DOCUMENT_URI))
+        .expect("document part must be present")
+        .data()
+        .expect("document payload must decode");
+    let original_artifact = package.source_artifact();
+    let original_fingerprint = original_artifact
+        .fingerprint()
+        .expect("original artifact must fingerprint before mutation");
+    drop(package);
+    source.bump_revision();
+
+    assert!(matches!(
+        original_artifact.fingerprint(),
+        Err(OpcError::SourceChanged { .. })
+    ));
+
+    let recipient = read_ahead_package(
+        Arc::new(OwnedSource::new(archive_bytes())),
+        SourceReadPolicy::exact(),
+    );
+    let current_artifact = recipient.source_artifact();
+    let proof = SourceArtifactRestoreProof {
+        current_len: current_artifact.len(),
+        current_sha256: current_artifact
+            .fingerprint()
+            .expect("recipient artifact must fingerprint"),
+        original_len: original_artifact.len(),
+        original_sha256: original_fingerprint,
+    };
+    let mut output = Vec::new();
+    let error = recipient
+        .restore_source_artifact_to_stream(
+            &original_artifact,
+            proof,
+            original_artifact.len() + 1,
+            &mut output,
+        )
+        .expect_err("a changed dropped artifact must refuse restore before output");
+    assert!(matches!(error, OpcError::SourceChanged { .. }));
+    assert!(output.is_empty());
+}
+
 #[derive(Debug)]
 struct VersionedSource {
     bytes: Arc<Vec<u8>>,

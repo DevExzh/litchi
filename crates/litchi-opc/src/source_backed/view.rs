@@ -324,14 +324,14 @@ impl PreparedTopology {
     ///
     /// ```
     /// use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter,
-    ///     SourceBackedPackage, SourceTopologyPlan};
+    ///     SourceBackedPackage, SourceCacheLimits, SourceLimits, SourceTopologyPlan};
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let name = PackURI::new("/example.xml")?;
     /// let mut package = OpcPackage::new();
     /// package.try_add_part(Box::new(BlobPart::new(
     ///     name.clone(), "application/xml".to_owned(), b"<before/>".to_vec(),
     /// )))?;
-    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
+    /// let source = SourceBackedPackage::from_vec(PackageWriter::to_bytes(&package)?, SourceLimits::default(), SourceCacheLimits::default(), None)?;
     /// let mut plan = SourceTopologyPlan::new();
     /// plan.try_replace_part(name.clone(), b"<after/>".to_vec())?;
     /// let candidate = source.prepare_topology(plan)?;
