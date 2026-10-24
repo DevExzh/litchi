@@ -319,8 +319,7 @@ impl SmartArt {
                     } else if dgm && local == b"cxn" {
                         if parent != Some((SmartArtNamespace::Diagram, b"cxnLst".as_slice())) {
                             return Err(Error::Invalid(
-                                "the SmartArt connection is outside its connection list"
-                                    .to_owned(),
+                                "the SmartArt connection is outside its connection list".to_owned(),
                             ));
                         }
                         if connections.len() >= max_connections {
@@ -448,8 +447,7 @@ impl SmartArt {
                     } else if dgm && local == b"cxn" {
                         if parent != Some((SmartArtNamespace::Diagram, b"cxnLst".as_slice())) {
                             return Err(Error::Invalid(
-                                "the SmartArt connection is outside its connection list"
-                                    .to_owned(),
+                                "the SmartArt connection is outside its connection list".to_owned(),
                             ));
                         }
                         if connections.len() >= max_connections {
@@ -493,7 +491,8 @@ impl SmartArt {
                             "unexpected SmartArt data-model closing element".to_owned(),
                         ));
                     };
-                    if *expected_namespace != namespace || expected_local.as_slice() != local.as_ref()
+                    if *expected_namespace != namespace
+                        || expected_local.as_slice() != local.as_ref()
                     {
                         return Err(Error::Invalid(
                             "SmartArt data-model element names are unbalanced".to_owned(),
@@ -606,15 +605,12 @@ impl SmartArt {
             .map(|point| point.id.clone());
         let mut content = Vec::new();
         let mut index_by_id = HashMap::new();
-        for point in points
-            .into_iter()
-            .filter(|point| {
-                !matches!(
-                    point.kind.as_str(),
-                    "doc" | "pres" | "parTrans" | "sibTrans"
-                )
-            })
-        {
+        for point in points.into_iter().filter(|point| {
+            !matches!(
+                point.kind.as_str(),
+                "doc" | "pres" | "parTrans" | "sibTrans"
+            )
+        }) {
             if content.len() >= max_nodes {
                 return Err(Error::limit(
                     LimitKind::DiagramNodes,
@@ -648,9 +644,7 @@ impl SmartArt {
                 None
             } else {
                 Some(*index_by_id.get(&connection.source).ok_or_else(|| {
-                    Error::Invalid(
-                        "a SmartArt parent connection has a dangling source".to_owned(),
-                    )
+                    Error::Invalid("a SmartArt parent connection has a dangling source".to_owned())
                 })?)
             };
             if parent_seen[child] {
@@ -675,9 +669,7 @@ impl SmartArt {
                 roots.push(index);
             }
         }
-        roots.sort_unstable_by_key(|index| {
-            (parent_orders[*index].unwrap_or(usize::MAX), *index)
-        });
+        roots.sort_unstable_by_key(|index| (parent_orders[*index].unwrap_or(usize::MAX), *index));
         for siblings in &mut children {
             siblings.sort_unstable_by_key(|(order, index)| (*order, *index));
         }
@@ -693,11 +685,7 @@ impl SmartArt {
             max_depth: usize,
         ) -> Result<DiagramNode> {
             if depth > max_depth {
-                return Err(Error::limit(
-                    LimitKind::DiagramNodeDepth,
-                    depth,
-                    max_depth,
-                ));
+                return Err(Error::limit(LimitKind::DiagramNodeDepth, depth, max_depth));
             }
             if visiting[index] {
                 return Err(Error::Invalid(
@@ -805,11 +793,7 @@ fn append_text(
         .checked_add(text.len())
         .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
     if observed > maximum {
-        return Err(Error::limit(
-            kind,
-            observed,
-            maximum,
-        ));
+        return Err(Error::limit(kind, observed, maximum));
     }
     *bytes = observed;
     output.push_str(text);
@@ -2049,9 +2033,7 @@ mod tests {
         let dgm = "http://schemas.openxmlformats.org/drawingml/2006/diagram";
         for xml in [
             format!("<dgm:dataModel xmlns:dgm=\"{dgm}\"></dgm:dataModel>"),
-            format!(
-                "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:pt modelId=\"1\"/></dgm:dataModel>"
-            ),
+            format!("<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:pt modelId=\"1\"/></dgm:dataModel>"),
             format!(
                 "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:ptLst/></dgm:ptLst></dgm:dataModel>"
             ),
@@ -2062,7 +2044,10 @@ mod tests {
                 "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:dataModel/></dgm:ptLst></dgm:dataModel>"
             ),
         ] {
-            assert!(SmartArt::parse_data_xml(&xml, &Limits::default()).is_err(), "{xml}");
+            assert!(
+                SmartArt::parse_data_xml(&xml, &Limits::default()).is_err(),
+                "{xml}"
+            );
         }
 
         let dangling = format!(
