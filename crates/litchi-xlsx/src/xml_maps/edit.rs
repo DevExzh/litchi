@@ -28,7 +28,9 @@ impl EditOptions {
 
 /// A staged, source-bound edit of the workbook's single Custom XML Maps
 /// owner of one [`crate::Package`]. Dropping it discards it;
-/// [`Self::commit`] publishes a new package.
+/// [`Self::commit`] publishes a new package. Starting one retains only the
+/// source package and options; the graph and semantic draft are materialized
+/// by the first getter, mutation or commit.
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
@@ -377,7 +379,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the Custom XML Maps graph.
+    /// refused. Custom XML Maps graph, XML and source-limit errors are
+    /// deferred to the first getter, mutation or commit.
     pub fn edit_xml_maps(&self) -> Result<Edit> {
         self.edit_xml_maps_with_options(EditOptions::default())
     }

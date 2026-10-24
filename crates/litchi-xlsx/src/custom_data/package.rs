@@ -728,8 +728,10 @@ impl EditOptions {
 
 /// A staged, source-bound Custom Data edit of one [`crate::Package`].
 ///
-/// Starting one reads the catalog and copies no part payload. Dropping the
-/// edit discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains only the source package and limits; it does not read
+/// the catalog or copy part payloads. The graph and semantic draft are
+/// materialized by the first getter, mutation or commit. Dropping the edit
+/// discards it; [`Self::commit`] publishes a new package.
 pub struct Edit {
     target: crate::record::Source,
     limits: Limits,
@@ -748,7 +750,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the catalog's read errors.
+    /// refused. Catalog, graph, XML and limit errors are deferred to the first
+    /// getter, mutation or commit.
     pub fn edit_custom_data(&self) -> Result<Edit> {
         self.edit_custom_data_with_options(EditOptions::default())
     }
@@ -808,7 +811,7 @@ impl Edit {
         Ok(self.loaded.as_mut().expect("Custom Data graph loaded"))
     }
 
-    /// Source snapshot captured at transaction start.
+    /// Materialize and return the source snapshot used by this edit.
     pub fn before(&mut self) -> Result<&Snapshot> {
         Ok(&self.ensure_loaded()?.before)
     }

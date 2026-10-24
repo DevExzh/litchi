@@ -100,7 +100,9 @@ impl EditOptions {
 }
 
 /// A staged calculation-metadata edit of one [`crate::Package`]. Dropping it
-/// discards it.
+/// discards it. Starting one retains only the source package and limits; the
+/// source graph and semantic draft are materialized by the first getter,
+/// mutation or commit.
 pub struct Edit {
     target: crate::record::Source,
     loaded: Option<Loaded>,
@@ -125,7 +127,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the read errors of the workbook part.
+    /// refused. Workbook XML and source-limit errors are deferred to the
+    /// first getter, mutation or commit.
     pub fn edit_calculation_metadata(&self) -> Result<Edit> {
         self.edit_calculation_metadata_with_options(EditOptions::default())
     }
@@ -175,7 +178,7 @@ impl Edit {
         Ok(self.loaded.as_mut().expect("calculation metadata loaded"))
     }
 
-    /// Exact immutable source captured when the transaction began.
+    /// Materialize and return the exact immutable source used by this edit.
     pub fn before(&mut self) -> Result<&Snapshot> {
         Ok(&self.ensure_loaded()?.before)
     }

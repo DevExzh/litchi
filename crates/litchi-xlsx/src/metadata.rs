@@ -188,7 +188,9 @@ impl EditOptions {
 
 /// A staged metadata edit of one [`Package`].
 ///
-/// Dropping the edit discards it.
+/// Starting one retains only the source package and options; metadata parts
+/// and the semantic draft are materialized by the first getter, mutation or
+/// commit. Dropping the edit discards it.
 #[derive(Debug)]
 pub struct Edit {
     package: Package,
@@ -359,7 +361,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the strict graph errors of the property families.
+    /// No source graph is read at entry. Property graph and decoding errors
+    /// are deferred to the first getter, mutation or commit.
     pub fn edit_metadata(&self) -> Result<Edit> {
         self.edit_metadata_with_options(EditOptions::default())
     }

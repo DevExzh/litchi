@@ -832,8 +832,10 @@ crate::record::limit_kinds!("connections", Connections {
 /// A staged, failure-atomic edit of the workbook's inert connection catalog
 /// of one [`crate::Package`].
 ///
-/// Starting one reads the connection graph and copies no payload. Dropping
-/// the edit discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains only the source package and performs no graph read or
+/// payload copy. The connection graph is materialized by the first getter,
+/// mutation or commit. Dropping the edit discards it; [`Self::commit`]
+/// publishes a new package.
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
@@ -853,7 +855,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the connection graph.
+    /// refused. Connection-graph, XML and source-limit errors are deferred to
+    /// the first getter, mutation or commit.
     pub fn edit_connections(&self) -> Result<Edit> {
         Edit::start(crate::record::Source::new(self, "edit_connections")?)
     }
@@ -893,7 +896,7 @@ impl Edit {
         Ok(self.loaded.as_mut().expect("connections graph loaded"))
     }
 
-    /// The source snapshot captured when the edit started.
+    /// Materialize and return the source snapshot used by this edit.
     pub fn before(&mut self) -> Result<&Snapshot> {
         Ok(&self.ensure_loaded()?.before)
     }

@@ -11,7 +11,9 @@ use crate::error::{Result, invalid};
 
 /// A staged, source-bound edit of the workbook's external-link catalog of
 /// one [`crate::Package`]. Dropping it discards it; [`Self::commit`]
-/// publishes a new package.
+/// publishes a new package. Starting one retains only the source package;
+/// the graph and semantic draft are materialized by the first getter,
+/// mutation or commit.
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
@@ -28,7 +30,8 @@ struct Loaded {
 }
 
 impl Edit {
-    /// Start an edit after validating and capturing the workbook graph.
+    /// Start an edit retaining only the source package. Graph validation and
+    /// source capture are deferred to the first getter, mutation or commit.
     fn start(target: crate::record::Source) -> Result<Self> {
         Ok(Self {
             target,
@@ -269,7 +272,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the external-link graph.
+    /// refused. External-link graph, XML and source-limit errors are deferred
+    /// to the first getter, mutation or commit.
     pub fn edit_external_links(&self) -> Result<Edit> {
         Edit::start(crate::record::Source::new(self, "edit_external_links")?)
     }

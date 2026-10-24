@@ -861,8 +861,10 @@ crate::record::record_family!("Data Model");
 
 /// A staged, source-bound Data Model edit of one [`crate::Package`].
 ///
-/// Starting one reads the graph and copies no payload. Dropping the edit
-/// discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains only the source package and limits; it does not read
+/// the graph or copy payload. The graph and semantic model are materialized
+/// by the first getter, mutation or commit. Dropping the edit discards it;
+/// [`Self::commit`] publishes a new package.
 pub struct Edit {
     target: crate::record::Source,
     limits: Limits,
@@ -875,12 +877,13 @@ struct Loaded {
 }
 
 impl crate::Package {
-    /// Start a Data Model edit from the package's current graph.
+    /// Start a Data Model edit retaining the package's current graph source.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the read errors of the graph.
+    /// refused. Graph, XML and source-limit errors are deferred to the first
+    /// getter, mutation or commit.
     pub fn edit_data_model(&self) -> Result<Edit> {
         self.edit_data_model_with_options(EditOptions::default())
     }
@@ -927,7 +930,7 @@ impl Edit {
         Ok(self.loaded.as_mut().expect("Data Model graph loaded"))
     }
 
-    /// Read the source snapshot captured at transaction start.
+    /// Materialize and return the source snapshot used by this edit.
     pub fn before(&mut self) -> Result<&Snapshot> {
         Ok(&self.ensure_loaded()?.before)
     }
