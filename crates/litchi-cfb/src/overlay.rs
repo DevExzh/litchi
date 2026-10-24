@@ -362,7 +362,7 @@ impl OverlayOperationShape {
 impl PublishReport {
     /// Complete published artifact length.
     #[must_use]
-    pub const fn bytes(self) -> u64 {
+    pub const fn output_bytes(self) -> u64 {
         self.bytes
     }
 
