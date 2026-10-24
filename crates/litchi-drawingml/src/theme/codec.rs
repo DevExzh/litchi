@@ -1673,6 +1673,7 @@ fn validate_replacement_fragment(
                     &namespace,
                     source_namespace,
                     reader.decoder(),
+                    stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 let local = element.local_name().as_ref().to_vec();
                 if !root_seen && local.as_slice() != target {
@@ -1771,6 +1772,7 @@ fn validate_replacement_fragment(
                     &namespace,
                     source_namespace,
                     reader.decoder(),
+                    stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 if !root_seen && element.local_name().as_ref() != target {
                     return Err(invalid("theme replacement root does not match target"));
@@ -2228,8 +2230,9 @@ fn validate_modeled_namespace_binding(
     namespace: &ResolveResult<'_>,
     source_namespace: &[u8],
     decoder: quick_xml::encoding::Decoder,
+    opaque_parent: bool,
 ) -> Result<()> {
-    if root || !is_known_replacement_local(element.local_name().as_ref(), target) {
+    if root || opaque_parent || !is_known_replacement_local(element.local_name().as_ref(), target) {
         return Ok(());
     }
     let counterpart = if source_namespace == NAMESPACE.as_bytes() {
@@ -3167,6 +3170,17 @@ mod tests {
         );
         let patched = replace_scheme(&original, b"clrScheme", with_opaque.as_bytes()).unwrap();
         assert_eq!(read(&patched).unwrap().colors, palette());
+        let nested_known_opaque = with_opaque.replace(
+            "<x:item/>",
+            &format!("<dk1 xmlns=\"{STRICT_NAMESPACE}\"><a:srgbClr val=\"4F81BD\"/></dk1>"),
+        );
+        let patched_nested_opaque =
+            replace_scheme(&original, b"clrScheme", nested_known_opaque.as_bytes()).unwrap();
+        let scheme_range = scheme_replacement_range(&original, b"clrScheme").unwrap();
+        let mut expected_nested_opaque = original.clone();
+        expected_nested_opaque.splice(scheme_range, nested_known_opaque.as_bytes().iter().copied());
+        assert_eq!(patched_nested_opaque, expected_nested_opaque);
+        assert_eq!(read(&patched_nested_opaque).unwrap().colors, palette());
         let undeclared_attribute = with_opaque.replace("<x:item/>", "<x:item y:flag=\"1\"/>");
         assert!(replace_scheme(&original, b"clrScheme", undeclared_attribute.as_bytes(),).is_err());
         let duplicate_expanded = with_opaque.replace(
