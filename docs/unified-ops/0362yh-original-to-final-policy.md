@@ -2,37 +2,40 @@
 
 This record defines the reviewed protocol rebind for comparing the historical
 f2 before endpoint with the candidate production source at
-`49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`.  The ordinary W8 runner remains
+`c796d0acc24c7c6e6fd08980b9e31af6bb86b18b`.  The ordinary W8 runner remains
 strict shared identity: `shared_identity()` still requires identical
 projection, lock, probe and fixture identities.  The exception is opt-in via
 `--original-to-final-policy` and `--original-to-final-receipt`; it does not
 alter that generic path.
 
 The checked-in policy is
-`docs/unified-ops/results/0362yh/original-to-final-policy.json` (7,307 bytes,
+`docs/unified-ops/results/0362yh/original-to-final-policy.json` (7,609 bytes,
 SHA-256
-`afb0d053a98ddb3d26d50d1d90944aab0fcc6c536c2cd99024162d49642d3d7f`).  It
+`978d9c1b4eff2281295dca10b3b54b9fb93df1e07af7f342eb9cbfb865aae9b9`).  It
 pins:
 
 - original commit `f2bbbc8d07ab5da26c180f1ff74813d39f632d54` and final commit
-  `49c25ef67f62a8bb943e7c6a0bf464e49ae87d07` (candidate production pin);
-- the candidate source archive (`6,630,123,520` bytes,
-  `127d81f130c6782c9329844b0992adb5b76b5f5e7d5258f3d95d1360e620db10`),
+  `c796d0acc24c7c6e6fd08980b9e31af6bb86b18b` (candidate production pin);
+- the candidate source archive (`6,633,830,400` bytes,
+  `65dc3102703cf9b4941003450440ac079bf74f269072f491cbce572e020bf9d8`),
   assembled without a production overlay;
 - the exact target, release profile, toolchain, all-features selection,
   corrected probe (`75,035` bytes), fixture (`4,231` bytes), and 109-route
   order;
 - the historical f2 lock (`139,441` bytes,
   `1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c`) and
-  candidate lock (`139,591` bytes,
-  `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`);
+  candidate lock (`139,606` bytes,
+  `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`);
 - the exact pre/post workspace and package manifests, toolchain, and complete
   dependency projections under `results/0362yh/images/`.
 
 The graph proof recomputes both projections.  All 518 registry identities,
 checksums and dependency lists must match.  Exactly six local package
 dependency lists may differ: `litchi-iwa-core`, `litchi-odraw`, `litchi-ops`,
-`litchi-ppt`, `litchi-xlsb` and `litchi-xlsx`.  The reviewed before source
+`litchi-ppt`, `litchi-xlsb` and `litchi-xlsx`; the `litchi-ops` delta includes
+the reviewed `litchi-vba` feature edge.  The historical before all-features
+selection predates the final `sign` feature and is pinned separately from the
+candidate after selection.  The reviewed before source
 assembly is the f2 archive plus the consumer-only compatibility adapter; the
 after assembly has no overlay.  No caller-supplied hashes, allowlists, source
 overrides or candidate-manifest overlay can replace these pins.
@@ -53,9 +56,14 @@ The reduced build-free rebind receipt is
 `results/0362yh/final-source-preparation.json`.  It records the regenerated
 candidate fixture/projection, the exact six local graph additions, and the
 stale f2 endpoint and b673 candidate-lock inputs that are explicitly rejected.
+The executable, build-free-to-native handoff is
+`results/0362yh/c796-qualification-commands.sh`; it keeps targets, binaries,
+receipts and ABBA output external, uses one offline locked build job, invokes
+the complete untimed validator and pair receipt before guarded ABBA, and
+fails closed for allocator because this probe has no allocator variant.
 
 This is a protocol/provenance record only.  It performs no Cargo build, native
-qualification, timing run, or inventory acceptance.  The `49c` source remains
+qualification, timing run, or inventory acceptance.  The `c796` source remains
 a candidate production pin until the final source inventory review, endpoint
 builds, untimed validation, pair receipt, and native ABBA review complete.
 
@@ -69,6 +77,4 @@ module. All three registered W8 modules now run 40 tests, including rejection
 of source, projection and lock tampering. The reviewed packet merges at
 `54398757b8`; these are synthetic analyzer tests, not native measurements.
 
-The subsequent inventory-driven API repairs require a new candidate source
-binding before qualification. The 49c archive and receipt remain historical
-preparation evidence and must not be relabeled as that later source.
+Any receipt or binary made for 49c is stale and must not be relabeled as c796.
