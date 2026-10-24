@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import native_qualification_runner as runner  # noqa: E402
 from native_qualification import legacy_native_validator as validator  # noqa: E402
+from native_qualification import prepare_legacy_native_inputs as preparation  # noqa: E402
 
 
 def _record(path: Path) -> dict[str, object]:
@@ -23,6 +24,15 @@ def _record(path: Path) -> dict[str, object]:
 
 
 class LegacyNativeQualificationTests(unittest.TestCase):
+    def test_reviewed_rtf_probe_pin_matches_tracked_source(self) -> None:
+        probe = ROOT / validator.REVIEWED_INPUTS["legacy-rtf"]["probe_relative"]
+        digest = hashlib.sha256(probe.read_bytes()).hexdigest()
+        self.assertEqual(digest, validator.REVIEWED_INPUTS["legacy-rtf"]["probe_sha256"]["after"])
+        self.assertEqual(
+            preparation.LANES["legacy-rtf"]["probe_sha256"]["after"],
+            digest,
+        )
+
     def test_manifests_bind_reusable_drivers_and_contracts(self) -> None:
         expected = {
             "legacy-rtf.json": ("legacy-rtf", 5, ["routes"]),

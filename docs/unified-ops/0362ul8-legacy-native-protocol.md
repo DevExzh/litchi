@@ -16,7 +16,7 @@ the existing executable drivers and the guarded process/identity runner:
 
 | lane | reusable executable and current source SHA-256 | source fence | protocol |
 | --- | --- | --- | --- |
-| RTF | `crates/litchi-rtf/examples/refusal_contract_bench.rs`, `c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea` (reviewed contract adapter) | original `86d708878fa537eab42fd4bd5ffbc0f79c606191`; candidate `$RTF_CANDIDATE_REVISION` | `legacy-rtf.json`, five guarded ABBA blocks |
+| RTF | `crates/litchi-rtf/examples/refusal_contract_bench.rs`, `70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585` (reviewed contract adapter) | original `86d708878fa537eab42fd4bd5ffbc0f79c606191`; candidate `$RTF_CANDIDATE_REVISION` | `legacy-rtf.json`, five guarded ABBA blocks |
 | OLE properties | existing `tools/perf-baseline/examples/ole_w5_probe.rs` from driver source fence `fdb139197d`, file SHA-256 `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f` | original `604822b44107999aaddb0bffb96b705e9464f546`; candidate `$OLE_CANDIDATE_REVISION` | `legacy-ole-properties.json`, `read` and `edit` |
 | XLS properties/lazy entry | `crates/litchi-ops/examples/ole_metadata_bench.rs`, before `b840acb620c09644ca4b89cbe42927485da9d457f3bf93b578eff90fa1008173`, after `53b26136e915fa0bf88518fd1c05e494d55ce5e8f91012be04ac7adf476c1f10` | derived pre-lazy parent `509bf28e7531ad75f278eaec3a732714a243915a` (parent of lazy feature `4f08cdc5e8751243d50077ce1a2a2ea24a0d9c51`); candidate `$XLS_CANDIDATE_REVISION` | `legacy-xls-properties.json`, existing metadata benchmark |
 
@@ -189,7 +189,7 @@ validator, identity, route-shape and cap logic:
 
 ```text
 python3 -m unittest tools.test_legacy_native_qualification tools.test_native_qualification_runner
-Ran 28 tests
+Ran 29 tests
 OK
 
 python3 -m unittest tools.test_no_3rdparty_references

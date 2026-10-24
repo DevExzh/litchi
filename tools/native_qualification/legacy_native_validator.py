@@ -42,8 +42,8 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
         "probe_relative": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
         "lock_relative": "Cargo.lock",
         "probe_sha256": {
-            "before": "c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea",
-            "after": "c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea",
+            "before": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+            "after": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
         },
         "fixture_relatives": (),
         "fixture_id": "rtf-refusal-contract-v1",

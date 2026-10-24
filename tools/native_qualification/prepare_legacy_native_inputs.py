@@ -28,8 +28,8 @@ LANES: dict[str, dict[str, Any]] = {
         "baseline": "86d708878fa537eab42fd4bd5ffbc0f79c606191",
         "probe": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
         "probe_sha256": {
-            "before": "c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea",
-            "after": "c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea",
+            "before": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+            "after": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
         },
         "lock": "Cargo.lock",
         "fixtures": [],
