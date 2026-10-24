@@ -659,17 +659,18 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError(f"{lane} must bind a source-preparation receipt")
     contracts: dict[str, dict[str, Any]] = {
         "legacy-rtf": {
-            "probe": ["crates/litchi-rtf/examples/refusal_contract_bench.rs"],
-            "lock": "Cargo.lock",
+            "probe": ["tools/perf-baseline/examples/refusal_contract_bench.rs"],
+            "lock": "tools/perf-baseline/Cargo.lock",
             "build_id": "rtf_refusal_contract",
             "build_argv": [
                 "cargo",
                 "build",
                 "--release",
                 "--manifest-path",
-                "Cargo.toml",
-                "-p",
-                "litchi-rtf",
+                "tools/perf-baseline/Cargo.toml",
+                "--no-default-features",
+                "--features",
+                "{rtf_features}",
                 "--example",
                 "refusal_contract_bench",
             ],
@@ -764,7 +765,9 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
             raise RunnerError(f"{leg} does not preserve the reviewed {lane} build command")
         command = commands[0]
         expected_build = list(contract["build_argv"])
-        if lane == "legacy-ole-properties":
+        if lane == "legacy-rtf":
+            expected_build[7] = "rtf-legacy-api" if leg == "before" else "rtf-current-api"
+        elif lane == "legacy-ole-properties":
             expected_build[7] = contract["features"][leg]
         if command.get("argv") != expected_build or command.get("artifacts") != contract["artifacts"]:
             raise RunnerError(f"{leg} does not preserve the reviewed {lane} build route")

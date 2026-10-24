@@ -35,6 +35,56 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             digest,
         )
 
+    def test_rtf_adapter_binds_native_variants_and_pinned_locks(self) -> None:
+        adapter = preparation.RTF_ADAPTER_RECORD
+        reviewed = validator.REVIEWED_INPUTS["legacy-rtf"]
+        self.assertEqual(adapter, reviewed["adapter"])
+        self.assertEqual(
+            reviewed["probe_sha256"],
+            {"before": adapter["probe_sha256"], "after": adapter["probe_sha256"]},
+        )
+        self.assertEqual(
+            reviewed["lock_sha256"],
+            {
+                "before": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
+                "after": "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39",
+            },
+        )
+        self.assertNotEqual(adapter["probe_sha256"], adapter["historical_failed_compile"]["source_sha256"])
+        self.assertEqual(adapter["historical_failed_compile"]["exit"], 101)
+        self.assertEqual(
+            adapter["native_error_api"]["before"],
+            "litchi_rtf::edit::Error::{UnsupportedSource,ProtectedDocument}",
+        )
+        self.assertEqual(
+            adapter["native_error_api"]["after"],
+            "litchi_rtf::edit::Error::Refused(Refusal)",
+        )
+
+    def test_rtf_adapter_rejects_mismatched_feature_variant(self) -> None:
+        data = json.loads(
+            (ROOT / "tools/native_qualification/manifests/legacy-rtf.json").read_text(encoding="utf-8")
+        )
+        data["preparation_receipt"] = "/tmp/rtf-preparation.json"
+        data["legs"]["before"]["build"][0]["argv"][7] = "rtf-current-api"
+        with self.assertRaisesRegex(runner.RunnerError, "reviewed legacy-rtf build route"):
+            runner._validate_legacy_native_workload(data)
+
+    def test_rtf_adapter_rejects_stale_probe_identity(self) -> None:
+        reviewed = validator.REVIEWED_INPUTS["legacy-rtf"]
+        lock = ROOT / reviewed["lock_relative"]
+        probe = ROOT / reviewed["probe_relative"]
+        identity = {
+            "source_root": str(ROOT),
+            "lock_paths": [str(lock)],
+            "probe_paths": [str(probe)],
+            "fixture_paths": [],
+            "identity_files": [_record(lock), _record(probe)],
+        }
+        identity["identity_files"][1]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(validator.ValidationError, "SHA-256 changed"):
+            validator._validate_reviewed_inputs("legacy-rtf", identity, "after")
+
     def test_reviewed_ole_adapter_materializes_the_candidate_probe_hash(self) -> None:
         source = subprocess.check_output(
             [
@@ -301,8 +351,8 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             identities: dict[str, object] = {}
             for leg, head in source_heads.items():
                 source = root / f"source-{leg}"
-                lock = source / "Cargo.lock"
-                probe = source / "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+                lock = source / "tools/perf-baseline/Cargo.lock"
+                probe = source / "tools/perf-baseline/examples/refusal_contract_bench.rs"
                 probe.parent.mkdir(parents=True)
                 lock.write_text(f"lock-{leg}\n", encoding="utf-8")
                 probe.write_text(f"probe-{leg}\n", encoding="utf-8")

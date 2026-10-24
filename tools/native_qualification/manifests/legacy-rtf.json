@@ -31,7 +31,7 @@
     }
   ],
   "shared": {
-    "probe_paths": ["crates/litchi-rtf/examples/refusal_contract_bench.rs"],
+    "probe_paths": ["tools/perf-baseline/examples/refusal_contract_bench.rs"],
     "fixture_paths": []
   },
   "legs": {
@@ -40,10 +40,11 @@
       "target_dir": "$RTF_TARGET_ROOT/before",
       "allow_dirty": true,
       "allowed_dirty_paths": [
-        "Cargo.lock",
-        "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/examples/refusal_contract_bench.rs"
       ],
-      "lock_paths": ["Cargo.lock"],
+      "lock_paths": ["tools/perf-baseline/Cargo.lock"],
       "build": [
         {
           "id": "rtf_refusal_contract",
@@ -52,9 +53,10 @@
             "build",
             "--release",
             "--manifest-path",
-            "Cargo.toml",
-            "-p",
-            "litchi-rtf",
+            "tools/perf-baseline/Cargo.toml",
+            "--no-default-features",
+            "--features",
+            "rtf-legacy-api",
             "--example",
             "refusal_contract_bench"
           ],
@@ -78,10 +80,11 @@
       "target_dir": "$RTF_TARGET_ROOT/after",
       "allow_dirty": true,
       "allowed_dirty_paths": [
-        "Cargo.lock",
-        "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/examples/refusal_contract_bench.rs"
       ],
-      "lock_paths": ["Cargo.lock"],
+      "lock_paths": ["tools/perf-baseline/Cargo.lock"],
       "build": [
         {
           "id": "rtf_refusal_contract",
@@ -90,9 +93,10 @@
             "build",
             "--release",
             "--manifest-path",
-            "Cargo.toml",
-            "-p",
-            "litchi-rtf",
+            "tools/perf-baseline/Cargo.toml",
+            "--no-default-features",
+            "--features",
+            "rtf-current-api",
             "--example",
             "refusal_contract_bench"
           ],

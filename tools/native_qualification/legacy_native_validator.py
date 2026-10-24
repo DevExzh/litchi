@@ -39,11 +39,44 @@ MANIFEST_DIR = ROOT / "tools/native_qualification/manifests"
 
 REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
     "legacy-rtf": {
-        "probe_relative": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
-        "lock_relative": "Cargo.lock",
+        "probe_relative": "tools/perf-baseline/examples/refusal_contract_bench.rs",
+        "lock_relative": "tools/perf-baseline/Cargo.lock",
         "probe_sha256": {
-            "before": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
-            "after": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+            "before": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
+            "after": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
+        },
+        "lock_sha256": {
+            "before": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
+            "after": "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39",
+        },
+        "adapter": {
+            "relative_path": "tools/perf-baseline/examples/refusal_contract_bench.rs",
+            "probe_sha256": "54e1c94472fddef671955126bc35fcd5e0a77afafbdff109b65bc87c4cd66908",
+            "manifest_relative_path": "tools/perf-baseline/Cargo.toml",
+            "manifest_sha256": {
+                "before": "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676",
+                "after": "60cde3ec148b08d81806d0b15740808c37ecbc9eed8ecf3f4d32e20ce8631a49",
+            },
+            "features": {
+                "before": "rtf-legacy-api",
+                "after": "rtf-current-api",
+            },
+            "native_error_api": {
+                "before": "litchi_rtf::edit::Error::{UnsupportedSource,ProtectedDocument}",
+                "after": "litchi_rtf::edit::Error::Refused(Refusal)",
+            },
+            "apply_result_api": {
+                "before": "litchi_rtf::Package::apply -> litchi_rtf::Package",
+                "after": "litchi_rtf::Package::apply -> litchi_rtf::edit::Commit",
+            },
+            "historical_failed_compile": {
+                "source_sha256": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+                "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json",
+                "receipt_sha256": "f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4",
+                "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.log",
+                "log_sha256": "119d4216675ee79a7e89e17579f019dd4fe3a6d43c08a8bd22d87c37622fd103",
+                "exit": 101,
+            },
         },
         "fixture_relatives": (),
         "fixture_id": "rtf-refusal-contract-v1",
@@ -173,7 +206,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
             "unsupported_content",
             "protected_commit",
         ),
-        "probe_contract": "rtf-refusal-contract-v1 workload with exact RefusalKind, fixed reason and unchanged/exact fidelity",
+        "probe_contract": "rtf-refusal-contract-v1 workload with native-era error variants normalized to one fixed reason/fidelity contract",
     },
     "legacy-ole-properties": {
         "baseline": "604822b44107999aaddb0bffb96b705e9464f546",
@@ -368,8 +401,18 @@ def _validate_reviewed_inputs(lane: str, identity: dict[str, Any], leg: str) -> 
     files = _identity_file_map(identity, f"{leg}")
     lock = files.get(str(expected_lock))
     _expect(lock is not None, f"{leg} lock file is not bound into source identity")
+    if "lock_sha256" in spec:
+        _expect(lock["sha256"] == spec["lock_sha256"][leg], f"{leg} lock provenance differs from the reviewed input")
     probe = files.get(str(expected_probe))
     _expect(probe is not None and probe["sha256"] == spec["probe_sha256"][leg], f"{leg} probe is not the reviewed generator")
+    if lane == "legacy-rtf":
+        adapter = spec["adapter"]
+        manifest_path = root / str(adapter["manifest_relative_path"])
+        manifest_hash, _ = _sha256(manifest_path)
+        _expect(
+            manifest_hash == adapter["manifest_sha256"][leg],
+            f"{leg} adapter manifest is not the reviewed consumer overlay",
+        )
     fixture_records: dict[str, dict[str, Any]] = {}
     for relative in spec["fixture_relatives"]:
         path = (root / relative).resolve()
@@ -398,7 +441,8 @@ def _normalize_cargo(argv: list[str]) -> list[str]:
 
 def _expected_build_argv(lane: str, leg: str) -> list[str]:
     if lane == "legacy-rtf":
-        return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "Cargo.toml", "-p", "litchi-rtf", "--example", "refusal_contract_bench"])
+        features = "rtf-legacy-api" if leg == "before" else "rtf-current-api"
+        return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features", "--features", features, "--example", "refusal_contract_bench"])
     if lane == "legacy-ole-properties":
         features = "current-owner-api,legacy-property-api" if leg == "before" else "current-owner-api,current-property-api"
         return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features", "--features", features, "--example", "ole_w5_probe"])
