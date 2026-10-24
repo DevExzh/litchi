@@ -13,7 +13,7 @@
 //! formatting ranges which cannot be resized losslessly still refuse, and
 //! that every other shape, slide and stream is preserved.
 
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleFile, OleFileLimits, OleWriter};
 use litchi_ppt::Package;
 use litchi_ppt::package::edit::{Error, Position, ShapeTextReplacement, Target};
 use litchi_ppt::slide_order;
@@ -246,7 +246,8 @@ fn position_dependent_ranges_keep_the_same_length_contract() {
 #[test]
 fn signed_outline_text_admits_exact_noops_and_refuses_changes() {
     let unsigned = fixture("ole/ppt/SampleShow.ppt");
-    let mut source = OleFile::open(Cursor::new(unsigned.as_slice())).unwrap();
+    let mut source =
+        OleFile::open(Cursor::new(unsigned.as_slice()), OleFileLimits::default()).unwrap();
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let names: Vec<&str> = path.iter().map(String::as_str).collect();

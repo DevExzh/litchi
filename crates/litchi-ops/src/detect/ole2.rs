@@ -37,7 +37,7 @@ pub(crate) fn detect_ole2_format_from_reader<R: Read + Seek>(
     limits: &super::SourceLimits,
 ) -> Option<FileFormat> {
     // Try to open as OLE file - this will validate the format and parse structure
-    let ole_file = match litchi_cfb::OleFile::open_with_limits(reader, limits.cfb()) {
+    let ole_file = match litchi_cfb::OleFile::open(reader, limits.cfb()) {
         Ok(ole) => ole,
         Err(_) => return None,
     };

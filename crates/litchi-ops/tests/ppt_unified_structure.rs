@@ -192,7 +192,9 @@ fn batch_swap(left: &'static str, right: &'static str) -> BatchItem<'static> {
 }
 
 fn signed_fixture() -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(fixture())).expect("open PPT fixture");
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(fixture()), litchi_cfb::OleFileLimits::default())
+            .expect("open PPT fixture");
     let document = ole
         .open_stream(&["PowerPoint Document"])
         .expect("PowerPoint Document stream");

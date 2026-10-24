@@ -84,7 +84,9 @@ fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
 }
 
 fn workbook_records(bytes: &[u8]) -> Vec<(u16, Vec<u8>)> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let mut offset = 0usize;
@@ -109,7 +111,9 @@ fn record_u16_values(records: &[(u16, Vec<u8>)], record_type: u16, offset: usize
 }
 
 fn cache_streams(bytes: &[u8], count: u16) -> Vec<Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     (1..=count)
         .map(|stream_id| {
             let name = format!("{stream_id:04X}");

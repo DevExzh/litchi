@@ -82,7 +82,8 @@ fn label_indexes(workbook: &[u8]) -> Vec<u32> {
 }
 
 fn replace_sst_family(package: &[u8], replacement: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package)).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let records = raw_records(&workbook).unwrap();
     let sst_index = records
@@ -473,7 +474,11 @@ fn package_with_ext_sst(count: usize) -> (Vec<u8>, Vec<String>) {
     let texts: Vec<String> = (0..count).map(|index| format!("s{index:05}")).collect();
     let borrowed: Vec<&str> = texts.iter().map(String::as_str).collect();
     let plain = package(&borrowed);
-    let mut ole = OleFile::open(Cursor::new(plain.as_slice())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(plain.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let sst_start = raw_records(&workbook)
         .unwrap()

@@ -133,7 +133,7 @@ fn read_xls_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("Use litchi::xls::shapes::extract_shapes_from_workbook() with raw data.");
     println!();
     println!("Example:");
-    println!("  let ole_file = OleFile::open(file)?;");
+    println!("  let ole_file = OleFile::open(file, OleFileLimits::default())?;");
     println!("  let workbook_data = ole_file.open_stream(&[\"Workbook\"])?;");
     println!("  let shapes = extract_shapes_from_workbook(&workbook_data)?;");
 

@@ -902,8 +902,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .external_data_part
         .as_ref()
         .expect("transferred embedded workbook");
-    let litchi_xlsb::builder::chart::ExternalDataTarget::Embedded { data, .. } = &external.target
-    else {
+    let builder::chart::ExternalDataTarget::Embedded { data, .. } = &external.target else {
         panic!("chart external data should stay embedded")
     };
     assert_eq!(data, b"PK exact chart workbook");

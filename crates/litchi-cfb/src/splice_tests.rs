@@ -1,5 +1,6 @@
 use crate::{
-    OleFile, OleWriter, OverlayError, SameLengthStreamSplice, SharedOleFile, StreamSpliceLimits,
+    OleFile, OleFileLimits, OleWriter, OverlayError, SameLengthStreamSplice, SharedOleFile,
+    SharedOleFileLimits, StreamSpliceLimits,
 };
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use std::io::{self, Cursor};
@@ -27,7 +28,11 @@ fn sample_bytes() -> Vec<u8> {
 }
 
 fn shared(bytes: Vec<u8>) -> SharedOleFile {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap()
 }
 
 fn splice(path: &str, offset: usize, source: &[u8], replacement: &[u8]) -> SameLengthStreamSplice {
@@ -61,7 +66,7 @@ fn first_middle_last_and_multi_stream_splices_preserve_every_other_byte() {
         .plan_same_length_stream_splices(edits, limits())
         .unwrap();
     let view = plan.composed_source().unwrap();
-    let candidate = SharedOleFile::open(Arc::new(view)).unwrap();
+    let candidate = SharedOleFile::open(Arc::new(view), SharedOleFileLimits::default()).unwrap();
 
     let mut expected_mini = mini;
     expected_mini[0..3].copy_from_slice(&[0xa0, 0xa1, 0xa2]);
@@ -222,7 +227,7 @@ fn composed_view_handles_short_and_interrupted_reads_and_is_concurrent() {
         maximum: 37,
         version: SourceVersion::new(0x51_1ce, 0),
     });
-    let file = SharedOleFile::open(source).unwrap();
+    let file = SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap();
     let plan = file
         .plan_same_length_stream_splices(
             vec![splice("Fat", 509, &fat, &[0xa1, 0xa2, 0xa3, 0xa4])],
@@ -341,9 +346,12 @@ fn owner_validation_shares_the_fenced_target_and_preserves_typed_results() {
             limits(),
             |candidate| {
                 callback_calls.fetch_add(1, Ordering::SeqCst);
-                let reopened = SharedOleFile::open(Arc::new(candidate.clone()))
-                    .map_err(OverlayError::from)
-                    .map_err(OwnerValidationError::from)?;
+                let reopened = SharedOleFile::open(
+                    Arc::new(candidate.clone()),
+                    SharedOleFileLimits::default(),
+                )
+                .map_err(OverlayError::from)
+                .map_err(OwnerValidationError::from)?;
                 let mut observed = [0_u8; 4];
                 reopened
                     .read_stream_range(&["Fat"], 510, &mut observed)
@@ -391,7 +399,8 @@ fn owned_owner_validated_planning_elides_only_the_final_complete_fingerprint() {
         reads: AtomicUsize::new(0),
         lie: false,
     });
-    let generic_file = SharedOleFile::open(generic_source.clone()).unwrap();
+    let generic_file =
+        SharedOleFile::open(generic_source.clone(), SharedOleFileLimits::default()).unwrap();
     generic_source.reads.store(0, Ordering::SeqCst);
     let (generic_plan, generic_owner) = generic_file
         .plan_same_length_stream_splices_with_owner(
@@ -460,7 +469,7 @@ fn owner_validation_is_closed_by_the_final_stable_token_fingerprint() {
         lie: true,
     });
     let source: Arc<dyn ReadAt> = mutable.clone();
-    let file = SharedOleFile::open(source).unwrap();
+    let file = SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap();
     let mut changed = source_bytes;
     changed[100] ^= 0xff;
     let result = file.plan_same_length_stream_splices_with_owner(
@@ -518,7 +527,7 @@ fn no_op_inverse_and_stale_source_contracts_are_exact() {
             lie,
         });
         let source: Arc<dyn ReadAt> = mutable.clone();
-        let plan = SharedOleFile::open(source)
+        let plan = SharedOleFile::open(source, SharedOleFileLimits::default())
             .unwrap()
             .plan_same_length_stream_splices(vec![splice("Fat", 510, &fat, &replacement)], limits())
             .unwrap();
@@ -595,7 +604,7 @@ fn stable_token_mutation_after_initial_precondition_read_is_rejected() {
         fired: AtomicBool::new(false),
     });
     let source: Arc<dyn ReadAt> = hostile.clone();
-    let file = SharedOleFile::open(source).unwrap();
+    let file = SharedOleFile::open(source, SharedOleFileLimits::default()).unwrap();
     hostile.armed.store(true, Ordering::SeqCst);
     let fat = sequence(6_000, 17);
     assert!(matches!(
@@ -631,11 +640,23 @@ fn invalid_fat_and_minifat_topology_is_rejected_at_validated_ingress() {
     let source = sample_bytes();
     let mut invalid_fat = source.clone();
     invalid_fat[76..80].copy_from_slice(&u32::MAX.to_le_bytes());
-    assert!(SharedOleFile::open(Arc::new(OwnedSource::new(invalid_fat))).is_err());
+    assert!(
+        SharedOleFile::open(
+            Arc::new(OwnedSource::new(invalid_fat)),
+            SharedOleFileLimits::default()
+        )
+        .is_err()
+    );
 
     let mut invalid_minifat = source;
     invalid_minifat[60..64].copy_from_slice(&0_u32.to_le_bytes());
-    assert!(SharedOleFile::open(Arc::new(OwnedSource::new(invalid_minifat))).is_err());
+    assert!(
+        SharedOleFile::open(
+            Arc::new(OwnedSource::new(invalid_minifat)),
+            SharedOleFileLimits::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -650,7 +671,7 @@ fn sequential_publication_reopens_with_the_existing_reader() {
         .unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     let stream = reopened.open_stream(&["Fat"]).unwrap();
     assert_eq!(&stream[511..514], &[0x71, 0x72, 0x73]);
 }
@@ -694,7 +715,7 @@ fn fragmented_fat_stream_ranges_are_mapped_in_logical_order() {
         .unwrap();
     let mut output = Vec::new();
     plan.write_to(&mut output).unwrap();
-    let mut reopened = OleFile::open(Cursor::new(output)).unwrap();
+    let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     let stream = reopened.open_stream(&["Fat"]).unwrap();
     assert_eq!(
         &stream[sector_size + 17..sector_size + 21],

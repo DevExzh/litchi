@@ -52,7 +52,11 @@ fn picture_fixture() -> Vec<u8> {
 }
 
 fn malformed_pictures_fixture() -> Vec<u8> {
-    let mut source = OleFile::open(Cursor::new(picture_fixture())).expect("PPT fixture OLE");
+    let mut source = OleFile::open(
+        Cursor::new(picture_fixture()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("PPT fixture OLE");
     let document = source
         .open_stream(&["PowerPoint Document"])
         .expect("PPT document stream");
@@ -205,7 +209,11 @@ impl Seek for RejectingReader {
 }
 
 fn fat_stream_range(bytes: &[u8], name: &str) -> (u64, u64) {
-    let ole = OleFile::open(Cursor::new(bytes.to_vec())).expect("fixture OLE");
+    let ole = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("fixture OLE");
     let entry = ole
         .list_directory_entries(&[])
         .expect("fixture directory")
@@ -299,7 +307,8 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
         );
 
         let (reader, rejected) = RejectingReader::new(bytes.clone(), vec![range]);
-        let ole = OleFile::open(reader).expect("directory indexing must not read the payload");
+        let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())
+            .expect("directory indexing must not read the payload");
         let error =
             match Reader::from_ole_file_with_options(ole, OpenOptions::new().source_limits(limits))
             {
@@ -349,7 +358,8 @@ fn all_declared_streams_contribute_to_aggregate_admission_before_payload_reads()
     assert!(!rejected.load(Ordering::Acquire));
 
     let (reader, rejected) = RejectingReader::new(bytes.clone(), ranges.clone());
-    let ole = OleFile::open(reader).expect("directory indexing must not read payloads");
+    let ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())
+        .expect("directory indexing must not read payloads");
     let error =
         match Reader::from_ole_file_with_options(ole, OpenOptions::new().source_limits(limits)) {
             Ok(_) => panic!("aggregate stream overflow must fail pre-parsed admission"),

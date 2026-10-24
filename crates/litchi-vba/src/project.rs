@@ -928,7 +928,7 @@ impl Project {
     /// structures are malformed, or `limits` are exceeded.
     pub fn read_with(bytes: &[u8], limits: &Limits) -> Result<Self, Error> {
         check_limit(LimitKind::CfbBytes, bytes.len(), limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(Cursor::new(bytes))?;
+        let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
         Self::open(&mut ole, &[], limits)
     }
 
@@ -2598,7 +2598,8 @@ mod tests {
             .finish(&Limits::default())
             .unwrap()
             .into_bytes();
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         let permissive = Limits::default();
         let text = project.project_text(&permissive).unwrap();
@@ -2843,7 +2844,7 @@ mod tests {
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
 
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.name(), "Sample");
         assert_eq!(project.page(), Mbcs::WINDOWS_1252);
@@ -2878,7 +2879,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
     }
 
@@ -2894,7 +2895,7 @@ mod tests {
             let mut cursor = Cursor::new(Vec::new());
             writer.write_to(&mut cursor).unwrap();
             cursor.set_position(0);
-            let mut ole = OleFile::open(cursor).unwrap();
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
             assert!(Project::open(&mut ole, &[], &Limits::default()).is_err());
         }
 
@@ -2920,7 +2921,7 @@ mod tests {
         let mut cursor = Cursor::new(Vec::new());
         writer.write_to(&mut cursor).unwrap();
         cursor.set_position(0);
-        let mut ole = OleFile::open(cursor).unwrap();
+        let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default()).unwrap();
         let project = Project::open(&mut ole, &[], &Limits::default()).unwrap();
         assert_eq!(project.modules()[0].source().raw(), source);
     }

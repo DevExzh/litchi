@@ -583,8 +583,11 @@ fn poi_fixture(name: &str) -> std::path::PathBuf {
 
 fn collect_from_fixture(name: &str) -> Vec<QueryTable> {
     let bytes = std::fs::read(poi_fixture(name)).expect("fixture readable");
-    let mut ole =
-        litchi_cfb::OleFile::open(std::io::Cursor::new(bytes)).expect("fixture is a CFB container");
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("fixture is a CFB container");
     let stream = ole
         .open_stream(&["Workbook"])
         .or_else(|_| ole.open_stream(&["Book"]))

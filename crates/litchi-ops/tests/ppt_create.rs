@@ -65,7 +65,9 @@ fn creation_options_are_explicit_refusals_and_capabilities_agree() {
 fn publication_preserves_signatures_and_requires_explicit_removal() {
     use std::io::Cursor;
     let original = create(FileFormat::Ppt).unwrap().to_bytes().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(original)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(original), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let current_user = ole.open_stream(&["Current User"]).unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
@@ -90,7 +92,9 @@ fn publication_preserves_signatures_and_requires_explicit_removal() {
     let unsigned = signed.unsign();
     let emitted = unsigned.to_bytes().unwrap();
     assert!(!litchi_ops::open_bytes(emitted.clone()).unwrap().is_signed());
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(emitted)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(emitted), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     assert_eq!(ole.open_stream(&["PowerPoint Document"]).unwrap(), document);
     assert_eq!(ole.open_stream(&["Current User"]).unwrap(), current_user);
 }
@@ -182,7 +186,9 @@ fn unsigning_cannot_bypass_encrypted_publication_policy() {
         [19; 16], [23; 16],
     ));
     let bytes = builder.build().unwrap().to_encrypted_bytes().unwrap();
-    let mut original = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut original =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let mut signed = litchi_cfb::OleWriter::new();
     for name in ["PowerPoint Document", "Current User"] {
         signed

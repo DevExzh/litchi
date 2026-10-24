@@ -51,7 +51,9 @@ fn read_value(bytes: &[u8], sheet: usize, comment: usize) -> Value {
 }
 
 fn streams(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let paths = ole.list_streams();
     paths
         .into_iter()
@@ -64,7 +66,9 @@ fn streams(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
 }
 
 fn add_stream(bytes: Vec<u8>, name: &str) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
@@ -75,7 +79,9 @@ fn add_stream(bytes: Vec<u8>, name: &str) -> Vec<u8> {
 }
 
 fn replace_workbook_record_kind(bytes: Vec<u8>, from: u16, to: u16) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0_usize;
     loop {
@@ -101,7 +107,9 @@ fn duplicate_workbook_record_before_first_worksheet_eof(
     kind: u16,
     matches: impl Fn(&[u8]) -> bool,
 ) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0_usize;
     let mut eof_count = 0_usize;
@@ -141,7 +149,9 @@ fn orphan_workbook_record_after_first_worksheet_bof(
     kind: u16,
     matches: impl Fn(&[u8]) -> bool,
 ) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0_usize;
     let mut duplicate = None;

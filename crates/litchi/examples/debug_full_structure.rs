@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|| "headers_footers.doc".to_string());
     let file = File::open(&path)?;
     let reader = BufReader::new(file);
-    let mut ole = OleFile::open(reader)?;
+    let mut ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())?;
 
     let table_data = ole.open_stream(&["1Table"])?;
     let wd_data = ole.open_stream(&["WordDocument"])?;

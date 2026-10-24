@@ -1110,9 +1110,8 @@ fn publish_source_operation(
         source.inner.options.splice_limits,
         |composed| -> Result<(Arc<dyn ReadAt>, SharedOleFile, SourceVersion)> {
             let candidate: Arc<dyn ReadAt> = Arc::new(composed.clone());
-            let candidate_shared =
-                SharedOleFile::open_with_limits(Arc::clone(&candidate), shared_limits)
-                    .map_err(map_ole_error)?;
+            let candidate_shared = SharedOleFile::open(Arc::clone(&candidate), shared_limits)
+                .map_err(map_ole_error)?;
             reject_macro_components(&candidate_shared)?;
             let candidate_resolved = source_range::resolve_source_target(
                 &candidate_shared,
@@ -5347,7 +5346,11 @@ mod tests {
     #[test]
     fn the_identity_plan_reports_one_digest_for_both_identities() {
         let bytes = fixture("abc");
-        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+        let shared = SharedOleFile::open(
+            Arc::new(OwnedSource::new(bytes.clone())),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         let plan = shared
             .plan_same_length_stream_splices(Vec::new(), StreamSpliceLimits::default())
             .unwrap();
@@ -5372,7 +5375,8 @@ mod tests {
     ) {
         let (counting, metrics) = CountingSource::new(bytes);
         let source: Arc<dyn ReadAt> = Arc::new(counting);
-        let shared = SharedOleFile::open(Arc::clone(&source)).unwrap();
+        let shared =
+            SharedOleFile::open(Arc::clone(&source), SharedOleFileLimits::default()).unwrap();
         let document_path =
             super::select_stream_path(&shared, &super::DOCUMENT_PATHS, "PowerPoint Document")
                 .unwrap();
@@ -5400,7 +5404,11 @@ mod tests {
     }
 
     fn live_document_bounds(source: &[u8]) -> (Vec<u8>, usize, usize) {
-        let mut ole = OleFile::open(Cursor::new(source.to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.to_vec()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let directory = crate::slide::SlideDirectory::build(
@@ -5553,7 +5561,11 @@ mod tests {
     }
 
     fn resolve_synthetic_history(source: Vec<u8>) -> Result<(), Error> {
-        let shared = SharedOleFile::open(Arc::new(OwnedSource::new(source))).unwrap();
+        let shared = SharedOleFile::open(
+            Arc::new(OwnedSource::new(source)),
+            SharedOleFileLimits::default(),
+        )
+        .unwrap();
         super::source_range::resolve_source_target(
             &shared,
             &["PowerPoint Document".to_string()],
@@ -5567,7 +5579,8 @@ mod tests {
     fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -5591,7 +5604,8 @@ mod tests {
     fn with_stream(source: Vec<u8>, path: &[&str], data: &[u8]) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -5615,7 +5629,8 @@ mod tests {
     fn relocate_root_stream_to_dual(source: Vec<u8>, name: &str) -> Vec<u8> {
         use litchi_cfb::{OleFile, OleWriter};
 
-        let mut source_file = OleFile::open(Cursor::new(source)).unwrap();
+        let mut source_file =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let streams = source_file
             .list_streams()
             .into_iter()
@@ -6002,8 +6017,10 @@ mod tests {
         let report = commit.write_to(&mut output).unwrap();
         assert_eq!(report.bytes(), u64::try_from(bytes.len()).unwrap());
 
-        let mut original = OleFile::open(Cursor::new(bytes)).unwrap();
-        let mut published = OleFile::open(Cursor::new(output)).unwrap();
+        let mut original =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        let mut published =
+            OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
         assert_eq!(
             published.open_stream(&["UnrelatedPayload"]).unwrap(),
             original.open_stream(&["UnrelatedPayload"]).unwrap()
@@ -6134,7 +6151,8 @@ mod tests {
         assert_eq!(owned.payload, ranged.payload);
         assert_eq!(owned.text, ranged.text);
 
-        let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let metrics = metrics.lock().unwrap();
         assert!(metrics.calls > 0);
@@ -6189,7 +6207,11 @@ mod tests {
         let bytes = generated_fixture(6, 4);
         let opened =
             super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let shared = Arc::new(
             SharedOleFile::from_owned_ole_file(
                 ole,
@@ -6263,7 +6285,7 @@ mod tests {
         let mut legacy_text = None;
         for _ in 0..2 {
             legacy_snapshot.ensure_current().unwrap();
-            let shared = SharedOleFile::open_with_limits(
+            let shared = SharedOleFile::open(
                 Arc::clone(&legacy_source),
                 super::shared_limits(crate::SourceLimits::default()).unwrap(),
             )
@@ -6468,7 +6490,11 @@ mod tests {
         ));
 
         let source = fixture("abc");
-        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(
             crate::CurrentUser::parse(&current_user)
@@ -6514,7 +6540,11 @@ mod tests {
         ));
 
         let source = fixture("abc");
-        let mut ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(

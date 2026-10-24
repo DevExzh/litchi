@@ -68,7 +68,9 @@ fn creation_options_are_explicit_refusals_and_capabilities_agree() {
 fn publication_preserves_signatures_and_requires_explicit_removal() {
     use std::io::Cursor;
     let original = create(FileFormat::Xls).unwrap().to_bytes().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(original)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(original), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
@@ -87,7 +89,9 @@ fn publication_preserves_signatures_and_requires_explicit_removal() {
     let unsigned = signed.unsign();
     let emitted = unsigned.to_bytes().unwrap();
     assert!(!litchi_ops::open_bytes(emitted.clone()).unwrap().is_signed());
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(emitted)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(emitted), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     assert_eq!(ole.open_stream(&["Workbook"]).unwrap(), workbook);
 }
 

@@ -7077,8 +7077,11 @@ fn append_raw_record(
 }
 
 fn picture_stream(snapshot: &Snapshot) -> Result<Vec<u8>> {
-    let mut ole =
-        litchi_cfb::OleFile::open(Cursor::new(snapshot.bytes())).map_err(PackageError::from)?;
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(snapshot.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .map_err(PackageError::from)?;
     let paths = ole
         .list_streams()
         .into_iter()
@@ -7123,8 +7126,12 @@ fn validate_transferred_pictures(
 }
 
 fn validate_unrelated_picture_publication(before: &[u8], after: &[u8]) -> Result<()> {
-    let mut old = litchi_cfb::OleFile::open(Cursor::new(before)).map_err(PackageError::from)?;
-    let mut new = litchi_cfb::OleFile::open(Cursor::new(after)).map_err(PackageError::from)?;
+    let mut old =
+        litchi_cfb::OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())
+            .map_err(PackageError::from)?;
+    let mut new =
+        litchi_cfb::OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())
+            .map_err(PackageError::from)?;
     let mut old_paths = old.list_streams();
     let mut new_paths = new.list_streams();
     old_paths.retain(|path| path.last().is_none_or(|name| name != "Pictures"));
@@ -8477,7 +8484,8 @@ mod tests {
     }
 
     fn signed_fixture(bytes: &[u8]) -> Vec<u8> {
-        let mut source = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut source =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let mut writer = OleWriter::new();
         for path in source.list_streams() {
             let names: Vec<&str> = path.iter().map(String::as_str).collect();
@@ -8537,7 +8545,11 @@ mod tests {
     fn open_ole_live_document_inspection_matches_byte_ingress() {
         let bytes = authored_fixture();
         let expected = crate::embedded::object::Editor::inspect_live_document(&bytes).unwrap();
-        let mut ole = OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let actual =
             crate::embedded::object::Editor::inspect_live_document_from_ole(&mut ole).unwrap();
 

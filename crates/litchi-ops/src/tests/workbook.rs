@@ -960,9 +960,11 @@ mod xls {
     }
 
     pub(super) fn workbook_stream() -> Vec<u8> {
-        let mut ole =
-            litchi_cfb::OleFile::open(Cursor::new(std::fs::read(test_data(FIXTURE)).unwrap()))
-                .unwrap();
+        let mut ole = litchi_cfb::OleFile::open(
+            Cursor::new(std::fs::read(test_data(FIXTURE)).unwrap()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         ole.open_stream(&["Workbook"]).unwrap()
     }
 

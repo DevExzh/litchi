@@ -574,7 +574,7 @@ fn package_publication_appends_tables_and_relocates_only_owned_pointers() {
         .unwrap();
     let commit = editor.apply(transaction).unwrap();
     let output = commit.snapshot().finish().unwrap();
-    let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word).unwrap();
@@ -612,7 +612,11 @@ fn package_publication_preserves_undefined_fields_and_rejects_source_conflicts()
         .update_file_path(FileNameSelector::Index(0), "C:\\docs\\changed.doc")
         .unwrap();
     let commit = editor.apply(transaction).unwrap();
-    let mut ole = OleFile::open(Cursor::new(commit.snapshot().finish().unwrap())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(commit.snapshot().finish().unwrap()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word).unwrap();

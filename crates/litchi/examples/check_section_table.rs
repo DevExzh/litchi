@@ -5,7 +5,7 @@ use std::io::BufReader;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let file = File::open("comprehensive_test.doc")?;
     let reader = BufReader::new(file);
-    let mut ole = OleFile::open(reader)?;
+    let mut ole = OleFile::open(reader, litchi_cfb::OleFileLimits::default())?;
 
     let table_data = ole.open_stream(&["1Table"])?;
 

@@ -123,7 +123,7 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
 fn write_package(editor: &mut Editor, appended: Vec<u8>) -> Result<Vec<u8>> {
     let mut writer = OleWriter::new();
     writer.set_sector_layout_policy(editor.layout);
-    writer.adopt_source_layout(&editor.original)?;
+    writer.adopt_source_layout(&editor.original, editor.cfb_limits)?;
 
     // `find_stream` selects the first matching leaf name.  A valid CFB
     // directory cannot contain the same complete path twice, but a malformed
@@ -186,7 +186,7 @@ fn write_package(editor: &mut Editor, appended: Vec<u8>) -> Result<Vec<u8>> {
 }
 
 fn validate_rewrite(editor: &Editor, bytes: Vec<u8>) -> Result<Vec<u8>> {
-    let mut reopen = OleFile::open(Cursor::new(bytes.as_slice()))?;
+    let mut reopen = OleFile::open(Cursor::new(bytes.as_slice()), editor.cfb_limits)?;
     let document = reopen.open_stream(&stream_refs(&editor.document_path))?;
     let current_user = reopen.open_stream(&stream_refs(&editor.current_user_path))?;
     let (mapping, _) = mapping::read(&document, rewrite::u32_at(&current_user, 16)?)?;
@@ -376,7 +376,7 @@ mod candidate_finish_tests {
     fn write_package_reference(editor: &Editor, appended: &[u8]) -> Result<Vec<u8>> {
         let mut writer = OleWriter::new();
         writer.set_sector_layout_policy(editor.layout);
-        writer.adopt_source_layout(&editor.original)?;
+        writer.adopt_source_layout(&editor.original, editor.cfb_limits)?;
         for (path, data) in &editor.streams {
             let stream_data = if path == &editor.document_path {
                 appended
@@ -562,7 +562,11 @@ mod candidate_finish_tests {
     fn open_reads_document_and_current_user_streams_once() {
         let source = fixture();
         let editor = Editor::open_records(source.clone()).unwrap();
-        let mut ole = OleFile::open(Cursor::new(source.as_slice())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(source.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(editor.streams.len(), ole.list_streams().len());
         assert_eq!(
             editor.document,
@@ -642,7 +646,8 @@ mod candidate_finish_tests {
         let actual = super::write_package(&mut candidate, appended).unwrap();
         assert_eq!(actual, expected);
 
-        let mut ole = OleFile::open(Cursor::new(actual)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(actual), litchi_cfb::OleFileLimits::default()).unwrap();
         assert!(
             !ole.open_stream(&stream_refs(&reference.document_path))
                 .unwrap()

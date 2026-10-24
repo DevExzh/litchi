@@ -48,7 +48,11 @@ fn synthetic_store_round_trips_with_modified_promotion() {
     write(&mut writer, &store).unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         inspect(&mut ole, Limits::default()).unwrap().unwrap(),
         store
@@ -59,7 +63,11 @@ fn synthetic_store_round_trips_with_modified_promotion() {
 fn reads_real_word_custom_xml_store() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/doc/inline-endnote-and-footnote.doc");
-    let mut ole = OleFile::open(std::fs::File::open(path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        std::fs::File::open(path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let store = inspect(&mut ole, Limits::default()).unwrap().unwrap();
     assert_eq!(store.promotion, Promotion::Unspecified);
     assert_eq!(store.items().len(), 1);
@@ -79,7 +87,11 @@ fn rejects_conflicting_markers_bad_shape_and_hostile_xml() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert!(inspect(&mut ole, Limits::default()).is_err());
 
     assert!(Item::new("item", b"<!DOCTYPE x><x/>".to_vec(), properties()).is_err());
@@ -105,7 +117,11 @@ fn zero_count_limits_can_disable_items_and_schema_references() {
     writer.create_storage(&[STORE_STORAGE]).unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes.into_inner())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let limits = Limits {
         max_items: 0,
         max_schema_references: 0,

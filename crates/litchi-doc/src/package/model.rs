@@ -734,6 +734,7 @@ fn core_vba_error(error: litchi_vba::Error) -> litchi_core::Error {
         | litchi_vba::Error::UnsupportedCodePage(_) => {
             litchi_core::Error::CorruptedFile("DOC VBA operation failed".to_string())
         },
+        _ => litchi_core::Error::CorruptedFile("DOC VBA operation failed".to_string()),
     }
 }
 

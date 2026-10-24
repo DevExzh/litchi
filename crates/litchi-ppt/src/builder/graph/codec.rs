@@ -33,7 +33,7 @@ pub(super) fn read(bytes: &[u8], limits: Limits) -> Result<Parts> {
     )?;
     let workbook_bytes = workbook.into_bytes();
 
-    let mut cfb = OleFile::open(Cursor::new(bytes))?;
+    let mut cfb = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let comp_obj = package
         .topology()
         .comp_obj_bytes()

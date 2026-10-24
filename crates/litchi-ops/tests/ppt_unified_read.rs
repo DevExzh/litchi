@@ -41,8 +41,11 @@ fn presentation_bytes() -> Vec<u8> {
 }
 
 fn signed_presentation_bytes() -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(presentation_bytes()))
-        .expect("open native PPT package");
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(presentation_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("open native PPT package");
     let document = ole
         .open_stream(&["PowerPoint Document"])
         .expect("PowerPoint Document stream");

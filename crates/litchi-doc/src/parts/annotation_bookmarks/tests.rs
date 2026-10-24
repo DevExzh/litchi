@@ -139,7 +139,9 @@ fn package_edit_appends_and_clear_only_removes_the_fib_range() {
     let reopened = Editor::open(written.clone()).unwrap();
     assert_eq!(reopened.value(), Some(&sample()));
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(written)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(written), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     assert!(table.starts_with(b"opaque prefix"));
     drop(table);
@@ -151,7 +153,9 @@ fn package_edit_appends_and_clear_only_removes_the_fib_range() {
     let reopened = Editor::open(finished.clone()).unwrap();
     assert!(reopened.value().is_none());
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(finished)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(finished), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     assert_eq!(&word[POINTER..POINTER + 8], &[0; 8]);
     let table = ole.open_stream(&["0Table"]).unwrap();

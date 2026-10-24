@@ -36,7 +36,7 @@ fn mixed_minifat_fat_nested_storage_clsids_reopen() {
 
     let bytes = publish(writer);
     assert_eq!(bytes.len() % 512, 0);
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(
         file.root_entry().unwrap().clsid,
         "A1A1A1A1-A1A1-A1A1-A1A1-A1A1A1A1A1A1"
@@ -90,7 +90,7 @@ fn sequential_directory_metadata_is_exact_and_defaults_are_zeroed() {
         .unwrap();
 
     let bytes = publish(writer);
-    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let root = file.root_entry().unwrap();
     assert_eq!(root.state_bits, 0x1020_3040);
     assert_eq!(root.creation_time, 0);
@@ -130,7 +130,7 @@ fn sequential_fresh_root_creation_time_rejects_nonzero_without_mutation() {
     assert!(writer.set_root_creation_time(1).is_err());
 
     let bytes = publish(writer);
-    let file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(file.root_entry().unwrap().creation_time, 0);
 }
 
@@ -145,7 +145,8 @@ fn sector_size_4096_and_current_writer_wire_parity() {
         .unwrap();
     let bytes = publish(sequential);
     assert_eq!(bytes.len() % 4096, 0);
-    let mut parsed = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut parsed =
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(parsed.open_stream(&["Small"]).unwrap(), b"payload");
 
     let mut legacy = OleWriter::with_sector_size(512).unwrap();
@@ -348,7 +349,7 @@ fn output_limit_accepts_exact_and_rejects_one_under_without_sink_calls() {
     let bytes = publish(baseline);
     let exact = u64::try_from(bytes.len()).unwrap();
 
-    let options = SequentialWriterOptions::default().with_limits(SequentialWriterLimits {
+    let options = SequentialWriterOptions::default().limits(SequentialWriterLimits {
         max_output_bytes: exact,
         ..SequentialWriterLimits::default()
     });
@@ -358,7 +359,7 @@ fn output_limit_accepts_exact_and_rejects_one_under_without_sink_calls() {
         .unwrap();
     assert_eq!(publish(accepted).len(), bytes.len());
 
-    let options = SequentialWriterOptions::default().with_limits(SequentialWriterLimits {
+    let options = SequentialWriterOptions::default().limits(SequentialWriterLimits {
         max_output_bytes: exact - 1,
         ..SequentialWriterLimits::default()
     });
@@ -392,7 +393,7 @@ fn difat_boundary_streams_without_retaining_source_payload() {
     let difat_count = u32::from_le_bytes(bytes[0x48..0x4C].try_into().unwrap());
     assert!(fat_count > 109);
     assert!(difat_count >= 1);
-    let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(file.stream_len(&["Large"]).unwrap(), length);
     assert_eq!(
         file.open_stream(&["Large"]).unwrap().len(),
@@ -449,7 +450,7 @@ fn exact_fat_boundary_has_no_difat_and_one_over_has_difat() {
 #[test]
 fn planning_limits_do_not_call_sink() {
     let limits = SequentialWriterLimits::new(1, 16, 8, 128, 8, 1024, 512);
-    let options = SequentialWriterOptions::default().with_limits(limits);
+    let options = SequentialWriterOptions::default().limits(limits);
     let mut writer = SequentialOleWriter::with_options(options).unwrap();
     writer
         .add_stream(&["TooLarge"], 9, Cursor::new(vec![0; 9]))
@@ -464,7 +465,7 @@ fn planning_limits_do_not_call_sink() {
         max_metadata_bytes: 1,
         ..SequentialWriterLimits::default()
     };
-    let options = SequentialWriterOptions::default().with_limits(metadata_limits);
+    let options = SequentialWriterOptions::default().limits(metadata_limits);
     let mut limited = SequentialOleWriter::with_options(options).unwrap();
     limited
         .add_stream(&["Data"], 1, Cursor::new(vec![1]))
@@ -482,6 +483,14 @@ fn planning_limits_do_not_call_sink() {
 }
 
 #[test]
+fn options_limits_round_trip_through_noun_accessors() {
+    let limits = SequentialWriterLimits::new(11, 22, 33, 44, 55, 66, 77);
+    let options = SequentialWriterOptions::default().limits(limits);
+
+    assert_eq!(options.limits_value(), limits);
+}
+
+#[test]
 fn atomic_save_reopens_candidate_before_replace() {
     let path = std::env::temp_dir().join(format!(
         "litchi-cfb-sequential-{}-{}.ole",
@@ -495,7 +504,7 @@ fn atomic_save_reopens_candidate_before_replace() {
     let report = writer.save(&path).unwrap();
     assert_eq!(report.payload_bytes(), 5);
     let file = std::fs::File::open(&path).unwrap();
-    let mut parsed = OleFile::open(file).unwrap();
+    let mut parsed = OleFile::open(file, litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(parsed.open_stream(&["Saved"]).unwrap(), b"saved");
     std::fs::remove_file(path).unwrap();
 }
@@ -514,7 +523,11 @@ fn atomic_save_overwrites_existing_destination() {
         .unwrap();
     writer.save(&path).unwrap();
 
-    let mut parsed = OleFile::open(std::fs::File::open(&path).unwrap()).unwrap();
+    let mut parsed = OleFile::open(
+        std::fs::File::open(&path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(parsed.open_stream(&["Saved"]).unwrap(), b"new!!");
     std::fs::remove_file(path).unwrap();
 }

@@ -145,7 +145,11 @@ fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
         .write_to(&mut workbook_bytes)
         .unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(workbook_bytes.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let workbook_stream = ole.open_stream(&["Workbook"]).unwrap();
 
     let mut container = OleWriter::new();

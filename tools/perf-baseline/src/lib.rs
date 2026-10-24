@@ -15632,7 +15632,10 @@ fn build_cfb_corpus(
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     if archive_member_count != entry_count {
         return Err("CFB stream count differs from generated corpus specification".into());
@@ -15704,7 +15707,10 @@ fn build_cfb_selective_corpus(
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
     let target_name = cfb_entry_name(target_index);
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     if parsed.list_streams().len() != entry_count
         || parsed.open_stream(&[target_name.as_str()])? != target_payload
     {
@@ -15765,7 +15771,10 @@ fn build_ole_common_corpus(base: &Corpus) -> Result<Corpus, Box<dyn Error>> {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     if parsed.list_streams().len() != entry_count
         || parsed.open_stream(&[OLE_COMMON_TARGET])? != OLE_COMMON_ORIGINAL
     {
@@ -15828,7 +15837,10 @@ fn build_writer_corpus(case: Case, shape: WriterShape) -> Result<Corpus, Box<dyn
         },
         _ => return Err("synthetic container case does not have a writer corpus".into()),
     };
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&[target_name])?;
     if archive_member_count == 0 || target_payload.is_empty() {
@@ -15990,7 +16002,10 @@ fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
     let mut output = Cursor::new(Vec::new());
     litchi_ppt::raw::encode(&mut writer, &mut output)?;
     let archive = output.into_inner();
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let pictures = parsed.open_stream(&["Pictures"])?;
     if pictures.len() <= 4 * 1024 || pictures.is_empty() {
         return Err("PPT Pictures corpus did not produce a regular stream".into());
@@ -16078,7 +16093,7 @@ fn ppt_picture_source_limits(
     archive: &[u8],
     pictures_bytes: usize,
 ) -> Result<litchi_ppt::SourceLimits, Box<dyn Error>> {
-    let parsed = OleFile::open(Cursor::new(archive))?;
+    let parsed = OleFile::open(Cursor::new(archive), litchi_cfb::OleFileLimits::default())?;
     let mut aggregate = 0_u64;
     for index in 0..parsed.directory_entry_count() {
         let sid = u32::try_from(index)?;
@@ -16118,7 +16133,7 @@ fn verify_ppt_picture_limit_gates(
 ) -> Result<(), Box<dyn Error>> {
     let exact = ppt_picture_source_limits(archive, pictures_bytes)?;
     let pictures_payload = {
-        let mut parsed = OleFile::open(Cursor::new(archive))?;
+        let mut parsed = OleFile::open(Cursor::new(archive), litchi_cfb::OleFileLimits::default())?;
         parsed.open_stream(&["Pictures"])?
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
@@ -26842,7 +26857,7 @@ fn run_cfb_bulk_read_scaling(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), cfb_shared_limits(corpus)?)?;
+        let ole = SharedOleFile::open(source.clone(), cfb_shared_limits(corpus)?)?;
         let context = execution_context(
             workers,
             logical_tasks,
@@ -28443,8 +28458,9 @@ fn profile_doc_changed_commit(
 }
 
 fn verify_doc_untouched_streams(source: &[u8], candidate: &[u8]) -> Result<(), Box<dyn Error>> {
-    let mut source_ole = OleFile::open(Cursor::new(source))?;
-    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
+    let mut candidate_ole =
+        OleFile::open(Cursor::new(candidate), litchi_cfb::OleFileLimits::default())?;
     let mut source_paths = source_ole.list_streams();
     let mut candidate_paths = candidate_ole.list_streams();
     source_paths.sort();
@@ -29016,7 +29032,10 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = xls_f3_corpus::build_xls_comments_fixture()?;
 
     verify_xls_comments_static_guards(&archive)?;
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&["Workbook"])?;
     let uncompressed_payload_bytes = target_payload
@@ -30096,7 +30115,10 @@ fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     }
     let mut workbook_package = Cursor::new(Vec::new());
     workbook_builder.build()?.write_to(&mut workbook_package)?;
-    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(workbook_package.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let workbook_stream = parsed.open_stream(&["Workbook"])?;
 
     let mut writer = OleWriter::new();
@@ -30122,7 +30144,10 @@ fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = output.into_inner();
 
     verify_xls_visibility_static_guards(&archive)?;
-    let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let archive_member_count = parsed.list_streams().len();
     let target_payload = parsed.open_stream(&["Workbook"])?;
     let opaque_bytes = XLS_VISIBILITY_OPAQUE_STREAM_COUNT
@@ -30974,8 +30999,9 @@ fn verify_xls_untouched_streams(
     candidate: &[u8],
     require_equal_workbook_length: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let mut source_ole = OleFile::open(Cursor::new(source))?;
-    let mut candidate_ole = OleFile::open(Cursor::new(candidate))?;
+    let mut source_ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
+    let mut candidate_ole =
+        OleFile::open(Cursor::new(candidate), litchi_cfb::OleFileLimits::default())?;
     if cfb_directory_inventory(&source_ole)? != cfb_directory_inventory(&candidate_ole)? {
         return Err("XLS comment publication changed the complete CFB directory topology".into());
     }
@@ -58704,7 +58730,10 @@ fn run_cfb_open(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+        let ole = OleFile::open(
+            Cursor::new(corpus.archive.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         let duration = started.elapsed();
         let allocation_metrics = match allocation_region.finish() {
             Some(sample) => Some(sample),
@@ -58734,7 +58763,10 @@ fn run_cfb_list_streams(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let ole = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -58767,7 +58799,10 @@ fn run_cfb_read_one(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let mut ole = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let mut ole = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let path = [corpus.target_name.as_str()];
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
@@ -58820,7 +58855,7 @@ fn run_cfb_shared_open(
         let source = cfb_instrumented_source(corpus);
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
         if ole.file_size() != expected_size {
@@ -58861,7 +58896,7 @@ fn run_cfb_shared_read_one(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         source.reset();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
@@ -58931,7 +58966,7 @@ fn run_cfb_selective_read(
         let open_started = Instant::now();
         let selected = if shared {
             let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
-            let ole = SharedOleFile::open_with_limits(source, limits)?;
+            let ole = SharedOleFile::open(source, limits)?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -58945,7 +58980,7 @@ fn run_cfb_selective_read(
             (payload, open_duration, read_duration, open_snapshot)
         } else {
             let cursor = SelectiveCursor::new(bytes, Arc::clone(&metrics));
-            let mut ole = OleFile::open(cursor)?;
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default())?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -59031,7 +59066,10 @@ fn run_cfb_selective_read(
 }
 
 fn cfb_open_stream_identity(corpus: &Corpus) -> Result<(usize, u32, bool, u64), Box<dyn Error>> {
-    let parsed = OleFile::open(Cursor::new(corpus.archive.as_slice()))?;
+    let parsed = OleFile::open(
+        Cursor::new(corpus.archive.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let root_ministream_bytes = parsed
         .root_entry()
         .ok_or("CFB open_stream source has no root directory entry")?
@@ -59178,7 +59216,7 @@ fn run_cfb_open_stream(
         let mut outputs = Vec::with_capacity(invocation_count);
         let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59459,7 +59497,7 @@ fn run_cfb_open_stream_bulk(
         let metrics = Arc::new(SelectiveReadMetrics::default());
         let source = Arc::new(SelectiveReadAt::new(bytes, Arc::clone(&metrics)));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59652,7 +59690,7 @@ fn run_cfb_open_stream_concurrent(
             target_len,
         ));
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source, limits)?;
+        let ole = SharedOleFile::open(source, limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = metrics.snapshot()?;
         metrics.reset()?;
@@ -59881,7 +59919,7 @@ fn run_cfb_open_stream_simulated(
             metrics: Arc::clone(&metrics),
         });
         let open_started = Instant::now();
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         let open_duration = open_started.elapsed();
         let open_snapshot = source.snapshot()?;
         metrics.reset()?;
@@ -60330,7 +60368,7 @@ fn run_cfb_selective_simulated_read(
         let open_started = Instant::now();
         let selected = if shared {
             let source = shared_source.ok_or("simulated shared CFB source is absent")?;
-            let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+            let ole = SharedOleFile::open(source.clone(), limits)?;
             let open_duration = open_started.elapsed();
             let open_snapshot = source.snapshot()?;
             metrics.reset()?;
@@ -60344,7 +60382,7 @@ fn run_cfb_selective_simulated_read(
             (payload, open_duration, read_duration, open_snapshot)
         } else {
             let cursor = legacy_cursor.ok_or("simulated legacy CFB cursor is absent")?;
-            let mut ole = OleFile::open(cursor)?;
+            let mut ole = OleFile::open(cursor, litchi_cfb::OleFileLimits::default())?;
             let open_duration = open_started.elapsed();
             let open_snapshot = metrics.snapshot()?;
             metrics.reset()?;
@@ -60460,7 +60498,7 @@ fn run_cfb_shared_concurrent_reads(
     let mut source_summary = SourceSummary::default();
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let source = cfb_instrumented_source(corpus);
-        let ole = SharedOleFile::open_with_limits(source.clone(), limits)?;
+        let ole = SharedOleFile::open(source.clone(), limits)?;
         source.reset();
         let start = Arc::new(Barrier::new(3));
         let allocation_region = allocation_metrics::begin();
@@ -60799,7 +60837,7 @@ fn ole_common_limits(corpus: &Corpus) -> Result<OleObjectLimits, Box<dyn Error>>
 
 fn verify_ole_common_changed_output(corpus: &Corpus, output: &[u8]) -> Result<(), Box<dyn Error>> {
     let kind = corpus_payload_kind(corpus)?;
-    let mut ole = OleFile::open(Cursor::new(output))?;
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?;
     let streams = ole.list_streams();
     if streams.len() != corpus.manifest.entry_count {
         return Err("OLE common output stream count differs from its corpus".into());
@@ -64335,7 +64373,11 @@ mod tests {
     }
 
     fn cfb_expected_minifat_physical_start(archive: &[u8], target_name: &str) -> u64 {
-        let parsed = super::OleFile::open(std::io::Cursor::new(archive)).unwrap();
+        let parsed = super::OleFile::open(
+            std::io::Cursor::new(archive),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let sector_size = parsed.sector_size();
         let read_u16 = |bytes: &[u8]| u16::from_le_bytes(bytes.try_into().unwrap());
         let read_u32 = |bytes: &[u8]| u32::from_le_bytes(bytes.try_into().unwrap());
@@ -70585,8 +70627,11 @@ mod tests {
             assert_eq!(operation.source.status, MetricStatus::NotApplicable);
             assert!(operation.source.logical_read_calls.values.is_none());
 
-            let mut reopened =
-                litchi_cfb::OleFile::open(std::io::Cursor::new(corpus.archive.as_slice())).unwrap();
+            let mut reopened = litchi_cfb::OleFile::open(
+                std::io::Cursor::new(corpus.archive.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
             assert_eq!(reopened.file_size(), corpus.archive.len() as u64);
             assert_eq!(reopened.list_streams().len(), corpus.manifest.entry_count);
             assert_eq!(

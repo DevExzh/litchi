@@ -49,7 +49,11 @@ fn editor_publishes_native_incremental_directory_and_retains_prior_chain() {
         .unwrap();
     let published = editor.finish().unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(published.as_slice())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(published.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let current_user = ole.open_stream(&["Current User"]).unwrap();
     let latest_edit_offset = rewrite::u32_at(&current_user, 16).unwrap();

@@ -113,9 +113,11 @@ mod defined_name_tests {
 
     #[test]
     fn a_password_required_open_hands_the_parsed_container_back() {
-        let ole =
-            litchi_cfb::OleFile::open(File::open(poi_fixture("xor-encryption-abc.xls")).unwrap())
-                .unwrap();
+        let ole = litchi_cfb::OleFile::open(
+            File::open(poi_fixture("xor-encryption-abc.xls")).unwrap(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let ole = match Reader::from_ole_file_or_password_required(ole, OpenOptions::new()) {
             Ok(Err(ole)) => ole,
             Ok(Ok(_)) => panic!("an encrypted workbook opened without a password"),

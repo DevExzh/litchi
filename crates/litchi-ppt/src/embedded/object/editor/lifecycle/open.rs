@@ -13,7 +13,7 @@ use std::sync::Arc;
     reason = "used by capability-specific package snapshot paths"
 )]
 pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     inspect_live_document_from_ole(&mut ole)
 }
 
@@ -72,8 +72,12 @@ pub(crate) fn inspect_live_mapping_at(
 
 /// Open over a package that may be signed; the editor records the signature
 /// and `finish` refuses a changed publication.
-pub(crate) fn open_admitting_signature(bytes: Arc<[u8]>, collection: Collection) -> Result<Editor> {
-    open_with_limit(bytes, collection, usize::MAX, true)
+pub(crate) fn open_admitting_signature(
+    bytes: Arc<[u8]>,
+    collection: Collection,
+    cfb_limits: litchi_cfb::OleFileLimits,
+) -> Result<Editor> {
+    open_with_limit(bytes, collection, usize::MAX, true, cfb_limits)
 }
 
 /// The empty collection of a records-only editor.
@@ -86,6 +90,7 @@ fn open_with_limit(
     collection: Collection,
     max_output_bytes: usize,
     admit_signature: bool,
+    cfb_limits: litchi_cfb::OleFileLimits,
 ) -> Result<Editor> {
     if bytes.len() > max_output_bytes {
         return Err(Error::ResourceLimit(format!(
@@ -93,7 +98,7 @@ fn open_with_limit(
             bytes.len()
         )));
     }
-    let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), cfb_limits)?;
     let signed = reject_unsupported_package(&ole, admit_signature)?;
     let paths = ole.list_streams();
 
@@ -127,6 +132,7 @@ fn open_with_limit(
     Ok(Editor {
         original: bytes,
         max_output_bytes,
+        cfb_limits,
         streams,
         document_path,
         current_user_path,
@@ -153,7 +159,13 @@ pub(crate) fn open_records_arc_with_limit(
     bytes: Arc<[u8]>,
     max_output_bytes: usize,
 ) -> Result<Editor> {
-    open_with_limit(bytes, no_objects(), max_output_bytes, false)
+    open_with_limit(
+        bytes,
+        no_objects(),
+        max_output_bytes,
+        false,
+        litchi_cfb::OleFileLimits::default(),
+    )
 }
 
 /// Refuse a package with an encryption or rights-management component, and

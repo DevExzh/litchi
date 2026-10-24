@@ -317,7 +317,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Analyzing PPT structure: {path}");
 
     let file = std::fs::File::open(&path)?;
-    let mut ole = OleFile::open(file)?;
+    let mut ole = OleFile::open(file, litchi_cfb::OleFileLimits::default())?;
 
     // List all OLE streams for high-level comparison
     let streams = ole.list_streams();

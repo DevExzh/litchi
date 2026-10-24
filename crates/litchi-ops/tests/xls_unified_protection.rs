@@ -21,7 +21,11 @@ fn builder() -> litchi_xls::Builder {
 
 fn signed() -> File {
     let bytes = builder().build().unwrap().to_bytes().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     for path in ole.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

@@ -102,7 +102,8 @@ fn unrelated_shapes(package: &Package, textboxes_per_slide: usize) -> Vec<(u32, 
 }
 
 fn stream_map(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("open CFB stream map");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("open CFB stream map");
     ole.list_streams()
         .into_iter()
         .map(|path| {

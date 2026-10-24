@@ -32,6 +32,9 @@ type Result<T> = std::result::Result<T, Error>;
 pub(crate) struct Editor {
     pub(super) original: Arc<[u8]>,
     pub(super) max_output_bytes: usize,
+    /// Physical CFB bounds retained from the source admission. Every
+    /// source-backed rewrite and candidate reopen must use this same profile.
+    pub(super) cfb_limits: litchi_cfb::OleFileLimits,
     /// Every stream in source order. Entries whose path is `document_path` or
     /// `current_user_path` carry no payload: `document` and `current_user`
     /// own those bytes, and `finish` emits them from there.
@@ -114,8 +117,12 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn open_admitting_signature(bytes: Vec<u8>, collection: Collection) -> Result<Self> {
-        lifecycle::open::open_admitting_signature(Arc::from(bytes), collection)
+    pub(crate) fn open_admitting_signature(
+        bytes: Vec<u8>,
+        collection: Collection,
+        cfb_limits: litchi_cfb::OleFileLimits,
+    ) -> Result<Self> {
+        lifecycle::open::open_admitting_signature(Arc::from(bytes), collection, cfb_limits)
     }
 
     /// [`Self::open_records`] over a package that may carry a
@@ -125,7 +132,11 @@ impl Editor {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub(crate) fn open_records_admitting_signature(bytes: Vec<u8>) -> Result<Self> {
-        lifecycle::open::open_admitting_signature(Arc::from(bytes), lifecycle::open::no_objects())
+        lifecycle::open::open_admitting_signature(
+            Arc::from(bytes),
+            lifecycle::open::no_objects(),
+            litchi_cfb::OleFileLimits::default(),
+        )
     }
 
     pub(crate) fn open_records_arc_with_limit(

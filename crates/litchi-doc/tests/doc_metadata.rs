@@ -44,7 +44,7 @@ fn fresh() -> Builder {
 }
 
 fn stream_names(bytes: &[u8]) -> Vec<String> {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .list_streams()
         .into_iter()
@@ -53,7 +53,7 @@ fn stream_names(bytes: &[u8]) -> Vec<String> {
 }
 
 fn root_clsid(bytes: &[u8]) -> String {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .root_entry()
         .unwrap()
@@ -87,7 +87,11 @@ fn builder_metadata_reads_back_through_every_reader() {
     assert_metadata(&package);
     let bytes = package.to_bytes().unwrap();
 
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let summary = summary_information::Snapshot::from_stream(
         &ole.property_set(Binding::SummaryInformation).unwrap(),
     )
@@ -230,7 +234,11 @@ fn metadata_transaction_creates_missing_streams_and_keeps_the_clsid() {
     let bytes = edited.to_bytes().unwrap();
     assert_eq!(root_clsid(&bytes), root_clsid(&source));
 
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let document_summary = document_summary::Snapshot::from_stream(
         &ole.property_set(Binding::DocumentSummaryInformation)
             .unwrap(),

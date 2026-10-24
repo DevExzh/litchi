@@ -34,7 +34,7 @@ fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
 }
 
 fn streams(file: &[u8]) -> (Vec<u8>, Vec<u8>, Option<Vec<u8>>) {
-    let mut ole = OleFile::open(Cursor::new(file)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(file), litchi_cfb::OleFileLimits::default()).unwrap();
     let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let current_user = ole.open_stream(&["Current User"]).unwrap();
     let pictures = ole.open_stream(&["Pictures"]).ok();

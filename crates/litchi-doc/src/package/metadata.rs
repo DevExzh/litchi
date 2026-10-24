@@ -395,7 +395,7 @@ fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
 
 /// Whether the FIB declares the document encrypted (XOR or RC4).
 fn is_encrypted(bytes: &[u8]) -> Result<bool> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let word = ole.open_stream(&["WordDocument"])?;
     let fib = FileInformationBlock::parse(&word)?;
     Ok(fib.is_encrypted())

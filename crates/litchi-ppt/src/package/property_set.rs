@@ -414,7 +414,7 @@ impl Patch {
 }
 
 fn validate_host(bytes: &[u8]) -> Result<()> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     if !ole.exists(&["PowerPoint Document"]) {
         return Err(Error::InvalidFormat(
             "Not a valid PowerPoint document: PowerPoint Document stream not found".to_string(),
@@ -424,7 +424,7 @@ fn validate_host(bytes: &[u8]) -> Result<()> {
 }
 
 fn read_stream(bytes: &[u8], binding: Binding) -> Result<Option<Stream>> {
-    let mut ole = OleFile::open(Cursor::new(bytes))?;
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default())?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
         Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
@@ -516,7 +516,11 @@ mod tests {
             Some("after company")
         );
 
-        let mut ole = OleFile::open(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(commit.snapshot().bytes().to_vec()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"

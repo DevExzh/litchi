@@ -117,7 +117,7 @@ impl SourceBackedPackage {
             });
         }
         let cfb_limits = SharedOleFileLimits::new(cfb_limit)?;
-        let shared = SharedOleFile::open_with_limits(source, cfb_limits)?;
+        let shared = SharedOleFile::open(source, cfb_limits)?;
         super::preflight_shared_ole_file(&shared, source_limits)?;
         Ok(Self {
             shared: Arc::new(shared),

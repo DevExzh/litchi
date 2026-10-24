@@ -435,7 +435,10 @@ impl Editor {
         if bytes.len() > limits.max_cfb_bytes() {
             return Err(Error::Limit("compound file exceeds byte policy".into()));
         }
-        let ole = OleFile::open(Cursor::new(bytes.as_slice()))?;
+        let ole = OleFile::open(
+            Cursor::new(bytes.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         reject_obvious_encryption(&ole)?;
         // Validate sector size and root metadata now, while retaining ownership
         // of the caller's allocation for an exact clean finish.
@@ -462,7 +465,10 @@ impl Editor {
         {
             self.verify_snapshot(policy)
         } else {
-            let mut ole = OleFile::open(Cursor::new(self.original.as_slice()))?;
+            let mut ole = OleFile::open(
+                Cursor::new(self.original.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )?;
             verify(&mut ole, self.format, policy)
         }
     }
@@ -533,7 +539,10 @@ impl Editor {
         if self.snapshot.is_some() {
             return Ok(());
         }
-        let mut ole = OleFile::open(Cursor::new(self.original.as_slice()))?;
+        let mut ole = OleFile::open(
+            Cursor::new(self.original.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )?;
         let snapshot = Snapshot::read(&mut ole, self.format, &self.limits, true)?;
         self.snapshot = Some(snapshot);
         Ok(())
@@ -844,7 +853,8 @@ mod tests {
     }
 
     fn reports(bytes: &[u8]) -> Vec<Report> {
-        let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut file =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         verify(&mut file, Format::Doc, &Policy::strict()).unwrap()
     }
 
@@ -863,7 +873,11 @@ mod tests {
         assert_eq!(report[0].integrity(), Status::Valid);
         assert_eq!(report[0].signature(), Status::Valid);
 
-        let mut file = OleFile::open(Cursor::new(signed.as_slice())).unwrap();
+        let mut file = OleFile::open(
+            Cursor::new(signed.as_slice()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let signature_name = file
             .list_directory_entries(&[XML_SIGNATURE_STORAGE])
             .unwrap()
@@ -933,7 +947,8 @@ mod tests {
         assert_eq!(editor.snapshot_ref().unwrap().streams.len(), before);
 
         let bytes = editor.finish().unwrap();
-        let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut file =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
         let reports = verify(&mut file, Format::Doc, &Policy::compatible()).unwrap();
         assert_eq!(reports.len(), 1);
         assert_eq!(reports[0].coverage(), Coverage::Partial);
@@ -960,7 +975,11 @@ mod tests {
             (&[XML_SIGNATURE_STORAGE, "1"], b"one"),
             (&[XML_SIGNATURE_STORAGE, "2"], b"two"),
         ]);
-        let mut file = OleFile::open(Cursor::new(signatures)).unwrap();
+        let mut file = OleFile::open(
+            Cursor::new(signatures),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let policy = Policy::strict().limits(Limits::standard().signatures(1).unwrap());
         assert!(matches!(
             verify(&mut file, Format::Doc, &policy),
@@ -990,7 +1009,8 @@ mod tests {
         editor.add(&signer()).unwrap();
         editor.add(&signer()).unwrap();
         let signed = editor.finish().unwrap();
-        let file = OleFile::open(Cursor::new(signed)).unwrap();
+        let file =
+            OleFile::open(Cursor::new(signed), litchi_cfb::OleFileLimits::default()).unwrap();
         let names: HashSet<String> = file
             .list_directory_entries(&[XML_SIGNATURE_STORAGE])
             .unwrap()

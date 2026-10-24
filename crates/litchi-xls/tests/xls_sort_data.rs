@@ -9,7 +9,9 @@ use litchi_xls::{Builder, raw::Reader};
 const LEGACY_SORT_RECORD_TYPE: u16 = 0x0090;
 
 fn workbook_record_types(bytes: &[u8]) -> Vec<u16> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut record_types = Vec::new();
     let mut offset = 0usize;

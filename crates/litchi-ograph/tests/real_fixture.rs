@@ -16,12 +16,13 @@ fn workbook_fixture(name: &str) -> Vec<u8> {
         .join(name);
     let source = std::fs::read(&path)
         .unwrap_or_else(|error| panic!("{} must remain readable: {error}", path.display()));
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap_or_else(|error| {
-        panic!(
-            "{} must remain a valid CFB workbook: {error}",
-            path.display()
-        )
-    });
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())
+        .unwrap_or_else(|error| {
+            panic!(
+                "{} must remain a valid CFB workbook: {error}",
+                path.display()
+            )
+        });
     ole.open_stream(&["Workbook"])
         .unwrap_or_else(|error| panic!("{} must contain Workbook: {error}", path.display()))
 }

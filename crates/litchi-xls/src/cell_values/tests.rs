@@ -7,6 +7,7 @@
 use super::*;
 use litchi_cfb::{
     OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
+    SharedOleFileLimits,
 };
 use std::io::Write;
 use std::sync::{
@@ -60,7 +61,7 @@ fn protected_package(worksheet: bool) -> Vec<u8> {
 
 fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     let source = package();
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut records = Vec::new();
     let parsed =
@@ -162,7 +163,7 @@ fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
 
 fn mul_blank_family_package() -> (Vec<u8>, Reference) {
     let (source, reference) = fixed_numeric_family_package(Storage::MulRk);
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut replaced = false;
@@ -199,7 +200,7 @@ fn mul_blank_family_package() -> (Vec<u8>, Reference) {
 
 fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Reference) {
     let (source, reference) = fixed_numeric_family_package(storage);
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut replaced = false;
@@ -265,7 +266,7 @@ const ANCILLARY_MEMORY_EXTRA: [u8; 10] = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0];
 
 fn ancillary_formula_package() -> Vec<u8> {
     let source = formula_package("1+1");
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut rebuilt = Vec::new();
     let mut patched = false;
@@ -309,7 +310,8 @@ fn positioned_formula_package(formula: &str, row: u32, column: u16) -> Vec<u8> {
 }
 
 fn signed_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -324,7 +326,8 @@ fn signed_package() -> Vec<u8> {
 }
 
 fn macro_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -347,7 +350,8 @@ fn macro_package() -> Vec<u8> {
 }
 
 fn empty_macro_storage_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -360,7 +364,8 @@ fn empty_macro_storage_package() -> Vec<u8> {
 }
 
 fn topology_with_clsids_package() -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(package())).unwrap();
+    let mut ole =
+        OleFile::open(Cursor::new(package()), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let opaque = ole.open_stream(&["Opaque"]).unwrap();
     let mut writer = OleWriter::new();
@@ -384,6 +389,7 @@ fn directory_signature(
     let shared = SharedOleFile::open_owned_vec(
         Arc::clone(&snapshot.inner.bytes),
         snapshot.inner.source_version,
+        SharedOleFileLimits::default(),
     )
     .unwrap();
     shared
@@ -406,7 +412,7 @@ fn directory_signature(
 }
 
 fn stream(bytes: &[u8], name: &str) -> Vec<u8> {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .open_stream(&[name])
         .unwrap()
@@ -797,7 +803,7 @@ fn source_backed_numeric_plan_preserves_complete_directory_topology_and_clsids()
     plan.write_to(&mut output).unwrap();
     assert_eq!(directory_signature(&output), before);
     assert_eq!(
-        OleFile::open(Cursor::new(&output))
+        OleFile::open(Cursor::new(&output), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .open_stream(&["Metadata", "Payload"])
             .unwrap(),
@@ -2887,7 +2893,11 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
 type MatrixRecord = (u16, Vec<u8>);
 
 fn matrix_records(package: &[u8]) -> Vec<MatrixRecord> {
-    let mut ole = OleFile::open(Cursor::new(package.to_vec())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(package.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     Records::new(&stream, litchi_biff::Limits::default())
         .expect("valid BIFF limits")
@@ -3408,8 +3418,11 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
 fn shared_ole_file_editor_matches_an_owned_byte_open() {
     let bytes = package();
     let owned = Snapshot::from_bytes(bytes.clone(), Limits::default()).unwrap();
-    let shared =
-        SharedOleFile::open(Arc::new(litchi_core::OwnedSource::new(bytes.clone()))).unwrap();
+    let shared = SharedOleFile::open(
+        Arc::new(litchi_core::OwnedSource::new(bytes.clone())),
+        SharedOleFileLimits::default(),
+    )
+    .unwrap();
     let adopted =
         Snapshot::from_shared_ole_file(&shared, Limits::default(), OleFileLimits::default())
             .unwrap();

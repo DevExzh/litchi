@@ -604,7 +604,11 @@ mod tests {
             .unwrap()
             .write_to(&mut source_bytes)
             .unwrap();
-        let mut source = OleFile::open(Cursor::new(source_bytes.into_inner())).unwrap();
+        let mut source = OleFile::open(
+            Cursor::new(source_bytes.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let workbook_stream = source.open_stream(&["Workbook"]).unwrap();
 
         let mut writer = OleWriter::new();

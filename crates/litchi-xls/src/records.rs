@@ -2212,8 +2212,11 @@ mod sst_measure_tests {
     }
 
     pub(super) fn workbook_stream(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
-        let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-            .map_err(|error| format!("container: {error}"))?;
+        let file = SharedOleFile::open(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .map_err(|error| format!("container: {error}"))?;
         let mut last = String::from("no workbook stream name matched");
         for name in ["Workbook", "Book", "WORKBOOK", "BOOK"] {
             match file.open_stream(&[name]) {

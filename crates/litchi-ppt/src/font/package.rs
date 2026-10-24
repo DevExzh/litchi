@@ -41,8 +41,8 @@ impl<R: Read + Seek> Reader<R> {
 
 /// Require every unrelated stream path and payload to remain exact.
 pub(crate) fn validate_unrelated_streams(before: &[u8], after: &[u8]) -> Result<()> {
-    let mut old = OleFile::open(Cursor::new(before))?;
-    let mut new = OleFile::open(Cursor::new(after))?;
+    let mut old = OleFile::open(Cursor::new(before), litchi_cfb::OleFileLimits::default())?;
+    let mut new = OleFile::open(Cursor::new(after), litchi_cfb::OleFileLimits::default())?;
     let mut old_paths = old.list_streams();
     let mut new_paths = new.list_streams();
     old_paths.sort();
@@ -73,7 +73,7 @@ pub(crate) fn validate_unrelated_streams(before: &[u8], after: &[u8]) -> Result<
 /// Refuse nested CFB storages because the shared stream-only publisher cannot
 /// prove preservation of their CLSIDs, state bits, timestamps, or emptiness.
 pub(crate) fn require_stream_only_cfb(source: &[u8]) -> Result<()> {
-    let ole = OleFile::open(Cursor::new(source))?;
+    let ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())?;
     if ole
         .list_directory_entries(&[])?
         .iter()

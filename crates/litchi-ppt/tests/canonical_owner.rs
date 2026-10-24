@@ -120,8 +120,15 @@ fn eager_reader_and_preparsed_adoption_preserve_exact_bytes() {
     let packages = [
         Package::from_bytes_with_options(&bytes, options).unwrap(),
         Package::from_reader_with_options(&mut Cursor::new(bytes.clone()), options).unwrap(),
-        Package::from_ole_file(OleFile::open(Cursor::new(bytes.clone())).unwrap(), options)
+        Package::from_ole_file(
+            OleFile::open(
+                Cursor::new(bytes.clone()),
+                litchi_cfb::OleFileLimits::default(),
+            )
             .unwrap(),
+            options,
+        )
+        .unwrap(),
     ];
     for package in packages {
         assert_eq!(package.source_limits(), selected);
@@ -274,7 +281,11 @@ fn encrypted_owner_retains_profile_and_requires_explicit_ciphertext_publication(
                 .unwrap()
                 .contains("encrypted text")
         );
-        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let ole = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         assert!(
             Package::from_ole_file_or_password_required(ole, OpenOptions::new())
                 .unwrap()

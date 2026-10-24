@@ -254,7 +254,9 @@ fn font_ppt10_and_smart_tag_ppt11_share_one_document_prog_tags_owner() {
         .unwrap();
     let bytes = write_to_bytes(&mut writer);
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let (document, _) = Record::parse(&stream, 0).unwrap();
     let doc_info = document
@@ -368,7 +370,9 @@ fn notes_font_references_round_trip_through_the_rich_text_path() {
     writer.build().unwrap().save(&path).unwrap();
 
     let bytes = std::fs::read(&path).unwrap();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let mut offset = 0usize;
     let notes = loop {

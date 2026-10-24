@@ -35,10 +35,13 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-        .unwrap()
-        .open_stream(&["Workbook"])
-        .unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .open_stream(&["Workbook"])
+    .unwrap()
 }
 
 fn cfb_with_workbook(stream: &[u8]) -> Vec<u8> {

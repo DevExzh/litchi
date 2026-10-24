@@ -1031,10 +1031,11 @@ impl<R: Read + Seek> OleFile<R> {
         (self.reader, index)
     }
 
-    /// Open and parse an OLE file from a reader
+    /// Open and parse an OLE file from a reader under explicit finite limits.
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read + Seek
+    /// * `limits` - Finite physical CFB bounds selected by the caller
     ///
     /// # Returns
     /// * `Result<OleFile<R>, OleError>` - The parsed OLE file or an error
@@ -1042,17 +1043,9 @@ impl<R: Read + Seek> OleFile<R> {
     /// # Errors
     /// Returns an `OleError` if the reader fails, or if the data is not a
     /// valid OLE compound file (bad magic, truncated header, corrupt FAT).
-    pub fn open(reader: R) -> Result<Self, OleError> {
-        Self::open_with_limits(reader, OleFileLimits::default())
-    }
-
-    /// Open and parse an OLE file under an explicit finite ingress limit.
-    ///
     /// The source length is checked immediately after the reader reports it,
     /// before any CFB metadata can cause an allocation or index traversal.
-    /// Existing callers should use [`Self::open`], which retains the same
-    /// source-compatible entry point with finite default limits.
-    pub fn open_with_limits(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
+    pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
         // Get file size
         let file_size = reader.seek(SeekFrom::End(0))?;
         if file_size > limits.max_input_bytes() {
@@ -4907,7 +4900,8 @@ mod tests {
     fn copy_source_to_preserves_extent_and_reader_position() {
         let mut expected = sample_file();
         expected.extend_from_slice(b"trailing bytes outside the CFB layout");
-        let mut file = OleFile::open(Cursor::new(expected.clone())).unwrap();
+        let mut file =
+            OleFile::open(Cursor::new(expected.clone()), OleFileLimits::default()).unwrap();
         file.reader.seek(SeekFrom::Start(17)).unwrap();
 
         let mut output = Vec::new();
@@ -4931,7 +4925,7 @@ mod tests {
             }
         }
 
-        let mut file = OleFile::open(Cursor::new(sample_file())).unwrap();
+        let mut file = OleFile::open(Cursor::new(sample_file()), OleFileLimits::default()).unwrap();
         file.reader.seek(SeekFrom::Start(23)).unwrap();
         let error = file.copy_source_to(FailingSink).unwrap_err();
 
@@ -4949,7 +4943,8 @@ mod tests {
             .expect("stream name should be present in directory");
         let creation_time = entry_name + 100;
         data[creation_time..creation_time + 8].copy_from_slice(&1_u64.to_le_bytes());
-        let file = OleFile::open(Cursor::new(data)).expect("legacy stream metadata is readable");
+        let file = OleFile::open(Cursor::new(data), OleFileLimits::default())
+            .expect("legacy stream metadata is readable");
         let stream = file
             .list_streams()
             .into_iter()
@@ -4975,7 +4970,7 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
-        OleFile::open(Cursor::new(output.into_inner())).unwrap()
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap()
     }
 
     #[test]
@@ -5110,7 +5105,7 @@ mod tests {
             let mut data = sample_file();
             data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
             assert!(matches!(
-                OleFile::open(Cursor::new(data)),
+                OleFile::open(Cursor::new(data), OleFileLimits::default()),
                 Err(OleError::InvalidFormat(_))
             ));
         }
@@ -5118,7 +5113,7 @@ mod tests {
         let mut data = sample_file();
         data[0x38..0x3C].copy_from_slice(&2048u32.to_le_bytes());
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::InvalidFormat(_))
         ));
     }
@@ -5403,7 +5398,7 @@ mod tests {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut data = sample_file();
             data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
-            OleFile::open(Cursor::new(data))
+            OleFile::open(Cursor::new(data), OleFileLimits::default())
         }));
 
         assert!(result.is_ok(), "malformed CFB input must not panic");
@@ -6134,7 +6129,11 @@ mod tests {
         writer.create_storage(&["Folder"]).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         file.reader.reads.clear();
 
         let mut byte = [0u8; 1];
@@ -6174,7 +6173,11 @@ mod tests {
         writer.create_stream(&["Large"], &payload).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         let start_sector = file.find_entry(&["Large"]).unwrap().start_sector;
         let physical = (u64::from(start_sector) + 1) * file.sector_size as u64 + 510;
         file.reader.reads.clear();
@@ -6201,7 +6204,11 @@ mod tests {
         writer.create_stream(&["Large"], &payload).unwrap();
         let mut serialized = Cursor::new(Vec::new());
         writer.write_to(&mut serialized).unwrap();
-        let mut file = OleFile::open(TrackingReader::new(serialized.into_inner())).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         file.reader.fail_seeks = true;
         let mut output = [0u8; 4];
         assert!(matches!(
@@ -6704,7 +6711,7 @@ mod tests {
         data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
 
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::CorruptedFile(message))
                 if message.contains("DIFAT sector count exceeds the physical file")
         ));
@@ -6778,7 +6785,7 @@ mod tests {
         data[directory_offset + 76..directory_offset + 80].copy_from_slice(&0u32.to_le_bytes());
 
         assert!(matches!(
-            OleFile::open(Cursor::new(data)),
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
             Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
         ));
     }
@@ -6857,7 +6864,7 @@ mod tests {
         );
         data[padding_offset..padding_offset + 4].copy_from_slice(&ENDOFCHAIN.to_le_bytes());
 
-        assert!(OleFile::open(Cursor::new(data)).is_ok());
+        assert!(OleFile::open(Cursor::new(data), OleFileLimits::default()).is_ok());
     }
 
     #[test]

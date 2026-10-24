@@ -105,7 +105,8 @@ fn unrelated_shapes(package: &Package, textboxes_per_slide: usize) -> Vec<(u32, 
 }
 
 fn stream_map(bytes: &[u8]) -> BTreeMap<Vec<String>, Vec<u8>> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("open CFB stream map");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("open CFB stream map");
     ole.list_streams()
         .into_iter()
         .map(|path| {
@@ -804,7 +805,8 @@ fn noops_count_as_operations_but_preserve_exact_source_and_signed_noops() {
 }
 
 fn signed_cfb(unsigned: &[u8]) -> Vec<u8> {
-    let mut source = OleFile::open(Cursor::new(unsigned)).expect("open unsigned CFB");
+    let mut source = OleFile::open(Cursor::new(unsigned), litchi_cfb::OleFileLimits::default())
+        .expect("open unsigned CFB");
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let names = path.iter().map(String::as_str).collect::<Vec<_>>();

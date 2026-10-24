@@ -184,7 +184,11 @@ fn package_lifecycle_appends_route_data_and_clears_only_fib_pointer() {
     let committed = editor.set(metadata.clone()).unwrap();
     let routed = committed.snapshot().finish().unwrap();
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(routed.clone())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(routed.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let table = ole.open_stream(&["0Table"]).unwrap();
     assert!(table.starts_with(original_table));
     assert_eq!(
@@ -197,7 +201,9 @@ fn package_lifecycle_appends_route_data_and_clears_only_fib_pointer() {
     let finished = completed.snapshot().finish().unwrap();
     let reopened = Editor::open(finished.clone()).unwrap();
     assert!(reopened.metadata().is_none());
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(finished)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(finished), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let pointer = 154 + 70 * 8;
     assert_eq!(&word[pointer..pointer + 8], &[0; 8]);

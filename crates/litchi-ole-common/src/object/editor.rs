@@ -148,7 +148,7 @@ impl Edit {
         cfb_limits: OleFileLimits,
     ) -> Result<Self, Error> {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits)?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
         let original = Arc::new(ole.into_inner().into_inner());
         Ok(Self::from_admitted(original, limits, cfb_limits, admitted))
@@ -167,7 +167,7 @@ impl Edit {
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
     {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)
+        let mut ole = OleFile::open(Cursor::new(bytes), cfb_limits)
             .map_err(Error::from)
             .map_err(E::from)?;
         admission(&ole)?;
@@ -192,7 +192,7 @@ impl Edit {
     {
         Self::validate_open_inputs(&targets, limits)?;
         let mut ole = observe_cfb_parse(&mut observer, || {
-            OleFile::open_with_limits(Cursor::new(bytes), cfb_limits).map_err(Error::from)
+            OleFile::open(Cursor::new(bytes), cfb_limits).map_err(Error::from)
         })
         .map_err(E::from)?;
         admission(&ole)?;
@@ -449,8 +449,7 @@ impl Edit {
         if object.compound() == compound_file.as_slice() {
             return Ok(None);
         }
-        let mut replacement_ole =
-            OleFile::open_with_limits(Cursor::new(compound_file), self.state.cfb_limits)?;
+        let mut replacement_ole = OleFile::open(Cursor::new(compound_file), self.state.cfb_limits)?;
         codec::open(
             &replacement_ole,
             self.state
@@ -860,8 +859,7 @@ impl Edit {
                 maximum: self.state.limits.max_object_size,
             });
         }
-        let mut nested_ole =
-            OleFile::open_with_limits(Cursor::new(compound_file), self.state.cfb_limits)?;
+        let mut nested_ole = OleFile::open(Cursor::new(compound_file), self.state.cfb_limits)?;
         codec::open(
             &nested_ole,
             self.state
@@ -935,10 +933,11 @@ impl Edit {
             {
                 return Ok(rendered);
             }
-            let rendered = self
-                .state
-                .package
-                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)?;
+            let rendered = self.state.package.render_with_layout(
+                Some(self.state.original.as_slice()),
+                self.state.layout,
+                self.state.cfb_limits,
+            )?;
             // Ordinary publication repeats the already validated deterministic
             // render. A caller-selected layout change needs a new physical gate.
             if self.state.layout != self.state.validated_layout {
@@ -999,14 +998,17 @@ impl Edit {
                         self.state.package.render_with_layout(
                             Some(self.state.original.as_slice()),
                             self.state.layout,
+                            self.state.cfb_limits,
                         )
                     },
                     Ok,
                 )?
         } else {
-            self.state
-                .package
-                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)?
+            self.state.package.render_with_layout(
+                Some(self.state.original.as_slice()),
+                self.state.layout,
+                self.state.cfb_limits,
+            )?
         };
         let mut check = open_candidate_with_limits(rendered.as_slice(), self.state.cfb_limits)?;
         codec::open(&check, self.state.limits.max_package_directory_entries())?;
@@ -1041,7 +1043,7 @@ fn open_candidate_with_limits(
     bytes: &[u8],
     limits: OleFileLimits,
 ) -> Result<OleFile<Cursor<&[u8]>>, Error> {
-    match OleFile::open_with_limits(Cursor::new(bytes), limits) {
+    match OleFile::open(Cursor::new(bytes), limits) {
         Ok(file) => Ok(file),
         Err(OleError::LimitExceeded {
             resource: "input bytes",

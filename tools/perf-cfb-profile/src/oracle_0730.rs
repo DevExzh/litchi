@@ -292,7 +292,10 @@ fn collect_directory_entry(
 }
 
 fn inventory(bytes: &[u8]) -> Result<Inventory, BoxError> {
-    let mut ole = OleFile::open(Cursor::new(bytes.to_vec()))?;
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let sector_size = ole.sector_size();
     let raw_directory = raw_directory_image(bytes)?;
     let root = ole.root_entry().cloned().ok_or_else(|| {
@@ -348,9 +351,13 @@ fn inventory(bytes: &[u8]) -> Result<Inventory, BoxError> {
 }
 
 fn structural_valid(bytes: &[u8]) -> bool {
-    validate_source(Arc::new(OwnedSource::new(bytes.to_vec())))
-        .map(|report| report.is_complete() && !report.has_errors())
-        .unwrap_or(false)
+    validate_source(
+        Arc::new(OwnedSource::new(bytes.to_vec())),
+        litchi_cfb::SharedOleFileLimits::default(),
+        litchi_core::ValidationLimits::default(),
+    )
+    .map(|report| report.is_complete() && !report.has_errors())
+    .unwrap_or(false)
 }
 
 #[derive(Clone, Debug, Serialize)]

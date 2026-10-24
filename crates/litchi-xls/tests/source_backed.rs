@@ -44,10 +44,13 @@ fn libreoffice_fixture(name: &str) -> Vec<u8> {
 }
 
 fn workbook_stream(bytes: Vec<u8>, name: &str) -> Vec<u8> {
-    SharedOleFile::open(Arc::new(OwnedSource::new(bytes)))
-        .unwrap()
-        .open_stream(&[name])
-        .unwrap()
+    SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap()
+    .open_stream(&[name])
+    .unwrap()
 }
 
 fn cfb_with_streams(streams: &[(&str, &[u8])]) -> Vec<u8> {
@@ -501,7 +504,13 @@ fn globals_reads_with_limits(
     limits: SourceBackedLimits,
 ) -> (Vec<(u64, usize)>, Result<(), SourceBackedError>) {
     let retained: Arc<dyn ReadAt> = source.clone();
-    let cfb = Arc::new(SharedOleFile::open(Arc::clone(&retained)).unwrap());
+    let cfb = Arc::new(
+        SharedOleFile::open(
+            Arc::clone(&retained),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap(),
+    );
     source.clear_ranges();
     let result = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(cfb, limits);
     let ranges = source.ranges();
@@ -1343,7 +1352,7 @@ fn a_changed_source_outranks_a_missing_workbook_stream() {
     );
     let cfb_observations = {
         let counter = Arc::new(CountingSource::new(bytes.clone()));
-        SharedOleFile::open(counter.clone()).unwrap();
+        SharedOleFile::open(counter.clone(), litchi_cfb::SharedOleFileLimits::default()).unwrap();
         counter.version_calls()
     };
 
@@ -1377,7 +1386,11 @@ fn physical_ranges_for_stream_range(
     length: usize,
 ) -> Vec<(u64, usize)> {
     source.clear_ranges();
-    let cfb = SharedOleFile::open(Arc::new(source.clone())).unwrap();
+    let cfb = SharedOleFile::open(
+        Arc::new(source.clone()),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     source.clear_ranges();
     let mut output = vec![0; length];
     cfb.read_stream_range(&["Workbook"], offset, &mut output)
@@ -1418,7 +1431,11 @@ fn physical_ranges_for_workbook_sheets(
     let positions = workbook_bound_sheet_positions(stream);
     let mut boundaries = positions.clone();
     boundaries.sort_unstable();
-    let cfb = SharedOleFile::open(Arc::new(source.clone())).unwrap();
+    let cfb = SharedOleFile::open(
+        Arc::new(source.clone()),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     source.clear_ranges();
     let mut all_ranges = Vec::with_capacity(positions.len());
     for start in positions {
@@ -1726,7 +1743,11 @@ fn selected_queries_are_bounded_to_the_selected_owner() {
     let sheet_tail = physical_ranges_from(&source, &workbook, smallest_sheet);
     assert!(!overlaps_any(&open_ranges, &sheet_tail));
     let catalog_probe = Arc::new(CountingSource::new(bytes.clone()));
-    let catalog = SharedOleFile::open(catalog_probe.clone()).unwrap();
+    let catalog = SharedOleFile::open(
+        catalog_probe.clone(),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .unwrap();
     let catalog_bytes = catalog_probe.bytes_read();
     drop(catalog);
     let open_bytes: usize = open_ranges.iter().map(|(_, length)| *length).sum();

@@ -78,7 +78,10 @@ pub(crate) fn build_xls_comments_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
     workbook_builder.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
     let mut workbook_package = Cursor::new(Vec::new());
     workbook_builder.build()?.write_to(&mut workbook_package)?;
-    let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
+    let mut parsed = OleFile::open(
+        Cursor::new(workbook_package.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let workbook_stream = parsed.open_stream(&["Workbook"])?;
 
     let mut writer = OleWriter::new();
@@ -117,7 +120,10 @@ pub(crate) fn build_rk_mulrk_fixture() -> Result<Vec<u8>, Box<dyn Error>> {
     let mut package = Cursor::new(Vec::new());
     workbook_builder.build()?.write_to(&mut package)?;
 
-    let mut source_ole = OleFile::open(Cursor::new(package.into_inner()))?;
+    let mut source_ole = OleFile::open(
+        Cursor::new(package.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let source_workbook = source_ole.open_stream(&["Workbook"])?;
     let rebuilt_workbook = convert_numbers_to_rk_mulrk(&source_workbook)?;
 

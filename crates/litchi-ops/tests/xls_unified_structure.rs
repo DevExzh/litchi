@@ -378,7 +378,11 @@ fn rows_and_columns_are_inserted_and_empty_ones_deleted() {
 #[test]
 fn signed_and_encrypted_workbooks_refuse_structure_edits() {
     let source = fixture();
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(source)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(source),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     for path in ole.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

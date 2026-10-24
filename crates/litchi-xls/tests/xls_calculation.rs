@@ -6,7 +6,9 @@ use litchi_xls::writer::{Builder, CalculationSettings};
 use litchi_xls::{CalculationMode, MultithreadedCalculation, ReferenceMode, raw::Reader};
 
 fn workbook_global_record_types(bytes: &[u8]) -> Vec<u16> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut record_types = Vec::new();
     let mut offset = 0usize;

@@ -95,7 +95,11 @@ fn fixture(relative: &str) -> PathBuf {
 /// globals by hand, so the bound below is the fixture's own property rather
 /// than a number copied into the test.
 fn unique_shared_strings(bytes: Vec<u8>) -> u32 {
-    let file = SharedOleFile::open(Arc::new(OwnedSource::new(bytes))).expect("the fixture opens");
+    let file = SharedOleFile::open(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .expect("the fixture opens");
     let stream = file
         .open_stream(&["Workbook"])
         .expect("the fixture has a workbook stream");

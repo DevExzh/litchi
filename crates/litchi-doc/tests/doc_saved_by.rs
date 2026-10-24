@@ -42,7 +42,11 @@ use std::path::Path;
 fn apache_poi_saved_by_table_is_exact_and_round_trips() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/document/saved-by-table.doc");
-    let mut ole = OleFile::open(File::open(path).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(path).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {

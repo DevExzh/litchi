@@ -2502,6 +2502,7 @@ impl Classify for litchi_vba::Error {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::UnsupportedCodePage(_) => Class::of(Code::UnsupportedCapability),
             Self::InvalidData(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::CorruptFile),
         }
     }
 }

@@ -1130,8 +1130,11 @@ impl Edit {
 }
 
 fn workbook_stream_name(bytes: &[u8]) -> Result<&'static str> {
-    let ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes))
-        .map_err(|error| Error::Records(crate::Error::Cfb(error)))?;
+    let ole = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .map_err(|error| Error::Records(crate::Error::Cfb(error)))?;
     Ok(if ole.exists(&["Workbook"]) {
         "Workbook"
     } else {

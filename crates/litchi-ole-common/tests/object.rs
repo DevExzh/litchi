@@ -175,7 +175,8 @@ fn doc_with_object(obj_info: &[u8]) -> Vec<u8> {
 #[test]
 fn discovers_only_host_selected_storage_and_keeps_metadata_opaque() {
     let bytes = doc_with_object(&[0x40, 0x00, 0x02, 0x00]);
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("test CFB should open");
     let selected = targets("host-object", &["ObjectPool", "_42"]);
     let objects = discover(&mut ole, &selected, Limits::default()).expect("discovery should pass");
     let object = objects
@@ -261,7 +262,8 @@ fn target_paths_follow_cfb_name_limits_and_simple_uppercase_identity() {
 #[test]
 fn discovery_resolves_case_variant_target_paths_to_stored_cfb_names() {
     let bytes = doc_with_object(&[0, 0, 0, 0]);
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("test CFB should open");
     let selected = targets("object", &["objectpool", "_42"]);
     let objects = discover(&mut ole, &selected, Limits::default()).expect("target should resolve");
     assert_eq!(
@@ -287,7 +289,8 @@ fn discovery_resolves_case_variant_target_paths_to_stored_cfb_names() {
 #[test]
 fn malformed_format_metadata_is_retained_without_common_classification() {
     let malformed = doc_with_object(&[0x00, 0x04, 0x00, 0x00]);
-    let mut ole = OleFile::open(Cursor::new(malformed)).expect("test CFB should open");
+    let mut ole = OleFile::open(Cursor::new(malformed), litchi_cfb::OleFileLimits::default())
+        .expect("test CFB should open");
     let selected = targets("object", &["ObjectPool", "_42"]);
     let objects = discover(&mut ole, &selected, Limits::default()).expect("opaque data is valid");
     assert_eq!(
@@ -299,7 +302,8 @@ fn malformed_format_metadata_is_retained_without_common_classification() {
     );
 
     let valid = doc_with_object(&[0, 0, 0, 0]);
-    let mut ole = OleFile::open(Cursor::new(valid)).expect("test CFB should open");
+    let mut ole = OleFile::open(Cursor::new(valid), litchi_cfb::OleFileLimits::default())
+        .expect("test CFB should open");
     let limits = Limits {
         max_stream_size: 4,
         ..Limits::default()
@@ -310,7 +314,8 @@ fn malformed_format_metadata_is_retained_without_common_classification() {
 #[test]
 fn missing_target_is_a_checked_discovery_error() {
     let bytes = doc_with_object(&[0, 0, 0, 0]);
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("test CFB should open");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("test CFB should open");
     let selected = targets("missing", &["ObjectPool", "_404"]);
     let error = discover(&mut ole, &selected, Limits::default()).unwrap_err();
     match error {
@@ -360,7 +365,8 @@ fn targeted_replace_preserves_unrelated_streams_and_opaque_reference() {
         .expect("replacement should commit");
     assert!(editor.clone().commit().unwrap().diagnostics().changed());
     let output = editor.render_bytes().expect("editor should finish");
-    let mut ole = OleFile::open(Cursor::new(output)).expect("output CFB should open");
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
+        .expect("output CFB should open");
     assert_eq!(
         ole.open_stream(&["WordDocument"])
             .expect("unrelated stream should remain"),
@@ -538,7 +544,8 @@ fn editor_edit_preserves_directory_metadata_for_unchanged_entries() {
         .put_stream(&["WordDocument".into()], b"edited host bytes".to_vec())
         .expect("unrelated stream edit should commit");
     let output = editor.render_bytes().expect("edited package should finish");
-    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let file = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
+        .expect("edited CFB should open");
 
     let root = file.root_entry().expect("root entry");
     assert_eq!(root.state_bits, 0x1020_3040);
@@ -589,7 +596,11 @@ fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults()
             .create_stream(&["Pool", "Object", "Payload"], b"payload")
             .unwrap();
     });
-    let mut ole = OleFile::open(Cursor::new(source.clone())).expect("source CFB should open");
+    let mut ole = OleFile::open(
+        Cursor::new(source.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("source CFB should open");
     let objects = discover(
         &mut ole,
         &targets("object", &["Pool", "Object"]),
@@ -603,8 +614,11 @@ fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults()
     assert_eq!(source_storage.creation_time(), 0x0102_0304_0506_0708);
     assert_eq!(source_storage.modified_time(), 0x1112_1314_1516_1718);
 
-    let promoted = OleFile::open(Cursor::new(object.compound().to_vec()))
-        .expect("promoted object CFB should open");
+    let promoted = OleFile::open(
+        Cursor::new(object.compound().to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("promoted object CFB should open");
     let root = promoted.root_entry().expect("promoted root should exist");
     assert_eq!(root.entry_type, EntryKind::Root.raw());
     assert_eq!(root.state_bits, 0);
@@ -622,8 +636,11 @@ fn selected_storage_metadata_stays_on_object_while_promoted_root_uses_defaults()
         editor_object.storage().directory().creation_time(),
         0x0102_0304_0506_0708
     );
-    let editor_promoted = OleFile::open(Cursor::new(editor_object.compound().to_vec()))
-        .expect("editor-promoted object CFB should open");
+    let editor_promoted = OleFile::open(
+        Cursor::new(editor_object.compound().to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("editor-promoted object CFB should open");
     let editor_root = editor_promoted
         .root_entry()
         .expect("editor-promoted root should exist");
@@ -669,7 +686,8 @@ fn replacement_preserves_target_storage_metadata_while_mapping_clsid() {
         .replace("object", replacement)
         .expect("replacement should commit");
     let output = editor.render_bytes().expect("edited package should finish");
-    let mut file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let mut file = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
+        .expect("edited CFB should open");
     let target = file
         .list_directory_entries(&["Pool"])
         .unwrap()
@@ -732,7 +750,8 @@ fn added_storage_uses_zero_metadata_for_nonzero_source_root() {
     assert_eq!(added.stream(&["CONTENTS"]), Some(&b"new object"[..]));
 
     let output = editor.render_bytes().expect("edited package should finish");
-    let file = OleFile::open(Cursor::new(output)).expect("edited CFB should open");
+    let file = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
+        .expect("edited CFB should open");
     let target = file
         .list_directory_entries(&["ObjectPool"])
         .unwrap()
@@ -1175,7 +1194,11 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
     });
     let source = {
         let mut writer = OleWriter::new();
-        assert!(writer.adopt_source_layout(&base).unwrap());
+        assert!(
+            writer
+                .adopt_source_layout(&base, litchi_cfb::OleFileLimits::default())
+                .unwrap()
+        );
         writer
             .create_stream(&["A"], &vec![0x33u8; 6_000])
             .expect("source edit should write");
@@ -1206,7 +1229,8 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
         output[free_offset], 0xA7,
         "copy-through retains untouched bytes"
     );
-    let mut ole = OleFile::open(Cursor::new(output)).expect("copy-through output should reopen");
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
+        .expect("copy-through output should reopen");
     assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 6_000]);
     assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
 }
@@ -1215,8 +1239,11 @@ fn same_length_editor_edit_uses_source_backed_copy_through() {
 /// the exact route `render_copy_through` took before change 0748 sealed the
 /// editor's original allocation.
 fn generic_overlay_publication(source: &[u8], overlays: Vec<SameLengthStreamOverlay>) -> Vec<u8> {
-    let shared = SharedOleFile::open(Arc::new(OwnedSource::new(source.to_vec())))
-        .expect("generic source should open");
+    let shared = SharedOleFile::open(
+        Arc::new(OwnedSource::new(source.to_vec())),
+        litchi_cfb::SharedOleFileLimits::default(),
+    )
+    .expect("generic source should open");
     let plan = shared
         .plan_same_length_stream_overlays(overlays, OverlayLimits::default())
         .expect("generic overlay should plan");
@@ -1243,7 +1270,11 @@ fn sealed_copy_through_publishes_the_generic_overlay_bytes() {
     // them distinguishes copy-through from a re-render.
     let shrunk = {
         let mut writer = OleWriter::new();
-        assert!(writer.adopt_source_layout(&base).unwrap());
+        assert!(
+            writer
+                .adopt_source_layout(&base, litchi_cfb::OleFileLimits::default())
+                .unwrap()
+        );
         writer.create_stream(&["A"], &vec![0x33u8; 6_000]).unwrap();
         writer.create_stream(&["B"], &vec![0x22u8; 5_000]).unwrap();
         writer.create_stream(&["Mini"], &vec![0x55u8; 700]).unwrap();
@@ -1306,7 +1337,8 @@ fn sealed_copy_through_publishes_the_generic_overlay_bytes() {
         .expect("second edit");
     let chained = editor.render_bytes().expect("chained finish");
     assert_eq!(chained, expected_both);
-    let mut ole = OleFile::open(Cursor::new(chained)).expect("reopen");
+    let mut ole =
+        OleFile::open(Cursor::new(chained), litchi_cfb::OleFileLimits::default()).expect("reopen");
     assert_eq!(ole.open_stream(&["B"]).unwrap(), vec![0x22; 5_000]);
 }
 
@@ -1321,7 +1353,11 @@ fn same_length_overlay_declines_noncanonical_v3_empty_size_word() {
             .expect("edited stream should write");
     });
     let empty_sid = {
-        let ole = OleFile::open(Cursor::new(source.clone())).expect("source should open");
+        let ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("source should open");
         ole.list_directory_entries(&[])
             .expect("root entries should list")
             .into_iter()
@@ -1344,7 +1380,11 @@ fn same_length_overlay_declines_noncanonical_v3_empty_size_word() {
     let output = editor
         .render_bytes()
         .expect("fallback layout should finish");
-    let mut ole = OleFile::open(Cursor::new(output.clone())).expect("output should reopen");
+    let mut ole = OleFile::open(
+        Cursor::new(output.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("output should reopen");
     assert_eq!(ole.open_stream(&["Empty"]).unwrap(), Vec::<u8>::new());
     assert_eq!(ole.open_stream(&["A"]).unwrap(), vec![0x44; 128]);
     let output_size_high =
@@ -1769,7 +1809,7 @@ fn changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors() {
         let mut writer = OleWriter::new();
         assert!(
             writer
-                .adopt_source_layout(&base)
+                .adopt_source_layout(&base, litchi_cfb::OleFileLimits::default())
                 .expect("source should adopt")
         );
         writer
@@ -1971,7 +2011,7 @@ fn selected_capture_enforces_absolute_depth_and_directory_admission() {
             .create_stream(&["Object", "Child", "Payload"], b"inert")
             .unwrap();
     });
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(matches!(
         discover(
             &mut ole,

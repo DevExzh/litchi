@@ -121,6 +121,15 @@ fn ooxml_kind(cfb: &mut impl Cfb) -> EncryptionKind {
     }
 }
 
+/// Translate the facade's retained input ceiling to the low-level eager CFB
+/// profile. The shared source route already clamps this same value before
+/// parsing; eager and unlock paths must not silently revert to the 2 GiB
+/// parser default when a caller selected a larger v4 input ceiling.
+fn ole_limits(options: &OpenOptions) -> Result<litchi_cfb::OleFileLimits> {
+    let ceiling = super::input_ceiling(options).min(litchi_cfb::OleFileLimits::MAX_INPUT_BYTES);
+    Ok(litchi_cfb::OleFileLimits::new(ceiling)?)
+}
+
 /// The scheme of an encrypted Word document: the FIB's `fObfuscated` flag,
 /// otherwise the encryption header at the start of its table stream.
 #[cfg(feature = "doc")]
@@ -233,7 +242,8 @@ pub(super) fn open_bytes(
     options: &OpenOptions,
     ooxml_hint: Option<FileFormat>,
 ) -> Result<File> {
-    let mut ole = match OleFile::open(Cursor::new(bytes)) {
+    let limits = ole_limits(options)?;
+    let mut ole = match OleFile::open(Cursor::new(bytes), limits) {
         Ok(ole) => ole,
         Err(error) if soft(&error) => {
             check_ooxml_hint(ooxml_hint, None)?;
@@ -359,7 +369,7 @@ pub(super) fn open_path(
             .unwrap_or(litchi_cfb::SharedOleFileLimits::DEFAULT_MAX_INPUT_BYTES)
             .min(litchi_cfb::SharedOleFileLimits::MAX_INPUT_BYTES),
     )?;
-    let shared = match SharedOleFile::open_with_limits(Arc::clone(&source), shared_limits) {
+    let shared = match SharedOleFile::open(Arc::clone(&source), shared_limits) {
         Ok(shared) => shared,
         Err(error) if soft(&error) => {
             ensure_path_source_current(source.as_ref(), version)?;
@@ -564,7 +574,7 @@ pub(super) fn unlock(
     password: &str,
     options: &OpenOptions,
 ) -> Result<File> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), ole_limits(options)?)?;
     let host = match container {
         Container::Doc => Host::Doc,
         Container::Ppt => Host::Ppt,
@@ -576,5 +586,18 @@ pub(super) fn unlock(
         // rather than hand back a second `Locked`.
         File::Locked(locked) => Err(locked.read_error()),
         file => Ok(file),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ole_limits;
+    use crate::OpenOptions;
+
+    #[test]
+    fn eager_cfb_profile_follows_explicit_v4_input_ceiling() {
+        let options = OpenOptions::new().max_input_bytes(3 * 1024 * 1024 * 1024);
+        let limits = ole_limits(&options).expect("valid CFB input profile");
+        assert_eq!(limits.max_input_bytes(), 3 * 1024 * 1024 * 1024);
     }
 }

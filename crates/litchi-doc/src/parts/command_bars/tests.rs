@@ -203,7 +203,11 @@ fn package_editor_publishes_command_bars_and_preserves_unrelated_bytes() {
     let reopened = Editor::open(bytes.clone()).expect("published package reopens");
     assert_eq!(reopened.command_bars().command_bars(), Some(&value));
 
-    let mut ole = OleFile::open(std::io::Cursor::new(bytes.clone())).expect("CFB opens");
+    let mut ole = OleFile::open(
+        std::io::Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("CFB opens");
     let table = ole.open_stream(&["0Table"]).expect("table stream exists");
     assert!(table.starts_with(original_table));
     assert!(committed.package_patch().inverse().apply(&bytes).is_ok());
@@ -211,7 +215,11 @@ fn package_editor_publishes_command_bars_and_preserves_unrelated_bytes() {
     let mut cleared = Editor::open(bytes).expect("published package opens for clear");
     let cleared = cleared.clear().expect("command bars clear");
     let cleared_bytes = cleared.snapshot().finish().expect("clear renders");
-    let mut ole = OleFile::open(std::io::Cursor::new(cleared_bytes)).expect("cleared CFB opens");
+    let mut ole = OleFile::open(
+        std::io::Cursor::new(cleared_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("cleared CFB opens");
     let word = ole
         .open_stream(&["WordDocument"])
         .expect("WordDocument stream exists");

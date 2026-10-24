@@ -187,7 +187,11 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
     let document_bytes = output.into_inner();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&document_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&document_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_name = if FileInformationBlock::parse(&word_document)
         .unwrap()

@@ -21,7 +21,9 @@ fn anchor() -> Anchor {
 }
 
 fn workbook_stream(bytes: Vec<u8>) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 

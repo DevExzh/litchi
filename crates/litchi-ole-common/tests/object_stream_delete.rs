@@ -74,7 +74,11 @@ impl RenderBytes for Package {
 #[test]
 fn removes_first_middle_last_and_only_stream_without_removing_storages() {
     let source = package();
-    let source_ole = OleFile::open(Cursor::new(source.clone())).unwrap();
+    let source_ole = OleFile::open(
+        Cursor::new(source.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let parent_clsid = source_ole
         .list_directory_entries(&[])
         .unwrap()
@@ -110,7 +114,7 @@ fn removes_first_middle_last_and_only_stream_without_removing_storages() {
     );
 
     let output = editor.render_bytes().unwrap();
-    let ole = OleFile::open(Cursor::new(output)).unwrap();
+    let ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
     assert!(ole.list_streams().is_empty());
     assert_eq!(ole.list_directory_entries(&[]).unwrap().len(), 1);
     assert_eq!(ole.list_directory_entries(&["Parent"]).unwrap().len(), 1);
@@ -411,7 +415,7 @@ fn deletion_composes_with_add_and_replace_in_one_editor() {
     assert!(editor.remove_stream(&path(&["First"])).unwrap().is_some());
 
     let output = editor.render_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(output)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default()).unwrap();
     assert_eq!(ole.open_stream(&["Parent", "Added"]).unwrap(), b"added");
     assert_eq!(ole.open_stream(&["Last"]).unwrap(), b"replaced");
     assert!(matches!(
@@ -515,7 +519,7 @@ fn supplementary_plane_case_pairs_are_distinct_stream_names() {
     );
     let output = editor.render_bytes().unwrap();
     assert!(
-        OleFile::open(Cursor::new(output))
+        OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .list_streams()
             .is_empty()

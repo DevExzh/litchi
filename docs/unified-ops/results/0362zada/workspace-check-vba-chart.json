@@ -1,0 +1,25 @@
+{
+  "source_phase": "resolved CFB merge with extensible VBA fallbacks and chart test qualification fix",
+  "head": "2021a41c4cb217844131892138a7d0452a81d6c1",
+  "merge_head": "bf7f48741bc02d1f5e736a7a732c25808d28af36",
+  "tree": "57abd651f19bc0ee91f24e1f60d2850a41eb7f6c",
+  "command": [
+    "cargo",
+    "check",
+    "--workspace",
+    "--offline",
+    "--locked",
+    "--all-features",
+    "--all-targets",
+    "--message-format=short"
+  ],
+  "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/target-cfb-explicit-limits",
+  "started_utc": "2026-10-24T10:59:46.864928+00:00",
+  "exit_code": 0,
+  "wall_seconds": 285.0675898180052,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed/workspace-check-vba-chart.log",
+  "log_bytes": 7279,
+  "log_sha256": "536bdfa7b6ffca2e96b17bdfdb4ff9eaff95c2db2ab2d38cc0fcaca865dd8919",
+  "lock_unchanged": true
+}

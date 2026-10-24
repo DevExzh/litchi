@@ -70,7 +70,7 @@ fn opens_apache_poi_cryptoapi_document() {
 #[test]
 fn raw_open_outcome_retains_encrypted_cfb_for_later_password_ingress() {
     let bytes = std::fs::read(poi_fixture("password_tika_binaryrc4.doc")).unwrap();
-    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let ole = match open_package(ole, OpenOptions::default()).unwrap() {
         OpenOutcome::PasswordRequired(ole) => *ole,
         OpenOutcome::Opened(_) => panic!("encrypted fixture unexpectedly opened without password"),

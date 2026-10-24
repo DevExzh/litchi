@@ -38,7 +38,7 @@ fn fresh() -> Builder {
 
 fn signed_package() -> Package {
     let source = fresh().build().unwrap().to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
     let workbook = ole.open_stream(&["Workbook"]).unwrap();
     let mut writer = OleWriter::new();
     writer.create_stream(&["Workbook"], &workbook).unwrap();
@@ -51,7 +51,7 @@ fn signed_package() -> Package {
 }
 
 fn stream_names(bytes: &[u8]) -> Vec<String> {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .list_streams()
         .into_iter()
@@ -60,7 +60,7 @@ fn stream_names(bytes: &[u8]) -> Vec<String> {
 }
 
 fn root_clsid(bytes: &[u8]) -> String {
-    OleFile::open(Cursor::new(bytes))
+    OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .root_entry()
         .unwrap()
@@ -88,7 +88,7 @@ fn builder_metadata_reads_back() {
     let package = builder.build().unwrap();
     assert_metadata(&package);
     let bytes = package.to_bytes().unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let custom = ole.get_metadata().unwrap().custom_properties;
     assert_eq!(custom.get("Reviewed"), Some(&Value::Bool(true)));
 }
@@ -184,7 +184,11 @@ fn metadata_transaction_round_trip() {
     assert_metadata(&edited);
     let bytes = edited.to_bytes().unwrap();
     assert_eq!(root_clsid(&bytes), root_clsid(&source));
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         document_summary::Snapshot::from_stream(
             &ole.property_set(Binding::DocumentSummaryInformation)

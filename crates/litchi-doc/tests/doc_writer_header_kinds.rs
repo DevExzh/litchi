@@ -184,7 +184,11 @@ fn even_and_first_page_header_text_boxes_round_trip() {
     assert_eq!(first.text(), "\u{8}\r\r");
 
     // Drawing layer: rectangle and ellipse with header-cluster spids.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let rectangle = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
     assert_eq!(rectangle.shape_type, Kind::TextBox);
@@ -202,7 +206,11 @@ fn even_and_first_headers_set_section_flags() {
     use litchi_doc::parts::fib::FileInformationBlock;
 
     let doc_bytes = write_doc_with_even_and_first_boxes();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let table_stream = ole.open_stream(&["1Table"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
@@ -285,7 +293,11 @@ fn header_picture_round_trips_with_byte_identical_payload() {
     assert_eq!((spa.width(), spa.height()), (480, 240));
 
     // Drawing layer: the header picture frame plus the main one.
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(&doc_bytes)).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(&doc_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let shapes = extract_drawing_shapes(&mut ole).unwrap();
     let header_pic = shapes.iter().find(|s| s.shape_id == 2049).unwrap();
     assert_eq!(header_pic.shape_type, Kind::Picture);

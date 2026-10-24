@@ -967,7 +967,7 @@ impl SourceBackedWorkbook {
         limits.validate()?;
         let cfb_limits =
             SharedOleFileLimits::new(limits.max_input_bytes).map_err(SourceBackedError::Cfb)?;
-        let cfb = SharedOleFile::open_with_limits(Arc::clone(&source), cfb_limits)
+        let cfb = SharedOleFile::open(Arc::clone(&source), cfb_limits)
             .map_err(SourceBackedError::from)?;
         Self::from_shared_ole_file_with_options(Arc::new(cfb), options)
     }
@@ -1246,7 +1246,7 @@ impl SourceBackedWorkbook {
         let cfb_limits = litchi_cfb::OleFileLimits::new(selected.max_input_bytes())?
             .with_max_directory_bytes(selected.max_directory_bytes())?
             .with_max_allocation_table_bytes(selected.max_allocation_table_bytes())?;
-        let parsed = litchi_cfb::OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)
+        let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes), cfb_limits)
             .map_err(Error::from)
             .and_then(|ole| {
                 Reader::from_admitted_ole_file(
@@ -5503,7 +5503,7 @@ mod tests {
     fn the_globals_scan_reads_identically_with_and_without_its_chain_hint() {
         let bytes = ole_fixture("SimpleWithImages-mac.xls");
         let source = Arc::new(RecordingSource::new(bytes));
-        let cfb = SharedOleFile::open(erased(&source)).unwrap();
+        let cfb = SharedOleFile::open(erased(&source), SharedOleFileLimits::default()).unwrap();
         let stream_len = cfb.stream_len(&["Workbook"]).unwrap();
         assert!(
             stream_len > FILL_SCHEDULE.last().unwrap().0,
@@ -5521,7 +5521,8 @@ mod tests {
         let filled = globals.filled;
 
         let plain_source = Arc::new(RecordingSource::new(source.bytes.clone()));
-        let plain_cfb = SharedOleFile::open(erased(&plain_source)).unwrap();
+        let plain_cfb =
+            SharedOleFile::open(erased(&plain_source), SharedOleFileLimits::default()).unwrap();
         let mut plain_bytes = vec![0u8; usize::try_from(filled).unwrap()];
         let _ = plain_source.take();
         for (start, end) in fill_extents(&globals_extents(stream_len)) {

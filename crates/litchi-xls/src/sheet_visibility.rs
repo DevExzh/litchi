@@ -1392,8 +1392,14 @@ fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()
 }
 
 fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
-    let mut left = OleFile::open(Cursor::new(before.bytes()))?;
-    let mut right = OleFile::open(Cursor::new(after.bytes()))?;
+    let mut left = OleFile::open(
+        Cursor::new(before.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
+    let mut right = OleFile::open(
+        Cursor::new(after.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     if left.sector_size() != right.sector_size()
         || root_identity(&left) != root_identity(&right)
         || directory_catalog(&left)? != directory_catalog(&right)?
@@ -1690,7 +1696,7 @@ mod tests {
     }
 
     fn stream(bytes: &[u8], path: &[&str]) -> Vec<u8> {
-        OleFile::open(Cursor::new(bytes))
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
             .unwrap()
             .open_stream(path)
             .unwrap()
@@ -1721,7 +1727,8 @@ mod tests {
     }
 
     fn rebuild(source: &[u8], configure: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
-        let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+        let mut ole =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
         let mut writer = OleWriter::new();
         for path in ole.list_streams() {
             let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -1793,7 +1800,11 @@ mod tests {
     fn source_backed_visibility_publishes_one_and_bounded_batches() {
         let source = Snapshot::from_bytes(package(3)).unwrap();
         let source_directory = {
-            let ole = OleFile::open(Cursor::new(source.bytes())).unwrap();
+            let ole = OleFile::open(
+                Cursor::new(source.bytes()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
             directory_catalog(&ole).unwrap()
         };
         let mut edit = source.edit();
@@ -1823,7 +1834,11 @@ mod tests {
         );
         assert_eq!(stream(&output, &["Opaque"]), b"untouched");
         let target_directory = {
-            let ole = OleFile::open(Cursor::new(output.as_slice())).unwrap();
+            let ole = OleFile::open(
+                Cursor::new(output.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
             directory_catalog(&ole).unwrap()
         };
         assert_eq!(source_directory, target_directory);

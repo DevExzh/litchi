@@ -162,7 +162,7 @@ fn workbook_with_cell_ixfe(ixfe: u16) -> Vec<u8> {
         .write_to(&mut Cursor::new(&mut bytes))
         .unwrap();
 
-    let mut stream = OleFile::open(Cursor::new(&bytes))
+    let mut stream = OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
         .unwrap()
         .open_stream(&["Workbook"])
         .unwrap();

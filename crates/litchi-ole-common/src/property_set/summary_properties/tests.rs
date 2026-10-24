@@ -389,7 +389,7 @@ fn streams_round_trip_through_the_readers() {
 
     // The projection the unified layer reads.
     let bytes = compound_file(Some(streams));
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let metadata = ole.get_metadata().unwrap();
     assert_eq!(metadata.codepage, Some(1252));
     assert_eq!(metadata.title.as_deref(), Some("Quarterly report"));
@@ -479,7 +479,11 @@ fn written_streams_are_editable_by_the_shared_editor() {
     editor
         .replace(Binding::SummaryInformation, summary)
         .unwrap();
-    let mut ole = OleFile::open(Cursor::new(editor.finish().unwrap())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(editor.finish().unwrap()),
+        OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.property_set(Binding::SummaryInformation).unwrap();
     assert_eq!(
         summary_information::Snapshot::from_stream(&stream)
@@ -567,7 +571,7 @@ fn unified_metadata_round_trips_through_the_streams() {
     let metadata = full_metadata();
     let properties = SummaryProperties::from_metadata(&metadata).unwrap();
     let bytes = compound_file(properties.to_streams().unwrap());
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     let read: litchi_core::Metadata = ole.get_metadata().unwrap().into();
     assert_eq!(read.keywords, metadata.keywords);
     for (field, left, right) in [
@@ -781,7 +785,7 @@ fn editor_bridge_stages_only_changed_sections() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     let source = output.into_inner();
-    let source_clsid = OleFile::open(Cursor::new(source.clone()))
+    let source_clsid = OleFile::open(Cursor::new(source.clone()), OleFileLimits::default())
         .unwrap()
         .root_entry()
         .unwrap()
@@ -792,7 +796,7 @@ fn editor_bridge_stages_only_changed_sections() {
         writer.create_stream(&["Workbook"], b"host").unwrap();
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
-        OleFile::open(Cursor::new(output.into_inner()))
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default())
             .unwrap()
             .root_entry()
             .unwrap()
@@ -817,7 +821,7 @@ fn editor_bridge_stages_only_changed_sections() {
     edited.set("Department", "Research").unwrap();
     assert!(edited.stage_changes(&base, &mut editor).unwrap());
     let bytes = editor.finish().unwrap();
-    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     assert_eq!(ole.root_entry().unwrap().clsid, source_clsid);
     let stream = ole.property_set(Binding::SummaryInformation).unwrap();
     let summary = summary_information::Snapshot::from_stream(&stream).unwrap();
@@ -840,7 +844,11 @@ fn editor_bridge_stages_only_changed_sections() {
     let mut edited = base.clone();
     assert!(edited.remove("department").unwrap());
     assert!(edited.stage_changes(&base, &mut editor).unwrap());
-    let mut ole = OleFile::open(Cursor::new(editor.finish().unwrap())).unwrap();
+    let mut ole = OleFile::open(
+        Cursor::new(editor.finish().unwrap()),
+        OleFileLimits::default(),
+    )
+    .unwrap();
     let document_summary = ole
         .property_set(Binding::DocumentSummaryInformation)
         .unwrap();

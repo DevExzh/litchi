@@ -56,7 +56,7 @@ impl Snapshot {
         bytes: Vec<u8>,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
-        let mut ole = OleFile::open_with_limits(Cursor::new(bytes.clone()), cfb_limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes.clone()), cfb_limits)?;
         validate_host(&mut ole)?;
 
         // A blank standard section (no property, not even a code page)
@@ -165,7 +165,7 @@ impl Edit {
     #[cfg(test)]
     fn detached(source: Snapshot) -> Result<Self> {
         let signed = {
-            let ole = OleFile::open(Cursor::new(source.bytes.to_vec()))?;
+            let ole = OleFile::open(Cursor::new(source.bytes.to_vec()), OleFileLimits::default())?;
             [
                 "_xmlsignatures",
                 "_signatures",
@@ -640,7 +640,11 @@ mod tests {
         let edited = Snapshot::from_bytes(patch.after().to_vec()).unwrap();
         assert_eq!(edited.summary_information().unwrap().title(), Some("after"));
 
-        let mut ole = OleFile::open(Cursor::new(patch.after().to_vec())).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(patch.after().to_vec()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             ole.open_stream(&["Unrelated", "Nested"]).unwrap(),
             b"untouched"

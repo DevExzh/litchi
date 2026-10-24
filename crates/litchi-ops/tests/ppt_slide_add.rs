@@ -176,7 +176,11 @@ fn invalid_protected_and_released_insertions_are_typed_refusals() {
         Code::UnsupportedCapability
     );
 
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.as_slice()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = litchi_cfb::OleWriter::new();
     for path in ole.list_streams() {
         let names: Vec<&str> = path.iter().map(String::as_str).collect();

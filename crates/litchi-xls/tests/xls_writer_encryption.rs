@@ -33,7 +33,7 @@ fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Reader<Cursor<&'a
 }
 
 fn workbook_stream(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 

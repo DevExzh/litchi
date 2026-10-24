@@ -74,7 +74,7 @@ fn route(protection: Protection) -> Metadata {
 }
 
 fn route_payload(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word).unwrap();
     let table_name = if fib.which_table_stream() {
@@ -199,7 +199,7 @@ fn lifecycle_edits_are_snapshot_based_and_clear_the_fib_range() {
     let mut reader = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(reader.document().unwrap().route_slip().unwrap().is_none());
 
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word).unwrap();
     assert_eq!(fib.get_table_pointer(70), Some((0, 0)));
@@ -272,7 +272,7 @@ fn failed_removal_does_not_change_a_single_recipient_snapshot() {
 }
 
 fn parse_bytes_from_fib(bytes: &[u8]) -> Metadata {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
     let word = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word).unwrap();
     let table_name = if fib.which_table_stream() {

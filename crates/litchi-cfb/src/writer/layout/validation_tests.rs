@@ -45,7 +45,7 @@ fn build_with(sector_size: usize, streams: &[(&[&str], Vec<u8>)]) -> Vec<u8> {
 }
 
 fn read_model(bytes: &[u8]) -> Model {
-    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
     ole.list_streams()
         .into_iter()
         .map(|path| {
@@ -241,7 +241,7 @@ fn synthetic_with(sector_size: usize) -> (Vec<u8>, Model) {
 #[test]
 fn the_synthetic_plan_reuses_the_source_and_both_validators_accept_it() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let plan = plan(&layout, &streams);
     let report = plan.report();
@@ -253,7 +253,7 @@ fn the_synthetic_plan_reuses_the_source_and_both_validators_accept_it() {
 #[test]
 fn overlapping_and_cyclic_chains_are_refused() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     let big = stream_sectors(&base, index_of(&model, BIG));
@@ -318,7 +318,7 @@ fn overlapping_and_cyclic_chains_are_refused() {
 #[test]
 fn wrong_lengths_are_refused() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     for path in [BIG, OTHER, SMALL, TINY, NESTED] {
@@ -362,7 +362,7 @@ fn wrong_lengths_are_refused() {
 #[test]
 fn wrong_contents_are_refused() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     let big = stream_sectors(&base, index_of(&model, BIG));
@@ -446,7 +446,7 @@ fn wrong_contents_are_refused() {
 #[test]
 fn mini_stream_faults_are_refused_and_padding_is_not_compared() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     let small_sid = sid_of(&layout, SMALL);
@@ -498,7 +498,7 @@ fn mini_stream_faults_are_refused_and_padding_is_not_compared() {
 #[test]
 fn header_and_table_faults_are_refused() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
 
@@ -557,7 +557,7 @@ fn header_and_table_faults_are_refused() {
 #[test]
 fn byte_identical_placements_are_accepted_by_both() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
 
@@ -581,7 +581,7 @@ fn byte_identical_placements_are_accepted_by_both() {
         (&["Twin1"], pattern(4_600, 1)),
         (&["Twin2"], pattern(4_600, 2)),
     ]);
-    let twin_layout = SourceLayout::parse(&twin_source).unwrap();
+    let twin_layout = SourceLayout::parse(&twin_source, OleFileLimits::default()).unwrap();
     let twin_streams = [
         StreamInput {
             path: &paths[0],
@@ -727,7 +727,7 @@ fn sweep_agreement(
 #[test]
 fn random_faults_reach_the_readback_verdict() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     sweep_agreement("synthetic", &base, &streams, 2_000, 0x0749_5eed);
@@ -738,7 +738,7 @@ fn random_faults_reach_the_readback_verdict() {
 #[test]
 fn version_4_plans_reach_the_readback_verdict() {
     let (source, model) = synthetic_with(4096);
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     assert_eq!(layout.sector_size, 4096);
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
@@ -796,7 +796,7 @@ fn real_fixture_plans_reach_the_readback_verdict() {
             .unwrap();
         model[largest].1.extend(pattern(1_500, 7));
         model[smallest].1.extend(pattern(10, 8));
-        let layout = SourceLayout::parse(&source).unwrap();
+        let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
         let streams = inputs(&model);
         let base = plan(&layout, &streams);
         assert!(base.report().reused_source_layout(), "{fixture}");
@@ -814,7 +814,7 @@ fn real_fixture_plans_reach_the_readback_verdict() {
 #[test]
 fn a_directory_chain_run_past_its_image_declines() {
     let (source, model) = synthetic();
-    let layout = SourceLayout::parse(&source).unwrap();
+    let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
     let streams = inputs(&model);
     let base = plan(&layout, &streams);
     let last_directory = base
@@ -889,7 +889,7 @@ fn many_mini_stream_plans_reach_the_readback_verdict() {
         model[3].1.extend(pattern(900, 1));
         model[40].1.truncate(100);
         model[77].1 = pattern(6_000, 2);
-        let layout = SourceLayout::parse(&source).unwrap();
+        let layout = SourceLayout::parse(&source, OleFileLimits::default()).unwrap();
         let streams = inputs(&model);
         let base = plan(&layout, &streams);
         assert!(base.report().reused_source_layout(), "{sector_size}");

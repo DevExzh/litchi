@@ -489,7 +489,8 @@ fn named_stream_validation_and_real_cfb_object_integration() {
     writer.write_to(&mut package).expect("CFB should write");
     let bytes = package.into_inner();
 
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("CFB should open");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("CFB should open");
     let targets = Targets::one(Target::new("object", ["ObjectPool", "_1"]).unwrap());
     let objects =
         discover(&mut ole, &targets, ObjectLimits::default()).expect("object should discover");

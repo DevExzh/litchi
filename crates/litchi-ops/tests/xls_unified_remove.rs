@@ -218,7 +218,9 @@ fn batch_remove(path: &'static str) -> BatchItem<'static> {
 
 fn signed_fixture() -> Vec<u8> {
     let source = fixture();
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(source)).expect("open XLS fixture");
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default())
+            .expect("open XLS fixture");
     let mut writer = litchi_cfb::OleWriter::new();
     for path in ole.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

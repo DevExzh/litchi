@@ -483,6 +483,18 @@ impl Base {
         &self.package
     }
 
+    /// Reconstruct the exact low-level CFB profile retained by the package's
+    /// shared source owner for source-backed editor ingress.
+    pub(crate) fn cfb_limits(&self) -> Result<litchi_cfb::OleFileLimits, Failure> {
+        let shared = self.package.shared_ole_file().limits();
+        litchi_cfb::OleFileLimits::new(shared.max_input_bytes())
+            .and_then(|limits| limits.with_max_directory_bytes(shared.max_directory_bytes()))
+            .and_then(|limits| {
+                limits.with_max_allocation_table_bytes(shared.max_allocation_table_bytes())
+            })
+            .map_err(|error| Failure::Package(PackageError::Ole(error)))
+    }
+
     /// The exact source package bytes.
     pub(crate) fn bytes(&self) -> Result<&[u8], Failure> {
         Ok(self.bytes_arc()?.as_ref())
@@ -951,7 +963,11 @@ pub(crate) use family;
 pub(crate) fn signed(package: &Package) -> Package {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source = OleFile::open(Cursor::new(package.to_bytes().unwrap())).unwrap();
+    let mut source = OleFile::open(
+        Cursor::new(package.to_bytes().unwrap()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -976,7 +992,11 @@ pub(crate) fn signed(package: &Package) -> Package {
 fn signature_package(package: &Package, marker: &str) -> Package {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let mut source = OleFile::open(Cursor::new(package.to_bytes().unwrap())).unwrap();
+    let mut source = OleFile::open(
+        Cursor::new(package.to_bytes().unwrap()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let mut writer = OleWriter::new();
     for path in source.list_streams() {
         let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
@@ -1535,7 +1555,11 @@ mod tests {
         use litchi_cfb::{OleFile, OleWriter};
 
         let package = Package::new().unwrap();
-        let mut source = OleFile::open(std::io::Cursor::new(package.to_bytes().unwrap())).unwrap();
+        let mut source = OleFile::open(
+            std::io::Cursor::new(package.to_bytes().unwrap()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let mut writer = OleWriter::new();
         for path in source.list_streams() {
             let refs = path.iter().map(String::as_str).collect::<Vec<_>>();

@@ -1241,7 +1241,7 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             })
             .map_err(PackageError::Cfb)?;
         let cfb = Arc::new(
-            SharedOleFile::open_owned_vec_with_limits(
+            SharedOleFile::open_owned_vec(
                 snapshot.bytes_shared(),
                 snapshot.source_version(),
                 cfb_limits,
@@ -1264,9 +1264,8 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         .try_reserve_exact(snapshot.bytes().len())
         .map_err(|_| Error::CellValues(crate::Error::Allocation("XLS primary read projection")))?;
     bytes.extend_from_slice(snapshot.bytes());
-    let mut ole =
-        litchi_cfb::OleFile::open_with_limits(std::io::Cursor::new(bytes), snapshot.cfb_limits())
-            .map_err(PackageError::Cfb)?;
+    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes), snapshot.cfb_limits())
+        .map_err(PackageError::Cfb)?;
     let metadata = super::eager_metadata(&mut ole);
     let options = OpenOptions::default()
         .leniency(source.leniency())
@@ -1354,7 +1353,10 @@ mod tests {
         builder.write_number(sheet, 0, 0, 42.0).unwrap();
         let bytes = builder.build().unwrap().to_bytes().unwrap();
         let source = Arc::new(AdmissionSource::new(bytes));
-        let source_cfb = Arc::new(SharedOleFile::open(source.clone()).unwrap());
+        let source_cfb = Arc::new(
+            SharedOleFile::open(source.clone(), litchi_cfb::SharedOleFileLimits::default())
+                .unwrap(),
+        );
         let original = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
             Arc::clone(&source_cfb),
             crate::SourceBackedOptions::default(),
@@ -1380,7 +1382,9 @@ mod tests {
             )
             .unwrap();
         let composed = Arc::new(plan.composed_source().unwrap());
-        let target_cfb = Arc::new(SharedOleFile::open(composed).unwrap());
+        let target_cfb = Arc::new(
+            SharedOleFile::open(composed, litchi_cfb::SharedOleFileLimits::default()).unwrap(),
+        );
         let deferred = original.committed_deferred(plan).unwrap();
         let limits = deferred.retained_limits();
         let leniency = deferred.retained_leniency();

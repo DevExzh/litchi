@@ -561,10 +561,7 @@ impl Package {
         }
         let shared_limits = SharedOleFileLimits::new(limits.max_input_bytes)?;
         let version = source.version()?;
-        let first_shared = Arc::new(SharedOleFile::open_with_limits(
-            Arc::clone(&source),
-            shared_limits,
-        )?);
+        let first_shared = Arc::new(SharedOleFile::open(Arc::clone(&source), shared_limits)?);
         Self::open_from_first_index(
             source,
             version,
@@ -700,7 +697,7 @@ impl Package {
         // caller's writer did (change 0644, cost B-iii).  Change 0621's rule
         // is to relocate such an observation onto the error branch, which is
         // what `relocate_structural_cfb_error` does here.
-        let shared = match SharedOleFile::open_with_limits(Arc::clone(&source), shared_limits) {
+        let shared = match SharedOleFile::open(Arc::clone(&source), shared_limits) {
             Ok(index) => Arc::new(index),
             Err(error) => {
                 return Err(relocate_structural_cfb_error(
@@ -857,10 +854,7 @@ impl Package {
         }
         let shared_limits = SharedOleFileLimits::new(limits.max_input_bytes)?;
         let version = source.version()?;
-        let shared = Arc::new(SharedOleFile::open_with_limits(
-            Arc::clone(&source),
-            shared_limits,
-        )?);
+        let shared = Arc::new(SharedOleFile::open(Arc::clone(&source), shared_limits)?);
         ensure_source_identity(&source, version, length)?;
         if shared.source_version()? != version {
             return Err(Error::Overlay(OverlayError::SourceChanged {
@@ -2794,7 +2788,11 @@ mod tests {
     fn adopted_shared_owner_matches_an_owned_byte_open() {
         let bytes = fixture("documentProperties.doc");
         let opened = Package::from_bytes(bytes.clone()).expect("owned DOC open");
-        let ole = litchi_cfb::OleFile::open(io::Cursor::new(bytes.clone())).unwrap();
+        let ole = litchi_cfb::OleFile::open(
+            io::Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
         let shared = Arc::new(
             SharedOleFile::from_owned_ole_file(
                 ole,
@@ -2815,7 +2813,7 @@ mod tests {
         // A caller-supplied positional source still takes the second index.
         let counter = Arc::new(CountingSource::new(&bytes));
         let counted: Arc<dyn ReadAt> = counter.clone();
-        let first = Arc::new(SharedOleFile::open(counted).unwrap());
+        let first = Arc::new(SharedOleFile::open(counted, SharedOleFileLimits::default()).unwrap());
         assert!(!first.is_owned_immutable());
         let generic = Package::from_shared(Arc::clone(&first)).expect("generic DOC adopt");
         assert!(!Arc::ptr_eq(&generic.inner.shared, &first));
@@ -3013,8 +3011,11 @@ mod tests {
             .write_to(&mut output)
             .expect("DOC fixture");
         let mut bytes = output.into_inner();
-        let mut file =
-            litchi_cfb::OleFile::open(io::Cursor::new(bytes.clone())).expect("CFB fixture");
+        let mut file = litchi_cfb::OleFile::open(
+            io::Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("CFB fixture");
         let word = file
             .open_stream(&[WORD_DOCUMENT])
             .expect("WordDocument fixture");
@@ -3191,10 +3192,8 @@ mod tests {
     fn source_protection(bytes: &[u8]) -> Result<EditProtection> {
         let limits = Limits::default();
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.to_vec()));
-        let shared = SharedOleFile::open_with_limits(
-            source,
-            SharedOleFileLimits::new(limits.max_input_bytes)?,
-        )?;
+        let shared =
+            SharedOleFile::open(source, SharedOleFileLimits::new(limits.max_input_bytes)?)?;
         let (table_name, fib) = read_fib(&shared, limits)?;
         classify_source_protection(&shared, &table_name, &fib, limits)
             .map(|(protection, _)| protection)
@@ -3383,17 +3382,20 @@ mod tests {
         // table stream, so the others are dropped once to keep each crafted
         // compound file small.
         let mut stripped = object_editor(&fixture(name));
-        let others = litchi_cfb::OleFile::open(io::Cursor::new(fixture(name)))
-            .expect("fixture CFB")
-            .list_directory_entries(&[])
-            .expect("fixture root")
-            .into_iter()
-            .filter(|entry| {
-                entry.entry_type == STGTY_STREAM
-                    && ![WORD_DOCUMENT, TABLE_0, TABLE_1].contains(&entry.name.as_str())
-            })
-            .map(|entry| vec![entry.name.clone()])
-            .collect::<Vec<_>>();
+        let others = litchi_cfb::OleFile::open(
+            io::Cursor::new(fixture(name)),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("fixture CFB")
+        .list_directory_entries(&[])
+        .expect("fixture root")
+        .into_iter()
+        .filter(|entry| {
+            entry.entry_type == STGTY_STREAM
+                && ![WORD_DOCUMENT, TABLE_0, TABLE_1].contains(&entry.name.as_str())
+        })
+        .map(|entry| vec![entry.name.clone()])
+        .collect::<Vec<_>>();
         stripped
             .remove_streams(others.iter().map(Vec::as_slice))
             .expect("stream removal");

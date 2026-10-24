@@ -308,7 +308,11 @@ fn autofilter_string_operands_carry_cch_and_fcompare_where_excel_reads_them() {
 }
 
 fn autofilter_doper(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let mut ole = litchi_cfb::OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let stream = ole.open_stream(&["Workbook"]).unwrap();
     let mut offset = 0;
     while offset + 4 <= stream.len() {

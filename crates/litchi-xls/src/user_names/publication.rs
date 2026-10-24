@@ -548,7 +548,7 @@ fn validate_user_names_limits(limits: UserNamesLimits) -> Result<()> {
 }
 
 fn preflight_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<Vec<String>> {
-    let ole = OleFile::open(Cursor::new(bytes))?;
+    let ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let path = find_user_names_path(&ole)?;
     let maximum = u64::try_from(limits.max_stream_bytes).unwrap_or(u64::MAX);
     let revision_path = find_revision_log_path(&ole)?;

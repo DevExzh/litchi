@@ -5,7 +5,11 @@ use std::sync::Arc;
 
 fn source(bytes: Vec<u8>) -> Package {
     let cfb = Arc::new(
-        litchi_cfb::SharedOleFile::open(Arc::new(litchi_core::OwnedSource::new(bytes))).unwrap(),
+        litchi_cfb::SharedOleFile::open(
+            Arc::new(litchi_core::OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .unwrap(),
     );
     Package::from_source(
         litchi_xls::raw::source_backed_workbook_from_shared_ole_file(

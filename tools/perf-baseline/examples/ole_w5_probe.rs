@@ -117,12 +117,7 @@ mod w5_counting_allocator {
             record_dealloc(layout.size());
         }
 
-        unsafe fn realloc(
-            &self,
-            pointer: *mut u8,
-            layout: Layout,
-            new_size: usize,
-        ) -> *mut u8 {
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
             let new_pointer = unsafe { System.realloc(pointer, layout, new_size) };
             if !new_pointer.is_null() {
                 record_realloc(layout.size(), new_size);
@@ -665,7 +660,10 @@ fn build_xls_archive() -> Result<Vec<u8>, Box<dyn StdError>> {
     }
     let mut package = Cursor::new(Vec::new());
     builder.build()?.write_to(&mut package)?;
-    let mut source = OleFile::open(Cursor::new(package.into_inner()))?;
+    let mut source = OleFile::open(
+        Cursor::new(package.into_inner()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let workbook = source.open_stream(&["Workbook"])?;
 
     let mut writer = OleWriter::new();
@@ -719,9 +717,7 @@ fn xls_cells_once(source: &XlsPackage) -> Result<XlsPackage, Box<dyn StdError>> 
     Ok(xls_cells_commit_once(source)?.into_package())
 }
 
-fn xls_cells_commit_once(
-    source: &XlsPackage,
-) -> Result<litchi_xls::Commit, Box<dyn StdError>> {
+fn xls_cells_commit_once(source: &XlsPackage) -> Result<litchi_xls::Commit, Box<dyn StdError>> {
     let mut edit = source.edit()?;
     edit.set_value(
         XlsSelector::Name("Cells"),
@@ -935,7 +931,7 @@ fn owner_commit_bytes(editor: ObjectEdit) -> Result<Vec<u8>, Box<dyn StdError>> 
 }
 
 fn verify_owner_output(output: &[u8], target: &[u8]) -> Result<(), Box<dyn StdError>> {
-    let mut file = OleFile::open(Cursor::new(output))?;
+    let mut file = OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?;
     if file.open_stream(&[TARGET_NAME])? != target {
         return Err("owner probe output target differs from expected bytes".into());
     }

@@ -54,7 +54,11 @@ fn fixture(relative: &str) -> PathBuf {
 const MERGE_FIXTURE: &str = "test-data/ole/doc/image-comment-at-char.doc";
 
 fn parse_fixture(relative: &str) -> (FileInformationBlock, Vec<u8>) {
-    let mut ole = OleFile::open(File::open(fixture(relative)).unwrap()).unwrap();
+    let mut ole = OleFile::open(
+        File::open(fixture(relative)).unwrap(),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
     let fib = FileInformationBlock::parse(&word_document).unwrap();
     let table_name = if fib.which_table_stream() {

@@ -112,7 +112,11 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     );
     let bytes = editor.commit().unwrap().patch().after_bytes().to_vec();
 
-    let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let ole = OleFile::open(
+        Cursor::new(bytes.clone()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     let storage = ole
         .list_directory_entries(&["ObjectPool"])
         .unwrap()
@@ -139,7 +143,11 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
     assert!(descriptor.recompose_on_resize);
     assert!(descriptor.view_object);
     assert_eq!(descriptor.clipboard_format, 3);
-    let mut nested = OleFile::open(Cursor::new(object.compound())).unwrap();
+    let mut nested = OleFile::open(
+        Cursor::new(object.compound()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .unwrap();
     assert_eq!(
         nested.root_entry().unwrap().clsid,
         "0002CE02-0000-0000-C000-000000000046"

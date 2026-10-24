@@ -19,7 +19,10 @@ pub(super) fn read_workbook(
     layout: WorkbookLayout,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let mut cfb = OleFile::open(Cursor::new(package_bytes))?;
+    let mut cfb = OleFile::open(
+        Cursor::new(package_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let bytes = cfb.open_stream(&[WORKBOOK])?;
     check_limit(
         crate::LimitKind::WorkbookBytes,
@@ -66,7 +69,10 @@ pub(super) fn replace_chart(source: &Package, replacement: &[u8]) -> Result<Vec<
         )))?
         .copy_from_slice(replacement);
 
-    let mut cfb = OleFile::open(Cursor::new(source.as_bytes()))?;
+    let mut cfb = OleFile::open(
+        Cursor::new(source.as_bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
     let comp_obj = if source.topology.comp_obj_bytes().is_some() {
         Some(cfb.open_stream(&[COMP_OBJ])?)
     } else {

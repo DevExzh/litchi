@@ -114,7 +114,11 @@ fn package_edit_publishes_caption_crud_without_rewriting_unrelated_table_bytes()
         .patch()
         .after_bytes()
         .to_vec();
-    let mut ole = OleFile::open(Cursor::new(cleared_bytes)).expect("cleared CFB opens");
+    let mut ole = OleFile::open(
+        Cursor::new(cleared_bytes),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("cleared CFB opens");
     let word = ole
         .open_stream(&["WordDocument"])
         .expect("WordDocument stream exists");
@@ -170,7 +174,8 @@ fn package_edit_defers_caption_range_rejection_on_ordinary_documents() {
 }
 
 fn table_stream(bytes: &[u8]) -> Vec<u8> {
-    let mut ole = OleFile::open(Cursor::new(bytes)).expect("fixture CFB opens");
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+        .expect("fixture CFB opens");
     let name = if ole.exists(&["1Table"]) {
         "1Table"
     } else {

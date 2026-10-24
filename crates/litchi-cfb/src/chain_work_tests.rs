@@ -525,8 +525,10 @@ fn stream_allocation_validation_matches_the_fresh_map_form_on_faulted_files() {
         let bytes = build_file(sector_size, &sizes);
         for case in 0..150u64 {
             let seed = (u64::try_from(file_index).unwrap() << 32) | case;
-            let mut reused = OleFile::open(Cursor::new(bytes.clone())).unwrap();
-            let mut fresh = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+            let mut reused =
+                OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
+            let mut fresh =
+                OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
             for file in [&mut reused, &mut fresh] {
                 before_allocation_validation(file);
                 inject_faults(file, seed);
@@ -660,10 +662,10 @@ fn reads_through_one_reader_match_a_fresh_reader_per_stream_on_faulted_tables() 
         let count = 20 + rng.below(40);
         let sizes = mixed_sizes(&mut rng, count);
         let bytes = build_file(sector_size, &sizes);
-        let paths = OleFile::open(Cursor::new(bytes.clone()))
+        let paths = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default())
             .unwrap()
             .list_streams();
-        let opened = OleFile::open(Cursor::new(bytes)).unwrap();
+        let opened = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
         for case in 0..60u64 {
             let seed = (u64::try_from(file_index).unwrap() << 32) | case;
             // The faults are applied after the validating open, so the reads
@@ -695,7 +697,7 @@ fn reads_through_one_reader_match_a_fresh_reader_per_stream_on_faulted_tables() 
 /// The words a validating open's chain maps write, and the file's tables.
 fn open_work(bytes: &[u8]) -> (u64, OleFile<Cursor<Vec<u8>>>) {
     visited_map_work::take();
-    let file = OleFile::open(Cursor::new(bytes.to_vec())).unwrap();
+    let file = OleFile::open(Cursor::new(bytes.to_vec()), OleFileLimits::default()).unwrap();
     (visited_map_work::take(), file)
 }
 
@@ -765,7 +767,7 @@ fn reading_every_stream_collects_chains_in_proportion_to_the_chains() {
             let mut per_stream = Vec::new();
             for count in [64usize, 256, 1_024] {
                 let bytes = build_file(sector_size, &vec![stream_size; count]);
-                let mut file = OleFile::open(Cursor::new(bytes)).unwrap();
+                let mut file = OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap();
                 let paths = file.list_streams();
                 visited_map_work::take();
                 let contents = read_every_stream(&mut file, &paths);
@@ -802,9 +804,12 @@ fn a_reader_reuses_its_chain_buffers_across_reads_and_errors() {
         .map(|index| if index % 2 == 0 { 700 } else { 9_000 })
         .collect();
     let bytes = build_file(SECTOR_SIZE_V3, &sizes);
-    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     let paths = file.list_streams();
-    let expected = read_every_stream(&mut OleFile::open(Cursor::new(bytes)).unwrap(), &paths);
+    let expected = read_every_stream(
+        &mut OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap(),
+        &paths,
+    );
     assert!(expected.iter().all(Result::is_ok));
 
     // Read every stream once, so both tables are covered and the longest
@@ -857,9 +862,12 @@ fn a_reader_frees_an_oversized_chain_buffer_after_each_read() {
         .map(|index| if index % 2 == 0 { 700 } else { 9_000 })
         .collect();
     let bytes = build_file(SECTOR_SIZE_V3, &sizes);
-    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     let paths = file.list_streams();
-    let expected = read_every_stream(&mut OleFile::open(Cursor::new(bytes)).unwrap(), &paths);
+    let expected = read_every_stream(
+        &mut OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap(),
+        &paths,
+    );
     assert!(expected.iter().all(Result::is_ok));
     // Cover both tables, so the map's buffer is fixed from here on.
     assert_eq!(read_every_stream(&mut file, &paths), expected);
@@ -921,9 +929,12 @@ fn a_reader_frees_an_oversized_chain_buffer_after_each_read() {
 #[test]
 fn a_mini_stream_read_puts_its_chain_buffers_back() {
     let bytes = build_file(SECTOR_SIZE_V4, &[700, 1_500, 64, 3_000, 9_000]);
-    let mut file = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let mut file = OleFile::open(Cursor::new(bytes.clone()), OleFileLimits::default()).unwrap();
     let paths = file.list_streams();
-    let expected = read_every_stream(&mut OleFile::open(Cursor::new(bytes)).unwrap(), &paths);
+    let expected = read_every_stream(
+        &mut OleFile::open(Cursor::new(bytes), OleFileLimits::default()).unwrap(),
+        &paths,
+    );
     let mini: Vec<usize> = (0..paths.len())
         .filter(|&index| expected[index].as_ref().unwrap().len() < 4096)
         .collect();
