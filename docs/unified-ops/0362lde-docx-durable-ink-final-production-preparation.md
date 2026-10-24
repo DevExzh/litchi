@@ -25,7 +25,7 @@ after adding the bounded outer boundary; the previous v2 receipt remains
 identified only as historical provenance:
 
     /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/source-preparation.json
-    19402 bytes, SHA-256 3ca82bc19a237deefd6ba8639c0b87b07e235fed3bd992b1902a91442e05c826
+    21619 bytes, SHA-256 ee0216cc5527a8b7082e0dac6a7282787efdb4d0a3a11626a7b02225165b9001
 
 The superseded v2 receipt was 13,470 bytes with SHA-256
 8f231da0c97436b134b7589c77e3f3df4714d9dc9fa92ef15e9b2c3e06cb2e20. Its
@@ -55,10 +55,10 @@ The final source contains the same canonical probe and runners as 0362ld:
     README.md                   2649 bytes   33f90aa185e84c6bfdfaff90e8df8f41617f4a9481009622ef5d96c1a9edf7f8
     test_ink_qualification.py 10410 bytes  dddf5fce77460b90b857875fd09f21ae15c89cb58d2a1e2fb7f89037ca829a0d
 
-The committed outer boundary is tools/ink_safe_runner.py, 16,643 bytes,
-SHA-256 f0522ceb54aa75c6a604536cb8fdb657f187c1d6a5a2b6003dff71da9a2e3398.
-Its fake-boundary tests are tools/test_ink_safe_runner.py, 8,136 bytes,
-SHA-256 af65a8e2201115f5d45b2a529924f36cdf58a9921189d6a28d9d8381691e6c91.
+The committed outer boundary is tools/ink_safe_runner.py, 16,835 bytes,
+SHA-256 f184664f29c1504e9d070931dcb476be2ac680fb5d7c5d62785f6fcdb41b4c16.
+Its fake-boundary tests are tools/test_ink_safe_runner.py, 8,356 bytes,
+SHA-256 ee98cfa591f5c5def975b79e9de7746fac4b45a31fcc517d33016fba0c080a58.
 The wrapper is source-only infrastructure: it does not alter the inner
 provenance, route, fidelity or allocation protocols.
 
@@ -124,7 +124,7 @@ this plain-Python phase:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/allocation-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-allocation-472b-a1 \
-      --unit litchi-docx-ink-allocation-472b-a1 \
+      --unit litchi-docx-ink-allocation-472b-a1.scope \
       --deadline 1800 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py \
       allocation /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
@@ -145,7 +145,7 @@ Native ABBA, only after a quiet coordinator grant and successful correctness:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-native-472b-a1 \
-      --unit litchi-docx-ink-abba-472b-a1 \
+      --unit litchi-docx-ink-abba-472b-a1.scope \
       --deadline 7200 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-abba.py \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-base/ink-native \
@@ -156,7 +156,8 @@ Native ABBA, only after a quiet coordinator grant and successful correctness:
 The effective child TMPDIR is
 /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1.
 The systemd-259 scope binds MemoryAccounting=yes, MemoryMax=20,000,000,000,
-MemorySwapMax=0, TasksMax=4096 and KillMode=control-group. The child launcher
+MemorySwapMax=0, RuntimeMaxSec=7200, TasksMax=4096 and
+KillMode=control-group. The child launcher
 sets byte-valued RLIMIT_FSIZE=1,000,000,000 and disables core dumps; the
 parent deadline monitor stops the named scope and its process group. The
 wrapper also polls aggregate output and TMP bytes and removes the owned TMP
@@ -172,7 +173,7 @@ bounded and uses a separate fresh output/TMP/log set:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-collect-472b-a1 \
-      --unit litchi-docx-ink-collect-472b-a1 \
+      --unit litchi-docx-ink-collect-472b-a1.scope \
       --deadline 900 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
@@ -188,14 +189,31 @@ Before binding the corrected receipt, the documented phase-first CLI was run
 against the host's real systemd 259 with the harmless inner command /bin/true;
 no Ink binary, Cargo process or profiler was invoked. The exact preflight used
 fresh paths under
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/boundary-preflight-lD2Pu1/,
+/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/boundary-preflight-atxyDJ/,
 returned zero, produced a complete outer receipt, and removed its TMP tree.
-The receipt is 2,646 bytes with SHA-256
-aa59978d2776907616404c7dcd1316877eb1ea7c9a535c796b40d82a8e3c6f95.
-The CLI stdout is 2,306 bytes with SHA-256
-156c5a4f4d5c933e99f18ae38f5d358a719ff3dc5bb43760d5b80f97551f6996;
+The receipt is 2,648 bytes with SHA-256
+2ea59079b7c100ffc406d975ab7cd887cc78e1bb9c3298348b071795b18f9d26.
+The CLI stdout is 2,316 bytes with SHA-256
+557895fcd8511290a159c1aa235fed6fd05e2b8015a258a2d793215a425a54ec;
 stderr is empty. The prior false-start receipt remains historical and is not
 relabelled.
+
+The hard deadline property was separately verified on a live harmless scope:
+systemd 259 reported RuntimeMaxUSec=2h and a non-empty scope ControlGroup for
+RuntimeMaxSec=7200 while /bin/sleep 2 was running. Its 124-byte launcher log
+is external at
+/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/runtime-property-mYimjA/run.log,
+SHA-256
+64f137a66a92b43f27f62e42be8f1064ec3ac3ae67effca3ad0d1ae7c4530ecc.
+
+The named-scope cleanup was also exercised with an escaped process group:
+the inner command launched setsid /bin/sh -c 'sleep 30', then the one-second
+deadline fired. systemctl kill returned zero, post-scope GC reported an empty
+cgroup, and the recorded escaped child PID 2211118 was gone. The external
+receipt is 2,941 bytes,
+SHA-256
+179a4d83f08eb378f5542856b8d078ccca0dc3722a32b956f93e232733f31952, under
+/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/escaped-child-GPCXUn/.
 
 ## Source-only validation
 
@@ -304,7 +322,7 @@ protected allocation binaries:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/allocation-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-allocation-472b-a1 \
-      --unit litchi-docx-ink-allocation-472b-a1 \
+      --unit litchi-docx-ink-allocation-472b-a1.scope \
       --deadline 1800 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py allocation \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
@@ -323,7 +341,7 @@ After the quiet native phase, the exact bounded ABBA invocation is:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-native-472b-a1 \
-      --unit litchi-docx-ink-abba-472b-a1 \
+      --unit litchi-docx-ink-abba-472b-a1.scope \
       --deadline 7200 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-abba.py \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-base/ink-native \
@@ -359,7 +377,7 @@ invocation is:
       --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1 \
       --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1 \
       --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-collect-472b-a1 \
-      --unit litchi-docx-ink-collect-472b-a1 \
+      --unit litchi-docx-ink-collect-472b-a1.scope \
       --deadline 900 --output-cap 1000000000 --tmp-cap 1000000000 \
       -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \

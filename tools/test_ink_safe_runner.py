@@ -88,6 +88,7 @@ class SafeInkRunnerTests(unittest.TestCase):
         argv = runner.systemd_argv(["/bin/true"])
         self.assertIn(f"--property=MemoryMax={MEMORY_MAX_BYTES}", argv)
         self.assertIn(f"--property=MemorySwapMax={SWAP_MAX_BYTES}", argv)
+        self.assertIn("--property=RuntimeMaxSec=17.5", argv)
         self.assertIn("--property=MemoryAccounting=yes", argv)
         self.assertIn("--property=TasksMax=4096", argv)
         self.assertIn("--property=KillMode=control-group", argv)
@@ -97,6 +98,7 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertNotIn("--wait", argv)
         self.assertNotIn("--collect", argv)
         self.assertNotIn(f"LimitFSIZE={runner.limits.output_bytes}", argv)
+        self.assertEqual(runner.unit, "ink-test-unit.scope")
 
     def test_limits_cannot_be_raised_above_policy(self) -> None:
         with self.assertRaises(BoundaryError):
@@ -116,7 +118,9 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertFalse(tmp.exists())
         self.assertEqual((output / "result").read_text(encoding="utf-8"), "output")
         self.assertTrue(self.fake_systemctl_log.exists())
-        self.assertIn("show", self.fake_systemctl_log.read_text(encoding="utf-8"))
+        systemctl_log = self.fake_systemctl_log.read_text(encoding="utf-8")
+        self.assertIn("show", systemctl_log)
+        self.assertIn("ink-test-unit.scope", systemctl_log)
         self.assertTrue(receipt["post_unit"]["unit_gone"])
         self.assertTrue((logs / "outer-receipt.json").exists())
 

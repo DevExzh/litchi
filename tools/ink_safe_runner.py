@@ -138,6 +138,11 @@ def _unit_name(value: str) -> str:
     return value
 
 
+def _scope_name(value: str) -> str:
+    base = value.removesuffix(".scope")
+    return f"{_unit_name(base)}.scope"
+
+
 class SafeInkCommand:
     """Run one existing Ink command inside an owned, capped unit."""
 
@@ -159,7 +164,7 @@ class SafeInkCommand:
         self.output = output.resolve()
         self.tmp = tmp.resolve()
         self.log_dir = log_dir.resolve()
-        self.unit = _unit_name(unit)
+        self.unit = _scope_name(unit)
         self.limits = limits
         self.systemd_run = systemd_run
         self.systemctl = systemctl
@@ -193,6 +198,7 @@ class SafeInkCommand:
             "--property=MemoryAccounting=yes",
             f"--property=MemoryMax={self.limits.memory_bytes}",
             f"--property=MemorySwapMax={self.limits.swap_bytes}",
+            f"--property=RuntimeMaxSec={self.limits.deadline_seconds:g}",
             "--property=TasksMax=4096",
             "--property=KillMode=control-group",
             "--",
