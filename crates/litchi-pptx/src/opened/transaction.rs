@@ -261,10 +261,7 @@ impl Edit {
     /// visible payload, or a record that cannot be reserved, is simply not
     /// recorded, which only costs the commit a second read.
     fn note_scene_read(&mut self, part_name: &PackURI) {
-        let Ok(part) = self
-            .working_ref()
-            .and_then(|working| working.get_part(part_name))
-        else {
+        let Ok(part) = self.working.get_part(part_name) else {
             return;
         };
         let payload = part.blob_arc();
