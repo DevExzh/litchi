@@ -14,6 +14,7 @@ platform dependent and are easy to misread as bytes.
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import importlib.util
 import json
@@ -21,6 +22,7 @@ import os
 from pathlib import Path
 import re
 import resource
+import signal
 import shutil
 import subprocess
 import sys
@@ -237,40 +239,210 @@ def show_unit(systemctl: Path, unit: str) -> dict[str, object]:
     try:
         completed = subprocess.run(command, capture_output=True, text=True, timeout=5, check=False)
     except (OSError, subprocess.TimeoutExpired) as error:
-        return {"available": False, "error": str(error), "command": command}
+        return {"available": False, "monitor_error_kind": "systemctl", "monitor_error": str(error), "command": command}
     if completed.returncode != 0:
+        stderr = completed.stderr[-4096:]
+        # A scope is allowed to disappear only after a valid final sample.  A
+        # generic non-zero systemctl result remains a monitor failure; this
+        # narrow classification is what lets the caller distinguish unit GC
+        # from an intermittent command failure.
+        unit_gone = completed.returncode == 1 and re.search(
+            r"(?:not found|not loaded|no such unit|could not be found)", stderr, re.IGNORECASE
+        )
         return {
             "available": False,
+            "monitor_error_kind": "unit-gone" if unit_gone else "systemctl",
+            "monitor_error": "systemctl failed",
             "returncode": completed.returncode,
-            "stderr": completed.stderr[-4096:],
+            "stderr": stderr,
             "command": command,
         }
     properties = parse_properties(completed.stdout)
+    missing = [name for name in UNIT_PROPERTIES if name not in properties]
+    if missing:
+        return {
+            "available": False,
+            "monitor_error_kind": "schema",
+            "monitor_error": f"systemctl omitted properties: {','.join(missing)}",
+            "missing_properties": missing,
+            "command": command,
+        }
+    if not properties.get("ControlGroup"):
+        return {
+            "available": False,
+            "monitor_error_kind": "schema",
+            "monitor_error": "systemctl returned an empty ControlGroup",
+            "command": command,
+        }
     properties["available"] = True
     properties["command"] = command
     return properties
 
 
-def cgroup_pids(properties: dict[str, object]) -> tuple[str | None, list[int]]:
+def cgroup_pids(properties: dict[str, object]) -> tuple[str | None, list[int], str | None]:
     raw = properties.get("ControlGroup")
     if not isinstance(raw, str) or not raw.startswith("/") or ".." in raw.split("/"):
-        return None, []
+        return None, [], "ControlGroup is missing or unsafe"
     path = Path("/sys/fs/cgroup") / raw.lstrip("/") / "cgroup.procs"
     try:
         pids = [int(line) for line in path.read_text().splitlines() if line.strip()]
-    except OSError:
-        return raw, []
-    return raw, pids
+    except (OSError, ValueError) as error:
+        return raw, [], f"cannot read cgroup.procs: {error}"
+    return raw, pids, None
 
 
-def kill_unit(systemctl: Path, unit: str) -> None:
-    subprocess.run(
-        [str(systemctl), "--user", "kill", "--kill-who=all", unit],
-        capture_output=True,
-        text=True,
-        timeout=5,
-        check=False,
-    )
+def kill_unit(systemctl: Path, unit: str) -> subprocess.CompletedProcess[str] | None:
+    try:
+        return subprocess.run(
+            [str(systemctl), "--user", "kill", "--kill-who=all", unit],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def terminate_process_group(process: subprocess.Popen[Any] | None, grace_seconds: float = 10.0) -> str | None:
+    if process is None:
+        return None
+    def group_exists() -> bool:
+        try:
+            os.killpg(process.pid, 0)
+            return True
+        except (ProcessLookupError, OSError):
+            return False
+
+    if process.poll() is not None and not group_exists():
+        try:
+            process.wait(timeout=0)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return None
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        return f"SIGTERM process-group cleanup failed: {error}"
+    try:
+        process.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        pass
+    if not group_exists():
+        return None
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return None
+    except OSError as error:
+        return f"SIGKILL process-group cleanup failed: {error}"
+    try:
+        process.wait(timeout=grace_seconds)
+    except subprocess.TimeoutExpired:
+        return "process group did not reap after SIGKILL"
+    deadline = time.monotonic() + grace_seconds
+    while group_exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return None if not group_exists() else "process group survived SIGKILL"
+
+
+def terminate_owned_identity(identity: dict[str, object], sig: int) -> str | None:
+    current = proc_identity(int(identity["pid"]))
+    if current is None or current["starttime"] != identity["starttime"]:
+        return None
+    try:
+        os.kill(int(identity["pid"]), sig)
+    except ProcessLookupError:
+        return None
+    except OSError as error:
+        return f"signal {sig} to owned pid {identity['pid']} failed: {error}"
+    return None
+
+
+def cleanup_owned(
+    systemctl: Path | None,
+    unit: str | None,
+    systemd_process: subprocess.Popen[Any] | None,
+    analyzer_process: subprocess.Popen[Any] | None,
+    state: dict[str, Any],
+) -> dict[str, object]:
+    """Stop and reap the scope, analyzer, and observed escaped identities."""
+    errors: list[str] = []
+    seen = state.get("seen_scope_processes", {})
+    cgroup_path = state.get("last_cgroup_path")
+    unit_gc_expected = bool(state.get("unit_gc_expected"))
+    reported_cgroup_errors: set[str] = set()
+
+    def observed_alive() -> list[dict[str, object]]:
+        return [identity for identity in seen.values() if alive(identity)] if isinstance(seen, dict) else []
+
+    def current_cgroup_pids() -> list[int]:
+        if not isinstance(cgroup_path, str):
+            return []
+        _, pids, error = cgroup_pids({"ControlGroup": cgroup_path})
+        if error is not None and not unit_gc_expected and error not in reported_cgroup_errors:
+            reported_cgroup_errors.add(error)
+            errors.append(error)
+        return pids
+
+    if analyzer_process is not None:
+        error = terminate_process_group(analyzer_process)
+        if error:
+            errors.append(error)
+
+    owned_alive = observed_alive()
+    cgroup_alive = current_cgroup_pids()
+    if systemctl is not None and unit is not None and (
+        (systemd_process is not None and systemd_process.poll() is None)
+        or owned_alive
+        or cgroup_alive
+        or (isinstance(cgroup_path, str) and not unit_gc_expected)
+    ):
+        result = kill_unit(systemctl, unit)
+        if result is None:
+            errors.append("systemd cgroup kill did not execute")
+        elif result.returncode != 0:
+            errors.append(f"systemd cgroup kill failed: {result.returncode}: {result.stderr[-1024:]}")
+    error = terminate_process_group(systemd_process)
+    if error:
+        errors.append(error)
+    for identity in owned_alive:
+        error = terminate_owned_identity(identity, signal.SIGTERM)
+        if error:
+            errors.append(error)
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        remaining = observed_alive()
+        current_pids = current_cgroup_pids()
+        if not remaining and not current_pids:
+            break
+        time.sleep(0.05)
+
+    remaining = observed_alive()
+    current_pids = current_cgroup_pids()
+    for identity in remaining:
+        error = terminate_owned_identity(identity, signal.SIGKILL)
+        if error:
+            errors.append(error)
+
+    # A TERM-resistant escaped child is killed above, but the receipt must not
+    # claim cleanup until a post-KILL observation proves that it disappeared.
+    kill_deadline = time.monotonic() + 10.0
+    while time.monotonic() < kill_deadline:
+        remaining = observed_alive()
+        current_pids = current_cgroup_pids()
+        if not remaining and not current_pids:
+            break
+        time.sleep(0.05)
+    remaining = observed_alive()
+    current_pids = current_cgroup_pids()
+    if remaining:
+        errors.append(f"owned descendants survived cleanup: {remaining}")
+    if current_pids:
+        errors.append(f"cgroup pids survived cleanup: {current_pids}")
+    return {"errors": errors, "remaining_processes": remaining, "remaining_cgroup_pids": current_pids}
 
 
 def systemd_command(config: dict[str, Any], paths: dict[str, Path]) -> list[str]:
@@ -296,11 +468,44 @@ def runner_arguments(paths: dict[str, Path], cpu: int, pair_receipt: Path) -> li
     ]
 
 
+def launcher_binding(path: Path) -> dict[str, object]:
+    """Read the literal CPU/argv embedded in the generated launcher."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except (OSError, UnicodeError, SyntaxError) as error:
+        raise GuardFailure(f"launcher is not parseable: {error}") from error
+    values: dict[str, object] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            continue
+        name = node.targets[0].id
+        if name in {"LAUNCHER_CPU", "LAUNCHER_ARGV"}:
+            if name in values:
+                raise GuardFailure(f"launcher contains duplicate {name} binding")
+            try:
+                values[name] = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError) as error:
+                raise GuardFailure(f"launcher binding {name} is not literal: {error}") from error
+    cpu = values.get("LAUNCHER_CPU")
+    argv = values.get("LAUNCHER_ARGV")
+    if not isinstance(cpu, int) or not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
+        raise GuardFailure("launcher does not contain literal CPU and argv bindings")
+    return {"cpu": cpu, "argv": argv}
+
+
+def verify_launcher_binding(path: Path, cpu: int, argv: list[str]) -> None:
+    binding = launcher_binding(path)
+    if binding["cpu"] != cpu or binding["argv"] != argv:
+        raise GuardFailure("launcher embedded CPU/argv does not match configuration")
+
+
 def launcher_source(paths: dict[str, Path], cpu: int, pair_receipt: Path, tmp: Path) -> str:
     python = str(Path(sys.executable).resolve())
     argv = [python, "-B", *runner_arguments(paths, cpu, pair_receipt)]
     return (
         "#!" + python + "\n"
+        f"LAUNCHER_CPU = {cpu!r}\n"
+        f"LAUNCHER_ARGV = {argv!r}\n"
         "import os\n"
         "import resource\n"
         "import sys\n"
@@ -309,7 +514,7 @@ def launcher_source(paths: dict[str, Path], cpu: int, pair_receipt: Path, tmp: P
         f"resource.setrlimit(resource.RLIMIT_FSIZE, ({OUTPUT_FILE_LIMIT_BYTES}, {OUTPUT_FILE_LIMIT_BYTES}))\n"
         "resource.setrlimit(resource.RLIMIT_CORE, (0, 0))\n"
         f"os.environ['TMPDIR'] = {str(tmp)!r}\n"
-        f"os.execve({python!r}, {argv!r}, os.environ.copy())\n"
+        "os.execve(LAUNCHER_ARGV[0], LAUNCHER_ARGV, os.environ.copy())\n"
     )
 
 
@@ -377,6 +582,7 @@ def prepare(args: argparse.Namespace) -> int:
     paths["systemd_run"] = systemd_run
     paths["systemctl"] = systemctl
     paths["timeout"] = timeout
+    launcher_argv = [str(python), "-B", *runner_arguments(paths, cpu, pair_receipt)]
     config = {
         "schema": SCHEMA,
         "run_id": args.run_id,
@@ -385,6 +591,8 @@ def prepare(args: argparse.Namespace) -> int:
         "pair_command": pair_command,
         "launcher_command": [str(launcher)],
         "runner_argv": runner_arguments(paths, cpu, pair_receipt),
+        "launcher_argv": launcher_argv,
+        "launcher_cpu": cpu,
         "cpu": cpu,
         "rounds": ROUNDS,
         "deadline_seconds": int(args.deadline_seconds),
@@ -455,17 +663,44 @@ def validate_config(config_path: Path) -> dict[str, Any]:
         raise GuardFailure("TMP directory is missing")
     if not os.access(launcher, os.X_OK):
         raise GuardFailure("no-argument launcher is not executable")
+    pair_receipt = paths.get("pair_revalidated")
+    if pair_receipt is None:
+        raise GuardFailure("revalidated pair receipt path is missing")
+    expected_runner_argv = runner_arguments(paths, cpu, pair_receipt)
+    configured_runner_argv = config.get("runner_argv")
+    if configured_runner_argv != expected_runner_argv:
+        raise GuardFailure("configured runner argv differs from the bound paths/CPU")
+    expected_launcher_argv = [str(Path(config["artifacts"]["python"]["path"])), "-B", *expected_runner_argv]
+    if config.get("launcher_cpu") != cpu or config.get("launcher_argv") != expected_launcher_argv:
+        raise GuardFailure("configured launcher CPU/argv differs from the runner binding")
+    verify_launcher_binding(launcher, cpu, expected_launcher_argv)
     return config
 
 
-def scope_state(systemctl: Path, unit: str, seen: dict[str, dict[str, object]]) -> dict[str, object]:
+def scope_state(
+    systemctl: Path,
+    unit: str,
+    seen: dict[str, dict[str, object]],
+    monitor_errors: list[str],
+) -> dict[str, object]:
     props = show_unit(systemctl, unit)
-    if props.get("available"):
-        _, pids = cgroup_pids(props)
-        for pid in pids:
-            identity = proc_identity(pid)
-            if identity is not None:
-                seen[f"{identity['pid']}:{identity['starttime']}"] = identity
+    if not props.get("available"):
+        error = str(props.get("monitor_error", "systemctl observation failed"))
+        monitor_errors.append(f"{props.get('monitor_error_kind', 'systemctl')}: {error}")
+        return props
+    cgroup, pids, error = cgroup_pids(props)
+    props["_cgroup_path"] = cgroup
+    props["_cgroup_pids"] = pids
+    if error is not None:
+        props["available"] = False
+        props["monitor_error_kind"] = "cgroup"
+        props["monitor_error"] = error
+        monitor_errors.append(f"cgroup: {error}")
+        return props
+    for pid in pids:
+        identity = proc_identity(pid)
+        if identity is not None:
+            seen[f"{identity['pid']}:{identity['starttime']}"] = identity
     return props
 
 
@@ -480,6 +715,16 @@ def post_process_checks(config: dict[str, Any], state: dict[str, Any]) -> list[s
         failures.append("external deadline exceeded")
     if state.get("output_limit_exceeded"):
         failures.append("aggregate output limit exceeded")
+    if state.get("monitor_errors"):
+        failures.append("active unit monitor errors: " + repr(state["monitor_errors"]))
+    fatal_post_errors = [
+        error for error in state.get("post_monitor_errors", [])
+        if not str(error).startswith("unit-gone:")
+    ]
+    if fatal_post_errors:
+        failures.append("post-run unit monitor errors: " + repr(fatal_post_errors))
+    if state.get("post_monitor_errors") and not state.get("unit_gc_expected"):
+        failures.append("post-run unit monitor errors: " + repr(state["post_monitor_errors"]))
     if state.get("unit_metadata_missing"):
         failures.append("transient unit status/MemoryPeak was never observed")
     peak = state.get("memory_peak_bytes")
@@ -498,9 +743,10 @@ def post_process_checks(config: dict[str, Any], state: dict[str, Any]) -> list[s
         failures.append("cgroup processes survived: " + repr(state["leftover_cgroup_pids"]))
     if directory_bytes((paths["output"], paths["tmp"])) > int(config["aggregate_output_limit_bytes"]):
         failures.append("final aggregate output exceeds cap")
-    for path in paths["output"].rglob("*"):
-        if path.is_file() and path.stat().st_size > int(config["file_limit_bytes"]):
-            failures.append(f"output file exceeds RLIMIT_FSIZE: {path}")
+    for root in (paths["output"], paths["tmp"]):
+        for path in root.rglob("*"):
+            if path.is_file() and path.stat().st_size > int(config["file_limit_bytes"]):
+                failures.append(f"lifecycle file exceeds RLIMIT_FSIZE: {path}")
     rows, blockers = forbidden_rows()
     state["post_quiet_blockers"] = blockers
     state["post_process_count"] = len(rows)
@@ -516,7 +762,7 @@ def write_failure_receipt(config: dict[str, Any], receipt: dict[str, Any]) -> Pa
     return path
 
 
-def invoke_analyzer(config: dict[str, Any], state: dict[str, Any]) -> None:
+def invoke_analyzer(config: dict[str, Any], state: dict[str, Any], owned: dict[str, Any]) -> None:
     paths = {key: Path(value) for key, value in config["paths"].items()}
     output = paths["output"]
     manifest_path = output / "manifest.json"
@@ -538,8 +784,31 @@ def invoke_analyzer(config: dict[str, Any], state: dict[str, Any]) -> None:
     stdout = paths["tmp"] / "analyzer.stdout"
     stderr = paths["tmp"] / "analyzer.stderr"
     command = [str(Path(config["artifacts"]["python"]["path"])), "-B", str(paths["analyzer"]), str(output)]
+    started = time.monotonic()
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        completed = subprocess.run(command, stdout=out, stderr=err, timeout=600, check=False)
+        process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
+        owned["analyzer"] = process
+        while process.poll() is None:
+            if directory_bytes((paths["output"], paths["tmp"])) > int(config["aggregate_output_limit_bytes"]):
+                state["analyzer_output_limit_exceeded"] = True
+                cleanup_error = terminate_process_group(process)
+                if cleanup_error:
+                    state["analyzer_cleanup_error"] = cleanup_error
+                    raise GuardFailure(
+                        "aggregate output limit exceeded during analyzer; "
+                        f"analyzer cleanup failed: {cleanup_error}"
+                    )
+                raise GuardFailure("aggregate output limit exceeded during analyzer")
+            if time.monotonic() - started > 600:
+                state["analyzer_timeout"] = True
+                cleanup_error = terminate_process_group(process)
+                if cleanup_error:
+                    state["analyzer_cleanup_error"] = cleanup_error
+                    raise GuardFailure(f"analyzer exceeded its ten-minute deadline; cleanup failed: {cleanup_error}")
+                raise GuardFailure("analyzer exceeded its ten-minute deadline")
+            time.sleep(POLL_SECONDS)
+        completed = process.wait()
+        owned["analyzer"] = None
     state["analyzer_command"] = command
     state["analyzer_exit_code"] = completed.returncode
     state["analyzer_stdout"] = str(stdout)
@@ -587,17 +856,28 @@ def run_config(config_path: Path) -> int:
         "launcher": config["artifacts"]["launcher"],
         "unit_samples": [],
     }
+    systemctl = Path(config["artifacts"]["systemctl"]["path"])
+    owned: dict[str, Any] = {"systemd": None, "analyzer": None}
+    previous_handlers: dict[int, Any] = {}
+    state: dict[str, Any] = {"seen_scope_processes": {}, "last_cgroup_path": None}
+    outcome_error: BaseException | None = None
+
+    def interrupt(signum: int, _frame: Any) -> None:
+        receipt["signal"] = signum
+        raise GuardFailure(f"received signal {signum}; owned lifecycle cleanup required")
+
     try:
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            previous_handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, interrupt)
         preflight = quiet_snapshot(tmp / "preflight.host.json", "preflight")
         receipt["preflight"] = preflight
         if preflight["blockers"]:
             raise GuardFailure("host is not quiet before launch")
-        systemctl = Path(config["artifacts"]["systemctl"]["path"])
         command = systemd_command(config, paths)
         receipt["systemd_command"] = command
         systemd_stdout = tmp / "systemd-run.stdout"
         systemd_stderr = tmp / "systemd-run.stderr"
-        seen: dict[str, dict[str, object]] = {}
         state: dict[str, Any] = {
             "started_monotonic": time.monotonic(),
             "unit_metadata_missing": True,
@@ -607,32 +887,59 @@ def run_config(config_path: Path) -> int:
             "memory_current_max_bytes": None,
             "leftover_processes": [],
             "leftover_cgroup_pids": [],
+            "monitor_errors": [],
+            "post_monitor_errors": [],
+            "post_monitor_available_samples": 0,
+            "seen_scope_processes": {},
+            "last_cgroup_path": None,
         }
+
+        def stop_scope() -> None:
+            if state.get("stop_requested"):
+                return
+            state["stop_requested"] = True
+            result = kill_unit(systemctl, str(config["unit"]))
+            if result is None:
+                state["monitor_errors"].append("systemd-kill: command did not execute")
+            elif result.returncode != 0:
+                state["monitor_errors"].append(
+                    f"systemd-kill: exit={result.returncode}: {result.stderr[-1024:]}"
+                )
+
         with systemd_stdout.open("wb") as out, systemd_stderr.open("wb") as err:
             child = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
+            owned["systemd"] = child
             while child.poll() is None:
-                props = scope_state(systemctl, str(config["unit"]), seen)
+                props = scope_state(systemctl, str(config["unit"]), state["seen_scope_processes"], state["monitor_errors"])
                 receipt["unit_samples"].append(props)
+                if props.get("_cgroup_path"):
+                    state["last_cgroup_path"] = props["_cgroup_path"]
+                if not props.get("available"):
+                    stop_scope()
                 if props.get("available"):
                     state["unit_metadata_missing"] = False
                     if props.get("MemoryPeak", "").isdigit():
                         state["memory_peak_bytes"] = max(int(state["memory_peak_bytes"] or 0), int(props["MemoryPeak"]))
                     if props.get("MemoryCurrent", "").isdigit():
                         state["memory_current_max_bytes"] = max(int(state["memory_current_max_bytes"] or 0), int(props["MemoryCurrent"]))
-                tracked = directory_bytes((paths["output"], systemd_stdout, systemd_stderr))
+                tracked = directory_bytes((paths["output"], paths["tmp"]))
                 receipt["aggregate_bytes"] = tracked
                 if tracked > int(config["aggregate_output_limit_bytes"]):
                     state["output_limit_exceeded"] = True
-                    kill_unit(systemctl, str(config["unit"]))
+                    stop_scope()
                 if time.monotonic() - state["started_monotonic"] > int(config["deadline_seconds"]) + int(config["stop_grace_seconds"]):
                     state["deadline_exceeded"] = True
-                    kill_unit(systemctl, str(config["unit"]))
+                    stop_scope()
                 time.sleep(POLL_SECONDS)
             state["runner_exit_code"] = child.wait()
             receipt["runner_exit_code"] = state["runner_exit_code"]
         for _ in range(3):
-            props = scope_state(systemctl, str(config["unit"]), seen)
+            props = scope_state(systemctl, str(config["unit"]), state["seen_scope_processes"], state["post_monitor_errors"])
             receipt["unit_samples"].append(props)
+            if props.get("_cgroup_path"):
+                state["last_cgroup_path"] = props["_cgroup_path"]
+            if props.get("available"):
+                state["post_monitor_available_samples"] += 1
             if props.get("available"):
                 state["unit_metadata_missing"] = False
                 if props.get("MemoryPeak", "").isdigit():
@@ -645,13 +952,14 @@ def run_config(config_path: Path) -> int:
         receipt["memory_peak_bytes"] = state["memory_peak_bytes"]
         receipt["memory_current_max_bytes"] = state["memory_current_max_bytes"]
         receipt["unit_metadata_missing"] = state["unit_metadata_missing"]
-        receipt["seen_scope_processes"] = list(seen.values())
+        receipt["seen_scope_processes"] = list(state["seen_scope_processes"].values())
         if receipt["unit_samples"] and not receipt["unit_samples"][-1].get("available", False):
             receipt["unit_gone_after_last_sample"] = True
         receipt["timeout_exit_code"] = state.get("runner_exit_code")
         state["timeout_exit_code"] = state.get("runner_exit_code")
-        state["leftover_processes"] = [item for item in seen.values() if alive(item)]
-        _, last_pids = cgroup_pids(next((item for item in reversed(receipt["unit_samples"]) if item.get("available")), {}))
+        state["leftover_processes"] = [item for item in state["seen_scope_processes"].values() if alive(item)]
+        last_available = next((item for item in reversed(receipt["unit_samples"]) if item.get("available")), {})
+        last_pids = list(last_available.get("_cgroup_pids", []))
         state["leftover_cgroup_pids"] = last_pids
         receipt["leftover_processes"] = state["leftover_processes"]
         receipt["leftover_cgroup_pids"] = last_pids
@@ -663,27 +971,52 @@ def run_config(config_path: Path) -> int:
             state["timeout_exit_code"] = state.get("runner_exit_code")
         receipt["unit_last"] = last_unit
         receipt["timeout_exit_code"] = state["timeout_exit_code"]
+        receipt["monitor_errors"] = state["monitor_errors"]
+        receipt["post_monitor_errors"] = state["post_monitor_errors"]
+        receipt["post_monitor_available_samples"] = state["post_monitor_available_samples"]
+        state["unit_gc_expected"] = bool(
+            not state["unit_metadata_missing"]
+            and state["post_monitor_errors"]
+            and state["post_monitor_available_samples"] == 0
+            and all(str(error).startswith("unit-gone:") for error in state["post_monitor_errors"])
+        )
+        receipt["unit_gc_expected"] = state["unit_gc_expected"]
         failures = post_process_checks(config, state)
         receipt["guard_failures"] = failures
         if failures:
             raise GuardFailure("; ".join(failures))
-        invoke_analyzer(config, state)
+        invoke_analyzer(config, state, owned)
         post_analyzer = quiet_snapshot(tmp / "post-analyzer.host.json", "post-analyzer")
         receipt["post_analyzer"] = post_analyzer
         if post_analyzer["blockers"]:
             raise GuardFailure("host is not quiet after final analysis")
+        final_failures = post_process_checks(config, state)
+        receipt["final_guard_failures"] = final_failures
+        if final_failures:
+            raise GuardFailure("; ".join(final_failures))
         receipt.update(state)
         receipt["status"] = "qualified"
+    except BaseException as error:
+        outcome_error = error
+    finally:
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(signum, signal.SIG_IGN)
+        cleanup = cleanup_owned(systemctl, str(config["unit"]), owned.get("systemd"), owned.get("analyzer"), state)
+        receipt["cleanup"] = cleanup
+        if cleanup.get("errors") and outcome_error is None:
+            outcome_error = GuardFailure("lifecycle cleanup failed: " + repr(cleanup["errors"]))
+        for signum, handler in previous_handlers.items():
+            signal.signal(signum, handler)
         receipt["finished_ns"] = time.time_ns()
+        receipt["status"] = "failed" if outcome_error is not None else "qualified"
+        if outcome_error is not None:
+            receipt["failure"] = str(outcome_error)
         receipt_path = write_failure_receipt(config, receipt)
-        print(json.dumps({"status": receipt["status"], "receipt": str(receipt_path), "receipt_sha256": sha256_text(receipt_path), "analysis": str(paths["output"] / "analysis.json")}))
-        return 0
-    except Exception as error:
-        receipt["failure"] = str(error)
-        receipt["finished_ns"] = time.time_ns()
-        receipt_path = write_failure_receipt(config, receipt)
-        print(json.dumps({"status": "failed", "receipt": str(receipt_path), "receipt_sha256": sha256_text(receipt_path), "error": str(error)}), file=sys.stderr)
+    if outcome_error is not None:
+        print(json.dumps({"status": "failed", "receipt": str(receipt_path), "receipt_sha256": sha256_text(receipt_path), "error": str(outcome_error)}), file=sys.stderr)
         return 1
+    print(json.dumps({"status": "qualified", "receipt": str(receipt_path), "receipt_sha256": sha256_text(receipt_path), "analysis": str(paths["output"] / "analysis.json")}))
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -17,6 +17,7 @@ from unittest import mock
 from tools import w8_projection_policy as policy
 from tools import w8_file_provenance as provenance
 from tools import test_w8_file_provenance as provenance_tests
+from tools.test_w8_quiet_abba import QuietAbbaWrapperTests
 
 
 ANALYZER_PATH = Path(__file__).resolve().parents[1] / "docs/unified-ops/results/0362h/analyze.py"

@@ -14,6 +14,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -56,6 +57,42 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             self.assertIn(f"RLIMIT_FSIZE, ({wrapper.OUTPUT_FILE_LIMIT_BYTES}, {wrapper.OUTPUT_FILE_LIMIT_BYTES})", source)
             self.assertIn("accepts no arguments", source)
             self.assertNotIn("ulimit", source)
+
+    def test_launcher_binding_rejects_cpu_or_argv_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {
+                "runner": root / "run.py",
+                "before_binary": root / "before",
+                "after_binary": root / "after",
+                "output": root / "output",
+                "before_manifest": root / "before.json",
+                "after_manifest": root / "after.json",
+                "policy": root / "policy.json",
+            }
+            launcher = root / "launcher.py"
+            launcher.write_text(wrapper.launcher_source(paths, 7, root / "pair.json", root / "tmp"), encoding="utf-8")
+            binding = wrapper.launcher_binding(launcher)
+            self.assertEqual(binding["cpu"], 7)
+            self.assertEqual(binding["argv"][1], "-B")
+            launcher.write_text(launcher.read_text().replace("LAUNCHER_CPU = 7", "LAUNCHER_CPU = 8"), encoding="utf-8")
+            self.assertEqual(wrapper.launcher_binding(launcher)["cpu"], 8)
+            with self.assertRaises(wrapper.GuardFailure):
+                wrapper.verify_launcher_binding(launcher, 7, binding["argv"])
+            launcher.write_text(
+                wrapper.launcher_source(paths, 7, root / "pair.json", root / "tmp").replace(
+                    str(root / "pair.json"), str(root / "other-pair.json")
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(wrapper.GuardFailure):
+                wrapper.verify_launcher_binding(launcher, 7, binding["argv"])
+            launcher.write_text(
+                launcher.read_text() + "\nLAUNCHER_CPU = 7\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(wrapper.GuardFailure):
+                wrapper.launcher_binding(launcher)
 
     def test_fake_launcher_executes_normal_and_rejects_extra_argument(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -119,9 +156,12 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             normal.write_text(
                 "#!/usr/bin/env python3\n"
                 "print('ActiveState=active')\n"
+                "print('SubState=running')\n"
                 "print('Result=success')\n"
                 "print('ExecMainStatus=0')\n"
+                "print('MainPID=123')\n"
                 "print('ControlGroup=/w8-test.scope')\n"
+                "print('MemoryCurrent=1000')\n"
                 "print('MemoryPeak=1234')\n",
                 encoding="utf-8",
             )
@@ -136,6 +176,38 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             value = wrapper.show_unit(failure, "w8-test.scope")
             self.assertFalse(value["available"])
             self.assertEqual(value["returncode"], 5)
+
+            gone = root / "fake-systemctl-unit-gone.py"
+            gone.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "print('Unit w8-test.scope not loaded.', file=sys.stderr)\n"
+                "raise SystemExit(1)\n",
+                encoding="utf-8",
+            )
+            gone.chmod(gone.stat().st_mode | stat.S_IXUSR)
+            value = wrapper.show_unit(gone, "w8-test.scope")
+            self.assertFalse(value["available"])
+            self.assertEqual(value["monitor_error_kind"], "unit-gone")
+
+            missing = root / "fake-systemctl-missing-control-group.py"
+            missing.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('ActiveState=active')\n"
+                "print('SubState=running')\n"
+                "print('Result=success')\n"
+                "print('ExecMainStatus=0')\n"
+                "print('MainPID=123')\n"
+                "print('MemoryCurrent=1000')\n"
+                "print('MemoryPeak=1234')\n",
+                encoding="utf-8",
+            )
+            missing.chmod(missing.stat().st_mode | stat.S_IXUSR)
+            value = wrapper.show_unit(missing, "w8-test.scope")
+            self.assertFalse(value["available"])
+            self.assertEqual(value["monitor_error_kind"], "schema")
+            _path, _pids, error = wrapper.cgroup_pids({"ControlGroup": "/missing-w8-cgroup"})
+            self.assertIsNotNone(error)
 
     def test_normal_state_passes_output_and_descendant_guards(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -153,6 +225,54 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             }
             with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
                 self.assertEqual(wrapper.post_process_checks(config, state), [])
+
+    def test_active_monitor_error_fails_after_a_good_sample(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = self._config(Path(directory))
+            state = {
+                "runner_exit_code": 0,
+                "timeout_exit_code": 0,
+                "unit_metadata_missing": False,
+                "memory_peak_bytes": 1024,
+                "memory_current_max_bytes": 1024,
+                "leftover_processes": [],
+                "leftover_cgroup_pids": [],
+                "deadline_exceeded": False,
+                "output_limit_exceeded": False,
+                "monitor_errors": ["systemctl: intermittent failure"],
+            }
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                failures = wrapper.post_process_checks(config, state)
+            self.assertTrue(any("active unit monitor errors" in failure for failure in failures))
+
+    def test_scope_state_retains_missing_and_cgroup_read_errors(self) -> None:
+        errors: list[str] = []
+        with mock.patch.object(
+            wrapper,
+            "show_unit",
+            return_value={
+                "available": False,
+                "monitor_error_kind": "schema",
+                "monitor_error": "systemctl omitted ControlGroup",
+            },
+        ):
+            value = wrapper.scope_state(Path("/systemctl"), "w8-test.scope", {}, errors)
+        self.assertFalse(value["available"])
+        self.assertEqual(errors, ["schema: systemctl omitted ControlGroup"])
+
+        errors = []
+        with mock.patch.object(
+            wrapper,
+            "show_unit",
+            return_value={"available": True, "ControlGroup": "/w8-test.scope"},
+        ), mock.patch.object(
+            wrapper,
+            "cgroup_pids",
+            return_value=("/w8-test.scope", [], "cannot read cgroup.procs: permission denied"),
+        ):
+            value = wrapper.scope_state(Path("/systemctl"), "w8-test.scope", {}, errors)
+        self.assertFalse(value["available"])
+        self.assertEqual(errors, ["cgroup: cannot read cgroup.procs: permission denied"])
 
     def test_failed_and_timeout_states_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -192,7 +312,7 @@ class QuietAbbaWrapperTests(unittest.TestCase):
 
             # A sparse file makes the guard test cheap while still exceeding
             # the exact byte-valued per-file limit.
-            output_file = config["paths"]["output"] / "oversized"
+            output_file = config["paths"]["output"] / "analysis.json"
             with output_file.open("wb") as stream:
                 stream.truncate(wrapper.OUTPUT_FILE_LIMIT_BYTES + 1)
             normal = {
@@ -208,6 +328,127 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
                 failures = wrapper.post_process_checks(config, normal)
             self.assertTrue(any("RLIMIT_FSIZE" in failure for failure in failures))
+
+            tmp_file = config["paths"]["tmp"] / "analysis.json"
+            output_file.unlink()
+            with tmp_file.open("wb") as stream:
+                stream.truncate(wrapper.OUTPUT_FILE_LIMIT_BYTES + 1)
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                failures = wrapper.post_process_checks(config, normal)
+            self.assertTrue(any("RLIMIT_FSIZE" in failure for failure in failures))
+
+            tmp_file.unlink()
+            with tmp_file.open("wb") as stream:
+                stream.truncate(wrapper.AGGREGATE_OUTPUT_LIMIT_BYTES + 1)
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                failures = wrapper.post_process_checks(config, normal)
+            self.assertTrue(any("aggregate output exceeds cap" in failure for failure in failures))
+
+    def test_post_monitor_error_without_explicit_gc_proof_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = self._config(Path(directory))
+            state = {
+                "runner_exit_code": 0,
+                "timeout_exit_code": 0,
+                "unit_metadata_missing": False,
+                "memory_peak_bytes": 1024,
+                "memory_current_max_bytes": 1024,
+                "leftover_processes": [],
+                "leftover_cgroup_pids": [],
+                "deadline_exceeded": False,
+                "output_limit_exceeded": False,
+                "post_monitor_errors": ["systemctl: temporary failure"],
+                "post_monitor_available_samples": 0,
+                "unit_gc_expected": False,
+            }
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                failures = wrapper.post_process_checks(config, state)
+            self.assertTrue(any("post-run unit monitor errors" in failure for failure in failures))
+
+    def test_only_explicit_unit_disappearance_after_valid_sample_is_tolerated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config = self._config(Path(directory))
+            state = {
+                "runner_exit_code": 0,
+                "timeout_exit_code": 0,
+                "unit_metadata_missing": False,
+                "memory_peak_bytes": 1024,
+                "memory_current_max_bytes": 1024,
+                "leftover_processes": [],
+                "leftover_cgroup_pids": [],
+                "deadline_exceeded": False,
+                "output_limit_exceeded": False,
+                "post_monitor_errors": ["unit-gone: systemctl failed"],
+                "post_monitor_available_samples": 0,
+                "unit_gc_expected": True,
+            }
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                self.assertEqual(wrapper.post_process_checks(config, state), [])
+
+            state["unit_gc_expected"] = False
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                self.assertTrue(wrapper.post_process_checks(config, state))
+
+    def test_cleanup_reaps_owned_process_group(self) -> None:
+        with tempfile.TemporaryDirectory() as _directory:
+            process = subprocess.Popen(["sleep", "30"], start_new_session=True)
+            identity = wrapper.proc_identity(process.pid)
+            self.assertIsNotNone(identity)
+            state = {
+                "seen_scope_processes": {f"{identity['pid']}:{identity['starttime']}": identity},
+                "last_cgroup_path": None,
+            }
+            cleanup = wrapper.cleanup_owned(None, None, process, None, state)
+            self.assertEqual(cleanup["errors"], [])
+            self.assertIsNotNone(process.poll())
+            self.assertEqual(cleanup["remaining_processes"], [])
+
+    def test_cleanup_reaps_analyzer_process_group(self) -> None:
+        with tempfile.TemporaryDirectory() as _directory:
+            process = subprocess.Popen(["sleep", "30"], start_new_session=True)
+            cleanup = wrapper.cleanup_owned(None, None, None, process, {"seen_scope_processes": {}, "last_cgroup_path": None})
+            self.assertEqual(cleanup["errors"], [])
+            self.assertIsNotNone(process.poll())
+
+    def test_cleanup_fails_closed_on_unreadable_owned_cgroup(self) -> None:
+        with mock.patch.object(
+            wrapper,
+            "cgroup_pids",
+            return_value=("/w8-test.scope", [], "cannot read cgroup.procs: permission denied"),
+        ):
+            cleanup = wrapper.cleanup_owned(
+                None,
+                None,
+                None,
+                None,
+                {"seen_scope_processes": {}, "last_cgroup_path": "/w8-test.scope"},
+            )
+        self.assertTrue(any("cannot read cgroup.procs" in error for error in cleanup["errors"]))
+
+    def test_cleanup_reaps_escaped_child_after_leader_exit(self) -> None:
+        code = (
+            "import subprocess,sys,time\n"
+            "child=subprocess.Popen(['sleep','30'])\n"
+            "print(child.pid, flush=True)\n"
+            "time.sleep(0.05)\n"
+        )
+        leader = subprocess.Popen(
+            [sys.executable, "-c", code],
+            stdout=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        self.assertIsNotNone(leader.stdout)
+        escaped_pid = int(leader.stdout.readline().strip())
+        self.assertEqual(leader.wait(timeout=5), 0)
+        leader.stdout.close()
+        cleanup = wrapper.cleanup_owned(None, None, leader, None, {"seen_scope_processes": {}, "last_cgroup_path": None})
+        self.assertEqual(cleanup["errors"], [])
+        for _ in range(20):
+            if wrapper.proc_identity(escaped_pid) is None:
+                break
+            time.sleep(0.05)
+        self.assertIsNone(wrapper.proc_identity(escaped_pid))
 
 
 if __name__ == "__main__":

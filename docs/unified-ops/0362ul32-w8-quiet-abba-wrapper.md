@@ -10,15 +10,23 @@ The wrapper is
 `docs/unified-ops/results/0362ul32/w8-quiet-abba.py`.  The source-only tests
 are `tools/test_w8_quiet_abba.py` and cover a normal guard state, failed and
 timeout exits, an escaped descendant, oversized output, fake systemctl
-success/failure, the exact launcher file limit, a fake no-argument launcher,
-and the cgroup/deadline command.  They ran as seven tests with:
+success/failure, missing-control-group and cgroup-read errors, CPU/argv
+launcher mutation, exact launcher file limits, a fake no-argument launcher,
+escaped-child cleanup, unreadable-cgroup cleanup, analyzer-group cleanup, and
+the cgroup/deadline command.  They ran as sixteen
+tests with:
 
 ```text
 python3 -m unittest -v tools.test_w8_quiet_abba
 ```
 
-The wrapper itself is 34,115 bytes with SHA-256
-`800a010868e1746fc6a24aabc06879b57dfc4c114c2105b143bb61972874bee9`; the
+The existing registered W8 policy module imports the same test case, so the
+current gate invocation `python3 -m unittest tools.test_w8_projection_policy`
+executes all sixteen wrapper tests (33 tests total in that module); no frozen gate
+source or native runner is changed.
+
+The wrapper itself is 49,150 bytes with SHA-256
+`d18b2ef531d2e1ca3f8d2eb93a9a6f549f2745555480b68829ced90e326afc3e`; the
 generated no-argument launcher is separately hashed into the run
 configuration before execution.
 
@@ -71,13 +79,25 @@ During the run the wrapper polls the transient unit, retains every observed
 status, `MemoryCurrent`, and `MemoryPeak` sample, kills the cgroup on aggregate-output or
 deadline breach, records the unit's process identities, and retains the last
 unit record even if systemd garbage-collects the scope.  The aggregate output
-cap is 8 GiB across ABBA output and lifecycle logs.  It rejects any output
-file above the exact file limit, nonzero/timeout/deadline exit, missing unit
-metadata or `MemoryPeak`, surviving cgroup members or observed descendants,
-and post-run forbidden processes.  Every refusal writes
+cap is 8 GiB across the entire ABBA output and TMP lifecycle tree, both during
+the native runner and after the analyzer.  It rejects any output or lifecycle
+file above the exact file limit, including a synthetic oversized
+`analysis.json`, nonzero/timeout/deadline exit, missing unit metadata or
+`MemoryPeak`, surviving cgroup members or observed descendants, and post-run
+forbidden processes.  `systemctl`/ControlGroup/cgroup-read errors are retained
+in the receipt and fail closed; the only tolerated post-run systemctl error is
+an explicitly recorded unit disappearance after a valid final sample.
+Every refusal writes
 `tmp/w8-quiet-abba-receipt.json`; successful and failed runs therefore have a
 raw receipt.  The final analyzer is invoked only after these checks and the
 runner's 109-route/2,400-receipt manifest checks pass.
+
+The configuration records the selected CPU and complete runner argv.  The
+generated launcher embeds both as literals, and `run` parses and compares the
+embedded values against the hashed configuration before launching.  Signal,
+exception, deadline, output-cap, and analyzer-timeout paths stop and reap the
+owned systemd scope/process group and observed escaped PIDs before writing the
+raw receipt.
 
 ## Bound inputs
 
