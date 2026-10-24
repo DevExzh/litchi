@@ -242,12 +242,7 @@ impl Edit {
         let Some(base) = &self.base else {
             return Ok(());
         };
-        if let Some(workbook) = base.source_workbook() {
-            workbook
-                .ensure_original_source_current()
-                .map_err(Error::Reader)?;
-        }
-        Ok(())
+        crate::package::ensure_source_fence(&base.inner)
     }
 
     /// The shared property-set editor, for the package metadata transaction.
