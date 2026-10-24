@@ -53,7 +53,7 @@ fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
     )));
     package.add_part(Box::new(BlobPart::new(
         timeline_cache.clone(),
-        timeline::CACHE_CONTENT_TYPE.into(),
+        litchi_xlsx::timeline::CACHE_CONTENT_TYPE.into(),
         b"<malformed".to_vec(),
     )));
     let workbook_part = package.get_part_mut(&workbook).unwrap();
@@ -64,7 +64,7 @@ fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
         false,
     );
     workbook_part.rels_mut().add_relationship(
-        timeline::CACHE_RELATIONSHIP_TYPE.into(),
+        litchi_xlsx::timeline::CACHE_RELATIONSHIP_TYPE.into(),
         timeline_cache.relative_ref(workbook.base_uri()),
         "rIdMalformedTimelineCache".into(),
         false,
