@@ -3861,3 +3861,31 @@ See [0063](0063-source-pptx-modern-comments.md).
   replay, glossary closure and every required native qualification remain
   active work. The prepared gate now registers 25 tooling modules without
   changing its 53 steps. Only redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, native correctness and DrawingML return):
+  Fresh capture at `29f072f19c` stops after nine packages on an ambiguous
+  DrawingML rustdoc link. Repair `642f2e45f6` selects the error enum explicitly;
+  all-feature hidden JSON rustdoc passes with the pinned 4100 lock. The failed
+  capture is retained unchanged, and a new all-68 capture is running from
+  frozen `082fbeafe8`. Record 0362dvk preserves both failure and focused pass.
+
+  Both OLE normal release endpoints now execute the complete correctness
+  oracle successfully: eighteen artifacts each, all byte-identical. Independent
+  source, command and artifact verification passes 146 checks. Record 0362ul10j
+  accepts that correctness evidence; allocator and paired timing qualification
+  remain required.
+
+  DrawingML native qualification is returned for timed setup/copies, incomplete
+  source-backed mutation checks and weak semantic oracles. Record 0362dvie binds
+  a reviewed plan that retains every row, sample requirement and baseline fence.
+  Separate owner and raw workers are repairing it. Harness isolation merges at
+  `47ea67dc44` after source review, and all forty composed tooling tests pass;
+  actual paired builds and native timing/fidelity acceptance remain pending.
+
+  Cleanup wave 46 removes the merged DrawingML observer and PPT protocol leaves,
+  preserving both branches and seventeen ignored files (918,418 bytes). Restore
+  and independent hash/mode/ancestry checks pass; record 0362ul13 contains the
+  receipts. The protected trunk probe and all native endpoints remain intact.
+  Full gate, actual corpus replay, final inventory/glossary closure and native
+  qualification remain active. Only redaction audit 22 is deferred. Nothing is
+  pushed.
