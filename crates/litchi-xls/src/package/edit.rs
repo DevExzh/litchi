@@ -1157,14 +1157,20 @@ fn capture_source_guard(package: &Package) -> Result<Option<SourceGuard>> {
     match &package.inner.state {
         PackageState::Source { cfb, workbook, .. } => {
             let original = workbook.needs_source_fence().then(|| workbook.clone());
-            if let Some(workbook) = &original {
-                workbook
-                    .ensure_current()
-                    .map_err(|error| Error::Package(PackageError::Source(error)))?;
-            }
-            let expected = cfb.source_version().map_err(|error| {
-                Error::Package(PackageError::Source(SourceBackedError::from(error)))
-            })?;
+            check_original_source_guard(original.as_ref())?;
+            let expected = match cfb.source_version() {
+                Ok(expected) => expected,
+                Err(error) => {
+                    // The original check above and this target observation
+                    // are separate windows.  A composed target can report
+                    // an in-flight original mutation as CFB/I/O here, before
+                    // a SourceGuard exists; promote the original error first.
+                    check_original_source_guard(original.as_ref())?;
+                    return Err(Error::Package(PackageError::Source(
+                        SourceBackedError::from(error),
+                    )));
+                },
+            };
             Ok(Some(SourceGuard {
                 source: Arc::clone(cfb),
                 expected,
@@ -1179,7 +1185,7 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
     let Some(guard) = guard else {
         return Ok(());
     };
-    check_original_source_guard(guard)?;
+    check_original_source_guard(guard.original.as_ref())?;
     let observed = match guard.source.source_version() {
         Ok(observed) => observed,
         Err(error) => {
@@ -1187,14 +1193,14 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
             // I/O/CFB error after the leading check. Re-fence the retained
             // original owner before exposing that target error, just as the
             // source-backed semantic owner does.
-            check_original_source_guard(guard)?;
+            check_original_source_guard(guard.original.as_ref())?;
             return Err(Error::Package(PackageError::Source(
                 SourceBackedError::from(error),
             )));
         },
     };
     if observed != guard.expected {
-        check_original_source_guard(guard)?;
+        check_original_source_guard(guard.original.as_ref())?;
         return Err(Error::Package(PackageError::Source(
             SourceBackedError::SourceChanged {
                 expected: guard.expected,
@@ -1205,8 +1211,8 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
     Ok(())
 }
 
-fn check_original_source_guard(guard: &SourceGuard) -> Result<()> {
-    if let Some(workbook) = &guard.original {
+fn check_original_source_guard(workbook: Option<&crate::SourceBackedWorkbook>) -> Result<()> {
+    if let Some(workbook) = workbook {
         workbook
             .ensure_current()
             .map_err(|error| Error::Package(PackageError::Source(error)))?;
