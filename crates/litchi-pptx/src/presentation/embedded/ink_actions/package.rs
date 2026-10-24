@@ -113,7 +113,10 @@ impl TargetCache {
         let closure = relationship_index.closure(target_name)?;
         let inbound = Arc::from(closure.owned_inbound()?);
         let outbound = Arc::from(closure.owned_outbound()?);
-        let profile = Arc::new(actions::read_profile(target.blob())?);
+        let profile = Arc::new(actions::read_profile(
+            target.blob(),
+            actions::Limits::DEFAULT,
+        )?);
         // The shared DrawingML profile retains the exact source allocation.
         // Reuse it for the anchor/cache view instead of retaining the OPC
         // `Arc<Vec<u8>>` next to a second profile-source allocation.

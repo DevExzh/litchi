@@ -23,15 +23,16 @@ fn foreign_namespace_lookalikes_are_opaque_under_unknown_extension_uris() {
         let template = format!("{}{payload}{}", &NATIVE[..start], &NATIVE[end..]);
         for uri in [part::EXTENSION_URI, part::NATIVE_EXTENSION_URI] {
             let recognized = template.replace(part::NATIVE_EXTENSION_URI, uri);
-            assert!(part::read(recognized.as_bytes()).is_err());
+            assert!(part::read(recognized.as_bytes(), part::Limits::DEFAULT).is_err());
         }
 
         let source = template.replace(part::NATIVE_EXTENSION_URI, "urn:vendor:unknown-extension");
-        let snapshot = part::read(source.as_bytes()).expect("foreign lookalike is opaque");
+        let snapshot = part::read(source.as_bytes(), part::Limits::DEFAULT)
+            .expect("foreign lookalike is opaque");
         assert!(snapshot.family().is_none());
         assert_eq!(snapshot.xml_bytes(), source.as_bytes());
         assert!(
-            part::read_family(source.as_bytes())
+            part::read_family(source.as_bytes(), part::Limits::DEFAULT)
                 .expect("borrowed projection")
                 .is_none()
         );
@@ -50,7 +51,7 @@ fn foreign_namespace_lookalikes_are_opaque_under_unknown_extension_uris() {
                 .expect("Theme UTF-8")
                 .contains(payload)
         );
-        let reopened = part::read(&added).expect("read added owner");
+        let reopened = part::read(&added, part::Limits::DEFAULT).expect("read added owner");
         assert_eq!(reopened.family(), Some(&detached));
         assert_eq!(
             reopened.family_profile(),

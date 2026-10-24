@@ -19,7 +19,7 @@ fn short_ids_and_non_reference_text_do_not_block_removal() {
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms">{comment}<a:action xml:id="{removed}" type="add" startTime="0"/><a:action xml:id="{retained}" type="add" startTime="1"/></a:actions>"#
         );
         let mut edit = Edit::new(
-            actions::read_profile(xml.as_bytes()).unwrap(),
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
             EditOptions::default(),
         )
         .unwrap();
@@ -63,7 +63,7 @@ fn encoded_local_fragment_cannot_bypass_reference_closure() {
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action xml:id="a" type="add" startTime="0"/><a:action xml:id="b" type="add" startTime="1"><a:actionData ref="{reference}"/></a:action></a:actions>"#
         );
         let mut edit = Edit::new(
-            actions::read_profile(xml.as_bytes()).unwrap(),
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
             EditOptions::default(),
         )
         .unwrap();
@@ -81,7 +81,7 @@ fn removing_action_cannot_orphan_id_owned_by_opaque_trace() {
         r##"<a:actions xmlns:a="{ACTION_NAMESPACE}" xmlns:i="http://www.w3.org/2003/InkML" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData><i:trace xml:id="stroke">0 0, 1 1</i:trace></a:actionData></a:action><a:action type="add" startTime="1"><a:actionData ref="#stroke"/></a:action></a:actions>"##
     );
     let mut edit = Edit::new(
-        actions::read_profile(xml.as_bytes()).unwrap(),
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
         EditOptions::default(),
     )
     .unwrap();
@@ -99,7 +99,7 @@ fn trace_draft_cannot_silently_disappear_as_comment_only_payload() {
             r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
         );
         let mut edit = Edit::new(
-            actions::read_profile(xml.as_bytes()).unwrap(),
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
             EditOptions::default(),
         )
         .unwrap();
@@ -121,7 +121,7 @@ fn empty_custom_type_remains_an_exact_source_noop() {
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type='' startTime="0"/></a:actions>"#
     );
     let mut edit = Edit::new(
-        actions::read_profile(xml.as_bytes()).unwrap(),
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
         EditOptions::default(),
     )
     .unwrap();
@@ -137,7 +137,7 @@ fn trace_draft_cannot_be_read_back_as_a_transform() {
     );
     let payload = format!(r#"<a:transform xmlns:a="{ACTION_NAMESPACE}"/>"#);
     let mut edit = Edit::new(
-        actions::read_profile(xml.as_bytes()).unwrap(),
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
         EditOptions::default(),
     )
     .unwrap();
@@ -157,7 +157,7 @@ fn opaque_descendants_count_toward_the_authored_depth_limit() {
     let xml = format!(
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"/></a:actions>"#
     );
-    let profile = actions::read_profile(xml.as_bytes()).unwrap();
+    let profile = actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap();
     let data = ActionDataDraft::new().trace(OpaquePayload::new(
         r#"<i:trace xmlns:i="http://www.w3.org/2003/InkML" xmlns:x="urn:future"><x:future>0 0</x:future></i:trace>"#,
     ).unwrap()).unwrap();
@@ -204,7 +204,7 @@ fn malformed_opaque_trace_xml_is_refused_before_publication() {
         let result = (|| {
             let data = ActionDataDraft::new().trace(OpaquePayload::new(payload)?)?;
             let mut edit = Edit::new(
-                actions::read_profile(xml.as_bytes())?,
+                actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT)?,
                 EditOptions::default(),
             )?;
             edit.add_data(ActionSelector::ordinal(0), data)?;
@@ -221,7 +221,7 @@ fn legal_opaque_comment_and_cdata_survive_authored_trace() {
     );
     let payload = r#"<i:trace xmlns:i="http://www.w3.org/2003/InkML"><!-- <? retained --> <![CDATA[<?x & raw <]]></i:trace>"#;
     let mut edit = Edit::new(
-        actions::read_profile(xml.as_bytes()).unwrap(),
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
         EditOptions::default(),
     )
     .unwrap();
@@ -255,7 +255,7 @@ fn clearing_action_cannot_orphan_a_retained_data_reference() {
         r##"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData xml:id="d1"/></a:action><a:action type="add" startTime="1"><a:actionData ref="#d1"/></a:action></a:actions>"##
     );
     let mut edit = Edit::new(
-        actions::read_profile(xml.as_bytes()).unwrap(),
+        actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
         EditOptions::default(),
     )
     .unwrap();
@@ -280,7 +280,7 @@ fn source_edit_refuses_invalid_payload_namespace_context_before_finish() {
         "<i:trace xmlns:i='http://www.w3.org/2003/InkML' xmlns:x='urn:future' xmlns:y='urn:future' x:value='1' y:value='2'/>",
     ] {
         let mut edit = Edit::new(
-            actions::read_profile(xml.as_bytes()).unwrap(),
+            actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap(),
             EditOptions::default(),
         )
         .unwrap();
@@ -300,7 +300,7 @@ fn cleared_children_release_the_final_node_budget() {
     let xml = format!(
         r#"<a:actions xmlns:a="{ACTION_NAMESPACE}" lengthUnit="cm" timeUnit="ms"><a:action type="add" startTime="0"><a:actionData/></a:action><a:action type="add" startTime="1"><a:actionData/></a:action></a:actions>"#
     );
-    let profile = actions::read_profile(xml.as_bytes()).unwrap();
+    let profile = actions::read_profile(xml.as_bytes(), actions::Limits::DEFAULT).unwrap();
     let mut edit = Edit::new(
         profile,
         EditOptions {

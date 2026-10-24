@@ -259,13 +259,21 @@ impl Builder {
     /// Add the writer-selected Theme part.
     fn add_theme(&self, package: &mut OpcPackage) -> Result<()> {
         let mut theme_xml = if let Some(theme) = self.theme.as_ref() {
-            litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?
+            litchi_drawingml::theme::codec::encode_part(
+                &theme.name,
+                &theme.colors,
+                &theme.fonts,
+                litchi_drawingml::theme::codec::Limits::DEFAULT,
+            )?
         } else {
             self.create_minimal_theme().as_bytes().to_vec()
         };
         if let Some(family) = self.theme_family.as_ref() {
-            let has_family =
-                litchi_drawingml::theme::family::part::read_family(&theme_xml)?.is_some();
+            let has_family = litchi_drawingml::theme::family::part::read_family(
+                &theme_xml,
+                litchi_drawingml::theme::family::part::Limits::DEFAULT,
+            )?
+            .is_some();
             theme_xml = if has_family {
                 litchi_drawingml::theme::family::part::replace_family(
                     &theme_xml,

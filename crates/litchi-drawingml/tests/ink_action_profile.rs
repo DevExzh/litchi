@@ -17,7 +17,7 @@ fn root(body: &str, length_unit: &str, time_unit: &str) -> String {
 }
 
 fn assert_rejected(xml: &[u8]) {
-    match actions::read_profile(xml) {
+    match actions::read_profile(xml, actions::Limits::DEFAULT) {
         Err(Error::Invalid(_) | Error::Xml(_)) => {},
         Err(other) => panic!("expected profile grammar rejection, got {other:?}"),
         Ok(profile) => panic!("accepted invalid profile {:?}", profile.source()),
@@ -25,7 +25,7 @@ fn assert_rejected(xml: &[u8]) {
 }
 
 fn assert_invalid(xml: &[u8]) {
-    match actions::read_profile(xml) {
+    match actions::read_profile(xml, actions::Limits::DEFAULT) {
         Err(Error::Invalid(_)) => {},
         Err(other) => panic!("expected Invalid profile error, got {other:?}"),
         Ok(profile) => panic!("accepted invalid profile {:?}", profile.source()),
@@ -33,7 +33,7 @@ fn assert_invalid(xml: &[u8]) {
 }
 
 fn assert_limit(xml: &[u8], kind: LimitKind, maximum: usize) {
-    match actions::read_profile(xml) {
+    match actions::read_profile(xml, actions::Limits::DEFAULT) {
         Err(Error::Limit {
             kind: actual_kind,
             observed,
@@ -52,8 +52,11 @@ fn assert_limit(xml: &[u8], kind: LimitKind, maximum: usize) {
 fn profile_preserves_character_reference_whitespace_in_element_only_containers() {
     let body = r#"&#32;<iact:actionGroup type="add" startTime="0">&#x9;<iact:action type="add" startTime="0">&#10;<iact:property name="style"/>&#xD;<iact:actionDataGroup>&#00032;<iact:actionData>&#x000020;</iact:actionData></iact:actionDataGroup></iact:action></iact:actionGroup>"#;
     let source = root(body, "m", "s");
-    let profile = actions::read_profile(source.as_bytes()).unwrap();
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
     for reference in ["&#65;", "&#xA0;", "&amp;", "&#0;", "&unknown;"] {
         assert_rejected(root(reference, "m", "s").as_bytes());
     }
@@ -75,8 +78,11 @@ fn profile_empty_property_content_rejects_whitespace_but_preserves_comments() {
         "m",
         "s",
     );
-    let profile = actions::read_profile(source.as_bytes()).unwrap();
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 }
 
 #[test]
@@ -87,18 +93,24 @@ fn profile_rejects_raw_xml_delimiters_and_all_cdata_outside_root() {
         r#"<iact:action type="add" startTime="0"><iact:actionData><i:trace xmlns:i="{INKML_NAMESPACE}">bad]]&gt;</i:trace></iact:actionData></iact:action>"#
     );
     let valid = root(&trace, "m", "s");
-    let profile = actions::read_profile(valid.as_bytes()).unwrap();
-    assert_eq!(actions::write_profile(&profile).unwrap(), valid.as_bytes());
+    let profile = actions::read_profile(valid.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        valid.as_bytes()
+    );
     assert_rejected(valid.replace("]]&gt;", "]]>").as_bytes());
     let valid = root(&trace.replace("bad]]&gt;", "<![CDATA[<?x]]>"), "m", "s");
-    let profile = actions::read_profile(valid.as_bytes()).unwrap();
-    assert_eq!(actions::write_profile(&profile).unwrap(), valid.as_bytes());
+    let profile = actions::read_profile(valid.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        valid.as_bytes()
+    );
     for cdata in ["<![CDATA[]]>", "<![CDATA[ ]]>"] {
         assert_rejected(format!("{cdata}{valid}").as_bytes());
         assert_rejected(format!("{valid}{cdata}").as_bytes());
     }
     let valid = root(&property.replace("value=\"<\"", "value=\"&lt;\""), "m", "s");
-    assert!(actions::read_profile(valid.as_bytes()).is_ok());
+    assert!(actions::read_profile(valid.as_bytes(), actions::Limits::DEFAULT).is_ok());
 }
 
 #[test]
@@ -123,17 +135,24 @@ fn profile_rejects_reserved_namespace_aliases_inside_opaque_payloads() {
         r#"<i:definitions xmlns:i="{INKML_NAMESPACE}"><future xmlns="" xmlns:p="urn:ordinary" p:value="z"/></i:definitions>"#
     );
     let source = root(&body, "m", "s");
-    let profile = actions::read_profile(source.as_bytes()).unwrap();
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 }
 
 #[test]
 fn profile_replays_exact_source_and_exposes_typed_children_in_schema_order() {
     let source = br###"<?xml version="1.0" encoding="UTF-8"?><!--before--><iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" xmlns:inkml="http://www.w3.org/2003/InkML" xml:id="root" lengthUnit="cm" timeUnit="ms"><inkml:definitions><inkml:future><inkml:payload>opaque</inkml:payload></inkml:future></inkml:definitions><iact:action xml:id="a0" type="add" startTime="+0.25"><iact:property name="dataType"/><iact:property name="style" value="instant"/><iact:property name="vendor" value="opaque-value"/><iact:actionDataGroup xml:id="g0" name="path"><iact:actionData xml:id="d0" name="target" ref="#stroke"><iact:transform/><inkml:trace><inkml:future><inkml:payload>opaque</inkml:payload></inkml:future></inkml:trace><inkml:traceView/></iact:actionData></iact:actionDataGroup></iact:action><iact:actionGroup xml:id="ag0" type="transform" startTime="1.0"><iact:action type="remove" startTime="2"><iact:actionData/></iact:action></iact:actionGroup></iact:actions><!--after-->"###;
 
-    let profile = actions::read_profile(source).expect("valid strict action profile");
+    let profile = actions::read_profile(source, actions::Limits::DEFAULT)
+        .expect("valid strict action profile");
     assert_eq!(profile.source(), source);
-    assert_eq!(actions::write_profile(&profile).unwrap(), source);
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source
+    );
     assert_eq!(profile.xml(profile.definitions_span().unwrap()), br#"<inkml:definitions><inkml:future><inkml:payload>opaque</inkml:payload></inkml:future></inkml:definitions>"#);
     assert_eq!(profile.xml_id(), Some("root"));
     assert_eq!(profile.length_unit(), actions::LengthUnit::Centimeter);
@@ -201,8 +220,9 @@ fn all_schema_length_and_time_units_round_trip_through_public_enums() {
         ("em", actions::LengthUnit::Em),
         ("ex", actions::LengthUnit::Ex),
     ] {
-        let profile = actions::read_profile(root("", lexical, "s").as_bytes())
-            .expect("standard InkML length unit");
+        let profile =
+            actions::read_profile(root("", lexical, "s").as_bytes(), actions::Limits::DEFAULT)
+                .expect("standard InkML length unit");
         assert_eq!(profile.length_unit(), expected);
         assert_eq!(profile.length_unit().as_str(), lexical);
     }
@@ -210,8 +230,9 @@ fn all_schema_length_and_time_units_round_trip_through_public_enums() {
         ("s", actions::TimeUnit::Second),
         ("ms", actions::TimeUnit::Millisecond),
     ] {
-        let profile = actions::read_profile(root("", "m", lexical).as_bytes())
-            .expect("standard InkML time unit");
+        let profile =
+            actions::read_profile(root("", "m", lexical).as_bytes(), actions::Limits::DEFAULT)
+                .expect("standard InkML time unit");
         assert_eq!(profile.time_unit(), expected);
         assert_eq!(profile.time_unit().as_str(), lexical);
     }
@@ -245,7 +266,8 @@ fn xsd_decimal_whitespace_is_collapsed_before_decimal_validation() {
         "m",
         "s",
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("xsd:decimal whitespace");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("xsd:decimal whitespace");
     let actions::RootChild::Action(action) = &profile.children()[0] else {
         panic!("root action expected");
     };
@@ -254,7 +276,10 @@ fn xsd_decimal_whitespace_is_collapsed_before_decimal_validation() {
         panic!("root action group expected");
     };
     assert_eq!(group.start_time().trim(), "-1.0");
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 
     for value in ["", ".", "+", "-", "1e2", "+ 1", "1 2"] {
         let source = root(
@@ -276,7 +301,8 @@ fn empty_action_type_is_allowed_by_the_unrestricted_user_union_member() {
         "m",
         "s",
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("empty custom action type");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("empty custom action type");
     let actions::RootChild::Action(empty) = &profile.children()[0] else {
         panic!("first root action expected");
     };
@@ -285,7 +311,10 @@ fn empty_action_type_is_allowed_by_the_unrestricted_user_union_member() {
         panic!("second root action expected");
     };
     assert_eq!(custom.action_type().as_str(), "vendor-action");
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 }
 
 #[test]
@@ -295,7 +324,8 @@ fn property_names_values_and_action_data_names_are_lexical_and_inert() {
         "m",
         "s",
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("lexical custom names");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("lexical custom names");
     let actions::RootChild::Action(action) = &profile.children()[0] else {
         panic!("root action expected");
     };
@@ -348,7 +378,7 @@ fn reserved_action_types_do_not_execute_semantic_name_requirements() {
         "m",
         "s",
     );
-    let profile = actions::read_profile(source.as_bytes())
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
         .expect("profile must remain inert about reserved action semantics");
     assert_eq!(profile.children().len(), 3);
     assert_eq!(profile.actions().count(), 3);
@@ -359,9 +389,13 @@ fn namespace_aliases_are_resolved_but_wrong_namespace_is_rejected() {
     let source = format!(
         r#"<alias:actions xmlns:alias="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" lengthUnit="m" timeUnit="s"><alias:action type="add" startTime="0"><alias:actionData><i:trace/></alias:actionData></alias:action></alias:actions>"#
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("prefix aliases are lexical");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("prefix aliases are lexical");
     assert_eq!(profile.children().len(), 1);
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 
     let wrong_root = r#"<alias:actions xmlns:alias="urn:wrong" lengthUnit="m" timeUnit="s"/>"#;
     assert_invalid(wrong_root.as_bytes());
@@ -402,9 +436,13 @@ fn encoded_namespace_aliases_resolve_to_the_same_expanded_names() {
     let source = format!(
         r#"<a:actions xmlns:a="{encoded_action}" xmlns:i="{encoded_inkml}" lengthUnit="m" timeUnit="s"><a:action type="add" startTime="0"><a:actionData><i:trace/></a:actionData></a:action></a:actions>"#
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("numeric URI references resolve");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("numeric URI references resolve");
     assert_eq!(profile.children().len(), 1);
-    assert_eq!(actions::write_profile(&profile).unwrap(), source.as_bytes());
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source.as_bytes()
+    );
 }
 
 #[test]
@@ -436,7 +474,8 @@ fn opaque_inkml_descendants_are_retained_while_known_containers_fail_closed() {
     let source = format!(
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" lengthUnit="m" timeUnit="s"><i:definitions><i:future><i:trace>opaque</i:trace></i:future></i:definitions><iact:action type="add" startTime="0"><iact:actionData><i:trace><i:future><i:payload>opaque</i:payload></i:future></i:trace></iact:actionData></iact:action></iact:actions>"#
     );
-    let profile = actions::read_profile(source.as_bytes()).expect("opaque InkML descendants");
+    let profile = actions::read_profile(source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("opaque InkML descendants");
     assert_eq!(profile.source(), source.as_bytes());
     assert!(
         std::str::from_utf8(profile.xml(profile.definitions_span().unwrap()))
@@ -475,8 +514,12 @@ fn xml_declaration_bom_comments_and_document_boundaries_follow_profile_grammar()
         b"<!--after-->".as_slice(),
     ]
     .concat();
-    let profile = actions::read_profile(&source).expect("well-formed XML profile");
-    assert_eq!(actions::write_profile(&profile).unwrap(), source);
+    let profile =
+        actions::read_profile(&source, actions::Limits::DEFAULT).expect("well-formed XML profile");
+    assert_eq!(
+        actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
+        source
+    );
 
     let late_declaration = [
         b"<!--before-->".as_slice(),
@@ -514,7 +557,7 @@ fn profile_depth_node_attribute_and_source_limits_are_bounded() {
         exact_depth.push_str("</x:node>");
     }
     exact_depth.push_str("</i:definitions></iact:actions>");
-    assert!(actions::read_profile(exact_depth.as_bytes()).is_ok());
+    assert!(actions::read_profile(exact_depth.as_bytes(), actions::Limits::DEFAULT).is_ok());
 
     let mut overflow_depth = format!(
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" xmlns:x="urn:opaque" lengthUnit="m" timeUnit="s"><i:definitions>"#
@@ -537,7 +580,7 @@ fn profile_depth_node_attribute_and_source_limits_are_bounded() {
     }
     exact_nodes.push_str("</i:definitions></iact:actions>");
     assert!(exact_nodes.len() < MAX_SOURCE_BYTES);
-    assert!(actions::read_profile(exact_nodes.as_bytes()).is_ok());
+    assert!(actions::read_profile(exact_nodes.as_bytes(), actions::Limits::DEFAULT).is_ok());
 
     let mut overflow_nodes = format!(
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" xmlns:x="urn:opaque" lengthUnit="m" timeUnit="s"><i:definitions>"#
@@ -581,4 +624,69 @@ fn action_type_overflow_is_reported_as_a_typed_scalar_limit() {
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" lengthUnit="m" timeUnit="s"><iact:action type="{value}" startTime="0"/></iact:actions>"#
     );
     assert_limit(source.as_bytes(), LimitKind::ScalarBytes, MAX_TOKEN_BYTES);
+}
+
+#[test]
+fn caller_action_limits_drive_attribute_scalar_and_output_errors() {
+    let source = format!(
+        r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" lengthUnit="m" timeUnit="s" xml:id="12345678"/>"#
+    );
+
+    let mut limits = actions::Limits::DEFAULT;
+    limits.max_attribute_value_bytes = 4;
+    assert!(matches!(
+        actions::read_profile(source.as_bytes(), limits),
+        Err(Error::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            observed: 8,
+            maximum: 4,
+        })
+    ));
+
+    let payload_source = root(
+        &format!(
+            r#"<i:definitions xmlns:i="{INKML_NAMESPACE}"><i:future>payload</i:future></i:definitions>"#
+        ),
+        "m",
+        "s",
+    );
+    let mut payload_limits = actions::Limits::DEFAULT;
+    payload_limits.max_payload_bytes = 16;
+    assert!(matches!(
+        actions::read_profile(payload_source.as_bytes(), payload_limits),
+        Err(Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            maximum: 16,
+            observed,
+        }) if observed > 16
+    ));
+
+    let scalar_source = format!(
+        r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" lengthUnit="m" timeUnit="s"><iact:action type="add" startTime="12345"/></iact:actions>"#
+    );
+    let mut scalar_limits = actions::Limits::DEFAULT;
+    scalar_limits.max_scalar_bytes = 4;
+    assert!(matches!(
+        actions::read_profile(scalar_source.as_bytes(), scalar_limits),
+        Err(Error::Limit {
+            kind: LimitKind::ScalarBytes,
+            maximum: 4,
+            ..
+        })
+    ));
+
+    let small_source =
+        format!(r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" lengthUnit="m" timeUnit="s"/>"#);
+    let profile = actions::read_profile(small_source.as_bytes(), actions::Limits::DEFAULT)
+        .expect("small profile");
+    let mut output_limits = actions::Limits::DEFAULT;
+    output_limits.max_output_bytes = profile.source().len() - 1;
+    assert!(matches!(
+        actions::write_profile(&profile, output_limits),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            maximum,
+            ..
+        }) if maximum == profile.source().len() - 1
+    ));
 }

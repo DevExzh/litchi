@@ -589,7 +589,10 @@ impl SourceBackedPresentation {
             };
             let part =
                 super::load_part(&self.inner, &target, ct::OFC_THEME, MAX_MASTER_PART_BYTES)?;
-            Ok(Some(litchi_drawingml::theme::codec::read(part.blob())?))
+            Ok(Some(litchi_drawingml::theme::codec::read(
+                part.blob(),
+                litchi_drawingml::theme::codec::Limits::DEFAULT,
+            )?))
         })
     }
 

@@ -23,6 +23,75 @@ pub const MAX_XML_BYTES: usize = 8 * 1024 * 1024;
 const MAX_NODES: usize = 100_000;
 const MAX_DEPTH: usize = 128;
 const MAX_NAMESPACE_DECLARATIONS: usize = 256;
+const MAX_ATTRIBUTES_PER_ELEMENT: usize = 256;
+const MAX_ATTRIBUTE_VALUE_BYTES: usize = 1 << 20;
+
+/// Caller-selected bounds for a raw DrawingML theme codec operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    /// Maximum complete theme XML bytes accepted or emitted.
+    pub max_xml_bytes: usize,
+    /// Maximum element nodes scanned.
+    pub max_nodes: usize,
+    /// Maximum element nesting depth.
+    pub max_depth: usize,
+    /// Maximum namespace declarations on one element.
+    pub max_namespace_declarations: usize,
+    /// Maximum attributes on one element.
+    pub max_attributes_per_element: usize,
+    /// Maximum decoded attribute value bytes.
+    pub max_attribute_value_bytes: usize,
+}
+
+impl Limits {
+    /// Historical bounded theme policy.
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_nodes: MAX_NODES,
+        max_depth: MAX_DEPTH,
+        max_namespace_declarations: MAX_NAMESPACE_DECLARATIONS,
+        max_attributes_per_element: MAX_ATTRIBUTES_PER_ELEMENT,
+        max_attribute_value_bytes: MAX_ATTRIBUTE_VALUE_BYTES,
+    };
+
+    /// Construct a policy with a caller-selected complete-theme byte cap.
+    #[must_use]
+    pub const fn new(max_xml_bytes: usize) -> Self {
+        Self {
+            max_xml_bytes,
+            ..Self::DEFAULT
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        check_limit(LimitKind::XmlBytes, self.max_xml_bytes, MAX_XML_BYTES)?;
+        check_limit(LimitKind::XmlNodes, self.max_nodes, MAX_NODES)?;
+        check_limit(LimitKind::XmlDepth, self.max_depth, MAX_DEPTH)?;
+        check_limit(
+            LimitKind::NamespaceDeclarations,
+            self.max_namespace_declarations,
+            MAX_NAMESPACE_DECLARATIONS,
+        )?;
+        check_limit(
+            LimitKind::XmlAttributes,
+            self.max_attributes_per_element,
+            MAX_ATTRIBUTES_PER_ELEMENT,
+        )?;
+        check_limit(
+            LimitKind::AttributeValueBytes,
+            self.max_attribute_value_bytes,
+            MAX_ATTRIBUTE_VALUE_BYTES,
+        )?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 // `CT_StyleMatrix` requires at least three entries in every style list. Keep
 // the authored default deliberately small while still valid in both the
@@ -63,7 +132,13 @@ const FORMAT_SCHEME: &str = concat!(
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<u8>> {
+pub fn encode_part(
+    name: &str,
+    colors: &Palette,
+    fonts: &FontSet,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     validate_name("theme", name)?;
     validate_palette(colors)?;
     validate_fonts(fonts)?;
@@ -78,7 +153,7 @@ pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<
     push_fonts(&mut xml, fonts, false);
     xml.push_str(FORMAT_SCHEME);
     xml.push_str("</a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>");
-    bounded(xml.into_bytes())
+    bounded(xml.into_bytes(), limits)
 }
 
 /// Encode a theme override part.
@@ -86,7 +161,8 @@ pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
+pub fn encode_override(value: &Override, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     if value.colors.is_none() && value.fonts.is_none() {
         return Err(invalid("theme override requires at least one scheme"));
     }
@@ -108,7 +184,7 @@ pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
         push_fonts(&mut xml, fonts, false);
     }
     xml.push_str("</a:themeOverride>");
-    bounded(xml.into_bytes())
+    bounded(xml.into_bytes(), limits)
 }
 
 /// Parse a complete theme part.
@@ -116,8 +192,8 @@ pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Theme> {
-    let parsed = parse(xml, "theme")?;
+pub fn read(xml: &[u8], limits: Limits) -> Result<Theme> {
+    let parsed = parse(xml, "theme", limits)?;
     let colors = parsed
         .colors
         .ok_or_else(|| invalid("theme has no color palette"))?;
@@ -136,8 +212,8 @@ pub fn read(xml: &[u8]) -> Result<Theme> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read_override(xml: &[u8]) -> Result<Override> {
-    let parsed = parse(xml, "themeOverride")?;
+pub fn read_override(xml: &[u8], limits: Limits) -> Result<Override> {
+    let parsed = parse(xml, "themeOverride", limits)?;
     Ok(Override {
         colors: parsed.colors,
         fonts: parsed.fonts,
@@ -154,9 +230,15 @@ pub fn read_override(xml: &[u8]) -> Result<Override> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
-    let range = scheme_replacement_range(xml, local)?;
-    let source_namespace = theme_root_namespace(xml)?;
+pub fn replace_scheme(
+    xml: &[u8],
+    local: &[u8],
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    let range = scheme_replacement_range(xml, local, limits)?;
+    let source_namespace = theme_root_namespace(xml, limits)?;
     let adjusted_replacement = adjust_replacement_namespace(replacement, source_namespace)?;
     let replacement = adjusted_replacement.as_deref().unwrap_or(replacement);
     let output_len = range
@@ -168,14 +250,14 @@ pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Ve
                 .and_then(|suffix| length.checked_add(suffix))
         })
         .ok_or_else(|| invalid("patched theme XML length overflows"))?;
-    if output_len > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
+    if output_len > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, output_len, limits.max_xml_bytes));
     }
     let mut output = Vec::with_capacity(output_len);
     output.extend_from_slice(&xml[..range.start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&xml[range.end..]);
-    bounded(output)
+    bounded(output, limits)
 }
 
 /// Find one directly owned, losslessly replaceable scheme in a complete Theme
@@ -191,8 +273,8 @@ pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Ve
 /// Returns an error when the source is malformed, the target is absent or
 /// ambiguous, or replacing it would discard source data outside the typed
 /// theme model.
-pub fn scheme_replacement_range(xml: &[u8], local: &[u8]) -> Result<Range<usize>> {
-    direct_scheme_range(xml, local)?
+pub fn scheme_replacement_range(xml: &[u8], local: &[u8], limits: Limits) -> Result<Range<usize>> {
+    direct_scheme_range(xml, local, limits)?
         .ok_or_else(|| invalid("theme scheme is missing from themeElements"))
 }
 
@@ -200,22 +282,24 @@ pub fn scheme_replacement_range(xml: &[u8], local: &[u8]) -> Result<Range<usize>
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn encode_palette_fragment(value: &Palette) -> Result<Vec<u8>> {
+pub fn encode_palette_fragment(value: &Palette, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     validate_palette(value)?;
     let mut output = String::with_capacity(1024);
     push_palette(&mut output, value, true);
-    bounded(output.into_bytes())
+    bounded(output.into_bytes(), limits)
 }
 
 /// # Errors
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn encode_fonts_fragment(value: &FontSet) -> Result<Vec<u8>> {
+pub fn encode_fonts_fragment(value: &FontSet, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     validate_fonts(value)?;
     let mut output = String::with_capacity(1024);
     push_fonts(&mut output, value, true);
-    bounded(output.into_bytes())
+    bounded(output.into_bytes(), limits)
 }
 
 fn push_palette(xml: &mut String, value: &Palette, declare_namespace: bool) {
@@ -359,19 +443,24 @@ fn is_font_face_parent(stack: &[Frame]) -> bool {
     })
 }
 
-fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+fn parse(xml: &[u8], root_name: &str, limits: Limits) -> Result<Parsed> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let processed = process_ooxml(xml)?;
-    if processed.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, processed.len(), MAX_XML_BYTES));
+    if processed.len() > limits.max_xml_bytes {
+        return Err(limit(
+            LimitKind::XmlBytes,
+            processed.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().check_end_names = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+        .set_max_declarations_per_element(limits.max_namespace_declarations);
     let mut stack: Vec<Frame> = Vec::new();
     let mut parsed = Parsed::default();
     let mut palette_name = String::new();
@@ -397,8 +486,8 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme node count overflow"))?;
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
@@ -421,16 +510,21 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                         &mut current_slot,
                         &mut fonts,
                         &mut parsed,
+                        limits,
                     )?;
                 } else {
                     if local != root_name.as_bytes() || !drawingml {
                         return Err(invalid("theme XML has an unexpected root"));
                     }
                     root_seen = true;
-                    parsed.name = attr(&element, b"name", reader.decoder())?;
+                    parsed.name = attr(&element, b"name", reader.decoder(), limits)?;
                 }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 stack.push(Frame { local, drawingml });
             },
@@ -438,8 +532,8 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme node count overflow"))?;
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
@@ -462,6 +556,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                         &mut current_slot,
                         &mut fonts,
                         &mut parsed,
+                        limits,
                     )?;
                     close(
                         &local,
@@ -481,7 +576,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                         return Err(invalid("theme XML has an unexpected root"));
                     }
                     root_seen = true;
-                    parsed.name = attr(&element, b"name", reader.decoder())?;
+                    parsed.name = attr(&element, b"name", reader.decoder(), limits)?;
                 }
             },
             Event::End(element) => {
@@ -543,6 +638,7 @@ fn open(
     current_slot: &mut Option<Slot>,
     fonts: &mut Option<FontState>,
     parsed: &mut Parsed,
+    limits: Limits,
 ) -> Result<()> {
     if drawingml
         && depth == scheme_depth
@@ -554,7 +650,7 @@ fn open(
         }
         palette_name.clear();
         palette_name.push_str(
-            attr(element, b"name", decoder)?
+            attr(element, b"name", decoder, limits)?
                 .as_deref()
                 .unwrap_or_default(),
         );
@@ -567,7 +663,7 @@ fn open(
             return Err(invalid("theme contains multiple font sets"));
         }
         *fonts = Some(FontState {
-            name: attr(element, b"name", decoder)?.unwrap_or_default(),
+            name: attr(element, b"name", decoder, limits)?.unwrap_or_default(),
             major: None,
             minor: None,
             target: None,
@@ -590,13 +686,14 @@ fn open(
     {
         let color = match local {
             b"srgbClr" => Color::rgb(
-                &attr(element, b"val", decoder)?.ok_or_else(|| invalid("srgbClr lacks val"))?,
+                &attr(element, b"val", decoder, limits)?
+                    .ok_or_else(|| invalid("srgbClr lacks val"))?,
             )?,
             b"sysClr" => {
-                let kind = attr(element, b"val", decoder)?
+                let kind = attr(element, b"val", decoder, limits)?
                     .and_then(|value| System::from_token(&value))
                     .ok_or_else(|| invalid("sysClr has an unknown system color"))?;
-                Color::system(kind, attr(element, b"lastClr", decoder)?.as_deref())?
+                Color::system(kind, attr(element, b"lastClr", decoder, limits)?.as_deref())?
             },
             _ => return Ok(()),
         };
@@ -633,16 +730,20 @@ fn open(
             .ok_or_else(|| invalid("font face is missing"))?;
             match local {
                 b"latin" => {
-                    face.latin = attr(element, b"typeface", decoder)?
+                    face.latin = attr(element, b"typeface", decoder, limits)?
                         .ok_or_else(|| invalid("latin face lacks typeface"))?;
                 },
-                b"ea" => face.east_asian = attr(element, b"typeface", decoder)?.unwrap_or_default(),
+                b"ea" => {
+                    face.east_asian =
+                        attr(element, b"typeface", decoder, limits)?.unwrap_or_default()
+                },
                 b"cs" => {
-                    face.complex_script = attr(element, b"typeface", decoder)?.unwrap_or_default();
+                    face.complex_script =
+                        attr(element, b"typeface", decoder, limits)?.unwrap_or_default();
                 },
                 b"font" => face.scripts.push(super::model::Script {
-                    code: attr(element, b"script", decoder)?.unwrap_or_default(),
-                    typeface: attr(element, b"typeface", decoder)?
+                    code: attr(element, b"script", decoder, limits)?.unwrap_or_default(),
+                    typeface: attr(element, b"typeface", decoder, limits)?
                         .ok_or_else(|| invalid("script face lacks typeface"))?,
                 }),
                 _ => {},
@@ -715,16 +816,44 @@ fn attr(
     element: &BytesStart<'_>,
     name: &[u8],
     decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
 ) -> Result<Option<String>> {
-    Ok(unqualified_attribute_value(element, name, decoder)?)
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme attribute count overflow"))?;
+        if count > limits.max_attributes_per_element {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                count,
+                limits.max_attributes_per_element,
+            ));
+        }
+        if attribute.key.as_ref() == name {
+            let value = unqualified_attribute_value(element, name, decoder)?;
+            if let Some(value) = &value
+                && value.len() > limits.max_attribute_value_bytes
+            {
+                return Err(limit(
+                    LimitKind::AttributeValueBytes,
+                    value.len(),
+                    limits.max_attribute_value_bytes,
+                ));
+            }
+            return Ok(value);
+        }
+    }
+    Ok(None)
 }
 
-fn theme_root_namespace(xml: &[u8]) -> Result<&'static [u8]> {
+fn theme_root_namespace(xml: &[u8], limits: Limits) -> Result<&'static [u8]> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+        .set_max_declarations_per_element(limits.max_namespace_declarations);
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
@@ -886,9 +1015,10 @@ fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Ra
     Ok(found)
 }
 
-fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+fn direct_scheme_range(xml: &[u8], target: &[u8], limits: Limits) -> Result<Option<Range<usize>>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     if !matches!(target, b"clrScheme" | b"fontScheme") {
         return Err(invalid("unsupported theme scheme for replacement"));
@@ -898,7 +1028,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
     reader.config_mut().check_end_names = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+        .set_max_declarations_per_element(limits.max_namespace_declarations);
     let mut stack: Vec<(usize, Frame)> = Vec::new();
     let mut nodes = 0usize;
     let mut root_seen = false;
@@ -919,8 +1049,8 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
         nodes = nodes
             .checked_add(1)
             .ok_or_else(|| invalid("theme node count overflow"))?;
-        if nodes > MAX_NODES {
-            return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+        if nodes > limits.max_nodes {
+            return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
         }
         match event {
             Event::Start(element) => {
@@ -951,6 +1081,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
                         source_namespace,
                         &element,
                         reader.decoder(),
+                        limits,
                     )?;
                     target_namespace = Some(source_namespace);
                 } else if is_target_stack(&stack, target) {
@@ -964,10 +1095,15 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
                         source_namespace,
                         &element,
                         reader.decoder(),
+                        limits,
                     )?;
                 }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
                 stack.push((start, Frame { local, drawingml }));
             },
@@ -1002,6 +1138,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
                         source_namespace,
                         &element,
                         reader.decoder(),
+                        limits,
                     )?;
                 }
                 if direct {
@@ -1091,6 +1228,7 @@ fn validate_scheme_element(
     source_namespace: &[u8],
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
 ) -> Result<()> {
     let current_namespace = current_namespace
         .ok_or_else(|| invalid("theme scheme contains an unsupported namespace"))?;
@@ -1101,7 +1239,7 @@ fn validate_scheme_element(
         if local != target {
             return Err(invalid("theme scheme contains an unsupported child"));
         }
-        ensure_supported_attributes(element, decoder, &[b"name"], source_namespace)?;
+        ensure_supported_attributes(element, decoder, &[b"name"], source_namespace, limits)?;
         return Ok(());
     }
     let parent = stack
@@ -1113,18 +1251,23 @@ fn validate_scheme_element(
             if Slot::from_token(std::str::from_utf8(local).unwrap_or_default()).is_none() {
                 return Err(invalid("color scheme contains an unsupported child"));
             }
-            ensure_supported_attributes(element, decoder, &[], source_namespace)?;
+            ensure_supported_attributes(element, decoder, &[], source_namespace, limits)?;
         } else if is_color_value_parent(stack) {
             match local {
-                b"srgbClr" => {
-                    ensure_supported_attributes(element, decoder, &[b"val"], source_namespace)?
-                },
+                b"srgbClr" => ensure_supported_attributes(
+                    element,
+                    decoder,
+                    &[b"val"],
+                    source_namespace,
+                    limits,
+                )?,
                 b"sysClr" => {
                     ensure_supported_attributes(
                         element,
                         decoder,
                         &[b"val", b"lastClr"],
                         source_namespace,
+                        limits,
                     )?;
                 },
                 _ => return Err(invalid("color slot contains an unsupported child")),
@@ -1137,14 +1280,14 @@ fn validate_scheme_element(
             if !matches!(local, b"majorFont" | b"minorFont") {
                 return Err(invalid("font scheme contains an unsupported child"));
             }
-            ensure_supported_attributes(element, decoder, &[], source_namespace)?;
+            ensure_supported_attributes(element, decoder, &[], source_namespace, limits)?;
         } else if is_font_face_parent_pair(stack) {
             let allowed = match local {
                 b"latin" | b"ea" | b"cs" => &[&b"typeface"[..]][..],
                 b"font" => &[&b"script"[..], &b"typeface"[..]][..],
                 _ => return Err(invalid("font face contains an unsupported child")),
             };
-            ensure_supported_attributes(element, decoder, allowed, source_namespace)?;
+            ensure_supported_attributes(element, decoder, allowed, source_namespace, limits)?;
         } else {
             return Err(invalid("font scheme contains an unsupported child"));
         }
@@ -1170,14 +1313,33 @@ fn ensure_supported_attributes(
     decoder: quick_xml::encoding::Decoder,
     allowed: &[&[u8]],
     source_namespace: &[u8],
+    limits: Limits,
 ) -> Result<()> {
+    let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme attribute count overflow"))?;
+        if count > limits.max_attributes_per_element {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                count,
+                limits.max_attributes_per_element,
+            ));
+        }
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
             let value = attribute
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| Error::Xml(error.to_string()))?;
+            if value.len() > limits.max_attribute_value_bytes {
+                return Err(limit(
+                    LimitKind::AttributeValueBytes,
+                    value.len(),
+                    limits.max_attribute_value_bytes,
+                ));
+            }
             if value.as_ref().as_bytes() != source_namespace {
                 return Err(invalid(
                     "theme scheme declares a foreign or cross-family namespace",
@@ -1188,16 +1350,27 @@ fn ensure_supported_attributes(
         if attribute.key.prefix().is_some() || !allowed.contains(&key) {
             return Err(invalid("theme scheme contains an unsupported attribute"));
         }
-        attribute
+        let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
     }
     Ok(())
 }
 
-fn bounded(value: Vec<u8>) -> Result<Vec<u8>> {
-    if value.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, value.len(), MAX_XML_BYTES));
+fn bounded(value: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
+    if value.len() > limits.max_xml_bytes {
+        return Err(limit(
+            LimitKind::XmlBytes,
+            value.len(),
+            limits.max_xml_bytes,
+        ));
     }
     Ok(value)
 }
@@ -1226,10 +1399,45 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     Error::limit(kind, observed, maximum)
 }
 
+fn check_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::invalid_limit(kind, value, maximum));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::theme::model::{Color, Face, FontSet, Palette, Slot, System};
+
+    fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<u8>> {
+        super::encode_part(name, colors, fonts, Limits::DEFAULT)
+    }
+
+    fn encode_override(value: &Override) -> Result<Vec<u8>> {
+        super::encode_override(value, Limits::DEFAULT)
+    }
+
+    fn read(xml: &[u8]) -> Result<Theme> {
+        super::read(xml, Limits::DEFAULT)
+    }
+
+    fn read_override(xml: &[u8]) -> Result<Override> {
+        super::read_override(xml, Limits::DEFAULT)
+    }
+
+    fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
+        super::replace_scheme(xml, local, replacement, Limits::DEFAULT)
+    }
+
+    fn scheme_replacement_range(xml: &[u8], local: &[u8]) -> Result<Range<usize>> {
+        super::scheme_replacement_range(xml, local, Limits::DEFAULT)
+    }
+
+    fn encode_palette_fragment(value: &Palette) -> Result<Vec<u8>> {
+        super::encode_palette_fragment(value, Limits::DEFAULT)
+    }
 
     fn palette() -> Palette {
         Slot::ALL

@@ -216,6 +216,7 @@ fn authored_theme_xml() -> Vec<u8> {
         "Office",
         &all_rgb_palette("Office", "4472C4"),
         &aptos_fonts(),
+        codec::Limits::DEFAULT,
     )
     .expect("authored theme XML")
 }
@@ -437,7 +438,7 @@ fn native_fixture_theme_is_typed_and_workbook_owned() {
         theme_uri()
     );
 
-    let parsed = codec::read(theme.blob()).expect("typed native theme");
+    let parsed = codec::read(theme.blob(), codec::Limits::DEFAULT).expect("typed native theme");
     assert!(!parsed.name.is_empty());
     assert_eq!(
         parsed.colors.color(Slot::Accent1),
@@ -565,7 +566,7 @@ fn malformed_and_oversized_theme_payloads_are_refused() {
         b"<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><a:themeElements/></a:theme>".to_vec(),
         b"<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><a:themeElements>".to_vec(),
     ] {
-        assert!(codec::read(&malformed).is_err());
+        assert!(codec::read(&malformed, codec::Limits::DEFAULT).is_err());
         let mut workbook = native_workbook();
         replace_theme_blob(&mut workbook, malformed);
         assert!(workbook.theme().is_err());
@@ -573,8 +574,16 @@ fn malformed_and_oversized_theme_payloads_are_refused() {
     }
 
     let oversized = vec![b' '; codec::MAX_XML_BYTES + 1];
-    assert!(codec::read(&oversized).is_err());
-    assert!(codec::replace_scheme(&oversized, b"clrScheme", b"<a:clrScheme/>").is_err());
+    assert!(codec::read(&oversized, codec::Limits::DEFAULT).is_err());
+    assert!(
+        codec::replace_scheme(
+            &oversized,
+            b"clrScheme",
+            b"<a:clrScheme/>",
+            codec::Limits::DEFAULT,
+        )
+        .is_err()
+    );
 
     let workbook = native_workbook();
     let exact = theme_bytes(&workbook).len();
@@ -607,13 +616,13 @@ fn strict_theme_namespace_is_accepted_but_wrong_namespace_is_not() {
             bytes
         })
         .expect("transitional namespace");
-    assert!(codec::read(&strict).is_ok());
+    assert!(codec::read(&strict, codec::Limits::DEFAULT).is_ok());
 
     let wrong_namespace = String::from_utf8(transitional)
         .expect("authored UTF-8")
         .replace(codec::NAMESPACE, "urn:example:not-drawingml")
         .into_bytes();
-    assert!(codec::read(&wrong_namespace).is_err());
+    assert!(codec::read(&wrong_namespace, codec::Limits::DEFAULT).is_err());
 
     let mut workbook = native_workbook();
     replace_theme_blob(&mut workbook, wrong_namespace);
@@ -763,9 +772,14 @@ fn writer_custom_theme_is_created_and_round_trips_as_typed_metadata() {
     assert_eq!(snapshot.theme(), &custom);
     assert_eq!(
         snapshot.source_xml(),
-        codec::encode_part(&custom.name, &custom.colors, &custom.fonts)
-            .expect("encode custom theme")
-            .as_slice()
+        codec::encode_part(
+            &custom.name,
+            &custom.colors,
+            &custom.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode custom theme")
+        .as_slice()
     );
     assert_eq!(
         workbook

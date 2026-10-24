@@ -126,6 +126,21 @@ impl EditOptions {
         Ok(())
     }
 
+    pub(super) const fn codec_limits(self) -> super::Limits {
+        super::Limits {
+            max_source_bytes: self.max_output_bytes,
+            max_output_bytes: self.max_output_bytes,
+            max_nodes: self.max_nodes,
+            max_depth: self.max_depth,
+            max_actions: self.max_actions,
+            max_action_groups: self.max_action_groups,
+            max_payload_bytes: self.max_payload_bytes,
+            max_scalar_bytes: self.max_scalar_bytes,
+            max_attribute_value_bytes: super::MAX_ATTRIBUTE_VALUE_BYTES,
+            max_attributes_per_element: super::MAX_ATTRIBUTES_PER_ELEMENT,
+        }
+    }
+
     /// Refuse an edit policy that would widen the policy which admitted its
     /// immutable owner.  Tighter per-edit budgets remain valid; a caller must
     /// reopen through a fresh owner to select a wider policy.
@@ -678,7 +693,7 @@ impl Draft {
             .map_err(|_| invalid("ink action output allocation failed"))?;
         emit_draft(&mut output, &self)?;
         debug_assert_eq!(output.len(), output_len);
-        let profile = read_profile(&output)?;
+        let profile = read_profile(&output, self.limits.codec_limits())?;
         validate_profile_limits(&profile, self.limits)?;
         ensure_unique_profile_ids(&profile)?;
         if !matches_draft(&self, &profile) {
@@ -753,7 +768,7 @@ impl Prepared {
         }
         let after = patch.apply_bytes(self.bytes.as_ref())?;
         let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
-        let profile = read_profile_owned(after.clone())?;
+        let profile = read_profile_owned(after.clone(), self.options.codec_limits())?;
         validate_profile_limits(&profile, self.options)?;
         ensure_unique_profile_ids(&profile)?;
         Ok(Commit::new(
@@ -1224,7 +1239,7 @@ impl Edit {
             return Ok(Commit::new(prepared, patch, Diagnostics::UNCHANGED));
         }
         let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
-        let profile = read_profile_owned(after.clone())?;
+        let profile = read_profile_owned(after.clone(), self.options.codec_limits())?;
         validate_profile_limits(&profile, self.options)?;
         ensure_unique_profile_ids(&profile)?;
         let prepared = Prepared {
@@ -1286,7 +1301,7 @@ fn decimal(value: &str) -> Result<Box<str>> {
         return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_SCALAR_BYTES));
     }
     let collapsed = super::collapse_xml_whitespace(value)?;
-    super::validate_decimal(&collapsed)?;
+    super::validate_decimal(&collapsed, MAX_SCALAR_BYTES)?;
     scalar(&collapsed, "ink action startTime")
 }
 
@@ -1389,7 +1404,7 @@ fn validate_draft(draft: &Draft) -> Result<()> {
                     draft.limits,
                 )?;
                 bounded_scalar(&group.start_time, "action group startTime", draft.limits)?;
-                super::validate_decimal(&group.start_time)?;
+                super::validate_decimal(&group.start_time, draft.limits.max_scalar_bytes)?;
                 if let Some(id) = &group.xml_id {
                     bounded_scalar(id, "xml:id", draft.limits)?;
                     if !is_ncname(id) {
@@ -1441,7 +1456,7 @@ fn validate_action_draft(
     *max_depth = (*max_depth).max(action_depth);
     bounded_scalar(action.action_type.as_str(), "action type", limits)?;
     bounded_scalar(&action.start_time, "ink action startTime", limits)?;
-    super::validate_decimal(&action.start_time)?;
+    super::validate_decimal(&action.start_time, limits.max_scalar_bytes)?;
     if let Some(id) = &action.xml_id {
         bounded_scalar(id, "xml:id", limits)?;
         if !is_ncname(id) {
@@ -5134,7 +5149,7 @@ fn validate_group_draft(
     *max_depth = (*max_depth).max(2);
     bounded_scalar(group.action_type.as_str(), "action group type", limits)?;
     bounded_scalar(&group.start_time, "action group startTime", limits)?;
-    super::validate_decimal(&group.start_time)?;
+    super::validate_decimal(&group.start_time, limits.max_scalar_bytes)?;
     if let Some(id) = &group.xml_id {
         bounded_scalar(id, "xml:id", limits)?;
         if !is_ncname(id) {

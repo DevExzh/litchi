@@ -395,7 +395,7 @@ fn fixture(action_count: usize) -> Result<Fixture> {
     }
     xml.push_str("</iact:actions><!--trailing-->");
     let source = xml.into_bytes();
-    let profile = actions::read_profile(&source)?;
+    let profile = actions::read_profile(&source, actions::Limits::DEFAULT)?;
     Ok(Fixture {
         action_count,
         profile,
@@ -882,7 +882,7 @@ fn validate_work(inputs: &Inputs, lane: &str, work: &Work) -> Result<Validation>
     {
         let post_source = retained_profile.source();
         let post_source_hash = source_hash(post_source);
-        let post_profile = actions::read_profile(post_source)?;
+        let post_profile = actions::read_profile(post_source, actions::Limits::DEFAULT)?;
         let post_state = profile_state(&post_profile);
         let no_op = Edit::from_profile(&post_profile, Limits::default())?.finish()?;
         let no_op_state = profile_state(no_op.package().profile());

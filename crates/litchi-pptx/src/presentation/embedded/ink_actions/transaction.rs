@@ -98,7 +98,7 @@ impl Draft {
                 limit: self.source.limits().target_bytes,
             });
         }
-        let profile = actions::read_profile(bytes.as_ref())?;
+        let profile = actions::read_profile(bytes.as_ref(), actions::Limits::DEFAULT)?;
         self.replace_profile(selector, profile)
     }
 

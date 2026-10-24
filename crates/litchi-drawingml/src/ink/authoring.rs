@@ -17,6 +17,7 @@ use quick_xml::{
 
 use crate::{Error, Result};
 
+use super::codec::Limits as CodecLimits;
 use super::{
     BrushPropertyName, ContextKind, Document, Guid, INKML_NAMESPACE, InkEffect,
     MAX_ATTRIBUTE_VALUE_BYTES, MAX_BRUSH_PROPERTIES, MAX_CONTEXTS, MAX_DEPTH, MAX_NODES,
@@ -154,6 +155,23 @@ impl AuthoringLimits {
             }
         }
         Ok(())
+    }
+
+    pub(crate) const fn codec_limits(self) -> CodecLimits {
+        CodecLimits {
+            max_source_bytes: self.max_source_bytes,
+            max_output_bytes: self.max_output_bytes,
+            max_xml_nodes: self.max_nodes,
+            max_xml_depth: self.max_depth,
+            max_contexts: self.max_contexts,
+            max_traces: self.max_traces,
+            max_brush_properties: self.max_brush_properties,
+            max_attributes_per_element: self.max_attributes_per_element,
+            max_attribute_value_bytes: self.max_attribute_value_bytes,
+            max_identifier_bytes: self.max_id_bytes,
+            max_reference_bytes: self.max_reference_bytes,
+            max_trace_text_bytes: self.max_trace_text_bytes,
+        }
     }
 }
 
@@ -342,11 +360,15 @@ impl Draft {
         let mut writer = XmlSink::new(output_len, self.limits.max_output_bytes)?;
         emit_document(&self, &source_ids, &mut writer)?;
         let bytes = Arc::new(writer.finish());
-        let document = read_shared(Arc::clone(&bytes))?;
+        let document = read_shared(Arc::clone(&bytes), self.limits.codec_limits())?;
         self.compare_readback(document.metadata())?;
         self.compare_trace_bytes(&document)?;
         let metadata = document.metadata().clone();
-        Ok(Prepared { bytes, metadata })
+        Ok(Prepared {
+            bytes,
+            metadata,
+            limits: self.limits,
+        })
     }
 
     fn validate_records(&self) -> Result<Vec<Option<Box<str>>>> {
@@ -612,6 +634,7 @@ fn authored_brush_value_matches(name: &BrushPropertyName, expected: &str, actual
 pub struct Prepared {
     bytes: Arc<Vec<u8>>,
     metadata: Metadata,
+    limits: AuthoringLimits,
 }
 
 impl Prepared {
@@ -655,7 +678,7 @@ impl Prepared {
             ));
         }
         preflight_import_limits(bytes, limits)?;
-        let metadata = read_metadata(bytes)?;
+        let metadata = read_metadata(bytes, limits.codec_limits())?;
         validate_import_metadata_limits(&metadata, limits)?;
         let draft = import_canonical_draft(bytes, &metadata, limits)?;
         let prepared = draft.finish()?;
@@ -679,6 +702,12 @@ impl Prepared {
         &self.metadata
     }
 
+    /// Borrow the policy retained from admission or authoring.
+    #[must_use]
+    pub const fn limits(&self) -> AuthoringLimits {
+        self.limits
+    }
+
     /// Clone the immutable source allocation for an existing shared reader or
     /// an OPC part owner.
     #[must_use]
@@ -693,7 +722,7 @@ impl Prepared {
     /// Returns an error if the immutable prepared bytes no longer satisfy the
     /// shared bounded reader.  The bytes cannot be changed through this type.
     pub fn readback(&self) -> Result<Document> {
-        read_shared(Arc::clone(&self.bytes))
+        read_shared(Arc::clone(&self.bytes), self.limits.codec_limits())
     }
 }
 

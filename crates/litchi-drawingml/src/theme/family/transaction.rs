@@ -23,7 +23,7 @@ impl Package {
     /// Validation precedes the source copy. Already shared callers can use
     /// [`Self::from_shared_xml`] to retain their existing allocation.
     pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        let value = codec::read(xml.as_ref())?;
+        let value = codec::read(xml.as_ref(), codec::Limits::DEFAULT)?;
         let source = value.source_state().ok_or_else(|| {
             Error::Invalid("theme family reader did not retain its source".into())
         })?;
@@ -33,7 +33,7 @@ impl Package {
 
     /// Parse and retain an already shared Theme Family fragment allocation.
     pub fn from_shared_xml(xml: Arc<[u8]>) -> Result<Self> {
-        let value = codec::read_shared(Arc::clone(&xml))?;
+        let value = codec::read_shared(Arc::clone(&xml), codec::Limits::DEFAULT)?;
         Ok(Self { xml, value })
     }
 
@@ -42,7 +42,7 @@ impl Package {
     /// Detached values use canonical XML. Parsed values retain their source
     /// and apply any staged scalar changes without discarding opaque markup.
     pub fn new(value: Family) -> Result<Self> {
-        let xml = codec::write(&value)?;
+        let xml = codec::write(&value, codec::Limits::DEFAULT)?;
         Self::from_xml(xml)
     }
 
@@ -139,7 +139,7 @@ impl Edit {
         if source_value.variant_id() != self.staged.variant_id() {
             source_value.set_variant_id(self.staged.variant_id().as_str())?;
         }
-        let xml = codec::write(&source_value)?;
+        let xml = codec::write(&source_value, codec::Limits::DEFAULT)?;
         let package = Package::from_xml(xml)?;
         if package.value() != &self.staged {
             return Err(Error::Invalid(

@@ -153,14 +153,14 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Parse a complete Theme part and retain its source bytes.
-    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        read(xml.as_ref())
+    pub fn from_xml(xml: impl AsRef<[u8]>, limits: Limits) -> Result<Self> {
+        read(xml.as_ref(), limits)
     }
 
     /// Parse a complete Theme part while retaining an existing source
     /// allocation.
-    pub fn from_shared_xml(xml: Arc<[u8]>) -> Result<Self> {
-        read_shared(xml)
+    pub fn from_shared_xml(xml: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        read_shared(xml, limits)
     }
 
     /// Borrow the exact source XML.
@@ -255,10 +255,11 @@ impl Snapshot {
 }
 
 /// Parse a complete DrawingML Theme part.
-pub fn read(xml: &[u8]) -> Result<Snapshot> {
+pub fn read(xml: &[u8], limits: Limits) -> Result<Snapshot> {
+    let limits = limits.validate()?;
     // Validate the borrowed input before allocating the retained source.
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
     let (family, owner) = parse_candidate(xml, &scanned)?;
@@ -270,9 +271,14 @@ pub fn read(xml: &[u8]) -> Result<Snapshot> {
 }
 
 /// Parse a complete DrawingML Theme part from an existing source allocation.
-pub fn read_shared(source: Arc<[u8]>) -> Result<Snapshot> {
-    if source.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, source.len(), MAX_XML_BYTES));
+pub fn read_shared(source: Arc<[u8]>, limits: Limits) -> Result<Snapshot> {
+    let limits = limits.validate()?;
+    if source.len() > limits.max_xml_bytes {
+        return Err(limit(
+            LimitKind::XmlBytes,
+            source.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let scanned = scan(source.as_ref())?;
     let (family, owner) = parse_candidate(source.as_ref(), &scanned)?;
@@ -291,27 +297,30 @@ pub fn read_shared(source: Arc<[u8]>) -> Result<Snapshot> {
 /// Theme, the returned [`Family::source`] includes injected namespace
 /// declarations so the family codec can write a standalone value. Use
 /// [`family_range`] with the original Theme bytes for the exact raw span.
-pub fn read_family(xml: &[u8]) -> Result<Option<Family>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read_family(xml: &[u8], limits: Limits) -> Result<Option<Family>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
     parse_family(xml, &scanned)
 }
 
 /// Return the direct family owner span without copying the complete part.
-pub fn family_range(xml: &[u8]) -> Result<Option<Range<usize>>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn family_range(xml: &[u8], limits: Limits) -> Result<Option<Range<usize>>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     Ok(scan(xml)?.candidate.map(|candidate| candidate.family_range))
 }
 
 /// Return the profile of the direct recognized family owner without copying
 /// the complete part.
-pub fn family_profile(xml: &[u8]) -> Result<Option<ExtensionProfile>> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn family_profile(xml: &[u8], limits: Limits) -> Result<Option<ExtensionProfile>> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
     let scanned = scan(xml)?;
     Ok(scanned
@@ -564,7 +573,7 @@ fn only_xml_whitespace(xml: &[u8]) -> Result<bool> {
             Event::Text(value) if is_xml_whitespace(value.as_ref()) => {},
             Event::CData(value) if is_xml_whitespace(value.as_ref()) => {},
             Event::GeneralRef(value)
-                if family_codec::validate_general_ref(&value)?
+                if family_codec::validate_general_ref(&value, family_codec::Limits::DEFAULT)?
                     .is_some_and(is_xml_whitespace_character) => {},
             Event::Eof => return Ok(true),
             _ => return Ok(false),
@@ -683,7 +692,7 @@ fn parse_family(xml: &[u8], scanned: &Scanned) -> Result<Option<Family>> {
         return Ok(None);
     };
     let decorated = decorate_family(xml, candidate)?;
-    let family = family_codec::read(&decorated)?;
+    let family = family_codec::read(&decorated, family_codec::Limits::DEFAULT)?;
     Ok(Some(family))
 }
 
@@ -1007,7 +1016,8 @@ fn scan(xml: &[u8]) -> Result<Scanned> {
                 if !root_seen || root_closed {
                     return Err(invalid("Theme XML has a reference outside its root"));
                 }
-                let character = family_codec::validate_general_ref(&reference)?;
+                let character =
+                    family_codec::validate_general_ref(&reference, family_codec::Limits::DEFAULT)?;
                 if element_only_context(&stack, &extensions)
                     && !character.is_some_and(is_xml_whitespace_character)
                 {
@@ -1648,7 +1658,7 @@ fn decorate_family(source: &[u8], candidate: &Candidate) -> Result<Vec<u8>> {
 }
 
 fn family_child_bytes(family: &Family, inherited: &[Binding]) -> Result<Vec<u8>> {
-    let mut bytes = family_codec::write(family)?;
+    let mut bytes = family_codec::write(family, family_codec::Limits::DEFAULT)?;
     // A UTF-8 BOM frames a standalone XML document; it is not character data
     // that can be embedded between extension elements. Strip only the exact
     // leading BOM after the fragment codec has validated the source.
@@ -1751,7 +1761,7 @@ fn inherited_namespace_removal_ranges(
 }
 
 fn family_child_len(family: &Family, inherited: &[Binding], max_xml_bytes: usize) -> Result<usize> {
-    let mut length = family_codec::serialized_len(family)?;
+    let mut length = family_codec::serialized_len(family, family_codec::Limits::DEFAULT)?;
     // The standalone intermediate must also fit the caller's cap.
     if length > max_xml_bytes {
         return Err(limit(LimitKind::XmlBytes, length, max_xml_bytes));

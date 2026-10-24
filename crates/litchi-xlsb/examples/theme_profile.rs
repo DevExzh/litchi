@@ -650,7 +650,12 @@ fn run_transaction_sample(fixture: &Fixture, case: Case) -> Result<Sample> {
 }
 
 fn observe(theme: &Theme) -> Result<ThemeObservation> {
-    let encoded = codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+    let encoded = codec::encode_part(
+        &theme.name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::DEFAULT,
+    )?;
     Ok(ThemeObservation {
         semantic_digest: digest_bytes(0xcbf29ce484222325, &encoded),
         metadata_digest: metadata_digest(theme),

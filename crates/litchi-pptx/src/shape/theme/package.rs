@@ -39,7 +39,7 @@ pub(crate) fn add(
     fonts: &FontSet,
 ) -> Result<Authored> {
     let uri = next_part_uri(package, "/ppt/theme/theme", ".xml")?;
-    let xml = codec::encode_part(name, colors, fonts)?;
+    let xml = codec::encode_part(name, colors, fonts, codec::Limits::DEFAULT)?;
     refuse_signed_change(package)?;
     package.add_part(Box::new(BlobPart::new(
         uri.clone(),
@@ -100,7 +100,10 @@ pub(crate) fn attach(
 pub fn load(package: &OpcPackage, theme_name: &str) -> Result<Theme> {
     let uri = uri(theme_name, "theme part")?;
     require_type(package, &uri, ct::OFC_THEME)?;
-    Ok(codec::read(package.get_part(&uri)?.blob())?)
+    Ok(codec::read(
+        package.get_part(&uri)?.blob(),
+        codec::Limits::DEFAULT,
+    )?)
 }
 
 /// Read the permissive summary view used by producer-facing theme inspection.
@@ -137,9 +140,10 @@ pub(crate) fn put_colors(
     let patched = codec::replace_scheme(
         &original,
         b"clrScheme",
-        &codec::encode_palette_fragment(colors)?,
+        &codec::encode_palette_fragment(colors, codec::Limits::DEFAULT)?,
+        codec::Limits::DEFAULT,
     )?;
-    if codec::read(&patched)?.colors != *colors {
+    if codec::read(&patched, codec::Limits::DEFAULT)?.colors != *colors {
         return Err(invalid("color palette did not survive theme read-back"));
     }
     // A palette that patches to the stored bytes publishes nothing, so an
@@ -172,9 +176,10 @@ pub(crate) fn put_fonts(package: &mut OpcPackage, theme_name: &str, fonts: &Font
     let patched = codec::replace_scheme(
         &original,
         b"fontScheme",
-        &codec::encode_fonts_fragment(fonts)?,
+        &codec::encode_fonts_fragment(fonts, codec::Limits::DEFAULT)?,
+        codec::Limits::DEFAULT,
     )?;
-    if codec::read(&patched)?.fonts != *fonts {
+    if codec::read(&patched, codec::Limits::DEFAULT)?.fonts != *fonts {
         return Err(invalid("font set did not survive theme read-back"));
     }
     // A font set that patches to the stored bytes publishes nothing, so an
@@ -210,7 +215,7 @@ pub(crate) fn put_override(
     if !matches!(parent.content_type(), ct::PML_SLIDE | ct::PML_SLIDE_LAYOUT) {
         return Err(invalid("theme overrides attach only to slides and layouts"));
     }
-    let xml = codec::encode_override(value)?;
+    let xml = codec::encode_override(value, codec::Limits::DEFAULT)?;
     let existing = parent
         .rels()
         .iter()
@@ -221,14 +226,16 @@ pub(crate) fn put_override(
         // An override that encodes to the stored bytes publishes nothing, so
         // an exact no-op keeps a signed package byte for byte.
         if package.get_part(&target)?.blob() == xml.as_slice() {
-            if codec::read_override(&xml)? != *value {
+            if codec::read_override(&xml, codec::Limits::DEFAULT)? != *value {
                 return Err(invalid("theme override did not survive read-back"));
             }
             return Ok(target.to_string());
         }
         refuse_signed_change(package)?;
         package.get_part_mut(&target)?.set_blob(xml);
-        if codec::read_override(package.get_part(&target)?.blob())? != *value {
+        if codec::read_override(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)?
+            != *value
+        {
             return Err(invalid("theme override did not survive read-back"));
         }
         settle_unsigned_change(package)?;
@@ -245,7 +252,7 @@ pub(crate) fn put_override(
     package
         .get_part_mut(&parent_uri)?
         .relate_to(&reference, rt::THEME_OVERRIDE);
-    if codec::read_override(package.get_part(&target)?.blob())? != *value {
+    if codec::read_override(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)? != *value {
         return Err(invalid("theme override did not survive read-back"));
     }
     settle_unsigned_change(package)?;
@@ -271,6 +278,7 @@ pub fn load_override(package: &OpcPackage, parent_name: &str) -> Result<Option<O
     require_type(package, &target, ct::OFC_THEME_OVERRIDE)?;
     Ok(Some(codec::read_override(
         package.get_part(&target)?.blob(),
+        codec::Limits::DEFAULT,
     )?))
 }
 
@@ -340,7 +348,7 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
             }
             let target = theme.target_partname()?;
             require_type(package, &target, ct::OFC_THEME)?;
-            let _ = codec::read(package.get_part(&target)?.blob())?;
+            let _ = codec::read(package.get_part(&target)?.blob(), codec::Limits::DEFAULT)?;
         }
         if matches!(part.content_type(), ct::PML_SLIDE | ct::PML_SLIDE_LAYOUT) {
             for relationship in part.rels().iter().filter(|r| is_override_rel(r.reltype())) {
@@ -349,7 +357,10 @@ pub fn validate(package: &OpcPackage) -> Result<()> {
                 }
                 let target = relationship.target_partname()?;
                 require_type(package, &target, ct::OFC_THEME_OVERRIDE)?;
-                let _ = codec::read_override(package.get_part(&target)?.blob())?;
+                let _ = codec::read_override(
+                    package.get_part(&target)?.blob(),
+                    codec::Limits::DEFAULT,
+                )?;
             }
         }
     }

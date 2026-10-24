@@ -12,7 +12,7 @@ pub mod part;
 mod transaction;
 
 pub use crate::Error;
-pub use codec::{read, read_shared, write, write_to};
+pub use codec::{Limits, read, read_shared, write, write_to};
 pub use model::{Family, Guid, ValueError};
 pub use transaction::{Commit, Diagnostics, Edit, LimitKind, Package, Patch};
 

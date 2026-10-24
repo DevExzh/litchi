@@ -86,7 +86,8 @@ fn source() -> Vec<u8> {
 }
 
 fn profile() -> actions::Profile {
-    actions::read_profile(&source()).expect("valid source-backed action profile")
+    actions::read_profile(&source(), actions::Limits::DEFAULT)
+        .expect("valid source-backed action profile")
 }
 
 fn bare_action(id: &str, action_type: ActionType, start_time: &str) -> ActionDraft {
@@ -247,7 +248,7 @@ fn detached_builder_round_trips_ordered_children_and_opaque_payloads() {
 #[test]
 fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
     let original = source();
-    let profile = actions::read_profile(&original).expect("profile");
+    let profile = actions::read_profile(&original, actions::Limits::DEFAULT).expect("profile");
     let mut edit = Edit::from_profile(&profile, EditOptions::default()).expect("edit");
     let action = ActionSelector::ordinal(0);
     let data = DataSelector::Action { action, index: 0 };
@@ -309,7 +310,7 @@ fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
 #[test]
 fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
     let original = source();
-    let profile = actions::read_profile(&original).expect("profile");
+    let profile = actions::read_profile(&original, actions::Limits::DEFAULT).expect("profile");
     let mut identity = Edit::from_profile(&profile, EditOptions::default()).expect("edit");
     identity
         .set_action_id(ActionSelector::ordinal(0), "a0")
@@ -555,7 +556,8 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
 
 #[test]
 fn forward_and_inverse_moves_reorder_source_sequence() {
-    let initial = actions::read_profile(&ordered_source()).expect("ordered profile");
+    let initial = actions::read_profile(&ordered_source(), actions::Limits::DEFAULT)
+        .expect("ordered profile");
     let mut forward =
         Edit::from_profile(&initial, EditOptions::default()).expect("forward move edit");
     forward
@@ -829,7 +831,8 @@ fn scalar_control_references_have_exact_lengths_in_detached_and_source_edits() {
 #[test]
 fn source_selectors_remain_stable_across_removal_and_move() {
     let ordered = ordered_source();
-    let profile = actions::read_profile(&ordered).expect("ordered profile");
+    let profile =
+        actions::read_profile(&ordered, actions::Limits::DEFAULT).expect("ordered profile");
     let mut remove_then_edit =
         Edit::from_profile(&profile, EditOptions::default()).expect("remove edit");
     let first = ActionSelector::ordinal(0);
@@ -960,7 +963,8 @@ fn removing_an_action_referenced_by_data_is_refused() {
         .expect("source UTF-8")
         .replace("ref=\"#d1\"", "ref=\"#a1\"")
         .into_bytes();
-    let profile = actions::read_profile(&referenced_source).expect("referenced profile");
+    let profile = actions::read_profile(&referenced_source, actions::Limits::DEFAULT)
+        .expect("referenced profile");
     let mut edit = Edit::from_profile(&profile, EditOptions::default()).expect("referenced edit");
     edit.remove_action(ActionSelector::ordinal(1))
         .expect("queue referenced action removal");
@@ -995,7 +999,8 @@ fn removing_a_referenced_data_group_id_is_refused() {
         .expect("source UTF-8")
         .replace("ref=\"#d1\"", "ref=\"#dg0\"")
         .into_bytes();
-    let profile = actions::read_profile(&referenced_source).expect("referenced group profile");
+    let profile = actions::read_profile(&referenced_source, actions::Limits::DEFAULT)
+        .expect("referenced group profile");
     let mut edit =
         Edit::from_profile(&profile, EditOptions::default()).expect("group removal edit");
     edit.remove_data_group(ChildSelector::DataGroup {
@@ -1012,7 +1017,8 @@ fn changed_edits_refuse_duplicate_ids_but_exact_no_op_replays() {
         .expect("source UTF-8")
         .replace("xml:id=\"d2\"", "xml:id=\"d1\"")
         .into_bytes();
-    let profile = actions::read_profile(&duplicate_source).expect("duplicate-id profile");
+    let profile = actions::read_profile(&duplicate_source, actions::Limits::DEFAULT)
+        .expect("duplicate-id profile");
     let property = ChildSelector::Property {
         action: ActionSelector::ordinal(0),
         index: 0,
@@ -1078,7 +1084,8 @@ fn aggregate_existing_and_added_records_are_bounded() {
 #[test]
 fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewriting() {
     let alias_source = alias_only_source();
-    let alias_profile = actions::read_profile(&alias_source).expect("alias-only profile");
+    let alias_profile =
+        actions::read_profile(&alias_source, actions::Limits::DEFAULT).expect("alias-only profile");
     let mut alias_edit =
         Edit::from_profile(&alias_profile, EditOptions::default()).expect("alias-only edit");
     alias_edit
@@ -1096,7 +1103,8 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
     assert_eq!(alias_commit.package().profile().actions().count(), 2);
 
     let self_closing_profile =
-        actions::read_profile(&self_closing_source()).expect("self-closing profile");
+        actions::read_profile(&self_closing_source(), actions::Limits::DEFAULT)
+            .expect("self-closing profile");
     let mut first_action_edit = Edit::from_profile(&self_closing_profile, EditOptions::default())
         .expect("self-closing action edit");
     first_action_edit
@@ -1170,8 +1178,8 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
     );
 
     let whitespace_source = whitespace_close_source();
-    let whitespace_profile =
-        actions::read_profile(&whitespace_source).expect("whitespace-close profile");
+    let whitespace_profile = actions::read_profile(&whitespace_source, actions::Limits::DEFAULT)
+        .expect("whitespace-close profile");
     let mut whitespace_edit =
         Edit::from_profile(&whitespace_profile, EditOptions::default()).expect("whitespace edit");
     whitespace_edit
@@ -1262,7 +1270,8 @@ fn group_and_data_group_metadata_edits_preserve_source_and_exact_no_ops() {
 #[test]
 fn adding_data_then_property_to_empty_action_preserves_schema_order_and_inverse() {
     let source = alias_only_source();
-    let profile = actions::read_profile(&source).expect("empty action profile");
+    let profile =
+        actions::read_profile(&source, actions::Limits::DEFAULT).expect("empty action profile");
     let action = ActionSelector::ordinal(0);
     let mut edit = Edit::from_profile(&profile, EditOptions::default()).expect("empty action edit");
     edit.add_data(action, ActionDataDraft::new())

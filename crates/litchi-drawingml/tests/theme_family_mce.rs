@@ -220,13 +220,13 @@ fn mce_owners_are_opaque_and_all_shared_mutations_refuse_without_source_change()
         .expect("valid incoming family");
 
     for (label, source) in hidden_mce_cases() {
-        let snapshot = part::read(&source).expect(label);
+        let snapshot = part::read(&source, part::Limits::DEFAULT).expect(label);
         assert!(
             snapshot.family().is_none(),
             "{label}: hidden family projected"
         );
         assert!(
-            part::read_family(&source)
+            part::read_family(&source, part::Limits::DEFAULT)
                 .expect("read optional hidden projection")
                 .is_none(),
             "{label}: hidden family projected by borrowed helper"
@@ -288,7 +288,7 @@ fn escaped_mce_owners_refuse_every_shared_mutation() {
     let escaped = r#"xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;""#;
     for (label, source) in hidden_mce_cases() {
         let source = replace_bytes(&source, literal.as_bytes(), escaped.as_bytes());
-        if let Ok(snapshot) = part::read(&source) {
+        if let Ok(snapshot) = part::read(&source, part::Limits::DEFAULT) {
             assert!(
                 snapshot.family().is_none(),
                 "{label}: hidden family projected"
@@ -351,7 +351,7 @@ fn foreign_wrapper_mce_theme() -> Vec<u8> {
 fn foreign_wrapper_mce_family_stays_opaque_while_direct_owner_can_be_added() {
     let source = foreign_wrapper_mce_theme();
     let opaque_wrapper = enclosed_bytes(&source, b"<x:wrapper>", b"</x:wrapper>");
-    let snapshot = part::read(&source).expect("foreign wrapper Theme");
+    let snapshot = part::read(&source, part::Limits::DEFAULT).expect("foreign wrapper Theme");
     assert!(snapshot.family().is_none());
 
     let incoming = family::Family::new("Fresh Direct Family", OFFICE_ID, OFFICE_VID)
@@ -359,7 +359,8 @@ fn foreign_wrapper_mce_family_stays_opaque_while_direct_owner_can_be_added() {
     let added = snapshot
         .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI, part::Limits::DEFAULT)
         .expect("foreign wrapper must not block direct owner");
-    let added_snapshot = part::read(&added).expect("read direct owner after insertion");
+    let added_snapshot =
+        part::read(&added, part::Limits::DEFAULT).expect("read direct owner after insertion");
     assert_eq!(
         added_snapshot.family().expect("direct owner").name(),
         "Fresh Direct Family"
@@ -377,7 +378,7 @@ fn foreign_wrapper_mce_family_stays_opaque_while_direct_owner_can_be_added() {
         "removing direct owner must restore opaque source"
     );
     assert!(
-        part::read(&removed)
+        part::read(&removed, part::Limits::DEFAULT)
             .expect("read restored source")
             .family()
             .is_none()
@@ -404,7 +405,7 @@ fn foreign_uri_mce_theme() -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn foreign_uri_mce_family_and_lookalike_remain_opaque_around_direct_owner() {
     let (source, foreign_payload) = foreign_uri_mce_theme();
-    let snapshot = part::read(&source).expect("foreign URI Theme");
+    let snapshot = part::read(&source, part::Limits::DEFAULT).expect("foreign URI Theme");
     assert!(snapshot.family().is_none());
 
     let incoming = family::Family::new("Fresh Direct Family", OFFICE_ID, OFFICE_VID)
@@ -416,7 +417,7 @@ fn foreign_uri_mce_family_and_lookalike_remain_opaque_around_direct_owner() {
         part::Limits::DEFAULT,
     )
     .expect("foreign URI must not block direct owner");
-    let added_snapshot = part::read(&added).expect("read direct owner");
+    let added_snapshot = part::read(&added, part::Limits::DEFAULT).expect("read direct owner");
     assert_eq!(
         added_snapshot.family().expect("direct owner").name(),
         "Fresh Direct Family"
@@ -434,7 +435,7 @@ fn foreign_uri_mce_family_and_lookalike_remain_opaque_around_direct_owner() {
         "foreign URI payload must survive inverse edit"
     );
     assert!(
-        part::read(&removed)
+        part::read(&removed, part::Limits::DEFAULT)
             .expect("read foreign source")
             .family()
             .is_none()

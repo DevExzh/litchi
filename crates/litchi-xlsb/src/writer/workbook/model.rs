@@ -115,7 +115,12 @@ impl Builder {
     /// The Theme is validated and encoded only after the complete typed model
     /// is supplied; failed validation leaves the writer unchanged.
     pub fn set_theme(&mut self, theme: crate::theme::Theme) -> Result<&mut Self> {
-        litchi_drawingml::theme::codec::encode_part(&theme.name, &theme.colors, &theme.fonts)?;
+        litchi_drawingml::theme::codec::encode_part(
+            &theme.name,
+            &theme.colors,
+            &theme.fonts,
+            litchi_drawingml::theme::codec::Limits::DEFAULT,
+        )?;
         self.theme = Some(theme);
         Ok(self)
     }
