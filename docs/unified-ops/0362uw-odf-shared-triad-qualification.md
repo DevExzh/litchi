@@ -51,7 +51,9 @@ only permitted member-level differences are the manifest member's XML text,
 content hash/length, compressed length and CRC; raw names, flags, compression
 options, version fields, attributes, extra fields, timestamps, comments,
 permissions, encryption and archive records must remain equal. The runner
-checks these nested identities instead of trusting the summary booleans. In the observed pair the native
+recomputes each ordered `manifest:full-path` sequence (excluding `/`) against
+the corresponding archive payload order and checks all three order flags,
+rather than trusting summary booleans. In the observed pair the native
 order is `mimetype,content.xml,meta.xml,META-INF/manifest.xml` and the facade
 order is `mimetype,meta.xml,content.xml,META-INF/manifest.xml`. The member
 audit also compares raw names, decompressed bytes and hashes, CRC/compressed

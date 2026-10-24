@@ -83,10 +83,16 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                     "ordered_entries": [[
                         ["manifest:full-path", "/"],
                         ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ], [
+                        ["manifest:full-path", "meta.xml"],
+                        ["manifest:media-type", "text/xml"],
                     ]],
                     "normalized_entries": [[
                         ["manifest:full-path", "/"],
                         ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ], [
+                        ["manifest:full-path", "meta.xml"],
+                        ["manifest:media-type", "text/xml"],
                     ]],
                     "other_events": [],
                 },
@@ -95,10 +101,16 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                     "ordered_entries": [[
                         ["manifest:full-path", "/"],
                         ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ], [
+                        ["manifest:full-path", "meta.xml"],
+                        ["manifest:media-type", "text/xml"],
                     ]],
                     "normalized_entries": [[
                         ["manifest:full-path", "/"],
                         ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ], [
+                        ["manifest:full-path", "meta.xml"],
+                        ["manifest:media-type", "text/xml"],
                     ]],
                     "other_events": [],
                 },
@@ -331,23 +343,27 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
                     "root_attributes": [["manifest:version", "1.0"]],
                     "ordered_entries": [
                         [["manifest:full-path", "/"]],
+                        [["manifest:full-path", "meta.xml"]],
                         [["manifest:full-path", "content.xml"]],
                     ],
                     "normalized_entries": [
                         [["manifest:full-path", "/"]],
                         [["manifest:full-path", "content.xml"]],
+                        [["manifest:full-path", "meta.xml"]],
                     ],
                     "other_events": [],
                 },
                 "facade_manifest_semantics": {
                     "root_attributes": [["manifest:version", "1.0"]],
                     "ordered_entries": [
-                        [["manifest:full-path", "content.xml"]],
                         [["manifest:full-path", "/"]],
+                        [["manifest:full-path", "content.xml"]],
+                        [["manifest:full-path", "meta.xml"]],
                     ],
                     "normalized_entries": [
                         [["manifest:full-path", "/"]],
                         [["manifest:full-path", "content.xml"]],
+                        [["manifest:full-path", "meta.xml"]],
                     ],
                     "other_events": [],
                 },
@@ -388,6 +404,33 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
         row["paired"]["changed_output_sha256"] = "4" * 64
         row["paired"]["facade_changed_output_sha256"] = "5" * 64
         runner.validate_probe_output(self.manifest, payload)
+
+        broken = copy.deepcopy(payload)
+        broken_audit = broken["families"][3]["paired"]["archive_audit"]
+        broken_audit["leaf_manifest_semantics"]["ordered_entries"] = [
+            [["manifest:full-path", "/"]],
+            [["manifest:full-path", "content.xml"]],
+            [["manifest:full-path", "meta.xml"]],
+        ]
+        broken_audit["facade_manifest_semantics"]["ordered_entries"] = [
+            [["manifest:full-path", "/"]],
+            [["manifest:full-path", "meta.xml"]],
+            [["manifest:full-path", "content.xml"]],
+        ]
+        normalized = [
+            [["manifest:full-path", "/"]],
+            [["manifest:full-path", "content.xml"]],
+            [["manifest:full-path", "meta.xml"]],
+        ]
+        broken_audit["leaf_manifest_semantics"]["normalized_entries"] = copy.deepcopy(normalized)
+        broken_audit["facade_manifest_semantics"]["normalized_entries"] = copy.deepcopy(normalized)
+        with self.assertRaisesRegex(runner.RunnerError, "leaf_manifest_tracks_order must be false"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["leaf_manifest_tracks_order"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "leaf_manifest_tracks_order must be true"):
+            runner.validate_probe_output(self.manifest, broken)
 
         audit["members"][2]["facade"]["flags"] = 1
         with self.assertRaisesRegex(runner.RunnerError, "unadmitted fields"):

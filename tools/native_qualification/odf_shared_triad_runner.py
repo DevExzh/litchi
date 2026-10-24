@@ -591,6 +591,20 @@ def _validate_archive_member_pair(
         raise RunnerError(f"{label} ZIP identity differs in unadmitted fields: {sorted(unexpected)}")
 
 
+def _manifest_paths(semantics: Mapping[str, Any], *, include_root: bool) -> list[str]:
+    paths = [
+        next(value for key, value in entry if key == "manifest:full-path")
+        for entry in semantics["ordered_entries"]
+    ]
+    if include_root:
+        return paths
+    return [path for path in paths if path != "/"]
+
+
+def _archive_payload_order(order: list[str]) -> list[str]:
+    return [name for name in order if name not in {"mimetype", "META-INF/manifest.xml"}]
+
+
 def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
     if audit.get("status") != "audited" or audit.get("allowed") is not True:
         raise RunnerError(f"{label}.archive_audit is not an allowed audit")
@@ -635,15 +649,6 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         if leaf_semantics[key] != facade_semantics[key]:
             raise RunnerError(f"{label}.archive_audit manifest {key} differs")
     ordered_equal = leaf_semantics["ordered_entries"] == facade_semantics["ordered_entries"]
-    for key, expected in (
-        ("manifest_listing_tracks_order", decision != "archive_member_order_and_manifest_listing"),
-        ("leaf_manifest_tracks_order", True),
-        ("facade_manifest_tracks_order", True),
-        ("archive_member_order_and_manifest_listing", decision == "archive_member_order_and_manifest_listing"),
-    ):
-        _require_bool(audit, key, expected, f"{label}.archive_audit")
-    _require_bool(audit, "member_order_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
-    _require_bool(audit, "non_meta_content_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
     differences = audit.get("content_differences")
     expected_differences = {
         "byte_exact": [],
@@ -668,8 +673,39 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         raise RunnerError(f"{label}.archive_audit member orders contain duplicates")
     if set(leaf_order) != set(facade_order):
         raise RunnerError(f"{label}.archive_audit member names differ")
+    leaf_manifest_paths = _manifest_paths(leaf_semantics, include_root=True)
+    facade_manifest_paths = _manifest_paths(facade_semantics, include_root=True)
+    leaf_manifest_payload_paths = _manifest_paths(leaf_semantics, include_root=False)
+    facade_manifest_payload_paths = _manifest_paths(facade_semantics, include_root=False)
+    actual_manifest_listing_tracks_order = leaf_manifest_paths == facade_manifest_paths
+    actual_leaf_manifest_tracks_order = leaf_manifest_payload_paths == _archive_payload_order(leaf_order)
+    actual_facade_manifest_tracks_order = facade_manifest_payload_paths == _archive_payload_order(facade_order)
+    for key, actual in (
+        ("manifest_listing_tracks_order", actual_manifest_listing_tracks_order),
+        ("leaf_manifest_tracks_order", actual_leaf_manifest_tracks_order),
+        ("facade_manifest_tracks_order", actual_facade_manifest_tracks_order),
+    ):
+        _require_bool(audit, key, actual, f"{label}.archive_audit")
+    _require_bool(
+        audit,
+        "archive_member_order_and_manifest_listing",
+        decision == "archive_member_order_and_manifest_listing",
+        f"{label}.archive_audit",
+    )
+    _require_bool(
+        audit,
+        "member_order_exact",
+        decision != "archive_member_order_and_manifest_listing",
+        f"{label}.archive_audit",
+    )
+    _require_bool(
+        audit,
+        "non_meta_content_exact",
+        decision != "archive_member_order_and_manifest_listing",
+        f"{label}.archive_audit",
+    )
     if decision == "archive_member_order_and_manifest_listing":
-        if leaf_order == facade_order:
+        if leaf_order == facade_order or not actual_leaf_manifest_tracks_order or not actual_facade_manifest_tracks_order:
             raise RunnerError(f"{label}.archive_audit order-only decision has no order difference")
     elif leaf_order != facade_order:
         raise RunnerError(f"{label}.archive_audit non-order decision has an order difference")
