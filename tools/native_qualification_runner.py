@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import errno
 import fcntl
 import hashlib
 import json
@@ -96,6 +97,10 @@ _TOKEN = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 
 class RunnerError(RuntimeError):
     """A fail-closed manifest, guard, or child-command error."""
+
+
+class ProcMonitorError(RunnerError):
+    """The process monitor could not establish a trustworthy /proc scan."""
 
 
 def _now() -> str:
@@ -1322,28 +1327,48 @@ def _build_phase_identity(
     raise RunnerError(f"phase {phase_id!r} is not an admitted manifest build entry")
 
 
-def _read_proc(pid: int) -> dict[str, Any] | None:
+def _read_proc(pid: int, *, allow_restricted_metadata: bool = False) -> dict[str, Any] | None:
     proc = Path("/proc") / str(pid)
     try:
         comm = (proc / "comm").read_text(encoding="utf-8", errors="replace").strip()
         cmdline = (proc / "cmdline").read_bytes().split(b"\0")
         cmdline = [part.decode("utf-8", "replace") for part in cmdline if part]
-        exe = os.readlink(proc / "exe")
-        cwd = os.readlink(proc / "cwd")
         stat = (proc / "stat").read_text(encoding="utf-8", errors="replace")
-    except (FileNotFoundError, PermissionError, OSError):
-        return None
+    except OSError as error:
+        # A process can disappear between the directory enumeration and any
+        # one of these reads.  Only those two kernel errors mean the identity
+        # is expected to be gone; permission, I/O, and filesystem failures
+        # invalidate the whole ownership scan and must fail closed.
+        if error.errno in (errno.ENOENT, errno.ESRCH):
+            return None
+        raise ProcMonitorError(f"cannot inspect /proc/{pid}: {error}") from error
+    restricted_metadata: list[str] = []
+    for name in ("exe", "cwd"):
+        try:
+            value = os.readlink(proc / name)
+        except OSError as error:
+            if error.errno in (errno.ENOENT, errno.ESRCH):
+                return None
+            if allow_restricted_metadata and error.errno in (errno.EACCES, errno.EPERM):
+                value = ""
+                restricted_metadata.append(name)
+            else:
+                raise ProcMonitorError(f"cannot inspect /proc/{pid}/{name}: {error}") from error
+        if name == "exe":
+            exe = value
+        else:
+            cwd = value
     right = stat.rsplit(") ", 1)
     if len(right) != 2:
-        return None
+        raise ProcMonitorError(f"malformed /proc/{pid}/stat")
     fields = right[1].split()
     try:
         parent = int(fields[1])
         process_group = int(fields[2])
         starttime = fields[19]
-    except (IndexError, ValueError):
-        return None
-    return {
+    except (IndexError, ValueError) as error:
+        raise ProcMonitorError(f"malformed /proc/{pid}/stat fields") from error
+    entry = {
         "pid": pid,
         "ppid": parent,
         "pgrp": process_group,
@@ -1353,6 +1378,9 @@ def _read_proc(pid: int) -> dict[str, Any] | None:
         "cwd": cwd,
         "cmdline": cmdline,
     }
+    if restricted_metadata:
+        entry["restricted_metadata"] = restricted_metadata
+    return entry
 
 
 _SUBREAPER_ENABLED = False
@@ -1428,11 +1456,20 @@ def _proc_snapshot() -> dict[int, dict[str, Any]]:
     entries: dict[int, dict[str, Any]] = {}
     try:
         pids = [int(item.name) for item in Path("/proc").iterdir() if item.name.isdigit()]
-    except OSError:
-        return entries
+    except OSError as error:
+        raise ProcMonitorError(f"cannot enumerate /proc: {error}") from error
     for pid in pids:
-        entry = _read_proc(pid)
+        entry = _read_proc(pid, allow_restricted_metadata=True)
         if entry is not None:
+            # ``comm``, the full decoded ``cmdline``, and ``stat`` remain
+            # readable when only exe/cwd are restricted.  These fields prove
+            # that an opaque entry is neither a heavy executable nor a
+            # Litchi-scoped command; otherwise even partial metadata is a
+            # monitoring failure rather than an allow-list shortcut.
+            if entry.get("restricted_metadata") and (_is_heavy(entry) or _in_litchi_scope(entry)):
+                raise ProcMonitorError(
+                    f"cannot establish complete process identity for relevant /proc/{pid}"
+                )
             entries[pid] = entry
     return entries
 
@@ -2690,6 +2727,12 @@ class SafeRunner:
         rejected_descendants: set[int] = set()
         leader_record = owned.get(process_pid)
         leader_entry = snapshot.get(process_pid)
+        if leader_record is None:
+            # Without the leader's exact spawn identity, a child seen under
+            # the runner could belong to a replacement process.  Refuse to
+            # admit any part of that unproven subtree rather than treating an
+            # empty/partial initial scan as ownership evidence.
+            raise RunnerError(f"cannot establish owned leader identity for pid {process_pid}")
         # Never walk a PID whose exact start time is not the one captured at
         # spawn.  If the leader PID has been reused, its current descendants
         # belong to the replacement process and are foreign to this command.
@@ -3036,9 +3079,14 @@ class SafeRunner:
                     preexec_fn=self._preexec(),
                 )
                 process_entry = _read_proc(process.pid)
-                if process_entry is not None:
+                if process_entry is None:
+                    runner_error = f"cannot establish leader process identity for pid {process.pid}"
+                    if process.poll() is None:
+                        self._terminate(process)
+                    returncode = process.returncode
+                else:
                     owned[process.pid] = _process_record(process_entry)
-                if overlap is not None:
+                if runner_error is None and overlap is not None:
                     try:
                         overlap.bind_child(
                             process,
@@ -3052,7 +3100,7 @@ class SafeRunner:
                         runner_error = f"overlap child binding failed at {event_id}: {error}"
                         self._terminate(process)
                         returncode = process.returncode
-                if self.process_observer is not None:
+                if runner_error is None and self.process_observer is not None:
                     try:
                         process_observation = self.process_observer.process_started(
                             event_id=event_id,
@@ -3110,6 +3158,11 @@ class SafeRunner:
                             if now - last_target_check >= 1.0:
                                 self._check_target(target)
                                 last_target_check = now
+                        except ProcMonitorError as error:
+                            runner_error = str(error)
+                            self._terminate(process)
+                            returncode = process.returncode
+                            break
                         except RunnerError as error:
                             # The child can exit between poll() above and
                             # the lease/guard snapshot.  In that narrow

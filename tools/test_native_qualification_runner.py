@@ -952,6 +952,58 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "unrelated Litchi"):
                 runner.ProcessGuard().require_quiet()
 
+    def test_proc_monitor_distinguishes_gone_process_from_scan_failure(self) -> None:
+        with mock.patch.object(
+            Path,
+            "read_text",
+            side_effect=FileNotFoundError(runner.errno.ENOENT, "gone"),
+        ):
+            self.assertIsNone(runner._read_proc(991981))
+        with mock.patch.object(
+            Path,
+            "read_text",
+            side_effect=PermissionError(runner.errno.EACCES, "denied"),
+        ):
+            with self.assertRaisesRegex(runner.ProcMonitorError, "cannot inspect /proc/991982"):
+                runner._read_proc(991982)
+        with mock.patch.object(
+            Path,
+            "iterdir",
+            side_effect=PermissionError(runner.errno.EACCES, "denied"),
+        ):
+            with self.assertRaisesRegex(runner.ProcMonitorError, "cannot enumerate /proc"):
+                runner._proc_snapshot()
+
+    def test_owned_record_rejects_unproved_leader_subtree(self) -> None:
+        def entry(pid: int, ppid: int, starttime: str) -> dict[str, object]:
+            return {
+                "pid": pid,
+                "ppid": ppid,
+                "pgrp": pid,
+                "starttime": starttime,
+                "comm": "cargo",
+                "exe": "/usr/bin/cargo",
+                "cwd": str(ROOT),
+                "cmdline": ["cargo", "build"],
+            }
+
+        snapshot = {
+            1: entry(1, 0, "runner"),
+            10: entry(10, 1, "replacement-leader"),
+            20: entry(20, 10, "unproved-child"),
+        }
+        owned: dict[int, dict[str, object]] = {}
+        with self.assertRaisesRegex(runner.RunnerError, "cannot establish owned leader identity"):
+            runner.SafeRunner._record_owned_processes(
+                snapshot,
+                process_pid=10,
+                runner_pid=1,
+                preexisting={},
+                owned=owned,
+                pid_reuse=[],
+            )
+        self.assertNotIn(20, owned)
+
     def test_compile_only_manifest_rejects_non_build_command(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-command-") as directory:
             root = Path(directory)
