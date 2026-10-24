@@ -14,8 +14,8 @@ success/failure, missing-control-group and cgroup-read errors, CPU/argv
 launcher mutation, exact launcher file limits, a fake no-argument launcher,
 escaped-child cleanup, unreadable-cgroup cleanup, analyzer-group cleanup,
 separate-session cgroup-child cleanup, transient-scope GC, analyzer exit
-and observed outside-scope-child paths, and the cgroup/deadline command.
-They ran as twenty-two
+and observed outside-scope-child paths, the real user-systemd GC shape, and
+the cgroup/deadline command.  They ran as twenty-three
 tests with:
 
 ```text
@@ -24,11 +24,11 @@ python3 -m unittest -v tools.test_w8_quiet_abba
 
 The existing registered W8 policy module imports the same test case, so the
 current gate invocation `python3 -m unittest tools.test_w8_projection_policy`
-executes all twenty-two wrapper tests (39 tests total in that module); no frozen gate
+executes all twenty-three wrapper tests (40 tests total in that module); no frozen gate
 source or native runner is changed.
 
-The wrapper itself is 51,908 bytes with SHA-256
-`4bf3b018d568864b138d92afef04bfcd42e8f1ea97fd1f1e32224c983978b0d3`; the
+The wrapper itself is 52,090 bytes with SHA-256
+`2d1466a8c2825a97ab226b6178e5f2fe81d90424202069d17e0c012112e97df2`; the
 generated no-argument launcher is separately hashed into the run
 configuration before execution.
 
@@ -68,7 +68,7 @@ executes the frozen runner with five outer blocks and the recorded CPU.
 The systemd command recorded in the receipt is equivalent to:
 
 ```text
-systemd-run --user --scope --wait --unit=w8-file-abba-<RUN_ID>.scope
+systemd-run --user --scope --unit=w8-file-abba-<RUN_ID>.scope
   --property=MemoryAccounting=yes
   --property=MemoryMax=20000000000
   --property=MemorySwapMax=0
@@ -80,7 +80,9 @@ systemd-run --user --scope --wait --unit=w8-file-abba-<RUN_ID>.scope
 During the run the wrapper polls the transient unit, retains every observed
 status, `MemoryCurrent`, and `MemoryPeak` sample, kills the cgroup on aggregate-output or
 deadline breach, records the unit's process identities, and retains the last
-unit record even if systemd garbage-collects the scope.  The aggregate output
+unit record even if systemd garbage-collects the scope.  `--scope` is
+foreground-waiting on systemd 259, so the command intentionally omits the
+incompatible `--wait` option.  The aggregate output
 cap is 8 GiB across the entire ABBA output and TMP lifecycle tree, both during
 the native runner and after the analyzer.  It rejects any output or lifecycle
 file above the exact file limit, including a synthetic oversized
@@ -88,7 +90,10 @@ file above the exact file limit, including a synthetic oversized
 `MemoryPeak`, surviving cgroup members or observed descendants, and post-run
 forbidden processes.  `systemctl`/ControlGroup/cgroup-read errors are retained
 in the receipt and fail closed; the only tolerated post-run systemctl error is
-an explicitly recorded unit disappearance after a valid final sample.
+an explicitly recorded unit disappearance after a valid final sample.  The
+accepted systemd GC representation is exactly inactive/dead/success with an
+empty ControlGroup, `[not set]` MemoryCurrent/MemoryPeak, and omitted
+MainPID/ExecMainStatus; other incomplete property sets remain refusals.
 Every refusal writes
 `tmp/w8-quiet-abba-receipt.json`; successful and failed runs therefore have a
 raw receipt.  The final analyzer is invoked only after these checks and the

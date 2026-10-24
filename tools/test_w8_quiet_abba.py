@@ -231,6 +231,7 @@ class QuietAbbaWrapperTests(unittest.TestCase):
         self.assertIn("--property=MemorySwapMax=0", command)
         self.assertIn("--property=KillMode=control-group", command)
         self.assertIn("43200s", command)
+        self.assertNotIn("--wait", command)
         self.assertEqual(command[-1], "/external/w8-noarg-launcher.py")
         self.assertNotIn("file_w8_qualified_probe", " ".join(command))
 
@@ -324,11 +325,9 @@ class QuietAbbaWrapperTests(unittest.TestCase):
                 "    print('ActiveState=inactive')\n"
                 "    print('SubState=dead')\n"
                 "    print('Result=success')\n"
-                "    print('ExecMainStatus=0')\n"
-                "    print('MainPID=0')\n"
                 "    print('ControlGroup=')\n"
-                "    print('MemoryCurrent=0')\n"
-                "    print('MemoryPeak=1234')\n",
+                "    print('MemoryCurrent=[not set]')\n"
+                "    print('MemoryPeak=[not set]')\n",
                 encoding="utf-8",
             )
             systemctl.chmod(systemctl.stat().st_mode | stat.S_IXUSR)
@@ -342,6 +341,21 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             self.assertEqual(gone["ActiveState"], "inactive")
             self.assertEqual(gone["ControlGroup"], "")
             self.assertEqual(len(errors), 1)
+
+            incomplete = root / "fake-systemctl-incomplete-gc.py"
+            incomplete.write_text(
+                "#!/usr/bin/env python3\n"
+                "print('ActiveState=inactive')\n"
+                "print('SubState=dead')\n"
+                "print('ControlGroup=')\n"
+                "print('MemoryCurrent=[not set]')\n"
+                "print('MemoryPeak=[not set]')\n",
+                encoding="utf-8",
+            )
+            incomplete.chmod(incomplete.stat().st_mode | stat.S_IXUSR)
+            incomplete_value = wrapper.show_unit(incomplete, "w8-test.scope")
+            self.assertFalse(incomplete_value["available"])
+            self.assertEqual(incomplete_value["monitor_error_kind"], "schema")
 
             config = self._config(root / "checks")
             state = {
@@ -376,6 +390,50 @@ class QuietAbbaWrapperTests(unittest.TestCase):
                 )
             self.assertEqual(cleanup["errors"], [])
             self.assertFalse(kill_log.exists())
+
+    def test_actual_user_systemd_scope_gc_shape_without_native_runner(self) -> None:
+        systemd_run = Path("/usr/bin/systemd-run")
+        systemctl = Path("/usr/bin/systemctl")
+        if not systemd_run.is_file() or not systemctl.is_file():
+            self.skipTest("systemd user tools are unavailable")
+        status = subprocess.run(
+            [str(systemctl), "--user", "is-system-running"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if status.returncode != 0 or status.stdout.strip() not in {"running", "degraded"}:
+            self.skipTest(f"user systemd is unavailable: {status.stdout.strip()} {status.stderr.strip()}")
+        unit = f"w8-quiet-test-{os.getpid()}-{time.time_ns()}.scope"
+        command = [
+            str(systemd_run),
+            "--user",
+            "--scope",
+            f"--unit={unit}",
+            "--property=MemoryAccounting=yes",
+            f"--property=MemoryMax={wrapper.MEMORY_MAX_BYTES}",
+            f"--property=MemorySwapMax={wrapper.SWAP_MAX_BYTES}",
+            "--property=TasksMax=4096",
+            "--property=KillMode=control-group",
+            "--",
+            "/bin/sh",
+            "-c",
+            "sleep 0.1",
+        ]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=15, check=False)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        observed = wrapper.show_unit(systemctl, unit)
+        self.assertFalse(observed["available"])
+        self.assertEqual(observed["monitor_error_kind"], "unit-gone")
+        self.assertEqual(observed["ActiveState"], "inactive")
+        self.assertEqual(observed["SubState"], "dead")
+        self.assertEqual(observed["Result"], "success")
+        self.assertEqual(observed["ControlGroup"], "")
+        self.assertEqual(observed["MemoryCurrent"], "[not set]")
+        self.assertEqual(observed["MemoryPeak"], "[not set]")
+        self.assertNotIn("MainPID", observed)
+        self.assertNotIn("ExecMainStatus", observed)
 
     def test_normal_state_passes_output_and_descendant_guards(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

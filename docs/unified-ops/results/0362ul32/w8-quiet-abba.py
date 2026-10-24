@@ -292,6 +292,22 @@ def show_unit(systemctl: Path, unit: str) -> dict[str, object]:
             "command": command,
         }
     properties = parse_properties(completed.stdout)
+    real_gc_shape = (
+        properties.get("ActiveState") == "inactive"
+        and properties.get("SubState") == "dead"
+        and properties.get("Result") == "success"
+        and properties.get("ControlGroup") == ""
+        and properties.get("MemoryCurrent") == "[not set]"
+        and properties.get("MemoryPeak") == "[not set]"
+        and "MainPID" not in properties
+        and "ExecMainStatus" not in properties
+    )
+    if real_gc_shape:
+        properties["available"] = False
+        properties["monitor_error_kind"] = "unit-gone"
+        properties["monitor_error"] = "transient scope is inactive with an empty ControlGroup"
+        properties["command"] = command
+        return properties
     missing = [name for name in UNIT_PROPERTIES if name not in properties]
     if missing:
         return {
@@ -302,17 +318,6 @@ def show_unit(systemctl: Path, unit: str) -> dict[str, object]:
             "command": command,
         }
     if not properties.get("ControlGroup"):
-        inactive_empty = (
-            properties.get("ActiveState") == "inactive"
-            and properties.get("SubState") in {"dead", "exited"}
-            and properties.get("MainPID") in {"", "0"}
-        )
-        if inactive_empty:
-            properties["available"] = False
-            properties["monitor_error_kind"] = "unit-gone"
-            properties["monitor_error"] = "transient scope is inactive with an empty ControlGroup"
-            properties["command"] = command
-            return properties
         return {
             "available": False,
             "monitor_error_kind": "schema",
@@ -501,7 +506,7 @@ def systemd_command(config: dict[str, Any], paths: dict[str, Path]) -> list[str]
     systemd_run = Path(config["artifacts"]["systemd_run"]["path"])
     timeout = Path(config["artifacts"]["timeout"]["path"])
     return [
-        str(systemd_run), "--user", "--scope", "--wait", f"--unit={config['unit']}",
+        str(systemd_run), "--user", "--scope", f"--unit={config['unit']}",
         "--property=MemoryAccounting=yes", f"--property=MemoryMax={config['memory_max_bytes']}",
         f"--property=MemorySwapMax={config['swap_max_bytes']}", "--property=TasksMax=4096",
         "--property=KillMode=control-group", "--", str(timeout), "--foreground", "--signal=TERM",
