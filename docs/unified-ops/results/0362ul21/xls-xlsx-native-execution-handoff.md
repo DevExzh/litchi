@@ -14,7 +14,7 @@ SHA-256 `419dfe0d55a0f8ba3cef3ad5ee247917da46a4b0c4d7efb3916a377fa771284b`.
 Its later qualification command is bound to the actual slot-3 candidate binary
 (`fff038b1320e20666f4e9cb49d7a907350dd9ecabce50eabfdecef100b0a7e54`) and
 reuses the original baseline binary
-(`9d39aa79e808096cd0487d88e8eddd277182ff5ab91a501d8e9caf6793d3be2c)).
+(`9d39aa79e808096cd0487d88e8eddd277182ff5ab91a501d8e9caf6793d3be2c`).
 The old unsuffixed and superseded candidate paths are forbidden.
 
 The XLSX source-family driver reuses the proved baseline/candidate timing and
