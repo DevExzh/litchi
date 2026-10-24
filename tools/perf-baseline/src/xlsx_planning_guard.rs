@@ -494,12 +494,12 @@ fn run_iteration(
 }
 
 fn validate_valid_transaction(transaction: litchi_xlsx::cell_values::Edit) -> AnyResult<()> {
-    if transaction.worksheet_count() != 1 {
+    if transaction.worksheet_count()? != 1 {
         return Err("valid guard selected an unexpected worksheet count".into());
     }
     let expected = Value::Number(Number::new("1").map_err(|error| error.to_string())?);
     let address = Address::from_a1("A1")?;
-    if transaction.before().value(0, address) != Some(&expected) {
+    if transaction.before()?.value(0, address) != Some(&expected) {
         return Err("valid guard snapshot did not retain A1".into());
     }
     // This is intentionally outside the phase clock: the empty commit is the
