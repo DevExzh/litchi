@@ -287,7 +287,7 @@ pub(super) fn write_data_labels<W: Write>(
         return Ok(());
     }
     if let Some(number_format) = labels.number_format.as_ref() {
-        write!(writer, r#"<c:numFmt formatCode="#)?;
+        write!(writer, "<c:numFmt formatCode=\"")?;
         write_escaped_xml(writer, &number_format.format_code)?;
         write!(
             writer,
@@ -375,7 +375,7 @@ pub(super) fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> s
         write_title_text(writer, text)?;
     }
     if let Some(number_format) = label.number_format.as_ref() {
-        write!(writer, r#"<c:numFmt formatCode="#)?;
+        write!(writer, "<c:numFmt formatCode=\"")?;
         write_escaped_xml(writer, &number_format.format_code)?;
         write!(
             writer,
