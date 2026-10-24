@@ -3260,3 +3260,60 @@ See [0063](0063-source-pptx-modern-comments.md).
   all-68 inventory, corpus replay, glossary closure and native qualification
   remain required. Only comprehensive redaction audit 22 is deferred.
   Nothing is pushed.
+
+
+- Coordinator checkpoint (2026-10-24, XLSX/DOCX/PPT composition):
+  Main integration reaches `5b06b2136a`. Reviewed composed XLSX source
+  `784d0ea83e` and receipt `7201866b32` merge at `3d129677ce`, closing the
+  source-backed, catalog, pivot, graph and object constructor work. The
+  coordinator verified 2,558 package tests, 36 doctests, strict Clippy,
+  standalone/fuzz consumers and three planning-guard correctness routes.
+  First-use errors and retries remain outside the constructor measurement;
+  the unknown-attribute fixture was corrected to an unsupported child element
+  after confirming that attributes are intentionally preserved. All evidence
+  retains exact source/overlay boundaries; no native claim is made.
+
+  DOCX final source `0cf1a17174` and receipt `3a6c56958c` merge at
+  `5ce9829784`. Review returned and then verified the signed empty-property
+  correction: valid targets preserve exact signed bytes; invalid targets keep
+  their target error. The coordinator verified 2,355 package tests, 170
+  doctests, 739 operations tests, 23 facade tests, strict checks and the
+  migrated fuzz/performance consumers. The recorded 31 ignored doctests
+  remain explicit.
+
+  PPT source `ca125d2ba1` and final consumer/binding receipt `70a9b57622`
+  merge at `127c26d59f`. The coordinator verified 1,568 package tests,
+  22 doctests, 71 selected operations tests, strict checks and standalone
+  consumer compilation. The ODG candidate probe compiles; refreshed probe
+  identities pass all 26 build-free protocol tests. No native qualification
+  is inferred from compilation.
+
+  A composed strict check returned the ODF example's fourteen-argument receipt
+  helper. Private identity grouping fixes the lint without changing proofs,
+  fields or measurement boundaries (0362ugsa). The rerun passes at
+  `ecf598b637`; after the DOCX/PPT merges, the same all-target/all-feature
+  CLI/operations/facade/Python strict check passes at `99c875ca41` in
+  145.777 seconds. Post-exit checks find no owned builders and a stable
+  4,706,726,912-byte target. Neither selected run is the full 53-step gate.
+
+  The finite W8 error audit returned XLS feature mapping and the PPTX
+  slide-removal override. PPTX correction 0362ugt merges at `c1eda2fdf6`: the
+  existing FinalSlide InvalidValue kind now reports invalid_value, with both
+  capability and registry goldens and the generated digest synchronized.
+  Focused tests, strict PPTX-only Clippy and both static OfficeCLI checks pass.
+  The remaining XLS correction 0362ugea has cold property/feature entry,
+  signed exact no-ops and corrected facade classification. Its final render
+  and candidate-admission source fence remains under review: an early error
+  return must not bypass SourceChanged precedence. This is required work.
+
+  Cleanups twenty through twenty-three remove nine completed leaves after
+  fresh ancestry/cleanliness/process checks. Branches and external evidence
+  remain; ignored lockfiles and the local XLSX target are hash-quarantined
+  with restore instructions. The coordinator independently verified every
+  preserved file, including all 2,937 entries from cleanup twenty-two.
+  Reviewers stopped only their own stale Git jobs before their leaf removal.
+
+  Source integration remains staging. Final source freeze, full gates,
+  all-68 inventory, actual corpus replay, glossary closure and native
+  qualification remain required. Only comprehensive redaction audit 22
+  is deferred. Nothing is pushed.
