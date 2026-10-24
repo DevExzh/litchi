@@ -139,7 +139,6 @@ impl<'a> Edit<'a> {
     }
 
     /// The selected pictures before the edit.
-    #[must_use]
     pub fn source(&self) -> Result<Snapshot> {
         self.ensure_inner()?;
         Ok(self
@@ -152,7 +151,6 @@ impl<'a> Edit<'a> {
     }
 
     /// The selected pictures with the staged changes.
-    #[must_use]
     pub fn projected(&self) -> Result<Snapshot> {
         self.ensure_inner()?;
         Ok(self

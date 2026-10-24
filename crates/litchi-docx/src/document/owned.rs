@@ -356,13 +356,11 @@ impl<P: Clone> Edit<P> {
     }
 
     /// Return the source main-document projection.
-    #[must_use]
     pub fn source(&self) -> Result<Snapshot> {
         self.inner_ref(|inner| inner.source().clone())
     }
 
     /// Return the staged main-document projection.
-    #[must_use]
     pub fn projected(&self) -> Result<Snapshot> {
         self.inner_ref(|inner| inner.projected().clone())
     }

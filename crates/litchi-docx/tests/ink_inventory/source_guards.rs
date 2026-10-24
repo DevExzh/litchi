@@ -255,8 +255,7 @@ fn relationship_lexical_tokens_count_against_public_ink_topology_limit() {
         .unwrap();
     let error = edit
         .inventory()
-        .err()
-        .expect("lexical relationship tokens should exceed the semantic-only budget");
+        .expect_err("lexical relationship tokens should exceed the semantic-only budget");
     assert!(matches!(
         error,
         Error::InkLimit {

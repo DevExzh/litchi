@@ -137,7 +137,6 @@ impl Edit {
     }
 
     /// The projected main story.
-    #[must_use]
     pub fn projected(&self) -> Result<raw::Tree, Error> {
         Ok(raw::Tree::from_record(
             self.inner_mut()?.projected().clone(),
@@ -160,7 +159,6 @@ impl Edit {
     }
 
     /// The effect the commit will have.
-    #[must_use]
     pub fn effect_report(&self) -> Result<EffectReport, Error> {
         Ok(self.inner_mut()?.clone().commit().effect_report())
     }

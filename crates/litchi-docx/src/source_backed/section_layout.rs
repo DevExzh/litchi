@@ -159,7 +159,7 @@ impl Edit {
     fn materialize(&self) -> Result<record::Edit> {
         self.package
             .section_layout_snapshot_bounded(&self.limits)?
-            .edit(self.selector.clone())
+            .edit(self.selector)
             .map(|edit| edit.with_max_retained_base_bytes(self.max_retained_base_bytes))
     }
 

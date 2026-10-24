@@ -239,7 +239,6 @@ struct Replacement {
 
 impl Edit {
     /// Return the immutable annotation inventory used by every selector.
-    #[must_use]
     pub fn inventory(&self) -> Result<Snapshot> {
         Ok(self.base_state()?.snapshot.clone())
     }
