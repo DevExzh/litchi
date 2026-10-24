@@ -280,3 +280,20 @@ the next build slot. The final gate runner's first post-exit successor
 can escape the current process-group lookup and write the target after a pass.
 An independent controlled reproduction establishes the gap. Ownership tracking
 and its detached-child regression must be corrected before final gate use.
+
+Gate successor `c196274831` closes that return and is merged at `72d106cfac`.
+The runner captures PID/start-time identities during a step and adopts new
+subreaper children without relying on cwd or command-line paths. The final
+regression covers `setsid`, `chdir("/")` and a delayed write through an
+inherited target descriptor; the predecessor fails that case. The coordinator
+independently verified the regression and byte-exact patch reproduction.
+Attempt-specific logs preserve retry provenance. This clears the runner for
+execution; it does not count as running the 53-step gate.
+
+The composed iWork ops check passes at `5ac9b25891`. That older non-iWork
+source boundary requires direct XLS/PPT metadata property access in its bench
+example; the coordinator must reconcile it with the final fallible XLS/PPT
+APIs when merging the assemblies. Standalone fuzz validation found one missed
+fallible Keynote `position()` result; `a0bf134246` now observes the error and
+returns before further work. The rerun passes with only the three pre-existing
+unused media constants. The final iWork harness check and receipt remain open.
