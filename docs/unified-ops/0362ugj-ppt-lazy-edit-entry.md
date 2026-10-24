@@ -121,4 +121,3 @@ only final claims.
 | `validation-candidate-consumer/odg-candidate-probe-check.log` | 1,894 | `d48b657ed261a8266e410b86275d4088e717b71ac43be755382e9ce83daa5843` |
 | `validation-candidate-consumer/odg-candidate-probe-check-v2.log` | 11,560 | `9533f16519334272f23ce05b1d39a35c1725749cd931d83e6c428f4b90f300` |
 | `validation-candidate-consumer/odg-candidate-probe-check-v3.log` | 166 | `6e2b1412895f0cd5a6872586ef26d60f9225f1b77436d8a40c5cd780f6f46d2e` |
-
