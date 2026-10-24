@@ -91,3 +91,36 @@ is promoted into a package edit family.  A fresh rustdoc inventory should
 therefore contain no `HeaderRowMove`, `HeaderRowEdit`, `TileRowEdit` or
 `CommentStorageTableReferenceEdit` path, while the listed wire-request and
 wire-schema rows remain traceable to their source witnesses.
+
+## Validation receipt
+
+The committed source patch was checked before commit `91dcf9c0d0` with ten
+staged paths (`127 insertions, 48 deletions`), `git diff --cached --check`, the
+large-evidence and binary guards, and a source/tool search that found none of
+the four removed names.  The locked root commands used the frozen-49
+`Cargo.lock` (139,591 bytes, SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`):
+`cargo test --locked --offline -p litchi-iwa-protos --lib --tests` reported
+972 library tests passed and every integration binary passed (no aggregate
+count is asserted), and `cargo check --locked --offline -p litchi-keynote
+-p litchi-numbers --lib` passed.  `python3 -m unittest
+tools.test_check_crate_boundaries` passed all 1,144 tests.
+
+The separate fuzz manifest had no pinned lock.  Its offline command,
+`cargo check --offline --manifest-path
+crates/litchi-iwa-protos/fuzz/Cargo.toml --bin
+keynote_table_physical_sort_codec`, resolved its own ignored 22,763-byte lock
+(SHA-256
+`e1523f0d57989de8b315d44ce639d2ebf7b05919fae030675d4c923c1c04b02b`) and
+passed; that lock was not committed.  The capped environment used the
+coordinator cargo shim, `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
+`RUST_TEST_THREADS=1`, offline mode, and target
+`/home/zhuhe/code/litchi-targets/uo2-iwa-protos-alias-repair` (822 MiB after
+validation); the temporary directory was
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-protos-alias-repair-tmp`.
+Session receipts were 79655, 98489,
+35753 and 75652 respectively; no durable command-log hash was retained.  An
+earlier sibling-lock attempt (session 79727, lock prefix `6d7895e`) was
+SIGINT before any test completed and is diagnostic only, not an acceptance
+receipt.  The alias-only declarations preserve the codec layout and core
+algorithms, so this leaf introduces no performance-path change.
