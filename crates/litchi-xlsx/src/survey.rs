@@ -3384,12 +3384,14 @@ impl EditOptions {
 /// A staged, source-bound edit of the table-owned Survey parts of one
 /// [`crate::Package`].
 ///
-/// Starting one reads the catalog and copies no part payload. Dropping the
-/// edit discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains the immutable source and finite policy only. The
+/// catalog and its clone-staged draft are read on the first operation that
+/// needs them. Dropping the edit discards it; [`Self::commit`] publishes a new
+/// package.
 pub struct Edit {
     target: crate::record::Source,
-    before: Snapshot,
-    draft: Vec<Part>,
+    before: Option<Snapshot>,
+    draft: Option<Vec<Part>>,
     limits: Limits,
 }
 
@@ -3430,25 +3432,58 @@ impl crate::Package {
 
 impl Edit {
     fn start(target: crate::record::Source, limits: &Limits) -> Result<Self> {
-        let before = Snapshot::load_with_limits(&target, limits)?;
         Ok(Self {
             target,
-            draft: before.entries.to_vec(),
-            before,
+            before: None,
+            draft: None,
             limits: *limits,
         })
     }
 
+    /// Materialize and clone the Survey catalog only when the edit first
+    /// needs a semantic value. Failed reads leave no partial draft and can be
+    /// retried without retaining the source graph.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load_with_limits(&self.target, &self.limits)?;
+        let draft = before.entries.to_vec();
+        self.draft = Some(draft);
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
+    fn draft(&self) -> Result<&[Part]> {
+        self.draft
+            .as_deref()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
+    fn draft_mut(&mut self) -> Result<&mut Vec<Part>> {
+        self.draft
+            .as_mut()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))
+    }
+
     /// Immutable source captured at transaction start.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Currently staged Survey entries.
     #[must_use]
-    pub fn entries(&self) -> &[Part] {
-        &self.draft
+    pub fn entries(&mut self) -> Result<&[Part]> {
+        self.ensure_prepared()?;
+        self.draft()
     }
 
     /// Edit one existing Survey in a clone-staged callback.
@@ -3457,8 +3492,9 @@ impl Edit {
         index: usize,
         edit: impl FnOnce(&mut Survey) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
-            .draft
+            .draft()?
             .get(index)
             .cloned()
             .ok_or_else(|| invalid(format!("survey index {index} is absent")))?;
@@ -3482,7 +3518,13 @@ impl Edit {
             }
         }
         validate_survey_with_limits(&draft.survey, &self.limits)?;
-        if draft.survey == self.draft[index].survey {
+        if draft.survey
+            == self
+                .draft()?
+                .get(index)
+                .ok_or_else(|| invalid("survey index is absent"))?
+                .survey
+        {
             return Ok(false);
         }
         // Existing entries were validated at ingress or their last successful
@@ -3490,7 +3532,7 @@ impl Edit {
         // remain immutable. Validate its bindings and catalog-wide uniqueness
         // before replacing one slot, so failures retain the exact staged state.
         if self
-            .draft
+            .draft()?
             .iter()
             .enumerate()
             .any(|(other, entry)| other != index && entry.survey.id() == draft.survey.id())
@@ -3498,7 +3540,7 @@ impl Edit {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
         self.validate_entry_bindings(index, &draft)?;
-        self.draft[index] = draft;
+        self.draft_mut()?[index] = draft;
         Ok(true)
     }
 
@@ -3513,6 +3555,7 @@ impl Edit {
 
     /// Attach a new Survey to an existing table part.
     pub fn insert(&mut self, table_part_name: PackURI, survey: Survey) -> Result<usize> {
+        self.ensure_prepared()?;
         validate_survey_with_limits(&survey, &self.limits)?;
         let table = self.target.get_part(&table_part_name)?;
         if table.content_type() != ct::SML_TABLE {
@@ -3523,16 +3566,16 @@ impl Edit {
         }
         validate_table_bindings(table, &survey)?;
         if self
-            .draft
+            .draft()?
             .iter()
             .any(|entry| entry.survey.id() == survey.id())
         {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
-        let relationship_id = allocate_relationship_id(table, &self.draft, &table_part_name);
-        let part_name = allocate_part_name(&self.target, &self.draft)?;
+        let relationship_id = allocate_relationship_id(table, self.draft()?, &table_part_name);
+        let part_name = allocate_part_name(&self.target, self.draft()?)?;
         let relationship_target = part_name.relative_ref(table_part_name.base_uri());
-        self.draft.push(Part {
+        self.draft_mut()?.push(Part {
             survey: Arc::new(survey),
             table_part_name,
             relationship_id,
@@ -3547,10 +3590,10 @@ impl Edit {
             survey_relationships_source: None,
         });
         if let Err(error) = self.validate_draft() {
-            self.draft.pop();
+            self.draft_mut()?.pop();
             return Err(error);
         }
-        Ok(self.draft.len() - 1)
+        Ok(self.draft()?.len() - 1)
     }
 
     /// Attach a new Survey by semantic table name.
@@ -3560,6 +3603,7 @@ impl Edit {
     /// authored. This keeps ordinary authoring independent of physical table
     /// part URIs and numeric column UIDs.
     pub fn insert_for_table(&mut self, table_name: &str, mut survey: Survey) -> Result<usize> {
+        self.ensure_prepared()?;
         let table_part_name = find_table_part(&self.target, table_name)?;
         let table = crate::table::parse_table_xml(self.target.get_part(&table_part_name)?.blob())?
             .ok_or_else(|| invalid("Survey owner table is not a supported table part"))?;
@@ -3571,30 +3615,30 @@ impl Edit {
 
     /// Remove one staged Survey and return its physical entry.
     pub fn remove(&mut self, index: usize) -> Result<Option<Part>> {
-        if index >= self.draft.len() {
+        self.ensure_prepared()?;
+        if index >= self.draft()?.len() {
             return Ok(None);
         }
-        let removed = self.draft.remove(index);
+        let removed = self.draft_mut()?.remove(index);
         if let Err(error) = self.validate_draft() {
-            self.draft.insert(index, removed);
+            self.draft_mut()?.insert(index, removed);
             return Err(error);
         }
         Ok(Some(removed))
     }
 
     /// Whether staged Survey semantics or ownership identities differ.
-    fn changed(&self) -> bool {
-        !self.before.same_semantics(&self.draft)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn is_changed(&self) -> bool {
-        self.changed()
+    fn changed(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        Ok(!self.snapshot()?.same_semantics(self.draft()?))
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.before.entries.to_vec();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let draft = self.snapshot()?.entries.to_vec();
+        self.draft = Some(draft);
+        Ok(())
     }
 
     /// Validate the staged Survey catalog and publish it as a new package.
@@ -3604,47 +3648,56 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
     /// the publication's validation errors.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         self.publish().map(|(commit, _)| commit)
     }
 
     /// [`Self::commit`], keeping the published catalog.
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))?;
+        let draft = self
+            .draft
+            .take()
+            .ok_or_else(|| invalid("Survey edit is not prepared"))?;
+        if before.same_semantics(&draft) {
+            let patch = Patch::new(before.clone(), before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                before,
             ));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
         let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
             });
         }
         let mut candidate = OpcPackage::clone(&self.target);
         let content_types = transition_content_types(
-            &self.before.source_content_types,
-            self.before.entries(),
-            &self.draft,
+            &before.source_content_types,
+            before.entries(),
+            &draft,
             self.target.read_limits().max_content_types_bytes(),
         )?;
         apply_entries(
             &mut candidate,
-            self.before.entries(),
-            &self.draft,
+            before.entries(),
+            &draft,
             &self.limits,
             &content_types,
         )?;
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_semantics(&self.draft) {
+        if !snapshot.same_semantics(&draft) {
             return Err(invalid("Survey publication changed the staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -3653,7 +3706,11 @@ impl Edit {
     }
 
     fn validate_draft(&self) -> Result<()> {
-        self.validate_draft_entries(&self.draft)
+        self.validate_draft_entries(
+            self.draft
+                .as_deref()
+                .ok_or_else(|| invalid("Survey edit is not prepared"))?,
+        )
     }
 
     fn validate_draft_entries(&self, entries: &[Part]) -> Result<()> {
@@ -3685,6 +3742,21 @@ impl Edit {
         }
         validate_table_bindings(table, &entry.survey)
             .map_err(|error| invalid(format!("survey {index} has invalid table binding: {error}")))
+    }
+}
+
+#[cfg(test)]
+mod lazy_entry_tests {
+    use super::*;
+
+    #[test]
+    fn edit_entry_defers_survey_catalog() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package.edit_surveys().expect("Survey edit");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert!(edit.entries().expect("first Survey read").is_empty());
+        assert!(edit.before.is_some());
     }
 }
 
@@ -4201,8 +4273,8 @@ mod tests {
         setup.insert_for_table("T", second).unwrap();
         setup.commit().unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let before = transaction.before().clone();
-        for (source, draft) in before.entries().iter().zip(transaction.entries()) {
+        let before = transaction.before().unwrap().clone();
+        for (source, draft) in before.entries().iter().zip(transaction.entries().unwrap()) {
             assert!(Arc::ptr_eq(&source.survey, &draft.survey));
             assert!(Arc::ptr_eq(&source.survey, &source.clone().survey));
         }
@@ -4219,20 +4291,23 @@ mod tests {
         assert_eq!(before.entries()[0].survey().title(), Some("Survey"));
         assert!(!Arc::ptr_eq(
             &before.entries()[0].survey,
-            &transaction.entries()[0].survey
+            &transaction.entries().unwrap()[0].survey
         ));
         assert!(Arc::ptr_eq(
             &before.entries()[1].survey,
-            &transaction.entries()[1].survey
+            &transaction.entries().unwrap()[1].survey
         ));
         assert_eq!(
-            transaction.entries()[1].survey().questions().values()[0]
+            transaction.entries().unwrap()[1]
+                .survey()
+                .questions()
+                .values()[0]
                 .text()
                 .unwrap()
                 .as_ptr(),
             payload
         );
-        let accepted = transaction.entries()[0].survey.clone();
+        let accepted = transaction.entries().unwrap()[0].survey.clone();
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4241,7 +4316,10 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4250,7 +4328,10 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(
             transaction
                 .edit(0, |survey| {
@@ -4259,12 +4340,18 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(!transaction.edit(0, |_| Ok(())).unwrap());
-        assert!(Arc::ptr_eq(&accepted, &transaction.entries()[0].survey));
+        assert!(Arc::ptr_eq(
+            &accepted,
+            &transaction.entries().unwrap()[0].survey
+        ));
         assert!(Arc::ptr_eq(
             &before.entries()[1].survey,
-            &transaction.entries()[1].survey
+            &transaction.entries().unwrap()[1].survey
         ));
         let patch = transaction.commit().unwrap().patch().clone();
         patch.inverse().apply(&mut package).unwrap();
@@ -4377,7 +4464,7 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(!transaction.is_changed());
+        assert!(!transaction.changed().unwrap());
         transaction
             .edit(0, |survey| {
                 let question = survey.questions_mut().remove(0).unwrap();
@@ -5147,7 +5234,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), detached)
                 .expect("detached insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commit");
             part_name
         };
@@ -5217,7 +5304,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), edited)
                 .expect("detached commented insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commented commit");
             part_name
         };
@@ -5274,7 +5361,7 @@ mod tests {
             let index = transaction
                 .insert(PackURI::new("/xl/tables/table1.xml").unwrap(), detached)
                 .expect("detached insert");
-            let part_name = transaction.entries()[index].part_name().clone();
+            let part_name = transaction.entries().unwrap()[index].part_name().clone();
             transaction.commit().expect("detached commit");
             part_name
         };
@@ -5366,7 +5453,7 @@ mod tests {
         let replacement = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(transaction.set(0, replacement.clone()).unwrap());
-        assert!(transaction.is_changed());
+        assert!(transaction.changed().unwrap());
         assert!(matches!(
             transaction.commit(),
             Err(Error::Unsupported {
@@ -5700,7 +5787,11 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         let index = transaction.insert_for_table("T", survey).unwrap();
         assert_eq!(
-            transaction.entries()[index].survey().questions().values()[0].binding(),
+            transaction.entries().unwrap()[index]
+                .survey()
+                .questions()
+                .values()[0]
+                .binding(),
             Binding::new(1)
         );
         transaction.commit().unwrap();
@@ -5992,7 +6083,11 @@ mod tests {
         });
         assert!(result.is_err());
         assert_eq!(
-            transaction.entries()[0].survey().questions().values()[0].binding(),
+            transaction.entries().unwrap()[0]
+                .survey()
+                .questions()
+                .values()[0]
+                .binding(),
             Binding::new(1)
         );
     }
