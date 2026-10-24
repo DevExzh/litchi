@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import collections
+import hashlib
 from pathlib import Path
 import tarfile
 import tempfile
@@ -19,20 +20,51 @@ class AdapterSource(unittest.TestCase):
     def test_only_four_old_accessor_calls_are_translated(self):
         source = PROBE.read_text(encoding="utf-8")
         adapted, records = overlay.consumer_adapter(source)
-        self.assertEqual(len(records), 4)
+        accessor_records = [record for record in records if record["old_accessor"] == ".into_file()"]
+        resolution_records = [record for record in records if record["old_accessor"] == overlay.XLSB_RESOLUTION_LABEL]
+        self.assertEqual(len(records), 7)
+        self.assertEqual(len(accessor_records), 4)
+        self.assertEqual(len(resolution_records), 3)
         self.assertEqual(source.count(".into_file()"), 4)
+        self.assertEqual(source.count(".resolve()"), 3)
+        self.assertEqual(source.count(overlay.XLSB_RESOLUTION_SEQUENCE), 3)
         self.assertNotIn(".into_file()", adapted.decode("utf-8"))
+        self.assertNotIn(".resolve()", adapted.decode("utf-8"))
         self.assertEqual(
-            [record["function"] for record in records],
+            [record["function"] for record in accessor_records],
             ["unified_batch", "unified_import", "unified_merge", "unified_refresh"],
         )
         self.assertEqual(
-            [record["new_accessor"] for record in records],
+            [record["new_accessor"] for record in accessor_records],
             [".file"] * 4,
+        )
+        self.assertEqual(
+            [record["function"] for record in resolution_records],
+            ["native_set", "native_import", "native_merge"],
         )
         # The adapter is a consumer example, never a production source patch;
         # its only accepted API spelling is the old public result field.
         self.assertEqual(adapted.decode("utf-8").count(".file"), source.count(".file") + 4)
+
+    def test_baseline_adapter_matches_pinned_d39_adapter_identity(self):
+        source = PROBE.read_text(encoding="utf-8")
+        adapted, _records = overlay.consumer_adapter(source)
+        self.assertEqual(len(adapted), 74_719)
+        self.assertEqual(
+            hashlib.sha256(adapted).hexdigest(),
+            "3e14376c366fa911025212d7e7081ab5c3b5aaac804c1e01a1415fd5cd826ca0",
+        )
+
+    def test_accidental_extra_xlsb_resolution_is_rejected(self):
+        source = PROBE.read_text(encoding="utf-8")
+        altered = source.replace(
+            "let mut edit = package\n                        .edit_cell_values(0_usize)",
+            "let mut edit = package\n                        .resolve()\n                        .edit_cell_values(0_usize)",
+            1,
+        )
+        self.assertEqual(altered.count(".resolve()"), 4)
+        with self.assertRaises(overlay.OverlayError):
+            overlay.consumer_adapter(altered)
 
     def test_compatibility_patch_contains_only_probe_and_adapter_additions(self):
         source = PROBE.read_bytes()
