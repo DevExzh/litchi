@@ -1,0 +1,64 @@
+{
+  "schema": "litchi.cleanup-coordinator-verification.v1",
+  "verified_utc": "2026-10-24T15:59:50.772688+00:00",
+  "wave": "47",
+  "integration_head_during_removal": "cfbb6b6cf47e1f2b8db4b63b604dc1a099dec8fd",
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/manifest.json",
+      "bytes": 81849,
+      "sha256": "ac52c7ac64fdb1d95b982299eed7dc0c6e12ba66584d4ea40374219fbe54d36f"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/receipt.json",
+      "bytes": 146733,
+      "sha256": "ac005666d71c811589838c1c74e0e18e5f45dc290a189b5a43c802f56c7d9f81"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/restore-check.json",
+      "bytes": 6425,
+      "sha256": "e8eb0b5147ddc3a5634a6c32aea58ccb8288cdaa96526456eac2e1450c1d9567"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/prepare_cleanup.py",
+      "bytes": 5990,
+      "sha256": "c3d1a04412c266c0918a30626914f57512997fd9b922f3d80ab4ebc586cfb3bc"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/restore.py",
+      "bytes": 664,
+      "sha256": "5152c71272bd35d3d9f001887e7aeee772a40043bb8e497914b021945c42db81"
+    }
+  ],
+  "leaves": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/uo2-odg-native-protocol",
+      "branch": "uo2/odg-native-protocol",
+      "head": "7c7d7a54fbdc9eb32f89c726f84bbc2d802f9d26",
+      "payload_count": 5,
+      "payload_bytes": 380375,
+      "removed": true,
+      "retained_branch_verified": true,
+      "ancestor_verified": true
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/uo2-legacy-safe-runner",
+      "branch": "uo2/legacy-safe-runner",
+      "head": "b47dcb41e40598786efbd908dde9f17be8d02b75",
+      "payload_count": 9,
+      "payload_bytes": 326362,
+      "removed": true,
+      "retained_branch_verified": true,
+      "ancestor_verified": true
+    }
+  ],
+  "preserved_files": 14,
+  "preserved_bytes": 706737,
+  "payload_hashes_sizes_modes_verified": true,
+  "restore_exercise_verified": true,
+  "source_worktrees_absent_and_unregistered": true,
+  "external_roots_touched": false,
+  "foreign_signals_sent": false,
+  "head_hold": "released",
+  "scope": "Two exact merged worktrees only; OLE foreign holder and all native endpoints remain untouched."
+}

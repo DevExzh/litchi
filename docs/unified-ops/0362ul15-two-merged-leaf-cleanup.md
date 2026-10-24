@@ -1,0 +1,7 @@
+# Two merged leaf worktrees removed
+
+Cleanup wave 47 removes `uo2-odg-native-protocol` at `7c7d7a54fbdc9eb32f89c726f84bbc2d802f9d26` and `uo2-legacy-safe-runner` at `b47dcb41e40598786efbd908dde9f17be8d02b75`. Both exact branch tips are ancestors of integration `cfbb6b6cf47e1f2b8db4b63b604dc1a099dec8fd`. Immediate checks confirm clean tracked files and no process holders. Both removals use non-forced `git worktree remove`.
+
+All fourteen ignored payloads, totaling 706,737 bytes, remain outside the repository under `/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave47/ignored/`. Both branches remain. A restoration exercise recreates both source worktrees, restores every payload, verifies hashes, sizes, file and parent-directory modes, and removes the recreated worktrees non-forced. The coordinator independently verifies all payloads, receipt hashes, retained refs, ancestry and final worktree absence. The [reduced verification receipt](results/0362ul15/cleanup-verification.json) binds the complete external manifest, removal receipt, restoration receipt and scripts.
+
+The staging HEAD remains fixed throughout removal and the hold is released. Native endpoints, external targets and other worktrees are untouched; no process is signalled. The OLE leaf with a foreign holder remains excluded. This cleanup changes no API or acceptance status. Nothing is pushed.
