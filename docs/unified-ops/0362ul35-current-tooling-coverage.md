@@ -49,13 +49,13 @@ positive PID before refreshing ownership. It retains the escaped-child
 identity assertion and the subsequent cleanup/reap assertions; it does not
 skip, relax, or suppress the lifecycle check.
 
-The exact combined command then passed all 68 tests in 19.068 seconds. Its
-external log is:
+The exact combined command then passed all 68 tests in 19.068 seconds. The
+committed repair tip was rerun unchanged; its external log is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/tooling-coverage-1079-combined-after.log
+/home/zhuhe/code/litchi-worktrees/.coord/tooling-coverage-cc0d41a952-combined.log
 901 bytes
-306e76833a66924d79cd7bb3fd6c9f423583f2e8afd3da287490af7977cf81c7
+f8aafbbd12d9ac2374dba8710df28ee57d2e08c4ec01959e875df0757101a3df
 ```
 
 The run remains source-only tooling evidence. The normal safe-runner fixture
