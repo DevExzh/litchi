@@ -597,6 +597,18 @@ def _kill_group(process: subprocess.Popen[bytes]) -> None:
             pass
 
 
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError as error:
+        raise RunFailure(f"cannot inspect child process group {pgid}: {error}") from error
+    except OSError as error:
+        raise RunFailure(f"cannot inspect child process group {pgid}: {error}") from error
+    return True
+
+
 def _stream_command(
     command: list[str],
     cwd: Path,
@@ -685,11 +697,22 @@ def _stream_command(
         raise RunFailure(f"{label}: {violation}")
     deadline = time.monotonic() + DESCENDANT_GRACE_S
     descendants = _descendants(process.pid)
-    while descendants and time.monotonic() < deadline:
+    group_alive = _group_alive(process.pid)
+    while (descendants or group_alive) and time.monotonic() < deadline:
         time.sleep(0.05)
         descendants = _descendants(process.pid)
-    if descendants:
-        raise RunFailure(f"{label}: child left descendants running after recheck: {sorted(descendants)}")
+        group_alive = _group_alive(process.pid)
+    if descendants or group_alive:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError as error:
+            raise RunFailure(f"{label}: cannot terminate orphaned child group: {error}") from error
+        raise RunFailure(
+            f"{label}: child left descendants/process group running after recheck: "
+            f"{sorted(descendants)} group_alive={group_alive}"
+        )
     target_after = _directory_bytes(target_dir)
     final_output_bytes = stdout_path.stat().st_size + stderr_path.stat().st_size
     samples.append({
