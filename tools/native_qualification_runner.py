@@ -790,6 +790,77 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
             if program.get("require_stdout") is not False:
                 raise RunnerError(f"{leg}/{program['id']} must write its report through --json")
 
+    controls = data.get("controls")
+    if not isinstance(controls, list) or len(controls) != 1:
+        raise RunnerError("DrawingML raw profile needs exactly one fixture-preflight control")
+    control = controls[0]
+    if not isinstance(control, dict) or control.get("id") != "drawingml-fixture-preflight":
+        raise RunnerError("DrawingML raw fixture-preflight control id differs")
+    if control.get("compare") != [
+        "fixture_sha256",
+        "fixture_bytes",
+        "fixture_lane_identity_sha256",
+        "generated_fixture_sha256",
+        "generated_fixture_parts",
+    ]:
+        raise RunnerError("DrawingML raw fixture-preflight comparison fields differ")
+    control_programs = control.get("programs")
+    if not isinstance(control_programs, dict) or set(control_programs) != {"before", "after"}:
+        raise RunnerError("DrawingML raw fixture-preflight must have before and after programs")
+    for leg in ("before", "after"):
+        program = control_programs[leg]
+        if not isinstance(program, dict) or program.get("id") != "fixture-preflight":
+            raise RunnerError(f"{leg} fixture-preflight program id differs")
+        expected_role = "baseline" if leg == "before" else "candidate"
+        expected_endpoint_argv = [
+            "--lane",
+            drawingml_lane,
+            "--endpoint",
+            endpoint,
+        ]
+        if owner_route is not None:
+            expected_endpoint_argv.extend(["--owner-route", str(owner_route)])
+        if raw_scope is not None:
+            expected_endpoint_argv.extend(["--raw-scope", str(raw_scope)])
+        expected_endpoint_argv.extend([
+            "--role",
+            expected_role,
+            "--mode",
+            "normal",
+            "--fixture",
+            "{fixture}",
+            "--source-revision",
+            str(data["legs"][leg]["source_revision"]),
+            "--iterations",
+            "1",
+            "--warmups",
+            "3",
+            "--blocks",
+            "5",
+            "--samples",
+            "20",
+            "--target-ms",
+            "500",
+            "--minimum-ms",
+            "150",
+            "--preflight",
+            "--json",
+            "{output}",
+        ])
+        if program.get("argv") != expected_endpoint_argv:
+            raise RunnerError(f"{leg} fixture-preflight changes the reviewed probe arguments")
+        if program.get("binary") != "{target_dir}/release/drawingml-raw-native":
+            raise RunnerError(f"{leg} fixture-preflight must use the normal binary")
+        output_name = f"{{output_dir}}/controls/dml-preflight-{leg}.json"
+        if program.get("outputs") != [output_name]:
+            raise RunnerError(f"{leg} fixture-preflight output path differs")
+        if program.get("stdout") != output_name.removesuffix(".json") + ".stdout":
+            raise RunnerError(f"{leg} fixture-preflight stdout path differs")
+        if program.get("stderr") != output_name.removesuffix(".json") + ".stderr":
+            raise RunnerError(f"{leg} fixture-preflight stderr path differs")
+        if program.get("require_stdout") is not False:
+            raise RunnerError(f"{leg} fixture-preflight must write its report through --json")
+
     validators = data.get("validators", [])
     if len(validators) != 1 or validators[0].get("id") != "drawingml-raw-identity":
         raise RunnerError("DrawingML raw profile needs exactly one identity/fidelity validator")
@@ -1513,6 +1584,8 @@ class SafeRunner:
         stdout_path: Path | None = None,
         stderr_path: Path | None = None,
         preflight_target: bool = True,
+        measured: bool = True,
+        event_kind: str = "measurement",
     ) -> dict[str, Any]:
         self.guard.require_quiet()
         target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
@@ -1615,6 +1688,8 @@ class SafeRunner:
         event = {
             "schema": SCHEMA,
             "event_id": event_id,
+            "event_kind": event_kind,
+            "measured": measured,
             "leg": leg,
             "argv": list(argv),
             "cwd": str(cwd),
@@ -1655,6 +1730,124 @@ class SafeRunner:
             raise RunnerError(f"child produced empty declared output(s) for {event_id}: {empty}")
         return event
 
+    @staticmethod
+    def _control_value(report: Mapping[str, Any], path: str) -> Any:
+        """Read a small, explicit JSON path used by a preflight handoff."""
+
+        value: Any = report
+        for component in path.split("."):
+            if not component or not isinstance(value, Mapping) or component not in value:
+                raise RunnerError(f"control report is missing comparison field {path!r}")
+            value = value[component]
+        return value
+
+    def _run_controls(self, identities: Mapping[str, Mapping[str, Any]]) -> None:
+        """Run untimed endpoint controls before any ABBA measurement child.
+
+        Controls are real child processes and are retained in the event
+        journal, but their explicit ``measured=false``/``event_kind=control``
+        fields keep RSS and timing consumers from treating them as measured
+        benchmark children.
+        """
+
+        controls = self.manifest.get("controls", [])
+        if not controls:
+            return
+        seen_outputs: set[Path] = set()
+        for control in controls:
+            if not isinstance(control, Mapping):
+                raise RunnerError("control entry must be an object")
+            control_id = control.get("id")
+            compare = control.get("compare")
+            programs = control.get("programs")
+            if (
+                not isinstance(control_id, str)
+                or not control_id
+                or not isinstance(compare, list)
+                or not compare
+                or any(not isinstance(path, str) or not path for path in compare)
+                or not isinstance(programs, Mapping)
+            ):
+                raise RunnerError("control entry has an invalid id, comparison list, or programs")
+            reports: dict[str, Mapping[str, Any]] = {}
+            for leg in ("before", "after"):
+                program = programs.get(leg)
+                if not isinstance(program, Mapping):
+                    raise RunnerError(f"control {control_id} has no {leg} program")
+                context = self._context(leg, 0)
+                spec = self.manifest["legs"][leg]
+                binary = _resolve_path(_render(str(program.get("binary", "")), context))
+                if not binary.is_file() or not os.access(binary, os.X_OK):
+                    raise RunnerError(f"control binary is missing or not executable: {binary}")
+                output_values = [
+                    _resolve_path(_render(str(value), context))
+                    for value in program.get("outputs", [])
+                ]
+                if len(output_values) != 1:
+                    raise RunnerError(f"control {control_id}/{leg} must declare exactly one output")
+                output = output_values[0]
+                if not _under(output, self.output):
+                    raise RunnerError(f"control output escapes output_dir: {output}")
+                if output in seen_outputs or output.is_symlink() or output.exists():
+                    raise RunnerError(f"refusing to overwrite or follow control output: {output}")
+                output.parent.mkdir(parents=True, exist_ok=True)
+                if output.parent.is_symlink():
+                    raise RunnerError(f"control output parent may not be a symlink: {output.parent}")
+                seen_outputs.add(output)
+                program_context = dict(context)
+                program_context["output"] = output
+                args = _render_argv([str(value) for value in program.get("argv", [])], program_context)
+                argv = [str(binary), *args]
+                stdout_path = (
+                    _resolve_path(_render(str(program["stdout"]), program_context))
+                    if "stdout" in program
+                    else None
+                )
+                stderr_path = (
+                    _resolve_path(_render(str(program["stderr"]), program_context))
+                    if "stderr" in program
+                    else None
+                )
+                source_root = Path(identities[leg]["source_root"])
+                run_cwd = _resolve_path(
+                    _render(str(spec.get("run_cwd", ".")), program_context),
+                    base=source_root,
+                )
+                if not _under(run_cwd, source_root):
+                    raise RunnerError(f"control run_cwd escapes source root: {run_cwd}")
+                env = self._environment(spec, context)
+                self._run_command(
+                    event_id=f"control-{control_id}-{leg}",
+                    leg=leg,
+                    argv=argv,
+                    cwd=run_cwd,
+                    env=env,
+                    identity=identities[leg],
+                    expected_outputs=output_values,
+                    require_stdout=bool(program.get("require_stdout", False)),
+                    stdout_path=stdout_path,
+                    stderr_path=stderr_path,
+                    measured=False,
+                    event_kind="control",
+                )
+                try:
+                    value = json.loads(output.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                    raise RunnerError(f"control {control_id}/{leg} output is not valid JSON: {error}") from error
+                if not isinstance(value, Mapping):
+                    raise RunnerError(f"control {control_id}/{leg} output is not an object")
+                if value.get("measured") is not False:
+                    raise RunnerError(f"control {control_id}/{leg} output is marked measured")
+                reports[leg] = value
+            for path in compare:
+                before = self._control_value(reports["before"], path)
+                after = self._control_value(reports["after"], path)
+                if before != after:
+                    raise RunnerError(
+                        f"control {control_id} comparison differs before/after for {path}: "
+                        f"{before!r} != {after!r}"
+                    )
+
     def _preexec(self):
         cpu = self.cpu
         memory = self.memory_limit
@@ -1694,6 +1887,12 @@ class SafeRunner:
             "abba_blocks": int(self.manifest.get("abba_blocks", 1)),
             "identities": identities,
             "event_count": len(self.recorded_events),
+            "measured_event_count": sum(
+                event.get("measured") is True for event in self.recorded_events
+            ),
+            "control_event_count": sum(
+                event.get("event_kind") == "control" for event in self.recorded_events
+            ),
             "event_journal": {
                 "path": str(self.events_path),
                 "bytes": journal_bytes,
@@ -1751,6 +1950,8 @@ class SafeRunner:
                         env=env,
                         identity=identity,
                         expected_outputs=outputs,
+                        measured=False,
+                        event_kind="build",
                     )
                 artifacts = []
                 for command in self.manifest["legs"][leg]["build"]:
@@ -2037,6 +2238,7 @@ class SafeRunner:
                     if str(program_path) not in recorded_paths:
                         raise RunnerError(f"program binary was not recorded by the build phase: {program_path}")
                 identities[leg] = identity
+            self._run_controls(identities)
             blocks = int(self.manifest.get("abba_blocks", 1))
             for block in range(1, blocks + 1):
                 for index, leg in enumerate(ABBA_ORDER, start=1):
@@ -2130,6 +2332,8 @@ class SafeRunner:
                     expected_outputs=outputs,
                     require_stdout=bool(validator.get("require_stdout", True)),
                     preflight_target=False,
+                    measured=False,
+                    event_kind="validator",
                 )
             self._write_receipt("passed", identities=identities, events=self.recorded_events)
         except (BaseException,) as error:

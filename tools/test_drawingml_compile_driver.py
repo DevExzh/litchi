@@ -38,6 +38,22 @@ class DrawingMlCompileDriverTests(unittest.TestCase):
         for feature in driver.FEATURES:
             self.assertIn(f"{feature} = []", manifest)
 
+    def test_every_profile_feature_is_supported_by_both_drivers(self) -> None:
+        import json
+        import tomllib
+        from native_qualification import drawingml_raw_paired_runner as paired
+
+        manifest = json.loads((ROOT / "tools/native_qualification/manifests/drawingml-raw.json").read_text())
+        cargo = tomllib.loads((ROOT / "tools/perf-baseline/Cargo.toml").read_text())
+        for group in ("profiles", "route_profiles", "owner_profiles"):
+            for profile in manifest[group]:
+                for role in ("baseline_features", "candidate_features"):
+                    for feature in profile.get(role, []):
+                        with self.subTest(profile=profile["id"], role=role, feature=feature):
+                            self.assertIn(feature, cargo["features"])
+                            self.assertIn(feature, driver.FEATURES)
+                            self.assertIn(feature, paired.DRAWINGML_FEATURES)
+
     def test_revision_validation_is_fail_closed(self) -> None:
         with self.assertRaises(driver.DriverError):
             driver._require_full_sha("short", "revision")

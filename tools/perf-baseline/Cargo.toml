@@ -27,6 +27,9 @@ drawingml-owner-current = []
 # from the detached owner transition.  The historical 11728 parent keeps the
 # explicit *_with_limit methods; current source uses part::Limits.
 drawingml-theme-family-current = []
+drawingml-theme-family-owner-limits-current = []
+drawingml-transform-limits-current = []
+drawingml-raw-current = []
 # The final Ink actions raw/editor boundary added the required typed reader
 # policy after the historical 2f7/996/11728 parents. Keep this independent
 # from the detached Package/Edit owner gate so those parents retain their

@@ -56,7 +56,10 @@ RAW_SCOPES = {"bulk", "family"}
 DRAWINGML_FEATURES = {
     "drawingml-owner-current",
     "drawingml-theme-family-current",
+    "drawingml-raw-current",
     "drawingml-ink-limits-current",
+    "drawingml-theme-family-owner-limits-current",
+    "drawingml-transform-limits-current",
 }
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
@@ -414,6 +417,30 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
             })
         return result
 
+    def fixture_preflight(role: str, leg: str) -> dict[str, Any]:
+        """Run the untimed fixture-identity handoff for one endpoint."""
+
+        revision = before_revision if role == "baseline" else after_revision
+        output_name = f"{{output_dir}}/controls/dml-preflight-{leg}.json"
+        return {
+            "id": "fixture-preflight",
+            "binary": "{target_dir}/release/drawingml-raw-native",
+            "argv": [
+                "--lane", lane, "--endpoint", endpoint,
+                *( ["--owner-route", str(owner_route)] if owner_route else [] ),
+                *( ["--raw-scope", str(raw_scope)] if raw_scope else [] ),
+                "--role", role, "--mode", "normal",
+                "--fixture", "{fixture}", "--source-revision", revision,
+                "--iterations", "1", "--warmups", "3", "--blocks", "5",
+                "--samples", "20", "--target-ms", "500", "--minimum-ms", "150",
+                "--preflight", "--json", "{output}",
+            ],
+            "outputs": [output_name],
+            "stdout": output_name.removesuffix(".json") + ".stdout",
+            "stderr": output_name.removesuffix(".json") + ".stderr",
+            "require_stdout": False,
+        }
+
     return {
         "schema": generic.SCHEMA,
         "lane": "drawingml-raw",
@@ -455,6 +482,20 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
                 "programs": programs("candidate", "after"),
             },
         },
+        "controls": [{
+            "id": "drawingml-fixture-preflight",
+            "compare": [
+                "fixture_sha256",
+                "fixture_bytes",
+                "fixture_lane_identity_sha256",
+                "generated_fixture_sha256",
+                "generated_fixture_parts",
+            ],
+            "programs": {
+                "before": fixture_preflight("baseline", "before"),
+                "after": fixture_preflight("candidate", "after"),
+            },
+        }],
         "validators": [{
             "id": "drawingml-raw-identity",
             "argv": [

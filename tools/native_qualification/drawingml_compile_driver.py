@@ -25,6 +25,7 @@ from typing import Any, Sequence
 
 SCHEMA = "litchi.drawingml.compile-preparation.v1"
 FEATURES = (
+    "drawingml-raw-current",
     "drawingml-owner-current",
     "drawingml-theme-family-current",
     "drawingml-theme-family-owner-limits-current",
@@ -230,6 +231,7 @@ edition = "2024"
 publish = false
 
 [features]
+drawingml-raw-current = []
 drawingml-owner-current = []
 drawingml-theme-family-current = []
 drawingml-theme-family-owner-limits-current = []
