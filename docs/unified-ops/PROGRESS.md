@@ -3177,3 +3177,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   stopped because a foreign process holds a fixture; no files or targets were
   removed. Final full gates, all-68 inventory, corpus, glossary and native
   qualification remain required. Only redaction audit 22 is deferred. No push.
+
+
+- Coordinator checkpoint (2026-10-24, PPTX integration and seventeenth cleanup):
+  Main integration reaches `0223f55f42`. Reviewed PPTX source `c10d6c6539`,
+  comment correction `fa63bdd22e` and receipt `e59c72184d` merge at
+  `a3eb017da2`. The coordinator verified 1,837 regular tests, 48 doctests,
+  strict Clippy and 11 facade tests, including exact raw-log identities and
+  pinned configuration. Candidate reopen preserves typed errors; bounded
+  fallback is limited to recompressing read-limit failures. Output policy and
+  memory admission remain distinct. The earlier uncapped diagnostic is
+  documented separately and receives no acceptance credit.
+
+  ODG paired qualification tooling `7c7d7a54fb` clears its returned source,
+  compiler-environment and final target-limit checks and merges at
+  `a41b437ca8`. Its 26 Python tests pass independently. Rust adapter builds
+  and native qualification remain required; no timing result is claimed.
+  The final gate runner's post-exit process/target checks and attempt-specific
+  retry logs are assigned for correction before final gate execution.
+
+  The composed iWork suites, 96 doctests and strict four-crate Clippy pass
+  through their recorded sources. Facade and standalone checks continue.
+  Scoped review returned the modified Pages table-name Debug field for
+  content redaction and its lazy resolution error path for preserving the
+  charged budget across retries. These are required corrections, with no
+  expansion of deferred audit 22. Composed XLSX, XLSB and DOCX validation
+  continues; PPT receives the next available capped build slot.
+
+  Seventeenth cleanup removes the clean, merged ODS leaf without force,
+  retaining its branch and quarantining its sole generated lockfile with
+  verified hashes and restore instructions. Apparent checkout size was
+  440,249,548 bytes. The external target and logs remain untouched. Foreign
+  searches still hold the completed XLS/PPTX leaves, which remain intact.
+
+  Source integration remains staging. Final full gates, all-68 inventory,
+  corpus replay, glossary closure and native qualification remain required.
+  Only comprehensive redaction audit 22 is deferred. Nothing is pushed.

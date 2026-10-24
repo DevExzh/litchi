@@ -220,9 +220,33 @@ is 117 bytes, SHA-256
 Review covers normalized manifest/ZIP proofs, allocator observation boundaries,
 actual source/config closure, per-endpoint toolchain context, journal ordering
 and fresh outputs. No actual build or native measurement is credited by these
-Python checks. The separate ODG protocol still has returned source-byte,
-effective-environment and final target-limit gaps at `8037019b33`.
+Python checks. The separate ODG protocol's source-byte, effective-environment
+and final target-limit corrections now clear scoped review at `7c7d7a54fb`.
+The coordinator independently ran its 26 Python tests successfully and merged
+the tooling at `a41b437ca8`, removing only a trailing blank line in the Python
+bindings file during merge. Its Rust adapters still require real compilation;
+this is tooling integration, with no native qualification claim.
+
+PPTX source `c10d6c6539`, comment correction `fa63bdd22e` and receipt
+`e59c72184d` merge at `a3eb017da2`. Candidate reopen is attempted on every
+route; only recompressing read-limit failures use the bounded fallback.
+Output limits remain separate from execution-memory admission. Independent
+review confirms lazy sharing, retry state and serialized-patch limit checks.
+The coordinator verified 1,837 passing tests across 113 result blocks,
+48 doctests, strict Clippy and 11 facade tests, with all raw-log identities
+and root configuration. One existing regular test and two doctests remain
+ignored. Record 0362ugk identifies an earlier uncapped diagnostic separately;
+it is not accepted validation. No native timing claim is made.
+
+The composed iWork suites, 96 explicit doctests and strict four-crate Clippy
+pass at their recorded source boundaries through `4c323ae060`; facade and
+standalone-consumer checks continue. A scoped review of changed diagnostics
+returned the Pages table-name Edit's authored-name Debug field, and review of
+its lazy state found that failed resolution drops the charged wire budget.
+Both require correction and focused validation before merge. This is not an
+expansion of deferred audit 22. Existing typed refusal enums remain permitted
+by 0351 §2.4.2.
 
 The four owned build slots now cover composed iWork, composed XLSX, XLSB and
-PPTX. PPT and DOCX runtime validation remains queued. Native endpoints stay
-unresolved until final source freeze; no required engineering work is waived.
+DOCX. PPT runtime validation remains queued. Native endpoints stay unresolved
+until final source freeze; no required engineering work is waived.
