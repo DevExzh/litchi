@@ -6,7 +6,7 @@
 //! body properties, paragraphs with their local paragraph properties, and
 //! runs, line breaks and fields with their local character properties. A host
 //! that streams a larger part forwards the element's descendants to a
-//! builder; [`read`] and [`read_with_options`] drive one over a single element span.
+//! builder; [`read`] drives one over a single element span.
 //!
 //! Property values are *local*: an attribute that is absent stays `None`.
 //! Markup the model does not cover (list styles, effects, outlines,
@@ -27,7 +27,7 @@
 //!     <a:bodyPr/>
 //!     <a:p><a:pPr algn="ctr" lvl="1"/><a:r><a:rPr sz="2400" b="1"/><a:t>Hello</a:t></a:r></a:p>
 //! </p:txBody>"#;
-//! let body = reader::read(xml)?;
+//! let body = reader::read(xml, quick_xml::name::NamespaceResolver::default(), reader::Limits::DEFAULT)?;
 //! let paragraph = &body.paragraphs[0];
 //! assert_eq!(paragraph.properties.alignment, Some(Alignment::Center));
 //! assert_eq!(paragraph.properties.level, Some(1));
@@ -89,7 +89,7 @@ impl Limits {
 
     /// Construct a finite, nonzero limit set.
     ///
-    /// `input_bytes` bounds the element span [`read_with_options`] accepts, `depth`
+    /// `input_bytes` bounds the element span [`read`] accepts, `depth`
     /// the nesting below the text-body element, `nodes` its descendant
     /// elements and `text_bytes` the run and field text the body keeps.
     #[must_use]
@@ -111,7 +111,7 @@ impl Limits {
         }
     }
 
-    /// Largest element span [`read_with_options`] accepts.
+    /// Largest element span [`read`] accepts.
     #[inline]
     #[must_use]
     pub const fn input_bytes(self) -> usize {
@@ -146,8 +146,8 @@ impl Default for Limits {
     }
 }
 
-/// Read one text-body element whose namespace prefixes are all declared
-/// inside it, with [`Limits::DEFAULT`].
+/// Read one text-body element span under an explicit namespace scope and
+/// resource policy.
 ///
 /// `xml` is the complete element, for example `<p:txBody>...</p:txBody>`;
 /// its own name is not interpreted. Markup-compatibility processing is the
@@ -158,10 +158,6 @@ impl Default for Limits {
 /// Returns [`Error::Xml`] or [`Error::Common`] for malformed XML,
 /// [`Error::Invalid`] for an invalid modeled value or a fragment that is not
 /// one element, and [`Error::Limit`] when a bound is exceeded.
-pub fn read(xml: &[u8]) -> Result<Body> {
-    read_with_options(xml, NamespaceResolver::default(), Limits::DEFAULT)
-}
-
 /// Read one text-body element span.
 ///
 /// `scope` holds the namespace bindings the element inherits from the
@@ -173,7 +169,7 @@ pub fn read(xml: &[u8]) -> Result<Body> {
 /// # Errors
 ///
 /// The errors of [`read`], under `limits`.
-pub fn read_with_options(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body> {
+pub fn read(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body> {
     if xml.len() > limits.input_bytes {
         return Err(Error::limit(
             crate::LimitKind::InputBytes,

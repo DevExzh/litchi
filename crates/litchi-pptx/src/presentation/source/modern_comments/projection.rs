@@ -493,7 +493,7 @@ fn body_text(
         reply_list_declarations,
         reply_declarations,
     )?;
-    let body = body_reader::read_with_options(xml, scope, body_limits()).map_err(body_error)?;
+    let body = body_reader::read(xml, scope, body_limits()).map_err(body_error)?;
     Ok(Some(body.text()))
 }
 

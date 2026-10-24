@@ -3,7 +3,7 @@
 use quick_xml::events::BytesStart;
 use quick_xml::name::NamespaceResolver;
 
-use super::reader::{self, Limits, read, read_with_options};
+use super::reader::{self, Limits};
 use super::{
     Body, Bullet, BulletColor, BulletFont, BulletSize, Field, Hyperlink, RunKind, Spacing, TabStop,
     TextFill,
@@ -22,6 +22,10 @@ const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
 fn body(content: &str) -> String {
     format!(r#"<p:txBody xmlns:p="{P}" xmlns:a="{A}" xmlns:r="{R}">{content}</p:txBody>"#)
+}
+
+fn read(xml: &[u8]) -> crate::Result<Body> {
+    reader::read(xml, NamespaceResolver::default(), Limits::DEFAULT)
 }
 
 fn read_body(content: &str) -> Body {
@@ -228,7 +232,7 @@ fn resolves_prefixes_inherited_from_the_owner_and_strict_names() {
     };
     let mut scope = NamespaceResolver::default();
     scope.push(&root).unwrap();
-    let body = read_with_options(fragment, scope, Limits::DEFAULT).unwrap();
+    let body = reader::read(fragment, scope, Limits::DEFAULT).unwrap();
     assert_eq!(body.text(), "Inherited");
     assert_eq!(
         body.paragraphs[0].runs[0]
@@ -351,7 +355,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     let xml = body(r#"<a:p><a:r><a:t>0123456789</a:t></a:r></a:p>"#);
     let text_limit = Limits::new(1 << 20, 64, 64, 9).unwrap();
     assert!(matches!(
-        read_with_options(xml.as_bytes(), NamespaceResolver::default(), text_limit),
+        reader::read(xml.as_bytes(), NamespaceResolver::default(), text_limit),
         Err(crate::Error::Limit {
             kind: crate::LimitKind::TextBytes,
             ..
@@ -359,7 +363,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     ));
     let node_limit = Limits::new(1 << 20, 64, 2, 64).unwrap();
     assert!(matches!(
-        read_with_options(xml.as_bytes(), NamespaceResolver::default(), node_limit),
+        reader::read(xml.as_bytes(), NamespaceResolver::default(), node_limit),
         Err(crate::Error::Limit {
             kind: crate::LimitKind::TextBodyElements,
             ..
@@ -367,7 +371,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     ));
     let depth_limit = Limits::new(1 << 20, 2, 64, 64).unwrap();
     assert!(matches!(
-        read_with_options(xml.as_bytes(), NamespaceResolver::default(), depth_limit),
+        reader::read(xml.as_bytes(), NamespaceResolver::default(), depth_limit),
         Err(crate::Error::Limit {
             kind: crate::LimitKind::TextBodyNestingDepth,
             ..
@@ -375,7 +379,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     ));
     let input_limit = Limits::new(8, 64, 64, 64).unwrap();
     assert!(matches!(
-        read_with_options(xml.as_bytes(), NamespaceResolver::default(), input_limit),
+        reader::read(xml.as_bytes(), NamespaceResolver::default(), input_limit),
         Err(crate::Error::Limit {
             kind: crate::LimitKind::InputBytes,
             ..
@@ -465,7 +469,7 @@ fn generated_break_and_tab_text_respects_the_budget() {
         let xml = body(content);
         let limits = Limits::new(4096, 64, 64, 1).unwrap();
         assert!(matches!(
-            read_with_options(xml.as_bytes(), NamespaceResolver::default(), limits),
+            reader::read(xml.as_bytes(), NamespaceResolver::default(), limits),
             Err(crate::Error::Limit {
                 kind: crate::LimitKind::TextBytes,
                 ..
@@ -500,7 +504,7 @@ fn unmodeled_autofit_scale_is_not_silently_reauthored() {
     let parsed = read_body(r#"<a:bodyPr><a:normAutofit fontScale="85000"/></a:bodyPr><a:p/>"#);
     assert!(parsed.properties.has_unmodeled_content);
     let mut output = "unchanged".to_owned();
-    assert!(super::writer::write(&mut output, &parsed).is_err());
+    assert!(super::writer::write(&mut output, &parsed, super::writer::Limits::DEFAULT,).is_err());
     assert_eq!(output, "unchanged");
 }
 
@@ -527,7 +531,9 @@ fn action_only_links_are_preserved_and_empty_color_choices_are_not_written() {
         let parsed = read_body(content);
         assert!(parsed.properties.has_unmodeled_content);
         let mut output = "untouched".to_owned();
-        assert!(super::writer::write(&mut output, &parsed).is_err());
+        assert!(
+            super::writer::write(&mut output, &parsed, super::writer::Limits::DEFAULT,).is_err()
+        );
         assert_eq!(output, "untouched");
     }
 }

@@ -56,6 +56,62 @@ pub const MAX_DEPTH: usize = 128;
 /// Maximum element count while validating unknown children.
 pub const MAX_NODES: usize = 100_000;
 
+/// Caller-selected bounds for one SVG blip operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum source bytes inspected by a read operation.
+    pub max_input_bytes: usize,
+    /// Maximum serialized bytes admitted by a write operation.
+    pub max_output_bytes: usize,
+    /// Maximum inherited namespace bindings inspected by a contextual read.
+    pub max_context_bindings: usize,
+    /// Maximum inherited namespace depth inspected by a contextual read.
+    pub max_context_depth: usize,
+}
+
+impl Limits {
+    /// Historical SVG blip policy.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_context_bindings: MAX_CONTEXT_BINDINGS,
+        max_context_depth: MAX_CONTEXT_DEPTH,
+    };
+
+    /// Construct a byte policy with the historical contextual ceilings.
+    #[must_use]
+    pub const fn new(max_input_bytes: usize, max_output_bytes: usize) -> Self {
+        Self {
+            max_input_bytes,
+            max_output_bytes,
+            ..Self::DEFAULT
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        validate_limit(LimitKind::InputBytes, self.max_input_bytes, MAX_XML_BYTES)?;
+        validate_limit(LimitKind::OutputBytes, self.max_output_bytes, MAX_XML_BYTES)?;
+        validate_limit(
+            LimitKind::NamespaceDeclarations,
+            self.max_context_bindings,
+            MAX_CONTEXT_BINDINGS,
+        )?;
+        validate_limit(
+            LimitKind::XmlDepth,
+            self.max_context_depth,
+            MAX_CONTEXT_DEPTH,
+        )?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// A checked `ST_RelationshipId` value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[must_use]
@@ -269,9 +325,9 @@ pub const MAX_CONTEXT_DEPTH: usize = 1_024;
 
 /// An immutable, persistent namespace scope for a source-backed fragment.
 ///
-/// [`codec::read`] remains the complete-document codec and retains its exact
-/// source fast path.  Hosts that index a nested element can instead retain a
-/// `NamespaceContext` handle and call [`codec::read_contextual`].  Cloning this
+/// [`crate::svg_blip::read`] remains the complete-document codec and retains
+/// its exact source fast path. Hosts that index a nested element can instead
+/// retain a `NamespaceContext` handle and call [`crate::svg_blip::read_contextual`]. Cloning this
 /// value is cheap: declarations are stored only on the scope that introduced
 /// them and each descendant shares its ancestors through `Arc`.
 #[derive(Clone)]
@@ -779,7 +835,7 @@ impl SvgBlip {
     ///
     /// A contextual fragment is intentionally not exposed through
     /// [`Self::source`]: its root may rely on declarations inherited from its
-    /// host.  Use [`crate::svg_blip::codec::write_contextual`] to export an
+    /// host. Use [`crate::svg_blip::write_contextual`] to export an
     /// independently readable fragment with those declarations completed.
     #[must_use]
     pub fn raw_source(&self) -> Option<&[u8]> {
@@ -866,8 +922,8 @@ fn contextual_equal(left: &Option<ContextualSource>, right: &Option<ContextualSo
 ///
 /// Returns an error for malformed XML, a wrong root namespace/name, invalid
 /// relationship IDs, or exhausted resource bounds.
-pub fn read(xml: &[u8]) -> Result<SvgBlip> {
-    codec::read(xml)
+pub fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
+    codec::read(xml, limits)
 }
 
 /// Read one `svgBlip` element whose namespace scope is inherited from a host.
@@ -877,8 +933,8 @@ pub fn read(xml: &[u8]) -> Result<SvgBlip> {
 /// explicitly exports the value as a standalone fragment, while
 /// [`SvgBlip::raw_source`] remains an exact source authority for host-level
 /// byte splicing.
-pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip> {
-    codec::read_contextual(xml, context)
+pub fn read_contextual(xml: &[u8], context: &NamespaceContext, limits: Limits) -> Result<SvgBlip> {
+    codec::read_contextual(xml, context, limits)
 }
 
 /// Serialize one SVG blip fragment.
@@ -889,8 +945,8 @@ pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip
 /// # Errors
 ///
 /// Returns an error when validation fails or the bounded output is too large.
-pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
-    codec::write(value)
+pub fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    codec::write(value, limits)
 }
 
 /// Serialize one SVG blip fragment to a caller-provided sink.
@@ -898,8 +954,8 @@ pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns an error when validation or the sink write fails.
-pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
-    codec::write_to(writer, value)
+pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip, limits: Limits) -> Result<()> {
+    codec::write_to(writer, value, limits)
 }
 
 /// Serialize a contextual SVG fragment as an independently readable element.
@@ -908,8 +964,8 @@ pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
 /// contextual value's raw fragment remains unchanged after the root opening
 /// tag; inherited bindings are inserted only when the exported root does not
 /// already declare that prefix.
-pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<u8>> {
-    codec::write_contextual(value, max_output_bytes)
+pub fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    codec::write_contextual(value, limits)
 }
 
 /// Serialize a contextual SVG fragment to a caller-owned sink.
@@ -919,20 +975,25 @@ pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<
 pub fn write_contextual_to<W: Write>(
     writer: &mut W,
     value: &SvgBlip,
-    max_output_bytes: usize,
+    limits: Limits,
 ) -> Result<()> {
-    codec::write_contextual_to(writer, value, max_output_bytes)
+    codec::write_contextual_to(writer, value, limits)
 }
 
 /// XML codec for [`SvgBlip`].
-pub mod codec {
+pub(crate) mod codec {
     use super::*;
     use litchi_ooxml_common::xml::attributes::SeenNames;
 
     /// Read one complete `svgBlip` element.
-    pub fn read(xml: &[u8]) -> Result<SvgBlip> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+    pub fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
+        let limits = limits.validate()?;
+        if xml.len() > limits.max_input_bytes {
+            return Err(limit(
+                LimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes,
+            ));
         }
         let mut reader = NsReader::from_reader(xml);
         let origin = ReaderOrigin::of(xml);
@@ -1036,22 +1097,31 @@ pub mod codec {
     /// The root and its attributes are resolved by a borrowed resolver over
     /// the persistent context chain, and the raw element is retained once as
     /// the contextual source authority.
-    pub fn read_contextual(xml: &[u8], context: &NamespaceContext) -> Result<SvgBlip> {
-        if xml.len() > MAX_XML_BYTES {
-            return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+    pub fn read_contextual(
+        xml: &[u8],
+        context: &NamespaceContext,
+        limits: Limits,
+    ) -> Result<SvgBlip> {
+        let limits = limits.validate()?;
+        if xml.len() > limits.max_input_bytes {
+            return Err(limit(
+                LimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes,
+            ));
         }
-        if context.binding_count() > MAX_CONTEXT_BINDINGS {
+        if context.binding_count() > limits.max_context_bindings {
             return Err(limit(
                 LimitKind::NamespaceDeclarations,
                 context.binding_count(),
-                MAX_CONTEXT_BINDINGS,
+                limits.max_context_bindings,
             ));
         }
-        if context.depth() > MAX_CONTEXT_DEPTH {
+        if context.depth() > limits.max_context_depth {
             return Err(limit(
                 LimitKind::XmlDepth,
                 context.depth(),
-                MAX_CONTEXT_DEPTH,
+                limits.max_context_depth,
             ));
         }
         let mut reader = Reader::from_reader(xml);
@@ -1154,27 +1224,17 @@ pub mod codec {
     }
 
     /// Serialize one SVG blip fragment.
-    pub fn write(value: &SvgBlip) -> Result<Vec<u8>> {
+    pub fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         validate(value)?;
-        if let Some(source) = &value.source {
-            return Ok(source.to_vec());
-        }
-        if value.contextual.is_some() {
-            return write_contextual(value, MAX_XML_BYTES);
-        }
-        let plan = output_plan(value)?;
-        let size = serialized_size(value, &plan)?;
-        let mut output = Vec::new();
-        output.reserve_exact(size);
-        write_inner(&mut output, value, &plan)?;
-        debug_assert_eq!(output.len(), size);
-        Ok(output)
+        write_standalone_bounded(value, limits.max_output_bytes)
     }
 
     /// Serialize a contextual value with an explicit finite output cap.
-    pub fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> Result<Vec<u8>> {
+    pub fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         validate(value)?;
-        let maximum = max_output_bytes.min(MAX_XML_BYTES);
+        let maximum = limits.max_output_bytes;
         let Some(contextual) = value.contextual.as_ref() else {
             return write_standalone_bounded(value, maximum);
         };
@@ -1196,10 +1256,11 @@ pub mod codec {
     pub fn write_contextual_to<W: Write>(
         writer: &mut W,
         value: &SvgBlip,
-        max_output_bytes: usize,
+        limits: Limits,
     ) -> Result<()> {
+        let limits = limits.validate()?;
         validate(value)?;
-        let maximum = max_output_bytes.min(MAX_XML_BYTES);
+        let maximum = limits.max_output_bytes;
         let Some(contextual) = value.contextual.as_ref() else {
             if let Some(source) = &value.source {
                 if source.len() > maximum {
@@ -1227,9 +1288,8 @@ pub mod codec {
     }
 
     /// Serialize one SVG blip fragment to a caller-owned sink.
-    pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip) -> Result<()> {
-        writer.write_all(&write(value)?)?;
-        Ok(())
+    pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip, limits: Limits) -> Result<()> {
+        write_contextual_to(writer, value, limits)
     }
 
     fn write_standalone_bounded(value: &SvgBlip, maximum: usize) -> Result<Vec<u8>> {
@@ -2903,6 +2963,13 @@ fn allocation(resource: &'static str, source: std::collections::TryReserveError)
 
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
     Error::limit(kind, observed, maximum)
+}
+
+fn validate_limit(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::invalid_limit(kind, value, maximum));
+    }
+    Ok(())
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {

@@ -53,7 +53,8 @@ pub(crate) struct Inventory {
 pub fn read(xml: &[u8]) -> Result<Scene> {
     let prepared = prepare_fragment(xml)?;
     Ok(Scene::from_wire(
-        drawing::codec::read(&prepared).map_err(super::model::drawing_error)?,
+        drawing::codec::read(&prepared, drawing::codec::Limits::DEFAULT)
+            .map_err(super::model::drawing_error)?,
     ))
 }
 
@@ -74,7 +75,8 @@ pub fn write(scene: &Scene) -> Result<Vec<u8>> {
                 .map_err(|error| invalid(error.to_string()))?,
         );
     }
-    drawing::codec::write(&wire).map_err(super::model::drawing_error)
+    drawing::codec::write(&wire, drawing::codec::Limits::DEFAULT)
+        .map_err(super::model::drawing_error)
 }
 
 pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {

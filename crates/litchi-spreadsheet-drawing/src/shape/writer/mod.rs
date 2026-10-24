@@ -35,7 +35,9 @@ use std::fmt::{self, Write as _};
 
 use litchi_core::xml::escape::escape_xml;
 use litchi_drawingml::geom::Preset;
-use litchi_drawingml::text::body::writer::write_contents as write_text_body_contents;
+use litchi_drawingml::text::body::writer::{
+    Limits as TextBodyLimits, write_contents as write_text_body_contents,
+};
 
 use super::{
     Anchor, CellMarker, EditAs, EmuExtent, EmuOffset, Geometry, GroupTransform, Paragraph,
@@ -950,7 +952,12 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) -> WriteResult<(
         },
     }
     xml.push_str("</xdr:spPr><xdr:txBody>");
-    write_text_body_contents(xml, &spec.properties, &spec.paragraphs)?;
+    write_text_body_contents(
+        xml,
+        &spec.properties,
+        &spec.paragraphs,
+        TextBodyLimits::DEFAULT,
+    )?;
     xml.push_str("</xdr:txBody></xdr:sp>");
     Ok(())
 }

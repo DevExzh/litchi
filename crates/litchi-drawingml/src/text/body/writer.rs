@@ -15,10 +15,49 @@
 //! or other unmodeled markup is also refused, because this writer cannot
 //! reproduce that projection losslessly.
 
-use litchi_core::xml::escape::escape_xml;
+use std::fmt::Write as _;
 
 use super::{Body, Paragraph, ParagraphProperties, Properties, Run, RunKind, RunProperties};
 use crate::text::{Anchor, Autofit, Columns, Direction, Wrap};
+
+/// Caller-selected bound for serialized text-body content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum bytes appended for one neutral text-body content value.
+    pub max_output_bytes: usize,
+}
+
+impl Limits {
+    /// Historical text-body output budget.
+    pub const DEFAULT: Self = Self {
+        max_output_bytes: 64 * 1024 * 1024,
+    };
+
+    /// Construct an output policy. The finite bound is checked by the writer
+    /// before it allocates or mutates the caller's string.
+    #[must_use]
+    pub const fn new(max_output_bytes: usize) -> Self {
+        Self { max_output_bytes }
+    }
+
+    fn validate(self) -> crate::Result<Self> {
+        if self.max_output_bytes == 0 || self.max_output_bytes > Self::DEFAULT.max_output_bytes {
+            return Err(crate::Error::invalid_limit(
+                crate::LimitKind::OutputBytes,
+                self.max_output_bytes,
+                Self::DEFAULT.max_output_bytes,
+            ));
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 /// Write the neutral content of one `DrawingML` text body.
 ///
@@ -30,8 +69,8 @@ use crate::text::{Anchor, Autofit, Columns, Direction, Wrap};
 /// Returns [`crate::Error::Invalid`] when the body contains content this
 /// writer cannot represent without loss, including a reader projection marked
 /// as incomplete. The output is unchanged on error.
-pub fn write(xml: &mut String, body: &Body) -> crate::Result<()> {
-    write_contents(xml, &body.properties, &body.paragraphs)
+pub fn write(xml: &mut String, body: &Body, limits: Limits) -> crate::Result<()> {
+    write_contents(xml, &body.properties, &body.paragraphs, limits)
 }
 
 /// Write the neutral content of one `DrawingML` text body without requiring an
@@ -46,24 +85,50 @@ pub fn write_contents(
     xml: &mut String,
     properties: &Properties,
     paragraphs: &[Paragraph],
+    limits: Limits,
 ) -> crate::Result<()> {
+    let limits = limits.validate()?;
     validate(properties, paragraphs)?;
-    write_properties(xml, properties);
-    xml.push_str("<a:lstStyle/>");
+    let size = serialized_size(properties, paragraphs)?;
+    if size > limits.max_output_bytes {
+        return Err(crate::Error::limit(
+            crate::LimitKind::OutputBytes,
+            size,
+            limits.max_output_bytes,
+        ));
+    }
+    let mut rendered = String::new();
+    rendered.try_reserve_exact(size).map_err(|error| {
+        crate::Error::Invalid(format!("text body output allocation failed: {error}"))
+    })?;
+    write_inner(&mut rendered, properties, paragraphs)?;
+    debug_assert_eq!(rendered.len(), size);
+    xml.push_str(&rendered);
+    Ok(())
+}
+
+fn write_inner<W: std::fmt::Write>(
+    xml: &mut W,
+    properties: &Properties,
+    paragraphs: &[Paragraph],
+) -> crate::Result<()> {
+    write_properties(xml, properties).map_err(render_error)?;
+    xml.write_str("<a:lstStyle/>").map_err(render_error)?;
     for paragraph in paragraphs {
-        xml.push_str("<a:p>");
+        xml.write_str("<a:p>").map_err(render_error)?;
         for run in &paragraph.runs {
             match &run.kind {
                 RunKind::Text => {
-                    xml.push_str("<a:r>");
-                    write_run_properties(xml, run);
-                    xml.push_str(&format!("<a:t>{}</a:t>", escape_xml(&run.text)));
-                    xml.push_str("</a:r>");
+                    xml.write_str("<a:r>").map_err(render_error)?;
+                    write_run_properties(xml, run).map_err(render_error)?;
+                    xml.write_str("<a:t>").map_err(render_error)?;
+                    write_escaped(xml, &run.text).map_err(render_error)?;
+                    xml.write_str("</a:t></a:r>").map_err(render_error)?;
                 },
                 RunKind::Break => {
-                    xml.push_str("<a:br>");
-                    write_run_properties(xml, run);
-                    xml.push_str("</a:br>");
+                    xml.write_str("<a:br>").map_err(render_error)?;
+                    write_run_properties(xml, run).map_err(render_error)?;
+                    xml.write_str("</a:br>").map_err(render_error)?;
                 },
                 RunKind::Field(_) => {
                     // `validate` above rejects fields before the first byte is
@@ -75,72 +140,111 @@ pub fn write_contents(
                 },
             }
         }
-        xml.push_str("</a:p>");
+        xml.write_str("</a:p>").map_err(render_error)?;
     }
     Ok(())
 }
 
-fn write_properties(xml: &mut String, properties: &Properties) {
-    xml.push_str("<a:bodyPr");
-    xml.push_str(&format!(
+fn write_properties<W: std::fmt::Write>(xml: &mut W, properties: &Properties) -> std::fmt::Result {
+    xml.write_str("<a:bodyPr")?;
+    write!(
+        xml,
         r#" lIns="{}" tIns="{}" rIns="{}" bIns="{}""#,
         properties.insets.left,
         properties.insets.top,
         properties.insets.right,
         properties.insets.bottom
-    ));
+    )?;
     if properties.vertical_anchor != Anchor::Top {
-        xml.push_str(&format!(
-            r#" anchor="{}""#,
-            properties.vertical_anchor.token()
-        ));
+        write!(xml, r#" anchor="{}""#, properties.vertical_anchor.token())?;
     }
     if properties.anchor_center {
-        xml.push_str(r#" anchorCtr="1""#);
+        xml.write_str(r#" anchorCtr="1""#)?;
     }
     if properties.direction != Direction::Horizontal {
-        xml.push_str(&format!(r#" vert="{}""#, properties.direction.token()));
+        write!(xml, r#" vert="{}""#, properties.direction.token())?;
     }
     if properties.wrap == Wrap::None {
-        xml.push_str(r#" wrap="none""#);
+        xml.write_str(r#" wrap="none""#)?;
     }
     if properties.column_count != Columns::ONE {
-        xml.push_str(&format!(r#" numCol="{}""#, properties.column_count));
+        write!(xml, r#" numCol="{}""#, properties.column_count)?;
     }
     if properties.space_first_last_paragraph {
-        xml.push_str(r#" spcFirstLastPara="1""#);
+        xml.write_str(r#" spcFirstLastPara="1""#)?;
     }
     match properties.autofit {
-        Autofit::None => xml.push_str("><a:noAutofit/></a:bodyPr>"),
-        Autofit::Shape => xml.push_str("><a:spAutoFit/></a:bodyPr>"),
-        Autofit::Normal => xml.push_str("><a:normAutofit/></a:bodyPr>"),
+        Autofit::None => xml.write_str("><a:noAutofit/></a:bodyPr>"),
+        Autofit::Shape => xml.write_str("><a:spAutoFit/></a:bodyPr>"),
+        Autofit::Normal => xml.write_str("><a:normAutofit/></a:bodyPr>"),
     }
 }
 
-fn write_run_properties(xml: &mut String, run: &Run) {
+fn write_run_properties<W: std::fmt::Write>(xml: &mut W, run: &Run) -> std::fmt::Result {
     let properties = &run.properties;
     if properties.bold.is_none()
         && properties.italic.is_none()
         && properties.underline.is_none()
         && properties.size.is_none()
     {
-        xml.push_str("<a:rPr/>");
-        return;
+        xml.write_str("<a:rPr/>")?;
+        return Ok(());
     }
-    xml.push_str("<a:rPr");
+    xml.write_str("<a:rPr")?;
     if let Some(size) = properties.size {
-        xml.push_str(&format!(r#" sz="{size}""#));
+        write!(xml, r#" sz="{size}""#)?;
     }
     if let Some(bold) = properties.bold {
-        xml.push_str(if bold { r#" b="1""# } else { r#" b="0""# });
+        xml.write_str(if bold { r#" b="1""# } else { r#" b="0""# })?;
     }
     if let Some(italic) = properties.italic {
-        xml.push_str(if italic { r#" i="1""# } else { r#" i="0""# });
+        xml.write_str(if italic { r#" i="1""# } else { r#" i="0""# })?;
     }
     if let Some(underline) = properties.underline {
-        xml.push_str(&format!(r#" u="{}""#, underline.dml()));
+        write!(xml, r#" u="{}""#, underline.dml())?;
     }
-    xml.push_str("/>");
+    xml.write_str("/>")
+}
+
+fn write_escaped<W: std::fmt::Write>(xml: &mut W, value: &str) -> std::fmt::Result {
+    let bytes = value.as_bytes();
+    let mut cursor = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        let replacement = match byte {
+            b'&' => "&amp;",
+            b'<' => "&lt;",
+            b'>' => "&gt;",
+            b'"' => "&quot;",
+            b'\'' => "&apos;",
+            _ => continue,
+        };
+        xml.write_str(&value[cursor..index])?;
+        xml.write_str(replacement)?;
+        cursor = index + 1;
+    }
+    xml.write_str(&value[cursor..])
+}
+
+fn serialized_size(properties: &Properties, paragraphs: &[Paragraph]) -> crate::Result<usize> {
+    let mut counter = CountingWriter::default();
+    write_inner(&mut counter, properties, paragraphs)?;
+    Ok(counter.bytes)
+}
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl std::fmt::Write for CountingWriter {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        self.bytes = self.bytes.checked_add(value.len()).ok_or(std::fmt::Error)?;
+        Ok(())
+    }
+}
+
+fn render_error(_: std::fmt::Error) -> crate::Error {
+    crate::Error::Invalid("text body output formatting failed".to_owned())
 }
 
 /// The first part of `paragraphs` the writer would not write, as a short
@@ -197,7 +301,7 @@ fn validate(properties: &Properties, paragraphs: &[Paragraph]) -> crate::Result<
 
 #[cfg(test)]
 mod tests {
-    use super::{unsupported, write, write_contents};
+    use super::{Limits, unsupported, write, write_contents};
     use crate::text::body::{
         Body, Field, Insets, Paragraph, ParagraphProperties, Properties, Run, RunKind,
         RunProperties,
@@ -216,7 +320,7 @@ mod tests {
                 ..Paragraph::default()
             }],
         };
-        write(&mut xml, &body).unwrap();
+        write(&mut xml, &body, Limits::DEFAULT).unwrap();
 
         assert_eq!(
             xml,
@@ -259,7 +363,7 @@ mod tests {
         assert_eq!(unsupported(&paragraphs), None);
         let mut xml = String::new();
 
-        write_contents(&mut xml, &properties, &paragraphs).unwrap();
+        write_contents(&mut xml, &properties, &paragraphs, Limits::DEFAULT).unwrap();
 
         assert_eq!(
             xml,
@@ -331,7 +435,13 @@ mod tests {
         }];
         let mut xml = String::new();
 
-        write_contents(&mut xml, &Properties::default(), &paragraphs).unwrap();
+        write_contents(
+            &mut xml,
+            &Properties::default(),
+            &paragraphs,
+            Limits::DEFAULT,
+        )
+        .unwrap();
 
         assert!(xml.contains("<a:br><a:rPr sz=\"1000\"/></a:br>"));
         assert!(!xml.contains("<a:t>"));
@@ -349,7 +459,13 @@ mod tests {
         }];
         let mut xml = "prefix".to_owned();
 
-        let error = write_contents(&mut xml, &Properties::default(), &paragraphs).unwrap_err();
+        let error = write_contents(
+            &mut xml,
+            &Properties::default(),
+            &paragraphs,
+            Limits::DEFAULT,
+        )
+        .unwrap_err();
 
         assert_eq!(xml, "prefix");
         assert!(
@@ -375,6 +491,7 @@ mod tests {
                 properties: Properties::default(),
                 paragraphs: paragraphs.to_vec(),
             },
+            Limits::DEFAULT,
         )
         .unwrap_err();
 
@@ -392,7 +509,7 @@ mod tests {
         };
         let mut xml = "prefix".to_owned();
 
-        let error = write_contents(&mut xml, &properties, &[]).unwrap_err();
+        let error = write_contents(&mut xml, &properties, &[], Limits::DEFAULT).unwrap_err();
 
         assert_eq!(xml, "prefix");
         assert!(
@@ -407,12 +524,14 @@ mod tests {
                 <a:bodyPr/><a:lstStyle><a:lvl1pPr><a:defRPr><a:effectLst><a:outerShdw/></a:effectLst></a:defRPr></a:lvl1pPr></a:lstStyle>
                 <a:p><a:r><a:t>text</a:t></a:r></a:p>
             </a:txBody>"#,
+            quick_xml::name::NamespaceResolver::default(),
+            crate::text::body::reader::Limits::DEFAULT,
         )
         .unwrap();
         assert!(body.properties.has_unmodeled_content);
 
         let mut xml = "prefix".to_owned();
-        let error = write(&mut xml, &body).unwrap_err();
+        let error = write(&mut xml, &body, Limits::DEFAULT).unwrap_err();
 
         assert_eq!(xml, "prefix");
         assert!(

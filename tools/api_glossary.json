@@ -7794,9 +7794,9 @@
           "replacement": "the shared reader is strict by default"
         },
         {
-          "name": "read_with",
+          "name": "read_with_options",
           "scope": "litchi_drawingml::text::body::reader",
-          "replacement": "use read_with_options"
+          "replacement": "use read(xml, scope, limits)"
         },
         {
           "name": "id",

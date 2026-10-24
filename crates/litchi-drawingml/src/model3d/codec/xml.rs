@@ -14,10 +14,10 @@ use quick_xml::{
 use crate::{Error, LimitKind, Result};
 
 use super::super::{
-    Blip, Child, Id, Inert, MAX_CHILDREN, MAX_DEPTH, MAX_FRAGMENT_BYTES, MAX_NODES, Metadata,
-    NAMESPACE, Namespace, RELATIONSHIP_NAMESPACE, RELATIONSHIP_NAMESPACE_STRICT, Raster,
-    RasterChild, Reference,
+    Blip, Child, Id, Inert, Metadata, NAMESPACE, Namespace, RELATIONSHIP_NAMESPACE,
+    RELATIONSHIP_NAMESPACE_STRICT, Raster, RasterChild, Reference,
 };
+use super::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// Read one complete `m3d:model3d` element.
@@ -25,13 +25,10 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Metadata> {
-    if xml.len() > super::super::MAX_XML_BYTES {
-        return Err(limit(
-            LimitKind::XmlBytes,
-            xml.len(),
-            super::super::MAX_XML_BYTES,
-        ));
+pub fn read(xml: &[u8], limits: Limits) -> Result<Metadata> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -84,14 +81,15 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
             Event::Start(element) if metadata.is_some() && root_depth == 1 => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 let child_start = event_start;
-                let child_end = capture_namespace_element(&mut reader, origin, &mut buffer)?;
+                let child_end =
+                    capture_namespace_element(&mut reader, origin, &mut buffer, limits)?;
                 let raw = xml
                     .get(child_start..child_end)
                     .ok_or_else(|| invalid("model3d child range is outside the input"))?;
                 let metadata = metadata
                     .as_mut()
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
-                push_child(metadata, local, namespace, raw.to_vec())?;
+                push_child(metadata, local, namespace, raw.to_vec(), limits)?;
             },
             Event::Empty(element) if metadata.is_some() && root_depth == 1 => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
@@ -101,7 +99,7 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
                 let metadata = metadata
                     .as_mut()
                     .ok_or_else(|| invalid("model3d root metadata is missing"))?;
-                push_child(metadata, local, namespace, raw.to_vec())?;
+                push_child(metadata, local, namespace, raw.to_vec(), limits)?;
             },
             Event::End(_) if metadata.is_some() && root_depth == 1 => {
                 root_depth = 0;
@@ -143,12 +141,13 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn opaque(xml: &[u8]) -> Result<Inert> {
-    if xml.len() > MAX_FRAGMENT_BYTES {
+pub fn opaque(xml: &[u8], limits: Limits) -> Result<Inert> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_fragment_bytes {
         return Err(limit(
             LimitKind::InertFragmentBytes,
             xml.len(),
-            MAX_FRAGMENT_BYTES,
+            limits.max_fragment_bytes,
         ));
     }
     let mut reader = NsReader::from_reader(xml);
@@ -175,7 +174,7 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
                 root = Some((local, namespace));
                 root_start = start;
-                root_end = capture_namespace_element(&mut reader, origin, &mut buffer)?;
+                root_end = capture_namespace_element(&mut reader, origin, &mut buffer, limits)?;
             },
             Event::Empty(element) if root.is_none() => {
                 let (local, namespace) = resolved_name(&namespace, &element.name())?;
@@ -228,17 +227,19 @@ pub fn opaque(xml: &[u8]) -> Result<Inert> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
+pub fn write(metadata: &Metadata, limits: Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     crate::model3d::validation::validate(metadata).map_err(|error| validation_error(&error))?;
-    let mut output = Vec::new();
-    write_inner(&mut output, metadata);
-    if output.len() > super::super::MAX_XML_BYTES {
-        return Err(limit(
-            LimitKind::XmlBytes,
-            output.len(),
-            super::super::MAX_XML_BYTES,
-        ));
+    let size = output_size(metadata)?;
+    if size > limits.max_output_bytes {
+        return Err(limit(LimitKind::OutputBytes, size, limits.max_output_bytes));
     }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|error| invalid(format!("model3d output allocation failed: {error}")))?;
+    write_inner(&mut output, metadata).map_err(Error::Io)?;
+    debug_assert_eq!(output.len(), size);
     Ok(output)
 }
 
@@ -247,9 +248,14 @@ pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write_to<W: Write>(writer: &mut W, metadata: &Metadata) -> Result<()> {
-    let output = write(metadata)?;
-    writer.write_all(&output)?;
+pub fn write_to<W: Write>(writer: &mut W, metadata: &Metadata, limits: Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    crate::model3d::validation::validate(metadata).map_err(|error| validation_error(&error))?;
+    let size = output_size(metadata)?;
+    if size > limits.max_output_bytes {
+        return Err(limit(LimitKind::OutputBytes, size, limits.max_output_bytes));
+    }
+    write_inner(writer, metadata).map_err(Error::Io)?;
     Ok(())
 }
 
@@ -258,18 +264,21 @@ fn push_child(
     local: String,
     namespace: String,
     raw: Vec<u8>,
+    limits: Limits,
 ) -> Result<()> {
-    if metadata.children.len() >= MAX_CHILDREN {
+    if metadata.children.len() >= limits.max_children {
         return Err(limit(
             LimitKind::ModelChildren,
             metadata.children.len() + 1,
-            MAX_CHILDREN,
+            limits.max_children,
         ));
     }
     if local == "raster" && namespace == NAMESPACE {
-        metadata
-            .children
-            .push(Child::Raster(parse_raster(&raw, &metadata.namespaces)?));
+        metadata.children.push(Child::Raster(parse_raster(
+            &raw,
+            &metadata.namespaces,
+            limits,
+        )?));
     } else {
         let value = Inert::from_wire(raw, local, namespace);
         crate::model3d::validation::validate_inert_fragment(&value)
@@ -279,7 +288,7 @@ fn push_child(
     Ok(())
 }
 
-fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
+fn parse_raster(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Raster> {
     let mut reader = Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -319,11 +328,18 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
             Event::Start(element) if depth == 1 => {
                 let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
-                let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
+                let child_end = capture_plain_element(&mut reader, origin, &mut buffer, limits)?;
                 let raw = xml
                     .get(start..child_end)
                     .ok_or_else(|| invalid("model3d raster child range is outside the input"))?;
-                push_raster_child(&mut children, local, namespace, raw.to_vec(), &namespaces)?;
+                push_raster_child(
+                    &mut children,
+                    local,
+                    namespace,
+                    raw.to_vec(),
+                    &namespaces,
+                    limits,
+                )?;
             },
             Event::Empty(element) if depth == 1 => {
                 let local = local_name(&element.name())?;
@@ -331,7 +347,14 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
                 let raw = xml
                     .get(start..end)
                     .ok_or_else(|| invalid("model3d raster child range is outside the input"))?;
-                push_raster_child(&mut children, local, namespace, raw.to_vec(), &namespaces)?;
+                push_raster_child(
+                    &mut children,
+                    local,
+                    namespace,
+                    raw.to_vec(),
+                    &namespaces,
+                    limits,
+                )?;
             },
             Event::End(_) => {
                 depth = depth
@@ -359,11 +382,11 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
         buffer.clear();
     }
     let _ = (root_start, root_end);
-    if children.len() > super::super::MAX_RASTER_CHILDREN {
+    if children.len() > limits.max_raster_children {
         return Err(limit(
             LimitKind::RasterChildren,
             children.len(),
-            super::super::MAX_RASTER_CHILDREN,
+            limits.max_raster_children,
         ));
     }
     Raster::from_wire(renderer_name, renderer_version, children, local_namespaces)
@@ -376,16 +399,17 @@ fn push_raster_child(
     namespace: String,
     raw: Vec<u8>,
     namespaces: &[Namespace],
+    limits: Limits,
 ) -> Result<()> {
-    if children.len() >= super::super::MAX_RASTER_CHILDREN {
+    if children.len() >= limits.max_raster_children {
         return Err(limit(
             LimitKind::RasterChildren,
             children.len() + 1,
-            super::super::MAX_RASTER_CHILDREN,
+            limits.max_raster_children,
         ));
     }
     if local == "blip" && namespace == NAMESPACE {
-        children.push(RasterChild::Blip(parse_blip(&raw, namespaces)?));
+        children.push(RasterChild::Blip(parse_blip(&raw, namespaces, limits)?));
     } else {
         let value = Inert::from_wire(raw, local, namespace);
         crate::model3d::validation::validate_inert_fragment(&value)
@@ -395,7 +419,7 @@ fn push_raster_child(
     Ok(())
 }
 
-fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
+fn parse_blip(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Blip> {
     let mut reader = Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -427,10 +451,17 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
             Event::Start(element) => {
                 let local = local_name(&element.name())?;
                 let namespace = prefix_namespace(element.name().prefix(), &namespaces);
-                let child_end = capture_plain_element(&mut reader, origin, &mut buffer)?;
+                let child_end = capture_plain_element(&mut reader, origin, &mut buffer, limits)?;
                 let raw = xml
                     .get(start..child_end)
                     .ok_or_else(|| invalid("model3d blip child range is outside the input"))?;
+                if children.len() >= limits.max_children {
+                    return Err(limit(
+                        LimitKind::ModelChildren,
+                        children.len() + 1,
+                        limits.max_children,
+                    ));
+                }
                 children.push(Inert::from_wire(raw.to_vec(), local, namespace));
             },
             Event::Empty(element) => {
@@ -439,6 +470,13 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
                 let raw = xml
                     .get(start..end)
                     .ok_or_else(|| invalid("model3d blip child range is outside the input"))?;
+                if children.len() >= limits.max_children {
+                    return Err(limit(
+                        LimitKind::ModelChildren,
+                        children.len() + 1,
+                        limits.max_children,
+                    ));
+                }
                 children.push(Inert::from_wire(raw.to_vec(), local, namespace));
             },
             Event::End(_) => break,
@@ -460,100 +498,134 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace]) -> Result<Blip> {
     Ok(Blip::from_wire(reference, children, local_namespaces))
 }
 
-fn write_inner(output: &mut Vec<u8>, metadata: &Metadata) {
-    output.extend_from_slice(b"<m3d:model3d");
+fn write_inner<W: Write>(output: &mut W, metadata: &Metadata) -> std::io::Result<()> {
+    output.write_all(b"<m3d:model3d")?;
     let mut has_model = false;
     let mut has_rel = false;
     for declaration in &metadata.namespaces {
         has_model |= declaration.uri() == NAMESPACE;
         has_rel |= declaration.uri() == RELATIONSHIP_NAMESPACE
             || declaration.uri() == RELATIONSHIP_NAMESPACE_STRICT;
-        write_namespace(output, declaration);
+        write_namespace(output, declaration)?;
     }
     if !has_model {
-        write_namespace_value(output, Some("m3d"), NAMESPACE);
+        write_namespace_value(output, Some("m3d"), NAMESPACE)?;
     }
     if !has_rel {
-        write_namespace_value(output, Some("r"), RELATIONSHIP_NAMESPACE);
+        write_namespace_value(output, Some("r"), RELATIONSHIP_NAMESPACE)?;
     }
-    write_reference(output, &metadata.reference);
-    output.push(b'>');
+    write_reference(output, &metadata.reference)?;
+    output.write_all(b">")?;
     for child in &metadata.children {
         match child {
-            Child::Opaque(value) => output.extend_from_slice(value.as_bytes()),
-            Child::Raster(value) => write_raster(output, value),
+            Child::Opaque(value) => output.write_all(value.as_bytes())?,
+            Child::Raster(value) => write_raster(output, value)?,
         }
     }
-    output.extend_from_slice(b"</m3d:model3d>");
+    output.write_all(b"</m3d:model3d>")?;
+    Ok(())
 }
 
-fn write_raster(output: &mut Vec<u8>, raster: &Raster) {
-    output.extend_from_slice(b"<m3d:raster rName=\"");
-    push_escaped(output, &raster.renderer_name);
-    output.extend_from_slice(b"\" rVer=\"");
-    push_escaped(output, &raster.renderer_version);
-    output.push(b'"');
+fn write_raster<W: Write>(output: &mut W, raster: &Raster) -> std::io::Result<()> {
+    output.write_all(b"<m3d:raster rName=\"")?;
+    push_escaped(output, &raster.renderer_name)?;
+    output.write_all(b"\" rVer=\"")?;
+    push_escaped(output, &raster.renderer_version)?;
+    output.write_all(b"\"")?;
     for declaration in &raster.namespaces {
-        write_namespace(output, declaration);
+        write_namespace(output, declaration)?;
     }
-    output.push(b'>');
+    output.write_all(b">")?;
     for child in &raster.children {
         match child {
-            RasterChild::Blip(value) => write_blip(output, value),
-            RasterChild::Opaque(value) => output.extend_from_slice(value.as_bytes()),
+            RasterChild::Blip(value) => write_blip(output, value)?,
+            RasterChild::Opaque(value) => output.write_all(value.as_bytes())?,
         }
     }
-    output.extend_from_slice(b"</m3d:raster>");
+    output.write_all(b"</m3d:raster>")?;
+    Ok(())
 }
 
-fn write_blip(output: &mut Vec<u8>, blip: &Blip) {
-    output.extend_from_slice(b"<m3d:blip");
+fn write_blip<W: Write>(output: &mut W, blip: &Blip) -> std::io::Result<()> {
+    output.write_all(b"<m3d:blip")?;
     for declaration in &blip.namespaces {
-        write_namespace(output, declaration);
+        write_namespace(output, declaration)?;
     }
-    write_reference(output, &blip.reference);
+    write_reference(output, &blip.reference)?;
     if blip.children.is_empty() {
-        output.extend_from_slice(b"/>");
+        output.write_all(b"/>")?;
     } else {
-        output.push(b'>');
+        output.write_all(b">")?;
         for child in &blip.children {
-            output.extend_from_slice(child.as_bytes());
+            output.write_all(child.as_bytes())?;
         }
-        output.extend_from_slice(b"</m3d:blip>");
+        output.write_all(b"</m3d:blip>")?;
     }
+    Ok(())
 }
 
-fn write_reference(output: &mut Vec<u8>, reference: &Reference) {
+fn write_reference<W: Write>(output: &mut W, reference: &Reference) -> std::io::Result<()> {
     if let Some(id) = &reference.embedded {
-        output.extend_from_slice(b" r:embed=\"");
-        push_escaped(output, id.as_str());
-        output.push(b'"');
+        output.write_all(b" r:embed=\"")?;
+        push_escaped(output, id.as_str())?;
+        output.write_all(b"\"")?;
     }
     if let Some(id) = &reference.linked {
-        output.extend_from_slice(b" r:link=\"");
-        push_escaped(output, id.as_str());
-        output.push(b'"');
+        output.write_all(b" r:link=\"")?;
+        push_escaped(output, id.as_str())?;
+        output.write_all(b"\"")?;
     }
+    Ok(())
 }
 
-fn write_namespace(output: &mut Vec<u8>, declaration: &Namespace) {
-    write_namespace_value(output, declaration.prefix(), declaration.uri());
+fn write_namespace<W: Write>(output: &mut W, declaration: &Namespace) -> std::io::Result<()> {
+    write_namespace_value(output, declaration.prefix(), declaration.uri())
 }
 
-fn write_namespace_value(output: &mut Vec<u8>, prefix: Option<&str>, uri: &str) {
-    output.extend_from_slice(b" xmlns");
+fn write_namespace_value<W: Write>(
+    output: &mut W,
+    prefix: Option<&str>,
+    uri: &str,
+) -> std::io::Result<()> {
+    output.write_all(b" xmlns")?;
     if let Some(prefix) = prefix {
-        output.push(b':');
-        output.extend_from_slice(prefix.as_bytes());
+        output.write_all(b":")?;
+        output.write_all(prefix.as_bytes())?;
     }
-    output.extend_from_slice(b"=\"");
-    push_escaped(output, uri);
-    output.push(b'"');
+    output.write_all(b"=\"")?;
+    push_escaped(output, uri)?;
+    output.write_all(b"\"")?;
+    Ok(())
 }
 
-fn push_escaped(output: &mut Vec<u8>, value: &str) {
+fn push_escaped<W: Write>(output: &mut W, value: &str) -> std::io::Result<()> {
     let escaped = quick_xml::escape::escape(value);
-    output.extend_from_slice(escaped.as_bytes());
+    output.write_all(escaped.as_bytes())
+}
+
+fn output_size(metadata: &Metadata) -> Result<usize> {
+    let mut counter = CountingWriter::default();
+    write_inner(&mut counter, metadata).map_err(Error::Io)?;
+    Ok(counter.bytes)
+}
+
+#[derive(Default)]
+struct CountingWriter {
+    bytes: usize,
+}
+
+impl Write for CountingWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.bytes = self
+            .bytes
+            .checked_add(bytes.len())
+            .ok_or_else(|| std::io::Error::other("model3d output size overflow"))?;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }
 
 fn reference_from_namespace<R: std::io::BufRead>(
@@ -741,6 +813,7 @@ fn capture_namespace_element<R: std::io::BufRead>(
     reader: &mut NsReader<R>,
     origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
+    limits: Limits,
 ) -> Result<usize> {
     let mut depth = 1usize;
     let mut nodes = 0usize;
@@ -756,18 +829,18 @@ fn capture_namespace_element<R: std::io::BufRead>(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("model3d XML nesting is too deep"))?;
-                if depth > MAX_DEPTH {
-                    return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+                if depth > limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
                 }
                 nodes = nodes.saturating_add(1);
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
             },
             Event::Empty(_) => {
                 nodes = nodes.saturating_add(1);
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
             },
             Event::End(_) => {
@@ -795,8 +868,10 @@ fn capture_plain_element<R: std::io::BufRead>(
     reader: &mut Reader<R>,
     origin: ReaderOrigin,
     buffer: &mut Vec<u8>,
+    limits: Limits,
 ) -> Result<usize> {
     let mut depth = 1usize;
+    let mut nodes = 0usize;
     loop {
         buffer.clear();
         let event = reader
@@ -811,8 +886,18 @@ fn capture_plain_element<R: std::io::BufRead>(
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("model3d XML nesting is too deep"))?;
-                if depth > MAX_DEPTH {
-                    return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+                if depth > limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
+                }
+                nodes = nodes.saturating_add(1);
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+            },
+            Event::Empty(_) => {
+                nodes = nodes.saturating_add(1);
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
             },
             Event::End(_) => {
@@ -825,8 +910,7 @@ fn capture_plain_element<R: std::io::BufRead>(
             },
             Event::DocType(_) => return Err(invalid("DTD is forbidden in model3d XML")),
             Event::Eof => return Err(invalid("model3d element is unterminated")),
-            Event::Empty(_)
-            | Event::Text(_)
+            Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)

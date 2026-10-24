@@ -2650,7 +2650,11 @@ fn project_svg_owner<'a>(
     // Keep the host range authoritative and resolve inherited names through
     // the persistent context.  Namespace completion remains an explicit,
     // bounded export operation on the owner.
-    let value = match svg_blip::read_contextual(fragment, context) {
+    let value = match svg_blip::read_contextual(
+        fragment,
+        context,
+        svg_blip::Limits::new(maximum, MAX_FRAGMENT_BYTES),
+    ) {
         Ok(value) => value,
         Err(_) => return Ok(SvgOwnerState::Refused),
     };

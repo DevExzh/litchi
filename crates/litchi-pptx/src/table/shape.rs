@@ -850,7 +850,7 @@ fn scan_tags(
 /// Whether the shared text-body reader accepts the body element `body` in
 /// `scope`, as [`Cell::text_body`] reads it (record 0348).
 fn body_readable(body: &[u8], scope: &NamespaceResolver) -> bool {
-    litchi_drawingml::text::body::reader::read_with_options(
+    litchi_drawingml::text::body::reader::read(
         body,
         scope.clone(),
         litchi_drawingml::text::body::reader::Limits::DEFAULT,
@@ -1355,7 +1355,7 @@ impl<'a> Cell<'a> {
                 resolver
             },
         };
-        let body = litchi_drawingml::text::body::reader::read_with_options(
+        let body = litchi_drawingml::text::body::reader::read(
             &xml[start..end],
             scope,
             litchi_drawingml::text::body::reader::Limits::DEFAULT,

@@ -645,7 +645,7 @@ impl<'a> Common<'a> {
             self.limits.retained_text_bytes(),
         )
         .unwrap_or(text_reader::Limits::DEFAULT);
-        Ok(Some(text_reader::read_with_options(xml, scope, limits)?))
+        Ok(Some(text_reader::read(xml, scope, limits)?))
     }
 
     /// The paragraphs and text runs of [`Self::text_body`] (record 0348);

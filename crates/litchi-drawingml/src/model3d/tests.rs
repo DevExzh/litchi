@@ -1,4 +1,4 @@
-use super::codec::{opaque, read, write};
+use super::codec::{Limits, opaque, read, write};
 use super::{
     Error, Id, MAX_NAMESPACE_TEXT_BYTES, MAX_RELATIONSHIP_ID_BYTES, Metadata, Namespace, Raster,
     RasterChild, Reference, Relationship, Resolver, Target, ValueError, validate_relationships,
@@ -8,7 +8,7 @@ const MODEL_XML: &[u8] = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.co
 
 #[test]
 fn reads_typed_relationships_and_keeps_the_scene_inert() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     assert_eq!(
         metadata.reference.embedded.as_ref().unwrap().as_str(),
         "rIdModel"
@@ -32,8 +32,8 @@ fn reads_typed_relationships_and_keeps_the_scene_inert() {
 
 #[test]
 fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
-    let encoded = write(&metadata).expect("model3d fixture must serialize");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
+    let encoded = write(&metadata, Limits::DEFAULT).expect("model3d fixture must serialize");
     assert!(
         encoded
             .windows(b"f:payload".len())
@@ -44,7 +44,7 @@ fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
             .windows(b"f:value".len())
             .any(|window| window == b"f:value")
     );
-    let reparsed = read(&encoded).expect("serialized model3d must parse");
+    let reparsed = read(&encoded, Limits::DEFAULT).expect("serialized model3d must parse");
     assert_eq!(reparsed, metadata);
 }
 
@@ -52,18 +52,18 @@ fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
 fn rejects_invalid_sequence_and_duplicate_raster_blip() {
     let missing = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/></m3d:model3d>"#;
     assert!(
-        matches!(read(missing), Err(crate::Error::Invalid(message)) if message.contains("trans"))
+        matches!(read(missing, Limits::DEFAULT), Err(crate::Error::Invalid(message)) if message.contains("trans"))
     );
 
     let duplicate = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:raster rName="x" rVer="y"><m3d:blip/><m3d:blip/></m3d:raster><m3d:objViewport/></m3d:model3d>"#;
     assert!(
-        matches!(read(duplicate), Err(crate::Error::Invalid(message)) if message.contains("blip"))
+        matches!(read(duplicate, Limits::DEFAULT), Err(crate::Error::Invalid(message)) if message.contains("blip"))
     );
 }
 
 #[test]
 fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
-    let metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     let graph = FixtureGraph;
     validate_relationships(&metadata, &graph).expect("fixture graph is valid");
 
@@ -84,16 +84,25 @@ fn relationship_graph_distinguishes_embedded_linked_and_missing_targets() {
 
 #[test]
 fn opaque_constructor_accepts_one_element_and_rejects_multiple_roots() {
-    let value = opaque(br#"<f:future xmlns:f="urn:future"><f:nested/></f:future>"#)
-        .expect("self-contained inert element");
+    let value = opaque(
+        br#"<f:future xmlns:f="urn:future"><f:nested/></f:future>"#,
+        Limits::DEFAULT,
+    )
+    .expect("self-contained inert element");
     assert_eq!(value.local_name(), "future");
     assert_eq!(value.namespace(), "urn:future");
-    assert!(opaque(b"<f:one xmlns:f=\"urn:f\"/><f:two xmlns:f=\"urn:f\"/>").is_err());
+    assert!(
+        opaque(
+            b"<f:one xmlns:f=\"urn:f\"/><f:two xmlns:f=\"urn:f\"/>",
+            Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn authoring_facade_can_replace_raster_without_losing_scene_children() {
-    let mut metadata = read(MODEL_XML).expect("model3d fixture must parse");
+    let mut metadata = read(MODEL_XML, Limits::DEFAULT).expect("model3d fixture must parse");
     let mut raster = Raster::new("Renderer", "1").unwrap();
     raster.children.push(RasterChild::Blip(super::Blip {
         reference: Reference::embedded("rIdRaster").unwrap(),
@@ -101,7 +110,7 @@ fn authoring_facade_can_replace_raster_without_losing_scene_children() {
         namespaces: Vec::new(),
     }));
     metadata.set_raster(raster);
-    let encoded = write(&metadata).expect("edited model3d must serialize");
+    let encoded = write(&metadata, Limits::DEFAULT).expect("edited model3d must serialize");
     assert!(
         encoded
             .windows(b"f:payload".len())

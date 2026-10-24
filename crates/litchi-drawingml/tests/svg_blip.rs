@@ -1,14 +1,40 @@
 use litchi_drawingml::{
     LimitKind,
     svg_blip::{
-        Attribute, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS, MAX_RELATIONSHIP_ID_BYTES,
-        NAMESPACE, Namespace, NamespaceContext, RELATIONSHIP_NAMESPACE, Reference, RelationshipId,
-        SvgBlip, ValueError, XML_NAMESPACE, read, read_contextual, write, write_contextual,
-        write_contextual_to,
+        Attribute, Limits, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS,
+        MAX_RELATIONSHIP_ID_BYTES, MAX_XML_BYTES, NAMESPACE, Namespace, NamespaceContext,
+        RELATIONSHIP_NAMESPACE, Reference, RelationshipId, SvgBlip, ValueError, XML_NAMESPACE,
+        read as read_with_policy, read_contextual as read_contextual_with_policy,
+        write as write_with_policy, write_contextual as write_contextual_with_policy,
+        write_contextual_to as write_contextual_to_with_policy,
     },
 };
 
 const SVG_BLIP: &[u8] = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:future="urn:example:future" r:embed="rIdSvg" future:mode="preserve"><future:payload data="x"/></asvg:svgBlip>"#;
+
+fn read(xml: &[u8]) -> litchi_drawingml::Result<SvgBlip> {
+    read_with_policy(xml, Limits::DEFAULT)
+}
+
+fn write(value: &SvgBlip) -> litchi_drawingml::Result<Vec<u8>> {
+    write_with_policy(value, Limits::DEFAULT)
+}
+
+fn read_contextual(xml: &[u8], context: &NamespaceContext) -> litchi_drawingml::Result<SvgBlip> {
+    read_contextual_with_policy(xml, context, Limits::DEFAULT)
+}
+
+fn write_contextual(value: &SvgBlip, max_output_bytes: usize) -> litchi_drawingml::Result<Vec<u8>> {
+    write_contextual_with_policy(value, Limits::new(MAX_XML_BYTES, max_output_bytes))
+}
+
+fn write_contextual_to<W: std::io::Write>(
+    writer: &mut W,
+    value: &SvgBlip,
+    max_output_bytes: usize,
+) -> litchi_drawingml::Result<()> {
+    write_contextual_to_with_policy(writer, value, Limits::new(MAX_XML_BYTES, max_output_bytes))
+}
 
 #[test]
 fn reads_typed_relationship_and_preserves_unknown_markup() {
