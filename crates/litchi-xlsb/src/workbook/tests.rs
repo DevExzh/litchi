@@ -323,10 +323,10 @@ fn task_pane_replace_failure_leaves_edit_retryable() {
     let worksheet_binding = crate::package::web_extension_bindings::Binding::new(
         "required-app-ref",
         crate::package::formula::ParsedFormula {
-            rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
+            rgce: vec![0x3B, 2, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
             rgcb: Vec::new(),
         },
-        |index| index == 0,
+        |index| index == 2,
         crate::raw::Limits::DEFAULT,
     )
     .unwrap();

@@ -2031,7 +2031,7 @@ mod tests {
 
     #[test]
     fn staged_constructor_and_drop_do_not_materialize_cold_projection() {
-        let cold = crate::Package::from(crate::Package::new().unwrap().into_opc());
+        let cold = Package::from(Package::new().unwrap().into_opc());
         assert!(!cold.projection_cached());
         let staged = Staged::of_package(&cold).unwrap();
         drop(staged);
@@ -2040,7 +2040,7 @@ mod tests {
 
     #[test]
     fn package_edit_constructors_and_drop_do_not_materialize_cold_projection() {
-        let cold = crate::Package::from(crate::Package::new().unwrap().into_opc());
+        let cold = Package::from(Package::new().unwrap().into_opc());
         assert!(!cold.projection_cached());
 
         drop(cold.edit_calculation_chain().unwrap());

@@ -1239,6 +1239,8 @@ mod tests {
         let edit = cold.edit_cell_values("missing").expect("edit entry");
         assert!(!cold.projection_cached());
         assert!(edit.resolve().expect("selector resolution").is_none());
-        assert!(cold.projection_cached());
+        // The edit owns a cloned immutable package, so its first resolution
+        // does not mutate the original owner's private projection cache.
+        assert!(!cold.projection_cached());
     }
 }

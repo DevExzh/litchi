@@ -246,7 +246,8 @@ impl Workbook {
                 .iter()
                 .flat_map(|pane| pane.add_in().bindings().iter()),
         )?;
-        for worksheet in &self.worksheets {
+        for index in 0..self.worksheet_names.len() {
+            let worksheet = self.cached_worksheet(index)?;
             package_refs.validate(worksheet.web_extension_bindings())?;
         }
         Ok(())

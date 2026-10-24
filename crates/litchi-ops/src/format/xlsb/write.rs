@@ -1155,6 +1155,9 @@ fn set_cells_with_limits(
     let Some(targets) = resolve_cell_targets(file, target, limits)? else {
         return Ok(None);
     };
+    if props.is_empty() {
+        return Ok(Some(identity_commit(file, limits)?));
+    }
     let assignments = match admitted {
         Some(assignments) => assignments,
         None => admit_cell_properties(props, limits)?,
@@ -1244,6 +1247,26 @@ fn set_cells_with_limits(
         authored_operations,
     )?;
     Ok(Some(commit))
+}
+
+/// Publish an exact native identity patch for an admitted empty-property
+/// write.  Keep this on the structural native owner so the transaction
+/// reports zero leaf operations while still applying the normal source,
+/// signature and snapshot-limit checks.
+fn identity_commit(file: &Xlsb, limits: &SemanticLimits) -> Result<Commit> {
+    let package = package_from_editor(file.editor_for_write()?);
+    let native_limits = TransferLimits::new(
+        limits.max_snapshot_bytes(),
+        limits.max_expanded_targets(),
+        1,
+        limits.max_snapshot_bytes(),
+    );
+    let native = package
+        .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
+        .map_err(native_error)?
+        .commit()
+        .map_err(native_error)?;
+    Commit::from_native(file, native, limits.max_snapshot_bytes())
 }
 
 /// Stage one cell's admitted payload and format in a native cell edit: the

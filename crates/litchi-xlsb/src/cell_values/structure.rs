@@ -432,7 +432,8 @@ impl Edit {
     ) -> Result<Option<bool>> {
         self.ensure_prepared()?;
         let selector = selector.into();
-        let Some(catalog_position) = resolve_catalog_position(self.catalog()?, &selector)? else {
+        let catalog = self.catalog()?;
+        let Some(catalog_position) = resolve_catalog_position(catalog, &selector)? else {
             return Ok(None);
         };
         let name_index = self
@@ -444,7 +445,7 @@ impl Edit {
                 })
             });
         let current = name_index.map_or_else(
-            || self.catalog()?[catalog_position].name.as_str(),
+            || catalog[catalog_position].name.as_str(),
             |index| match &self.operations[index] {
                 Operation::SetSheetName { name, .. } => name.as_str(),
                 Operation::RenameSheet { .. }
@@ -456,9 +457,7 @@ impl Edit {
                 | Operation::AddImage { .. }
                 | Operation::TransferDrawing { .. }
                 | Operation::SetMergedRanges { .. }
-                | Operation::SetDefinedName { .. } => {
-                    self.catalog()?[catalog_position].name.as_str()
-                },
+                | Operation::SetDefinedName { .. } => catalog[catalog_position].name.as_str(),
             },
         );
         let changed = current != name;
@@ -713,10 +712,11 @@ impl Edit {
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch operation bytes",
             })?;
+        let before_len = self.before_image()?.len();
         let minimum_patch_bytes = MAGIC
             .len()
             .checked_add(24)
-            .and_then(|size| size.checked_add(self.before_image()?.len()))
+            .and_then(|size| size.checked_add(before_len))
             .and_then(|size| size.checked_add(operation_bytes))
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch bytes",
@@ -871,10 +871,11 @@ impl Edit {
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch operation bytes",
             })?;
+        let before_len = self.before_image()?.len();
         let minimum_patch_bytes = MAGIC
             .len()
             .checked_add(24)
-            .and_then(|size| size.checked_add(self.before_image()?.len()))
+            .and_then(|size| size.checked_add(before_len))
             .and_then(|size| size.checked_add(operation_bytes))
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch bytes",

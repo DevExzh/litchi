@@ -1156,6 +1156,7 @@ mod transaction_tests {
     #[test]
     fn duplicate_singleton_cell_failure_retains_the_draft() {
         let before = Snapshot::empty_transaction_fixture(false);
+        let limits = before.limits();
         let first = SingleCellBinding::new(
             1,
             1,
@@ -1167,7 +1168,8 @@ mod transaction_tests {
         .expect("binding");
         let mut transaction = Edit {
             source: crate::Package::from(litchi_opc::OpcPackage::new()),
-            before,
+            before: Some(before),
+            limits,
             catalog: Some(fixture_catalog()),
             conformance: XmlMapConformance::Transitional,
             mapped_tables: Vec::new(),
@@ -1216,7 +1218,10 @@ mod transaction_tests {
             .expect_err("non-XML table refusal");
         assert!(error.to_string().contains("not an ordinary LTXML Table"));
         assert!(transaction.mapped_tables.is_empty());
-        assert_eq!(transaction.before.source(), &source);
+        assert_eq!(
+            transaction.before.as_ref().expect("prepared").source(),
+            &source
+        );
     }
 
     fn fixture_catalog() -> XmlMapInfo {

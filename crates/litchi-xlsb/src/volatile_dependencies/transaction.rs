@@ -108,7 +108,7 @@ impl Edit {
         }
         let mut candidate = before.package().as_ref().clone();
         let after_dependencies = self.dependencies.clone();
-        super::patch::materialize(&mut candidate, before, after_dependencies.as_deref())?;
+        super::patch::materialize(&mut candidate, &before, after_dependencies.as_deref())?;
         let after = Snapshot::read_with_limits(&candidate, before.limits())?;
         if after.dependencies() != after_dependencies.as_deref() {
             return Err(Error::InvalidFormat(

@@ -197,17 +197,13 @@ impl Edit {
     fn draft(&self) -> Result<&OwnerDraft> {
         self.draft
             .as_ref()
-            .ok_or(crate::package::error::Error::InvalidFormat(
-                "Theme edit is not prepared",
-            ))
+            .ok_or(Error::InvalidFormat("Theme edit is not prepared"))
     }
 
     fn draft_mut(&mut self) -> Result<&mut OwnerDraft> {
         self.draft
             .as_mut()
-            .ok_or(crate::package::error::Error::InvalidFormat(
-                "Theme edit is not prepared",
-            ))
+            .ok_or(Error::InvalidFormat("Theme edit is not prepared"))
     }
 
     /// The staged typed Theme, or `None` when the part is absent or its
@@ -339,9 +335,7 @@ impl Edit {
         let draft = self
             .draft
             .take()
-            .ok_or(crate::package::error::Error::InvalidFormat(
-                "Theme edit is not prepared",
-            ))?;
+            .ok_or(Error::InvalidFormat("Theme edit is not prepared"))?;
         let commit = draft.commit()?;
         let changed = commit.changed();
         let (_, patch) = commit.into_parts();
