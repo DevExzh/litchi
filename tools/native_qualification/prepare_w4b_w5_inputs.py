@@ -6,7 +6,7 @@ or a timing command.  The accepted W4b baseline is a synthetic merge tree
 because the record measured the pre-W4b code after combining the W4-XLSX tree
 with trunk.  The accepted W5 baseline predates the source-backed probe.  Both
 baselines therefore need the exact probe consumers from the candidate tree,
-with the recorded W5 route module substituted for the old API.
+with the recorded W4b/W5 compatibility overlays applied for the old APIs.
 """
 
 from __future__ import annotations
@@ -207,6 +207,38 @@ def _adapt_w4b_crud(baseline_crud: str) -> str:
     return baseline_crud.replace(marker, f"{marker}\n{import_line}", 1)
 
 
+def _adapt_w4b_probe(candidate_probe: str) -> str:
+    """Translate the three lazy-selector calls for the historical W4b API."""
+
+    # The candidate's edit_cell_values returns a lazy Edit and therefore
+    # exposes Edit::resolve. The fixed synthetic baseline resolves the
+    # selector at the package entry point and returns Result<Option<Edit>>.
+    # Keep this overlay exact and fail closed if the candidate probe changes.
+    pattern = re.compile(
+        r'^(?P<indent> *)\.edit_cell_values\(0_usize\)\n'
+        r'(?P=indent)\.expect\("cell edit"\)\n'
+        r'(?P=indent)\.resolve\(\)\n'
+        r'(?P=indent)\.expect\("worksheet resolution"\)\n'
+        r'(?P=indent)\.expect\("worksheet"\);',
+        re.MULTILINE,
+    )
+    translated, replacements = pattern.subn(
+        lambda match: (
+            f'{match.group("indent")}.edit_cell_values(0_usize)\n'
+            f'{match.group("indent")}.expect("cell edit")\n'
+            f'{match.group("indent")}.expect("worksheet");'
+        ),
+        candidate_probe,
+    )
+    if candidate_probe.count(".resolve()") != 3 or replacements != 3:
+        raise PreparationError(
+            "W4b probe must contain exactly three historical selector-resolution calls"
+        )
+    if ".resolve()" in translated:
+        raise PreparationError("W4b baseline probe retained a candidate-only resolve call")
+    return translated
+
+
 def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
     before_state = _source_state(before)
     after_state = _source_state(after)
@@ -216,7 +248,12 @@ def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
         )
     _require_clean(before_state, "W4b baseline")
     _require_clean(after_state, "W4b candidate")
-    probe = _write_exact(after / W4B_PROBE, before / W4B_PROBE)
+    probe_source = (after / W4B_PROBE).read_text(encoding="utf-8")
+    probe_text = _adapt_w4b_probe(probe_source)
+    probe = _write_text_exact(before / W4B_PROBE, probe_text, after / W4B_PROBE)
+    probe["candidate_sha256"] = _sha256(after / W4B_PROBE)[0]
+    probe["candidate_bytes"] = len(probe_source.encode("utf-8"))
+    probe["adaptation"] = "recorded three-call historical selector-resolution translation"
 
     crud_source = after / W4B_CRUD
     crud_destination = before / W4B_CRUD

@@ -300,6 +300,41 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 )
             )
 
+    def test_w4b_probe_overlay_translates_exactly_three_lazy_resolutions(self) -> None:
+        candidate = "".join(
+            [
+                "fn first() {\n",
+                "    let edit = package\n",
+                "        .edit_cell_values(0_usize)\n",
+                "        .expect(\"cell edit\")\n",
+                "        .resolve()\n",
+                "        .expect(\"worksheet resolution\")\n",
+                "        .expect(\"worksheet\");\n",
+                "}\n",
+                "fn second() {\n",
+                "        let edit = package\n",
+                "            .edit_cell_values(0_usize)\n",
+                "            .expect(\"cell edit\")\n",
+                "            .resolve()\n",
+                "            .expect(\"worksheet resolution\")\n",
+                "            .expect(\"worksheet\");\n",
+                "}\n",
+                "fn third() {\n",
+                "        let edit = package\n",
+                "            .edit_cell_values(0_usize)\n",
+                "            .expect(\"cell edit\")\n",
+                "            .resolve()\n",
+                "            .expect(\"worksheet resolution\")\n",
+                "            .expect(\"worksheet\");\n",
+                "}\n",
+            ]
+        )
+        adapted = source_prep._adapt_w4b_probe(candidate)
+        self.assertEqual(adapted.count(".resolve()"), 0)
+        self.assertEqual(adapted.count('.expect("worksheet");'), 3)
+        with self.assertRaisesRegex(source_prep.PreparationError, "exactly three"):
+            source_prep._adapt_w4b_probe(candidate.replace(".resolve()", "", 1))
+
     def test_source_preparation_requires_external_disjoint_provenance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-prep-paths-") as directory:
             root = Path(directory)
