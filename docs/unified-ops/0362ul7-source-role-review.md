@@ -7,9 +7,18 @@
   156 rows, SHA-256
   `a0166f99f9c1c30d30967bd5ad14d7d6ef56dbad5363788821d62d0ab90db840`.
 - Current-source receipt:
-  [`source-role-evidence.json`](0362ul7/source-role-evidence.json), 30,158
+  [`source-role-evidence.json`](results/0362ul7/source-role-evidence.json), 30,158
   bytes, SHA-256
   `95995c8693a5952a6b4dc2b0d273404571642a430050ab98128c54ff0c975d6b`.
+- Independent source-role review: READY at receipt tip `fc2997619c`; the
+  receipt content and the original source/inventory identities are unchanged
+  by the subsequent rebase onto the gate-tooling baseline.
+- Validator receipt: `tools/validate_api_disposition.py` now registers exactly
+  49 current rows across six source-role decisions (38 raw, 4 composition,
+  1 archive, 1 wire, 4 OPC source-plan and 1 OPC splice), while rejecting all
+  six absent raw aliases and all near-match identities.
+- Tool test receipt: `python3 -m unittest tools.test_validate_api_disposition -v`
+  — 12 tests passed.
 
 ## Result
 
@@ -45,10 +54,8 @@ The 11 descriptor rows are:
 * OPC XML splice descriptor: `OwnedElementEdit`.
 
 The receipt gives each exact definition, consumer, receiver/field shape and
-absence of a Package/Edit/Commit lifecycle. It recommends exact nominal
-categories only; it does not change the validator or introduce a wildcard
-exception. The body-text and OPC categories still require independent review
-because the current semantic checker registers only the exact AST/WIRE rows.
+absence of a Package/Edit/Commit lifecycle. The validator registers only the
+exact nominal categories above; it does not introduce a wildcard exception.
 
 ## Basis and pending work
 
@@ -59,12 +66,10 @@ Package owner, or unified `File` lifecycle is treated as a descriptor.
 
 Pending before final acceptance:
 
-1. Independent review of the 55-row receipt, including the exact nominal
-   category predicates and the six stale-path separations.
-2. A fresh all-68 diagnostic capture against the final assembled source, not
+1. A fresh all-68 diagnostic capture against the final assembled source, not
    reuse of the old 156-row capture.
-3. Any checker registration must be exact-row and source-role based; no broad
-   `*Edit`/`Reader` or substrate waiver is permitted.
+2. Final coordinator acceptance of the capture and source-role receipt; no
+   broad `*Edit`/`Reader` or substrate waiver is permitted.
 
-No production source, validator, or `PROGRESS.md` was changed by this record.
-No Cargo or capture command was run.
+No production source or `PROGRESS.md` was changed. No Cargo or capture command
+was run; the Python tool test above is the only new execution receipt.

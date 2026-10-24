@@ -12,12 +12,21 @@ Accepted decisions are:
 * ``FIXED`` — a source repair is evidenced;
 * ``BUILDER_DRAFT`` — a proven authoring builder is intentionally mutable;
 * ``SUBSTRATE_TRANSPORT`` — only a transport-only CFB/ZIP substrate row;
+* ``RAW_READER_METHOD`` — only the 38 current raw DOC/PPT/XLS Reader methods;
+* ``COMPOSITION_DESCRIPTOR`` — only the four exact SubEdit composition values;
+* ``RAW_ARCHIVE_DESCRIPTOR`` — only the IWA EntryEdit descriptor;
+* ``RAW_WIRE_DESCRIPTOR`` — only the IWA NestedFieldEdit descriptor;
+* ``OPC_SOURCE_PLAN_DESCRIPTOR`` — only the four exact OPC source-plan values;
+* ``OPC_XML_SPLICE_DESCRIPTOR`` — only the exact OPC XML splice value;
 * ``DEFERRED_REDACTION_22`` — only an explicitly identified item-22
   redaction row.
 
 The last category is the sole permitted deferral. Placeholder decisions from
 the scaffold and broad ``deferred``/``out-of-scope``/``wontfix`` values are
-rejected.
+rejected. The six source-role decisions below are exact full inventory-row
+allowlists; they never infer approval from a prefix, suffix, crate, or type
+name. The six removed raw Reader aliases are explicitly outside the raw
+allowlist.
 """
 from __future__ import annotations
 
@@ -40,6 +49,102 @@ SCAFFOLD_DECISIONS = frozenset({
     "DRAFT_CANDIDATE_REVIEW",
     "SUBSTRATE_SCOPE_REVIEW",
     "UNASSIGNED_REQUIRED_REVIEW",
+})
+
+# These are exact source-role classifications, not name-pattern allowances.
+# Every tuple is the complete inventory identity (crate, category, path).  In
+# particular, removed diagnostic Reader aliases are intentionally absent.
+SEMANTIC_ROWS = {
+    "RAW_READER_METHOD": frozenset({
+        (crate, "mut_draft", path)
+        for crate, paths in {
+            "litchi-doc": (
+                "litchi_doc::raw::Reader::custom_xml_data_store",
+                "litchi_doc::raw::Reader::data_spaces",
+                "litchi_doc::raw::Reader::data_spaces_snapshot",
+                "litchi_doc::raw::Reader::document",
+                "litchi_doc::raw::Reader::document_summary_information",
+                "litchi_doc::raw::Reader::document_with_options",
+                "litchi_doc::raw::Reader::ole_file",
+                "litchi_doc::raw::Reader::save",
+                "litchi_doc::raw::Reader::save_with_durability",
+                "litchi_doc::raw::Reader::signatures",
+                "litchi_doc::raw::Reader::summary_information",
+                "litchi_doc::raw::Reader::to_bytes",
+                "litchi_doc::raw::Reader::user_defined_hyperlinks",
+                "litchi_doc::raw::Reader::user_defined_properties",
+                "litchi_doc::raw::Reader::vba",
+                "litchi_doc::raw::Reader::vba_signature",
+                "litchi_doc::raw::Reader::write_data_spaces_patch",
+                "litchi_doc::raw::Reader::write_to",
+            ),
+            "litchi-ppt": (
+                "litchi_ppt::raw::Reader::custom_xml_data_store",
+                "litchi_ppt::raw::Reader::document_comparison",
+                "litchi_ppt::raw::Reader::document_summary_information",
+                "litchi_ppt::raw::Reader::fonts",
+                "litchi_ppt::raw::Reader::ole_file",
+                "litchi_ppt::raw::Reader::picture_bullets",
+                "litchi_ppt::raw::Reader::presentation",
+                "litchi_ppt::raw::Reader::presentation_with_options",
+                "litchi_ppt::raw::Reader::signatures",
+                "litchi_ppt::raw::Reader::summary_information",
+                "litchi_ppt::raw::Reader::user_defined_properties",
+            ),
+            "litchi-xls": (
+                "litchi_xls::raw::Reader::custom_xml_data_store",
+                "litchi_xls::raw::Reader::document_summary_information",
+                "litchi_xls::raw::Reader::revision_log",
+                "litchi_xls::raw::Reader::signatures",
+                "litchi_xls::raw::Reader::summary_information",
+                "litchi_xls::raw::Reader::toolbar",
+                "litchi_xls::raw::Reader::user_defined_properties",
+                "litchi_xls::raw::Reader::user_names",
+                "litchi_xls::raw::Reader::vba",
+            ),
+        }.items()
+        for path in paths
+    }),
+    "COMPOSITION_DESCRIPTOR": frozenset({
+        ("litchi-core", "edit_type", "litchi_core::SubEdit"),
+        ("litchi-doc", "edit_type", "litchi_doc::body_text::SubEdit"),
+        ("litchi-odb", "edit_type", "litchi_odb::SubEdit"),
+        ("litchi-odg", "edit_type", "litchi_odg::edit::SubEdit"),
+    }),
+    "RAW_ARCHIVE_DESCRIPTOR": frozenset({
+        ("litchi-iwa-archive", "edit_type", "litchi_iwa_archive::package::EntryEdit"),
+    }),
+    "RAW_WIRE_DESCRIPTOR": frozenset({
+        ("litchi-iwa-common", "edit_type", "litchi_iwa_common::wire::NestedFieldEdit"),
+    }),
+    "OPC_SOURCE_PLAN_DESCRIPTOR": frozenset({
+        ("litchi-opc", "edit_type", "litchi_opc::ContentTypeEdit"),
+        ("litchi-opc", "edit_type", "litchi_opc::ContentTypeFragmentEdit"),
+        ("litchi-opc", "edit_type", "litchi_opc::RelationshipEdit"),
+        ("litchi-opc", "edit_type", "litchi_opc::RelationshipFragmentEdit"),
+    }),
+    "OPC_XML_SPLICE_DESCRIPTOR": frozenset({
+        ("litchi-opc", "edit_type", "litchi_opc::OwnedElementEdit"),
+    }),
+}
+SEMANTIC_DECISIONS = frozenset(SEMANTIC_ROWS)
+ACCEPTED_DECISIONS = frozenset({
+    "FIXED",
+    "BUILDER_DRAFT",
+    "SUBSTRATE_TRANSPORT",
+    "DEFERRED_REDACTION_22",
+}) | SEMANTIC_DECISIONS
+
+# These six names were present in the retained old-source capture but have no
+# exact definition at the final source commit. They must never become raw
+# semantic rows through a prefix/suffix or compatibility-name match.
+REMOVED_RAW_READER_ROWS = frozenset({
+    ("litchi-doc", "mut_draft", "litchi_doc::raw::Reader::signatures_with"),
+    ("litchi-doc", "mut_draft", "litchi_doc::raw::Reader::vba_signature_with"),
+    ("litchi-doc", "mut_draft", "litchi_doc::raw::Reader::vba_with"),
+    ("litchi-ppt", "mut_draft", "litchi_ppt::raw::Reader::signatures_with"),
+    ("litchi-xls", "mut_draft", "litchi_xls::raw::Reader::signatures_with"),
+    ("litchi-xls", "mut_draft", "litchi_xls::raw::Reader::vba_with"),
 })
 
 
@@ -123,6 +228,19 @@ def _decision_errors(row: dict[str, str], line: int) -> list[str]:
         if row.get("category") != "redaction" or "redaction" not in lowered or "22" not in lowered:
             errors.append(
                 f"{label}: DEFERRED_REDACTION_22 requires a redaction row whose evidence names item 22"
+            )
+    elif decision in SEMANTIC_DECISIONS:
+        row_identity = (
+            row.get("crate", ""), row.get("category", ""), row.get("path", "")
+        )
+        if row_identity in REMOVED_RAW_READER_ROWS:
+            errors.append(
+                f"{label}: {decision} rejects removed raw Reader alias {row_identity!r}"
+            )
+        elif row_identity not in SEMANTIC_ROWS[decision]:
+            errors.append(
+                f"{label}: {decision} requires an exact reviewed crate/category/path; "
+                f"got {row_identity!r}"
             )
     return errors
 
