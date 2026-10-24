@@ -160,6 +160,7 @@ def child(
         if process_tree is not None:
             process_tree.kill()
             process_tree.reap()
+            process_tree.release()
         wait_for_group_exit(process_group)
 
     try:
@@ -224,6 +225,8 @@ def child(
                     guard_error = str(error)
         if process_group is not None:
             stop_group()
+        elif process_tree is not None:
+            process_tree.release()
         finished_ns = time.time_ns()
         failed_after = {
             "time_ns": finished_ns,

@@ -167,9 +167,14 @@ requires the matrix's expected disposition.
    timeout or failed-after field is rejected. The runner is a Linux child
    subreaper and tracks the complete descendant tree, including `setsid` and
    reparented children; every owned descendant is killed and reaped before a
-   receipt can report an empty process tree. Each route calibrates to at least
-   500 ms, rejects samples below 150 ms, and runs at least five outer blocks.
-   Final-only blocks are exactly leaf, facade, facade, leaf.
+   receipt can report an empty process tree. This ownership helper is scoped
+   to the standalone serial controller: one Python thread, one live tracker
+   and one `Popen` subtree at a time. It records the pre-existing direct-child
+   set before that `Popen`; new direct children during that owned window are
+   target descendants. It is not a generic concurrent-embedding claim, and a
+   second tracker or controller thread is rejected. Each route calibrates to
+   at least 500 ms, rejects samples below 150 ms, and runs at least five outer
+   blocks. Final-only blocks are exactly leaf, facade, facade, leaf.
 5. Allocation evidence is separate and per fixture. The probe introduces no
    allocator or `unsafe` code. The external memory runner profiles the same
    uninstrumented final binary with identical setup for each fixture, route

@@ -146,6 +146,7 @@ def stop_group(
         process.wait(timeout=5)
     process_tree.kill()
     process_tree.reap()
+    process_tree.release()
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline and process_group_members(pgid):
         time.sleep(0.1)

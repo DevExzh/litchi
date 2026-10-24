@@ -17,6 +17,7 @@ import math
 import re
 import signal
 import sys
+import threading
 import time
 import tomllib
 from typing import Any
@@ -105,6 +106,7 @@ REVIEWED_W8_BEFORE_PROJECTION = (
 )
 _REVIEWED_PARSER_MODULE: Any | None = None
 _SUBREAPER_ENABLED = False
+_ACTIVE_PROCESS_TREE: Any | None = None
 REVIEWED_W8_AFTER_PROJECTION = (
     REPOSITORY / "docs/unified-ops/results/0362yh/images/after/projection.json"
 )
@@ -159,10 +161,24 @@ def enable_child_subreaper() -> None:
 
 
 class OwnedProcessTree:
-    """Track one spawned process and every descendant, including adopted ones."""
+    """Track one spawned process and every descendant, including adopted ones.
+
+    This helper is intentionally scoped to the standalone qualification
+    runners: one controller thread owns one Popen subtree at a time, and the
+    controller does not spawn unrelated children while the tracker is live.
+    New direct children after the baseline are therefore owned descendants,
+    not a generic embedding guarantee.
+    """
 
     def __init__(self) -> None:
+        global _ACTIVE_PROCESS_TREE
+        if threading.active_count() != 1:
+            raise RuntimeError("process-tree ownership requires a single controller thread")
+        if _ACTIVE_PROCESS_TREE is not None:
+            raise RuntimeError("process-tree ownership is already active")
         enable_child_subreaper()
+        _ACTIVE_PROCESS_TREE = self
+        self._released = False
         self.owner_pid = os.getpid()
         records = _proc_records()
         self._baseline_children = {
@@ -274,6 +290,12 @@ class OwnedProcessTree:
 
     def empty(self) -> bool:
         return not self.pids()
+
+    def release(self) -> None:
+        global _ACTIVE_PROCESS_TREE
+        if not self._released and _ACTIVE_PROCESS_TREE is self:
+            _ACTIVE_PROCESS_TREE = None
+        self._released = True
 
 
 def reject_symlink_path(path: Path, label: str) -> None:

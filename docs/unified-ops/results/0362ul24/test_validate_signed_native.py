@@ -521,6 +521,40 @@ class SignedNativeValidatorTests(unittest.TestCase):
             finally:
                 tree.kill()
                 tree.reap()
+                tree.release()
+
+    def test_owned_process_tree_rejects_concurrent_tracker(self) -> None:
+        tree = VALIDATE.OwnedProcessTree()
+        try:
+            with self.assertRaises(RuntimeError):
+                VALIDATE.OwnedProcessTree()
+        finally:
+            tree.release()
+
+    def test_owned_process_tree_preserves_a_preexisting_foreign_child(self) -> None:
+        foreign = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
+        )
+        tree = VALIDATE.OwnedProcessTree()
+        target = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True
+        )
+        tree.attach(target.pid)
+        try:
+            self.assertNotIn(foreign.pid, tree.pids())
+            tree.kill()
+            target.wait(timeout=5)
+            self.assertTrue(tree.reap())
+            self.assertTrue(tree.empty())
+            self.assertIsNone(foreign.poll())
+        finally:
+            tree.release()
+            if target.poll() is None:
+                target.kill()
+            target.wait(timeout=5)
+            if foreign.poll() is None:
+                foreign.kill()
+            foreign.wait(timeout=5)
 
     def test_runner_receipt_rejects_and_reaps_a_setsid_descendant(self) -> None:
         with tempfile.TemporaryDirectory(prefix="signed-runner-tree-") as directory:
