@@ -5885,7 +5885,7 @@ fn run_cfb_overlay_save(
     let publication_elapsed_ns = u64::try_from(publication_started.elapsed().as_nanos())?;
     let after_publication = counter.totals();
     details.cfb_changed_spans = Some(u64::try_from(report.changed_spans())?);
-    details.cfb_published_bytes = Some(report.bytes());
+    details.cfb_published_bytes = Some(report.output_bytes());
     details.cfb_phases = Some(CfbPhaseEvidence {
         open: cfb_phase_sample(ReadTotals::default(), after_open, open_elapsed_ns)?,
         plan: cfb_phase_sample(after_open, after_plan, plan_elapsed_ns)?,
@@ -5932,7 +5932,7 @@ fn run_cfb_owned_overlay_save(
     let report = plan.save(destination)?;
     let publication_elapsed_ns = u64::try_from(publication_started.elapsed().as_nanos())?;
     details.cfb_changed_spans = Some(u64::try_from(report.changed_spans())?);
-    details.cfb_published_bytes = Some(report.bytes());
+    details.cfb_published_bytes = Some(report.output_bytes());
     details.cfb_owned = Some(CfbOwnedEvidence {
         implementation: "SharedOleFile::open_owned".to_owned(),
         ingress: "filesystem_read_all_before_cfb_phase_timers".to_owned(),

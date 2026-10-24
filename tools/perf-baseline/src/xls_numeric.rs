@@ -1469,7 +1469,7 @@ fn prepare_expected(
     verify_patch(&route, &publication)?;
     verify_partial_publication(&publication, output.len())?;
     if let Some(report) = report
-        && (report.bytes() != u64::try_from(output.len())? || report.changed_spans() == 0)
+        && (report.output_bytes() != u64::try_from(output.len())? || report.changed_spans() == 0)
     {
         return Err("XLS numeric source-backed publication report is incomplete".into());
     }
@@ -1659,7 +1659,7 @@ pub(crate) fn run(
             if diagnostics.splice_count != Some(expected.edits.len())
                 || diagnostics.replacement_bytes != Some(u64::try_from(expected_replacement_bytes)?)
                 || diagnostics.changed_spans != Some(report.changed_spans())
-                || report.bytes() != sink.summary().accepted_bytes
+                || report.output_bytes() != sink.summary().accepted_bytes
                 || diagnostics.source_fingerprint
                     != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
                 || diagnostics.target_fingerprint
