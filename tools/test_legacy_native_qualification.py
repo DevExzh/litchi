@@ -68,6 +68,73 @@ class LegacyNativeQualificationTests(unittest.TestCase):
         self.assertEqual(baseline.count('UserProperties::with_limits'), 1)
         self.assertEqual(baseline.count('UserEdit::with_limits'), 1)
 
+    def test_ole_adapter_files_reject_symlinks_and_escape_targets(self) -> None:
+        source = subprocess.check_output(
+            [
+                "git",
+                "show",
+                "fdb139197d08677d6fa0e14d536e798e380e4cb1:tools/perf-baseline/examples/ole_w5_probe.rs",
+            ],
+            cwd=ROOT,
+        ).decode("utf-8")
+        with tempfile.TemporaryDirectory(prefix="legacy-native-ole-adapter-") as directory:
+            root = Path(directory)
+            owned = root / "owned"
+            owned.mkdir()
+            source_path = root / "source.rs"
+            source_path.write_text(source, encoding="utf-8")
+
+            symlink_source = root / "source-link.rs"
+            symlink_source.symlink_to(source_path)
+            with self.assertRaisesRegex(preparation.PreparationError, "contains a symlink"):
+                preparation.materialize_ole_baseline_adapter_file(
+                    symlink_source,
+                    owned / "symlink-source.rs",
+                    owned_root=owned,
+                )
+
+            missing = root / "missing.rs"
+            dangling_destination = owned / "dangling.rs"
+            dangling_destination.symlink_to(missing)
+            with self.assertRaisesRegex(preparation.PreparationError, "contains a symlink"):
+                preparation.materialize_ole_adapter_file(
+                    source_path,
+                    dangling_destination,
+                    owned_root=owned,
+                )
+            self.assertFalse(missing.exists())
+
+            parent_link = root / "owned-link"
+            parent_link.symlink_to(owned, target_is_directory=True)
+            with self.assertRaisesRegex(preparation.PreparationError, "contains a symlink"):
+                preparation.materialize_ole_baseline_adapter_file(
+                    source_path,
+                    parent_link / "parent-link.rs",
+                    owned_root=owned,
+                )
+
+            outside = root / "outside"
+            outside.mkdir()
+            with self.assertRaisesRegex(preparation.PreparationError, "escapes owned root"):
+                preparation.materialize_ole_adapter_file(
+                    source_path,
+                    outside / "escape.rs",
+                    owned_root=owned,
+                )
+
+            baseline_target = owned / "nested" / "baseline.rs"
+            preparation.materialize_ole_baseline_adapter_file(source_path, baseline_target, owned_root=owned)
+            self.assertEqual(
+                hashlib.sha256(baseline_target.read_bytes()).hexdigest(),
+                preparation.OLE_BASELINE_ADAPTER_RECIPE["adapted_sha256"],
+            )
+            candidate_target = owned / "nested" / "candidate.rs"
+            preparation.materialize_ole_adapter_file(source_path, candidate_target, owned_root=owned)
+            self.assertEqual(
+                hashlib.sha256(candidate_target.read_bytes()).hexdigest(),
+                preparation.OLE_ADAPTER_RECIPE["after_sha256"],
+            )
+
     def test_manifests_bind_reusable_drivers_and_contracts(self) -> None:
         expected = {
             "legacy-rtf.json": ("legacy-rtf", 5, ["routes"]),

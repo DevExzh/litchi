@@ -220,7 +220,7 @@ validator, identity, route-shape and cap logic:
 
 ```text
 python3 -m unittest tools.test_legacy_native_qualification tools.test_native_qualification_runner
-Ran 31 tests
+Ran 32 tests
 OK
 
 python3 -m unittest tools.test_no_3rdparty_references

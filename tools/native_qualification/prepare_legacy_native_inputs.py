@@ -146,6 +146,53 @@ def _expect(condition: bool, message: str) -> None:
         raise PreparationError(message)
 
 
+def _reject_symlink_components(path: Path, label: str) -> None:
+    """Reject the raw path before resolution can hide a symlink."""
+
+    raw = Path(path)
+    cursor = Path(raw.anchor) if raw.is_absolute() else Path()
+    components = raw.parts[1:] if raw.is_absolute() else raw.parts
+    for component in components:
+        cursor /= component
+        _expect(not cursor.is_symlink(), f"{label} path contains a symlink: {cursor}")
+
+
+def _materialize_ole_file(
+    source: Path,
+    destination: Path,
+    owned_root: Path,
+    materializer: Any,
+    label: str,
+) -> None:
+    """Materialize one adapter while keeping its output inside ``owned_root``."""
+
+    source_raw = Path(source)
+    destination_raw = Path(destination)
+    owned_raw = Path(owned_root)
+    _reject_symlink_components(source_raw, f"{label} source")
+    _reject_symlink_components(destination_raw, f"{label} destination")
+    _reject_symlink_components(owned_raw, f"{label} owned root")
+    _expect(source_raw.is_file() and not source_raw.is_symlink(), f"{label} source is missing or symlinked: {source_raw}")
+    _expect(owned_raw.is_dir() and not owned_raw.is_symlink(), f"{label} owned root is missing or symlinked: {owned_raw}")
+    _expect(not destination_raw.exists() and not destination_raw.is_symlink(), f"refusing to overwrite {label} destination: {destination_raw}")
+
+    source_path = source_raw.resolve(strict=True)
+    owned_path = owned_raw.resolve(strict=True)
+    destination_path = destination_raw.resolve(strict=False)
+    try:
+        destination_path.relative_to(owned_path)
+    except ValueError as error:
+        raise PreparationError(f"{label} destination escapes owned root: {destination_raw}") from error
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    _expect(not destination_path.exists() and not destination_path.is_symlink(), f"refusing to overwrite {label} destination: {destination_path}")
+    rendered = materializer(source_path.read_text(encoding="utf-8"))
+    try:
+        with destination_path.open("x", encoding="utf-8") as stream:
+            stream.write(rendered)
+    except FileExistsError as error:
+        raise PreparationError(f"refusing to overwrite {label} destination: {destination_path}") from error
+
+
 def materialize_ole_baseline_adapter(source: str) -> str:
     """Select the public-owner/legacy-property APIs for the 604822 baseline."""
 
@@ -174,26 +221,16 @@ def materialize_ole_adapter(source: str) -> str:
     return adapted
 
 
-def materialize_ole_adapter_file(source: Path, destination: Path) -> None:
-    """Materialize the adapter into a fresh candidate overlay file."""
+def materialize_ole_adapter_file(source: Path, destination: Path, *, owned_root: Path) -> None:
+    """Materialize the candidate adapter under an explicitly owned root."""
 
-    source = source.resolve()
-    destination = destination.resolve()
-    _expect(source.is_file() and not source.is_symlink(), f"OLE adapter source is missing or symlinked: {source}")
-    _expect(not destination.exists() and not destination.is_symlink(), f"refusing to overwrite OLE adapter destination: {destination}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(materialize_ole_adapter(source.read_text(encoding="utf-8")), encoding="utf-8")
+    _materialize_ole_file(source, destination, owned_root, materialize_ole_adapter, "OLE adapter")
 
 
-def materialize_ole_baseline_adapter_file(source: Path, destination: Path) -> None:
-    """Materialize the public-owner baseline adapter into a fresh file."""
+def materialize_ole_baseline_adapter_file(source: Path, destination: Path, *, owned_root: Path) -> None:
+    """Materialize the baseline adapter under an explicitly owned root."""
 
-    source = source.resolve()
-    destination = destination.resolve()
-    _expect(source.is_file() and not source.is_symlink(), f"OLE baseline adapter source is missing or symlinked: {source}")
-    _expect(not destination.exists() and not destination.is_symlink(), f"refusing to overwrite OLE baseline adapter destination: {destination}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(materialize_ole_baseline_adapter(source.read_text(encoding="utf-8")), encoding="utf-8")
+    _materialize_ole_file(source, destination, owned_root, materialize_ole_baseline_adapter, "OLE baseline adapter")
 
 
 def _sha256(path: Path) -> tuple[str, int]:
