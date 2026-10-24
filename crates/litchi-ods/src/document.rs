@@ -236,7 +236,9 @@ impl Package {
 
     /// Adopt bytes a metadata commit published, under this package's limits.
     pub(crate) fn adopt_metadata_bytes(&self, bytes: Vec<u8>) -> CoreResult<Self> {
-        Self::from_vec_with(bytes, self.limits, self.xml_limits)
+        let package = Self::from_vec_with(bytes, self.limits, self.xml_limits)?;
+        validate_resource_count(&package.package, self.limits)?;
+        Ok(package)
     }
 
     /// Create the minimal valid spreadsheet: one empty worksheet named
@@ -530,7 +532,6 @@ impl Package {
     ) -> CoreResult<Self> {
         validate_package_size(source.len(), limits)?;
         let package = Archive::from_shared_bytes_with_xml_limits(Arc::clone(&source), xml_limits)?;
-        validate_resource_count(&package, limits)?;
         if package
             .package()
             .package()?
@@ -561,7 +562,6 @@ impl Package {
     ) -> CoreResult<Self> {
         let source = package.shared_bytes_owner();
         validate_package_size(source.len(), limits)?;
-        validate_resource_count(package.as_ref(), limits)?;
         // A password-bearing facade package must not be captured by this
         // cloneable, credential-free snapshot.  The previous byte-ingress
         // handoff rejected encrypted sources here as well; retain that
@@ -948,8 +948,10 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when the package exceeds the transaction bounds or
-    /// is encrypted (encrypted sources stay read-only exact no-ops).
+    /// Returns an error when the package exceeds the byte transaction bound
+    /// or is encrypted (encrypted sources stay read-only exact no-ops). The
+    /// resource-count bound is admitted by the first staging operation or
+    /// commit, so constructing and dropping an edit remains O(1) in members.
     pub fn edit(&self) -> FamilyResult<Edit> {
         self.edit_with_options(EditOptions::new())
     }
@@ -959,14 +961,14 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// As [`Self::edit`].
+    /// As [`Self::edit`]; resource-count admission is deferred to the first
+    /// staging operation or commit.
     pub fn edit_with_options(&self, options: EditOptions) -> FamilyResult<Edit> {
         Ok(self.edit_core(options.limits)?)
     }
 
     pub(crate) fn edit_core(&self, limits: Limits) -> CoreResult<Edit> {
         validate_package_size(self.source.len(), limits)?;
-        validate_resource_count(&self.package, limits)?;
         if self
             .package
             .package()
@@ -3003,6 +3005,10 @@ impl Edit {
     }
 
     pub(crate) fn commit_core(self, policy: SecurityWritePolicy) -> CoreResult<Commit> {
+        // Resource admission belongs to the first operation on an edit, not
+        // to edit construction.  This also covers an untouched edit whose
+        // first operation is commit, before a no-op snapshot is published.
+        self.ensure_resource_limit()?;
         if self.candidate.as_slice() == self.before.as_bytes() || self.steps.is_empty() {
             let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
             let patch = Patch::build(Arc::clone(&source), source, Vec::new(), self.before.limits)?;
@@ -3053,6 +3059,7 @@ impl Edit {
         candidate: Arc<Vec<u8>>,
     ) -> CoreResult<bool> {
         validate_package_size(candidate.len(), self.before.limits)?;
+        self.ensure_resource_limit()?;
         let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
             return Ok(false);
@@ -3066,6 +3073,7 @@ impl Edit {
             Arc::clone(&candidate),
             self.before.xml_limits,
         )?;
+        validate_resource_count(&validated, self.before.limits)?;
         self.candidate = Arc::clone(&candidate);
         self.package = Arc::new(validated);
         self.steps.push(Step {
@@ -3085,10 +3093,12 @@ impl Edit {
         provenance_spliced: bool,
     ) -> CoreResult<bool> {
         validate_package_size(candidate.len(), self.before.limits)?;
+        self.ensure_resource_limit()?;
         let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
             return Ok(false);
         }
+        validate_resource_count(&package, self.before.limits)?;
         for effect in &effects {
             if let Some(path) = effect.strip_prefix("part:") {
                 self.spliced_parts.remove(path);
@@ -3109,6 +3119,10 @@ impl Edit {
             self.spliced_parts.insert("content.xml".to_string());
         }
         Ok(true)
+    }
+
+    fn ensure_resource_limit(&self) -> CoreResult<()> {
+        validate_resource_count(&self.package, self.before.limits)
     }
 
     fn stage_package_family(
@@ -3311,6 +3325,11 @@ impl Patch {
         if !self.is_applicable_to(snapshot) {
             return invalid("ODS unified patch source snapshot does not match");
         }
+        // Patch replay is another first operation boundary for an owner that
+        // may have been opened before resource admission.  Refuse an
+        // over-limit source before constructing or retaining the target
+        // snapshot.
+        validate_resource_count(&snapshot.package, self.limits)?;
         if self.changed() {
             enforce_security_policy(snapshot, policy)?;
         }
@@ -3319,6 +3338,7 @@ impl Patch {
             self.limits,
             snapshot.xml_limits,
         )?;
+        validate_resource_count(&target.package, self.limits)?;
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
@@ -3463,6 +3483,8 @@ impl Patch {
             limits,
             XmlStreamLimits::owner_default_value(),
         )?;
+        validate_resource_count(&_source_snapshot.package, limits)?;
+        validate_resource_count(&_target_snapshot.package, limits)?;
         Ok(Self {
             source,
             target,
@@ -4345,7 +4367,7 @@ fn validate_package_size(length: usize, limits: Limits) -> CoreResult<()> {
 }
 
 fn validate_resource_count(package: &Archive, limits: Limits) -> CoreResult<()> {
-    let count = package.resource_count();
+    let count = package.resource_count()?;
     if count > limits.resources {
         invalid(format!(
             "ODS resource count limit exceeded: observed {count}, limit {}",
@@ -4417,7 +4439,10 @@ mod raw_package_diff_tests {
 
     use litchi_core::DiagnosticFingerprint;
 
-    use super::{Limits, Package, Patch, Step, changed_effects};
+    use super::{
+        Collision, EditOptions, Limits, Package, Patch, Resource, Step, XmlStreamLimits,
+        changed_effects,
+    };
 
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -4520,6 +4545,74 @@ mod raw_package_diff_tests {
         assert_eq!(commit.package().prepared_index_identity(), facade_identity);
         let malformed = Package::from_bytes(&[0x50, 0x4b, 0x03]);
         assert!(malformed.is_err());
+    }
+
+    #[test]
+    fn resource_admission_stays_cold_until_edit_operation_or_commit() {
+        let source = raw_package(
+            zip::CompressionMethod::Stored,
+            "application/octet-stream",
+            b"lazy resource admission",
+        );
+        let package = Package::from_bytes(&source).unwrap();
+        assert_eq!(package.package.resource_count_cached(), None);
+
+        let edit = package.edit().unwrap();
+        assert_eq!(package.package.resource_count_cached(), None);
+        drop(edit);
+        assert_eq!(package.package.resource_count_cached(), None);
+
+        let reopened = Package::from_vec_with(
+            source.clone(),
+            Limits::default(),
+            XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap();
+        assert_eq!(reopened.package.resource_count_cached(), None);
+        let handed_off = Package::from_shared_package(
+            Arc::clone(&reopened.package),
+            Limits::default(),
+            XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap();
+        assert_eq!(handed_off.package.resource_count_cached(), None);
+
+        let defaults = Limits::default();
+        let zero_resources = Limits::new(
+            defaults.max_package_bytes(),
+            0,
+            defaults.max_resource_bytes(),
+            defaults.patch(),
+            defaults.composition(),
+            defaults.history(),
+        );
+        let mut over_limit = package
+            .edit_with_options(EditOptions::new().limits(zero_resources))
+            .unwrap();
+        assert_eq!(over_limit.package.resource_count_cached(), None);
+        assert!(
+            over_limit
+                .put_resource(
+                    Resource::new(
+                        "Pictures/new.bin",
+                        "application/octet-stream",
+                        b"new resource".to_vec(),
+                    )
+                    .unwrap(),
+                    Collision::Reject,
+                )
+                .is_err()
+        );
+        assert_eq!(over_limit.package.resource_count_cached(), Some(1));
+        assert!(over_limit.steps.is_empty());
+        assert_eq!(over_limit.as_bytes().as_ptr(), package.as_bytes().as_ptr());
+        assert_eq!(package.package.resource_count_cached(), Some(1));
+
+        let untouched = Package::from_bytes(&source).unwrap();
+        assert_eq!(untouched.package.resource_count_cached(), None);
+        let commit = untouched.edit().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(untouched.package.resource_count_cached(), Some(1));
     }
 
     #[test]
