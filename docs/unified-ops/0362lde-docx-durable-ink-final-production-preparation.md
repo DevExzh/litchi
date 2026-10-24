@@ -25,7 +25,7 @@ after adding the bounded outer boundary; the previous v2 receipt remains
 identified only as historical provenance:
 
     /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/source-preparation.json
-    17124 bytes, SHA-256 c1ae8d03fa8d0b0d925ff5cca406868a6ee903ad212757ae7dbe4997b73a40f6
+    17358 bytes, SHA-256 a7ca83bd3a5f1e7fbfc5bc5fc1919b1b986de62da26d67df76dbd1f0424591e9
 
 The superseded v2 receipt was 13,470 bytes with SHA-256
 8f231da0c97436b134b7589c77e3f3df4714d9dc9fa92ef15e9b2c3e06cb2e20. Its
@@ -57,8 +57,8 @@ The final source contains the same canonical probe and runners as 0362ld:
 
 The committed outer boundary is tools/ink_safe_runner.py, 12,857 bytes,
 SHA-256 76cd6f888950b826e294e8345d149c9d463ffd9e5b378824dbce6c4096f4da.
-Its fake-boundary tests are tools/test_ink_safe_runner.py, 5,536 bytes,
-SHA-256 572cef2622ca31f3ae831d35284c1cea85ab0777f1f4c04f84e935d52ba32ce7.
+Its fake-boundary tests are tools/test_ink_safe_runner.py, 6,085 bytes,
+SHA-256 16c33e0fc2384a414508a2103e41f0417fcbf31f8e83698fb354e4cc37ccde01.
 The wrapper is source-only infrastructure: it does not alter the inner
 provenance, route, fidelity or allocation protocols.
 
@@ -367,7 +367,7 @@ four validation sets. The fresh output/TMP paths remained absent and CPU 29
 was present in the current affinity; neither fact is a timing or quiet grant.
 
 The new outer-boundary tests also passed without systemd, Cargo or native
-execution: six fake-systemd lifecycle/resource tests cover argv policy
+execution: seven fake-systemd lifecycle/resource tests cover argv policy
 binding, fixed cap ceilings, normal TMPDIR propagation and cleanup, owned
 unit termination on TMP growth and deadline, and pairwise path rejection.
 The launcher and its tests both pass py_compile.

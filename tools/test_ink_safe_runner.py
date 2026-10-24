@@ -120,6 +120,19 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertFalse(tmp.exists())
         self.assertTrue(self.fake_systemctl_log.exists())
 
+    def test_output_cap_stops_owned_unit(self) -> None:
+        runner, output, _tmp, _logs = self._runner(output_cap=4)
+        command = [
+            "/bin/sh",
+            "-c",
+            f"mkdir -p {str(output)!r}; "
+            f"dd if=/dev/zero of={str(output / 'grow')!r} bs=1024 count=16 >/dev/null; sleep 5",
+        ]
+        receipt = runner.run(command)
+        self.assertEqual(receipt["status"], "failed")
+        self.assertIn("output cap exceeded", receipt["violation"])
+        self.assertTrue(self.fake_systemctl_log.exists())
+
     def test_deadline_stops_owned_unit(self) -> None:
         runner, _output, tmp, _logs = self._runner(deadline=0.1)
         receipt = runner.run(["/bin/sh", "-c", "sleep 5"])
