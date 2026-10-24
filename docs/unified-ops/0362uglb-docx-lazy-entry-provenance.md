@@ -109,4 +109,3 @@ outside the checkout and were not committed.
 | DOCX fuzz manifest | `/home/zhuhe/code/litchi-worktrees/.coord/docx-lazy-entry/receipts/docx-fuzz-check-final2-609523b702.log` | 177 | `60e0d59bcb018462f6efa1882ad7622c9e01df31cf984440295cf1f877d7827a` |
 | litchi-ops fuzz manifest | `/home/zhuhe/code/litchi-worktrees/.coord/docx-lazy-entry/receipts/litchi-ops-fuzz-check-472d21297b.log` | 951 | `ee209e1ceeddedbb6534a614ddb8da221234e5c14320bb056f161aef9e0888af` |
 | perf-baseline consumers | `/home/zhuhe/code/litchi-worktrees/.coord/docx-lazy-entry/receipts/docx-perf-baseline-check-472d21297b.log` | 8549 | `256d140ede2bd24db2c2536bdfdd7046436cc8152ce4ad74a9832a3cccf71268` |
-
