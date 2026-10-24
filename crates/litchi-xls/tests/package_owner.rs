@@ -246,6 +246,22 @@ fn signed_owner_publishes_exactly_and_allows_identity_editing() {
 }
 
 #[test]
+fn signed_source_property_edit_reports_freshness_before_policy_refusal() {
+    let source = Arc::new(CountingReadAt::new(signed_package()));
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let package = Package::from_source(workbook).unwrap();
+    let mut edit = package.edit_property_sets().unwrap();
+    edit.before().unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.edit_summary_information(|_| Ok(())),
+        Err(PackageError::Reader(
+            SourceBackedError::SourceChanged { .. }
+        ))
+    ));
+}
+
+#[test]
 fn unlocked_encrypted_owner_refuses_ordinary_publication_without_clobbering_destination() {
     let bytes = fixture("poi/test-data/spreadsheet/xor-encryption-abc.xls");
     let package =

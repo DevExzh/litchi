@@ -218,6 +218,7 @@ impl Edit {
 
     fn editor_ref(&mut self) -> Result<&PropertySetEdit> {
         self.ensure_ready()?;
+        self.check_signed_source()?;
         self.editor
             .as_ref()
             .ok_or(Error::Reader(crate::Error::Signed))
@@ -225,9 +226,28 @@ impl Edit {
 
     fn editor_mut_ready(&mut self) -> Result<&mut PropertySetEdit> {
         self.ensure_ready()?;
+        self.check_signed_source()?;
         self.editor
             .as_mut()
             .ok_or(Error::Reader(crate::Error::Signed))
+    }
+
+    /// Recheck a dynamic original source before a signed edit reports its
+    /// policy refusal. This is a version-only fence; full bytes are checked
+    /// once at publication by [`Self::check_source`].
+    fn check_signed_source(&self) -> Result<()> {
+        if !self.signed {
+            return Ok(());
+        }
+        let Some(base) = &self.base else {
+            return Ok(());
+        };
+        if let Some(workbook) = base.source_workbook() {
+            workbook
+                .ensure_original_source_current()
+                .map_err(Error::Reader)?;
+        }
+        Ok(())
     }
 
     /// The shared property-set editor, for the package metadata transaction.
