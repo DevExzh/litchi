@@ -909,6 +909,13 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
             guard = _object(item[guard_label], f"{label}.{guard_label}")
             _exact_keys(guard, {"phase", "load_1m", "max_load", "heavy_processes", "checked_unix_ns"},
                         f"{label}.{guard_label}")
+            if (type(guard["load_1m"]) not in (int, float) or guard["load_1m"] < 0
+                    or type(guard["max_load"]) not in (int, float)
+                    or guard["max_load"] <= 0):
+                raise RunFailure(f"{label}: quiet guard numeric identity is malformed")
+            _positive_int(guard["checked_unix_ns"], f"{label}.{guard_label}.checked_unix_ns")
+            if not isinstance(guard["heavy_processes"], list):
+                raise RunFailure(f"{label}: quiet guard process list is malformed")
             if guard["max_load"] != plan["max_load"] or guard["heavy_processes"] != []:
                 raise RunFailure(f"{label}: quiet guard identity or process list changed")
         target = _object(item["target"], f"{label}.target")
