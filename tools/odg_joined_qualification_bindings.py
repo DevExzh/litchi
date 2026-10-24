@@ -24,10 +24,10 @@ REVIEWED_FIXTURE_RELATIVE = Path("test-data/odg/joined-content.xml")
 # These values are deliberately source bindings, not values copied from a
 # caller's manifest.  They are refreshed together with the reviewed inputs.
 REVIEWED_PROBE_IDENTITIES = {
-    "common": {"bytes": 17350, "sha256": "dd13d8945600f58e9b5681badb562b7a1228c13cc07ef82a84f476ed42090082"},
+    "common": {"bytes": 17863, "sha256": "cdbe48f55e51ba6a35285c0b0a321e36c4d07c616053be685c9865d79fa3b9c5"},
     "allocator": {"bytes": 10357, "sha256": "8f657e87e65dffcd10dae5906212ccf1b4e68e12d8bc2008c261e189ef1e815d"},
-    "baseline": {"bytes": 11324, "sha256": "4eacac4e93ecba11d41e7b6112fb10acdf25fe3c0a51f3566e4d527f64cfff67"},
-    "candidate": {"bytes": 13203, "sha256": "e96dddaec4d1420730c7ac98dd7a73bd665a67e6d2c88e94e08d005868acc2f6"},
+    "baseline": {"bytes": 11351, "sha256": "8b3adac40dee59156fa667d6478779f7c63a28c60c1253f4e0187140a57a5a40"},
+    "candidate": {"bytes": 13180, "sha256": "ba4dab289b8786c83882925d3afb50ff131805a575fced4ea6c735d1f0256fbc"},
 }
 REVIEWED_FIXTURE_IDENTITY = {
     "bytes": 738,
