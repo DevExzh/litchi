@@ -1,0 +1,117 @@
+{
+  "schema": "litchi.drawingml.followup-validation.v1",
+  "record": "0362dv",
+  "scope": "DrawingML immutable-owner glossary correction, truthful chart replay documentation, and the isolated unified-chart-add lock closure.",
+  "source": {
+    "repair_parent": "cc37c1b6245db8ac8265f41727b5a29c0d949a6a",
+    "checked_tree_equivalent_commit": "c9975aabf2cc910909b55816ff529ccf81198825",
+    "checked_tree": "7e0abc7cb075bd8254ffeb24d394f4681d4924c9",
+    "execution_phase": "The checks ran on the pre-commit working tree after the repair files and final lock were prepared; that exact source content was committed as c9975aabf2.",
+    "repair_files": [
+      {
+        "path": "crates/litchi-drawingml/src/chart/edit/transaction.rs",
+        "bytes": 14667,
+        "sha256": "505ff5dfd04ce2c11c22b72363301c9fa801b4db6139ee7b6e004e95a51446e2"
+      },
+      {
+        "path": "tools/api_glossary.json",
+        "bytes": 850746,
+        "sha256": "eaac435fd1fec6061cec2e814f8777f4272ee786354056fe684ca96d9a50d8ef"
+      }
+    ]
+  },
+  "locks": {
+    "workspace_pinned_52ed": {
+      "path": "Cargo.lock",
+      "source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock",
+      "bytes": 139591,
+      "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+    },
+    "standalone_manifest": {
+      "path": "tools/perf-baseline/unified-chart-add/Cargo.toml",
+      "bytes": 620,
+      "sha256": "cb7652af84cb89cc7fc83d6bf91fd252ea24fe2d62d83204d19b716ff27768b1"
+    },
+    "standalone_transition": [
+      {
+        "label": "tracked-before-repair",
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "bytes": 31748,
+        "sha256": "b0b8b8fc4bcd6dceb0e6d1de8606878ecd7191c8403de836cfebf35761f7f847"
+      },
+      {
+        "label": "manual-two-edge-attempt",
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-lock-manual.patch.lock",
+        "bytes": 31780,
+        "sha256": "b1d25ab8d54c6e779f928c93363035b263e4c78c58d7b97997640ac66dc0f72e"
+      },
+      {
+        "label": "offline-resolved-final",
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "bytes": 31939,
+        "sha256": "811dc166f6aaec285dfea8276aa1a153e4d992c00f603f5e5f0113a4f71a7f3e"
+      }
+    ]
+  },
+  "environment": {
+    "cargo_shim_path_prefix": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+    "litchi_mem_max": "20G",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "dev_test_release_bench_debug": 0,
+    "offline": true,
+    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+    "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp"
+  },
+  "checks": [
+    {
+      "label": "locked-before-final-lock",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "bytes": 298,
+        "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
+      },
+      "note": "The two manually added sha2 edges were still insufficient; --locked refused to update the stale local graph before compilation."
+    },
+    {
+      "label": "offline-lock-resolution-and-check",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "cargo_reported": "Finished dev profile in 1m 12s",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-unlocked-resolution.log",
+        "bytes": 5560,
+        "sha256": "fa33065a9258be4500d5d142c7636f52080d566daf9b0a05f73fb67a2aeb5723"
+      },
+      "note": "Offline resolution added only local package graph state; all compatible registry versions/checksums were retained."
+    },
+    {
+      "label": "locked-final",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "cargo_reported": "Finished dev profile in 2.14s",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check-locked.log",
+        "bytes": 590,
+        "sha256": "a0d88f49ca29aed02c60152559c08380cbd6247aafbaf89699781e59f814856d"
+      },
+      "target_bytes_after": 206480812
+    }
+  ],
+  "lock_diff": {
+    "local_package_changes": [
+      "litchi-ops: add chrono, litchi-sheet-text, memchr, quick-xml, and sha2 0.11.0; drop unselected litchi-biff and litchi-ograph edges",
+      "litchi-pptx: add memchr",
+      "add litchi-sheet-text 0.0.1 with litchi-core, litchi-sheet, and thiserror dependencies",
+      "litchi-xlsx: add sha2 0.11.0"
+    ],
+    "registry_changes": "none: no registry package version or checksum changed"
+  },
+  "prior_pinned_native_test": {
+    "command": "cargo test -p litchi-drawingml --all-features --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tests-target",
+    "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+    "result": "235 unit tests, integration suites, and 12 doctests passed; this earlier pre-c997 run has no separately retained stdout log artifact."
+  }
+}
