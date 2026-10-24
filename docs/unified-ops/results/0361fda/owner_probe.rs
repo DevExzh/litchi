@@ -16,6 +16,84 @@ use std::{hint::black_box, time::Instant};
 
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "allocations")]
+mod allocation {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    pub static CURRENT: AtomicUsize = AtomicUsize::new(0);
+    pub static PEAK: AtomicUsize = AtomicUsize::new(0);
+    pub static BYTES: AtomicUsize = AtomicUsize::new(0);
+    pub static CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    pub struct Counting;
+
+    // SAFETY: every operation forwards to the system allocator with the
+    // caller's layout and pointer; the atomics only observe sizes.
+    unsafe impl GlobalAlloc for Counting {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: the system allocator receives the original layout.
+            let pointer = unsafe { System.alloc(layout) };
+            if !pointer.is_null() {
+                add(layout.size());
+            }
+            pointer
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            // SAFETY: the pointer and layout came from this allocator.
+            unsafe { System.dealloc(pointer, layout) };
+            CURRENT.fetch_sub(layout.size(), Ordering::Relaxed);
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
+            // SAFETY: the pointer and old layout came from this allocator.
+            let moved = unsafe { System.realloc(pointer, layout, size) };
+            if !moved.is_null() {
+                let live = if size >= layout.size() {
+                    CURRENT.fetch_add(size - layout.size(), Ordering::Relaxed) + size
+                        - layout.size()
+                } else {
+                    CURRENT.fetch_sub(layout.size() - size, Ordering::Relaxed)
+                        - (layout.size() - size)
+                };
+                PEAK.fetch_max(live, Ordering::Relaxed);
+                BYTES.fetch_add(size, Ordering::Relaxed);
+                CALLS.fetch_add(1, Ordering::Relaxed);
+            }
+            moved
+        }
+    }
+
+    fn add(size: usize) {
+        let live = CURRENT.fetch_add(size, Ordering::Relaxed) + size;
+        PEAK.fetch_max(live, Ordering::Relaxed);
+        BYTES.fetch_add(size, Ordering::Relaxed);
+        CALLS.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn start() -> usize {
+        let live = CURRENT.load(Ordering::Relaxed);
+        PEAK.store(live, Ordering::Relaxed);
+        BYTES.store(0, Ordering::Relaxed);
+        CALLS.store(0, Ordering::Relaxed);
+        live
+    }
+
+    pub fn result(base: usize) -> (usize, usize, usize, usize) {
+        (
+            PEAK.load(Ordering::Relaxed).saturating_sub(base),
+            CURRENT.load(Ordering::Relaxed).saturating_sub(base),
+            BYTES.load(Ordering::Relaxed),
+            CALLS.load(Ordering::Relaxed),
+        )
+    }
+}
+
+#[cfg(feature = "allocations")]
+#[global_allocator]
+static ALLOCATOR: allocation::Counting = allocation::Counting;
+
 const ROUTES: [&str; 4] = [
     "numbers_headers",
     "keynote_media",
@@ -370,6 +448,45 @@ fn owner_correctness(route: &str, directory: &std::path::Path) -> Correctness {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct AllocationMetrics {
+    peak: usize,
+    retained: usize,
+    allocated: usize,
+    allocations: usize,
+}
+
+#[cfg(feature = "allocations")]
+fn allocation_start() -> usize {
+    allocation::start()
+}
+
+#[cfg(not(feature = "allocations"))]
+fn allocation_start() -> usize {
+    0
+}
+
+#[cfg(feature = "allocations")]
+fn allocation_finish(base: usize) -> AllocationMetrics {
+    let (peak, retained, allocated, allocations) = allocation::result(base);
+    AllocationMetrics {
+        peak,
+        retained,
+        allocated,
+        allocations,
+    }
+}
+
+#[cfg(not(feature = "allocations"))]
+fn allocation_finish(_base: usize) -> AllocationMetrics {
+    AllocationMetrics {
+        peak: 0,
+        retained: 0,
+        allocated: 0,
+        allocations: 0,
+    }
+}
+
 fn print_report(
     route: &str,
     iterations: usize,
@@ -378,13 +495,18 @@ fn print_report(
     output: &[u8],
     source_sha256: &str,
     correctness: &Correctness,
+    metrics: AllocationMetrics,
 ) {
     assert_eq!(sha256(output), correctness.changed_sha256);
     assert_eq!(output.len(), correctness.changed_bytes);
     println!(
-        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{},\"source_bytes\":{},\"changed_bytes\":{},\"noop_bytes\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
+        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"peak\":{},\"retained\":{},\"allocated\":{},\"allocations\":{},\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{},\"source_bytes\":{},\"changed_bytes\":{},\"noop_bytes\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
         output.len(),
         correctness.changed_sha256,
+        metrics.peak,
+        metrics.retained,
+        metrics.allocated,
+        metrics.allocations,
         correctness.replay_matches_changed,
         correctness.inverse_matches_source,
         correctness.noop_is_noop,
@@ -411,6 +533,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
             let before = package.table_header_settings(0usize, 0usize).unwrap();
             let mut changed = before;
             changed.header_rows_frozen = Some(!before.header_rows_are_frozen());
+            let allocation_base = allocation_start();
             let started = Instant::now();
             let mut checksum = 0u64;
             for _ in 0..iterations {
@@ -424,6 +547,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 black_box(commit);
             }
             let elapsed = started.elapsed().as_nanos();
+            let metrics = allocation_finish(allocation_base);
             let output = package
                 .edit_table_headers(0usize, 0usize)
                 .unwrap()
@@ -439,6 +563,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 &bytes,
                 &source_sha256,
                 &correctness,
+                metrics,
             );
         },
         "keynote_media" => {
@@ -456,6 +581,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                     .and_then(|edit| edit.commit())
                     .unwrap()
             };
+            let allocation_base = allocation_start();
             let started = Instant::now();
             let mut checksum = 0u64;
             for _ in 0..iterations {
@@ -464,6 +590,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 black_box(commit);
             }
             let elapsed = started.elapsed().as_nanos();
+            let metrics = allocation_finish(allocation_base);
             let commit = run(&package);
             let bytes = write_keynote(commit.package());
             print_report(
@@ -474,12 +601,14 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 &bytes,
                 &source_sha256,
                 &correctness,
+                metrics,
             );
         },
         "pages_footnote_insert" => {
             let source = std::fs::read(directory.join("footnote-fixture.pages")).unwrap();
             let package = litchi_pages::Package::from_bytes(&source).unwrap();
             let position = litchi_pages::footnote::body::Position::from_utf16_index(1).unwrap();
+            let allocation_base = allocation_start();
             let started = Instant::now();
             let mut checksum = 0u64;
             for _ in 0..iterations {
@@ -490,6 +619,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 black_box(commit);
             }
             let elapsed = started.elapsed().as_nanos();
+            let metrics = allocation_finish(allocation_base);
             let commit = package
                 .insert_body_footnote(position, "Inserted", Some("\u{2021}"))
                 .unwrap();
@@ -502,6 +632,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 &bytes,
                 &source_sha256,
                 &correctness,
+                metrics,
             );
         },
         "pages_section_name" => {
@@ -517,6 +648,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 edit.set_name(Some(black_box(name))).unwrap();
                 edit.commit().unwrap()
             };
+            let allocation_base = allocation_start();
             let started = Instant::now();
             let mut checksum = 0u64;
             for _ in 0..iterations {
@@ -525,6 +657,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 black_box(commit);
             }
             let elapsed = started.elapsed().as_nanos();
+            let metrics = allocation_finish(allocation_base);
             let commit = run(&package);
             let bytes = write_pages(commit.package());
             print_report(
@@ -535,6 +668,7 @@ fn run(route: &str, iterations: usize, directory: &std::path::Path) {
                 &bytes,
                 &source_sha256,
                 &correctness,
+                metrics,
             );
         },
         other => panic!("unknown owner route {other}"),

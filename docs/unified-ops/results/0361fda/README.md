@@ -110,3 +110,24 @@ python3 -m unittest discover -s docs/unified-ops/results/0361fda -p 'test_*.py'
 The host coordinator must supply a quiet window before the `run` phase. The
 build phase is deliberately separate so source and binary provenance can be
 reviewed before any native timing is attempted.
+
+Before native timing, collect the required operation-allocation packet for
+every route. The allocation binary is a separate counting-allocator build;
+the native binary is never used for this phase. Each route runs exactly 100
+operations in an `ABBA` order, with the same CPU pinning and before/during/after
+quiet-host guards as native children. The packet retains `peak`, `retained`,
+`allocated`, and `allocations` from the operation closure. It makes no latency
+claim and fails closed if the owner probe does not report real allocation
+metrics or if either endpoint changes its paired metrics:
+
+```text
+python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py \
+  allocation constructor /outside/0361fda --attempt allocation-a1 --cpu 29
+python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py \
+  allocation owner /outside/0361fda --attempt allocation-a1 --cpu 29 \
+  --fixtures /outside/iwa-fixtures
+```
+
+The constructor packet covers all 15 routes and the owner packet all four.
+The allocation attempt must complete before the fixed native `run` command;
+native timing remains a separate quiet-window operation.
