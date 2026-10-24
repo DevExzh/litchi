@@ -13,7 +13,9 @@ replay must publish that owner. Local aliases are resolved by identity, not
 spelling. "shared_types" explicitly pins nominated public aliases/re-exports to
 the nominal litchi_core::edit::Commit or Diagnostics item; generic arguments
 and richer format-owned diagnostics remain outside that rule. Direct shared
-core Commit types use their canonical dependency path.
+core Commit types use their canonical dependency path. "required_signatures"
+pins caller-visible input names and a required typed limits argument for
+raw/record/codec entry points; it deliberately checks only registered methods.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
@@ -95,7 +97,7 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
         fields = {"id", "package", "default_features", "features", "banned_names", "families"}
         optional = {
             "delegated_globs", "immutable_owners", "family_methods", "result_methods",
-            "shared_types",
+            "shared_types", "required_signatures",
         }
         if (not isinstance(profile, dict) or not fields <= set(profile)
                 or set(profile) - (fields | optional)):
@@ -196,6 +198,30 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             if shared["path"] in seen_shared_paths:
                 raise ValueError("duplicate shared type path")
             seen_shared_paths.add(shared["path"])
+        required_signatures = profile.get("required_signatures", [])
+        if not isinstance(required_signatures, list):
+            raise ValueError("required_signatures must be an array")
+        seen_signature_methods = set()
+        for signature in required_signatures:
+            fields = {"method", "inputs", "limits_argument", "limits_type"}
+            if (not isinstance(signature, dict) or set(signature) != fields):
+                raise ValueError(
+                    "required signature requires method, inputs, limits_argument and limits_type"
+                )
+            check_path(signature["method"])
+            check_path(signature["limits_type"])
+            inputs = signature["inputs"]
+            if (not isinstance(inputs, list) or not inputs
+                    or any(not isinstance(name, str) or not IDENTIFIER.fullmatch(name)
+                           for name in inputs)
+                    or len(set(inputs)) != len(inputs)):
+                raise ValueError("required signature inputs must be unique Rust identifiers")
+            if (not isinstance(signature["limits_argument"], str)
+                    or signature["limits_argument"] not in inputs):
+                raise ValueError("required signature limits_argument must name an input")
+            if signature["method"] in seen_signature_methods:
+                raise ValueError("duplicate required signature method")
+            seen_signature_methods.add(signature["method"])
         results = profile.get("result_methods", [])
         if not isinstance(results, list):
             raise ValueError("result_methods must be an array")
@@ -574,6 +600,47 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         # Associated functions have no receiver but still count as methods.
         if kind == "function" and len(path) > 1:
             methods.setdefault(path[:-1], set()).add(path[-1])
+    for rule in profile.get("required_signatures", []):
+        method = tuple(rule["method"].split("::"))
+        if surface.exports.get(method) != "function":
+            failures.add(
+                f"{rule['method']} must remain a public function with the required limits signature "
+                "(record 0351 §2.5.3)"
+            )
+            continue
+        item_id = surface.item_ids.get(method)
+        function = surface.index.get(item_id, {}).get("inner", {}).get("function")
+        inputs = function.get("sig", {}).get("inputs") if isinstance(function, dict) else None
+        names = [item[0] for item in inputs] if isinstance(inputs, list) and all(
+            isinstance(item, list) and len(item) == 2 and isinstance(item[0], str)
+            for item in inputs
+        ) else None
+        if names != rule["inputs"]:
+            failures.add(
+                f"{rule['method']} must take inputs {rule['inputs']} (record 0351 §2.5.3)"
+            )
+            continue
+        limits_index = rule["inputs"].index(rule["limits_argument"])
+        actual = inputs[limits_index][1]
+        normalized = return_types.resolve(actual)
+        while isinstance(normalized, tuple) and normalized and normalized[0] == "ref":
+            normalized = normalized[2]
+        expected_path = tuple(rule["limits_type"].split("::"))
+        expected_id = surface.item_ids.get(expected_path)
+        expected_identity = (
+            return_types._resolve_nominal_identity(expected_id)
+            if expected_id is not None else None
+        )
+        actual_identity = (
+            return_types._resolve_nominal_identity(normalized[1])
+            if isinstance(normalized, tuple) and len(normalized) == 3
+            and normalized[0] == "nominal" else None
+        )
+        if expected_identity is None or actual_identity != expected_identity:
+            failures.add(
+                f"{rule['method']} limits argument {rule['limits_argument']} must have type "
+                f"{rule['limits_type']} (record 0351 §2.5.3)"
+            )
     for rule in profile.get("shared_types", []):
         public = tuple(rule["path"].split("::"))
         target = tuple(rule["target"].split("::"))

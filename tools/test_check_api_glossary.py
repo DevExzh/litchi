@@ -47,6 +47,16 @@ pub mod incomplete {
 pub enum Selector { Name, Id }
 pub mod domain { pub struct Id; pub struct ReadLimits; }
 pub struct ReadLimits;
+pub struct SourceLimits;
+pub struct RawParser;
+impl RawParser {
+    pub fn parse(data: &[u8], offset: usize, limits: SourceLimits) {
+        let _ = (data, offset, limits);
+    }
+    pub fn parse_without_limits(data: &[u8], offset: usize) {
+        let _ = (data, offset);
+    }
+}
 pub struct Fields { pub old_field: u8, secret_field: u8 }
 pub enum Variants { Named { old_variant_field: u8 } }
 pub trait Contract {
@@ -239,7 +249,7 @@ pub mod unrelated { pub struct Commit<P, T>(pub P, pub T); }
 def profile(**changes):
     value = {
         "id": "fixture", "package": "fixture", "default_features": False,
-        "features": [], "banned_names": [], "families": [],
+        "features": [], "banned_names": [], "families": [], "required_signatures": [],
     }
     value.update(changes)
     return value
@@ -274,6 +284,7 @@ class PolicyTests(unittest.TestCase):
             {"version": 1, "profiles": [profile(immutable_owners=["other::Owner"])]},
             {"version": 1, "profiles": [profile(immutable_owners=["fixture::Owner", "fixture::Owner"])]},
             {"version": 1, "profiles": [profile(result_methods="yes")]},
+            {"version": 1, "profiles": [profile(required_signatures="yes")]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "Commit"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Package"}])]},
@@ -359,6 +370,24 @@ class RustdocTests(unittest.TestCase):
     def check(self, *names, scope="fixture", families=()):
         return gate.violations(self.document, profile(
             banned_names=[ban(n, scope) for n in names], families=list(families)))
+
+    def test_required_signature_policy_is_checked_by_input_names_and_limit_type(self):
+        row = {
+            "method": "fixture::RawParser::parse",
+            "inputs": ["data", "offset", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "fixture::SourceLimits",
+        }
+        self.assertEqual(gate.violations(self.document, profile(required_signatures=[row])), [])
+        for changed in (
+            {**row, "inputs": ["data", "offset"]},
+            {**row, "limits_argument": "offset"},
+            {**row, "limits_type": "fixture::ReadLimits"},
+            {**row, "method": "fixture::RawParser::parse_without_limits"},
+        ):
+            with self.subTest(changed=changed):
+                failures = gate.violations(self.document, profile(required_signatures=[changed]))
+                self.assertEqual(len(failures), 1, failures)
 
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
         document = copy.deepcopy(self.document)
