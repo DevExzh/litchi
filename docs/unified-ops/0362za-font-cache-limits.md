@@ -68,6 +68,47 @@ above and `TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/tmp
 The toolchain was rustc/cargo 1.95.0 (`rustc` commit
 `59807616e1fa2540724bfbac14d7976d7e4a3860`).
 
-No command-output log files were redirected or retained; the successful output
-was present only in the interactive run transcript. Consequently this record
-does not claim a log size or log SHA-256.
+For the original pre-commit run, no command-output log files were redirected
+or retained; its successful output was present only in the interactive run
+transcript. Consequently that run has no claimed log size or log SHA-256.
+
+## Pinned-lock rerun receipt
+
+The generated `6d7895e6…6747da` lock was retained as a diagnostic only: it
+differs from the frozen `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`
+lock in six registry versions (`cc`, `crypto-common`, `ctutils`,
+`generic-array`, `pulldown-cmark` and `smallvec`). The rerun copied
+`Cargo.lock` from `uo2-budget-validation` without regeneration and used the
+pinned hash above (139,591 bytes).
+
+At source `dbe846e1fc42691821e21bdd14ecd86b0b1457b0`, with a clean worktree,
+the pinned-lock rerun passed all 216 focused tests: fonts 25, cache 10 and
+archive library 181. It also passed the strict checks below, all with
+`--offline --locked`, one Cargo job, the same shim/memory/target/TMPDIR
+settings recorded above:
+
+```text
+cargo clippy --offline --locked -p litchi-fonts -p litchi-iwa-cache -p litchi-iwa-archive --all-targets --all-features -- -D warnings
+RUSTDOCFLAGS=-Dwarnings cargo doc --offline --locked --no-deps --all-features -p litchi-fonts -p litchi-iwa-cache -p litchi-iwa-archive
+cargo fmt --all --check
+```
+
+The external retained logs and per-command resource receipts are under
+`/home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/validation-52ed/`.
+Their manifest is `metadata.after.txt`, SHA-256
+`a6ada7d0447acb8a8f2a5fa78e55a392604be031db0901f18ae641191d247054` (2,706
+bytes). The command receipt files are:
+
+| Receipt | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `01-fonts.receipt.txt` | 3,928 | `fb1fd745fdbed3576bc5f4cd40d621c7040dec417505b8c8f26605c4a91abd02` |
+| `02-cache.receipt.txt` | 2,213 | `1ada8d38fea63d1be9d36f0da2bcff14f4bd0cac5c1be31f660e0829bd1cd9e4` |
+| `03-archive.receipt.txt` | 17,361 | `dcafe3b8555ec4e902036f3b5479d5a44b3ddb8165f0cbd9b3c92149c803d63c` |
+| `04-clippy.receipt.txt` | 1,990 | `ffa00d7ad957dccdbaedc6f4fc301026a66b69e314dc2abe093172d22399d421` |
+| `05-doc.receipt.txt` | 1,842 | `34b2e164cfef34de2a72b1d88cb44e347dabbec6ced089e17c3bbf51a5611f40` |
+| `06-fmt.receipt.txt` | 98 | `996e0642b577cab9fe7fd4ac58b37dc797605c4013a819e7046ca629db37be53` |
+
+The target measured 1,071,572,749 bytes after this rerun, below the 20 GB
+ceiling. This receipt supersedes the earlier pre-commit validation limitation;
+the tests now cover the frozen dependency graph without claiming a post-merge
+trunk run.
