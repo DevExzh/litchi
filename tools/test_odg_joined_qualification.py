@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 from dataclasses import replace
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -37,6 +38,8 @@ CONTENT = (
 
 
 def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_ms: int = 500) -> Path:
+    from tools import odg_joined_qualification_builder as builder
+
     fixture = RUNNER.REVIEWED_REPO_ROOT / RUNNER.REVIEWED_FIXTURE_RELATIVE
     reviewed = {
         name: RUNNER.REVIEWED_REPO_ROOT / relative
@@ -104,6 +107,9 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
         return {"entries": len(value.splitlines()), "bytes": len(value),
                 "sha256": hashlib.sha256(value).hexdigest()}
 
+    def source_closure(source: Path, revision: str) -> dict[str, object]:
+        return builder._capture_source_closure(source, revision)["binding"]
+
     values = {
         "schema": RUNNER.INPUT_SCHEMA,
         "fixture": {"path": str(fixture), **RUNNER.REVIEWED_FIXTURE_IDENTITY,
@@ -116,6 +122,7 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
                       "cargo_config": identity(baseline_root / ".cargo/config.toml"),
                       "cargo_manifest": identity(baseline_root / "Cargo.toml"),
                       "source_manifest": tree_identity(baseline_root),
+                      "source_closure": source_closure(baseline_root, baseline_ref),
                       "allocator_binary": str(baseline_allocator_target / "release" / "examples" / binary_name),
                       "allocator_target_dir": str(baseline_allocator_target), "features": ["odg"],
                       "binary_identity": digest((baseline_target / "release" / "examples" / binary_name).read_bytes()),
@@ -128,6 +135,7 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
                        "cargo_config": identity(candidate_root / ".cargo/config.toml"),
                        "cargo_manifest": identity(candidate_root / "Cargo.toml"),
                        "source_manifest": tree_identity(candidate_root),
+                       "source_closure": source_closure(candidate_root, candidate_ref),
                        "allocator_binary": str(candidate_allocator_target / "release" / "examples" / binary_name),
                        "allocator_target_dir": str(candidate_allocator_target), "features": ["odg"],
                        "binary_identity": digest((candidate_target / "release" / "examples" / binary_name).read_bytes()),
@@ -253,6 +261,20 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             manifest.write_text(manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8")
             with self.assertRaises(RUNNER.RunFailure):
                 RUNNER._assert_unchanged(parsed, identity["endpoints"], "manifest-change")
+
+    def test_source_closure_catches_same_size_mtime_restored_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parsed = RUNNER.load_manifest(write_manifest(root))
+            out_dir = root / "out"
+            out_dir.mkdir()
+            identity = RUNNER.runtime_identity(parsed, out_dir, require_build_receipt=False)
+            tracked = identity["endpoints"]["baseline"].endpoint.root / "tracked"
+            original = tracked.stat()
+            tracked.write_bytes(b"tamper-0")
+            os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns))
+            with self.assertRaises(RUNNER.RunFailure):
+                RUNNER._assert_unchanged(parsed, identity["endpoints"], "after-correctness")
 
     def test_path_layout_rejects_target_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -434,6 +456,7 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                 "command": [], "returncode": 0, "endpoint": "baseline",
                 "profile": RUNNER.BASELINE_PROFILE, "resolved_ref": endpoint.resolved_ref,
                 "binary": endpoint.binary,
+                "environment": endpoint.environment,
                 "binding": {"mode": "verify", "route": None, "scope": None},
                 "stdout": {"path": str(stdout_path), "bytes": 3,
                             "sha256": hashlib.sha256(b"{}\n").hexdigest()},
@@ -534,6 +557,30 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                 subprocess.run(["git", "-C", str(root), "update-index", flag, "tracked"], check=True)
                 with self.assertRaises(RUNNER.RunFailure):
                     builder._check_worktree_shape(root, flag)
+
+    def test_builder_binds_effective_environment_and_final_target_sample(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parsed = RUNNER.load_manifest(write_manifest(root))
+            endpoint = parsed.baseline
+            with mock.patch.dict(os.environ, {"RUSTC_WRAPPER": "/unreviewed/wrapper"}, clear=False):
+                with self.assertRaises(RUNNER.RunFailure):
+                    builder._environment_identity(
+                        endpoint.root,
+                        ref=endpoint.requested_ref,
+                        tree=endpoint.expected_tree,
+                        source_closure=endpoint.source_closure,
+                    )
+            with self.assertRaises(RUNNER.RunFailure):
+                builder._validate_target_accounting(
+                    {"path": str(root / "target"), "bytes_before": 0,
+                     "bytes_after": builder.MEMORY_LIMIT_BYTES + 1,
+                     "hard_limit_bytes": builder.MEMORY_LIMIT_BYTES},
+                    "final-write.target",
+                    root / "target",
+                )
 
     def test_directory_guard_rejects_missing_and_symlinked_targets(self) -> None:
         from tools import odg_joined_qualification_builder as builder

@@ -22,6 +22,7 @@ from pathlib import Path
 import resource
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -75,9 +76,9 @@ except ImportError:  # pragma: no cover - direct tools import.
     )
 
 
-PREPARE_SCHEMA = "litchi.odg.joined-native-qualification.prepare.v3"
-BUILD_SCHEMA = "litchi.odg.joined-native-qualification.build.v3"
-BUILDER_REVISION = "odg-joined-builder-v3-bound-release-streamed-receipt"
+PREPARE_SCHEMA = "litchi.odg.joined-native-qualification.prepare.v4"
+BUILD_SCHEMA = "litchi.odg.joined-native-qualification.build.v4"
+BUILDER_REVISION = "odg-joined-builder-v4-closure-environment-target-bound"
 PRISTINE_BASELINE_REF = "ad52437f5e5e2c71ea476eedd5ddcf61aee2021d"
 EXPECTED_EXAMPLE = "litchi-perf-odg-joined-qualification"
 EXPECTED_PACKAGE = "litchi-odg"
@@ -188,7 +189,7 @@ def _endpoint_value(raw: Mapping[str, Any], name: str) -> dict[str, Any]:
     expected = {
         "root", "ref", "tree", "profile", "binary", "target_dir", "lock",
         "toolchain", "cargo_config", "cargo_manifest", "source_manifest", "allocator_binary",
-        "allocator_target_dir", "features", "binary_identity", "allocator_binary_identity",
+        "source_closure", "allocator_target_dir", "features", "binary_identity", "allocator_binary_identity",
     }
     _exact_keys(value, expected, f"manifest.{name}")
     return value
@@ -367,6 +368,157 @@ def _tree_manifest(root: Path, revision: str) -> dict[str, Any]:
     }
 
 
+def _git_tree_entries(root: Path, revision: str) -> list[tuple[str, str, str]]:
+    raw = _run_git_bytes(root, "ls-tree", "-r", "-z", "--full-tree", revision)
+    entries: list[tuple[str, str, str]] = []
+    for item in raw.split(b"\0"):
+        if not item:
+            continue
+        try:
+            header, raw_path = item.split(b"\t", 1)
+            mode, kind, oid = header.split()
+        except ValueError as error:
+            raise RunFailure(f"malformed Git tree entry in {root}: {item!r}") from error
+        if kind != b"blob":
+            raise RunFailure(f"source closure contains non-blob entry {raw_path!r}")
+        entries.append((os.fsdecode(raw_path), mode.decode("ascii"), oid.decode("ascii")))
+    return entries
+
+
+def _capture_source_closure(root: Path, revision: str) -> dict[str, Any]:
+    """Hash every tracked byte and retain metadata for cheap between-probe checks."""
+
+    root = _safe_path(root, "source closure root", must_exist=True)
+    files: list[dict[str, Any]] = []
+    total_bytes = 0
+    closure_digest = hashlib.sha256()
+    stat_digest = hashlib.sha256()
+    for relative, mode, git_oid in _git_tree_entries(root, revision):
+        path = _safe_path(root / relative, f"source closure {relative}", must_exist=True)
+        try:
+            info = path.lstat()
+        except OSError as error:
+            raise RunFailure(f"cannot stat tracked source {relative}: {error}") from error
+        if not stat.S_ISREG(info.st_mode):
+            raise RunFailure(f"tracked source is not a regular file: {relative}")
+        expected_mode = True if mode == "100755" else False if mode == "100644" else None
+        executable = bool(info.st_mode & 0o111)
+        if expected_mode is None or executable != expected_mode:
+            raise RunFailure(f"tracked source mode differs from Git tree: {relative}")
+        mode_bits = stat.S_IMODE(info.st_mode) & 0o111
+        sha256 = hashlib.sha256()
+        # The stat size is part of Git's blob header.  Initialising this
+        # before the one content pass lets us verify the Git object without
+        # retaining or rereading the source bytes.
+        git_hash = hashlib.sha1(f"blob {info.st_size}\0".encode("ascii"))
+        size = 0
+        try:
+            with path.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    size += len(chunk)
+                    sha256.update(chunk)
+                    git_hash.update(chunk)
+        except OSError as error:
+            raise RunFailure(f"cannot read tracked source {relative}: {error}") from error
+        if size != info.st_size:
+            raise RunFailure(f"tracked source changed while being read: {relative}")
+        actual_git_oid = git_hash.hexdigest()
+        if actual_git_oid != git_oid:
+            raise RunFailure(f"tracked source bytes differ from HEAD: {relative}")
+        encoded = (
+            mode.encode("ascii") + b"\0" + relative.encode("utf-8") + b"\0"
+            + str(size).encode("ascii") + b"\0" + sha256.hexdigest().encode("ascii")
+            + b"\0" + git_oid.encode("ascii") + b"\0"
+        )
+        closure_digest.update(encoded)
+        stat_digest.update(
+            (
+                relative.encode("utf-8") + b"\0" + str(info.st_dev).encode("ascii") + b"\0"
+                + str(info.st_ino).encode("ascii") + b"\0" + str(info.st_size).encode("ascii") + b"\0"
+                + str(info.st_mtime_ns).encode("ascii") + b"\0"
+                + str(info.st_ctime_ns).encode("ascii") + b"\0"
+                + str(mode_bits).encode("ascii") + b"\0"
+            )
+        )
+        files.append({
+            "path": relative,
+            "mode": mode,
+            "bytes": size,
+            "sha256": sha256.hexdigest(),
+            "git_oid": git_oid,
+            "dev": info.st_dev,
+            "ino": info.st_ino,
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
+            "mode_bits": mode_bits,
+        })
+        total_bytes += size
+    return {
+        "revision": revision,
+        "binding": {"entries": len(files), "bytes": total_bytes, "sha256": closure_digest.hexdigest()},
+        "stat_sha256": stat_digest.hexdigest(),
+        "files": files,
+    }
+
+
+def _closure_binding(value: Any, label: str) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"entries", "bytes", "sha256"}, label)
+    return {
+        "entries": _positive_int(item.get("entries"), f"{label}.entries"),
+        "bytes": _positive_int(item.get("bytes"), f"{label}.bytes"),
+        "sha256": _digest(item.get("sha256"), f"{label}.sha256"),
+    }
+
+
+def _cheap_source_closure_probe(root: Path, cache: Mapping[str, Any]) -> bool:
+    for item in cache["files"]:
+        path = root / item["path"]
+        try:
+            info = path.lstat()
+        except OSError:
+            return False
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_dev != item["dev"]
+            or info.st_ino != item["ino"]
+            or info.st_size != item["bytes"]
+            or info.st_mtime_ns != item["mtime_ns"]
+            or info.st_ctime_ns != item["ctime_ns"]
+            or (stat.S_IMODE(info.st_mode) & 0o111) != item["mode_bits"]
+        ):
+            return False
+    return True
+
+
+def _validate_source_closure(
+    root: Path,
+    cache: dict[str, Any],
+    expected: Mapping[str, Any],
+    *,
+    force_full: bool = False,
+) -> dict[str, Any]:
+    expected_binding = _closure_binding(expected, "source_closure")
+    if cache["binding"] != expected_binding:
+        raise RunFailure("source closure cache differs from its external binding")
+    if force_full or not _cheap_source_closure_probe(root, cache):
+        refreshed = _capture_source_closure(root, cache["revision"])
+        if refreshed["binding"] != expected_binding:
+            raise RunFailure("tracked source bytes differ from the externally bound closure")
+        cache.clear()
+        cache.update(refreshed)
+    return expected_binding
+
+
+def _source_closure(root: Path, revision: str, expected: Mapping[str, Any]) -> dict[str, Any]:
+    cache = _capture_source_closure(root, revision)
+    cache["revision"] = revision
+    expected_binding = _closure_binding(expected, "source_closure")
+    if cache["binding"] != expected_binding:
+        raise RunFailure("tracked source closure differs from the manifest")
+    return cache
+
+
 def _check_tree_manifest(value: Any, actual: Mapping[str, Any], label: str) -> dict[str, Any]:
     item = _object(value, label)
     _exact_keys(item, {"entries", "bytes", "sha256"}, label)
@@ -417,6 +569,10 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
             raise RunFailure(f"{name}.{field} must use the reviewed {expected_relative} path")
     tree_identity = _tree_manifest(root, head)
     source_manifest = _check_tree_manifest(value["source_manifest"], tree_identity, f"{name}.source_manifest")
+    source_cache = _capture_source_closure(root, head)
+    source_closure = _closure_binding(value["source_closure"], f"{name}.source_closure")
+    if source_cache["binding"] != source_closure:
+        raise RunFailure(f"{name}.source_closure differs from the tracked bytes at HEAD")
     binary = _safe_path(_raw_path(value["binary"], f"manifest.{name}.binary", base), f"{name}.binary")
     allocator_binary = _safe_path(
         _raw_path(value["allocator_binary"], f"manifest.{name}.allocator_binary", base),
@@ -475,6 +631,7 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
         "cargo_config": cargo_config,
         "cargo_manifest": cargo_manifest,
         "source_manifest": source_manifest,
+        "source_closure": source_closure,
         "binary": str(binary),
         "allocator_binary": str(allocator_binary),
         "target_dir": str(target_dir),
@@ -529,6 +686,150 @@ def _fixture_plan(raw: Mapping[str, Any], base: Path) -> dict[str, Any]:
     return {**actual, "path": str(path), "provenance": provenance}
 
 
+_REJECTED_WRAPPER_ENV = (
+    "RUSTC_WRAPPER",
+    "RUSTC_WORKSPACE_WRAPPER",
+    "CARGO_BUILD_RUSTC_WRAPPER",
+    "WORKSPACE_WRAPPER",
+    "CARGO_WORKSPACE_WRAPPER",
+)
+# These are launcher bookkeeping rather than Cargo/rustc inputs.  Passing
+# them through would make a prepare receipt depend on the shell's command
+# counter or caller cwd, while omitting them keeps the recorded map exactly
+# equal to the environment actually handed to the child.
+_VOLATILE_LAUNCHER_ENV = frozenset({"_", "PWD", "OLDPWD", "SHLVL", "CODEX_TOOL_CALL_ID"})
+
+
+def _tool_identity(name: str, environment: Mapping[str, str], cwd: Path) -> dict[str, Any]:
+    search_path = environment.get("PATH", "")
+    requested_path: Path | None = None
+    for raw_directory in search_path.split(os.pathsep):
+        directory = Path(raw_directory or os.curdir)
+        if not directory.is_absolute():
+            directory = cwd / directory
+        candidate = directory / name
+        try:
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                requested_path = candidate.absolute()
+                break
+        except OSError:
+            continue
+    if requested_path is None:
+        raise RunFailure(f"cannot resolve {name} through the bound PATH")
+    try:
+        resolved = requested_path.resolve(strict=True)
+    except OSError as error:
+        raise RunFailure(f"cannot resolve {name} executable {requested_path}: {error}") from error
+    resolved = _safe_path(resolved, f"resolved {name}", must_exist=True)
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise RunFailure(f"resolved {name} is not an executable regular file: {resolved}")
+    sha, size = _sha256_file(resolved)
+    return {
+        "name": name,
+        "requested": str(requested_path),
+        "resolved": str(resolved),
+        "bytes": size,
+        "sha256": sha,
+    }
+
+
+def _environment_config_paths(root: Path, environment: Mapping[str, str]) -> list[Path]:
+    candidates: set[Path] = set()
+    current = root.absolute()
+    while True:
+        cargo = current / ".cargo"
+        candidates.update((cargo / "config.toml", cargo / "config"))
+        if current.parent == current:
+            break
+        current = current.parent
+    def env_path(value: str) -> Path:
+        path = Path(value)
+        return (root / path).absolute() if not path.is_absolute() else path.absolute()
+
+    home_path = env_path(environment["HOME"]) if environment.get("HOME") else Path.home().absolute()
+    candidates.update((home_path / ".cargo" / "config.toml", home_path / ".cargo" / "config"))
+    cargo_home = environment.get("CARGO_HOME")
+    if cargo_home:
+        cargo_home_path = env_path(cargo_home)
+        candidates.update((cargo_home_path / "config.toml", cargo_home_path / "config"))
+    rustup_home = environment.get("RUSTUP_HOME")
+    rustup_home_path = env_path(rustup_home) if rustup_home else home_path / ".rustup"
+    candidates.add(rustup_home_path / "settings.toml")
+    return sorted(candidates, key=str)
+
+
+def _environment_config_identity(root: Path, environment: Mapping[str, str]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for path in _environment_config_paths(root, environment):
+        path = _safe_path(path.absolute(), "bound tool configuration")
+        if path.is_symlink():
+            raise RunFailure(f"bound tool configuration must not be a symlink: {path}")
+        if not path.exists():
+            result.append({"path": str(path), "present": False})
+            continue
+        if not path.is_file():
+            raise RunFailure(f"bound tool configuration is not a regular file: {path}")
+        sha, size = _sha256_file(path)
+        result.append({"path": str(path), "present": True, "bytes": size, "sha256": sha})
+    return result
+
+
+def _environment_identity(
+    root: Path,
+    *,
+    ref: str,
+    tree: str,
+    source_closure: Mapping[str, Any],
+    overrides: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Bind every input Cargo/rustc can inherit, not only explicit overrides."""
+
+    root = _safe_path(root, "bound command cwd", must_exist=True)
+    if not root.is_dir():
+        raise RunFailure(f"bound command cwd is not a directory: {root}")
+    environment = {
+        key: value for key, value in os.environ.items()
+        if key not in _VOLATILE_LAUNCHER_ENV
+    }
+    if overrides is not None:
+        for key, value in overrides.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                raise RunFailure("bound environment overrides must be strings")
+        environment.update(overrides)
+    for key in _REJECTED_WRAPPER_ENV:
+        if environment.get(key):
+            raise RunFailure(f"unreviewed compiler wrapper is set in {key}")
+    if "PATH" not in environment:
+        raise RunFailure("bound environment must contain PATH")
+    try:
+        info = root.lstat()
+    except OSError as error:
+        raise RunFailure(f"cannot stat bound command cwd {root}: {error}") from error
+    if not stat.S_ISDIR(info.st_mode):
+        raise RunFailure(f"bound command cwd is not a directory: {root}")
+    closure = _closure_binding(source_closure, "environment.cwd.source_closure")
+    variables = {key: environment[key] for key in sorted(environment)}
+    return {
+        "variables": variables,
+        "tools": {
+            "cargo": _tool_identity("cargo", environment, root),
+            "rustc": _tool_identity("rustc", environment, root),
+        },
+        "configs": _environment_config_identity(root, environment),
+        "cwd": {
+            "path": str(root),
+            "dev": info.st_dev,
+            "ino": info.st_ino,
+            "mode": info.st_mode,
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
+            "ref": ref,
+            "tree": tree,
+            "source_closure": closure,
+        },
+    }
+
+
 def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[str, Any]:
     target = endpoint["allocator_target_dir"] if allocator else endpoint["target_dir"]
     features = endpoint["features"]
@@ -572,6 +873,24 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
     for root in (Path(baseline["root"]), Path(candidate["root"])):
         _outside(prepare_receipt, root, "prepare receipt")
         _outside(receipt, root, "build receipt")
+    commands = {
+        "baseline": {"normal": _command(baseline, allocator=False, cpu=cpu),
+                     "allocator": _command(baseline, allocator=True, cpu=cpu)},
+        "candidate": {"normal": _command(candidate, allocator=False, cpu=cpu),
+                       "allocator": _command(candidate, allocator=True, cpu=cpu)},
+    }
+    for name, endpoint in (("baseline", baseline), ("candidate", candidate)):
+        for kind in ("normal", "allocator"):
+            command = commands[name][kind]
+            overrides = dict(command["environment"])
+            command["environment_overrides"] = overrides
+            command["environment"] = _environment_identity(
+                Path(endpoint["root"]),
+                ref=endpoint["ref"],
+                tree=endpoint["tree"],
+                source_closure=endpoint["source_closure"],
+                overrides=overrides,
+            )
     plan = {
         "schema": PREPARE_SCHEMA,
         "builder_revision": BUILDER_REVISION,
@@ -589,10 +908,7 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
             {"source": next(item for item in probes if item["name"] == "baseline")["path"], "destination": EXPECTED_OVERLAY_DESTINATION, "endpoint": "baseline"},
             {"source": next(item for item in probes if item["name"] == "candidate")["path"], "destination": EXPECTED_OVERLAY_DESTINATION, "endpoint": "candidate"},
         ],
-        "commands": {
-            "baseline": {"normal": _command(baseline, allocator=False, cpu=cpu), "allocator": _command(baseline, allocator=True, cpu=cpu)},
-            "candidate": {"normal": _command(candidate, allocator=False, cpu=cpu), "allocator": _command(candidate, allocator=True, cpu=cpu)},
-        },
+        "commands": commands,
         "receipts": {"prepare": str(prepare_receipt), "build": receipt_binding},
     }
     return plan
@@ -815,6 +1131,25 @@ def _group_alive(pgid: int) -> bool:
     return True
 
 
+def _validate_target_accounting(value: Any, label: str, expected_path: Path) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}, label)
+    before = item["bytes_before"]
+    after = item["bytes_after"]
+    hard_limit = item["hard_limit_bytes"]
+    if (item["path"] != str(expected_path)
+            or type(before) is not int or before < 0 or before > MEMORY_LIMIT_BYTES
+            or type(after) is not int or after < 0 or after > MEMORY_LIMIT_BYTES
+            or hard_limit != MEMORY_LIMIT_BYTES):
+        raise RunFailure(f"{label} target accounting exceeds the fixed memory limit")
+    return {
+        "path": str(expected_path),
+        "bytes_before": before,
+        "bytes_after": after,
+        "hard_limit_bytes": hard_limit,
+    }
+
+
 def _stream_command(
     command: list[str],
     cwd: Path,
@@ -832,12 +1167,16 @@ def _stream_command(
     if stdout_path.exists() or stderr_path.exists():
         raise RunFailure(f"{label}: refusing stale child logs")
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ)
-    env.update({"CARGO_INCREMENTAL": "0", "CARGO_TERM_COLOR": "never"})
-    if environment is not None:
-        env.update(environment)
-    if "allocator" in label:
-        env["RUSTFLAGS"] = "--cfg odg_joined_allocator"
+    if environment is None:
+        env = dict(os.environ)
+        env.update({"CARGO_INCREMENTAL": "0", "CARGO_TERM_COLOR": "never"})
+        if "allocator" in label:
+            env["RUSTFLAGS"] = "--cfg odg_joined_allocator"
+    else:
+        # A prepared environment is an exact child environment.  Merging it
+        # with the runner's ambient environment would make unrecorded Cargo
+        # configuration and wrappers part of the build.
+        env = dict(environment)
     parent_pid = os.getpid()
     # A double-forked/setsid child is otherwise reparented to init as soon as
     # the direct child exits.  Keep it owned by this runner so the final
@@ -972,6 +1311,12 @@ def _stream_command(
             f"{sorted(live_owned)} group_alive={group_alive}"
         )
     target_after = _directory_bytes(target_dir)
+    _validate_target_accounting(
+        {"path": str(target_dir), "bytes_before": target_before, "bytes_after": target_after,
+         "hard_limit_bytes": MEMORY_LIMIT_BYTES},
+        f"{label}.target",
+        target_dir,
+    )
     final_output_bytes = stdout_path.stat().st_size + stderr_path.stat().st_size
     samples.append({
         "checked_unix_ns": time.time_ns(),
@@ -1052,16 +1397,19 @@ def build(manifest_path: Path) -> dict[str, Any]:
         root = Path(endpoint["root"])
         target = Path(endpoint["target_dir"])
         allocator_target = Path(endpoint["allocator_target_dir"])
+        source_cache = _source_closure(root, endpoint["ref"], endpoint["source_closure"])
         _fresh_dir(target, f"{name} target directory")
         _fresh_dir(allocator_target, f"{name} allocator target directory")
         for kind, target_dir in (("normal", target), ("allocator", allocator_target)):
             overlay_paths: list[str] = []
             event: dict[str, Any] | None = None
             try:
+                _validate_source_closure(root, source_cache, endpoint["source_closure"])
                 source_before = {
                     "ref": _git_output(root, "rev-parse", "--verify", "HEAD"),
                     "tree": _git_output(root, "rev-parse", "--verify", "HEAD^{tree}"),
-                    "source_manifest": _tree_manifest(root, endpoint["ref"]),
+                    "source_manifest": endpoint["source_manifest"],
+                    "source_closure": endpoint["source_closure"],
                     "lock": _identity(Path(endpoint["lock"]["path"])),
                     "toolchain": _identity(Path(endpoint["toolchain"]["path"])),
                     "cargo_config": _identity(Path(endpoint["cargo_config"]["path"])),
@@ -1080,9 +1428,10 @@ def build(manifest_path: Path) -> dict[str, Any]:
                 guard_before = _quiet_guard(plan["max_load"], f"before-{name}-{kind}")
                 event = _stream_command(
                     command, root, logs_dir, f"{name}-{kind}", target_dir, plan["cpu"],
-                    environment=command_spec["environment"],
+                    environment=command_spec["environment"]["variables"],
                     max_load=plan["max_load"],
                 )
+                _validate_target_accounting(event["target"], f"{name}/{kind}.target", target_dir)
                 event["environment"] = command_spec["environment"]
                 event["guard_before"] = guard_before
                 event["guard_after"] = _quiet_guard(plan["max_load"], f"after-{name}-{kind}")
@@ -1105,10 +1454,14 @@ def build(manifest_path: Path) -> dict[str, Any]:
                 if shape["root"] != endpoint["root"]:
                     raise RunFailure(f"{name}: source root changed during build")
                 if event is not None:
+                    _validate_source_closure(
+                        root, source_cache, endpoint["source_closure"], force_full=True
+                    )
                     event["source_after"] = {
                         "ref": _git_output(root, "rev-parse", "--verify", "HEAD"),
                         "tree": _git_output(root, "rev-parse", "--verify", "HEAD^{tree}"),
-                        "source_manifest": _tree_manifest(root, endpoint["ref"]),
+                        "source_manifest": endpoint["source_manifest"],
+                        "source_closure": endpoint["source_closure"],
                         "lock": _identity(Path(endpoint["lock"]["path"])),
                         "toolchain": _identity(Path(endpoint["toolchain"]["path"])),
                         "cargo_config": _identity(Path(endpoint["cargo_config"]["path"])),
@@ -1244,10 +1597,8 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
             if guard["max_load"] != plan["max_load"] or guard["heavy_processes"] != []:
                 raise RunFailure(f"{label}: quiet guard identity or process list changed")
         target = _object(item["target"], f"{label}.target")
-        _exact_keys(target, {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}, f"{label}.target")
         endpoint_target = plan[identity[0]]["allocator_target_dir" if identity[1] == "allocator" else "target_dir"]
-        if target["path"] != endpoint_target or target["hard_limit_bytes"] != 20_000_000_000:
-            raise RunFailure(f"{label}: target identity differs from its endpoint")
+        _validate_target_accounting(target, f"{label}.target", Path(endpoint_target))
         artifact = _object(item["artifact"], f"{label}.artifact")
         _exact_keys(artifact, {"path", "bytes", "sha256"}, f"{label}.artifact")
         artifact_path = _safe_path(Path(_string(artifact["path"], f"{label}.artifact.path")).absolute(), f"{label}.artifact.path", must_exist=True)
@@ -1262,7 +1613,7 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
         if (artifact["bytes"] != expected_artifact_identity["bytes"]
                 or artifact["sha256"] != expected_artifact_identity["sha256"]):
             raise RunFailure(f"{label}: artifact is not the externally bound binary")
-        expected_command = plan[identity[0]]["commands"][identity[0]][identity[1]]
+        expected_command = plan["commands"][identity[0]][identity[1]]
         if item["command"] != expected_command["argv"]:
             raise RunFailure(f"{label}: command differs from the prepared command")
         if item["environment"] != expected_command["environment"]:
@@ -1270,23 +1621,27 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
         if item["cwd"] != plan[identity[0]]["root"]:
             raise RunFailure(f"{label}: command cwd differs from the endpoint root")
         source_before = _object(item["source_before"], f"{label}.source_before")
-        _exact_keys(source_before, {"ref", "tree", "source_manifest", "lock", "toolchain", "cargo_config", "cargo_manifest"},
+        _exact_keys(source_before, {"ref", "tree", "source_manifest", "source_closure", "lock", "toolchain", "cargo_config", "cargo_manifest"},
                     f"{label}.source_before")
         endpoint = plan[identity[0]]
         if source_before["ref"] != endpoint["ref"] or source_before["tree"] != endpoint["tree"]:
             raise RunFailure(f"{label}: source identity is not bound to its endpoint")
         if source_before["source_manifest"] != endpoint["source_manifest"]:
             raise RunFailure(f"{label}: source manifest before build differs from its endpoint")
+        if source_before["source_closure"] != endpoint["source_closure"]:
+            raise RunFailure(f"{label}: source closure before build differs from its endpoint")
         for field in ("lock", "toolchain", "cargo_config", "cargo_manifest"):
             if source_before[field] != endpoint[field]:
                 raise RunFailure(f"{label}: {field} before build differs from its endpoint")
         source_after = _object(item["source_after"], f"{label}.source_after")
-        _exact_keys(source_after, {"ref", "tree", "source_manifest", "lock", "toolchain", "cargo_config", "cargo_manifest"},
+        _exact_keys(source_after, {"ref", "tree", "source_manifest", "source_closure", "lock", "toolchain", "cargo_config", "cargo_manifest"},
                     f"{label}.source_after")
         if source_after["ref"] != endpoint["ref"] or source_after["tree"] != endpoint["tree"]:
             raise RunFailure(f"{label}: source changed during the build")
         if source_after["source_manifest"] != endpoint["source_manifest"]:
             raise RunFailure(f"{label}: complete source manifest changed during the build")
+        if source_after["source_closure"] != endpoint["source_closure"]:
+            raise RunFailure(f"{label}: complete source closure changed during the build")
         for field in ("lock", "toolchain", "cargo_config", "cargo_manifest"):
             if source_after[field] != endpoint[field]:
                 raise RunFailure(f"{label}: {field} changed during the build")

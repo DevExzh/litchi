@@ -23,8 +23,9 @@ exactly one of the two adapters to
 `crates/litchi-odg/examples/litchi-perf-odg-joined-qualification.rs`. The
 manifest records each overlay source digest and destination, the clean
 worktree's immutable commit SHA and tree SHA, the complete `git ls-tree`
-source manifest, `Cargo.lock`, `.cargo/config.toml`, and
-`rust-toolchain.toml` digests, the enabled feature list, and both normal and
+source manifest, an actual byte closure of every tracked blob (including stat
+identities for cheap between-probe checks), `Cargo.lock`, `.cargo/config.toml`,
+and `rust-toolchain.toml` digests, the enabled feature list, and both normal and
 allocator binary identities. The baseline is admitted only at pristine
 `ad52437f5e5e2c71ea476eedd5ddcf61aee2021d`; the candidate ref is bound to the
 final candidate field. The builder rejects sparse/skip-worktree omissions,
@@ -52,7 +53,14 @@ git ls-files -v and git ls-files --debug are checked, so assume-unchanged,
 skip-worktree, extended-index, sparse, missing, or symlinked inputs fail
 closed. Cargo.toml is admitted alongside Cargo.lock, rust-toolchain.toml, and
 .cargo/config.toml, and its actual bytes are recorded before and after each
-build event.
+build event. Every build command records the complete effective environment,
+resolved Cargo/rustc paths and hashes, ancestor/home Cargo and rustup config
+identities, and the endpoint cwd identity; nonempty unreviewed compiler
+wrapper variables are rejected. Runtime phases reuse the cached closure and
+perform cheap stat probes between launches, with full byte revalidation at
+phase boundaries so stat-hidden edits fail closed. The final target byte
+sample is checked against the 20 GB hard cap both at execution and receipt
+validation.
 
 ## Routes and clocks
 

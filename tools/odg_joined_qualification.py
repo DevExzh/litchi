@@ -86,8 +86,8 @@ except ImportError:  # pragma: no cover - supports direct test-module loading.
     )
 
 
-INPUT_SCHEMA = "litchi.odg.joined-native-qualification.input.v2"
-REPORT_SCHEMA = "litchi.odg.joined-native-qualification.v2"
+INPUT_SCHEMA = "litchi.odg.joined-native-qualification.input.v3"
+REPORT_SCHEMA = "litchi.odg.joined-native-qualification.v3"
 BASELINE_SCHEMA = "litchi.odg.joined-native-qualification.legacy-probe.v2"
 CANDIDATE_SCHEMA = "litchi.odg.joined-native-qualification.probe.v2"
 BASELINE_PROFILE = "legacy-apply-joined"
@@ -191,6 +191,7 @@ class Endpoint:
     cargo_config: IdentityFile
     cargo_manifest: IdentityFile
     source_manifest: dict[str, Any]
+    source_closure: dict[str, Any]
     features: tuple[str, ...]
     allocator_binary: Path
     allocator_target_dir: Path
@@ -241,6 +242,8 @@ class ResolvedEndpoint:
     toolchain: dict[str, Any]
     cargo_config: dict[str, Any]
     cargo_manifest: dict[str, Any]
+    source_closure: dict[str, Any]
+    environment: dict[str, Any]
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -393,7 +396,7 @@ def load_manifest(path: Path) -> Manifest:
         item = _object(value.get(name), f"manifest.{name}")
         _exact_keys(item, {
             "root", "ref", "tree", "profile", "binary", "target_dir", "lock", "toolchain",
-            "cargo_config", "cargo_manifest", "source_manifest", "allocator_binary", "allocator_target_dir",
+            "cargo_config", "cargo_manifest", "source_manifest", "source_closure", "allocator_binary", "allocator_target_dir",
             "features", "binary_identity", "allocator_binary_identity",
         }, f"manifest.{name}")
         requested_ref = _string(item.get("ref"), f"manifest.{name}.ref")
@@ -421,6 +424,7 @@ def load_manifest(path: Path) -> Manifest:
             cargo_config=_identity_file(item.get("cargo_config"), f"manifest.{name}.cargo_config", base),
             cargo_manifest=_identity_file(item.get("cargo_manifest"), f"manifest.{name}.cargo_manifest", base),
             source_manifest=_tree_identity(item.get("source_manifest"), f"manifest.{name}.source_manifest"),
+            source_closure=_tree_identity(item.get("source_closure"), f"manifest.{name}.source_closure"),
             features=tuple(features_value),
             allocator_binary=_path(item.get("allocator_binary"), f"manifest.{name}.allocator_binary", base),
             allocator_target_dir=_path(item.get("allocator_target_dir"), f"manifest.{name}.allocator_target_dir", base),
@@ -552,13 +556,28 @@ def validate_probe_sources(sources: tuple[ProbeSource, ...]) -> dict[str, Any]:
     return records
 
 
-def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEndpoint:
+def _resolve_endpoint(
+    endpoint: Endpoint,
+    roots: tuple[Path, ...],
+    *,
+    environment_overrides: Mapping[str, str] | None = None,
+) -> ResolvedEndpoint:
     if not endpoint.root.is_dir():
         raise RunFailure(f"{endpoint.name}.root is not a directory: {endpoint.root}")
     try:
-        from odg_joined_qualification_builder import _check_worktree_shape
+        from odg_joined_qualification_builder import (
+            _check_worktree_shape,
+            _environment_identity,
+            _source_closure,
+            _tree_manifest,
+        )
     except ImportError:  # pragma: no cover
-        from tools.odg_joined_qualification_builder import _check_worktree_shape  # type: ignore[no-redef]
+        from tools.odg_joined_qualification_builder import (  # type: ignore[no-redef]
+            _check_worktree_shape,
+            _environment_identity,
+            _source_closure,
+            _tree_manifest,
+        )
     _check_worktree_shape(endpoint.root, endpoint.name)
     status = _run_git(endpoint.root, "status", "--porcelain", "--untracked-files=all")
     if status:
@@ -626,8 +645,19 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
         endpoint.allocator_binary_identity["bytes"], endpoint.allocator_binary_identity["sha256"]
     ):
         raise RunFailure(f"{endpoint.name}.allocator_binary differs from its external binding")
+    if _tree_manifest(endpoint.root, resolved) != endpoint.source_manifest:
+        raise RunFailure(f"{endpoint.name}: Git tree metadata differs from its manifest")
+    source_closure = _source_closure(endpoint.root, resolved, endpoint.source_closure)
+    environment = _environment_identity(
+        endpoint.root,
+        ref=resolved,
+        tree=tree,
+        source_closure=source_closure["binding"],
+        overrides=environment_overrides,
+    )
     return ResolvedEndpoint(endpoint, resolved, tree, actual_binary, actual_allocator,
-                            lock, toolchain, cargo_config, cargo_manifest)
+                            lock, toolchain, cargo_config, cargo_manifest,
+                            source_closure, environment)
 
 
 def _under(left: Path, right: Path) -> bool:
@@ -683,8 +713,9 @@ def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt
     fixture = validate_fixture(manifest.fixture)
     probes = validate_probe_sources(manifest.probe_sources)
     roots = (manifest.baseline.root, manifest.candidate.root)
-    baseline = _resolve_endpoint(manifest.baseline, roots)
-    candidate = _resolve_endpoint(manifest.candidate, roots)
+    environment_overrides = {"TMPDIR": str(manifest.tmpdir)}
+    baseline = _resolve_endpoint(manifest.baseline, roots, environment_overrides=environment_overrides)
+    candidate = _resolve_endpoint(manifest.candidate, roots, environment_overrides=environment_overrides)
     if baseline.resolved_ref == candidate.resolved_ref or baseline.tree == candidate.tree:
         raise RunFailure("baseline and candidate source identities must differ")
     if _directory_bytes(manifest.tmpdir) > TARGET_HARD_LIMIT_BYTES:
@@ -697,6 +728,8 @@ def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt
                      "profile": baseline.endpoint.profile, "features": list(baseline.endpoint.features),
                      "lock": baseline.lock, "toolchain": baseline.toolchain,
                      "cargo_config": baseline.cargo_config, "cargo_manifest": baseline.cargo_manifest,
+                     "source_closure": baseline.source_closure["binding"],
+                     "environment": baseline.environment,
                      "binary": baseline.binary, "allocator_binary": baseline.allocator_binary,
                      "target_dir": str(baseline.endpoint.target_dir),
                      "allocator_target_dir": str(baseline.endpoint.allocator_target_dir)},
@@ -705,6 +738,8 @@ def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt
                       "profile": candidate.endpoint.profile, "features": list(candidate.endpoint.features),
                       "lock": candidate.lock, "toolchain": candidate.toolchain,
                       "cargo_config": candidate.cargo_config, "cargo_manifest": candidate.cargo_manifest,
+                      "source_closure": candidate.source_closure["binding"],
+                      "environment": candidate.environment,
                       "binary": candidate.binary, "allocator_binary": candidate.allocator_binary,
                       "target_dir": str(candidate.endpoint.target_dir),
                       "allocator_target_dir": str(candidate.endpoint.allocator_target_dir)},
@@ -717,12 +752,21 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
         raise RunFailure(f"{phase}: manifest changed")
     result: dict[str, Any] = {"phase": phase, "fixture": validate_fixture(manifest.fixture),
                               "probe_sources": validate_probe_sources(manifest.probe_sources)}
+    full_source_check = phase in {"after-correctness", "after-allocation", "after-calibration", "after-abba"}
     for name, resolved in endpoints.items():
         root = resolved.endpoint.root
         try:
-            from odg_joined_qualification_builder import _check_worktree_shape, _tree_manifest
+            from odg_joined_qualification_builder import (
+                _check_worktree_shape,
+                _environment_identity,
+                _validate_source_closure,
+            )
         except ImportError:  # pragma: no cover
-            from tools.odg_joined_qualification_builder import _check_worktree_shape, _tree_manifest  # type: ignore[no-redef]
+            from tools.odg_joined_qualification_builder import (  # type: ignore[no-redef]
+                _check_worktree_shape,
+                _environment_identity,
+                _validate_source_closure,
+            )
         _check_worktree_shape(root, name)
         status = _run_git(root, "status", "--porcelain", "--untracked-files=all")
         head = _run_git(root, "rev-parse", "--verify", "HEAD")
@@ -730,8 +774,21 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
         tree = _run_git(root, "rev-parse", "--verify", f"{resolved.resolved_ref}^{{tree}}")
         if status or head != resolved.resolved_ref or requested != resolved.resolved_ref or tree != resolved.tree:
             raise RunFailure(f"{phase}: {name} source ref or cleanliness changed")
-        if _tree_manifest(root, resolved.resolved_ref) != resolved.endpoint.source_manifest:
-            raise RunFailure(f"{phase}: {name} complete source tree changed")
+        _validate_source_closure(
+            root,
+            resolved.source_closure,
+            resolved.endpoint.source_closure,
+            force_full=full_source_check,
+        )
+        current_environment = _environment_identity(
+            root,
+            ref=resolved.resolved_ref,
+            tree=resolved.tree,
+            source_closure=resolved.source_closure["binding"],
+            overrides={"TMPDIR": str(manifest.tmpdir)},
+        )
+        if current_environment != resolved.environment:
+            raise RunFailure(f"{phase}: {name} effective build environment changed")
         actual = binary_identity(resolved.endpoint.binary)
         if actual != resolved.binary:
             raise RunFailure(f"{phase}: {name} binary changed")
@@ -753,7 +810,9 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
                         "features": list(resolved.endpoint.features), "binary": actual,
                         "allocator_binary": actual_allocator,
                         "lock": resolved.lock, "toolchain": resolved.toolchain,
-                        "cargo_config": resolved.cargo_config, "cargo_manifest": resolved.cargo_manifest}
+                        "cargo_config": resolved.cargo_config, "cargo_manifest": resolved.cargo_manifest,
+                        "source_closure": resolved.source_closure["binding"],
+                        "environment": resolved.environment}
     result["checked_unix_ns"] = time.time_ns()
     return result
 
@@ -773,8 +832,8 @@ def _probe_command(endpoint: ResolvedEndpoint, manifest: Manifest, mode: str,
 def _run_probe(endpoint: ResolvedEndpoint, manifest: Manifest, out_dir: Path, mode: str, label: str,
                *, binary: Path | None = None, target_dir: Path | None = None, **kwargs: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     command = _probe_command(endpoint, manifest, mode, binary=binary, **kwargs)
-    environment = dict(os.environ)
-    environment["TMPDIR"] = str(manifest.tmpdir)
+    environment_identity = endpoint.environment
+    environment = environment_identity["variables"]
     try:
         from odg_joined_qualification_builder import _stream_command
     except ImportError:  # pragma: no cover - direct module loading in tests.
@@ -798,6 +857,7 @@ def _run_probe(endpoint: ResolvedEndpoint, manifest: Manifest, out_dir: Path, mo
         "endpoint": endpoint.endpoint.name, "profile": endpoint.endpoint.profile,
         "resolved_ref": endpoint.resolved_ref,
         "binary": binary_identity(binary) if binary is not None else endpoint.binary,
+        "environment": environment_identity,
         "binding": {"mode": mode, "route": kwargs.get("route"), "scope": kwargs.get("scope")},
         "stdout": event["stdout"], "stderr": event["stderr"],
         "guard": {"before": guard_before, "live": event["monitor"]["samples"], "after": guard_after,
@@ -814,11 +874,12 @@ def _run_probe(endpoint: ResolvedEndpoint, manifest: Manifest, out_dir: Path, mo
 def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, mode: str,
                           route: str | None, scope: str | None, label: str) -> None:
     _exact_keys(logs, {"command", "returncode", "endpoint", "profile", "resolved_ref", "binary",
-                       "binding", "stdout", "stderr", "guard", "target"}, label)
+                       "environment", "binding", "stdout", "stderr", "guard", "target"}, label)
     if (logs.get("returncode") != 0 or logs.get("endpoint") != endpoint.endpoint.name
             or logs.get("profile") != endpoint.endpoint.profile
             or logs.get("resolved_ref") != endpoint.resolved_ref
-            or logs.get("binary") != endpoint.binary):
+            or logs.get("binary") != endpoint.binary
+            or logs.get("environment") != endpoint.environment):
         raise RunFailure(f"{label}: child log is bound to a different endpoint or binary")
     binding = _object(logs.get("binding"), f"{label}.binding")
     _exact_keys(binding, {"mode", "route", "scope"}, f"{label}.binding")
@@ -881,6 +942,9 @@ def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, m
         raise RunFailure(f"{label}.guard.live: owned descendants remained after child exit")
     target = _object(logs.get("target"), f"{label}.target")
     _exact_keys(target, {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}, f"{label}.target")
+    expected_target = str(endpoint.endpoint.target_dir)
+    if target["path"] != expected_target:
+        raise RunFailure(f"{label}.target path differs from the endpoint target")
     if (type(target["bytes_before"]) is not int or type(target["bytes_after"]) is not int
             or target["bytes_before"] < 0 or target["bytes_after"] < 0
             or target["bytes_before"] > TARGET_HARD_LIMIT_BYTES
@@ -1189,7 +1253,7 @@ def validate_abba_rows(rows: Any, key: str) -> list[dict[str, Any]]:
             raise RunFailure(f"{key}.rows[{index}].target temporary identity is malformed")
         logs = _object(row.get("logs"), f"{key}.rows[{index}].logs")
         _exact_keys(logs, {"command", "returncode", "endpoint", "profile", "resolved_ref", "binary",
-                           "binding", "stdout", "stderr", "guard", "target"},
+                           "environment", "binding", "stdout", "stderr", "guard", "target"},
                     f"{key}.rows[{index}].logs")
         for stream in ("stdout", "stderr"):
             _digest_object(logs[stream], f"{key}.rows[{index}].logs.{stream}")
