@@ -103,13 +103,17 @@ TMPDIR directories and enforces the 20-GB cap:
 
 ```sh
 set -euo pipefail
-INTEGRATION=/home/zhuhe/code/litchi-worktrees/unified-ops-api
+INTEGRATION=/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration
 PREPARED=/home/zhuhe/code/litchi-worktrees/.coord/signed-build-adapter-f2-current-ppoSOO/prepared
-: "${CARGO_SHIM:?set CARGO_SHIM to the pinned memory-capped cargo executable}"
-test "$(git -C "$INTEGRATION" rev-parse HEAD)" = 1c2ce1f7d5230abf6c364b62a19807290ed2bc29
+CARGO_SHIM=/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+unset LITCHI_CAPPED LITCHI_BLESS
 git -C "$INTEGRATION" merge-base --is-ancestor \
-  75e5dd4b0fc8d37e7d0c0cbc2a27e34ab5da8a50 "$INTEGRATION"
+  1c2ce1f7d5230abf6c364b62a19807290ed2bc29 HEAD
+git -C "$INTEGRATION" merge-base --is-ancestor \
+  75e5dd4b0fc8d37e7d0c0cbc2a27e34ab5da8a50 HEAD
 test -x "$CARGO_SHIM"
+test "$(sha256sum "$CARGO_SHIM" | cut -d' ' -f1)" = \
+  1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8
 env CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true \
   LITCHI_MEM_MAX=20G \
   python3 "$INTEGRATION/docs/unified-ops/results/0362ul24/prepare_signed_native_consumer.py" \
