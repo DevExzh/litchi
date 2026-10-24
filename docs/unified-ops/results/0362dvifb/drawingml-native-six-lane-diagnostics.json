@@ -1,0 +1,2361 @@
+{
+  "schema": "litchi.drawingml.raw.six-lane-diagnostic.v1",
+  "record": "0362dvifb",
+  "generated_at_utc": "2026-10-24",
+  "classification": "compile/runtime correctness and fidelity diagnostics only",
+  "native_qualification_claimed": false,
+  "native_qualification_reason": "Six current-candidate normal processes were run from a debug binary, one process per raw lane. No historical baseline, paired ABBA comparison, allocator run, RSS qualification, or performance claim is made.",
+  "source": {
+    "revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+    "tree": "7bd75b5fb3220b2f13aa3d6566c0cd921d34ac48",
+    "files": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/perf-baseline/src/drawingml_raw_probe.rs",
+        "bytes": 236030,
+        "sha256": "af7975d475b42c0766b6280829cbe03fb6a9154556d2a4d7939d894e35f61bb3"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/native_qualification/drawingml_raw_validator.py",
+        "bytes": 70755,
+        "sha256": "4454b2f6eb2cd78b30686613573464d25daaf37ab8dab35a3ef523914536c450"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/perf-baseline/src/bin/drawingml_raw_native.rs",
+        "bytes": 94,
+        "sha256": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/perf-baseline/Cargo.toml",
+        "bytes": 6778,
+        "sha256": "4f060dc6492f607c73aeb2eedb951676135ea6d112fdb8adee24c3b8496d1603"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/perf-baseline/Cargo.lock",
+        "bytes": 57227,
+        "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
+        "bytes": 2407,
+        "sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925"
+      }
+    ],
+    "fixture_descriptor": "tools/native_qualification/fixtures/drawingml_raw_fixtures.json"
+  },
+  "toolchain": {
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "llvm": "22.1.2",
+    "host": "x86_64-unknown-linux-gnu"
+  },
+  "build": {
+    "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
+    "argv": [
+      "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "build",
+      "--manifest-path",
+      "tools/perf-baseline/Cargo.toml",
+      "--bin",
+      "drawingml-raw-native",
+      "--features",
+      "current-api,drawingml-owner-current,drawingml-raw-current,drawingml-theme-family-current,drawingml-theme-family-owner-limits-current,drawingml-ink-limits-current,drawingml-transform-limits-current",
+      "--offline",
+      "--locked",
+      "--target-dir",
+      "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-repair-target",
+      "-j",
+      "1"
+    ],
+    "environment": {
+      "LITCHI_BLESS": "<unset>",
+      "LITCHI_CAPPED": "<unset>",
+      "LITCHI_MEM_MAX": "20G",
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin"
+    },
+    "features": [
+      "current-api",
+      "drawingml-owner-current",
+      "drawingml-raw-current",
+      "drawingml-theme-family-current",
+      "drawingml-theme-family-owner-limits-current",
+      "drawingml-ink-limits-current",
+      "drawingml-transform-limits-current"
+    ],
+    "offline": true,
+    "locked": true,
+    "jobs": 1,
+    "exit": 0,
+    "binary": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-repair-target/debug/drawingml-raw-native",
+      "bytes": 25154104,
+      "sha256": "82182f0ba0fb5ba174a0ecff5430d1f702a35eae4595e17a308e47ac09378430"
+    },
+    "target_after_bytes": 5419181476,
+    "debug_log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/debug-build.log",
+      "bytes": 32310,
+      "sha256": "d81620e05b31f906ffac227b859856b15c9855d8ca0158b0488e348d4a721940"
+    },
+    "canceled_release_attempt": {
+      "exit": 130,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/build.log",
+        "bytes": 10406,
+        "sha256": "3442479a3af8f10185fcef6f603245d1d4ae6c716f8a58a671b61e2c2a76dfd3"
+      },
+      "note": "Earlier release attempt was canceled while another build held the slot; it is retained as an initial diagnostic, not used for the reports."
+    }
+  },
+  "runtime": {
+    "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
+    "command_log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-commands.txt",
+      "bytes": 4134,
+      "sha256": "278fcb5cc24b93f80a25c549f604127427265f6c15c6b4a8ee52a210ebb41b13"
+    },
+    "environment_log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-env.txt",
+      "bytes": 230,
+      "sha256": "286bd7a02463dc27a4d4a9cdbafc867211bfa96c9fe8b4cd9c44f610c8c11ca0"
+    },
+    "summary_log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-summary.txt",
+      "bytes": 314,
+      "sha256": "4c1f36ab4d6b7ad067c7a6fb69c55fb3c23025d6c5b9b2161bfd4c290ea0505c"
+    },
+    "common_argv": {
+      "endpoint": "raw",
+      "role": "candidate",
+      "mode": "normal",
+      "iterations": 1,
+      "warmups": 3,
+      "blocks": 5,
+      "samples": 20,
+      "target_ms": 500,
+      "minimum_ms": 150,
+      "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+      "fixture": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair/tools/native_qualification/fixtures/drawingml_raw_fixtures.json"
+    },
+    "runs": [
+      {
+        "id": "chart",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.json",
+          "bytes": 61312,
+          "sha256": "d6089c16935600702d31ebf861df73abb1ebceaa8af1dac43a0a91f581d5e217"
+        },
+        "lane": "drawingml-chart-raw",
+        "raw_scope": null,
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stdout",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stderr",
+            "bytes": 2232,
+            "sha256": "af69c60ab304faf1face3c6c5959956b0b25daa6091041b6d8a7d07a9655f1f4"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "d353375d72f434b53db30125fd627805f9635bf2e03dd44f462f64bf7c134da3",
+          "generated_parts": [
+            {
+              "part_id": "chart",
+              "source_sha256": "82f73c41ad345fdfa8507dafe55d7476e99eda803b4113e6a8838aa9ea9e7650",
+              "source_bytes": 2253,
+              "changed_sha256": "6c8dd71f7b2eb5c07f55f2ef4c9b59e730d916939096fe691ae51befae042249",
+              "changed_bytes": 2275,
+              "malformed_sha256": "9cdb2b15810f257bf63dbfe2051e7c4b5f5e69eb54238fcdcc48ffedf2c11846",
+              "malformed_bytes": 53
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "chart",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "82f73c41ad345fdfa8507dafe55d7476e99eda803b4113e6a8838aa9ea9e7650",
+            "source_output_sha256": "82f73c41ad345fdfa8507dafe55d7476e99eda803b4113e6a8838aa9ea9e7650",
+            "changed_sha256": "6c8dd71f7b2eb5c07f55f2ef4c9b59e730d916939096fe691ae51befae042249",
+            "changed_output_sha256": "6c8dd71f7b2eb5c07f55f2ef4c9b59e730d916939096fe691ae51befae042249",
+            "malformed_sha256": "9cdb2b15810f257bf63dbfe2051e7c4b5f5e69eb54238fcdcc48ffedf2c11846",
+            "source_semantic_sha256": "e4e7c58766e61f1bdba96c0b75bb83d2144d0984ed1aa9cc969cdf459b28d09c",
+            "source_output_semantic_sha256": "e4e7c58766e61f1bdba96c0b75bb83d2144d0984ed1aa9cc969cdf459b28d09c",
+            "changed_semantic_sha256": "c74dfbfa0432ede40e72fad880961513751aaaa6742e67af90057b01ac57651c",
+            "changed_output_semantic_sha256": "c74dfbfa0432ede40e72fad880961513751aaaa6742e67af90057b01ac57651c"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "chart",
+            "class": "small",
+            "bytes": 2253,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "chart",
+            "class": "near_limit",
+            "bytes": 268435455,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "chart",
+            "class": "at_limit",
+            "bytes": 268435456,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "chart",
+            "class": "over_limit",
+            "bytes": 268435457,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML input bytes",
+              "limit": 268435456,
+              "observed": 268435457,
+              "resource": "DrawingML input bytes"
+            }
+          },
+          {
+            "part_id": "chart",
+            "class": "malformed",
+            "bytes": 53,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 53
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": false,
+          "preflight_partial_output_bytes": 2260,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 248,
+          "parts": [
+            {
+              "part_id": "chart",
+              "boundary": "input_limit",
+              "operation_scope": "typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 2275,
+              "observed_output": 2275,
+              "output_limit": 2274,
+              "partial_output_allowed": true,
+              "partial_output_bytes": 2260,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 248,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML input bytes",
+                "limit": 268435456,
+                "observed": 268435457,
+                "resource": "DrawingML input bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 2274,
+                "observed": 2275,
+                "resource": "DrawingML output bytes"
+              }
+            }
+          ]
+        },
+        "theme_family_mutations": [],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 249
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      },
+      {
+        "id": "diagram",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.json",
+          "bytes": 61248,
+          "sha256": "c8b7042217adeeb2985b7e461a5c67a8ce0e9ca0fb9786d82a0425b71e49542e"
+        },
+        "lane": "drawingml-diagram-raw",
+        "raw_scope": null,
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stdout",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stderr",
+            "bytes": 2232,
+            "sha256": "6c22219b9951784aad772cf54e7ce2e1d81f47beca9148fc6f5df4f56616956b"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "c78f6bfe6550f46e787f14e05b72d3a3b6ecceac4b1fbc663e33dba8931ef782",
+          "generated_parts": [
+            {
+              "part_id": "diagram-data-model",
+              "source_sha256": "976ccf6261b372a84cca0ee242835d81bffa5ea62ca3e59a7082a1f10d2ecbc7",
+              "source_bytes": 3480,
+              "changed_sha256": "4117370256a2270ba2bf9271ba2af5bc03b01e69f3042ca1c46d9d80918f1d61",
+              "changed_bytes": 3860,
+              "malformed_sha256": "f7721645a8d0e98d304c9f829c1ca3dfee49305b73e870b8a9330b2d1c5d854e",
+              "malformed_bytes": 66
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "diagram-data-model",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "976ccf6261b372a84cca0ee242835d81bffa5ea62ca3e59a7082a1f10d2ecbc7",
+            "source_output_sha256": "976ccf6261b372a84cca0ee242835d81bffa5ea62ca3e59a7082a1f10d2ecbc7",
+            "changed_sha256": "4117370256a2270ba2bf9271ba2af5bc03b01e69f3042ca1c46d9d80918f1d61",
+            "changed_output_sha256": "4117370256a2270ba2bf9271ba2af5bc03b01e69f3042ca1c46d9d80918f1d61",
+            "malformed_sha256": "f7721645a8d0e98d304c9f829c1ca3dfee49305b73e870b8a9330b2d1c5d854e",
+            "source_semantic_sha256": "5b051ad6228a715dc8d925bf2134b5a4d566a9b037de40262b256f445db510d7",
+            "source_output_semantic_sha256": "5b051ad6228a715dc8d925bf2134b5a4d566a9b037de40262b256f445db510d7",
+            "changed_semantic_sha256": "9fcdb9b1e2c20868a3763b117e4624d74db3ff2b5c4a3e5487a7a27452eabb1a",
+            "changed_output_semantic_sha256": "9fcdb9b1e2c20868a3763b117e4624d74db3ff2b5c4a3e5487a7a27452eabb1a"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "diagram-data-model",
+            "class": "small",
+            "bytes": 3480,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "diagram-data-model",
+            "class": "near_limit",
+            "bytes": 16777215,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "diagram-data-model",
+            "class": "at_limit",
+            "bytes": 16777216,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "diagram-data-model",
+            "class": "over_limit",
+            "bytes": 16777217,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "diagram data-model bytes",
+              "limit": 16777216,
+              "observed": 16777217,
+              "resource": "diagram data-model bytes"
+            }
+          },
+          {
+            "part_id": "diagram-data-model",
+            "class": "malformed",
+            "bytes": 66,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 66
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": true,
+          "preflight_partial_output_bytes": 0,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 0,
+          "parts": [
+            {
+              "part_id": "diagram-data-model",
+              "boundary": "input_limit",
+              "operation_scope": "source_edit_serialize",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 3860,
+              "observed_output": 3860,
+              "output_limit": 3859,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "diagram data-model bytes",
+                "limit": 16777216,
+                "observed": 16777217,
+                "resource": "diagram data-model bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "diagram data-model bytes",
+                "limit": 3859,
+                "observed": 3860,
+                "resource": "diagram data-model bytes"
+              }
+            }
+          ]
+        },
+        "theme_family_mutations": [],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      },
+      {
+        "id": "text_media",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.json",
+          "bytes": 79084,
+          "sha256": "4b1a356f58303cb6cac2d2a28262afc8abb1b1722d07d0d9cf08be1f69156afb"
+        },
+        "lane": "drawingml-text-media-raw",
+        "raw_scope": null,
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stdout",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stderr",
+            "bytes": 2239,
+            "sha256": "7075de856b88d7f31fe9f07cb4262c73343ec9ace2d25f78988398c22bcb35bf"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "dc9684925de23e24ff184fae3b41185f777d6b33372ae85fd06926aafde2faf4",
+          "generated_parts": [
+            {
+              "part_id": "text-body",
+              "source_sha256": "b40c951efd4ced168807957b571dc947f26c3468187c49626860715ec3314fc9",
+              "source_bytes": 230,
+              "changed_sha256": "35626bfd224a1d8ab51473073acb7ce9e315beff6921a8bfa6953494e20cdb62",
+              "changed_bytes": 294,
+              "malformed_sha256": "a1fedd1c1407f139bbf5e03fc9b8fbd9422c562b3aca3210e01991a346932ce3",
+              "malformed_bytes": 56
+            },
+            {
+              "part_id": "svg-blip",
+              "source_sha256": "7cd3af75d8419c2e9fbaa25bc6de04036c586c343fe79386a995d4c76420ffb3",
+              "source_bytes": 113,
+              "changed_sha256": "df30bc3c8c1237f0efb67f94d053ce36c764c4aa89340c5ca8cf2e41deda1318",
+              "changed_bytes": 355,
+              "malformed_sha256": "bf03cecfc83a0dda96e4b5d7af0987090a090f30545293e34e5e39efd5f55a78",
+              "malformed_bytes": 55
+            },
+            {
+              "part_id": "model3d",
+              "source_sha256": "4c622e6f4a55b9cbd32ed61c84abdf620c3d75647798b6f8ec9d739aaf745e61",
+              "source_bytes": 422,
+              "changed_sha256": "15ed71bbec26c48622711236f804b933b569541579b86bad066216ad7ab07e15",
+              "changed_bytes": 410,
+              "malformed_sha256": "e3d4c3c2a5b011bbc5e7ac6ddbde37f70b92336060a5a82bd027c418e1c5de1e",
+              "malformed_bytes": 54
+            },
+            {
+              "part_id": "image-blip",
+              "source_sha256": "6c2755dc48656c605a7e39abbe85c17f7120f398fcc1b5056b8323fd09a03757",
+              "source_bytes": 106,
+              "changed_sha256": "e99fd19a377a984c371c871a9d86ee1188d4e2f30c0d6da0f0f3af7bafd82d3d",
+              "changed_bytes": 113,
+              "malformed_sha256": "284555d917c534f67908c2dd63eb602d55d87586a4b4a142c1944f8b03fd8afd",
+              "malformed_bytes": 57
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "text-body",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "b40c951efd4ced168807957b571dc947f26c3468187c49626860715ec3314fc9",
+            "source_output_sha256": "b40c951efd4ced168807957b571dc947f26c3468187c49626860715ec3314fc9",
+            "changed_sha256": "35626bfd224a1d8ab51473073acb7ce9e315beff6921a8bfa6953494e20cdb62",
+            "changed_output_sha256": "35626bfd224a1d8ab51473073acb7ce9e315beff6921a8bfa6953494e20cdb62",
+            "malformed_sha256": "a1fedd1c1407f139bbf5e03fc9b8fbd9422c562b3aca3210e01991a346932ce3",
+            "source_semantic_sha256": "34b9357003e291a6dd12ac333c00ee60f68271edc112962347c5908a680de187",
+            "source_output_semantic_sha256": "34b9357003e291a6dd12ac333c00ee60f68271edc112962347c5908a680de187",
+            "changed_semantic_sha256": "86d21119c2f8914eab3ef52824f52bfa7b4b54fb7d9adacfdbcc6773c9e7c8a0",
+            "changed_output_semantic_sha256": "86d21119c2f8914eab3ef52824f52bfa7b4b54fb7d9adacfdbcc6773c9e7c8a0"
+          },
+          {
+            "part_id": "svg-blip",
+            "fidelity_mode": "source_exact",
+            "read_write_route": "contextual_read_write",
+            "source_preserving_expected": true,
+            "source_raw_exact": true,
+            "source_output_exact": false,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": true,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "7cd3af75d8419c2e9fbaa25bc6de04036c586c343fe79386a995d4c76420ffb3",
+            "source_output_sha256": "ecd944ba8bc8fa2ed25f10a0c8519dcaa841e7a60c37cc23107a30dcb262d33f",
+            "changed_sha256": "df30bc3c8c1237f0efb67f94d053ce36c764c4aa89340c5ca8cf2e41deda1318",
+            "changed_output_sha256": "df30bc3c8c1237f0efb67f94d053ce36c764c4aa89340c5ca8cf2e41deda1318",
+            "malformed_sha256": "bf03cecfc83a0dda96e4b5d7af0987090a090f30545293e34e5e39efd5f55a78",
+            "source_semantic_sha256": "0a4f537d83fd9ad680d86701bee53651e1a310f91a52fb03b4c93a8fe8993542",
+            "source_output_semantic_sha256": "0a4f537d83fd9ad680d86701bee53651e1a310f91a52fb03b4c93a8fe8993542",
+            "changed_semantic_sha256": "5fd2a48691e295cf93d265bd2363531e076d82095c4695ad653f87e7891d9d9d",
+            "changed_output_semantic_sha256": "5fd2a48691e295cf93d265bd2363531e076d82095c4695ad653f87e7891d9d9d"
+          },
+          {
+            "part_id": "model3d",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "4c622e6f4a55b9cbd32ed61c84abdf620c3d75647798b6f8ec9d739aaf745e61",
+            "source_output_sha256": "4c622e6f4a55b9cbd32ed61c84abdf620c3d75647798b6f8ec9d739aaf745e61",
+            "changed_sha256": "15ed71bbec26c48622711236f804b933b569541579b86bad066216ad7ab07e15",
+            "changed_output_sha256": "15ed71bbec26c48622711236f804b933b569541579b86bad066216ad7ab07e15",
+            "malformed_sha256": "e3d4c3c2a5b011bbc5e7ac6ddbde37f70b92336060a5a82bd027c418e1c5de1e",
+            "source_semantic_sha256": "c8926cd26b1c0ef5f497fced0ee9debcbac9e001522d9e14cfdb028bced9474d",
+            "source_output_semantic_sha256": "c8926cd26b1c0ef5f497fced0ee9debcbac9e001522d9e14cfdb028bced9474d",
+            "changed_semantic_sha256": "25359b51c79720b448ca4d59f638c1952c0a2d8875b6b857dab626e6634b7eef",
+            "changed_output_semantic_sha256": "25359b51c79720b448ca4d59f638c1952c0a2d8875b6b857dab626e6634b7eef"
+          },
+          {
+            "part_id": "image-blip",
+            "fidelity_mode": "scanner",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "6c2755dc48656c605a7e39abbe85c17f7120f398fcc1b5056b8323fd09a03757",
+            "source_output_sha256": "6c2755dc48656c605a7e39abbe85c17f7120f398fcc1b5056b8323fd09a03757",
+            "changed_sha256": "e99fd19a377a984c371c871a9d86ee1188d4e2f30c0d6da0f0f3af7bafd82d3d",
+            "changed_output_sha256": "e99fd19a377a984c371c871a9d86ee1188d4e2f30c0d6da0f0f3af7bafd82d3d",
+            "malformed_sha256": "284555d917c534f67908c2dd63eb602d55d87586a4b4a142c1944f8b03fd8afd",
+            "source_semantic_sha256": "1894f054188f2f1cf7dcb7abffbaeb4bc3f5a50a571a7f4a65225af65a0b4bab",
+            "source_output_semantic_sha256": "1894f054188f2f1cf7dcb7abffbaeb4bc3f5a50a571a7f4a65225af65a0b4bab",
+            "changed_semantic_sha256": "1cb26a685a3cebf200c9366338066d13256f9826bde6a84181d45a54cc4679c1",
+            "changed_output_semantic_sha256": "1cb26a685a3cebf200c9366338066d13256f9826bde6a84181d45a54cc4679c1"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "text-body",
+            "class": "small",
+            "bytes": 230,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "text-body",
+            "class": "near_limit",
+            "bytes": 67108863,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "text-body",
+            "class": "at_limit",
+            "bytes": 67108864,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "text-body",
+            "class": "over_limit",
+            "bytes": 67108865,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML input bytes",
+              "limit": 67108864,
+              "observed": 67108865,
+              "resource": "DrawingML input bytes"
+            }
+          },
+          {
+            "part_id": "text-body",
+            "class": "malformed",
+            "bytes": 56,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 56
+            }
+          },
+          {
+            "part_id": "svg-blip",
+            "class": "small",
+            "bytes": 113,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "svg-blip",
+            "class": "near_limit",
+            "bytes": 16777215,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "svg-blip",
+            "class": "at_limit",
+            "bytes": 16777216,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "svg-blip",
+            "class": "over_limit",
+            "bytes": 16777217,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML input bytes",
+              "limit": 16777216,
+              "observed": 16777217,
+              "resource": "DrawingML input bytes"
+            }
+          },
+          {
+            "part_id": "svg-blip",
+            "class": "malformed",
+            "bytes": 55,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 55
+            }
+          },
+          {
+            "part_id": "model3d",
+            "class": "small",
+            "bytes": 422,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "model3d",
+            "class": "near_limit",
+            "bytes": 16777215,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "model3d",
+            "class": "at_limit",
+            "bytes": 16777216,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "model3d",
+            "class": "over_limit",
+            "bytes": 16777217,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 16777216,
+              "observed": 16777217,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "model3d",
+            "class": "malformed",
+            "bytes": 54,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 54
+            }
+          },
+          {
+            "part_id": "image-blip",
+            "class": "small",
+            "bytes": 106,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "none",
+            "refusal": null
+          },
+          {
+            "part_id": "image-blip",
+            "class": "near_limit",
+            "bytes": 106,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "none",
+            "refusal": null
+          },
+          {
+            "part_id": "image-blip",
+            "class": "at_limit",
+            "bytes": 106,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "none",
+            "refusal": null
+          },
+          {
+            "part_id": "image-blip",
+            "class": "over_limit",
+            "bytes": 0,
+            "applicable": false,
+            "accepted": false,
+            "boundary": "none",
+            "refusal": null
+          },
+          {
+            "part_id": "image-blip",
+            "class": "malformed",
+            "bytes": 57,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "none",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 57
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": true,
+          "preflight_partial_output_bytes": 0,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 0,
+          "parts": [
+            {
+              "part_id": "text-body",
+              "boundary": "input_limit",
+              "operation_scope": "string_output",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 209,
+              "observed_output": 209,
+              "output_limit": 208,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML input bytes",
+                "limit": 67108864,
+                "observed": 67108865,
+                "resource": "DrawingML input bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 208,
+                "observed": 209,
+                "resource": "DrawingML output bytes"
+              }
+            },
+            {
+              "part_id": "svg-blip",
+              "boundary": "input_limit",
+              "operation_scope": "contextual_typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 355,
+              "observed_output": 355,
+              "output_limit": 354,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML input bytes",
+                "limit": 16777216,
+                "observed": 16777217,
+                "resource": "DrawingML input bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 354,
+                "observed": 355,
+                "resource": "DrawingML output bytes"
+              }
+            },
+            {
+              "part_id": "model3d",
+              "boundary": "input_limit",
+              "operation_scope": "typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 410,
+              "observed_output": 410,
+              "output_limit": 409,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 16777216,
+                "observed": 16777217,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 409,
+                "observed": 410,
+                "resource": "DrawingML output bytes"
+              }
+            },
+            {
+              "part_id": "image-blip",
+              "boundary": "none",
+              "operation_scope": null,
+              "preflight": "not_applicable",
+              "preflight_bytes": null,
+              "observed_output": null,
+              "output_limit": null,
+              "partial_output_allowed": null,
+              "partial_output_bytes": null,
+              "partial_output_within_limit": null,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": null,
+              "sink_refusal": null
+            }
+          ]
+        },
+        "theme_family_mutations": [],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 4
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 4
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 56
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      },
+      {
+        "id": "theme_ink_bulk",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.json",
+          "bytes": 67713,
+          "sha256": "f7cea2a8881e77f1d88bbf7fe55096045b320967f546f67342a378308ee65ca7"
+        },
+        "lane": "drawingml-theme-ink",
+        "raw_scope": "bulk",
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "available": false,
+            "reason": "successful bulk stdout sidecar was overwritten by the duplicate family invocation"
+          },
+          "stderr": {
+            "available": false,
+            "reason": "successful bulk stderr sidecar was overwritten by the duplicate family invocation"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "98619819ec5614db420310370115c8102fb655f764ee92cbafb6feaddf6042ef",
+          "generated_parts": [
+            {
+              "part_id": "theme",
+              "source_sha256": "62890ae036723dea2e2b3d454cf3fea087e2c245d8b1294777117b6484772f61",
+              "source_bytes": 2149,
+              "changed_sha256": "33ee14a0442d560a8258f13205437505b722312b247b5ff9e3d558f00ca5e942",
+              "changed_bytes": 2157,
+              "malformed_sha256": "75f5fb799cae88046f7de06486dfc52e73d98beee4a4cc1fbfd912b910eec314",
+              "malformed_bytes": 53
+            },
+            {
+              "part_id": "ink-actions",
+              "source_sha256": "a4f084b7e8ea2ceace9c8a825edaf00d3e1b14b946f6ed5c0c8aed0e7a41b0cc",
+              "source_bytes": 330,
+              "changed_sha256": "4fed7d69e80eae4255b68f6f2c53ba5cf17f3925f0dfe1712f70929b6d2af5cf",
+              "changed_bytes": 330,
+              "malformed_sha256": "3b350a21473d9414f360b004b391083888a74ce13fcdd72ca80d2a7e3b55a480",
+              "malformed_bytes": 59
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "theme",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "62890ae036723dea2e2b3d454cf3fea087e2c245d8b1294777117b6484772f61",
+            "source_output_sha256": "62890ae036723dea2e2b3d454cf3fea087e2c245d8b1294777117b6484772f61",
+            "changed_sha256": "33ee14a0442d560a8258f13205437505b722312b247b5ff9e3d558f00ca5e942",
+            "changed_output_sha256": "33ee14a0442d560a8258f13205437505b722312b247b5ff9e3d558f00ca5e942",
+            "malformed_sha256": "75f5fb799cae88046f7de06486dfc52e73d98beee4a4cc1fbfd912b910eec314",
+            "source_semantic_sha256": "45c55636ae50b411e06cae9b98fa62aebc87389b6e9306a08c9de509d2abd15b",
+            "source_output_semantic_sha256": "45c55636ae50b411e06cae9b98fa62aebc87389b6e9306a08c9de509d2abd15b",
+            "changed_semantic_sha256": "c77741ea51e44a27756496dcfcac89b64fa0acb622c1fdd5ef12095276ec5f68",
+            "changed_output_semantic_sha256": "c77741ea51e44a27756496dcfcac89b64fa0acb622c1fdd5ef12095276ec5f68"
+          },
+          {
+            "part_id": "ink-actions",
+            "fidelity_mode": "source_exact",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": true,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": true,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "a4f084b7e8ea2ceace9c8a825edaf00d3e1b14b946f6ed5c0c8aed0e7a41b0cc",
+            "source_output_sha256": "a4f084b7e8ea2ceace9c8a825edaf00d3e1b14b946f6ed5c0c8aed0e7a41b0cc",
+            "changed_sha256": "4fed7d69e80eae4255b68f6f2c53ba5cf17f3925f0dfe1712f70929b6d2af5cf",
+            "changed_output_sha256": "4fed7d69e80eae4255b68f6f2c53ba5cf17f3925f0dfe1712f70929b6d2af5cf",
+            "malformed_sha256": "3b350a21473d9414f360b004b391083888a74ce13fcdd72ca80d2a7e3b55a480",
+            "source_semantic_sha256": "28eaa7f1af9538fbac8dee80455c26a366f17ae737b509a20e98d64c71e696d5",
+            "source_output_semantic_sha256": "28eaa7f1af9538fbac8dee80455c26a366f17ae737b509a20e98d64c71e696d5",
+            "changed_semantic_sha256": "58523976d807b4ced02615e008a3a3b132c59e6b4c3fbfd18f33b5e4cab2949f",
+            "changed_output_semantic_sha256": "58523976d807b4ced02615e008a3a3b132c59e6b4c3fbfd18f33b5e4cab2949f"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "theme",
+            "class": "small",
+            "bytes": 2149,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme",
+            "class": "near_limit",
+            "bytes": 8388607,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme",
+            "class": "at_limit",
+            "bytes": 8388608,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme",
+            "class": "over_limit",
+            "bytes": 8388609,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 8388608,
+              "observed": 8388609,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "theme",
+            "class": "malformed",
+            "bytes": 53,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 53
+            }
+          },
+          {
+            "part_id": "ink-actions",
+            "class": "small",
+            "bytes": 330,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "ink-actions",
+            "class": "near_limit",
+            "bytes": 16777215,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "ink-actions",
+            "class": "at_limit",
+            "bytes": 16777216,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "ink-actions",
+            "class": "over_limit",
+            "bytes": 16777217,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML source bytes",
+              "limit": 16777216,
+              "observed": 16777217,
+              "resource": "DrawingML source bytes"
+            }
+          },
+          {
+            "part_id": "ink-actions",
+            "class": "malformed",
+            "bytes": 59,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 59
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": true,
+          "preflight_partial_output_bytes": 0,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 0,
+          "parts": [
+            {
+              "part_id": "theme",
+              "boundary": "input_limit",
+              "operation_scope": "vec_output",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 2157,
+              "observed_output": 2157,
+              "output_limit": 2156,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 8388608,
+                "observed": 8388609,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 2156,
+                "observed": 2157,
+                "resource": "DrawingML XML bytes"
+              }
+            },
+            {
+              "part_id": "ink-actions",
+              "boundary": "input_limit",
+              "operation_scope": "typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 330,
+              "observed_output": 330,
+              "output_limit": 329,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML source bytes",
+                "limit": 16777216,
+                "observed": 16777217,
+                "resource": "DrawingML source bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 329,
+                "observed": 330,
+                "resource": "DrawingML output bytes"
+              }
+            }
+          ]
+        },
+        "theme_family_mutations": [],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 2
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 2
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      },
+      {
+        "id": "geometry",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.json",
+          "bytes": 80771,
+          "sha256": "0a16b9762bf447d394338cc8fedb0a841539056f1b31fbe3c87d936c77b22b51"
+        },
+        "lane": "drawingml-geometry-color-formatcode2-transform",
+        "raw_scope": null,
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stdout",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stderr",
+            "bytes": 2280,
+            "sha256": "85fc27efacef9599dfd146c08be12e784e1c8a0eb8a9bc656381cf7220f81fe3"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "e64aaedd0e7549826d4f4a52b83df053f9d3e6a30dc29baa846c3c80f984fd6e",
+          "generated_parts": [
+            {
+              "part_id": "geometry",
+              "source_sha256": "2b60de47387ea3b08b1332567bc9c2f0b18780acbb37945af6e3076ea75b3dfd",
+              "source_bytes": 171,
+              "changed_sha256": "56d2b9bdc6b110411ce9f180d1268312bd807513142a940d31b718e57df9dddc",
+              "changed_bytes": 170,
+              "malformed_sha256": "3a58f285ff3f1378cd51840c98bfaa9b54c918f1a11d3bf3880c9a3f9c111fa9",
+              "malformed_bytes": 61
+            },
+            {
+              "part_id": "color",
+              "source_sha256": "4c93053d1f6967bdecf1f90830ee4f13f22434026733acb3acace1c050fcb24a",
+              "source_bytes": 25,
+              "changed_sha256": "872c965ea9d35eeb47da42c8d1b815e75b70ad9d44c09c56e4bf30ff1af7eaf7",
+              "changed_bytes": 25,
+              "malformed_sha256": "36da123f352951de6c9b272fceb27bfae758b1f7dba380bd0a99e7cc3620d51c",
+              "malformed_bytes": 58
+            },
+            {
+              "part_id": "formatcode2",
+              "source_sha256": "abd223b89799a26c5dcba458fe5fd3300250a9d57712489748993bcc55d8542e",
+              "source_bytes": 203,
+              "changed_sha256": "7d2ee0fc1b55fc3056ece6bd1dded98f93412cd8e3a4b96239d8ab247954fce2",
+              "changed_bytes": 206,
+              "malformed_sha256": "87a283724c0948becab78777cdd59555f0a83388aaa3767d0255669855e86770",
+              "malformed_bytes": 64
+            },
+            {
+              "part_id": "transform",
+              "source_sha256": "b555e9a16f5a0684c563bb54de41621ed426a3efa55a09317f146a27a5028d9a",
+              "source_bytes": 63,
+              "changed_sha256": "7c0b4c575ce68eee6c129cbd4e13721b7c8040ecb42605917c6793cbd278bb82",
+              "changed_bytes": 75,
+              "malformed_sha256": "71bdc25adb691e16e6c32d8c90d416d32c545e9992b9faa05016ff1118ef5262",
+              "malformed_bytes": 62
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "geometry",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "2b60de47387ea3b08b1332567bc9c2f0b18780acbb37945af6e3076ea75b3dfd",
+            "source_output_sha256": "2b60de47387ea3b08b1332567bc9c2f0b18780acbb37945af6e3076ea75b3dfd",
+            "changed_sha256": "56d2b9bdc6b110411ce9f180d1268312bd807513142a940d31b718e57df9dddc",
+            "changed_output_sha256": "56d2b9bdc6b110411ce9f180d1268312bd807513142a940d31b718e57df9dddc",
+            "malformed_sha256": "3a58f285ff3f1378cd51840c98bfaa9b54c918f1a11d3bf3880c9a3f9c111fa9",
+            "source_semantic_sha256": "2f18eed545a961947011378638943b86d212b78bd808774b83f090321afe7bb8",
+            "source_output_semantic_sha256": "2f18eed545a961947011378638943b86d212b78bd808774b83f090321afe7bb8",
+            "changed_semantic_sha256": "a1ab2f4caf68aa872fa37cbd67c4ef6266e7e5d330d3c78ec6b41548c0662604",
+            "changed_output_semantic_sha256": "a1ab2f4caf68aa872fa37cbd67c4ef6266e7e5d330d3c78ec6b41548c0662604"
+          },
+          {
+            "part_id": "color",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "4c93053d1f6967bdecf1f90830ee4f13f22434026733acb3acace1c050fcb24a",
+            "source_output_sha256": "4c93053d1f6967bdecf1f90830ee4f13f22434026733acb3acace1c050fcb24a",
+            "changed_sha256": "872c965ea9d35eeb47da42c8d1b815e75b70ad9d44c09c56e4bf30ff1af7eaf7",
+            "changed_output_sha256": "872c965ea9d35eeb47da42c8d1b815e75b70ad9d44c09c56e4bf30ff1af7eaf7",
+            "malformed_sha256": "36da123f352951de6c9b272fceb27bfae758b1f7dba380bd0a99e7cc3620d51c",
+            "source_semantic_sha256": "465e792ec7eedb7e4459b2a30ef2c0ee415a0c2f54c5e81b7800feba91fdfba4",
+            "source_output_semantic_sha256": "465e792ec7eedb7e4459b2a30ef2c0ee415a0c2f54c5e81b7800feba91fdfba4",
+            "changed_semantic_sha256": "0fba66b47d5ef59ea0fdd3d1c993b1d4edcd833745a74c9ad1f8d008a1db1fd3",
+            "changed_output_semantic_sha256": "0fba66b47d5ef59ea0fdd3d1c993b1d4edcd833745a74c9ad1f8d008a1db1fd3"
+          },
+          {
+            "part_id": "formatcode2",
+            "fidelity_mode": "source_exact",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": true,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": true,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": true,
+            "splice_oracle_passed": true,
+            "source_sha256": "abd223b89799a26c5dcba458fe5fd3300250a9d57712489748993bcc55d8542e",
+            "source_output_sha256": "abd223b89799a26c5dcba458fe5fd3300250a9d57712489748993bcc55d8542e",
+            "changed_sha256": "7d2ee0fc1b55fc3056ece6bd1dded98f93412cd8e3a4b96239d8ab247954fce2",
+            "changed_output_sha256": "7d2ee0fc1b55fc3056ece6bd1dded98f93412cd8e3a4b96239d8ab247954fce2",
+            "malformed_sha256": "87a283724c0948becab78777cdd59555f0a83388aaa3767d0255669855e86770",
+            "source_semantic_sha256": "561b2814d3c09e62a92442c946307918f7f63f833c84876c08bd4c406767e53b",
+            "source_output_semantic_sha256": "561b2814d3c09e62a92442c946307918f7f63f833c84876c08bd4c406767e53b",
+            "changed_semantic_sha256": "6ad01b860405544e67b10d5a442447da8608d29567873011c62814da22737dc1",
+            "changed_output_semantic_sha256": "6ad01b860405544e67b10d5a442447da8608d29567873011c62814da22737dc1"
+          },
+          {
+            "part_id": "transform",
+            "fidelity_mode": "model",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": false,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": false,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": false,
+            "splice_oracle_passed": true,
+            "source_sha256": "b555e9a16f5a0684c563bb54de41621ed426a3efa55a09317f146a27a5028d9a",
+            "source_output_sha256": "b555e9a16f5a0684c563bb54de41621ed426a3efa55a09317f146a27a5028d9a",
+            "changed_sha256": "7c0b4c575ce68eee6c129cbd4e13721b7c8040ecb42605917c6793cbd278bb82",
+            "changed_output_sha256": "7c0b4c575ce68eee6c129cbd4e13721b7c8040ecb42605917c6793cbd278bb82",
+            "malformed_sha256": "71bdc25adb691e16e6c32d8c90d416d32c545e9992b9faa05016ff1118ef5262",
+            "source_semantic_sha256": "8345784391a093f386258d7ffc2f17152d78214f6155f6e1d8ec2745c31c9f57",
+            "source_output_semantic_sha256": "8345784391a093f386258d7ffc2f17152d78214f6155f6e1d8ec2745c31c9f57",
+            "changed_semantic_sha256": "02b082eb1078eb85f2fcb783df9d97bfa181f6416a64c9946e1e69722f74e6a6",
+            "changed_output_semantic_sha256": "02b082eb1078eb85f2fcb783df9d97bfa181f6416a64c9946e1e69722f74e6a6"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "geometry",
+            "class": "small",
+            "bytes": 171,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "structural",
+            "refusal": null
+          },
+          {
+            "part_id": "geometry",
+            "class": "near_limit",
+            "bytes": 171,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "structural",
+            "refusal": null
+          },
+          {
+            "part_id": "geometry",
+            "class": "at_limit",
+            "bytes": 171,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "structural",
+            "refusal": null
+          },
+          {
+            "part_id": "geometry",
+            "class": "over_limit",
+            "bytes": 21637,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "structural",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "custom geometry paths",
+              "limit": 1024,
+              "observed": 21637,
+              "resource": "custom geometry paths"
+            }
+          },
+          {
+            "part_id": "geometry",
+            "class": "malformed",
+            "bytes": 61,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "structural",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 61
+            }
+          },
+          {
+            "part_id": "color",
+            "class": "small",
+            "bytes": 25,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "color",
+            "class": "near_limit",
+            "bytes": 65535,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "color",
+            "class": "at_limit",
+            "bytes": 65536,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "color",
+            "class": "over_limit",
+            "bytes": 65537,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 65536,
+              "observed": 65537,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "color",
+            "class": "malformed",
+            "bytes": 58,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 58
+            }
+          },
+          {
+            "part_id": "formatcode2",
+            "class": "small",
+            "bytes": 203,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "formatcode2",
+            "class": "near_limit",
+            "bytes": 1048575,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "formatcode2",
+            "class": "at_limit",
+            "bytes": 1048576,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "formatcode2",
+            "class": "over_limit",
+            "bytes": 1048577,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 1048576,
+              "observed": 1048577,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "formatcode2",
+            "class": "malformed",
+            "bytes": 64,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 64
+            }
+          },
+          {
+            "part_id": "transform",
+            "class": "small",
+            "bytes": 63,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "transform",
+            "class": "near_limit",
+            "bytes": 1048575,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "transform",
+            "class": "at_limit",
+            "bytes": 1048576,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "transform",
+            "class": "over_limit",
+            "bytes": 1048577,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 1048576,
+              "observed": 1048577,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "transform",
+            "class": "malformed",
+            "bytes": 62,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 62
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": true,
+          "preflight_partial_output_bytes": 0,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 0,
+          "parts": [
+            {
+              "part_id": "geometry",
+              "boundary": "structural",
+              "operation_scope": "string_output",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 170,
+              "observed_output": 170,
+              "output_limit": 169,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "custom geometry paths",
+                "limit": 1024,
+                "observed": 21637,
+                "resource": "custom geometry paths"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 169,
+                "observed": 170,
+                "resource": "DrawingML output bytes"
+              }
+            },
+            {
+              "part_id": "color",
+              "boundary": "input_limit",
+              "operation_scope": "vec_output",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 25,
+              "observed_output": 25,
+              "output_limit": 24,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 65536,
+                "observed": 65537,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 24,
+                "observed": 25,
+                "resource": "DrawingML XML bytes"
+              }
+            },
+            {
+              "part_id": "formatcode2",
+              "boundary": "input_limit",
+              "operation_scope": "typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 206,
+              "observed_output": 206,
+              "output_limit": 205,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 1048576,
+                "observed": 1048577,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML output bytes",
+                "limit": 205,
+                "observed": 206,
+                "resource": "DrawingML output bytes"
+              }
+            },
+            {
+              "part_id": "transform",
+              "boundary": "input_limit",
+              "operation_scope": "typed_writer",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 75,
+              "observed_output": 75,
+              "output_limit": 74,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": true,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 1048576,
+                "observed": 1048577,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 74,
+                "observed": 75,
+                "resource": "DrawingML XML bytes"
+              }
+            }
+          ]
+        },
+        "theme_family_mutations": [],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 4
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 4
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 21
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      },
+      {
+        "id": "theme_family",
+        "report": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.json",
+          "bytes": 63572,
+          "sha256": "c7dd9729c978e3b5421b526d41a9cc9f3371ef2fd43a49fddc87350d61a9fe3c"
+        },
+        "lane": "drawingml-theme-ink",
+        "raw_scope": "family",
+        "source_revision": "75afbd79cbac2cd4a7f7fe42d296d79c3439b586",
+        "status": "qualified",
+        "qualification_claim_in_report": true,
+        "process_exit": 0,
+        "sidecars": {
+          "stdout": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stdout",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stderr": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stderr",
+            "bytes": 2253,
+            "sha256": "91850492705175c058703ef7e19e7470fb1d1d81e812bb00112e493f26facb83"
+          }
+        },
+        "fixture": {
+          "descriptor_sha256": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
+          "descriptor_bytes": 2407,
+          "generated_sha256": "cf4f8fb1e44bc06b69515f35ccc9344cfd6aa53c8468475f0318fee02568f220",
+          "generated_parts": [
+            {
+              "part_id": "theme-family-part",
+              "source_sha256": "408801aabd9e8f75919341aca452fd2f5ba508a54c91f3259fd21f1d1a40e097",
+              "source_bytes": 598,
+              "changed_sha256": "1ed033bbad6fbe03115e360be4a4e5e82f6695797c65c3ba5063063bebc84314",
+              "changed_bytes": 601,
+              "malformed_sha256": "f769d3697aa961763d2e037ef7023a085df78c0e2e2c61a9dec59c2575265d1f",
+              "malformed_bytes": 65
+            }
+          ]
+        },
+        "fidelity": [
+          {
+            "part_id": "theme-family-part",
+            "fidelity_mode": "source_exact",
+            "read_write_route": "standalone_read_write",
+            "source_preserving_expected": true,
+            "source_raw_exact": true,
+            "source_output_exact": true,
+            "changed_output_exact": true,
+            "changed_output_exact_expected": true,
+            "source_semantic_equal": true,
+            "changed_semantic_equal": true,
+            "standalone_route_checked": false,
+            "splice_oracle_checked": true,
+            "splice_oracle_passed": true,
+            "source_sha256": "408801aabd9e8f75919341aca452fd2f5ba508a54c91f3259fd21f1d1a40e097",
+            "source_output_sha256": "408801aabd9e8f75919341aca452fd2f5ba508a54c91f3259fd21f1d1a40e097",
+            "changed_sha256": "1ed033bbad6fbe03115e360be4a4e5e82f6695797c65c3ba5063063bebc84314",
+            "changed_output_sha256": "1ed033bbad6fbe03115e360be4a4e5e82f6695797c65c3ba5063063bebc84314",
+            "malformed_sha256": "f769d3697aa961763d2e037ef7023a085df78c0e2e2c61a9dec59c2575265d1f",
+            "source_semantic_sha256": "84df2755bc2a27b3f0d02014141b10b8e6466072fed0058cd11c08b0a61f96c5",
+            "source_output_semantic_sha256": "84df2755bc2a27b3f0d02014141b10b8e6466072fed0058cd11c08b0a61f96c5",
+            "changed_semantic_sha256": "466ab2d79f5ef800d9b5c8a3e319b144464b016c860242f335d7bf20c1224097",
+            "changed_output_semantic_sha256": "466ab2d79f5ef800d9b5c8a3e319b144464b016c860242f335d7bf20c1224097"
+          }
+        ],
+        "size_checks": [
+          {
+            "part_id": "theme-family-part",
+            "class": "small",
+            "bytes": 598,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme-family-part",
+            "class": "near_limit",
+            "bytes": 8388607,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme-family-part",
+            "class": "at_limit",
+            "bytes": 8388608,
+            "applicable": true,
+            "accepted": true,
+            "boundary": "input_limit",
+            "refusal": null
+          },
+          {
+            "part_id": "theme-family-part",
+            "class": "over_limit",
+            "bytes": 8388609,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "limit",
+              "limit_kind": "DrawingML XML bytes",
+              "limit": 8388608,
+              "observed": 8388609,
+              "resource": "DrawingML XML bytes"
+            }
+          },
+          {
+            "part_id": "theme-family-part",
+            "class": "malformed",
+            "bytes": 65,
+            "applicable": true,
+            "accepted": false,
+            "boundary": "input_limit",
+            "refusal": {
+              "kind": "invalid_input",
+              "observed": 65
+            }
+          }
+        ],
+        "preflight": {
+          "status": "qualified",
+          "fidelity_checked": true,
+          "typed_refusal_checked": true,
+          "preflight_zero_writes": true,
+          "preflight_partial_output_bytes": 0,
+          "preflight_writes_within_limit": true,
+          "sink_writes": 0,
+          "parts": [
+            {
+              "part_id": "theme-family-part",
+              "boundary": "input_limit",
+              "operation_scope": "source_edit_serialize",
+              "preflight": "typed_output_limit",
+              "preflight_bytes": 601,
+              "observed_output": 601,
+              "output_limit": 600,
+              "partial_output_allowed": false,
+              "partial_output_bytes": 0,
+              "partial_output_within_limit": true,
+              "sink_supported": false,
+              "sink_writes": 0,
+              "production_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 8388608,
+                "observed": 8388609,
+                "resource": "DrawingML XML bytes"
+              },
+              "sink_refusal": {
+                "kind": "limit",
+                "limit_kind": "DrawingML XML bytes",
+                "limit": 600,
+                "observed": 601,
+                "resource": "DrawingML XML bytes"
+              }
+            }
+          ]
+        },
+        "theme_family_mutations": [
+          {
+            "operation": "replace_family",
+            "source_sha256": "408801aabd9e8f75919341aca452fd2f5ba508a54c91f3259fd21f1d1a40e097",
+            "output_sha256": "1ed033bbad6fbe03115e360be4a4e5e82f6695797c65c3ba5063063bebc84314",
+            "output_bytes": 601,
+            "output_differs": true,
+            "requested_name": "Family 81",
+            "requested_id": "{11111111-1111-1111-1111-111111111111}",
+            "requested_variant_id": "{22222222-2222-2222-2222-222222222222}",
+            "observed_name": "Family 81",
+            "observed_id": "{11111111-1111-1111-1111-111111111111}",
+            "observed_variant_id": "{22222222-2222-2222-2222-222222222222}",
+            "requested_identity_matches": true,
+            "source_identity_matches": true
+          },
+          {
+            "operation": "remove_family",
+            "source_sha256": "408801aabd9e8f75919341aca452fd2f5ba508a54c91f3259fd21f1d1a40e097",
+            "output_sha256": "b6dd6bb9e9cbfe6c2783784855207d442a3e6a7e7bc60c99db461dd63e5ee295",
+            "output_bytes": 407,
+            "output_differs": true,
+            "requested_name": null,
+            "requested_id": null,
+            "requested_variant_id": null,
+            "observed_name": null,
+            "observed_id": null,
+            "observed_variant_id": null,
+            "requested_identity_matches": true,
+            "source_identity_matches": true
+          },
+          {
+            "operation": "add_family",
+            "source_sha256": "b6dd6bb9e9cbfe6c2783784855207d442a3e6a7e7bc60c99db461dd63e5ee295",
+            "output_sha256": "94487f896c8cc615947e8a0e3448479ccbc85cf266c942dce74ccd8266c0373c",
+            "output_bytes": 665,
+            "output_differs": true,
+            "requested_name": "Family 81",
+            "requested_id": "{11111111-1111-1111-1111-111111111111}",
+            "requested_variant_id": "{22222222-2222-2222-2222-222222222222}",
+            "observed_name": "Family 81",
+            "observed_id": "{11111111-1111-1111-1111-111111111111}",
+            "observed_variant_id": "{22222222-2222-2222-2222-222222222222}",
+            "requested_identity_matches": true,
+            "source_identity_matches": true
+          }
+        ],
+        "operations": [
+          {
+            "operation": "entry_read",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "read_shared_when_supported",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "vec_write",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 1
+          },
+          {
+            "operation": "write_to_bounded_sink",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": false,
+            "sink_writes": 0
+          },
+          {
+            "operation": "preflight_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          },
+          {
+            "operation": "malformed_refusal",
+            "status": "qualified",
+            "fidelity_checked": true,
+            "typed_refusal_checked": true,
+            "sink_writes": 0
+          }
+        ]
+      }
+    ],
+    "duplicate_setup_attempt": {
+      "lane": "drawingml-theme-ink",
+      "raw_scope": "family",
+      "exit": 1,
+      "reason": "JSON output path already existed; no report was accepted from this attempt. Its stderr sidecar is retained externally.",
+      "stderr": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stderr",
+        "bytes": 2760,
+        "sha256": "77c5f8641a504212972ab9a1dc71b4fd5663bfcac2c30b0dc63dbf6e2483b0f5"
+      }
+    },
+    "all_six_runtime_checks": "PASS: every final report has qualified rows, valid near/at/over/malformed boundary behavior, typed output-cap refusal coverage, and required semantic/source fidelity checks."
+  },
+  "external_artifacts": {
+    "runtime-commands.txt": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-commands.txt",
+      "bytes": 4134,
+      "sha256": "278fcb5cc24b93f80a25c549f604127427265f6c15c6b4a8ee52a210ebb41b13"
+    },
+    "runtime-env.txt": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-env.txt",
+      "bytes": 230,
+      "sha256": "286bd7a02463dc27a4d4a9cdbafc867211bfa96c9fe8b4cd9c44f610c8c11ca0"
+    },
+    "runtime-summary.txt": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-summary.txt",
+      "bytes": 314,
+      "sha256": "4c1f36ab4d6b7ad067c7a6fb69c55fb3c23025d6c5b9b2161bfd4c290ea0505c"
+    },
+    "debug-build.log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/debug-build.log",
+      "bytes": 32310,
+      "sha256": "d81620e05b31f906ffac227b859856b15c9855d8ca0158b0488e348d4a721940"
+    },
+    "build.log": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/build.log",
+      "bytes": 10406,
+      "sha256": "3442479a3af8f10185fcef6f603245d1d4ae6c716f8a58a671b61e2c2a76dfd3"
+    },
+    "normal/drawingml-chart-raw.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.json",
+      "bytes": 61312,
+      "sha256": "d6089c16935600702d31ebf861df73abb1ebceaa8af1dac43a0a91f581d5e217"
+    },
+    "normal/drawingml-chart-raw.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stderr",
+      "bytes": 2232,
+      "sha256": "af69c60ab304faf1face3c6c5959956b0b25daa6091041b6d8a7d07a9655f1f4"
+    },
+    "normal/drawingml-chart-raw.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "normal/drawingml-diagram-raw.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.json",
+      "bytes": 61248,
+      "sha256": "c8b7042217adeeb2985b7e461a5c67a8ce0e9ca0fb9786d82a0425b71e49542e"
+    },
+    "normal/drawingml-diagram-raw.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stderr",
+      "bytes": 2232,
+      "sha256": "6c22219b9951784aad772cf54e7ce2e1d81f47beca9148fc6f5df4f56616956b"
+    },
+    "normal/drawingml-diagram-raw.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "normal/drawingml-geometry-color-formatcode2-transform.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.json",
+      "bytes": 80771,
+      "sha256": "0a16b9762bf447d394338cc8fedb0a841539056f1b31fbe3c87d936c77b22b51"
+    },
+    "normal/drawingml-geometry-color-formatcode2-transform.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stderr",
+      "bytes": 2280,
+      "sha256": "85fc27efacef9599dfd146c08be12e784e1c8a0eb8a9bc656381cf7220f81fe3"
+    },
+    "normal/drawingml-geometry-color-formatcode2-transform.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "normal/drawingml-text-media-raw.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.json",
+      "bytes": 79084,
+      "sha256": "4b1a356f58303cb6cac2d2a28262afc8abb1b1722d07d0d9cf08be1f69156afb"
+    },
+    "normal/drawingml-text-media-raw.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stderr",
+      "bytes": 2239,
+      "sha256": "7075de856b88d7f31fe9f07cb4262c73343ec9ace2d25f78988398c22bcb35bf"
+    },
+    "normal/drawingml-text-media-raw.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "normal/drawingml-theme-family-raw.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.json",
+      "bytes": 63572,
+      "sha256": "c7dd9729c978e3b5421b526d41a9cc9f3371ef2fd43a49fddc87350d61a9fe3c"
+    },
+    "normal/drawingml-theme-family-raw.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stderr",
+      "bytes": 2253,
+      "sha256": "91850492705175c058703ef7e19e7470fb1d1d81e812bb00112e493f26facb83"
+    },
+    "normal/drawingml-theme-family-raw.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "normal/drawingml-theme-ink.json": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.json",
+      "bytes": 67713,
+      "sha256": "f7cea2a8881e77f1d88bbf7fe55096045b320967f546f67342a378308ee65ca7"
+    },
+    "normal/drawingml-theme-ink.stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stderr",
+      "bytes": 2760,
+      "sha256": "77c5f8641a504212972ab9a1dc71b4fd5663bfcac2c30b0dc63dbf6e2483b0f5"
+    },
+    "normal/drawingml-theme-ink.stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "preserved_prior_diagnostics": [
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-dvif-v5",
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-dvif-v7",
+    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/compile-preflight-diagnostics.json"
+  ],
+  "evidence_policy": "Only this reduced receipt is committed. The six reports, sidecars, build logs, binary, and target remain external under .coord; no binary or evidence file is added to the repository."
+}

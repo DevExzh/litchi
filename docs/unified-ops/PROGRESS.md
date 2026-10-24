@@ -3956,3 +3956,34 @@ See [0063](0063-source-pptx-modern-comments.md).
   cause, complete publication report and progress. Slot 2 is reassigned from
   the stopped gate to that repair. A new source binding and full gate remain
   required; prepared b4 native packets are source-only diagnostics.
+
+- Coordinator continuation (2026-10-24, composed proofs and consumer closure):
+  CFB error layout and canonical output accessors merge with the final ordinary
+  harness consumer repair at `c796d0acc2`. The error keeps its typed source and
+  complete report; the success path gains no allocation. All eight missed
+  benchmark consumers now use `output_bytes()`. Independent source, lock, log,
+  target and adapter-pin review passes. Records 0362ul16, 0362ul16a and 0362ul16b
+  preserve the initial failures and successful 555-test CFB suite, 23 tooling
+  tests and ordinary performance harness all-target check.
+
+  DrawingML owner and raw proof repairs compose at `a3ec979993`. Native owner
+  helpers are measured directly, with mutation, remainder and stale-patch
+  proofs outside timing. All six raw diagnostic lanes pass their boundary,
+  malformed, output-cap and fidelity checks; exact Ink source preservation is
+  retained. Independent reviews pass, and all 41 combined tooling tests pass.
+  Records 0362dvig, 0362dvifb and 0362dvih distinguish those results from paired
+  performance qualification, which remains required.
+
+  The Clippy return also exposes a quadratic DrawingML attribute iterator.
+  Repair `eb94d5a6b2` uses the existing bounded checked-attribute helper and adds
+  a late-attribute/duplicate regression test. All 486 DrawingML tests and the
+  assembled facade, ops, CLI and Python all-feature/all-target Clippy check
+  pass. Record 0362dvla retains each intermediate failure. A fresh full 53-step
+  gate and actual corpus replay start on immutable c796 source. Fresh all-68
+  API capture continues on a3; its production API equivalence to c796 is
+  verified separately before final inventory acceptance.
+
+  Combined native correctness runs and the remaining qualification builds are
+  active. No performance regression is waived, and the prepared packets alone
+  do not establish acceptance. Only redaction audit 22 is deferred. Nothing is
+  pushed.
