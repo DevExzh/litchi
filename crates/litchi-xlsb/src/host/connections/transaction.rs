@@ -113,7 +113,8 @@ impl std::fmt::Display for LimitKind {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    before: Snapshot,
+    raw_limits: crate::raw::Limits,
+    before: Option<Snapshot>,
     draft: Option<Connections>,
 }
 
@@ -129,15 +130,14 @@ impl crate::Package {
 
     /// Start a connections edit. Starting one copies no part payload.
     ///
-    /// # Errors
-    ///
-    /// Returns the connections graph and decoding errors.
+    /// The owner graph is read on the first operation or commit, so dropping
+    /// an untouched edit does not decode the connections part.
     pub fn edit_connections(&self) -> Result<Edit> {
-        let before = Snapshot::read(self.opc_package(), self.raw_limits_value())?;
         Ok(Edit {
             staged: Staged::of_package(self)?,
-            draft: before.connections.clone(),
-            before,
+            raw_limits: self.raw_limits_value(),
+            draft: None,
+            before: None,
         })
     }
 
@@ -154,21 +154,41 @@ impl crate::Package {
 }
 
 impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::read(self.staged.opc(), self.raw_limits)?;
+        self.draft = before.connections.clone();
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| super::invalid("connections edit is not prepared"))
+    }
+
     /// The source snapshot the edit started from.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// The staged connection catalog.
     #[must_use]
-    pub const fn connections(&self) -> Option<&Connections> {
-        self.draft.as_ref()
+    pub fn connections(&mut self) -> Result<Option<&Connections>> {
+        self.ensure_prepared()?;
+        Ok(self.draft.as_ref())
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.before.connections.clone();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        self.draft = self.snapshot()?.connections.clone();
+        Ok(())
     }
 
     /// Replace or remove the complete connections owner. Returns whether the
@@ -178,6 +198,7 @@ impl Edit {
     ///
     /// Returns the catalog validation errors.
     pub fn replace(&mut self, value: Option<Connections>) -> Result<bool> {
+        self.ensure_prepared()?;
         if let Some(value) = &value {
             validation::connections(value)?;
         }
@@ -199,6 +220,7 @@ impl Edit {
         connection_id: u32,
         edit: impl FnOnce(&mut Connection) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -228,6 +250,7 @@ impl Edit {
     ///
     /// Returns the catalog validation errors.
     pub fn set(&mut self, connection: Connection) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self.draft.clone().unwrap_or_default();
         if let Some(existing) = draft
             .connections
@@ -253,6 +276,7 @@ impl Edit {
     ///
     /// Returns an absent owner and the catalog validation errors.
     pub fn remove(&mut self, connection_id: u32) -> Result<Option<Connection>> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -337,12 +361,17 @@ impl Edit {
     /// connections graph errors, a readback that differs from the staged
     /// catalog, and the workbook validation errors of the result.
     pub fn commit(mut self) -> Result<Commit> {
-        if self.draft == self.before.connections {
+        self.ensure_prepared()?;
+        let unchanged = {
+            let before = self.snapshot()?;
+            self.draft == before.connections
+        };
+        if unchanged {
             self.staged.reset();
             return Ok(Commit::new(self.staged.commit()?));
         }
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
-        let workbook = self.before.source.workbook_name.clone();
+        let workbook = self.snapshot()?.source.workbook_name.clone();
         let draft = self.draft.clone();
         let raw_limits = self.staged.raw_limits();
         self.staged.update(|candidate| {

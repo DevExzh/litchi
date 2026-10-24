@@ -275,10 +275,11 @@ fn signed_xlsb_routes_preserve_exact_bytes_until_explicit_unsign() {
         assert_eq!(count, streamed.len() as u64);
         assert_eq!(streamed, bytes);
 
-        let refusal = signed
+        let unchanged = signed
             .set(FIRST, props! { "name" => "Data" })
-            .expect_err("signed no-op must still require explicit unsign");
-        assert_eq!(refusal.code(), Code::DocumentProtected);
+            .expect("signed exact no-op preserves the signature");
+        assert!(unchanged.is_signed());
+        assert_eq!(unchanged.to_bytes().expect("publish signed no-op"), bytes);
         assert_eq!(signed.to_bytes().unwrap(), bytes);
 
         let File::Signed(wrapper) = signed else {

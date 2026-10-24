@@ -52,7 +52,7 @@ impl EditOptions {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    conformance: Conformance,
+    conformance: Option<Conformance>,
 }
 
 impl Package {
@@ -84,13 +84,9 @@ impl Package {
     /// Returns the task-pane graph errors of this package.
     pub fn edit_task_panes_with_options(&self, options: EditOptions) -> Result<Edit> {
         let staged = Staged::unparsed(self)?;
-        let conformance = match options.conformance {
-            Some(conformance) => conformance,
-            None => existing_conformance(staged.opc())?,
-        };
         Ok(Edit {
             staged,
-            conformance,
+            conformance: options.conformance,
         })
     }
 
@@ -134,11 +130,14 @@ impl Edit {
         if panes.is_empty() {
             return self.clear();
         }
-        self.staged.workbook().validate_task_pane_bindings(&panes)?;
+        let conformance = self.conformance()?;
+        self.staged
+            .workbook()?
+            .validate_task_pane_bindings(&panes)?;
         let patch = common_web::plan_put(
             self.staged.opc(),
             panes,
-            self.conformance,
+            conformance,
             &common_web::Limits::standard(),
         )?;
         self.stage(&patch)
@@ -162,7 +161,7 @@ impl Edit {
             return Ok(false);
         }
         self.staged
-            .workbook()
+            .workbook()?
             .validate_task_pane_bindings(&Panes::new())?;
         let patch = common_web::plan_remove(self.staged.opc(), &common_web::Limits::standard())?;
         self.stage(&patch)
@@ -189,6 +188,15 @@ impl Edit {
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook.
     pub fn commit(self) -> Result<Commit> {
         Ok(Commit::new(self.staged.commit()?))
+    }
+
+    fn conformance(&mut self) -> Result<Conformance> {
+        if let Some(conformance) = self.conformance {
+            return Ok(conformance);
+        }
+        let conformance = existing_conformance(self.staged.opc())?;
+        self.conformance = Some(conformance);
+        Ok(conformance)
     }
 }
 
@@ -224,4 +232,17 @@ fn existing_conformance(package: &OpcPackage) -> Result<Conformance> {
             Conformance::Transitional
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn edit_constructor_defers_default_conformance_detection() {
+        let cold = Package::from(Package::new().expect("package").into_opc());
+        let edit = cold.edit_task_panes().expect("task-pane edit entry");
+        assert!(edit.conformance.is_none());
+        assert!(!cold.projection_cached());
+    }
 }

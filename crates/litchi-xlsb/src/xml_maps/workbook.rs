@@ -50,11 +50,7 @@ impl crate::Package {
         let limits = options
             .limits_value()
             .unwrap_or_else(|| self.semantic_limits().xml_maps_value());
-        let worksheets = self.workbook()?.xml_maps_worksheet_parts()?;
-        Ok(Edit::new(
-            self.clone(),
-            Snapshot::read_for_worksheets(self.opc_package(), worksheets, limits)?,
-        ))
+        Ok(Edit::new(self.clone(), limits))
     }
 
     /// Apply one reversible, source-checked Custom XML Maps patch to a new

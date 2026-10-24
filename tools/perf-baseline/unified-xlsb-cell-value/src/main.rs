@@ -168,11 +168,13 @@ fn native_once(
     let mut edit = match owner {
         NativeOwner::Eager(base) => base
             .edit_cell_values(0usize)?
+            .resolve()?
             .ok_or("worksheet selector unexpectedly did not resolve")?,
         NativeOwner::Source(base) => {
             let package = base.to_workbook()?.into_package();
             package
                 .edit_cell_values(0usize)?
+                .resolve()?
                 .ok_or("worksheet selector unexpectedly did not resolve")?
         },
     };

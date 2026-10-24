@@ -30,7 +30,8 @@ crate::part_edit::limits_options!(super::SemanticLimits, "Custom XML Maps");
 #[derive(Clone, Debug)]
 pub struct Edit {
     source: crate::Package,
-    before: Snapshot,
+    limits: super::SemanticLimits,
+    before: Option<Snapshot>,
     catalog: Option<XmlMapInfo>,
     conformance: XmlMapConformance,
     mapped_tables: Vec<MappedTable>,
@@ -38,40 +39,79 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, limits: super::SemanticLimits) -> Self {
         Self {
             source,
+            limits,
+            before: None,
+            catalog: None,
+            conformance: XmlMapConformance::default(),
+            mapped_tables: Vec::new(),
+            single_cell_bindings: Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_snapshot(source: crate::Package, before: Snapshot) -> Self {
+        Self {
+            source,
+            limits: before.limits(),
             catalog: before.map_info().cloned(),
             conformance: before.conformance(),
             mapped_tables: before.mapped_tables().to_vec(),
             single_cell_bindings: before.binding_groups(),
-            before,
+            before: Some(before),
         }
     }
 
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let worksheets = self.source.workbook()?.xml_maps_worksheet_parts()?;
+        let before =
+            Snapshot::read_for_worksheets(self.source.opc_package(), worksheets, self.limits)?;
+        self.catalog = before.map_info().cloned();
+        self.conformance = before.conformance();
+        self.mapped_tables = before.mapped_tables().to_vec();
+        self.single_cell_bindings = before.binding_groups();
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("Custom XML Maps edit is not prepared"))
+    }
+
     /// Immutable source snapshot used by the eventual stale check.
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Borrow the staged MapInfo catalog.
-    pub fn catalog(&self) -> Option<&XmlMapInfo> {
-        self.catalog.as_ref()
+    pub fn catalog(&mut self) -> Result<Option<&XmlMapInfo>> {
+        self.ensure_prepared()?;
+        Ok(self.catalog.as_ref())
     }
 
     /// Replace or create the complete catalog after validating all bindings.
     pub fn set_catalog(&mut self, catalog: XmlMapInfo) -> Result<bool> {
+        self.ensure_prepared()?;
         self.replace_catalog(Some(catalog))
     }
 
     /// Replace, create, or remove the complete catalog.
     pub fn replace_catalog(&mut self, catalog: Option<XmlMapInfo>) -> Result<bool> {
+        self.ensure_prepared()?;
         validate_draft(
             catalog.as_ref(),
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         )?;
         if self.catalog == catalog {
             return Ok(false);
@@ -82,6 +122,7 @@ impl Edit {
 
     /// Remove the catalog only when no binary binding depends on it.
     pub fn remove_catalog(&mut self) -> Result<Option<XmlMapInfo>> {
+        self.ensure_prepared()?;
         if !self.mapped_tables.is_empty()
             || self
                 .single_cell_bindings
@@ -98,6 +139,7 @@ impl Edit {
 
     /// Set one map name by stable map ID. Failed validation retains the draft.
     pub fn set_map_name(&mut self, map_id: u32, name: impl Into<String>) -> Result<bool> {
+        self.ensure_prepared()?;
         let name = name.into();
         let catalog = self
             .catalog
@@ -117,7 +159,7 @@ impl Edit {
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(true),
             Err(error) => {
@@ -137,6 +179,7 @@ impl Edit {
         map_id: u32,
         edit: impl FnOnce(&mut XmlMap) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let catalog = self
             .catalog
             .as_mut()
@@ -159,7 +202,7 @@ impl Edit {
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(true),
             Err(error) => {
@@ -171,13 +214,14 @@ impl Edit {
 
     /// Select the namespace conformance for the published catalog.
     pub fn set_conformance(&mut self, conformance: XmlMapConformance) -> Result<bool> {
+        self.ensure_prepared()?;
         if self.conformance == conformance {
             return Ok(false);
         }
         let Some(catalog) = self.catalog.as_ref() else {
             return Ok(false);
         };
-        serialize_catalog(catalog, conformance, self.before.limits())?;
+        serialize_catalog(catalog, conformance, self.limits)?;
         self.conformance = conformance;
         Ok(true)
     }
@@ -188,6 +232,7 @@ impl Edit {
         sheet_index: usize,
         binding: SingleCellBinding,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let values = self
             .single_cell_bindings
             .get(sheet_index)
@@ -214,7 +259,7 @@ impl Edit {
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(true),
             Err(error) => {
@@ -230,6 +275,7 @@ impl Edit {
         sheet_index: usize,
         table_id: u32,
     ) -> Result<Option<SingleCellBinding>> {
+        self.ensure_prepared()?;
         let Some(values) = self
             .single_cell_bindings
             .get(sheet_index)
@@ -254,7 +300,7 @@ impl Edit {
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(Some(removed)),
             Err(error) => {
@@ -270,6 +316,7 @@ impl Edit {
         table_id: u32,
         binding: ColumnBinding,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let column_id = binding.column_id();
         let table_index = self
             .mapped_tables
@@ -293,9 +340,9 @@ impl Edit {
             })?;
             columns.push(binding);
         }
-        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.limits.bindings)?;
         let source = self.source_table(table_id, column_id)?;
-        patch_table_bindings(&source, &replacement, self.before.limits().bindings)?;
+        patch_table_bindings(&source, &replacement, self.limits.bindings)?;
         let previous = if let Some(index) = table_index {
             Some(std::mem::replace(
                 &mut self.mapped_tables[index],
@@ -316,7 +363,7 @@ impl Edit {
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(true),
             Err(error) => {
@@ -336,6 +383,7 @@ impl Edit {
         table_id: u32,
         column_id: u32,
     ) -> Result<Option<ColumnBinding>> {
+        self.ensure_prepared()?;
         let table_index = self
             .mapped_tables
             .iter()
@@ -349,14 +397,14 @@ impl Edit {
             return Ok(None);
         };
         let removed = columns.remove(column_index);
-        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.limits.bindings)?;
         let previous = std::mem::replace(&mut self.mapped_tables[table_index], replacement);
         match validate_draft(
             self.catalog.as_ref(),
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         ) {
             Ok(()) => Ok(Some(removed)),
             Err(error) => {
@@ -367,34 +415,43 @@ impl Edit {
     }
 
     /// Build a reversible source-bound commit without touching a workbook.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         let source = self.source.clone();
         let patch = self.plan()?;
         source.apply_xml_maps(&patch)
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        *self = Self::new(self.source.clone(), self.before.clone());
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let before = self.snapshot()?.clone();
+        self.catalog = before.map_info().cloned();
+        self.conformance = before.conformance();
+        self.mapped_tables = before.mapped_tables().to_vec();
+        self.single_cell_bindings = before.binding_groups();
+        Ok(())
     }
 
-    fn plan(self) -> Result<Patch> {
+    fn plan(mut self) -> Result<Patch> {
+        self.ensure_prepared()?;
+        let before = self.snapshot()?.clone();
         validate_draft(
             self.catalog.as_ref(),
             &self.mapped_tables,
             &self.single_cell_bindings,
             self.conformance,
-            self.before.limits(),
+            self.limits,
         )?;
-        if self.before.map_info() == self.catalog.as_ref()
-            && self.before.conformance() == self.conformance
-            && self.before.mapped_tables() == self.mapped_tables
-            && self.before.binding_groups_equal(&self.single_cell_bindings)
+        if before.map_info() == self.catalog.as_ref()
+            && before.conformance() == self.conformance
+            && before.mapped_tables() == self.mapped_tables
+            && before.binding_groups_equal(&self.single_cell_bindings)
         {
-            return Ok(Patch::new(self.before.clone(), self.before.clone()));
+            return Ok(Patch::new(before.clone(), before.clone()));
         }
 
-        let mut source = self.before.source().clone();
+        let mut source = before.source().clone();
         self.materialize_catalog(&mut source)?;
         self.materialize_tables(&mut source)?;
         self.materialize_single_cells(&mut source)?;
@@ -418,7 +475,7 @@ impl Edit {
                 part.content_type == litchi_ooxml_common::spreadsheet_xml_maps::CONTENT_TYPE
             })
             .map(|part| {
-                parse_xml_map_info(part.bytes(), &self.before.limits().xml_maps)
+                parse_xml_map_info(part.bytes(), &self.limits.xml_maps)
                     .map_err(|_error| invalid("the Custom XML Maps part is not valid"))
             })
             .transpose()?;
@@ -428,14 +485,14 @@ impl Edit {
             XmlMapConformance::Transitional
         };
         let after = Snapshot::materialized(
-            &self.before,
+            &before,
             projected_catalog,
             projected_conformance,
             projected_tables,
             self.single_cell_bindings,
             source,
         )?;
-        Ok(Patch::new(self.before, after))
+        Ok(Patch::new(before, after))
     }
 
     fn materialize_catalog(&self, source: &mut SourceState) -> Result<()> {
@@ -444,21 +501,21 @@ impl Edit {
             .dependencies
             .iter()
             .position(|part| part.content_type == content_type);
-        match (existing, self.before.map_info(), self.catalog.as_ref()) {
+        match (existing, self.snapshot()?.map_info(), self.catalog.as_ref()) {
             (Some(index), Some(before), Some(after)) => {
                 let xml = litchi_ooxml_common::spreadsheet_xml_maps::patch_xml_map_info_source(
                     source.dependencies[index].bytes(),
                     before,
                     after,
-                    self.before.conformance(),
+                    self.snapshot()?.conformance(),
                     self.conformance,
-                    &self.before.limits().xml_maps,
+                    &self.limits.xml_maps,
                 )?;
-                parse_xml_map_info(&xml, &self.before.limits().xml_maps)
+                parse_xml_map_info(&xml, &self.limits.xml_maps)
                     .map_err(|_error| invalid("the Custom XML Maps part is not valid"))?;
                 source.dependencies[index].bytes = Arc::new(xml);
                 let map_name = source.dependencies[index].part_name.clone();
-                if self.before.conformance() != self.conformance {
+                if self.snapshot()?.conformance() != self.conformance {
                     let relationship = source
                         .workbook
                         .relationships
@@ -479,7 +536,7 @@ impl Edit {
             },
             (None, None, Some(after)) => {
                 let part_name = next_map_part_name(source)?;
-                let xml = serialize_catalog(after, self.conformance, self.before.limits())?;
+                let xml = serialize_catalog(after, self.conformance, self.limits)?;
                 let relationship_id = next_relationship_id(&source.workbook.relationships);
                 let target = part_name.relative_ref(source.workbook.part_name.base_uri());
                 source.dependencies.push(SourcePart {
@@ -530,14 +587,13 @@ impl Edit {
     fn source_table(&self, table_id: u32, column_id: u32) -> Result<super::TableBindingsSource> {
         let mut found = None;
         for part in self
-            .before
+            .snapshot()?
             .source()
             .dependencies
             .iter()
             .filter(|part| part.content_type == TABLE_CONTENT_TYPE)
         {
-            let host =
-                crate::package::table::parse_table_part(part.bytes(), self.before.limits().raw)?;
+            let host = crate::package::table::parse_table_part(part.bytes(), self.limits.raw)?;
             if host.id != table_id {
                 continue;
             }
@@ -547,11 +603,10 @@ impl Edit {
             if !host.columns.iter().any(|column| column.id == column_id) {
                 return Err(invalid("column is absent from physical table ID"));
             }
-            let parsed =
-                match super::parse_table_bindings(part.bytes(), self.before.limits().bindings) {
-                    Ok(parsed) => parsed,
-                    Err(error) => return Err(error),
-                };
+            let parsed = match super::parse_table_bindings(part.bytes(), self.limits.bindings) {
+                Ok(parsed) => parsed,
+                Err(error) => return Err(error),
+            };
             if parsed.value().table_id() != host.id {
                 return Err(invalid("host Table ID disagrees with XML binding table ID"));
             }
@@ -582,23 +637,18 @@ impl Edit {
             .iter_mut()
             .filter(|part| part.content_type == TABLE_CONTENT_TYPE)
         {
-            let parsed =
-                match super::parse_table_bindings(part.bytes(), self.before.limits().bindings) {
-                    Ok(parsed) => parsed,
-                    Err(Error::Unrecognized {
-                        typ: "mapped table type",
-                        ..
-                    }) => continue,
-                    Err(error) => return Err(error),
-                };
+            let parsed = match super::parse_table_bindings(part.bytes(), self.limits.bindings) {
+                Ok(parsed) => parsed,
+                Err(Error::Unrecognized {
+                    typ: "mapped table type",
+                    ..
+                }) => continue,
+                Err(error) => return Err(error),
+            };
             let Some(table) = tables.get(&parsed.value().table_id()).copied() else {
                 continue;
             };
-            part.bytes = Arc::new(patch_table_bindings(
-                &parsed,
-                table,
-                self.before.limits().bindings,
-            )?);
+            part.bytes = Arc::new(patch_table_bindings(&parsed, table, self.limits.bindings)?);
         }
         Ok(())
     }
@@ -672,12 +722,8 @@ impl Edit {
                 continue;
             };
             let part = &mut source.dependencies[*dependency_index];
-            let parsed = parse_single_cells(part.bytes(), self.before.limits().bindings)?;
-            part.bytes = Arc::new(patch_single_cells(
-                &parsed,
-                values,
-                self.before.limits().bindings,
-            )?);
+            let parsed = parse_single_cells(part.bytes(), self.limits.bindings)?;
+            part.bytes = Arc::new(patch_single_cells(&parsed, values, self.limits.bindings)?);
         }
 
         let mut removals = Vec::new();
@@ -700,9 +746,9 @@ impl Edit {
                 continue;
             }
             let part = &source.dependencies[*dependency_index];
-            let parsed = parse_single_cells(part.bytes(), self.before.limits().bindings)?;
+            let parsed = parse_single_cells(part.bytes(), self.limits.bindings)?;
             parsed.ensure_removal_lossless()?;
-            patch_single_cells(&parsed, &[], self.before.limits().bindings)?;
+            patch_single_cells(&parsed, &[], self.limits.bindings)?;
             let relationship_id = owners[sheet_index]
                 .as_ref()
                 .map(|(_, id)| id.clone())
@@ -727,7 +773,7 @@ impl Edit {
                 continue;
             }
             let part_name = next_single_cells_part_name(source)?;
-            let bytes = serialize_single_cells(values, self.before.limits().bindings)?;
+            let bytes = serialize_single_cells(values, self.limits.bindings)?;
             let relationship_id =
                 next_relationship_id(&source.worksheets[sheet_index].relationships);
             let target =
@@ -981,7 +1027,7 @@ mod transaction_tests {
     fn absent_catalog_conformance_is_an_exact_signed_no_op() {
         let snapshot = Snapshot::empty_transaction_fixture(true);
         let before = snapshot.source().clone();
-        let mut transaction = Edit::new(
+        let mut transaction = Edit::from_snapshot(
             crate::Package::from(litchi_opc::OpcPackage::new()),
             snapshot,
         );
@@ -1110,6 +1156,7 @@ mod transaction_tests {
     #[test]
     fn duplicate_singleton_cell_failure_retains_the_draft() {
         let before = Snapshot::empty_transaction_fixture(false);
+        let limits = before.limits();
         let first = SingleCellBinding::new(
             1,
             1,
@@ -1121,7 +1168,8 @@ mod transaction_tests {
         .expect("binding");
         let mut transaction = Edit {
             source: crate::Package::from(litchi_opc::OpcPackage::new()),
-            before,
+            before: Some(before),
+            limits,
             catalog: Some(fixture_catalog()),
             conformance: XmlMapConformance::Transitional,
             mapped_tables: Vec::new(),
@@ -1153,7 +1201,7 @@ mod transaction_tests {
     fn additive_binding_refuses_a_non_xml_table_without_mutating_the_draft() {
         let snapshot = Snapshot::non_xml_table_transaction_fixture();
         let source = snapshot.source().clone();
-        let mut transaction = Edit::new(
+        let mut transaction = Edit::from_snapshot(
             crate::Package::from(litchi_opc::OpcPackage::new()),
             snapshot,
         );
@@ -1170,7 +1218,10 @@ mod transaction_tests {
             .expect_err("non-XML table refusal");
         assert!(error.to_string().contains("not an ordinary LTXML Table"));
         assert!(transaction.mapped_tables.is_empty());
-        assert_eq!(transaction.before.source(), &source);
+        assert_eq!(
+            transaction.before.as_ref().expect("prepared").source(),
+            &source
+        );
     }
 
     fn fixture_catalog() -> XmlMapInfo {

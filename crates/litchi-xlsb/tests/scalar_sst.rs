@@ -142,6 +142,8 @@ fn scalar_conversion_closes_global_sst_and_reindexes_other_worksheets() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select first worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("first worksheet");
     edit.set_scalar(a1(), Scalar::Number(9.5))
         .expect("convert shared string to number");
@@ -172,6 +174,8 @@ fn scalar_conversion_compacts_only_when_unique_would_exceed_total() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select first worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("first worksheet");
     edit.set_scalar(a1(), Scalar::Number(9.5))
         .expect("convert sole shared string");
@@ -195,6 +199,8 @@ fn scalar_patch_inverse_restores_the_exact_preclosure_package() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Blank)
         .expect("clear SST cell");
@@ -251,6 +257,8 @@ fn custom_shared_string_relationship_target_is_reconciled_without_uri_assumption
     let mut edit = custom
         .edit_cell_values(0)
         .expect("select worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(2.0))
         .expect("convert custom-target SST cell");
@@ -275,6 +283,8 @@ fn opaque_sst_suffix_survives_entry_compaction() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(3.0))
         .expect("convert SST cell");
@@ -328,6 +338,8 @@ fn unsupported_low_cell_family_is_refused_before_remapping() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     // Relationship iteration may select either worksheet. A reserved family
     // in the edited sheet refuses at admission; one in another sheet refuses
@@ -383,6 +395,8 @@ fn shared_string_cell_inside_opaque_frt_is_refused() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("select worksheet")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(4.0))
         .expect("convert SST cell");
@@ -414,6 +428,8 @@ fn inconsistent_source_sst_count_is_not_silently_repaired() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(4.0)).expect("scalar");
     let error = edit.commit().expect_err("refuse inconsistent count");

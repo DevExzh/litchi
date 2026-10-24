@@ -316,6 +316,54 @@ fn task_pane_family_round_trips_common_model() {
     assert!(cleared.task_panes().unwrap().is_none());
 }
 
+#[test]
+fn task_pane_replace_failure_leaves_edit_retryable() {
+    let mut builder = crate::builder::Builder::new();
+    let mut sheet = crate::builder::Worksheet::new("Sheet1");
+    let worksheet_binding = crate::package::web_extension_bindings::Binding::new(
+        "required-app-ref",
+        crate::package::formula::ParsedFormula {
+            rgce: vec![0x3B, 2, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
+            rgcb: Vec::new(),
+        },
+        |index| index == 2,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    sheet
+        .set_web_extension_bindings(vec![worksheet_binding])
+        .unwrap();
+    builder.add_worksheet(sheet);
+    let package = builder.build().unwrap();
+
+    let binding = web::Binding::new("binding-1", "text", "missing-app-ref").unwrap();
+    let add_in = web::AddIn::new(
+        "add-in-invalid",
+        web::Reference::new("ref-invalid", "1", web::Store::Registry).unwrap(),
+    )
+    .unwrap()
+    .bind(binding)
+    .unwrap();
+    let mut invalid = web::Panes::new();
+    invalid.push(web::Pane::new(add_in)).unwrap();
+
+    let valid_add_in = web::AddIn::new(
+        "add-in-valid",
+        web::Reference::new("ref-valid", "1", web::Store::Registry).unwrap(),
+    )
+    .unwrap();
+    let valid_binding = web::Binding::new("binding-valid", "text", "required-app-ref").unwrap();
+    let valid_add_in = valid_add_in.bind(valid_binding).unwrap();
+    let mut valid = web::Panes::new();
+    valid.push(web::Pane::new(valid_add_in)).unwrap();
+
+    let mut edit = package.edit_task_panes().unwrap();
+    assert!(edit.replace(invalid).is_err());
+    assert!(edit.panes().unwrap().is_empty());
+    assert!(edit.replace(valid).unwrap());
+    assert_eq!(edit.panes().unwrap().len(), 1);
+}
+
 fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> Result<ExternalBook> {
     parse_external_link_with_relationship_type(records, Some(relationship_type::EXTERNAL_LINK_PATH))
 }
@@ -1810,6 +1858,8 @@ fn exact_noop_cell_value_commit_publishes_nothing() {
     let edit = package
         .edit_cell_values(name)
         .unwrap()
+        .resolve()
+        .unwrap()
         .expect("worksheet selector");
     let commit = edit.commit().unwrap();
     assert!(
@@ -1840,6 +1890,8 @@ fn cell_value_publication_installs_the_parse_that_validated_it() {
     let name = workbook.worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
+        .unwrap()
+        .resolve()
         .unwrap()
         .expect("worksheet selector");
     edit.insert(
@@ -1874,6 +1926,8 @@ fn refused_cell_value_publication_leaves_the_workbook_unchanged() {
     let name = workbook.worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
+        .unwrap()
+        .resolve()
         .unwrap()
         .expect("worksheet selector");
     edit.insert(

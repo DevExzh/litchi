@@ -590,6 +590,8 @@ fn source_handles_materialize_the_eager_editor_from_the_same_package() {
     editor
         .edit_cell_values(0)
         .expect("eager cell-value edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet selector resolves");
     // The source-backed handle stays readable.
     assert_eq!(handle.text().unwrap().len(), 75);
@@ -600,6 +602,8 @@ fn source_handles_materialize_the_eager_editor_from_the_same_package() {
     editor
         .edit_cell_values(0)
         .expect("eager cell-value edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet selector resolves");
 
     for handle in [

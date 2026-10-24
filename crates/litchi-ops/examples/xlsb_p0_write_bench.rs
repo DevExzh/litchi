@@ -94,7 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (
                     "value",
                     Box::new(|| {
-                        let mut edit = leaf_package()?.edit_cell_values(0_usize)?.expect("sheet");
+                        let mut edit = leaf_package()?
+                            .edit_cell_values(0_usize)?
+                            .resolve()?
+                            .expect("sheet");
                         edit.set_scalar(a1, litchi_xlsb::cell_values::Scalar::Number(7.0))?;
                         black_box(edit.commit()?.into_package());
                         Ok(())
@@ -107,7 +110,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (
                     "format",
                     Box::new(|| {
-                        let mut edit = leaf_package()?.edit_cell_values(0_usize)?.expect("sheet");
+                        let mut edit = leaf_package()?
+                            .edit_cell_values(0_usize)?
+                            .resolve()?
+                            .expect("sheet");
                         edit.set_format(a1, &format)?;
                         black_box(edit.commit()?.into_package());
                         Ok(())
@@ -123,7 +129,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (
                     "formula",
                     Box::new(|| {
-                        let mut edit = leaf_package()?.edit_cell_values(0_usize)?.expect("sheet");
+                        let mut edit = leaf_package()?
+                            .edit_cell_values(0_usize)?
+                            .resolve()?
+                            .expect("sheet");
                         edit.set_formula_text(target, "SUM(A1:A2)")?;
                         black_box(edit.commit()?.into_package());
                         Ok(())

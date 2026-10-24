@@ -14,43 +14,62 @@ crate::part_edit::limits_options!(super::SemanticLimits, "Volatile Dependencies"
 #[derive(Clone, Debug)]
 pub struct Edit {
     source: crate::Package,
-    before: Snapshot,
+    limits: super::SemanticLimits,
+    before: Option<Snapshot>,
     dependencies: Option<Arc<Dependencies>>,
 }
 
 impl Edit {
-    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, limits: super::SemanticLimits) -> Self {
         Self {
             source,
-            dependencies: before.dependencies_arc(),
-            before,
+            limits,
+            before: None,
+            dependencies: None,
         }
     }
 
+    fn ensure_prepared(&mut self) -> Result<&Snapshot> {
+        if self.before.is_none() {
+            let before = Snapshot::read_with_limits(self.source.opc_package(), self.limits)?;
+            self.dependencies = before.dependencies_arc();
+            self.before = Some(before);
+        }
+        self.before.as_ref().ok_or(Error::InvalidFormat(
+            "Volatile Dependencies edit is not prepared",
+        ))
+    }
+
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.dependencies = self.before.dependencies_arc();
+    pub fn reset(&mut self) -> Result<()> {
+        self.dependencies = self.ensure_prepared()?.dependencies_arc();
+        Ok(())
     }
 
     /// Immutable source snapshot used by stale-source checks.
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()
     }
 
     /// Borrow the currently staged hierarchy, or `None` when removal is staged.
-    pub fn dependencies(&self) -> Option<&Dependencies> {
-        self.dependencies.as_deref()
+    pub fn dependencies(&mut self) -> Result<Option<&Dependencies>> {
+        self.ensure_prepared()?;
+        Ok(self.dependencies.as_deref())
     }
 
     /// Replace or remove the complete Volatile Dependencies owner.
     pub fn replace(&mut self, dependencies: Option<Dependencies>) -> Result<bool> {
+        let (limits, can_edit) = {
+            let before = self.ensure_prepared()?;
+            (before.limits(), before.can_edit())
+        };
         if let Some(value) = dependencies.as_ref() {
-            value.validate(self.before.limits())?;
+            value.validate(limits)?;
         }
         if self.dependencies.as_deref() == dependencies.as_ref() {
             return Ok(false);
         }
-        if dependencies.is_some() && !self.before.can_edit() {
+        if dependencies.is_some() && !can_edit {
             return Err(unsupported_unknown_records());
         }
         self.dependencies = dependencies.map(Arc::new);
@@ -68,40 +87,41 @@ impl Edit {
     }
 
     /// Commit the detached draft into an atomic, reversible patch.
-    pub fn commit(self) -> Result<Commit> {
-        let changed = self.dependencies.as_deref() != self.before.dependencies();
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
+        let before = self.before.take().ok_or(Error::InvalidFormat(
+            "Volatile Dependencies edit is not prepared",
+        ))?;
+        let changed = self.dependencies.as_deref() != before.dependencies();
         if !changed {
-            let before = self.before;
             return Ok(Commit::new(
                 self.source,
                 Patch::new(before.clone(), before),
                 litchi_core::edit::Diagnostics::UNCHANGED,
             ));
         }
-        if self.dependencies.is_some() && !self.before.can_edit() {
+        if self.dependencies.is_some() && !before.can_edit() {
             return Err(unsupported_unknown_records());
         }
-        if self.before.package().is_signed()
-            || self.before.package().requires_signature_edit_policy()
-        {
+        if before.package().is_signed() || before.package().requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let mut candidate = self.before.package().as_ref().clone();
+        let mut candidate = before.package().as_ref().clone();
         let after_dependencies = self.dependencies.clone();
-        super::patch::materialize(&mut candidate, &self.before, after_dependencies.as_deref())?;
-        let after = Snapshot::read_with_limits(&candidate, self.before.limits())?;
+        super::patch::materialize(&mut candidate, &before, after_dependencies.as_deref())?;
+        let after = Snapshot::read_with_limits(&candidate, before.limits())?;
         if after.dependencies() != after_dependencies.as_deref() {
             return Err(Error::InvalidFormat(
                 "Volatile Dependencies transaction readback did not match staged content",
             ));
         }
-        if after.source() == self.before.source() {
+        if after.source() == before.source() {
             return Err(Error::InvalidFormat(
                 "changed Volatile Dependencies transaction produced no source change",
             ));
         }
         self.source
-            .apply_volatile_dependencies(&Patch::new(self.before, after))
+            .apply_volatile_dependencies(&Patch::new(before, after))
     }
 }
 

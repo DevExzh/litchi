@@ -211,8 +211,10 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
         .to_string();
     missing.rels_mut().remove(&root_id);
     let missing = Package::from(missing);
-    assert!(missing.edit_slicers().is_err());
-    assert!(missing.edit_timelines().is_err());
+    let slicers = missing.edit_slicers().expect("cold slicer entry");
+    assert!(slicers.caches().is_err());
+    let timelines = missing.edit_timelines().expect("cold timeline entry");
+    assert!(timelines.caches().is_err());
 
     let mut ambiguous = Package::new().unwrap().into_opc();
     ambiguous
@@ -225,8 +227,10 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
         )
         .unwrap();
     let ambiguous = Package::from(ambiguous);
-    assert!(ambiguous.edit_slicers().is_err());
-    assert!(ambiguous.edit_timelines().is_err());
+    let slicers = ambiguous.edit_slicers().expect("cold slicer entry");
+    assert!(slicers.caches().is_err());
+    let timelines = ambiguous.edit_timelines().expect("cold timeline entry");
+    assert!(timelines.caches().is_err());
 
     let mut alternate = with_owners(&Package::new().unwrap()).into_opc();
     relocate_workbook(

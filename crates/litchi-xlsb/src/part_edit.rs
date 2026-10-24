@@ -1304,13 +1304,12 @@ pub(crate) enum Publication {
 
 /// A staged part-level edit of one [`Package`].
 ///
-/// Starting one clones the package (a reference-count increment) and its
-/// cached workbook projection; the OPC graph is copied on the first change
-/// only.
+/// Starting one clones only the package owner (a reference-count increment);
+/// the workbook projection is borrowed from that owner on the first operation
+/// that needs it, and the OPC graph is copied on the first change only.
 #[derive(Debug, Clone)]
 pub(crate) struct Staged {
     source: Package,
-    workbook: Arc<Workbook>,
     staged: Option<OpcPackage>,
     touched: BTreeSet<String>,
     /// Whether a whole-graph operation ran, so the commit compares every
@@ -1320,10 +1319,9 @@ pub(crate) struct Staged {
 }
 
 impl Staged {
-    /// Start staging over `package` and its workbook projection.
+    /// Start staging over `package` without materializing its projection.
     pub(crate) fn of_package(package: &Package) -> Result<Self> {
         Ok(Self {
-            workbook: package.projection()?,
             source: package.clone(),
             staged: None,
             touched: BTreeSet::new(),
@@ -1340,14 +1338,14 @@ impl Staged {
         Ok(staged)
     }
 
-    /// The source workbook projection.
-    pub(crate) fn workbook(&self) -> &Workbook {
-        &self.workbook
+    /// The source workbook projection, materialized only when needed.
+    pub(crate) fn workbook(&self) -> Result<Arc<Workbook>> {
+        self.source.projection()
     }
 
     /// The raw BIFF12 policy retained by the package being edited.
     pub(crate) fn raw_limits(&self) -> crate::raw::Limits {
-        self.workbook.raw_limits_value()
+        self.source.raw_limits_value()
     }
 
     /// The staged OPC graph.
@@ -1397,7 +1395,8 @@ impl Staged {
     }
 
     pub(crate) fn worksheet(&self, sheet: usize) -> Result<PackURI> {
-        worksheet_uri(self.workbook(), sheet)
+        let workbook = self.workbook()?;
+        worksheet_uri(&workbook, sheet)
     }
 
     pub(crate) fn blob(&self, name: &PackURI) -> Result<&[u8]> {
@@ -1554,7 +1553,7 @@ impl Staged {
     /// The feature pass of the staged worksheet `name` at catalog position
     /// `sheet`.
     pub(crate) fn feature_pass(&self, name: &PackURI, sheet: usize) -> Result<FeaturePass> {
-        let workbook = self.workbook();
+        let workbook = self.workbook()?;
         feature_pass(
             self.blob(name)?,
             &workbook.formula_context,
@@ -2028,6 +2027,35 @@ mod tests {
             (kind::END_SHEET, &[]),
         ]);
         assert!(SheetLayout::scan_with_limits(&data, crate::raw::Limits::DEFAULT).is_err());
+    }
+
+    #[test]
+    fn staged_constructor_and_drop_do_not_materialize_cold_projection() {
+        let cold = Package::from(Package::new().unwrap().into_opc());
+        assert!(!cold.projection_cached());
+        let staged = Staged::of_package(&cold).unwrap();
+        drop(staged);
+        assert!(!cold.projection_cached());
+    }
+
+    #[test]
+    fn package_edit_constructors_and_drop_do_not_materialize_cold_projection() {
+        let cold = Package::from(Package::new().unwrap().into_opc());
+        assert!(!cold.projection_cached());
+
+        drop(cold.edit_calculation_chain().unwrap());
+        drop(cold.edit_volatile_dependencies().unwrap());
+        drop(cold.edit_data_model().unwrap());
+        drop(cold.edit_xml_maps().unwrap());
+        drop(cold.edit_connections().unwrap());
+        drop(cold.edit_shared_workbook().unwrap());
+        drop(cold.edit_theme().unwrap());
+        drop(cold.edit_custom_data().unwrap());
+        drop(cold.edit_threaded_comments().unwrap());
+        drop(cold.edit_task_panes().unwrap());
+        drop(cold.edit_cell_values("missing").unwrap());
+
+        assert!(!cold.projection_cached());
     }
 }
 

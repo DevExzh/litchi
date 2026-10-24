@@ -20,7 +20,7 @@
 //! use litchi_xlsb::Package;
 //!
 //! let source = Package::new()?;
-//! let edit = source.edit_cell_values(0usize)?.expect("worksheet");
+//! let edit = source.edit_cell_values(0usize)?.resolve()?.expect("worksheet");
 //! let commit = edit.commit()?;
 //! assert_eq!(commit.package().to_bytes()?, commit.patch().after());
 //! assert_eq!(commit.diagnostics().changed(), !commit.patch().is_noop());

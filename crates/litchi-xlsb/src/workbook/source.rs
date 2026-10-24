@@ -2779,6 +2779,8 @@ mod materialize_tests {
             .to_package()
             .edit_cell_values(materialized.worksheet_names()[0].as_str())
             .expect("eager cell-value edit")
+            .resolve()
+            .expect("worksheet resolution")
             .expect("worksheet selector");
         // The lazy catalog stays readable after materialization.
         assert_eq!(source.worksheet_names().unwrap(), eager.worksheet_names());

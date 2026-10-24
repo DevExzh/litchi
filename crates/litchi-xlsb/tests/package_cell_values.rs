@@ -30,6 +30,8 @@ fn changed_commit(source: &Package) -> litchi_xlsb::cell_values::Commit {
     let mut edit = source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     edit.insert(a1(), style_zero(), Value::Number(42.0))
         .expect("insert numeric cell");
@@ -113,7 +115,13 @@ fn package_cell_name_selection_rejects_ambiguous_names() {
     // Even a raw OPC escape into Package must validate the catalog before
     // selecting a name; imported ambiguity must never choose the first tab.
     let package = Package::from(opc);
-    assert!(package.edit_cell_values("DaTa").is_err());
+    assert!(
+        package
+            .edit_cell_values("DaTa")
+            .expect("cell-value edit entry")
+            .resolve()
+            .is_err()
+    );
     assert!(package.workbook().is_err());
 }
 
@@ -183,6 +191,8 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
     let noop = source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet")
         .commit()
         .expect("no-op package commit");
@@ -207,6 +217,8 @@ fn package_cell_noop_preserves_exact_bytes() {
     let noop = source
         .edit_cell_values("Sheet1")
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet")
         .commit()
         .expect("no-op package commit");
@@ -228,6 +240,8 @@ fn package_cell_commit_rejects_invalid_style_in_context() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     edit.insert(
         a1(),
@@ -254,6 +268,8 @@ fn package_cell_commit_and_replay_honor_finite_retained_input_limits() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     edit.insert(
         a1(),
@@ -283,6 +299,8 @@ fn package_cell_commit_and_replay_honor_finite_retained_input_limits() {
     let mut bounded_edit = bounded_source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     bounded_edit
         .insert(
@@ -305,26 +323,40 @@ fn package_cell_selector_uses_the_complete_catalog() {
         package
             .edit_cell_values("missing")
             .expect("missing selector")
+            .resolve()
+            .expect("missing worksheet resolution")
             .is_none()
     );
     assert!(
-        package.edit_cell_values("sales chart").is_err(),
+        package
+            .edit_cell_values("sales chart")
+            .expect("chart edit entry")
+            .resolve()
+            .is_err(),
         "a chart tab selected by case-insensitive name is not a worksheet"
     );
     assert!(
-        package.edit_cell_values(0_usize).is_err(),
+        package
+            .edit_cell_values(0_usize)
+            .expect("chart edit entry")
+            .resolve()
+            .is_err(),
         "the chart tab's complete-catalog position is not a worksheet"
     );
     assert!(
         package
             .edit_cell_values(1_usize)
             .expect("worksheet selector")
+            .resolve()
+            .expect("worksheet resolution")
             .is_some()
     );
     assert!(
         package
             .edit_cell_values("Data")
             .expect("worksheet selector")
+            .resolve()
+            .expect("worksheet resolution")
             .is_some()
     );
 }
@@ -350,6 +382,8 @@ fn package_cell_edit_accepts_explicit_worksheet_and_transfer_limits() {
     let edit = source
         .edit_cell_values_with_options(0_usize, litchi_xlsb::cell_values::EditOptions::new())
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     assert!(edit.commit().expect("bounded no-op").patch().is_noop());
 }
@@ -366,6 +400,8 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
             litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(1, 1)),
         )
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(matches!(
         edit.commit(),
@@ -379,6 +415,8 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
     let image_bytes = source
         .edit_cell_values(0)
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet")
         .commit()
         .expect("baseline patch")
@@ -394,6 +432,8 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
             litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes - 1, 1)),
         )
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(matches!(
         edit.commit(),
@@ -410,6 +450,8 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
             litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes, 1)),
         )
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(
         edit.commit()
@@ -423,6 +465,8 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
             litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes * 2, 1)),
         )
         .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     for column in [0, 1] {
         edit.insert(

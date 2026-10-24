@@ -982,6 +982,7 @@ fn run_case_with_opener(
             let edit = workbook
                 .into_package()
                 .edit_cell_values(selector)?
+                .resolve()?
                 .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             let commit = edit.commit()?;
             if commit.diagnostics().changed() || !commit.patch().is_noop() {
@@ -999,6 +1000,7 @@ fn run_case_with_opener(
             let mut edit = workbook
                 .into_package()
                 .edit_cell_values(selector)?
+                .resolve()?
                 .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             edit.set_value(target.reference, target.after.clone())?;
             let commit = edit.commit()?;
@@ -1011,6 +1013,7 @@ fn run_case_with_opener(
             let mut edit = workbook
                 .into_package()
                 .edit_cell_values(selector)?
+                .resolve()?
                 .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             for target in corpus.edits.iter().take(count) {
                 edit.set_value(target.reference, target.after.clone())?;
@@ -1925,6 +1928,8 @@ mod tests {
             .to_package()
             .edit_cell_values(selector)
             .expect("projection edit")
+            .resolve()
+            .expect("worksheet resolution")
             .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("projection scalar edit");
@@ -2195,6 +2200,8 @@ mod tests {
             .to_package()
             .edit_cell_values(selector)
             .expect("scalar edit")
+            .resolve()
+            .expect("worksheet resolution")
             .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("scalar value");

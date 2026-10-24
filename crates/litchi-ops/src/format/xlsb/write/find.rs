@@ -242,6 +242,8 @@ fn commit(
                 NativeCellOptions::new().transfer_limits(native_limits),
             )
             .map_err(native_error)?
+            .resolve()
+            .map_err(native_error)?
             .ok_or_else(|| {
                 Error::new(
                     Code::OutOfRange,
@@ -283,6 +285,8 @@ fn commit(
                 NativeSelector::from(canonical_sheet),
                 NativeCellOptions::new().transfer_limits(canonical_limits),
             )
+            .map_err(native_error)?
+            .resolve()
             .map_err(native_error)?;
         let Some(edit) = edit else {
             return Err(Error::new(

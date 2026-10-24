@@ -47,15 +47,13 @@ impl crate::Package {
 
     /// Start a threaded-comments edit. Starting one copies no part payload.
     ///
-    /// # Errors
-    ///
-    /// Returns the graph, decoding and validation errors.
+    /// The graph is read on the first operation or commit, so dropping an
+    /// untouched edit does not decode threaded-comments parts.
     pub fn edit_threaded_comments(&self) -> Result<Edit> {
-        let graph = package::load_graph(self.opc_package())?;
         Ok(Edit {
             staged: Staged::of_package(self)?,
-            base: graph.clone(),
-            graph,
+            base: None,
+            graph: Graph::default(),
         })
     }
 
@@ -148,14 +146,32 @@ impl Eq for Snapshot {}
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    base: Graph,
+    base: Option<Graph>,
     graph: Graph,
 }
 
 impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.base.is_some() {
+            return Ok(());
+        }
+        let base = package::load_graph(self.staged.opc())?;
+        self.graph = base.clone();
+        self.base = Some(base);
+        Ok(())
+    }
+
+    fn base(&self) -> Result<&Graph> {
+        self.base
+            .as_ref()
+            .ok_or_else(|| invalid_state("threaded-comments edit is not prepared"))
+    }
+
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.graph = self.base.clone();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        self.graph = self.base()?.clone();
+        Ok(())
     }
 
     /// Replace the complete staged graph.
@@ -164,6 +180,7 @@ impl Edit {
     ///
     /// Returns the graph validation errors.
     pub fn replace(&mut self, graph: Graph) -> Result<()> {
+        self.ensure_prepared()?;
         validate(&graph)?;
         self.graph = graph;
         Ok(())
@@ -171,10 +188,11 @@ impl Edit {
 
     /// Remove every threaded-comments and persons part. Returns whether the
     /// staged graph had any.
-    pub fn clear(&mut self) -> bool {
+    pub fn clear(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
         let present = self.graph.persons.is_some() || !self.graph.worksheets.is_empty();
         self.graph = Graph::default();
-        present
+        Ok(present)
     }
 
     /// Remove the workbook persons part when no comment or mention still
@@ -184,6 +202,7 @@ impl Edit {
     ///
     /// Returns the graph validation errors.
     pub fn remove_people(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
         if self.graph.persons.is_none() {
             return Ok(false);
         }
@@ -196,18 +215,21 @@ impl Edit {
 
     /// Borrow the currently staged graph.
     #[must_use]
-    pub const fn graph(&self) -> &Graph {
-        &self.graph
+    pub fn graph(&mut self) -> Result<&Graph> {
+        self.ensure_prepared()?;
+        Ok(&self.graph)
     }
 
     /// Borrow the currently staged workbook people.
     #[must_use]
-    pub fn people(&self) -> Option<&People> {
-        self.graph.persons.as_ref().map(|part| &part.persons)
+    pub fn people(&mut self) -> Result<Option<&People>> {
+        self.ensure_prepared()?;
+        Ok(self.graph.persons.as_ref().map(|part| &part.persons))
     }
 
     /// Replace workbook people, retaining the existing package identity.
     pub fn set_people(&mut self, people: People) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         if let Some(part) = candidate.persons.as_mut() {
             part.persons = people;
@@ -225,7 +247,8 @@ impl Edit {
 
     /// Add or replace one workbook person by stable GUID.
     pub fn upsert_person(&mut self, person: Person) -> Result<()> {
-        let mut people = self.people().cloned().unwrap_or_default();
+        self.ensure_prepared()?;
+        let mut people = self.people()?.cloned().unwrap_or_default();
         if let Some(existing) = people.persons.iter_mut().find(|item| item.id == person.id) {
             *existing = person;
         } else {
@@ -236,10 +259,12 @@ impl Edit {
 
     /// Remove a workbook person when no comment or mention still references it.
     pub fn remove_person(&mut self, person_id: &str) -> Result<Option<Person>> {
-        let Some(current) = self.people() else {
+        self.ensure_prepared()?;
+        let Some(current) = self.graph.persons.as_ref() else {
             return Ok(None);
         };
         let Some(index) = current
+            .persons
             .persons
             .iter()
             .position(|person| person.id == person_id)
@@ -271,12 +296,14 @@ impl Edit {
 
     /// Borrow one staged worksheet threaded-comments collection.
     #[must_use]
-    pub fn worksheet(&self, worksheet_part_name: &str) -> Option<&Comments> {
-        self.graph
+    pub fn worksheet(&mut self, worksheet_part_name: &str) -> Result<Option<&Comments>> {
+        self.ensure_prepared()?;
+        Ok(self
+            .graph
             .worksheets
             .iter()
             .find(|part| part.worksheet_part_name == worksheet_part_name)
-            .map(|part| &part.comments)
+            .map(|part| &part.comments))
     }
 
     /// Replace one worksheet's threaded comments, retaining package identity.
@@ -285,6 +312,7 @@ impl Edit {
         worksheet_part_name: impl Into<String>,
         comments: Comments,
     ) -> Result<()> {
+        self.ensure_prepared()?;
         let worksheet_part_name = worksheet_part_name.into();
         let mut candidate = self.graph.clone();
         if let Some(part) = candidate
@@ -311,6 +339,7 @@ impl Edit {
 
     /// Append one root or reply comment to an existing worksheet collection.
     pub fn add_comment(&mut self, worksheet_part_name: &str, comment: Comment) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         let part = candidate
             .worksheets
@@ -329,7 +358,8 @@ impl Edit {
         worksheet_part_name: &str,
         root_id: &str,
     ) -> Result<Option<Thread>> {
-        let Some(current) = self.worksheet(worksheet_part_name) else {
+        self.ensure_prepared()?;
+        let Some(current) = self.worksheet(worksheet_part_name)? else {
             return Ok(None);
         };
         let threads = validation::group_threads(current).map_err(map_validation_error)?;
@@ -355,6 +385,7 @@ impl Edit {
 
     /// Remove one worksheet's complete threaded-comments part from the graph.
     pub fn remove_worksheet(&mut self, worksheet_part_name: &str) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut candidate = self.graph.clone();
         let old_len = candidate.worksheets.len();
         candidate
@@ -377,8 +408,13 @@ impl Edit {
     /// edit of a signed workbook and the workbook validation errors of the
     /// result.
     pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         validate(&self.graph)?;
-        if self.graph != self.base {
+        let changed = {
+            let base = self.base()?;
+            self.graph != *base
+        };
+        if changed {
             let graph = self.graph.clone();
             self.staged.update(|candidate| {
                 package::store_graph(candidate, &graph)?;

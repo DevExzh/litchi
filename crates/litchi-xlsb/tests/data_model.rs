@@ -873,6 +873,7 @@ fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
     assert!(
         edit.definition()
             .expect("staged Data Model definition")
+            .expect("model")
             .time_groupings
             .is_empty()
     );

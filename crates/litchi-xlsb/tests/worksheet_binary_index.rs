@@ -93,6 +93,8 @@ fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cel
     let edit = package
         .edit_cell_values(name)
         .expect("cell-value selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet selector");
     (package, edit)
 }

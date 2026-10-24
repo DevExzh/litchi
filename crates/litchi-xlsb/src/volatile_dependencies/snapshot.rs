@@ -78,7 +78,7 @@ impl Snapshot {
     pub(crate) fn edit(&self) -> super::Edit {
         super::Edit::new(
             crate::Package::from(self.package().as_ref().clone()),
-            self.clone(),
+            self.limits(),
         )
     }
 

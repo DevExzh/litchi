@@ -160,6 +160,8 @@ fn changed_cell_values_on_a_signed_workbook_are_refused() {
     let mut edit = package
         .edit_cell_values(name)
         .unwrap()
+        .resolve()
+        .unwrap()
         .expect("worksheet selector");
     let (reference, style, value) = new_cell();
     edit.insert(reference, style, value).unwrap();
@@ -177,6 +179,8 @@ fn exact_noop_cell_values_keep_the_signature_bytes() {
     let edit = package
         .edit_cell_values(name)
         .unwrap()
+        .resolve()
+        .unwrap()
         .expect("worksheet selector");
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
@@ -190,6 +194,8 @@ fn explicit_unsign_authorizes_a_changed_edit() {
     let name = package.workbook().unwrap().worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
+        .unwrap()
+        .resolve()
         .unwrap()
         .expect("worksheet selector");
     let (reference, style, value) = new_cell();
@@ -319,7 +325,7 @@ fn threaded_comment_edits_refuse_a_signed_package() {
     assert!(matches!(error, PackageError::Signed), "{error:?}");
     // Clearing an absent graph changes nothing and is not refused.
     let mut edit = package.edit_threaded_comments().unwrap();
-    assert!(!edit.clear());
+    assert!(!edit.clear().unwrap());
     assert_eq!(save(edit.commit().unwrap().package()), bytes);
 }
 
@@ -461,7 +467,12 @@ fn package_cell_removal_preserves_signed_noops_and_refuses_changed_publication()
     let plain = Package::new().expect("new");
     let a1 = Reference::new(0, 0).expect("A1");
     let b1 = Reference::new(0, 1).expect("B1");
-    let mut edit = plain.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = plain
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     edit.set_scalar(a1, litchi_xlsb::cell_values::Scalar::Number(1.0))
         .expect("set");
     let bytes = signed(
@@ -473,12 +484,22 @@ fn package_cell_removal_preserves_signed_noops_and_refuses_changed_publication()
             .expect("bytes"),
     );
     let source = Package::from_bytes(&bytes).expect("signed source");
-    let mut noop = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut noop = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     assert!(!noop.remove(b1).expect("missing"));
     let commit = noop.commit().expect("signed noop");
     assert!(commit.patch().is_noop());
     assert_eq!(commit.package().to_bytes().expect("bytes"), bytes);
-    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     assert!(edit.remove(a1).expect("stage removal"));
     assert!(matches!(edit.commit(), Err(PackageError::Signed)));
     assert_eq!(source.to_bytes().expect("source unchanged"), bytes);

@@ -756,6 +756,8 @@ mod probe {
                     let mut edit = package
                         .edit_cell_values(0_usize)
                         .expect("xlsb edit")
+                        .resolve()
+                        .expect("xlsb worksheet resolution")
                         .expect("xlsb worksheet");
                     for index in 0..count {
                         let target = target(index);
@@ -887,6 +889,8 @@ mod probe {
                     let mut edit = package
                         .edit_cell_values(0_usize)
                         .expect("xlsb import edit")
+                        .resolve()
+                        .expect("xlsb worksheet resolution")
                         .expect("xlsb worksheet");
                     for index in 0..cells {
                         edit.set_value(
@@ -994,6 +998,8 @@ mod probe {
                     let mut edit = package
                         .edit_cell_values(0_usize)
                         .expect("xlsb edit")
+                        .resolve()
+                        .expect("xlsb worksheet resolution")
                         .expect("worksheet");
                     edit.set_value(
                         Reference::new(0, 11).expect("xlsb ref"),

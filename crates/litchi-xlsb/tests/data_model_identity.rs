@@ -991,7 +991,12 @@ fn unknown_table_id_and_invalid_names_refuse_without_draft_mutation() {
     assert!(transaction.rename_table(TABLE_ID, "").is_err());
     assert!(transaction.rename_table(TABLE_ID, "bad\0name").is_err());
     assert_eq!(
-        transaction.definition().expect("draft definition").tables[0].name,
+        transaction
+            .definition()
+            .expect("draft definition")
+            .expect("model")
+            .tables[0]
+            .name,
         OLD_TABLE_NAME
     );
 }
@@ -1003,7 +1008,7 @@ fn duplicate_outer_name_refuses_atomically() {
     let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(transaction.rename_table(TABLE_ID, "Other").is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
 }
@@ -1044,9 +1049,12 @@ fn outer_inner_name_mismatch_refuses_without_repairing_source() {
         .edit_data_model()
         .expect("mismatched source snapshot");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
-    assert_eq!(transaction.definition().unwrap().tables[0].name, "Sales");
     assert_eq!(
-        transaction.payload().unwrap(),
+        transaction.definition().unwrap().expect("model").tables[0].name,
+        "Sales"
+    );
+    assert_eq!(
+        transaction.payload().unwrap().expect("payload"),
         package_part_bytes(&source, MODEL_URI)
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -1090,7 +1098,7 @@ fn oversized_table_name_refuses_without_draft_mutation() {
     let mut transaction = source.edit_data_model().expect("source snapshot");
     assert!(transaction.rename_table(TABLE_ID, &too_long).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
 }
@@ -1150,10 +1158,13 @@ fn opaque_payload_replacement_then_rename_refuses_without_source_repair() {
         .expect("stage opaque replacement");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
-    assert_eq!(transaction.payload().unwrap(), replacement.as_slice());
+    assert_eq!(
+        transaction.payload().unwrap().expect("payload"),
+        replacement.as_slice()
+    );
 }
 
 #[test]
@@ -1164,7 +1175,7 @@ fn incomplete_opaque_model_refuses_table_identity_edits_and_preserves_source() {
     let mut transaction = source.edit_data_model().expect("snapshot");
     assert!(transaction.rename_table(TABLE_ID, NEW_TABLE_NAME).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);
@@ -1218,7 +1229,7 @@ fn caller_model_part_limit_refuses_before_draft_change() {
         .expect("source under exact model-part limit");
     assert!(transaction.rename_table(TABLE_ID, &long_name).is_err());
     assert_eq!(
-        transaction.definition().unwrap().tables[0].name,
+        transaction.definition().unwrap().expect("model").tables[0].name,
         OLD_TABLE_NAME
     );
     assert_eq!(source.to_bytes().unwrap(), source_bytes);

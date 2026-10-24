@@ -10,8 +10,8 @@
 //! patch.
 
 use super::worksheet::{
-    CellError, CellFormula, Change, Limits, Patch as WorksheetPatch, Reference, Snapshot,
-    StyleIndex, TransferLimits, Value,
+    CellError, CellFormula, Change, Limits, Patch as WorksheetPatch, Reference, StyleIndex,
+    TransferLimits, Value,
 };
 use crate::cell_values::workbook::{self, Applied};
 use crate::package::Package;
@@ -19,6 +19,7 @@ use crate::package::error::{Error, Result};
 use crate::package::shared_strings::{PhoneticRun, SharedString, SharedStringRun};
 use crate::sheet::Selector;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
+use std::borrow::Cow;
 use std::io::{self, Write};
 use std::mem::size_of;
 use std::sync::Arc;
@@ -113,11 +114,14 @@ impl Scalar {
 #[derive(Debug, Clone)]
 pub struct Edit {
     base: Package,
-    worksheet: PackURI,
-    raw: super::worksheet::Draft,
+    selector: Selector<'static>,
+    worksheet: Option<PackURI>,
+    resolved: bool,
+    worksheet_limits: Limits,
+    raw: Option<super::worksheet::Draft>,
     transfer_limits: TransferLimits,
     shared_strings: Option<Vec<SharedString>>,
-    calculation_chain_present: bool,
+    calculation_chain_present: Option<bool>,
     /// The styles part with the formats staged by [`Self::set_format`].
     styles: Option<StylesDraft>,
 }
@@ -208,20 +212,83 @@ impl StylesDraft {
 impl Edit {
     fn new(
         base: Package,
-        worksheet: PackURI,
-        snapshot: Snapshot,
+        selector: Selector<'static>,
+        worksheet_limits: Limits,
         transfer_limits: TransferLimits,
-        calculation_chain_present: bool,
     ) -> Self {
         Self {
             base,
-            worksheet,
-            raw: snapshot.draft(),
+            selector,
+            worksheet: None,
+            resolved: false,
+            worksheet_limits,
+            raw: None,
             transfer_limits,
             shared_strings: None,
-            calculation_chain_present,
+            calculation_chain_present: None,
             styles: None,
         }
+    }
+
+    /// Resolve the selected tab against the workbook catalog.
+    ///
+    /// Construction of an edit is deliberately cold, including when the
+    /// package came from [`litchi_opc::OpcPackage`] without a parsed workbook
+    /// projection.  This first fallible resolution performs the catalog scan
+    /// and preserves the selector's missing-tab capability as `Ok(None)`.
+    /// A chart, dialog, macro, or otherwise non-grid tab is reported as the
+    /// same typed refusal as an operation that reaches it through `commit`.
+    pub fn resolve(mut self) -> Result<Option<Self>> {
+        if self.resolve_selector()?.is_some() {
+            Ok(Some(self))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn resolve_selector(&mut self) -> Result<Option<PackURI>> {
+        if !self.resolved {
+            self.worksheet = resolve_worksheet(&self.base, &self.selector)?;
+            self.resolved = true;
+        }
+        Ok(self.worksheet.clone())
+    }
+
+    fn worksheet_not_found(&self) -> Error {
+        match &self.selector {
+            Selector::Name(_) => Error::WorksheetNotFound(None),
+            Selector::Position(position) => Error::WorksheetNotFound(Some(position.get())),
+        }
+    }
+
+    fn ensure_prepared(&mut self) -> Result<()> {
+        let worksheet = self
+            .resolve_selector()?
+            .ok_or_else(|| self.worksheet_not_found())?;
+        if self.raw.is_some() {
+            return Ok(());
+        }
+        let snapshot = workbook::read_with_limits_and_leniency(
+            self.base.opc_package(),
+            &worksheet,
+            self.worksheet_limits,
+            self.base.leniency(),
+        )?;
+        self.calculation_chain_present = Some(has_calculation_chain(self.base.opc_package())?);
+        self.raw = Some(snapshot.draft());
+        Ok(())
+    }
+
+    fn raw_mut(&mut self) -> Result<&mut super::worksheet::Draft> {
+        self.ensure_prepared()?;
+        self.raw
+            .as_mut()
+            .ok_or(Error::InvalidFormat("cell-values edit is not prepared"))
+    }
+
+    fn chain_present(&self) -> Result<bool> {
+        self.calculation_chain_present
+            .ok_or(Error::InvalidFormat("cell-values edit is not prepared"))
     }
 
     fn shared_string(&mut self, index: u32) -> Result<SharedString> {
@@ -264,25 +331,25 @@ impl Edit {
     /// let mut writer = Builder::new();
     /// writer.add_worksheet(sheet);
     /// let package = writer.build()?;
-    /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
+    /// let mut edit = package.edit_cell_values(0)?.resolve()?.expect("worksheet");
     /// edit.set_scalar(Reference::new(0, 0)?, Scalar::Number(2.0))?;
     /// let _commit = edit.commit()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn set_scalar(&mut self, reference: Reference, scalar: Scalar) -> Result<bool> {
-        scalar.validate(self.raw.limits())?;
-        self.raw.scalar_assignment_guard(reference)?;
-        if self.raw.is_removed(reference) {
+        scalar.validate(self.raw_mut()?.limits())?;
+        self.raw_mut()?.scalar_assignment_guard(reference)?;
+        if self.raw_mut()?.is_removed(reference) {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedTarget,
                 "edit_cell_values",
                 "scalar edits cannot target a cell already staged for removal",
             ));
         }
-        let current = self.raw.current_cell(reference)?.cloned();
+        let current = self.raw_mut()?.current_cell(reference)?.cloned();
         let Some(current) = current else {
             if matches!(scalar, Scalar::Blank) {
-                if self.raw.source_has_cell(reference)? {
+                if self.raw_mut()?.source_has_cell(reference)? {
                     return Err(Error::refused(
                         litchi_core::edit::RefusalKind::UnsupportedTarget,
                         "edit_cell_values",
@@ -292,12 +359,13 @@ impl Edit {
                 return Ok(false);
             }
             let value = scalar_value(scalar);
-            self.raw.insert(reference, StyleIndex::new(0)?, value)?;
+            self.raw_mut()?
+                .insert(reference, StyleIndex::new(0)?, value)?;
             return Ok(true);
         };
 
         if (current.formula().is_some() || current.value().is_formula_cache())
-            && self.calculation_chain_present
+            && self.chain_present()?
         {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -373,7 +441,8 @@ impl Edit {
                 | Value::FormulaErrorCache(_) => Value::Blank,
             },
         };
-        self.raw.replace_scalar_value(reference, replacement)?;
+        self.raw_mut()?
+            .replace_scalar_value(reference, replacement)?;
         Ok(true)
     }
 
@@ -393,7 +462,7 @@ impl Edit {
     /// use litchi_xlsb::cell_values::{Format, Reference};
     ///
     /// let package = Package::new()?;
-    /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
+    /// let mut edit = package.edit_cell_values(0)?.resolve()?.expect("worksheet");
     /// let mut format = Format::default();
     /// format.bold = Some(true);
     /// assert!(edit.set_format(Reference::new(0, 0)?, &format)?);
@@ -411,15 +480,18 @@ impl Edit {
         if format.is_empty() {
             return Ok(false);
         }
-        if self.raw.is_removed(reference) {
+        if self.raw_mut()?.is_removed(reference) {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedTarget,
                 "edit_cell_values",
                 "format edits cannot target a cell already staged for removal",
             ));
         }
-        let current = self.raw.current_cell(reference)?.map(|cell| cell.style());
-        if current.is_none() && self.raw.source_has_cell(reference)? {
+        let current = self
+            .raw_mut()?
+            .current_cell(reference)?
+            .map(|cell| cell.style());
+        if current.is_none() && self.raw_mut()?.source_has_cell(reference)? {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedTarget,
                 "edit_cell_values",
@@ -440,8 +512,8 @@ impl Edit {
         }
         let style = StyleIndex::new(new)?;
         match current {
-            Some(_) => self.raw.set_style(reference, style)?,
-            None => self.raw.insert(reference, style, Value::Blank)?,
+            Some(_) => self.raw_mut()?.set_style(reference, style)?,
+            None => self.raw_mut()?.insert(reference, style, Value::Blank)?,
         }
         Ok(true)
     }
@@ -480,31 +552,31 @@ impl Edit {
             parsed.rgcb,
             self.base.raw_limits_value(),
         )?;
-        self.raw.scalar_assignment_guard(reference)?;
-        if self.raw.is_removed(reference) {
+        self.raw_mut()?.scalar_assignment_guard(reference)?;
+        if self.raw_mut()?.is_removed(reference) {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedTarget,
                 "edit_cell_values",
                 "formula edits cannot target a cell already staged for removal",
             ));
         }
-        let current = self.raw.current_cell(reference)?.cloned();
+        let current = self.raw_mut()?.current_cell(reference)?.cloned();
         let Some(current) = current else {
-            if self.raw.source_has_cell(reference)? {
+            if self.raw_mut()?.source_has_cell(reference)? {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedTarget,
                     "edit_cell_values",
                     "formula edits cannot target an unsupported cell-record family",
                 ));
             }
-            if self.calculation_chain_present {
+            if self.chain_present()? {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedContent,
                     "edit_cell_values",
                     "a new formula cell cannot be added while an opaque calculation chain is present",
                 ));
             }
-            self.raw.insert_formula(
+            self.raw_mut()?.insert_formula(
                 reference,
                 StyleIndex::new(0)?,
                 Value::FormulaStringCache(String::new()),
@@ -516,10 +588,10 @@ impl Edit {
             if current.formula() == Some(&formula) {
                 return Ok(false);
             }
-            self.raw.set_formula(reference, formula)?;
+            self.raw_mut()?.set_formula(reference, formula)?;
             return Ok(true);
         }
-        if self.calculation_chain_present {
+        if self.chain_present()? {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "edit_cell_values",
@@ -545,53 +617,54 @@ impl Edit {
                 ));
             },
         };
-        self.raw.replace_with_formula(reference, cache, formula)?;
+        self.raw_mut()?
+            .replace_with_formula(reference, cache, formula)?;
         Ok(true)
     }
 
     /// Replace a value while retaining the existing BIFF12 storage family.
     pub fn set_value(&mut self, reference: Reference, value: Value) -> Result<()> {
-        self.raw.set_value(reference, value)
+        self.raw_mut()?.set_value(reference, value)
     }
 
     /// Set an existing direct numeric value, retaining direct or RK storage.
     pub fn set_number(&mut self, reference: Reference, value: f64) -> Result<()> {
-        self.raw.set_number(reference, value)
+        self.raw_mut()?.set_number(reference, value)
     }
 
     /// Set an existing Boolean cell.
     pub fn set_boolean(&mut self, reference: Reference, value: bool) -> Result<()> {
-        self.raw.set_boolean(reference, value)
+        self.raw_mut()?.set_boolean(reference, value)
     }
 
     /// Set an existing cell error.
     pub fn set_error(&mut self, reference: Reference, value: CellError) -> Result<()> {
-        self.raw.set_error(reference, value)
+        self.raw_mut()?.set_error(reference, value)
     }
 
     /// Set an existing inline string.
     pub fn set_inline_string(&mut self, reference: Reference, value: String) -> Result<()> {
-        self.raw.set_inline_string(reference, value)
+        self.raw_mut()?.set_inline_string(reference, value)
     }
 
     /// Set an existing shared-string index.
     pub fn set_shared_string_index(&mut self, reference: Reference, index: u32) -> Result<()> {
-        self.raw.set_shared_string_index(reference, index)
+        self.raw_mut()?.set_shared_string_index(reference, index)
     }
 
     /// Set an existing rich string.
     pub fn set_rich_string(&mut self, reference: Reference, value: SharedString) -> Result<()> {
-        self.raw.set_rich_string(reference, value)
+        self.raw_mut()?.set_rich_string(reference, value)
     }
 
     /// Set the cached numeric result of an existing formula cell.
     pub fn set_formula_number_cache(&mut self, reference: Reference, value: f64) -> Result<()> {
-        self.raw.set_formula_number_cache(reference, value)
+        self.raw_mut()?.set_formula_number_cache(reference, value)
     }
 
     /// Set the cached Boolean result of an existing formula cell.
     pub fn set_formula_boolean_cache(&mut self, reference: Reference, value: bool) -> Result<()> {
-        self.raw.set_formula_boolean_cache(reference, value)
+        self.raw_mut()?.set_formula_boolean_cache(reference, value)
     }
 
     /// Set the cached error result of an existing formula cell.
@@ -600,32 +673,32 @@ impl Edit {
         reference: Reference,
         value: CellError,
     ) -> Result<()> {
-        self.raw.set_formula_error_cache(reference, value)
+        self.raw_mut()?.set_formula_error_cache(reference, value)
     }
 
     /// Set the cached string result of an existing formula cell.
     pub fn set_formula_string_cache(&mut self, reference: Reference, value: String) -> Result<()> {
-        self.raw.set_formula_string_cache(reference, value)
+        self.raw_mut()?.set_formula_string_cache(reference, value)
     }
 
     /// Change the cell-XF style index of an existing cell.
     pub fn set_style(&mut self, reference: Reference, style: StyleIndex) -> Result<()> {
-        self.raw.set_style(reference, style)
+        self.raw_mut()?.set_style(reference, style)
     }
 
     /// Change the phonetic-display flag of an existing cell.
     pub fn set_show_phonetic(&mut self, reference: Reference, show: bool) -> Result<()> {
-        self.raw.set_show_phonetic(reference, show)
+        self.raw_mut()?.set_show_phonetic(reference, show)
     }
 
     /// Replace the inert formula payload of an existing formula cell.
     pub fn set_formula(&mut self, reference: Reference, formula: CellFormula) -> Result<()> {
-        self.raw.set_formula(reference, formula)
+        self.raw_mut()?.set_formula(reference, formula)
     }
 
     /// Insert one direct scalar cell.
     pub fn insert(&mut self, reference: Reference, style: StyleIndex, value: Value) -> Result<()> {
-        self.raw.insert(reference, style, value)
+        self.raw_mut()?.insert(reference, style, value)
     }
 
     /// Insert one formula cell with a typed cached-result family.
@@ -636,7 +709,8 @@ impl Edit {
         cache: Value,
         formula: CellFormula,
     ) -> Result<()> {
-        self.raw.insert_formula(reference, style, cache, formula)
+        self.raw_mut()?
+            .insert_formula(reference, style, cache, formula)
     }
 
     /// Remove one supported stored cell without shifting its neighbours.
@@ -652,12 +726,12 @@ impl Edit {
     /// Returns an error for an ambiguous or unsupported stored record,
     /// formula dependencies that cannot be preserved, or exceeded limits.
     pub fn remove(&mut self, reference: Reference) -> Result<bool> {
-        self.raw.scalar_assignment_guard(reference)?;
-        if self.raw.is_removed(reference) {
+        self.raw_mut()?.scalar_assignment_guard(reference)?;
+        if self.raw_mut()?.is_removed(reference) {
             return Ok(false);
         }
-        let Some(current) = self.raw.current_cell(reference)? else {
-            if self.raw.source_has_cell(reference)? {
+        let Some(current) = self.raw_mut()?.current_cell(reference)? else {
+            if self.raw_mut()?.source_has_cell(reference)? {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::UnsupportedTarget,
                     "edit_cell_values",
@@ -667,8 +741,8 @@ impl Edit {
             return Ok(false);
         };
         if (current.formula().is_some() || current.value().is_formula_cache())
-            && self.calculation_chain_present
-            && !self.raw.is_inserted(reference)
+            && self.chain_present()?
+            && !self.raw_mut()?.is_inserted(reference)
         {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -676,20 +750,27 @@ impl Edit {
                 "cell removal cannot remove a formula while an opaque calculation chain is present",
             ));
         }
-        self.raw.remove(reference)?;
+        self.raw_mut()?.remove(reference)?;
         Ok(true)
     }
 
     /// Validate the edit and publish an immutable package commit.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         validate_limits(self.transfer_limits)?;
-        let worksheet_limits = self.raw.limits();
-        let raw_commit = self
+        let raw = self
             .raw
-            .commit_with_change_limit(self.transfer_limits.changes())?;
+            .take()
+            .ok_or(Error::InvalidFormat("cell-values edit is not prepared"))?;
+        let worksheet_limits = raw.limits();
+        let raw_commit = raw.commit_with_change_limit(self.transfer_limits.changes())?;
         validate_transfer_limits(raw_commit.patch(), self.transfer_limits)?;
+        let worksheet = self
+            .worksheet
+            .clone()
+            .ok_or_else(|| self.worksheet_not_found())?;
         let retained = size_of::<Patch>()
-            .saturating_add(self.worksheet.as_str().len())
+            .saturating_add(worksheet.as_str().len())
             .saturating_add(worksheet_retained_bytes(raw_commit.patch()));
         let image_budget = remaining_image_budget(retained, self.transfer_limits)?;
         let before: Arc<[u8]> = Arc::from(serialize_package(&self.base, image_budget)?);
@@ -709,7 +790,7 @@ impl Edit {
         };
         let applied = workbook::apply_retaining_parse(
             styled.as_ref().unwrap_or_else(|| self.base.opc_package()),
-            &self.worksheet,
+            &worksheet,
             &raw_commit,
             self.base.external_link_limits(),
             self.base.drawing_load_policy(),
@@ -742,7 +823,7 @@ impl Edit {
         let patch = Patch {
             before,
             after,
-            worksheet: self.worksheet,
+            worksheet,
             worksheet_patch,
             transfer_limits: self.transfer_limits,
         };
@@ -906,9 +987,13 @@ fn retained_shared_string_bytes(value: &SharedString) -> usize {
 }
 
 impl Package {
-    /// Start a detached cell-values edit selected from the complete tab
-    /// catalog using the default worksheet and transfer policies.
-    pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
+    /// Start a detached cell-values edit carrying a selector and the default
+    /// worksheet and transfer policies.
+    ///
+    /// The selector is owned but resolved lazily.  Call [`Edit::resolve`] when
+    /// the caller needs to distinguish a missing tab before staging the first
+    /// cell operation; ordinary operations and `commit` resolve it on demand.
+    pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
         self.edit_cell_values_with_options(selector, EditOptions::default())
     }
 
@@ -921,27 +1006,16 @@ impl Package {
         &self,
         selector: impl Into<Selector<'a>>,
         options: EditOptions,
-    ) -> Result<Option<Edit>> {
+    ) -> Result<Edit> {
         let worksheet_limits = options.limits;
         let transfer_limits = options.transfer_limits;
         validate_limits(transfer_limits)?;
-        let Some(worksheet) = resolve_worksheet(self, selector)? else {
-            return Ok(None);
-        };
-        let snapshot = workbook::read_with_limits_and_leniency(
-            self.opc_package(),
-            &worksheet,
-            worksheet_limits,
-            self.leniency(),
-        )?;
-        let calculation_chain_present = has_calculation_chain(self.opc_package())?;
-        Ok(Some(Edit::new(
+        Ok(Edit::new(
             self.clone(),
-            worksheet,
-            snapshot,
+            own_selector(selector.into()),
+            worksheet_limits,
             transfer_limits,
-            calculation_chain_present,
-        )))
+        ))
     }
 
     /// Apply an exact-source cell-values patch to a new package; this one is
@@ -960,13 +1034,9 @@ impl Package {
     }
 }
 
-fn resolve_worksheet<'a>(
-    package: &Package,
-    selector: impl Into<Selector<'a>>,
-) -> Result<Option<PackURI>> {
+fn resolve_worksheet<'a>(package: &Package, selector: &Selector<'a>) -> Result<Option<PackURI>> {
     let workbook = package.workbook()?;
-    let selector = selector.into();
-    if let Selector::Name(name) = &selector {
+    if let Selector::Name(name) = selector {
         let matches = workbook
             .sheets()
             .filter(|tab| crate::package::formula::excel_name_eq(tab.name(), name.as_ref()))
@@ -977,7 +1047,7 @@ fn resolve_worksheet<'a>(
             ));
         }
     }
-    let Some(tab) = workbook.sheet(selector)? else {
+    let Some(tab) = workbook.sheet(selector.clone())? else {
         return Ok(None);
     };
     let Some(position) = tab.worksheet_position() else {
@@ -988,6 +1058,13 @@ fn resolve_worksheet<'a>(
         ));
     };
     workbook.worksheet_uri(position.get()).map(Some)
+}
+
+fn own_selector<'a>(selector: Selector<'a>) -> Selector<'static> {
+    match selector {
+        Selector::Name(name) => Selector::Name(Cow::Owned(name.into_owned())),
+        Selector::Position(position) => Selector::Position(position),
+    }
 }
 
 fn has_calculation_chain(package: &OpcPackage) -> Result<bool> {
@@ -1148,4 +1225,22 @@ fn validate_limits(limits: TransferLimits) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selector_resolution_is_deferred_for_cold_packages() {
+        let cold = Package::from(Package::new().expect("package").into_opc());
+        assert!(!cold.projection_cached());
+
+        let edit = cold.edit_cell_values("missing").expect("edit entry");
+        assert!(!cold.projection_cached());
+        assert!(edit.resolve().expect("selector resolution").is_none());
+        // The edit owns a cloned immutable package, so its first resolution
+        // does not mutate the original owner's private projection cache.
+        assert!(!cold.projection_cached());
+    }
 }

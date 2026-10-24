@@ -105,11 +105,11 @@ fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     assert_eq!(owner_image(&package), before_stale_apply);
 
     let mut invalid = start_edit(&package);
-    let before = invalid.catalog().clone();
+    let before = invalid.catalog().unwrap().clone();
     let mut info = applied.headers().unwrap().info.clone();
     info.version = 0;
     assert!(invalid.set_info(info).is_err());
-    assert_eq!(invalid.catalog(), &before);
+    assert_eq!(invalid.catalog().unwrap(), &before);
 }
 
 #[test]

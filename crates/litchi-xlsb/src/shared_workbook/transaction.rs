@@ -45,15 +45,14 @@ impl crate::Package {
     /// Start a shared-workbook metadata edit. Starting one copies no part
     /// payload.
     ///
-    /// # Errors
-    ///
-    /// Returns the owner graph, decoding and validation errors.
+    /// The owner graph is read on the first operation or commit, so dropping
+    /// an untouched edit does not decode shared-workbook metadata.
     pub fn edit_shared_workbook(&self) -> Result<Edit> {
-        let base = Snapshot::read(self.opc_package(), self.raw_limits_value())?;
         Ok(Edit {
             staged: Staged::of_package(self)?,
-            catalog: base.catalog.clone(),
-            base,
+            raw_limits: self.raw_limits_value(),
+            catalog: Catalog::empty(),
+            base: None,
         })
     }
 
@@ -145,29 +144,52 @@ impl Eq for Snapshot {}
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    base: Snapshot,
+    raw_limits: crate::raw::Limits,
+    base: Option<Snapshot>,
     catalog: Catalog,
 }
 
 impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.base.is_some() {
+            return Ok(());
+        }
+        let base = Snapshot::read(self.staged.opc(), self.raw_limits)?;
+        self.catalog = base.catalog.clone();
+        self.base = Some(base);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.base
+            .as_ref()
+            .ok_or_else(|| super::invalid("shared-workbook edit is not prepared"))
+    }
+
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.catalog = self.base.catalog.clone();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let catalog = self.snapshot()?.catalog.clone();
+        self.catalog = catalog;
+        Ok(())
     }
 
     /// Borrow the currently staged metadata graph.
     #[must_use]
-    pub const fn catalog(&self) -> &Catalog {
-        &self.catalog
+    pub fn catalog(&mut self) -> Result<&Catalog> {
+        self.ensure_prepared()?;
+        Ok(&self.catalog)
     }
 
     /// Replace the complete metadata graph after validating its local shape.
     pub fn replace(&mut self, catalog: Catalog) -> Result<()> {
+        self.ensure_prepared()?;
         self.apply_candidate(catalog)
     }
 
     /// Replace the current-user metadata.
     pub fn set_users(&mut self, users: Option<UserNames>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.users = users;
         self.apply_candidate(candidate)
@@ -175,6 +197,7 @@ impl Edit {
 
     /// Replace revision-header metadata while retaining the existing log list.
     pub fn set_headers(&mut self, headers: Option<RevisionHeaders>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.headers = headers;
         if candidate.headers.is_none() {
@@ -185,6 +208,7 @@ impl Edit {
 
     /// Replace all revision logs in header order.
     pub fn set_logs(&mut self, logs: Vec<RevisionLog>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate.logs = logs;
         self.apply_candidate(candidate)
@@ -192,6 +216,7 @@ impl Edit {
 
     /// Replace the typed `BrtInfo` metadata.
     pub fn set_info(&mut self, info: Info) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -203,6 +228,7 @@ impl Edit {
 
     /// Add or replace a currently open user by stable id or GUID.
     pub fn upsert_user(&mut self, user: User) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let users = candidate
             .users
@@ -229,6 +255,7 @@ impl Edit {
 
     /// Remove a currently open user by id.
     pub fn remove_user(&mut self, id: u32) -> Result<Option<User>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let Some(users) = candidate.users.as_mut() else {
             return Ok(None);
@@ -243,6 +270,7 @@ impl Edit {
 
     /// Replace one revision header and its corresponding opaque log.
     pub fn set_revision(&mut self, index: usize, header: Header, log: RevisionLog) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -263,6 +291,7 @@ impl Edit {
 
     /// Add a revision header and its opaque log at the end of the owner.
     pub fn push_revision(&mut self, header: Header, log: RevisionLog) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         candidate
             .headers
@@ -276,6 +305,7 @@ impl Edit {
 
     /// Remove one revision header and its corresponding log.
     pub fn remove_revision(&mut self, index: usize) -> Result<Option<(Header, RevisionLog)>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let headers = candidate
             .headers
@@ -292,6 +322,7 @@ impl Edit {
 
     /// Replace the opaque records of one revision log.
     pub fn set_log_records(&mut self, index: usize, records: Vec<RawRecord>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -303,6 +334,7 @@ impl Edit {
 
     /// Append one opaque BIFF12 record to a revision log.
     pub fn push_log_record(&mut self, index: usize, record: RawRecord) -> Result<()> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -314,6 +346,7 @@ impl Edit {
 
     /// Remove one opaque BIFF12 record from a revision log.
     pub fn remove_log_record(&mut self, index: usize, record: usize) -> Result<Option<RawRecord>> {
+        self.ensure_prepared()?;
         let mut candidate = self.catalog.clone();
         let log = candidate
             .logs
@@ -336,8 +369,13 @@ impl Edit {
     /// edit of a signed workbook and the workbook validation errors of the
     /// result.
     pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         self.validate_candidate(&self.catalog)?;
-        if self.catalog != self.base.catalog {
+        let changed = {
+            let base = self.snapshot()?;
+            self.catalog != base.catalog
+        };
+        if changed {
             let catalog = self.catalog.clone();
             let raw_limits = self.staged.raw_limits();
             self.staged.update(|candidate| {
@@ -355,11 +393,12 @@ impl Edit {
     }
 
     fn validate_candidate(&self, candidate: &Catalog) -> Result<()> {
+        let base = self.snapshot()?;
         validation::validate_local(candidate)?;
         match (&candidate.users, &candidate.headers) {
             (None, None) if candidate.logs.is_empty() => Ok(()),
             (Some(_), Some(headers)) if candidate.logs.len() == headers.headers.len() => {
-                if self.base.is_empty() {
+                if base.is_empty() {
                     validate_new_graph(candidate)
                 } else {
                     validation::validate_catalog(candidate)

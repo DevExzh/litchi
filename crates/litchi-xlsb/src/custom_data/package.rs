@@ -807,10 +807,9 @@ impl crate::Package {
 
     /// Start a Custom Data edit with explicit options.
     ///
-    /// # Errors
-    ///
-    /// Returns the Custom Data graph, decoding and limit errors, and the
-    /// execution-context refusals.
+    /// The graph is read on the first operation or commit.  The finite policy
+    /// and execution context are checked at entry, while dropping an
+    /// untouched edit does not decode or copy Custom Data payloads.
     pub fn edit_custom_data_with_options(&self, options: EditOptions) -> Result<Edit> {
         let limits = options
             .limits
@@ -853,10 +852,10 @@ pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 /// A staged Custom Data edit of one package. Dropping it discards it.
 pub struct Edit {
-    before: Snapshot,
+    before: Option<Snapshot>,
     draft: Vec<Storage>,
     source: crate::Package,
-    package: OpcPackage,
+    package: Option<OpcPackage>,
     limits: Limits,
     context: Option<ExecutionContext>,
     connection_edits: BTreeMap<String, String>,
@@ -874,6 +873,31 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let package = self.source.opc_package().clone();
+        let before =
+            Snapshot::load_with_limits_and_context(&package, self.limits, self.context.clone())?;
+        self.draft = clone_storages(&before.entries, "Custom Data transaction draft")?;
+        self.package = Some(package);
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("Custom Data edit is not prepared"))
+    }
+
+    fn package(&self) -> Result<&OpcPackage> {
+        self.package
+            .as_ref()
+            .ok_or_else(|| invalid("Custom Data edit is not prepared"))
+    }
+
     /// Start an edit of `source` under a finite policy and an optional owned
     /// execution context.
     pub(crate) fn from_package_with_limits_and_context(
@@ -881,13 +905,13 @@ impl Edit {
         limits: Limits,
         context: Option<ExecutionContext>,
     ) -> Result<Self> {
-        let package = source.opc_package().clone();
-        let before = Snapshot::load_with_limits_and_context(&package, limits, context.clone())?;
+        limits.validate()?;
+        check_context(context.as_ref())?;
         Ok(Self {
-            draft: clone_storages(&before.entries, "Custom Data transaction draft")?,
+            draft: Vec::new(),
             source,
-            package,
-            before,
+            package: None,
+            before: None,
             limits,
             context,
             connection_edits: BTreeMap::new(),
@@ -896,24 +920,27 @@ impl Edit {
 
     /// Source snapshot captured when this transaction was created.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Borrow currently staged semantic storages.
     #[must_use]
-    pub fn storages(&self) -> &[Storage] {
-        &self.draft
+    pub fn storages(&mut self) -> Result<&[Storage]> {
+        self.ensure_prepared()?;
+        Ok(&self.draft)
     }
 
     /// Alias for [`Self::storages`].
     #[must_use]
-    pub fn entries(&self) -> &[Storage] {
+    pub fn entries(&mut self) -> Result<&[Storage]> {
         self.storages()
     }
 
     /// Replace one complete storage value while retaining its package graph.
     pub fn set<S: StorageSelectorInput>(&mut self, selector: S, value: CustomData) -> Result<bool> {
+        self.ensure_prepared()?;
         let index = self.resolve(selector)?;
         self.set_at(index, value.into())
     }
@@ -924,6 +951,7 @@ impl Edit {
         selector: S,
         data: Vec<u8>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let index = self.resolve(selector)?;
         let current = self
             .draft
@@ -940,6 +968,7 @@ impl Edit {
         selector: S,
         edit: impl FnOnce(&mut Properties) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let index = self.resolve(selector)?;
         let current = self
             .draft
@@ -954,6 +983,7 @@ impl Edit {
 
     /// Insert a new inert storage and return its owned UID.
     pub fn insert(&mut self, value: CustomData) -> Result<StorageId> {
+        self.ensure_prepared()?;
         check_context(self.context.as_ref())?;
         let value = value.into();
         validate_value(&value, &self.limits)?;
@@ -968,7 +998,7 @@ impl Edit {
                 self.limits.max_storages(),
             ));
         }
-        let identity = allocate_identity(&self.package, &self.draft)?;
+        let identity = allocate_identity(self.package()?, &self.draft)?;
         let mut candidate = clone_storages(&self.draft, "Custom Data insertion draft")?;
         candidate
             .try_reserve(1)
@@ -985,6 +1015,7 @@ impl Edit {
 
     /// Insert or replace a storage with the same UID.
     pub fn upsert(&mut self, value: CustomData) -> Result<StorageId> {
+        self.ensure_prepared()?;
         let id = StorageId::new(value.properties.id.clone())?;
         if let Some(index) = self
             .draft
@@ -1003,6 +1034,7 @@ impl Edit {
         selector: S,
         id: impl Into<String>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let id = id.into();
         self.edit_properties(selector, |properties| {
             properties.id = id;
@@ -1012,6 +1044,7 @@ impl Edit {
 
     /// Remove one storage, refusing if effective bindings refer to it.
     pub fn remove<S: StorageSelectorInput>(&mut self, selector: S) -> Result<Option<Storage>> {
+        self.ensure_prepared()?;
         self.remove_with(selector, RemovalDisposition::RejectReferenced)
     }
 
@@ -1021,12 +1054,16 @@ impl Edit {
         selector: S,
         disposition: RemovalDisposition,
     ) -> Result<Option<Storage>> {
+        self.ensure_prepared()?;
         let Some(index) = self.resolve_optional(selector) else {
             return Ok(None);
         };
         let removed = self.draft[index].clone();
         let source_id = removed.origin.as_ref().and_then(StorageOrigin::source_id);
-        let reference_count = source_id.map_or(0, |id| self.before.connection_references(id));
+        let reference_count = match source_id {
+            Some(id) => self.snapshot()?.connection_references(id),
+            None => 0,
+        };
         let target = match disposition {
             RemovalDisposition::RejectReferenced if reference_count != 0 => {
                 return Err(Error::CustomDataReferenced {
@@ -1054,7 +1091,7 @@ impl Edit {
         };
         let mut candidate_edits = self.connection_edits.clone();
         if let Some(source_id) = source_id {
-            if self.before.source.connection.is_some()
+            if self.snapshot()?.source.connection.is_some()
                 && (reference_count != 0 || !target.is_empty())
             {
                 candidate_edits.insert(source_id.to_owned(), target);
@@ -1072,14 +1109,19 @@ impl Edit {
 
     /// Whether the staged semantic graph differs from the source.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !staged_entries_equal(&self.before.entries, &self.draft)
-            || !self.connection_edits.is_empty()
+    pub fn changed(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        Ok(
+            !staged_entries_equal(&self.snapshot()?.entries, &self.draft)
+                || !self.connection_edits.is_empty(),
+        )
     }
 
     /// Discard every staged change.
     pub fn reset(&mut self) -> Result<()> {
-        self.draft = clone_storages(&self.before.entries, "Custom Data transaction draft")?;
+        self.ensure_prepared()?;
+        let entries = self.snapshot()?.entries.clone();
+        self.draft = clone_storages(&entries, "Custom Data transaction draft")?;
         self.connection_edits.clear();
         Ok(())
     }
@@ -1093,35 +1135,41 @@ impl Edit {
     /// [`Error::PatchConflict`] for a changed source closure, the limit and
     /// execution-context refusals, and the workbook validation errors of the
     /// result.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
         check_context(self.context.as_ref())?;
-        if !self.changed() {
+        if !self.changed()? {
+            let before = self
+                .before
+                .take()
+                .ok_or_else(|| invalid("Custom Data edit is not prepared"))?;
             let patch = Patch {
-                before: self.before.clone(),
-                after: self.before.clone(),
+                before: before.clone(),
+                after: before,
             };
             return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
         }
-        if self.before.source.signed || self.before.source.signature_policy_required {
+        let before = self.snapshot()?;
+        if before.source.signed || before.source.signature_policy_required {
             return Err(Error::Signed);
         }
         let current = Snapshot::load_with_limits_and_context(
-            &self.package,
+            self.package()?,
             self.limits,
             self.context.clone(),
         )?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(before) {
             return Err(conflict("Custom Data source closure"));
         }
-        if self.has_identity_blocking_opaque() {
+        if self.has_identity_blocking_opaque()? {
             return Err(unsupported(
                 "an opaque AC/FRT/unsupported connection block may hide a Custom Data reference",
             ));
         }
-        let mut candidate = self.package.clone();
+        let mut candidate = self.package()?.clone();
         apply_draft(
             &mut candidate,
-            &self.before,
+            before,
             &self.draft,
             &self.connection_edits,
             self.limits,
@@ -1131,12 +1179,16 @@ impl Edit {
         let snapshot =
             Snapshot::load_with_limits_and_context(&candidate, self.limits, self.context.clone())?;
         if !snapshot.same_semantics(&self.draft)
-            || !connection_values_equal_after(&self.before, &snapshot, &self.connection_edits)
+            || !connection_values_equal_after(before, &snapshot, &self.connection_edits)
         {
             return Err(invalid("Custom Data publication changed staged semantics"));
         }
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("Custom Data edit is not prepared"))?;
         let patch = Patch {
-            before: self.before,
+            before,
             after: snapshot,
         };
         let package = self
@@ -1173,31 +1225,33 @@ impl Edit {
         {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
-        if value.properties.id.is_empty()
-            && current
-                .origin
-                .as_ref()
-                .and_then(StorageOrigin::source_id)
-                .is_some_and(|id| self.before.connection_references(id) != 0)
-        {
+        let empty_id_is_referenced = if value.properties.id.is_empty() {
+            match current.origin.as_ref().and_then(StorageOrigin::source_id) {
+                Some(id) => self.snapshot()?.connection_references(id) != 0,
+                None => false,
+            }
+        } else {
+            false
+        };
+        if empty_id_is_referenced {
             return Err(invalid(
                 "a referenced Custom Data storage cannot be renamed to the empty UID",
             ));
         }
         let mut candidate_edits = self.connection_edits.clone();
         if let Some(source_id) = current.origin.as_ref().and_then(StorageOrigin::source_id) {
-            let referenced = self
-                .before
-                .source
-                .connection
-                .as_ref()
-                .is_some_and(|connection| {
-                    !source_id.is_empty()
-                        && connection
-                            .references
-                            .iter()
-                            .any(|value| !value.is_empty() && value == source_id)
-                });
+            let referenced =
+                self.snapshot()?
+                    .source
+                    .connection
+                    .as_ref()
+                    .is_some_and(|connection| {
+                        !source_id.is_empty()
+                            && connection
+                                .references
+                                .iter()
+                                .any(|value| !value.is_empty() && value == source_id)
+                    });
             if source_id != value.properties.id && referenced {
                 candidate_edits.insert(source_id.to_owned(), value.properties.id.clone());
             } else if source_id == value.properties.id || !referenced {
@@ -1214,12 +1268,13 @@ impl Edit {
         Ok(true)
     }
 
-    fn has_identity_blocking_opaque(&self) -> bool {
-        if !self.before.has_opaque_reference_candidates() {
-            return false;
+    fn has_identity_blocking_opaque(&self) -> Result<bool> {
+        let snapshot = self.snapshot()?;
+        if !snapshot.has_opaque_reference_candidates() {
+            return Ok(false);
         }
-        self.connection_edits.iter().any(|(from, to)| from != to)
-            || self.before.entries.iter().any(|before| {
+        Ok(self.connection_edits.iter().any(|(from, to)| from != to)
+            || snapshot.entries.iter().any(|before| {
                 let Some(current) = self
                     .draft
                     .iter()
@@ -1231,7 +1286,7 @@ impl Edit {
                         .is_some_and(|origin| matches!(origin, StorageOrigin::Existing(_)));
                 };
                 before.id() != current.id()
-            })
+            }))
     }
 }
 
