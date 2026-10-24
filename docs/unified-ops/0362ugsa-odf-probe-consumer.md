@@ -26,3 +26,16 @@ confirms that all four identities, receipt keys, assertions and measured
 boundaries are unchanged. [The reduced receipt](results/0362ugsa/consumer-check.json)
 binds the command, source, locks, runner policy and complete external logs.
 This remains one selected check, not the full 53-step gate.
+
+The native shared-triad manifest is synchronized with this reviewed probe
+(75,857 bytes, SHA-256 `89db987251dd8f857e4d144ee0a711828e157ee89077f8b656e3ac7d9bcf6c0d`). The private receipt-identity
+refactor changed its source bytes, so the former digest could not admit the
+final paired qualification. This binding update preserves the fixed 173dd
+baseline, all routes, proof checks and measurement boundaries.
+
+Build-free validation: `python3 -m unittest tools.test_odf_shared_triad_runner
+tools.test_odf_shared_triad_paired_runner` passes 56 tests, with no failures
+or skips. The external log is
+`.coord/final-acceptance-2026-10-24/odf-manifest-binding-tests.log`
+(115 bytes, SHA-256 `0c5b9385d3e288ccac90e88b3a2e57269f17a8cbc122007aafa74ce027262458`). No native
+qualification is inferred from these protocol tests.
