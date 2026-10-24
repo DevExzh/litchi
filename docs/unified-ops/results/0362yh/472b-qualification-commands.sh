@@ -54,6 +54,11 @@ BASE_MANIFEST="$W8_PREP/endpoint-before.json"
 FINAL_MANIFEST="$W8_PREP/endpoint-after.json"
 PAIR_RECEIPT="$W8_PREP/original-to-final-pair.json"
 ABBA_OUT="$W8_PREP/abba-472b"
+# validate.py writes a receipt directory containing the canonical receipt and
+# the route artifact.  Endpoint provenance binds the canonical receipt file,
+# not the enclosing directory.
+BASE_VALIDATION_RECEIPT="$W8_PREP/validation-before.json/receipt.json"
+FINAL_VALIDATION_RECEIPT="$W8_PREP/validation-after.json/receipt.json"
 
 require_inputs() {
   : "${W8_PREP:?set W8_PREP to an external scratch directory}"
@@ -256,7 +261,7 @@ validate() {
     --toolchain "$W8_BASELINE_ROOT/rust-toolchain.toml" \
     --source-assembly "$BASE_ASSEMBLY" \
     --build-receipt "$W8_PREP/build-before.json" \
-    --validation-receipt "$W8_PREP/validation-before.json" \
+    --validation-receipt "$BASE_VALIDATION_RECEIPT" \
     --output "$BASE_MANIFEST" --source-commit "$BASELINE_COMMIT" \
     --all-features --target "$TARGET" --profile "$PROFILE"
   python3 "$PROVENANCE" endpoint --binary "$FINAL_BIN" \
@@ -268,7 +273,7 @@ validate() {
     --toolchain "$CANDIDATE_SOURCE/rust-toolchain.toml" \
     --source-assembly "$FINAL_ASSEMBLY" \
     --build-receipt "$W8_PREP/build-after.json" \
-    --validation-receipt "$W8_PREP/validation-after.json" \
+    --validation-receipt "$FINAL_VALIDATION_RECEIPT" \
     --output "$FINAL_MANIFEST" --source-commit "$FINAL_COMMIT" \
     --all-features --target "$TARGET" --profile "$PROFILE"
 }
