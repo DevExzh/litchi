@@ -77370,6 +77370,14 @@ PAGES_TRANSACTION_SHARED_TYPE_REEXPORTS = {
         r"edit[ \t]*::[ \t]*Diagnostics[ \t]*;"
     ),
 }
+PAGES_TRANSACTION_SHARED_TYPE_ALIASES = {
+    "Diagnostics": re.compile(
+        r"(?ms)\bpub\s+use\s+litchi_core\s*::\s*edit\s*::\s*"
+        r"(?:Diagnostics\s+as\s+(?P<direct>[A-Za-z_][A-Za-z0-9_]*)"
+        r"|\{\s*[^;{}]*?\bDiagnostics\s+as\s+"
+        r"(?P<group>[A-Za-z_][A-Za-z0-9_]*)[^;{}]*\})\s*;"
+    ),
+}
 PAGES_TRANSACTION_SHARED_TYPE_SOURCES = {
     "Diagnostics": Path("crates/litchi-core/src/edit.rs"),
 }
@@ -77627,6 +77635,15 @@ def _pages_transaction_family_violations(
                         f"{owner_relative}"
                     )
                 else:
+                    alias_pattern = PAGES_TRANSACTION_SHARED_TYPE_ALIASES.get(name)
+                    if alias_pattern is not None:
+                        owner_code = _mask_rust_non_code(owner_source)
+                        for alias_match in alias_pattern.finditer(owner_code):
+                            alias = alias_match.group("direct") or alias_match.group("group")
+                            violations.append(
+                                f"{title} has alternate public alias {alias} for "
+                                f"shared litchi_core::edit::{name}: {owner_relative}"
+                            )
                     violations.extend(_pages_shared_type_violations(root, name, title))
                     defined.add(name)
                 continue

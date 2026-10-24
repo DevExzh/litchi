@@ -15,7 +15,8 @@ canonical owner and public-module exports, the generic commit alias, and all
 other family names; this is not a family exemption or an alternate API.
 
 The fixture builder and regression tests cover the accepted shared re-export
-and reject replacing it with an alias. The production Rust source is
+and reject both a direct alias and a multiline grouped alias, including when
+the exact canonical re-export is still present. The production Rust source is
 unchanged.
 
 Checks:

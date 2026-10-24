@@ -10257,11 +10257,11 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             metadata = root / boundaries.PAGES_SOURCE_ROOT / "package" / "metadata_edit.rs"
             metadata.write_text(
-                metadata.read_text(encoding="utf-8").replace(
-                    "pub use litchi_core::edit::Diagnostics;",
-                    "pub use litchi_core::edit::Diagnostics as MetadataDiagnostics;",
-                    1,
-                ),
+                metadata.read_text(encoding="utf-8")
+                + "pub use litchi_core::edit::Diagnostics as MetadataDiagnostics;\n"
+                + "pub use litchi_core::edit::{\n"
+                + "    Diagnostics as GroupedMetadataDiagnostics,\n"
+                + "};\n",
                 encoding="utf-8",
             )
 
@@ -10277,7 +10277,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "defines retired name DocumentSourceLimits",
                 "body_chart_data transaction public API exposes raw identifier object_id",
                 "body_chart_data transaction public API exposes raw byte slice",
-                "metadata_edit transaction family must re-export shared litchi_core::edit::Diagnostics",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "MetadataDiagnostics for shared litchi_core::edit::Diagnostics",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "GroupedMetadataDiagnostics for shared litchi_core::edit::Diagnostics",
             ):
                 self.assertTrue(
                     any(fragment in item for item in violations),
