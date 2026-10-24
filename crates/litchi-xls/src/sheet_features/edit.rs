@@ -245,7 +245,7 @@ impl Commit {
 /// The staged features of one package.
 pub struct Edit {
     base: Package,
-    source: Arc<[u8]>,
+    source: Option<Arc<[u8]>>,
     stream: Vec<u8>,
     operations: usize,
 }
@@ -270,14 +270,29 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::Package(crate::package::Error::EncryptionPolicy));
         }
-        let source = base.workbook_stream()?;
-        Globals::parse(&source)?;
         Ok(Self {
             base: base.clone(),
-            stream: source.to_vec(),
-            source,
+            source: None,
+            stream: Vec::new(),
             operations: 0,
         })
+    }
+
+    /// Materialize and validate the Workbook stream on first use.
+    ///
+    /// The source and mutable copy are installed together only after the
+    /// global record parse succeeds, so a failed first operation leaves the
+    /// edit retryable.
+    pub(super) fn ensure_ready(&mut self) -> Result<()> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        let source = self.base.workbook_stream()?;
+        Globals::parse(&source)?;
+        let stream = source.to_vec();
+        self.source = Some(source);
+        self.stream = stream;
+        Ok(())
     }
 
     fn step(&mut self) -> Result<()> {
@@ -305,7 +320,8 @@ impl Edit {
     ///
     /// Returns an error when the position is not a worksheet or its records
     /// are malformed.
-    pub fn features(&self, sheet: usize, select: FeatureSet) -> Result<Features> {
+    pub fn features(&mut self, sheet: usize, select: FeatureSet) -> Result<Features> {
+        self.ensure_ready()?;
         let (globals, layout) = self.sheet(sheet)?;
         Ok(read::read(&self.stream, &globals, &layout, sheet, select)?)
     }
@@ -338,6 +354,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for more than 1,026 breaks.
     pub fn set_row_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
+        self.ensure_ready()?;
         self.set_breaks(sheet, HORIZONTAL_PAGE_BREAKS, breaks, LAST_COLUMN)
     }
 
@@ -349,6 +366,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for more than 1,026 breaks or a column
     /// outside the grid.
     pub fn set_column_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
+        self.ensure_ready()?;
         if breaks.iter().any(|item| item.index > 255) {
             return Err(refused(
                 RefusalKind::InvalidValue,
@@ -435,6 +453,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for a link without a target or a value
     /// outside its BIFF8 bound.
     pub fn add_hyperlink(&mut self, sheet: usize, link: &HyperlinkSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::hyperlink(link)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
@@ -456,6 +475,7 @@ impl Edit {
         index: usize,
         link: &HyperlinkSpec,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::hyperlink(link)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
@@ -473,6 +493,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such hyperlink.
     pub fn remove_hyperlink(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end) = *Self::hyperlink_units(&layout).get(index).ok_or(refused(
@@ -518,6 +539,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for a validation outside its BIFF8 bounds.
     pub fn add_validation(&mut self, sheet: usize, spec: &ValidationSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::validation(spec).map_err(|_| {
             refused(
@@ -556,6 +578,7 @@ impl Edit {
         index: usize,
         spec: &ValidationSpec,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::validation(spec).map_err(|_| {
             refused(
@@ -579,6 +602,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such validation.
     pub fn remove_validation(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (dval, rules) = Self::validation_records(&layout);
@@ -676,6 +700,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for a format outside its BIFF8 bounds.
     pub fn add_format(&mut self, sheet: usize, format: &Format) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let identifier = self.next_format_identifier(&layout);
@@ -696,6 +721,7 @@ impl Edit {
     /// [`Error::Refused`] when it holds more than one rule or a `CFEx`
     /// extends it.
     pub fn set_format(&mut self, sheet: usize, index: usize, format: &Format) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -732,6 +758,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such format.
     pub fn set_format_ranges(&mut self, sheet: usize, index: usize, ranges: &[Area]) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -777,6 +804,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such format.
     pub fn remove_format(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -826,6 +854,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for a range outside the grid and
     /// [`Error::Refused`] for source layouts the editor does not rewrite.
     pub fn set_auto_filter(&mut self, sheet: usize, area: Option<Area>) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         if let Some(area) = area {
             if area.last_column > 255 || area.last_column - area.first_column > 255 {
@@ -1023,11 +1052,23 @@ impl Edit {
     /// Returns an error when the edited stream cannot be written into the
     /// package or the result does not reopen.
     pub fn commit(self) -> Result<Commit> {
-        let operations = self.operations;
-        if self.stream.as_slice() == &*self.source {
-            let bytes: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
+        let mut this = self;
+        this.ensure_ready()?;
+        let operations = this.operations;
+        let source =
+            this.source
+                .take()
+                .ok_or(Error::Package(crate::package::Error::InvalidData(
+                    "worksheet-feature edit lost its source stream",
+                )))?;
+        let current_stream = this.base.workbook_stream()?;
+        if current_stream.as_ref() != source.as_ref() {
+            return Err(Error::PatchConflict);
+        }
+        if this.stream.as_slice() == &*source {
+            let bytes: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
             return Ok(Commit {
-                package: self.base,
+                package: this.base,
                 patch: Patch {
                     before: Arc::clone(&bytes),
                     after: bytes,
@@ -1038,7 +1079,7 @@ impl Edit {
                 },
             });
         }
-        let before: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
+        let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
         let name = workbook_stream_name(&before)?;
         let package = ObjectPackage::open_with_options(
             before.to_vec(),
@@ -1051,14 +1092,14 @@ impl Edit {
             .edit()
             .map_err(|error| Error::Records(error.into()))?;
         editor
-            .put_stream_shared(&[name.to_owned()], Arc::from(self.stream))
+            .put_stream_shared(&[name.to_owned()], Arc::from(this.stream))
             .map_err(|error| Error::Records(error.into()))?;
         let committed = editor
             .commit()
             .map_err(|error| Error::Records(error.into()))?;
         let rendered = committed.package().source_shared().as_ref().clone();
         let after: Arc<[u8]> = Arc::from(rendered.as_slice());
-        let package = crate::package::republish(&self.base, rendered)?;
+        let package = crate::package::republish(&this.base, rendered)?;
         Ok(Commit {
             package,
             patch: Patch { before, after },
@@ -1116,6 +1157,19 @@ pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
             "the formula cannot be encoded as BIFF8 tokens",
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Edit;
+
+    #[test]
+    fn package_edit_entry_keeps_workbook_stream_cold() {
+        let package = crate::Builder::new().build().unwrap();
+        let edit = Edit::new(&package).unwrap();
+        assert!(edit.source.is_none());
+        assert!(edit.stream.is_empty());
+    }
 }
 
 /// Apply a patch to the exact package it was made from.

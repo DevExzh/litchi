@@ -192,15 +192,22 @@ pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 pub struct Edit {
     base: Package,
     transaction: property_set::Edit,
-    initial: SummaryProperties,
-    properties: SummaryProperties,
+    initial: Option<SummaryProperties>,
+    properties: Option<SummaryProperties>,
 }
 
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("changed", &(self.initial != self.properties))
+            .field(
+                "changed",
+                &self
+                    .initial
+                    .as_ref()
+                    .zip(self.properties.as_ref())
+                    .is_some_and(|(initial, properties)| initial != properties),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -210,30 +217,64 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::Protected);
         }
-        let transaction = property_set::Edit::new(base).map_err(|error| match error {
-            crate::package::Error::Reader(error) => protected(error),
-            error => Error::from(error),
-        })?;
-        let initial = SummaryProperties::from_editor(transaction.editor())?;
+        let transaction = property_set::Edit::new(base).map_err(transaction_error)?;
         Ok(Self {
             base: base.clone(),
             transaction,
-            properties: initial.clone(),
-            initial,
+            initial: None,
+            properties: None,
         })
     }
 
+    fn ensure_properties(&mut self) -> Result<()> {
+        if self.properties.is_some() {
+            return Ok(());
+        }
+        let initial = {
+            let editor = self.transaction.editor().map_err(transaction_error)?;
+            SummaryProperties::from_editor(editor)?
+        };
+        self.initial = Some(initial.clone());
+        self.properties = Some(initial);
+        Ok(())
+    }
+
+    fn properties_ref(&mut self) -> Result<&SummaryProperties> {
+        self.ensure_properties()?;
+        self.properties
+            .as_ref()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "metadata edit lost its staged properties",
+            )))
+    }
+
+    fn properties_mut_ref(&mut self) -> Result<&mut SummaryProperties> {
+        self.ensure_properties()?;
+        self.properties
+            .as_mut()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "metadata edit lost its staged properties",
+            )))
+    }
+
     /// The staged workbook properties.
-    #[must_use]
-    pub const fn properties(&self) -> &SummaryProperties {
-        &self.properties
+    /// # Errors
+    ///
+    /// Returns an error when the property streams cannot be parsed under the
+    /// package's retained CFB policy.
+    pub fn properties(&mut self) -> Result<&SummaryProperties> {
+        self.properties_ref()
     }
 
     /// Mutable access to the staged properties: set or remove one property
     /// by name ([`SummaryProperties::set`], [`SummaryProperties::remove`]),
     /// custom properties, and typed section edits.
-    pub fn properties_mut(&mut self) -> &mut SummaryProperties {
-        &mut self.properties
+    /// # Errors
+    ///
+    /// Returns an error when the property streams cannot be parsed under the
+    /// package's retained CFB policy.
+    pub fn properties_mut(&mut self) -> Result<&mut SummaryProperties> {
+        self.properties_mut_ref()
     }
 
     /// Set every field `metadata` carries, keeping the others.
@@ -245,7 +286,7 @@ impl Edit {
     /// Returns [`Error::Metadata`], leaving the staged properties unchanged,
     /// for a field the property sets cannot store or a refused value.
     pub fn merge_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<bool> {
-        Ok(self.properties.merge_metadata(metadata)?)
+        Ok(self.properties_mut_ref()?.merge_metadata(metadata)?)
     }
 
     /// Publish the staged properties as a new package.
@@ -255,17 +296,28 @@ impl Edit {
     /// Returns [`Error::Property`] when a changed source stream cannot be
     /// rewritten without loss, and [`Error::Package`] when the edited bytes
     /// cannot be republished.
-    pub fn commit(self) -> Result<Commit> {
-        let Self {
-            base,
-            mut transaction,
-            initial,
-            properties,
-        } = self;
-        if properties == initial {
-            return unchanged(base);
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_properties()?;
+        let base = self.base;
+        let mut transaction = self.transaction;
+        let initial = self
+            .initial
+            .take()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "metadata edit lost its initial properties",
+            )))?;
+        let properties =
+            self.properties
+                .take()
+                .ok_or(Error::Package(PackageError::InvalidData(
+                    "metadata edit lost its staged properties",
+                )))?;
+        if properties != initial {
+            properties.stage_changes(
+                &initial,
+                transaction.editor_mut().map_err(transaction_error)?,
+            )?;
         }
-        properties.stage_changes(&initial, transaction.editor_mut())?;
         let (patch, _) = transaction.finish()?;
         let before: Arc<[u8]> = Arc::from(patch.before());
         let after: Arc<[u8]> = Arc::from(patch.after());
@@ -288,8 +340,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Protected`] for an encrypted or signed workbook, and
-    /// an error when the property streams cannot be read or are invalid.
+    /// Returns [`Error::Protected`] for an encrypted workbook. Property
+    /// stream errors are returned by the first accessor, verb, or commit.
     pub fn edit_metadata(&self) -> Result<Edit> {
         Edit::new(self)
     }
@@ -326,16 +378,11 @@ fn protected(error: crate::Error) -> Error {
     }
 }
 
-fn unchanged(base: Package) -> Result<Commit> {
-    let bytes: Arc<[u8]> = Arc::from(base.to_bytes()?);
-    Ok(Commit::new(
-        base,
-        Patch {
-            before: Arc::clone(&bytes),
-            after: bytes,
-        },
-        Diagnostics::new(false),
-    ))
+fn transaction_error(error: crate::package::Error) -> Error {
+    match error {
+        crate::package::Error::Reader(error) => protected(error),
+        other => Error::from(other),
+    }
 }
 
 /// Admit edited bytes under the source package's retained policy.
@@ -376,5 +423,18 @@ fn republish(source: &Package, bytes: Vec<u8>) -> Result<Package> {
             .map_err(PackageError::Source)?;
             Ok(Package::from_source(workbook)?)
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Edit;
+
+    #[test]
+    fn package_edit_entry_keeps_properties_cold() {
+        let package = crate::Builder::new().build().unwrap();
+        let edit = Edit::new(&package).unwrap();
+        assert!(edit.initial.is_none());
+        assert!(edit.properties.is_none());
     }
 }

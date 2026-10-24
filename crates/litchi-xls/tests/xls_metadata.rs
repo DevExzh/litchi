@@ -161,7 +161,10 @@ fn metadata_transaction_round_trip() {
 
     let mut edit = package.edit_metadata().unwrap();
     assert!(edit.merge_metadata(&metadata()).unwrap());
-    edit.properties_mut().set("Department", "Research").unwrap();
+    edit.properties_mut()
+        .unwrap()
+        .set("Department", "Research")
+        .unwrap();
     let (edited, patch) = edit.commit().unwrap().into_parts();
     assert_metadata(&edited);
     let bytes = edited.to_bytes().unwrap();
