@@ -11,6 +11,7 @@ import sys
 import tempfile
 import textwrap
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -61,6 +62,8 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             "LIVE_TARGET": safe.LIVE_TARGET,
             "START_TARGET": safe.START_TARGET,
             "MIN_FREE": safe.MIN_FREE,
+            "DESCENDANT_WAIT_SECONDS": safe.DESCENDANT_WAIT_SECONDS,
+            "PROCESS_KILL_GRACE_SECONDS": safe.PROCESS_KILL_GRACE_SECONDS,
         }
 
     def tearDown(self) -> None:
@@ -137,6 +140,41 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             self.assertEqual(marker.read_text(encoding="utf-8"), "done")
             self.assertEqual(len(retired), 1)
             self.assertFalse(artifact.exists())
+
+    def test_hung_setsid_descendant_forces_blocked_retention(self) -> None:
+        script = textwrap.dedent(
+            """
+            import json
+            import os
+            from pathlib import Path
+            import subprocess
+            import sys
+            import time
+
+            artifact = Path(sys.argv[1])
+            marker = Path(sys.argv[2])
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_bytes(b"\x7fELFhung descendant artifact")
+            artifact.chmod(0o751)
+            subprocess.Popen(
+                [sys.executable, "-c", "import os,pathlib,sys,time; os.setsid(); time.sleep(5); pathlib.Path(sys.argv[1]).write_text('late')", str(marker)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            print(json.dumps({"reason": "compiler-artifact", "target": {"kind": ["test"]}, "executable": str(artifact)}), flush=True)
+            """
+        )
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-hung-descendant-") as raw:
+            command, target, artifact, marker, quarantine, log = self._command(Path(raw), script)
+            safe.MIN_FREE = 0
+            safe.DESCENDANT_WAIT_SECONDS = 0.15
+            safe.PROCESS_KILL_GRACE_SECONDS = 0.1
+            with self.assertRaisesRegex(RuntimeError, "forced cleanup"):
+                safe.execute(command, target, log, quarantine, 0)
+            self.assertTrue(artifact.exists())
+            self.assertFalse(marker.exists())
+            self.assertFalse((quarantine / "manifest.jsonl").exists())
+            self.assertIn('"forced_cleanup": true', log.read_text(encoding="utf-8"))
 
     def test_live_overflow_stops_command_and_does_not_skip_or_retire_work(self) -> None:
         script = textwrap.dedent(
@@ -332,6 +370,147 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
                 process.wait()
                 guard.join(timeout=2)
                 runner.LIVE_TARGET = previous_live
+
+    def test_gate_runner_live_guard_reaps_setsid_child(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-live-escaped-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            script = directory / "spawn_escaped.py"
+            growth = target / "debug" / "escaped-growth.bin"
+            marker = directory / "escaped-marker"
+            script.write_text(
+                textwrap.dedent(
+                    """
+                    import os
+                    from pathlib import Path
+                    import subprocess
+                    import sys
+
+                    target = Path(sys.argv[1])
+                    marker = Path(sys.argv[2])
+                    child = "\\n".join((
+                        "import os, pathlib, sys, time",
+                        "os.setsid()",
+                        "marker = pathlib.Path(sys.argv[2])",
+                        "marker.write_text('started')",
+                        "path = pathlib.Path(sys.argv[1])",
+                        "path.parent.mkdir(parents=True, exist_ok=True)",
+                        "deadline = time.monotonic() + 0.55",
+                        "while time.monotonic() < deadline:",
+                        "    with path.open('ab') as stream:",
+                        "        stream.write(b'x' * 4096)",
+                        "    time.sleep(0.01)",
+                        "marker.write_text('done')",
+                    ))
+                    subprocess.Popen(
+                        [sys.executable, "-c", child, str(target / "debug" / "escaped-growth.bin"), str(marker)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    """
+                ),
+                encoding="utf-8",
+            )
+            runner.enable_child_subreaper()
+            previous_live = runner.LIVE_TARGET
+            initial = runner.target_bytes(target)
+            runner.LIVE_TARGET = initial + 32_000
+            prelaunch = runner.process_table()
+            process = subprocess.Popen(
+                [sys.executable, str(script), str(target), str(marker)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            ownership = runner.new_ownership(process.pid, directory, target, prelaunch, runner.process_table())
+            monitor = threading.Thread(target=runner.capture_step_identities, args=(process, ownership))
+            stop = threading.Event()
+            overflow: list[dict] = []
+            stats: dict = {}
+            guard = threading.Thread(
+                target=lambda: stats.update(runner._watch_target(process, target, stop, overflow, ownership))
+            )
+            monitor.start()
+            guard.start()
+            try:
+                guard.join(timeout=5)
+                self.assertFalse(guard.is_alive())
+                process.wait(timeout=2)
+                monitor.join(timeout=2)
+                self.assertTrue(overflow)
+                self.assertFalse(marker.exists() and marker.read_text(encoding="utf-8") == "done")
+                time.sleep(0.8)
+                self.assertFalse(marker.exists() and marker.read_text(encoding="utf-8") == "done")
+                self.assertEqual(runner._owned_identity_rows(process.pid, ownership), [])
+            finally:
+                stop.set()
+                runner._terminate_owned_tree(process.pid, ownership, "test-cleanup")
+                if process.poll() is None:
+                    process.wait()
+                monitor.join(timeout=2)
+                guard.join(timeout=2)
+                runner.LIVE_TARGET = previous_live
+
+    def test_gate_post_exit_timeout_reaps_setsid_child(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-post-exit-escaped-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            script = directory / "spawn_hung.py"
+            marker = directory / "post-exit-marker"
+            script.write_text(
+                textwrap.dedent(
+                    """
+                    import os
+                    from pathlib import Path
+                    import subprocess
+                    import sys
+
+                    marker = Path(sys.argv[1])
+                    child = "\\n".join((
+                        "import os, pathlib, sys, time",
+                        "os.setsid()",
+                        "time.sleep(0.55)",
+                        "pathlib.Path(sys.argv[1]).write_text('late')",
+                    ))
+                    subprocess.Popen(
+                        [sys.executable, "-c", child, str(marker)],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                    """
+                ),
+                encoding="utf-8",
+            )
+            runner.enable_child_subreaper()
+            previous_timeout = runner.POST_EXIT_TIMEOUT_SECONDS
+            previous_grace = runner.PROCESS_KILL_GRACE_SECONDS
+            runner.POST_EXIT_TIMEOUT_SECONDS = 0.1
+            runner.PROCESS_KILL_GRACE_SECONDS = 0.1
+            prelaunch = runner.process_table()
+            process = subprocess.Popen(
+                [sys.executable, str(script), str(marker)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            ownership = runner.new_ownership(process.pid, directory, target, prelaunch, runner.process_table())
+            monitor = threading.Thread(target=runner.capture_step_identities, args=(process, ownership))
+            monitor.start()
+            try:
+                process.wait(timeout=2)
+                monitor.join(timeout=2)
+                with self.assertRaisesRegex(RuntimeError, "owned child"):
+                    runner.post_exit_guard(process.pid, directory, target, ownership)
+                time.sleep(0.7)
+                self.assertFalse(marker.exists())
+                self.assertEqual(runner._owned_identity_rows(process.pid, ownership), [])
+            finally:
+                runner._terminate_owned_tree(process.pid, ownership, "test-cleanup")
+                if process.poll() is None:
+                    process.wait()
+                monitor.join(timeout=2)
+                runner.POST_EXIT_TIMEOUT_SECONDS = previous_timeout
+                runner.PROCESS_KILL_GRACE_SECONDS = previous_grace
 
 
 if __name__ == "__main__":

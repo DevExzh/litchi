@@ -198,15 +198,20 @@ def _signal_owned(process: subprocess.Popen, pids: set[int], signal_number: int)
             continue
 
 
-def _wait_for_descendants(process: subprocess.Popen, baseline: set[tuple[int, int]]) -> list[int]:
-    """Do not retire artifacts while a group or adopted descendant lives."""
+def _wait_for_descendants(process: subprocess.Popen, baseline: set[tuple[int, int]]) -> tuple[list[int], bool]:
+    """Do not retire artifacts while a group or adopted descendant lives.
+
+    The second return value records that the timeout path had to signal a
+    descendant.  Even when SIGTERM succeeds, that is not a successful Cargo
+    lifetime: callers must retain artifacts and produce a blocked receipt.
+    """
     deadline = time.monotonic() + DESCENDANT_WAIT_SECONDS
     while time.monotonic() < deadline:
         table, owned = _owned_descendants(process, baseline)
         _reap_owned(table, owned)
         table, owned = _owned_descendants(process, baseline)
         if not owned:
-            return []
+            return [], False
         time.sleep(0.02)
 
     table, owned = _owned_descendants(process, baseline)
@@ -217,7 +222,7 @@ def _wait_for_descendants(process: subprocess.Popen, baseline: set[tuple[int, in
         _reap_owned(table, owned)
         table, owned = _owned_descendants(process, baseline)
         if not owned:
-            return []
+            return [], True
         time.sleep(0.02)
     table, owned = _owned_descendants(process, baseline)
     _signal_owned(process, owned, signal.SIGKILL)
@@ -225,7 +230,7 @@ def _wait_for_descendants(process: subprocess.Popen, baseline: set[tuple[int, in
     table, owned = _owned_descendants(process, baseline)
     _reap_owned(table, owned)
     _, owned = _owned_descendants(process, baseline)
-    return sorted(owned)
+    return sorted(owned), True
 
 
 def _watch_target(
@@ -233,6 +238,7 @@ def _watch_target(
     target: Path,
     stop: threading.Event,
     overflow: list[dict],
+    baseline: set[tuple[int, int]] | None = None,
 ) -> dict:
     """Sample target growth and stop a command before the hard cap."""
     maximum = target_bytes(target)
@@ -251,7 +257,13 @@ def _watch_target(
                 "samples": samples,
             }
             overflow.append(detail)
+            if baseline is not None:
+                _, owned = _owned_descendants(process, baseline)
+                _signal_owned(process, owned, signal.SIGTERM)
             _terminate_process_group(process)
+            if baseline is not None:
+                remaining, forced = _wait_for_descendants(process, baseline)
+                detail["cleanup"] = {"remaining_descendants": remaining, "forced_cleanup": forced}
             break
     return {"max_sampled_bytes": maximum, "samples": samples, "live_target": LIVE_TARGET}
 
@@ -420,7 +432,7 @@ def execute(
             start_new_session=True,
         )
         guard = threading.Thread(
-            target=lambda: guard_stats.update(_watch_target(process, target, guard_stop, overflow)),
+            target=lambda: guard_stats.update(_watch_target(process, target, guard_stop, overflow, baseline)),
             name=f"target-guard-{process.pid}",
             daemon=True,
         )
@@ -450,12 +462,17 @@ def execute(
         process.stdout.close()
         guard_stop.set()
         guard.join()
-        descendants = _wait_for_descendants(process, baseline)
-        if descendants:
-            detail = {"process_group": process.pid, "remaining_descendants": descendants, "command_exit": status}
+        descendants, forced_cleanup = _wait_for_descendants(process, baseline)
+        if descendants or forced_cleanup:
+            detail = {
+                "process_group": process.pid,
+                "remaining_descendants": descendants,
+                "forced_cleanup": forced_cleanup,
+                "command_exit": status,
+            }
             stream.write(json.dumps({"safe_chunked_descendant_guard": detail}, sort_keys=True) + "\n")
             stream.flush()
-            raise RuntimeError(f"Cargo descendants remained after command: {descendants}")
+            raise RuntimeError(f"Cargo descendant lifetime required forced cleanup: {detail}")
         if overflow:
             detail = {**overflow[0], "command_exit": status}
             stream.write(json.dumps({"safe_chunked_live_guard": detail}, sort_keys=True) + "\n")

@@ -27,12 +27,15 @@ are recorded in `manifest.jsonl`. Caches, rlibs, build outputs, shared
 libraries, non-ELF files, `target/debug/build`, and release artifacts remain
 in the Cargo target. A failed chunk stops the helper immediately; failed,
 aborted or hung commands retain their artifacts in place and produce a blocked
-receipt.
+receipt. If descendant cleanup has to escalate after its lifetime timeout, the
+helper treats that cleanup itself as a failed chunk even when all descendants
+are eventually reaped; no artifact from that chunk is retired.
 
 Both the helper and the outer runner sample the target during each command and
-stop its private process group at `19,000,000,000` bytes, before the hard
-`20,000,000,000` byte cap. A command starts only below `18,000,000,000` bytes,
-with at least 12 GB free disk. The helper uses chunk size 2; planning tests
+stop their identity-guarded owned tree (including adopted `setsid` children)
+at `19,000,000,000` bytes, before the hard `20,000,000,000` byte cap. A
+command starts only below `18,000,000,000` bytes, with at least 12 GB free
+disk. The helper uses chunk size 2; planning tests
 assert that all test and example targets occur exactly once, so shrinking the
 chunks cannot drop work. No historical target cleanup is used.
 

@@ -91,8 +91,9 @@ def process_table() -> dict[int, dict]:
         try:
             pid = int(entry.name)
             command = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace").strip()
-            executable = Path(os.readlink(entry / "exe")).name
-            cwd = Path(os.readlink(entry / "cwd"))
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError):
+            continue
+        try:
             stat = (entry / "stat").read_text()
             close = stat.rfind(")")
             fields = stat[close + 2 :].split()
@@ -102,6 +103,16 @@ def process_table() -> dict[int, dict]:
             start_time = int(fields[19])
         except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
             continue
+        # Keep zombies in the identity table: an adopted escaped child has no
+        # /proc/$pid/exe after it exits, but the runner still has to reap it.
+        try:
+            executable = Path(os.readlink(entry / "exe")).name
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            executable = ""
+        try:
+            cwd = str(Path(os.readlink(entry / "cwd")))
+        except (FileNotFoundError, ProcessLookupError, PermissionError):
+            cwd = ""
         info[pid] = {
             "pid": pid,
             "ppid": ppid,
@@ -110,7 +121,7 @@ def process_table() -> dict[int, dict]:
             "start_time": start_time,
             "command": command,
             "executable": executable,
-            "cwd": str(cwd),
+            "cwd": cwd,
         }
     return info
 
@@ -235,6 +246,7 @@ def new_ownership(
         "root_pgrps": {root_row["pgrp"]} if root_row else {process_pid},
         "known": {},
         "pgrps": set(),
+        "lock": threading.RLock(),
         "preexisting_runner_children": {
             process_key(row)
             for row in prelaunch.values()
@@ -246,6 +258,14 @@ def new_ownership(
 
 
 def _capture_owned(ownership: dict, info: dict[int, dict]) -> None:
+    lock = ownership.get("lock")
+    if lock is None:
+        return _capture_owned_unlocked(ownership, info)
+    with lock:
+        _capture_owned_unlocked(ownership, info)
+
+
+def _capture_owned_unlocked(ownership: dict, info: dict[int, dict]) -> None:
     """Capture live identities before a fast child can disappear or reparent."""
     process_pid = ownership["process_pid"]
     root_row = info.get(process_pid)
@@ -293,7 +313,12 @@ def owned_processes(
         descendants = _descendant_pids(info, {process_pid})
         return [process_output(row) for pid, row in info.items() if pid in descendants or row["pgrp"] == process_pid]
     _capture_owned(ownership, info)
-    known = set(ownership["known"])
+    lock = ownership.get("lock")
+    if lock is None:
+        known = set(ownership["known"])
+    else:
+        with lock:
+            known = set(ownership["known"])
     return [
         process_output(row)
         for row in info.values()
@@ -320,6 +345,107 @@ def owned_builders(
     return rows
 
 
+def _owned_identity_rows(process_pid: int, ownership: dict | None) -> list[dict]:
+    """Return only current rows whose PID and start time were captured."""
+    rows = owned_processes(process_pid, ownership=ownership)
+    if ownership is None:
+        return rows
+    lock = ownership.get("lock")
+    if lock is None:
+        known = set(ownership["known"])
+    else:
+        with lock:
+            known = set(ownership["known"])
+    return [row for row in rows if process_key(row) in known]
+
+
+def _signal_rows(rows: list[dict], signal_number: int) -> None:
+    for row in rows:
+        pid = int(row["pid"])
+        if pid == os.getpid():
+            continue
+        try:
+            os.kill(pid, signal_number)
+        except (ProcessLookupError, PermissionError):
+            continue
+
+
+def _reap_rows(rows: list[dict], process_pid: int) -> None:
+    for row in rows:
+        pid = int(row["pid"])
+        # Popen owns the top-level wait; reaping it here would race the
+        # caller's process.wait(). Adopted descendants are safe to reap.
+        if pid in {os.getpid(), process_pid}:
+            continue
+        try:
+            os.waitpid(pid, os.WNOHANG)
+        except (ChildProcessError, ProcessLookupError, PermissionError):
+            continue
+
+
+def _terminate_owned_tree(process_pid: int, ownership: dict | None, reason: str) -> dict:
+    """Terminate and reap only identities owned by one gate step.
+
+    Individual PID signals are intentional here: a helper that calls
+    ``setsid`` is outside the original process group, while the captured
+    ``(pid,start_time)`` identities prevent a recycled PID from being killed.
+    The loop also captures children forked during cleanup before escalating to
+    SIGKILL.
+    """
+    term_sent = False
+    kill_sent = False
+    seen: dict[tuple[int, int | None], dict] = {}
+    deadline = time.monotonic() + PROCESS_KILL_GRACE_SECONDS
+    while True:
+        rows = _owned_identity_rows(process_pid, ownership)
+        for row in rows:
+            seen[process_key(row)] = process_output(row)
+        _reap_rows(rows, process_pid)
+        if not rows:
+            return {
+                "reason": reason,
+                "signal": "SIGKILL" if kill_sent else ("SIGTERM" if term_sent else None),
+                "seen": list(seen.values()),
+                "remaining": [],
+            }
+        if not term_sent:
+            _signal_rows(rows, signal.SIGTERM)
+            term_sent = True
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(PRE_EXIT_POLL_SECONDS)
+
+    rows = _owned_identity_rows(process_pid, ownership)
+    for row in rows:
+        seen[process_key(row)] = process_output(row)
+    _signal_rows(rows, signal.SIGKILL)
+    kill_sent = True
+    deadline = time.monotonic() + PROCESS_KILL_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        rows = _owned_identity_rows(process_pid, ownership)
+        for row in rows:
+            seen[process_key(row)] = process_output(row)
+        _reap_rows(rows, process_pid)
+        if not rows:
+            return {
+                "reason": reason,
+                "signal": "SIGKILL",
+                "seen": list(seen.values()),
+                "remaining": [],
+            }
+        time.sleep(PRE_EXIT_POLL_SECONDS)
+    rows = _owned_identity_rows(process_pid, ownership)
+    for row in rows:
+        seen[process_key(row)] = process_output(row)
+    _reap_rows(rows, process_pid)
+    return {
+        "reason": reason,
+        "signal": "SIGKILL",
+        "seen": list(seen.values()),
+        "remaining": rows,
+    }
+
+
 def post_exit_guard(process_pid: int, root: Path, target: Path, ownership: dict | None = None) -> dict:
     """Require owned builders to exit and the selected target to stabilize."""
     deadline = time.monotonic() + POST_EXIT_TIMEOUT_SECONDS
@@ -329,15 +455,23 @@ def post_exit_guard(process_pid: int, root: Path, target: Path, ownership: dict 
     while True:
         info = process_table()
         owned = owned_processes(process_pid, info, ownership)
+        _reap_rows(owned, process_pid)
+        if owned:
+            # Re-query after WNOHANG so a naturally exited adopted child is
+            # not mistaken for a live lifetime leak.
+            info = process_table()
+            owned = owned_processes(process_pid, info, ownership)
         leaked = owned_builders(process_pid, root, target, info, ownership)
         size = target_bytes(target)
         samples.append({"at": time.time(), "target_bytes": size, "owned": owned, "builders": leaked})
         if leaked:
-            raise RuntimeError(f"owned builder remained after child exit: {leaked}")
+            cleanup = _terminate_owned_tree(process_pid, ownership, "owned-builder-after-exit")
+            raise RuntimeError(f"owned builder remained after child exit: {leaked}; cleanup={cleanup}")
         if owned:
             stable_samples = 0
             if time.monotonic() >= deadline:
-                raise RuntimeError(f"owned child remained after child exit: {owned}")
+                cleanup = _terminate_owned_tree(process_pid, ownership, "owned-child-timeout")
+                raise RuntimeError(f"owned child remained after child exit: {owned}; cleanup={cleanup}")
             time.sleep(POST_EXIT_POLL_SECONDS)
             continue
         if previous_size is not None and size == previous_size:
@@ -347,7 +481,8 @@ def post_exit_guard(process_pid: int, root: Path, target: Path, ownership: dict 
         if stable_samples >= POST_EXIT_STABLE_SAMPLES:
             return {"target_bytes": size, "samples": samples}
         if time.monotonic() >= deadline:
-            raise RuntimeError(f"target did not stabilize after child exit: {samples[-1]}")
+            cleanup = _terminate_owned_tree(process_pid, ownership, "target-stability-timeout")
+            raise RuntimeError(f"target did not stabilize after child exit: {samples[-1]}; cleanup={cleanup}")
         previous_size = size
         time.sleep(POST_EXIT_POLL_SECONDS)
 
@@ -358,12 +493,14 @@ def target_bytes(target: Path) -> int:
     return int(subprocess.check_output(["du", "-sb", str(target)], text=True).split()[0])
 
 
-def _terminate_process_group(process: subprocess.Popen) -> None:
+def _terminate_process_group(process: subprocess.Popen, ownership: dict | None = None) -> dict | None:
     """Stop the isolated gate command before it reaches the hard target cap."""
+    if ownership is not None:
+        return _terminate_owned_tree(process.pid, ownership, "target-live-overflow")
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
+        return None
     deadline = time.monotonic() + PROCESS_KILL_GRACE_SECONDS
     while process.poll() is None and time.monotonic() < deadline:
         time.sleep(PRE_EXIT_POLL_SECONDS)
@@ -372,6 +509,7 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+    return None
 
 
 def _watch_target(
@@ -379,13 +517,24 @@ def _watch_target(
     target: Path,
     stop: threading.Event,
     overflow: list[dict],
+    ownership: dict | None = None,
 ) -> dict:
     """Enforce the live cap for every gate command, not just Cargo chunks."""
     maximum = target_bytes(target)
     samples = 0
+    exited_at: float | None = None
     while not stop.wait(PRE_EXIT_POLL_SECONDS):
         if process.poll() is not None:
-            break
+            if ownership is None:
+                break
+            owned = _owned_identity_rows(process.pid, ownership)
+            if not owned:
+                if exited_at is None:
+                    exited_at = time.monotonic()
+                if time.monotonic() - exited_at >= POST_EXIT_TIMEOUT_SECONDS:
+                    break
+            else:
+                exited_at = None
         size = target_bytes(target)
         maximum = max(maximum, size)
         samples += 1
@@ -397,7 +546,9 @@ def _watch_target(
                 "samples": samples,
             }
             overflow.append(detail)
-            _terminate_process_group(process)
+            cleanup = _terminate_process_group(process, ownership)
+            if cleanup is not None:
+                detail["cleanup"] = cleanup
             break
     return {"max_sampled_bytes": maximum, "samples": samples, "live_target": LIVE_TARGET}
 
@@ -556,18 +707,18 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     else:
         command = ["bash", "-c", step["command"]]
         process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+    ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
+    monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
+    monitor.start()
     live_stop = threading.Event()
     live_overflow: list[dict] = []
     live_guard_stats: dict = {}
     live_guard = threading.Thread(
-        target=lambda: live_guard_stats.update(_watch_target(process, target, live_stop, live_overflow)),
+        target=lambda: live_guard_stats.update(_watch_target(process, target, live_stop, live_overflow, ownership)),
         name=f"gate-target-guard-{process.pid}",
         daemon=True,
     )
     live_guard.start()
-    ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
-    monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
-    monitor.start()
     with log.open("w", encoding="utf-8") as stream:
         assert process.stdout is not None
         for line in process.stdout:
