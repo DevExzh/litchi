@@ -297,3 +297,34 @@ packet must migrate its own getter call when it merges. Standalone fuzz validati
 fallible Keynote `position()` result; `a0bf134246` now observes the error and
 returns before further work. The rerun passes with only the three pre-existing
 unused media constants. The final iWork harness check and receipt remain open.
+
+
+## Reviewed assembly merges, 2026-10-24
+
+Composed iWork source `a0bf134246` and receipt `4441c86bbe` merge at
+`9ea602e0e1`. The coordinator independently verified all successful and
+reported diagnostic logs, actual root configuration, three lock identities,
+and the minimal harness lock delta. Final package runs total 4,695 passing
+regular tests, with 96 passing doctests and 50 selected facade tests. Strict
+checks, operations targets, standalone fuzz and unified-batch iWork checks
+pass at their documented source boundaries. Existing ignored tests and the
+three unrelated fuzz media constants remain explicitly recorded. This is
+source/correctness integration; native qualification remains open.
+
+XLSB source `51c8628446`, documentation correction `c7aecdb536` and receipt
+`16ba8da04f` merge at `0d35a83a31`. The coordinator verified the five closed
+logs: 1,355 package tests including 42 doctests, strict all-target/all-feature
+Clippy over XLSB/ops/facade/Python, 126 operations tests, 23 facade tests and
+nine standalone CRUD harness tests. All actual root configuration and both
+locks match their recorded identities. The final target was 12,379,273,678
+bytes, below the decimal 20 GB cap. The receipt now distinguishes the r7
+pre-footer hash and the final closed log, and identifies the documentation-only
+slicer/timeline overlay that overlapped the standalone run; exact compiler-read
+timing was not captured. No native performance claim is made.
+
+The coordinator's diagnostic checkout is fast-forwarded to `0d35a83a31` and
+is running the repaired gate runner's `clippy-all-features` step against the
+combined CLI/ops/facade/Python consumers. This is a single selected check,
+not the final 53-step gate. Its build slot was released by XLSB. The other
+three slots now cover PPT, XLSX and DOCX validation. Final source freeze,
+all-68 inventory, full gate, corpus and native qualification remain required.
