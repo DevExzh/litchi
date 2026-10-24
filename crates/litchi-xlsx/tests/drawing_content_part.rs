@@ -515,7 +515,9 @@ fn alias_default_namespace_and_mixed_picture_content_part_order_stay_paired() {
     assert_eq!(source.pictures().len(), 2);
     assert_eq!(source.content_parts().len(), 2);
 
-    let typed = litchi_xlsx::drawing::parse(&xml).unwrap().unwrap();
+    let typed = litchi_xlsx::drawing::parse(&xml, &SourceLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(typed.objects().len(), 4);
     assert!(matches!(&typed.objects()[0], Object::Picture(_)));
     assert!(matches!(
@@ -615,7 +617,7 @@ fn strict_core_content_part_rejects_unknown_attributes_and_pairs_valid_typed_own
             "strict contentPart accepted an unknown attribute: {candidate}"
         );
         assert!(
-            litchi_xlsx::drawing::parse(&candidate).is_err(),
+            litchi_xlsx::drawing::parse(&candidate, &SourceLimits::default()).is_err(),
             "typed strict parser accepted an unknown attribute: {candidate}"
         );
     }
@@ -628,7 +630,9 @@ fn strict_core_content_part_rejects_unknown_attributes_and_pairs_valid_typed_own
     .unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(source.relationship_dialect(), RelationshipDialect::Strict);
-    let typed = litchi_xlsx::drawing::parse(&valid).unwrap().unwrap();
+    let typed = litchi_xlsx::drawing::parse(&valid, &SourceLimits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(typed.objects().len(), source.content_parts().len());
     for (index, owner) in source.content_parts().iter().enumerate() {
         let typed_anchor = match &typed.objects()[index] {

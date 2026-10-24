@@ -1526,7 +1526,7 @@ fn scanner_matches_typed_inventory_for_all_anchor_forms_and_direct_svg_owner() {
     );
     assert_eq!(source.pictures().len(), 3);
     let text = String::from_utf8(drawing_xml.clone()).unwrap();
-    let typed = parse(&text).unwrap().unwrap();
+    let typed = parse(&text, &SourceLimits::default()).unwrap().unwrap();
     let typed_anchors = typed
         .pictures()
         .map(|picture| *picture.drawing_anchor())

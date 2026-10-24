@@ -693,7 +693,7 @@ fn read_drawing<'a>(
     let text = str::from_utf8(drawing_part.blob())
         .map_err(|error| invalid(format!("worksheet drawing XML is not UTF-8: {error}")))?;
     let typed = Arc::new(
-        crate::drawing::parse_with_limits(text, &owner.package.read_limits())?
+        crate::drawing::parse(text, &owner.package.read_limits())?
             .ok_or_else(|| invalid("worksheet drawing is missing its wsDr root"))?,
     );
     let mut typed_picture_indices = Vec::new();
