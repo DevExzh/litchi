@@ -3712,3 +3712,28 @@ See [0063](0063-source-pptx-modern-comments.md).
   actual corpus replay, glossary closure and all required native qualification
   remain pending the source repairs. Only redaction audit 22 is deferred.
   Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, native protocol composition):
+  The PPT source-only qualification packet `4fbfe1205a` merges at
+  `e563cc486b`. Independent review verifies nonempty object, movie and
+  picture-bullet fixtures, route/digest bindings outside timing and mutation
+  rejection for both baseline/candidate normal and allocator binaries.
+  All 13 composed Python tests pass. Actual standalone baseline/candidate
+  compile checks are now scheduled; no native measurement is claimed.
+
+  The legacy packet `384740be13` is returned before committing its merge.
+  Although 64 combined Python tests pass, review of the executable handoff
+  finds a stale OLE feature contract, mismatched preparation/runner identity
+  digests and missing preparation-path separation. The resolved patch and
+  draft record are preserved externally, and the uncommitted merge is
+  aborted for a corrected leaf. Required integration tests now cover actual
+  manifest loading and the preparation-to-runner identity handoff.
+
+  Diagram and geometry/color/transform/formatcode2 raw packets also remain
+  under review returns for admission, XML grammar and retained-policy gaps.
+  Text/media's typed admission repair exposes a successful-output namespace
+  regression, which must be fixed before merge. Theme/ink remains under
+  review with output-preflight and nested-policy corrections underway.
+  New paired DrawingML and full OLE owner/history protocols are active work;
+  the earlier 17-lane catalog does not close those obligations. Only audit 22
+  remains deferred. Nothing is pushed.
