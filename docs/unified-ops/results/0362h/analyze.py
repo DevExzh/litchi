@@ -34,6 +34,23 @@ def load(path: Path):
         fail(f"{path}: {error}")
 
 
+def canonical(value: object) -> bytes:
+    return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def load_canonical(path: Path, label: str) -> dict:
+    value = load(path)
+    try:
+        payload = path.read_bytes()
+    except OSError as error:
+        fail(f"{label}: {error}")
+    if canonical(value) != payload:
+        fail(f"{label} is not canonical JSON")
+    if not isinstance(value, dict):
+        fail(f"{label} is not a JSON object")
+    return value
+
+
 def digest(path: Path) -> tuple[int, str]:
     try:
         size = path.stat().st_size
@@ -82,6 +99,188 @@ def check_endpoint(value, label: str) -> dict:
     if value["dependency_projection"]["sha256"] != dependency:
         fail(f"{label}.dependency_projection_sha256 does not identify the projection artifact")
     return value
+
+
+def _pair_policy_module():
+    root = Path(__file__).resolve().parents[4]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    try:
+        from tools import w8_projection_policy
+    except Exception as error:
+        fail(f"cannot load the reviewed original-to-final policy: {error}")
+    return w8_projection_policy
+
+
+def _pair_endpoint_part(endpoint: dict, label: str) -> dict:
+    def hash_of(name: str) -> str:
+        value = endpoint.get(name)
+        if not isinstance(value, dict) or not isinstance(value.get("sha256"), str):
+            fail(f"{label} endpoint has no {name} identity")
+        return value["sha256"]
+
+    manifest = endpoint.get("manifest")
+    if not isinstance(manifest, dict):
+        fail(f"{label} endpoint has no manifest identity")
+    source_commit = endpoint.get("source_commit")
+    if not isinstance(source_commit, str):
+        fail(f"{label} endpoint has no source commit")
+    projection = endpoint.get("dependency_projection_sha256")
+    if not isinstance(projection, str):
+        fail(f"{label} endpoint has no projection identity")
+    return {
+        "manifest": dict(manifest),
+        "source_commit": source_commit,
+        "source_sha256": hash_of("source"),
+        "workspace_manifest_sha256": hash_of("workspace_manifest"),
+        "package_manifest_sha256": hash_of("package_manifest"),
+        "lock_sha256": hash_of("lock"),
+        "projection_sha256": projection,
+    }
+
+
+def _check_pair_endpoint_document(endpoint: dict, label: str) -> dict:
+    manifest = endpoint.get("manifest")
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("path"), str):
+        fail(f"{label} endpoint manifest identity is missing")
+    value = load_canonical(Path(manifest["path"]), f"{label} endpoint manifest")
+    if value.get("schema") != "litchi_file_endpoint.v1":
+        fail(f"{label} endpoint manifest schema is invalid")
+    for name in (
+        "binary", "source", "lock", "probe", "fixture", "dependency_projection",
+        "workspace_manifest", "package_manifest", "toolchain", "source_assembly",
+        "build_receipt", "validation",
+    ):
+        if value.get(name) != endpoint.get(name):
+            fail(f"{label} endpoint manifest {name} differs from provenance")
+    if value.get("source_commit") != endpoint.get("source_commit"):
+        fail(f"{label} endpoint manifest source commit differs from provenance")
+    if value.get("dependency_projection_sha256") != endpoint.get("dependency_projection_sha256"):
+        fail(f"{label} endpoint manifest projection differs from provenance")
+    return value
+
+
+def _check_pair_fixed_inputs(policy, endpoint: dict, side: str, label: str) -> None:
+    expected = policy.FIXED_INPUTS[side]
+    if endpoint.get("source_commit") != expected["source_commit"]:
+        fail(f"{label} source commit differs from the reviewed original-to-final policy")
+    expected_artifacts = {
+        "source": expected["source"],
+        "workspace_manifest": expected["workspace_manifest"],
+        "package_manifest": expected["package_manifest"],
+        "toolchain": expected["toolchain"],
+        "lock": expected["lock"],
+        "probe": {"bytes": policy.PROBE_BYTES, "sha256": policy.PROBE_SHA256},
+        "fixture": {"bytes": policy.FIXTURE_BYTES, "sha256": policy.FIXTURE_SHA256},
+    }
+    for name, expected_artifact in expected_artifacts.items():
+        actual = endpoint.get(name)
+        if not isinstance(actual, dict) or (actual.get("bytes"), actual.get("sha256")) != (
+            expected_artifact["bytes"], expected_artifact["sha256"]
+        ):
+            fail(f"{label} {name} differs from the reviewed original-to-final policy")
+    if endpoint.get("dependency_projection_sha256") != expected["projection"]["sha256"]:
+        fail(f"{label} projection differs from the reviewed original-to-final policy")
+
+
+def check_original_to_final_shared(
+    shared: dict,
+    before_endpoint: dict,
+    after_endpoint: dict,
+    routes: list[str],
+) -> dict:
+    """Verify the explicit pair record instead of ordinary shared identity.
+
+    Ordinary W8 receipts still use ``shared_identity`` in ``main``. Pair
+    receipts deliberately carry different endpoint projection/lock/source
+    identities, so this branch binds the mode, reviewed policy, exact pair
+    receipt, fixed endpoint inputs, and the recomputed graph proof.
+    """
+    expected_keys = {"mode", "policy", "receipt", "projection", "workload", "build"}
+    if set(shared) != expected_keys or shared.get("mode") != "original_to_final":
+        fail("original-to-final shared provenance has an invalid mode or field set")
+    policy = _pair_policy_module()
+    try:
+        reviewed = policy.load_reviewed_policy()
+    except Exception as error:
+        fail(f"original-to-final policy is not accepted: {error}")
+    policy_identity = {
+        "schema": reviewed["schema"],
+        "version": reviewed["policy_version"],
+        "sha256": policy.REVIEWED_POLICY_SHA256,
+    }
+    if shared.get("policy") != policy_identity:
+        fail("original-to-final shared policy identity is not the reviewed policy")
+    for endpoint, side, label in (
+        (before_endpoint, "before", "before"),
+        (after_endpoint, "after", "after"),
+    ):
+        _check_pair_endpoint_document(endpoint, label)
+        _check_pair_fixed_inputs(policy, endpoint, side, label)
+
+    if len(routes) != 109 or len(set(routes)) != 109:
+        fail("original-to-final workload does not contain the exact 109-route order")
+    try:
+        from tools import w8_file_provenance as provenance
+        fixture_routes = []
+        for endpoint, label in ((before_endpoint, "before"), (after_endpoint, "after")):
+            fixture = load_canonical(Path(endpoint["fixture"]["path"]), f"{label}.fixture")
+            current = provenance.fixture_routes(fixture, f"{label}.fixture")
+            if fixture_routes and current != fixture_routes:
+                fail("original-to-final endpoint fixture route orders differ")
+            fixture_routes = current
+        if fixture_routes != routes:
+            fail("original-to-final workload route order differs from endpoint fixtures")
+    except SystemExit:
+        raise
+    except Exception as error:
+        fail(f"original-to-final fixture route verification failed: {error}")
+
+    expected_workload = {
+        "probe_sha256": policy.PROBE_SHA256,
+        "fixture_sha256": policy.FIXTURE_SHA256,
+        "route_count": 109,
+        "routes": routes,
+    }
+    expected_build = {
+        "target": policy.TARGET,
+        "profile": policy.PROFILE,
+        "features": list(policy.FEATURES),
+        "toolchain_sha256": policy.TOOLCHAIN_SHA256,
+    }
+    try:
+        before_projection = load_canonical(
+            Path(before_endpoint["dependency_projection"]["path"]),
+            "before dependency projection",
+        )
+        after_projection = load_canonical(
+            Path(after_endpoint["dependency_projection"]["path"]),
+            "after dependency projection",
+        )
+        expected_projection = policy.validate_projection_pair(before_projection, after_projection)
+    except Exception as error:
+        fail(f"original-to-final projection proof is not accepted: {error}")
+    expected_receipt = {
+        "schema": policy.PAIR_SCHEMA,
+        "policy": policy_identity,
+        "before": _pair_endpoint_part(before_endpoint, "before"),
+        "after": _pair_endpoint_part(after_endpoint, "after"),
+        "workload": expected_workload,
+        "build": expected_build,
+        "projection": expected_projection,
+        "status": "verified_protocol_only",
+    }
+    receipt = check_artifact(shared.get("receipt"), "original-to-final receipt")
+    receipt_value = load_canonical(Path(receipt["path"]), "original-to-final receipt")
+    if receipt_value != expected_receipt:
+        fail("original-to-final receipt is stale or does not bind the verified pair")
+    if (
+        shared.get("workload") != expected_workload
+        or shared.get("build") != expected_build
+        or shared.get("projection") != expected_projection
+    ):
+        fail("original-to-final shared metadata differs from the verified pair")
+    return shared
 
 
 def check_host(path: Path, label: str) -> None:
@@ -269,17 +468,24 @@ def main() -> None:
     shared = provenance.get("shared")
     if not isinstance(shared, dict):
         fail("manifest.provenance.shared is missing")
-    shared_names = {
-        "dependency_projection_sha256": "dependency_projection_sha256",
-        "lock_sha256": "lock",
-        "probe_sha256": "probe",
-        "fixture_sha256": "fixture",
-    }
-    for key, endpoint_key in shared_names.items():
-        before_value = before_endpoint[endpoint_key] if endpoint_key == "dependency_projection_sha256" else before_endpoint[endpoint_key]["sha256"]
-        after_value = after_endpoint[endpoint_key] if endpoint_key == "dependency_projection_sha256" else after_endpoint[endpoint_key]["sha256"]
-        if shared.get(key) != before_value or shared.get(key) != after_value:
-            fail(f"shared provenance {key} differs between endpoint manifests")
+    if shared.get("mode") == "original_to_final":
+        check_original_to_final_shared(shared, before_endpoint, after_endpoint, routes)
+    else:
+        # Ordinary W8 analysis remains the strict shared-identity contract.
+        # Do not let a missing/unknown mode silently select the pair rules.
+        if "mode" in shared:
+            fail(f"unknown shared provenance mode: {shared.get('mode')!r}")
+        shared_names = {
+            "dependency_projection_sha256": "dependency_projection_sha256",
+            "lock_sha256": "lock",
+            "probe_sha256": "probe",
+            "fixture_sha256": "fixture",
+        }
+        for key, endpoint_key in shared_names.items():
+            before_value = before_endpoint[endpoint_key] if endpoint_key == "dependency_projection_sha256" else before_endpoint[endpoint_key]["sha256"]
+            after_value = after_endpoint[endpoint_key] if endpoint_key == "dependency_projection_sha256" else after_endpoint[endpoint_key]["sha256"]
+            if shared.get(key) != before_value or shared.get(key) != after_value:
+                fail(f"shared provenance {key} differs between endpoint manifests")
     if before_endpoint["binary"]["sha256"] != before_binary["sha256"] or after_endpoint["binary"]["sha256"] != after_binary["sha256"]:
         fail("endpoint manifests do not identify the selected binaries")
 
