@@ -538,11 +538,16 @@ impl Base {
     /// records live in the live document or a slide.
     pub(crate) fn native(&self) -> Result<slide_order::Snapshot, Failure> {
         let bytes = self.shared_bytes()?;
-        Ok(slide_order::Snapshot::from_package_with_options(
+        let snapshot = slide_order::Snapshot::from_package_with_options(
             &self.package,
             bytes,
             self.open_options(),
-        )?)
+        );
+        // Preserve the edit-entry source fence even when the native snapshot
+        // reused cached package projections whose own check observed a newer
+        // baseline during construction.
+        self.ensure_source_version()?;
+        Ok(snapshot?)
     }
 
     /// The exact current bytes of one persisted owner record.
@@ -1239,6 +1244,25 @@ mod tests {
 
         assert!(matches!(
             base.bytes(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn native_projection_rechecks_a_cached_positional_source() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = super::Base::capture(&package).unwrap();
+        base.bytes().unwrap();
+        source.change();
+
+        assert!(matches!(
+            base.native(),
             Err(super::Failure::Package(Error::Ole(
                 OleError::SourceChanged { .. }
             )))
