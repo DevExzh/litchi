@@ -111,7 +111,7 @@ fn xls_named(objects: &[OleObjectRecord], storages: &[(&str, u32)]) -> Vec<u8> {
 #[test]
 fn opens_link_storage_from_dde_obj_reference() {
     let bytes = xls_named(&[linked_object(1, 42, 1)], &[("LNK", 42)]);
-    let editor = litchi_xls::Package::from_bytes(&bytes)
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
         .unwrap()
         .edit_ole_objects()
         .unwrap();
@@ -151,7 +151,7 @@ fn add_and_reorder_repairs_sheet_offset_and_preserves_unknown_data() {
         .unwrap();
     editor.reorder_objects(0, &[2, 1]).unwrap();
     let bytes = editor.commit().unwrap().patch().after().to_vec();
-    let editor = litchi_xls::Package::from_bytes(&bytes)
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
         .unwrap()
         .edit_ole_objects()
         .unwrap();

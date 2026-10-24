@@ -296,10 +296,17 @@ impl crate::Package {
     /// Returns the same errors as [`Self::edit_ole_objects`], or a limit
     /// error when the package exceeds `options`.
     pub fn edit_ole_objects_with_options(&self, options: EditOptions) -> Result<super::Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Ok(super::Edit::new(
-            base,
-            Snapshot::open(bytes, options.limits_value())?,
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::Protected,
+                "edit OLE objects",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(super::Edit::lazy(
+            Some(self.clone()),
+            self.clone(),
+            options.limits_value(),
         ))
     }
 

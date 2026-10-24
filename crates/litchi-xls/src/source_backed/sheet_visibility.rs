@@ -15,16 +15,34 @@ pub use crate::sheet_visibility::source_diagnostics::Diagnostics;
 #[derive(Clone)]
 pub struct Edit {
     source: SourceBackedWorkbook,
-    inner: crate::sheet_visibility::Edit,
+    inner: Option<crate::sheet_visibility::Edit>,
 }
 
 impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("Edit").finish_non_exhaustive()
+        formatter
+            .debug_struct("Edit")
+            .field("materialized", &self.inner.is_some())
+            .finish_non_exhaustive()
     }
 }
 
 impl Edit {
+    fn inner_mut(&mut self) -> Result<&mut crate::sheet_visibility::Edit> {
+        if self.inner.is_none() {
+            let package = self.source.staging_package().map_err(|error| {
+                crate::source_backed::protected_edit_error(error, "edit sheet visibility")
+            })?;
+            let inner = package.edit_sheet_visibility().map_err(|error| {
+                crate::source_backed::protected_edit_error(error, "edit sheet visibility")
+            })?;
+            self.inner = Some(inner);
+        }
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed visibility edit engine was not retained",
+        ))
+    }
+
     /// Stage one exact visible, hidden or very-hidden outcome.
     ///
     /// # Errors
@@ -35,7 +53,7 @@ impl Edit {
         selector: Selector<'_>,
         visibility: SheetVisibility,
     ) -> Result<&mut Self> {
-        self.inner.set_visibility(selector, visibility)?;
+        self.inner_mut()?.set_visibility(selector, visibility)?;
         Ok(self)
     }
 
@@ -75,7 +93,7 @@ impl Edit {
     where
         I: IntoIterator<Item = (Selector<'a>, SheetVisibility)>,
     {
-        self.inner.set_visibility_batch(changes)?;
+        self.inner_mut()?.set_visibility_batch(changes)?;
         Ok(self)
     }
 
@@ -87,8 +105,24 @@ impl Edit {
     /// Returns a refusal for a protected, signed, encrypted, stale or
     /// last-visible-sheet edit, or a failed readback.
     pub fn commit(self) -> Result<Commit> {
-        let (plan, diagnostics) = self.inner.commit_source_backed()?.into_plan();
-        published(&self.source, plan, diagnostics)
+        let source = self.source.clone();
+        source.ensure_original_source_current()?;
+        let inner = match self.inner {
+            Some(inner) => inner,
+            None => {
+                let package = source.staging_package().map_err(|error| {
+                    crate::source_backed::protected_edit_error(error, "edit sheet visibility")
+                })?;
+                package.edit_sheet_visibility().map_err(|error| {
+                    crate::source_backed::protected_edit_error(error, "edit sheet visibility")
+                })?
+            },
+        };
+        let (plan, diagnostics) = inner.commit_source_backed()?.into_plan();
+        source.ensure_original_source_current()?;
+        let commit = published(&source, plan, diagnostics)?;
+        source.ensure_original_source_current()?;
+        Ok(commit)
     }
 }
 
@@ -99,15 +133,10 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook's sheet table cannot be read.
     pub fn edit_sheet_visibility(&self) -> Result<Edit> {
-        let package = self.staging_package().map_err(|error| {
-            crate::source_backed::protected_edit_error(error, "edit sheet visibility")
-        })?;
-        let inner = package.edit_sheet_visibility().map_err(|error| {
-            crate::source_backed::protected_edit_error(error, "edit sheet visibility")
-        })?;
+        self.ensure_original_source_current()?;
         Ok(Edit {
             source: self.clone(),
-            inner,
+            inner: None,
         })
     }
 

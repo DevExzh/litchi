@@ -99,14 +99,6 @@ impl Snapshot {
         &self.inner.user_names
     }
 
-    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
-        Edit {
-            base,
-            source: self.clone(),
-            user_names: self.inner.user_names.edit(),
-        }
-    }
-
     /// Return the exact validated source artifact.
     #[must_use]
     pub fn finish(&self) -> Vec<u8> {
@@ -136,33 +128,71 @@ impl Eq for Snapshot {}
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    source: Snapshot,
-    user_names: UserNamesEdit,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
+    user_names: Option<UserNamesEdit>,
+    options: EditOptions,
 }
 
 impl Edit {
-    /// The immutable package snapshot used as the publication source.
-    #[must_use]
-    pub const fn source(&self) -> &Snapshot {
-        &self.source
+    fn lazy(package: crate::Package, options: EditOptions) -> Self {
+        Self {
+            base: Some(package.clone()),
+            package: Some(package),
+            source: None,
+            user_names: None,
+            options,
+        }
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        if self.user_names.is_some() {
+            return Ok(());
+        }
+        let package = self
+            .package
+            .clone()
+            .ok_or_else(|| Error::InvalidData("User Names edit lost its source package".into()))?;
+        let (_, bytes) = crate::scoped::capture(&package)?;
+        let source = Snapshot::from_bytes(bytes, self.options.limits_value())?;
+        self.user_names = Some(source.inner.user_names.edit());
+        self.source = Some(source);
+        Ok(())
     }
 
     /// The immutable package snapshot used as the publication source.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub fn source(&mut self) -> Result<&Snapshot> {
+        self.ensure_open()?;
+        self.source
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("User Names edit source was not retained".into()))
+    }
+
+    /// The immutable package snapshot used as the publication source.
+    #[must_use]
+    pub fn before(&mut self) -> Result<&Snapshot> {
         self.source()
     }
 
     /// Borrow staged User Names entries in source order.
     #[must_use]
-    pub fn users(&self) -> &[super::UserEntry] {
-        self.user_names.users()
+    pub fn users(&mut self) -> Result<&[super::UserEntry]> {
+        self.ensure_open()?;
+        self.user_names
+            .as_ref()
+            .map(UserNamesEdit::users)
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))
     }
 
     /// Borrow the staged User Names semantic projection.
     #[must_use]
-    pub fn model(&self) -> &super::UserNames {
-        self.user_names.model()
+    pub fn model(&mut self) -> Result<&super::UserNames> {
+        self.ensure_open()?;
+        self.user_names
+            .as_ref()
+            .map(UserNamesEdit::model)
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))
     }
 
     /// Stage a User Names display-name change.
@@ -172,7 +202,11 @@ impl Edit {
     /// Returns an index, name, or bounded stream error without changing this
     /// transaction.
     pub fn set_user_name(&mut self, index: usize, name: impl Into<String>) -> Result<&mut Self> {
-        self.user_names.set_user_name(index, name)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .set_user_name(index, name)?;
         Ok(self)
     }
 
@@ -187,7 +221,11 @@ impl Edit {
         index: usize,
         opened_at: crate::revision_records::ShortDtr,
     ) -> Result<&mut Self> {
-        self.user_names.set_user_opened_at(index, opened_at)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .set_user_opened_at(index, opened_at)?;
         Ok(self)
     }
 
@@ -212,7 +250,11 @@ impl Edit {
     /// Returns an index, GUID-closure, duplicate-ID, or bound error without
     /// changing this transaction.
     pub fn insert(&mut self, index: usize, user: super::UserEntry) -> Result<&mut Self> {
-        self.user_names.insert(index, user)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .insert(index, user)?;
         Ok(self)
     }
 
@@ -223,7 +265,11 @@ impl Edit {
     /// Returns a GUID-closure, duplicate-ID, or bound error without changing
     /// this transaction.
     pub fn push(&mut self, user: super::UserEntry) -> Result<&mut Self> {
-        self.user_names.push(user)?;
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .push(user)?;
         Ok(self)
     }
 
@@ -244,7 +290,11 @@ impl Edit {
     /// Returns an index or bounded stream error without changing the source
     /// package.
     pub fn remove(&mut self, index: usize) -> Result<super::UserEntry> {
-        self.user_names.remove(index)
+        self.ensure_open()?;
+        self.user_names
+            .as_mut()
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?
+            .remove(index)
     }
 
     /// Validate and publish the complete XLS package with a reversible patch.
@@ -266,10 +316,15 @@ impl Edit {
         Ok(Commit::new(package, patch, diagnostics))
     }
 
-    pub(crate) fn commit_record(self) -> Result<(Snapshot, Patch)> {
+    pub(crate) fn commit_record(mut self) -> Result<(Snapshot, Patch)> {
+        self.ensure_open()?;
         let Self {
             source, user_names, ..
         } = self;
+        let source = source
+            .ok_or_else(|| Error::InvalidData("User Names edit source was not retained".into()))?;
+        let user_names = user_names
+            .ok_or_else(|| Error::InvalidData("User Names edit was not retained".into()))?;
         let user_names_commit = user_names.commit()?;
         if !user_names_commit.diagnostics().changed() {
             return Ok((
@@ -303,7 +358,7 @@ impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("UserNamesPackageEdit")
-            .field("source", &self.source)
+            .field("materialized", &self.source.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -383,8 +438,14 @@ impl crate::Package {
     /// Returns the same errors as [`Self::edit_user_names`], or a limit error
     /// when the package exceeds `options`.
     pub fn edit_user_names_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Ok(Snapshot::from_bytes(bytes, options.limits_value())?.edit_based(base))
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit user names",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Edit::lazy(self.clone(), options))
     }
 
     /// Replay a `User Names` patch onto the exact package it was made from.

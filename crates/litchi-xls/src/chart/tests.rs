@@ -214,8 +214,8 @@ mod chart_tests {
             value: Value::Number(42.0),
         });
         let bytes = build_workbook_fixture(chart, Limits::default()).unwrap();
-        let editor = Edit::open(bytes, Limits::default()).unwrap();
-        let mut charts = editor.charts();
+        let mut editor = Edit::open(bytes, Limits::default()).unwrap();
+        let mut charts = editor.charts().unwrap();
         assert_eq!(charts.len(), 1);
         let chart = charts.next().unwrap();
         assert_eq!(
@@ -287,7 +287,12 @@ mod chart_tests {
     fn editor_and_package_share_the_workbook_stream_allocation() {
         let bytes = build_workbook_fixture(Chart::default(), Limits::default()).unwrap();
         let editor = Edit::open(bytes, Limits::default()).unwrap();
-        let captured = editor.package.stream_shared(&editor.workbook_path).unwrap();
+        let captured = editor
+            .package
+            .as_ref()
+            .unwrap()
+            .stream_shared(&editor.workbook_path)
+            .unwrap();
         assert!(Arc::ptr_eq(&captured, &editor.workbook));
     }
 

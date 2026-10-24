@@ -31,7 +31,7 @@ use litchi_cfb::{OleFileLimits, SharedOleFile};
 use litchi_core::SourceVersion;
 use litchi_ole_common::object::Limits as ObjectLimits;
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub use crate::error::LimitKind;
 
@@ -419,7 +419,8 @@ impl Commit {
 /// Detached primary XLS edit backed by the checked cell-values snapshot.
 pub struct Edit {
     package: Package,
-    inner: cell_values::Edit,
+    inner: Option<cell_values::Edit>,
+    lazy: LazySnapshot,
     options: EditOptions,
     source_guard: Option<SourceGuard>,
 }
@@ -430,6 +431,7 @@ impl fmt::Debug for Edit {
             .debug_struct("Edit")
             .field("package", &self.package)
             .field("options", &self.options)
+            .field("materialized", &self.inner.is_some())
             .field("source_backed", &self.source_guard.is_some())
             .finish_non_exhaustive()
     }
@@ -439,6 +441,59 @@ impl fmt::Debug for Edit {
 struct SourceGuard {
     source: Arc<SharedOleFile>,
     expected: SourceVersion,
+    /// A deferred or handed-off source owner retains the original dynamic
+    /// source separately from its composed CFB target.  Keep that owner in
+    /// the primary package guard so a mutation is promoted to the typed
+    /// `SourceChanged` result before the composed target can report I/O.
+    original: Option<crate::SourceBackedWorkbook>,
+}
+
+/// Demand-driven semantic snapshot for the primary edit.
+///
+/// Package admission already retains the source owner and its policies, so
+/// constructing an edit only clones those handles.  BIFF validation and the
+/// cell indexes are built on the first source lookup, staged verb, or commit;
+/// a successful snapshot is reused by all later operations.
+struct LazySnapshot {
+    package: Package,
+    options: EditOptions,
+    snapshot: OnceLock<cell_values::Snapshot>,
+}
+
+impl LazySnapshot {
+    fn new(package: Package, options: EditOptions) -> Self {
+        Self {
+            package,
+            options,
+            snapshot: OnceLock::new(),
+        }
+    }
+
+    fn get(&self) -> Result<&cell_values::Snapshot> {
+        if let Some(snapshot) = self.snapshot.get() {
+            return Ok(snapshot);
+        }
+        let snapshot = self
+            .package
+            .edit_snapshot_with_options(self.options)
+            .map_err(Error::Package)?;
+        let _ = self.snapshot.set(snapshot);
+        self.snapshot
+            .get()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "XLS edit snapshot was not retained",
+            )))
+    }
+
+    fn into_edit(self) -> Result<cell_values::Edit> {
+        if let Some(snapshot) = self.snapshot.into_inner() {
+            return Ok(snapshot.edit());
+        }
+        self.package
+            .edit_snapshot_with_options(self.options)
+            .map_err(Error::Package)
+            .map(|snapshot| snapshot.edit())
+    }
 }
 
 impl Edit {
@@ -448,14 +503,11 @@ impl Edit {
     ) -> Result<Self> {
         super::ensure_publication_allowed(&package.inner).map_err(Error::Package)?;
         let source_guard = capture_source_guard(&package)?;
-        let snapshot = package
-            .edit_snapshot_with_options(options)
-            .map_err(Error::Package)?;
         check_source_guard(source_guard.as_ref())?;
-        let inner = snapshot.edit();
         Ok(Self {
+            lazy: LazySnapshot::new(package.clone(), options),
             package,
-            inner,
+            inner: None,
             options,
             source_guard,
         })
@@ -470,11 +522,24 @@ impl Edit {
     ) -> Result<Self> {
         let source_guard = capture_source_guard(&package)?;
         Ok(Self {
+            lazy: LazySnapshot::new(package.clone(), options),
             package,
-            inner,
+            inner: Some(inner),
             options,
             source_guard,
         })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut cell_values::Edit> {
+        if self.inner.is_none() {
+            let inner = self.lazy.get()?.edit();
+            self.inner = Some(inner);
+        }
+        self.inner
+            .as_mut()
+            .ok_or(Error::Package(PackageError::InvalidData(
+                "XLS edit engine was not retained",
+            )))
     }
 
     /// Join another edit of the same source package when the two are provably
@@ -488,7 +553,16 @@ impl Edit {
         &mut self,
         incoming: Self,
     ) -> std::result::Result<&mut Self, cell_values::JoinError> {
-        self.inner.join(incoming.inner)?;
+        let incoming = match incoming.inner {
+            Some(inner) => inner,
+            None => incoming
+                .lazy
+                .into_edit()
+                .map_err(|_| cell_values::JoinError::Allocation)?,
+        };
+        self.inner_mut()
+            .map_err(|_| cell_values::JoinError::Allocation)?
+            .join(incoming)?;
         Ok(self)
     }
 
@@ -534,7 +608,8 @@ impl Edit {
     ) -> Result<Option<&cell_values::Cell>> {
         check_source_guard(self.source_guard.as_ref())?;
         let result = self
-            .inner
+            .lazy
+            .get()?
             .source_cell(selector.into(), reference)
             .map_err(Error::from);
         check_source_guard(self.source_guard.as_ref())?;
@@ -548,7 +623,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_numeric(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -560,7 +635,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_number(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -577,7 +652,7 @@ impl Edit {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
         let donor = donor.edit_snapshot_with_options(options)?;
-        let mut candidate = self.inner.clone();
+        let mut candidate = self.inner_mut()?.clone();
         let copied = candidate
             .copy_scalar_cells_from(
                 &donor,
@@ -590,7 +665,7 @@ impl Edit {
             .is_some();
         check_source_guard(guard.as_ref())?;
         if copied {
-            self.inner = candidate;
+            self.inner = Some(candidate);
         }
         Ok(copied.then_some(self))
     }
@@ -607,7 +682,7 @@ impl Edit {
         let guard = capture_source_guard(donor)?;
         let options = donor.retained_edit_options()?;
         let donor = donor.edit_snapshot_with_options(options)?;
-        let mut candidate = self.inner.clone();
+        let mut candidate = self.inner_mut()?.clone();
         let copied = candidate
             .copy_scalar_cell_from(
                 &donor,
@@ -620,7 +695,7 @@ impl Edit {
             .is_some();
         check_source_guard(guard.as_ref())?;
         if copied {
-            self.inner = candidate;
+            self.inner = Some(candidate);
         }
         Ok(copied.then_some(self))
     }
@@ -632,7 +707,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: cell_values::Value,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_value(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -643,7 +718,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         reference: cell_values::Reference,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .clear_cell(selector.into(), reference)
             .map_err(Error::from)
     }
@@ -655,7 +730,7 @@ impl Edit {
         reference: cell_values::Reference,
         value: cell_values::Value,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_cell(selector.into(), reference, value)
             .map_err(Error::from)
     }
@@ -668,7 +743,7 @@ impl Edit {
         value: cell_values::Value,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_cell_with_style(selector.into(), reference, value, style)
             .map_err(Error::from)
     }
@@ -681,7 +756,7 @@ impl Edit {
         text: String,
         formatting_runs: Vec<crate::records::SharedStringFormatRun>,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_rich_text_cell(selector.into(), reference, text, formatting_runs)
             .map_err(Error::from)
     }
@@ -693,7 +768,7 @@ impl Edit {
         reference: cell_values::Reference,
         expression: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_formula(selector.into(), reference, expression)
             .map_err(Error::from)
     }
@@ -706,7 +781,7 @@ impl Edit {
         expression: &str,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_formula_with_style(selector.into(), reference, expression, style)
             .map_err(Error::from)
     }
@@ -723,7 +798,7 @@ impl Edit {
         reference: cell_values::Reference,
         expression: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_formula(selector.into(), reference, expression)
             .map_err(Error::from)
     }
@@ -739,7 +814,7 @@ impl Edit {
         row: u16,
         twips: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_row_height(selector.into(), row, twips)
             .map_err(Error::from)
     }
@@ -755,7 +830,7 @@ impl Edit {
         row: u16,
         hidden: bool,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_row_hidden(selector.into(), row, hidden)
             .map_err(Error::from)
     }
@@ -772,7 +847,7 @@ impl Edit {
         column: u8,
         width: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_column_width(selector.into(), column, width)
             .map_err(Error::from)
     }
@@ -789,7 +864,7 @@ impl Edit {
         column: u8,
         hidden: bool,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_column_hidden(selector.into(), column, hidden)
             .map_err(Error::from)
     }
@@ -806,7 +881,7 @@ impl Edit {
         reference: cell_values::Reference,
         change: &cell_values::FormatChange,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_cell_format(selector.into(), reference, change)
             .map_err(Error::from)
     }
@@ -817,7 +892,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         reference: cell_values::Reference,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_cell(selector.into(), reference)
             .map_err(Error::from)
     }
@@ -829,7 +904,7 @@ impl Edit {
         reference: cell_values::Reference,
         style: cell_values::StyleIndex,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_style(selector.into(), reference, style)
             .map_err(Error::from)
     }
@@ -839,12 +914,14 @@ impl Edit {
         &mut self,
         source: cell_values::StyleIndex,
     ) -> Result<cell_values::StyleIndex> {
-        self.inner.duplicate_style(source).map_err(Error::from)
+        self.inner_mut()?
+            .duplicate_style(source)
+            .map_err(Error::from)
     }
 
     /// Author one validated workbook XF resource for later style operations.
     pub fn author_style(&mut self, payload: &[u8]) -> Result<cell_values::StyleIndex> {
-        self.inner.author_style(payload).map_err(Error::from)
+        self.inner_mut()?.author_style(payload).map_err(Error::from)
     }
 
     /// Insert rows and shift the checked worksheet closure.
@@ -854,7 +931,7 @@ impl Edit {
         start: u16,
         count: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_rows(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -866,7 +943,7 @@ impl Edit {
         start: u16,
         count: u16,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .delete_rows(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -878,7 +955,7 @@ impl Edit {
         start: u8,
         count: u8,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_columns(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -890,7 +967,7 @@ impl Edit {
         start: u8,
         count: u8,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .delete_columns(selector.into(), start, count)
             .map_err(Error::from)
     }
@@ -901,7 +978,7 @@ impl Edit {
         selector: impl Into<cell_values::Selector<'a>>,
         name: &str,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .rename_sheet(selector.into(), name)
             .map_err(Error::from)
     }
@@ -933,7 +1010,7 @@ impl Edit {
     /// Returns a typed selector, protection, dependency-closure or
     /// exclusivity refusal without staging.
     pub fn reorder_sheets(&mut self, order: &[cell_values::Selector<'_>]) -> Result<()> {
-        self.inner.reorder_sheets(order).map_err(Error::from)
+        self.inner_mut()?.reorder_sheets(order).map_err(Error::from)
     }
 
     /// Insert one empty worksheet at a complete-catalog position.
@@ -943,7 +1020,9 @@ impl Edit {
     /// Returns a typed name, uniqueness, position, protection, macro-project
     /// or dependency-closure refusal without staging.
     pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
-        self.inner.insert_sheet(position, name).map_err(Error::from)
+        self.inner_mut()?
+            .insert_sheet(position, name)
+            .map_err(Error::from)
     }
 
     /// Remove one ordinary worksheet tab.
@@ -956,7 +1035,7 @@ impl Edit {
         &mut self,
         selector: impl Into<cell_values::Selector<'a>>,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_sheet(selector.into())
             .map_err(Error::from)
     }
@@ -965,7 +1044,11 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         check_source_guard(self.source_guard.as_ref())?;
         let source = self.package.clone();
-        let leaf_commit = self.inner.commit().map_err(Error::from)?;
+        let inner = match self.inner {
+            Some(inner) => inner,
+            None => self.lazy.into_edit()?,
+        };
+        let leaf_commit = inner.commit().map_err(Error::from)?;
         check_source_guard(self.source_guard.as_ref())?;
         let leaf_diagnostics = leaf_commit.diagnostics();
         let (leaf_snapshot, leaf_patch) = leaf_commit.into_parts();
@@ -1072,13 +1155,26 @@ impl Package {
 
 fn capture_source_guard(package: &Package) -> Result<Option<SourceGuard>> {
     match &package.inner.state {
-        PackageState::Source { cfb, .. } => {
-            let expected = cfb.source_version().map_err(|error| {
-                Error::Package(PackageError::Source(SourceBackedError::from(error)))
-            })?;
+        PackageState::Source { cfb, workbook, .. } => {
+            let original = workbook.needs_source_fence().then(|| workbook.clone());
+            check_original_source_guard(original.as_ref())?;
+            let expected = match cfb.source_version() {
+                Ok(expected) => expected,
+                Err(error) => {
+                    // The original check above and this target observation
+                    // are separate windows.  A composed target can report
+                    // an in-flight original mutation as CFB/I/O here, before
+                    // a SourceGuard exists; promote the original error first.
+                    check_original_source_guard(original.as_ref())?;
+                    return Err(Error::Package(PackageError::Source(
+                        SourceBackedError::from(error),
+                    )));
+                },
+            };
             Ok(Some(SourceGuard {
                 source: Arc::clone(cfb),
                 expected,
+                original,
             }))
         },
         PackageState::Eager { .. } => Ok(None),
@@ -1089,17 +1185,37 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
     let Some(guard) = guard else {
         return Ok(());
     };
-    let observed = guard
-        .source
-        .source_version()
-        .map_err(|error| Error::Package(PackageError::Source(SourceBackedError::from(error))))?;
+    check_original_source_guard(guard.original.as_ref())?;
+    let observed = match guard.source.source_version() {
+        Ok(observed) => observed,
+        Err(error) => {
+            // A composed target can report the original mutation as an
+            // I/O/CFB error after the leading check. Re-fence the retained
+            // original owner before exposing that target error, just as the
+            // source-backed semantic owner does.
+            check_original_source_guard(guard.original.as_ref())?;
+            return Err(Error::Package(PackageError::Source(
+                SourceBackedError::from(error),
+            )));
+        },
+    };
     if observed != guard.expected {
+        check_original_source_guard(guard.original.as_ref())?;
         return Err(Error::Package(PackageError::Source(
             SourceBackedError::SourceChanged {
                 expected: guard.expected,
                 observed,
             },
         )));
+    }
+    Ok(())
+}
+
+fn check_original_source_guard(workbook: Option<&crate::SourceBackedWorkbook>) -> Result<()> {
+    if let Some(workbook) = workbook {
+        workbook
+            .ensure_current()
+            .map_err(|error| Error::Package(PackageError::Source(error)))?;
     }
     Ok(())
 }
@@ -1165,9 +1281,137 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             },
             policy: source.inner.policy,
             signed: source.inner.signed,
-            metadata: std::sync::OnceLock::from(metadata),
+            metadata: OnceLock::from(metadata),
             edit_snapshot: Some(snapshot),
-            workbook_stream: std::sync::OnceLock::new(),
+            workbook_stream: OnceLock::new(),
         }),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::{SameLengthStreamSplice, SharedOleFile, StreamSpliceLimits};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct AdmissionSource {
+        bytes: Arc<Vec<u8>>,
+        revision: AtomicU64,
+        observations: AtomicU64,
+        bump_after: AtomicU64,
+    }
+
+    impl AdmissionSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                revision: AtomicU64::new(0),
+                observations: AtomicU64::new(0),
+                bump_after: AtomicU64::new(0),
+            }
+        }
+
+        fn bump_after_observation(&self, ordinal: u64) {
+            self.observations.store(0, Ordering::Relaxed);
+            self.bump_after.store(ordinal, Ordering::Relaxed);
+        }
+    }
+
+    impl ReadAt for AdmissionSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let ordinal = self.observations.fetch_add(1, Ordering::Relaxed) + 1;
+            let observed = SourceVersion::new(
+                0x584c_535f_4144_4d49,
+                self.revision.load(Ordering::Relaxed),
+            );
+            if self.bump_after.load(Ordering::Relaxed) == ordinal {
+                self.revision.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(observed)
+        }
+    }
+
+    #[test]
+    fn capture_source_guard_promotes_target_error_to_original_source_changed() {
+        let mut builder = crate::Builder::new();
+        let sheet = builder.add_worksheet("Admission").unwrap();
+        builder.write_number(sheet, 0, 0, 42.0).unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+        let source = Arc::new(AdmissionSource::new(bytes));
+        let source_cfb = Arc::new(SharedOleFile::open(source.clone()).unwrap());
+        let original = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
+            Arc::clone(&source_cfb),
+            crate::SourceBackedOptions::default(),
+        )
+        .unwrap();
+
+        let workbook_stream = source_cfb.open_stream(&["Workbook"]).unwrap();
+        let expected = 42.0_f64.to_le_bytes();
+        let offset = workbook_stream
+            .windows(expected.len())
+            .position(|window| window == expected)
+            .expect("writer must retain the Number value in the Workbook stream");
+        let replacement = 43.0_f64.to_le_bytes();
+        let plan = source_cfb
+            .plan_same_length_stream_splices(
+                vec![SameLengthStreamSplice::new(
+                    vec!["Workbook".to_string()],
+                    offset as u64,
+                    Arc::from(expected),
+                    Arc::from(replacement),
+                )],
+                StreamSpliceLimits::default(),
+            )
+            .unwrap();
+        let composed = Arc::new(plan.composed_source().unwrap());
+        let target_cfb = Arc::new(SharedOleFile::open(composed).unwrap());
+        let deferred = original.committed_deferred(plan).unwrap();
+        let limits = deferred.retained_limits();
+        let leniency = deferred.retained_leniency();
+        let package = Package {
+            inner: Arc::new(super::super::PackageInner {
+                state: PackageState::Source {
+                    cfb: target_cfb,
+                    workbook: deferred,
+                    encryption: None,
+                    materialized: OnceLock::new(),
+                    catalog: OnceLock::new(),
+                },
+                policy: super::super::RetainedPolicy::Source { limits, leniency },
+                signed: false,
+                metadata: OnceLock::new(),
+                edit_snapshot: None,
+                workbook_stream: OnceLock::new(),
+            }),
+        };
+
+        // The first observation is the retained original-owner fence. The
+        // target CFB's composed-source version check then observes twice; the
+        // mutation after its first observation must be reported as the typed
+        // original SourceChanged error, before a SourceGuard exists.
+        source.bump_after_observation(2);
+        assert!(matches!(
+            package.edit(),
+            Err(Error::Package(PackageError::Source(
+                SourceBackedError::SourceChanged { .. }
+            )))
+        ));
+    }
 }
