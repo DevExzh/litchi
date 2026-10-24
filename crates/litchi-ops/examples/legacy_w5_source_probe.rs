@@ -26,6 +26,8 @@
 //! `LITCHI_PROBE_BATCH_ROUNDS` rounds (default 7).
 //!
 //! `LITCHI_PROBE_ONLY=<prefix>` runs only the scenarios starting with it.
+//! `LITCHI_PROBE_OUTPUT_DIR=<directory>` additionally writes each selected
+//! scenario's output as `<scenario-with-slashes-replaced>.bin`.
 //!
 //! Output: one JSON array of `{scenario, samples, median_us, min_us}` on
 //! stdout. Run pinned, release:
@@ -34,6 +36,7 @@
 #[cfg(all(feature = "doc", feature = "xls", feature = "rtf"))]
 mod probe {
     use std::hint::black_box;
+    use std::path::PathBuf;
     use std::time::Instant;
 
     use litchi_ops::props;
@@ -114,6 +117,7 @@ mod probe {
 
     struct Probe {
         rounds: usize,
+        output_dir: Option<PathBuf>,
         rows: Vec<serde_json::Value>,
     }
 
@@ -121,6 +125,15 @@ mod probe {
         /// Record the SHA-256 of the scenario's output on its row, so the
         /// base and head outputs can be compared byte for byte.
         fn output(&mut self, bytes: &[u8]) {
+            let scenario = self
+                .rows
+                .last()
+                .and_then(|row| row["scenario"].as_str())
+                .map(str::to_owned);
+            if let (Some(output_dir), Some(scenario)) = (&self.output_dir, scenario) {
+                let filename = format!("{}.bin", scenario.replace('/', "_"));
+                std::fs::write(output_dir.join(filename), bytes).expect("probe output");
+            }
             if let Some(row) = self.rows.last_mut() {
                 row["output_sha256"] = litchi_core::BlobId::of(bytes).as_hex().into();
             }
@@ -168,8 +181,13 @@ mod probe {
             .nth(1)
             .and_then(|value| value.parse().ok())
             .unwrap_or(15);
+        let output_dir = std::env::var_os("LITCHI_PROBE_OUTPUT_DIR").map(PathBuf::from);
+        if let Some(output_dir) = &output_dir {
+            std::fs::create_dir_all(output_dir).expect("probe output directory");
+        }
         let mut probe = Probe {
             rounds,
+            output_dir,
             rows: Vec::new(),
         };
 
