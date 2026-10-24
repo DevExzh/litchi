@@ -752,7 +752,7 @@ fn assert_refused_or_diagnostic_read_only(workbook: &crate::Package) {
                 "malformed recognized closure became silently editable"
             );
             assert!(!view.is_editable());
-            assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+            assert_edit_deferred_error(workbook);
         },
         Ok(None) => panic!("recognized C444 owner disappeared"),
     }
@@ -766,7 +766,15 @@ fn assert_diagnostic_read_only(workbook: &crate::Package) {
         .expect("recognized C444 owner should remain readable");
     assert_ne!(view.diagnostic_status(), PivotTableDataDiagnostic::None);
     assert!(!view.is_editable());
-    assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+    assert_edit_deferred_error(workbook);
+}
+
+fn assert_edit_deferred_error(workbook: &crate::Package) {
+    let mut edit = workbook
+        .edit_pivot_table_data("Pivot")
+        .expect("pivot edit construction is deferred");
+    assert!(edit.before().is_err());
+    assert!(edit.before().is_err());
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> u16 {
@@ -860,10 +868,15 @@ fn minimum_retained_limit(package: &OpcPackage) -> usize {
 fn transaction_limit_admits(fixture: &Fixture, maximum: usize) -> bool {
     let workbook = fixture.workbook();
     let limits = Limits::new().with_max_retained_bytes(maximum);
-    match workbook.edit_pivot_table_data_with_options(
+    let mut edit = match workbook.edit_pivot_table_data_with_options(
         "Pivot",
         crate::pivot::table_data::EditOptions::default().limits(limits),
     ) {
+        Ok(edit) => edit,
+        Err(Error::Limit { .. }) => return false,
+        Err(error) => panic!("transaction-limit search hit an unrelated error: {error:?}"),
+    };
+    match edit.before() {
         Ok(_) => true,
         Err(Error::Limit { .. }) => false,
         Err(error) => panic!("transaction-limit search hit an unrelated error: {error:?}"),
@@ -1372,7 +1385,7 @@ fn direct_ancestry_is_required_and_mce_owner_is_readable_but_not_editable() {
         PivotTableDataDiagnostic::MceAmbiguous
     );
     assert!(!view.is_editable());
-    assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+    assert_edit_deferred_error(&workbook);
 }
 
 #[test]
@@ -1480,7 +1493,7 @@ fn cache_725_identity_gaps_are_readable_diagnostic_and_read_only() {
             PivotTableDataDiagnostic::CacheClosureUnresolved
         );
         assert!(!view.is_editable());
-        assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+        assert_edit_deferred_error(&workbook);
     }
 }
 
@@ -1501,7 +1514,7 @@ fn duplicate_known_workbook_owner_is_readable_diagnostic_and_read_only() {
         PivotTableDataDiagnostic::CacheClosureUnresolved
     );
     assert!(!view.is_editable());
-    assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+    assert_edit_deferred_error(&workbook);
 }
 
 #[test]
@@ -1644,7 +1657,7 @@ fn entire_registered_closure_extensions_under_mce_are_readable_diagnostic_and_re
             PivotTableDataDiagnostic::MceAmbiguous
         );
         assert!(!view.is_editable());
-        assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+        assert_edit_deferred_error(&workbook);
     }
 }
 
@@ -1791,7 +1804,7 @@ fn missing_c444_is_none_and_c510_index_routes_are_diagnostic_read_only() {
         PivotTableDataDiagnostic::ServerFormatIndexUnresolved
     );
     assert!(!view.is_editable());
-    assert!(workbook.edit_pivot_table_data("Pivot").is_err());
+    assert_edit_deferred_error(&workbook);
 
     let count_mismatch = Fixture::build(FixtureOptions {
         server_count: "3",
@@ -2394,7 +2407,6 @@ fn borrowed_workbook_scalar_setters_preflight_limits_are_atomic_and_preserve_sou
     let too_wide = "z".repeat(5_000);
     let mut edit = workbook.edit_pivot_table_data("Pivot").unwrap();
     assert!(edit.set_text((0, 0), too_wide.as_str()).is_err());
-    assert!(!edit.is_changed());
     assert!(edit.set_text((0, 0), "borrowed").unwrap());
     assert!(edit.set_error((1, 0), "#VALUE!").unwrap());
     let commit = edit.commit().unwrap();
@@ -2504,13 +2516,15 @@ fn retained_byte_limit_has_exact_and_one_under_boundaries_and_failure_is_atomic(
     assert_resource_limit(&read_error, "pivotTableData");
     assert_eq!(workbook.to_bytes().unwrap(), before);
 
-    let transaction_error = match workbook.edit_pivot_table_data_with_options(
-        "Pivot",
-        crate::pivot::table_data::EditOptions::default().limits(exact_limits),
-    ) {
-        Err(error) => error,
-        Ok(_) => panic!("exact retained limit unexpectedly admitted staged transaction"),
-    };
+    let mut transaction = workbook
+        .edit_pivot_table_data_with_options(
+            "Pivot",
+            crate::pivot::table_data::EditOptions::default().limits(exact_limits),
+        )
+        .unwrap();
+    let transaction_error = transaction
+        .before()
+        .expect_err("exact retained limit unexpectedly admitted staged transaction");
     assert_resource_limit(&transaction_error, "pivotTableData retained bytes");
     assert_eq!(workbook.to_bytes().unwrap(), before);
 }
@@ -2607,7 +2621,6 @@ fn lowered_retained_budget_rejects_borrowed_setter_before_staging_mutation() {
         .unwrap();
     let error = edit.set_text((0, 0), replacement.as_str()).unwrap_err();
     assert_resource_limit(&error, "pivotTableData");
-    assert!(!edit.is_changed());
 
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -2692,7 +2705,6 @@ fn owned_scalar_capacity_is_charged_before_staging() {
         Ok(_) => panic!("over-capacity owned String unexpectedly fit the retained budget"),
     };
     assert_resource_limit(&error, "pivotTableData");
-    assert!(!inflated.is_changed());
     let commit = inflated.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
@@ -2726,7 +2738,6 @@ fn empty_owned_scalar_replacement_is_charged_at_the_boundary() {
         Ok(_) => panic!("empty owned replacement unexpectedly fit the retained budget"),
     };
     assert_resource_limit(&error, "pivotTableData");
-    assert!(!edit.is_changed());
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
@@ -2766,7 +2777,6 @@ fn repeated_scalar_replacements_use_net_retained_delta() {
     assert!(edit.set_text((0, 0), first.as_str()).unwrap());
     let error = edit.set_text((0, 0), oversized.as_str()).unwrap_err();
     assert_resource_limit(&error, "pivotTableData");
-    assert!(edit.is_changed());
     assert!(edit.set_text((0, 0), "short").unwrap());
     assert!(edit.set_text((0, 0), second.as_str()).unwrap());
     for _ in 0..16 {
@@ -2835,7 +2845,6 @@ fn invalid_extra_edit_is_atomic_on_low_level_and_workbook_transactions() {
     let before_workbook = workbook.to_bytes().unwrap();
     let mut workbook_edit = workbook.edit_pivot_table_data("Pivot").unwrap();
     assert!(workbook_edit.set_extra((0, 0), invalid_extra()).is_err());
-    assert!(!workbook_edit.is_changed());
     let workbook_commit = workbook_edit.commit().unwrap();
     assert!(!workbook_commit.diagnostics().changed());
     assert!(workbook_commit.patch().is_noop());

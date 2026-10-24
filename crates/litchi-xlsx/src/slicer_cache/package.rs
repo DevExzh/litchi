@@ -146,9 +146,30 @@ fn preflight_slicer_cache_insertion(
 /// [`crate::Error::Signed`]: remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
 pub(crate) fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
-    validate(&value.definition)?;
     let limits = package.read_limits();
-    preflight_slicer_cache_insertion(package, value, &limits)?;
+    store_slicer_cache_limited(package, value, &limits)
+}
+
+pub(crate) fn store_slicer_cache_limited(
+    package: &mut OpcPackage,
+    value: &Cache,
+    limits: &SourceLimits,
+) -> Result<()> {
+    validate(&value.definition)?;
+    preflight_slicer_cache_insertion(package, value, limits)?;
+    let workbook_name = package.main_document_part()?.partname().clone();
+    let uri = crate::slicer::raw::validate_cache_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        workbook_name.base_uri(),
+        limits,
+    )?;
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+        uri.relative_ref(workbook_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, &workbook_name, &additions, limits)?;
     let mut staged = package.clone();
     let prepared = crate::slicer::raw::prepare_cache(
         crate::slicer::raw::Cache {
@@ -156,10 +177,10 @@ pub(crate) fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Res
             part_name: value.part_name.clone(),
             definition: value.definition.clone(),
         },
-        package.main_document_part()?.partname().base_uri(),
-        &limits,
+        workbook_name.base_uri(),
+        limits,
     )?;
-    store_slicer_cache_prepared_in_place(&mut staged, &prepared, &limits)?;
+    store_slicer_cache_prepared_in_place_with_budget(&mut staged, &prepared, limits, &budget)?;
     *package = staged;
     Ok(())
 }
@@ -168,6 +189,22 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
     package: &mut OpcPackage,
     prepared: &crate::slicer::raw::PreparedCache,
     limits: &SourceLimits,
+) -> Result<()> {
+    let workbook_name = package.main_document_part()?.partname().clone();
+    let additions = [(
+        prepared.value.relationship_id.clone(),
+        SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+        prepared.uri.relative_ref(workbook_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, &workbook_name, &additions, limits)?;
+    store_slicer_cache_prepared_in_place_with_budget(package, prepared, limits, &budget)
+}
+
+pub(crate) fn store_slicer_cache_prepared_in_place_with_budget(
+    package: &mut OpcPackage,
+    prepared: &crate::slicer::raw::PreparedCache,
+    limits: &SourceLimits,
+    budget: &crate::raw::PackageBudget,
 ) -> Result<()> {
     let value = &prepared.value;
     let xml = &prepared.xml;
@@ -210,12 +247,6 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
         Err(litchi_opc::OpcError::PartNotFound(_)) => {},
         Err(error) => return Err(error.into()),
     }
-    let additions = [(
-        value.relationship_id.clone(),
-        SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
-        uri.relative_ref(workbook_name.base_uri()),
-    )];
-    let budget = crate::raw::prepare_package_budget(package, &workbook_name, &additions, limits)?;
     let ids = existing
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -232,7 +263,7 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
         |replacement_len| {
             crate::raw::check_part_budget_with_ledger(
                 package,
-                &budget,
+                budget,
                 1,
                 xml.len(),
                 &[(&workbook_name, replacement_len)],

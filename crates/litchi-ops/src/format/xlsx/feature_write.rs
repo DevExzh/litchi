@@ -3288,9 +3288,9 @@ impl Xlsx {
             .edit_page_breaks_with_options(sheet, part_edit_options(&source, max_snapshot_bytes))?;
         let changed = if breaks.is_empty() {
             if kind == Kind::RowBreak {
-                edit.remove_horizontal()
+                edit.remove_horizontal()?
             } else {
-                edit.remove_vertical()
+                edit.remove_vertical()?
             }
         } else if kind == Kind::RowBreak {
             edit.set_horizontal(

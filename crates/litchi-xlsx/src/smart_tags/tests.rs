@@ -21,6 +21,13 @@ fn sample() -> Collection {
     .unwrap()
 }
 
+#[test]
+fn edit_entry_defers_selector_resolution() {
+    let package = Package::new().unwrap();
+    let edit = package.edit_smart_tags("missing-sheet").unwrap();
+    assert!(edit.collection().is_err());
+}
+
 fn worksheet(fragment: &str) -> Vec<u8> {
     format!(
         r#"<worksheet xmlns="{NS}"><dimension ref="A1"/><sheetData/><ignoredErrors><ignoredError sqref="A1"/></ignoredErrors>{fragment}<drawing xmlns:r="urn:r" r:id="rId1"/><extLst/></worksheet>"#

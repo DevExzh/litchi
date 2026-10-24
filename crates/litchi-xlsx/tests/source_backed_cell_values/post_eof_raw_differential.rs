@@ -89,8 +89,11 @@ fn source_for_shape(shape: Shape) -> (Vec<u8>, Vec<u8>) {
 }
 
 fn selected_error(editor: &SourceBackedEditor) -> Error {
-    match editor.edit_sheets(["Sheet1".into()]) {
-        Ok(_) => panic!("post-EOF raw error was unexpectedly accepted"),
+    match editor
+        .edit_sheets(["Sheet1".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("post-EOF raw error was unexpectedly committed"),
         Err(error) => error,
     }
 }

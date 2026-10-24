@@ -470,6 +470,15 @@ fn workbook_facade_resolves_server_formats_by_semantic_selector() {
 }
 
 #[test]
+fn ordinary_server_format_edit_defers_selector_resolution_and_retries_failure() {
+    let fixture = Fixture::build(FixtureOptions::default());
+    let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();
+    let mut edit = workbook.edit_pivot_table("missing-pivot").unwrap();
+    assert!(edit.before().is_err());
+    assert!(edit.before().is_err());
+}
+
+#[test]
 fn workbook_facade_scalar_edit_commit_save_reopen_and_inverse() {
     let fixture = Fixture::build(FixtureOptions::default());
     let workbook = crate::Package::from_bytes(&fixture.bytes).unwrap();

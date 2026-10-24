@@ -51,8 +51,11 @@ fn source_with_sheets(sheet1: &str, sheet2: &str) -> Vec<u8> {
 }
 
 fn error_from_edit_sheets(editor: &SourceBackedEditor) -> Error {
-    match editor.edit_sheets(["Sheet1".into(), "Sheet2".into()]) {
-        Ok(_) => panic!("invalid worksheet unexpectedly accepted by edit_sheets"),
+    match editor
+        .edit_sheets(["Sheet1".into(), "Sheet2".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("invalid worksheet unexpectedly committed"),
         Err(error) => error,
     }
 }
@@ -479,8 +482,11 @@ fn first_error_across_selected_worksheets_follows_workbook_order() {
     // later worksheet's validator cannot override the first worksheet's raw
     // failure, even when the caller supplies selectors in the opposite order.
     for selectors in [["Sheet1", "Sheet2"], ["Sheet2", "Sheet1"]] {
-        let error = match editor.edit_sheets(selectors.map(Selector::from)) {
-            Ok(_) => panic!("both faulty worksheets unexpectedly accepted"),
+        let error = match editor
+            .edit_sheets(selectors.map(Selector::from))
+            .and_then(|edit| edit.commit())
+        {
+            Ok(_) => panic!("both faulty worksheets unexpectedly committed"),
             Err(error) => error,
         };
         assert_expected_error(
@@ -489,8 +495,11 @@ fn first_error_across_selected_worksheets_follows_workbook_order() {
             "workbook error order",
         );
     }
-    let error = match editor.edit_sheets(["Sheet2".into()]) {
-        Ok(_) => panic!("second faulty worksheet unexpectedly accepted"),
+    let error = match editor
+        .edit_sheets(["Sheet2".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("second faulty worksheet unexpectedly committed"),
         Err(error) => error,
     };
     assert_expected_error(

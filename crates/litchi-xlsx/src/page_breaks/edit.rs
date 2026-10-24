@@ -25,6 +25,8 @@
 //! # }
 //! ```
 
+use std::borrow::Cow;
+
 use litchi_opc::OpcPackage;
 
 use super::{Collection, PageBreaks, Snapshot};
@@ -96,8 +98,9 @@ impl crate::record::Record for Patch {
 /// Dropping it discards it.
 pub struct Edit {
     target: crate::record::Source,
-    before: Snapshot,
-    staged: PageBreaks,
+    selector: Selector<'static>,
+    before: Option<Snapshot>,
+    staged: Option<PageBreaks>,
     max_retained_bytes: Option<usize>,
 }
 
@@ -120,12 +123,11 @@ impl crate::Package {
         options: crate::EditOptions,
     ) -> Result<Edit> {
         let target = crate::record::Source::new(self, "edit_page_breaks")?;
-        let before = Snapshot::load(&target, selector)?;
-        let staged = before.page_breaks().clone();
         Ok(Edit {
             target,
-            before,
-            staged,
+            selector: owned_selector(selector.into())?,
+            before: None,
+            staged: None,
             max_retained_bytes: options.max_retained_bytes_value(),
         })
     }
@@ -144,16 +146,44 @@ impl crate::Package {
 }
 
 impl Edit {
+    /// Materialize the selected worksheet only when the edit first needs its
+    /// semantic state. Selector ownership is bounded to the caller's input;
+    /// failed reads leave no partial staged value.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(&self.target, self.selector.clone())?;
+        let staged = before.page_breaks().clone();
+        self.staged = Some(staged);
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))
+    }
+
+    fn staged(&self) -> Result<&PageBreaks> {
+        self.staged
+            .as_ref()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))
+    }
+
     /// Exact source state captured at transaction start.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    #[must_use = "use the source snapshot or handle the error"]
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Currently staged page-break state.
-    #[must_use]
-    pub const fn page_breaks(&self) -> &PageBreaks {
-        &self.staged
+    #[must_use = "use the staged page breaks or handle the error"]
+    pub fn page_breaks(&mut self) -> Result<&PageBreaks> {
+        self.ensure_prepared()?;
+        self.staged()
     }
 
     /// Replace the complete staged page-break state.
@@ -162,11 +192,12 @@ impl Edit {
     ///
     /// Returns an error when `value` violates page-break invariants.
     pub fn set(&mut self, value: PageBreaks) -> Result<bool> {
+        self.ensure_prepared()?;
         value.validate()?;
-        if self.staged == value {
+        if self.staged()? == &value {
             return Ok(false);
         }
-        self.staged = value;
+        self.staged = Some(value);
         Ok(true)
     }
 
@@ -176,7 +207,8 @@ impl Edit {
     ///
     /// Returns the closure's error or a page-break validation error.
     pub fn edit(&mut self, edit: impl FnOnce(&mut PageBreaks) -> Result<()>) -> Result<bool> {
-        let mut draft = self.staged.clone();
+        self.ensure_prepared()?;
+        let mut draft = self.staged()?.clone();
         edit(&mut draft)?;
         self.set(draft)
     }
@@ -200,28 +232,41 @@ impl Edit {
     }
 
     /// Remove horizontal row breaks.
-    pub fn remove_horizontal(&mut self) -> bool {
-        self.staged.remove_horizontal()
+    pub fn remove_horizontal(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        Ok(self
+            .staged
+            .as_mut()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))?
+            .remove_horizontal())
     }
 
     /// Remove vertical column breaks.
-    pub fn remove_vertical(&mut self) -> bool {
-        self.staged.remove_vertical()
+    pub fn remove_vertical(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        Ok(self
+            .staged
+            .as_mut()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))?
+            .remove_vertical())
     }
 
     /// Remove both authored collections.
-    pub fn clear(&mut self) -> bool {
-        self.staged.clear()
-    }
-
-    /// Whether the exact authored semantic state differs from its source.
-    fn changed(&self) -> bool {
-        self.before.page_breaks() != &self.staged
+    pub fn clear(&mut self) -> Result<bool> {
+        self.ensure_prepared()?;
+        Ok(self
+            .staged
+            .as_mut()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))?
+            .clear())
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.staged = self.before.page_breaks().clone();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let staged = self.snapshot()?.page_breaks().clone();
+        self.staged = Some(staged);
+        Ok(())
     }
 
     /// Validate, rewrite the worksheet, read it back and publish it as a new
@@ -231,9 +276,18 @@ impl Edit {
     ///
     /// Returns an error for stale source bytes, signed packages, invalid
     /// staged state, rewrite failures, or semantic readback failures.
-    pub fn commit(self) -> Result<Commit> {
-        if !self.changed() {
-            let patch = Patch(super::Patch::new(self.before.clone(), self.before));
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))?;
+        let staged = self
+            .staged
+            .take()
+            .ok_or_else(|| invalid("page-break edit is not prepared"))?;
+        if before.page_breaks() == &staged {
+            let patch = Patch(super::Patch::new(before.clone(), before));
             if let Some(maximum) = self.max_retained_bytes {
                 let endpoint_bytes = self.target.retained_bytes();
                 let observed = endpoint_bytes
@@ -257,24 +311,23 @@ impl Edit {
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        if !self.before.matches_current_source(&self.target) {
+        if !before.matches_current_source(&self.target) {
             return Err(Error::PatchConflict {
-                part: self.before.worksheet_part_name().to_string(),
+                part: before.worksheet_part_name().to_string(),
             });
         }
-        let output = super::replace(self.before.source_xml(), &self.staged)?;
-        let estimated_patch_bytes = self
-            .before
+        let output = super::replace(before.source_xml(), &staged)?;
+        let estimated_patch_bytes = before
             .source_arc()
             .map(|before| before.capacity())
             .unwrap_or(0)
             .saturating_add(output.capacity());
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
-            .get_part_mut(self.before.worksheet_part_name())?
+            .get_part_mut(before.worksheet_part_name())?
             .set_blob(output);
-        let snapshot = Snapshot::load(&candidate, self.before.sheet_position())?;
-        if snapshot.page_breaks() != &self.staged {
+        let snapshot = Snapshot::load(&candidate, before.sheet_position())?;
+        if snapshot.page_breaks() != &staged {
             return Err(invalid(
                 "page-break publication changed the staged semantic state",
             ));
@@ -298,7 +351,7 @@ impl Edit {
                 }));
             }
         }
-        let patch = Patch(super::Patch::new(self.before, snapshot));
+        let patch = Patch(super::Patch::new(before, snapshot));
         if let Some(maximum) = self.max_retained_bytes {
             let (source_bytes, target_bytes) =
                 endpoint_charge.expect("retained endpoint charge established with the budget");
@@ -315,5 +368,52 @@ impl Edit {
             }
         }
         Ok(Commit::new(package, patch, Diagnostics::new(true)))
+    }
+}
+
+fn owned_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
+    match selector {
+        Selector::Name(name) => Ok(Selector::Name(Cow::Owned(name.into_owned()))),
+        Selector::Position(position) => Ok(Selector::Position(position)),
+        Selector::Id(id) => match id {},
+        _ => Err(Error::UnsupportedSelector),
+    }
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    use litchi_opc::PackURI;
+
+    #[test]
+    fn edit_entry_defers_page_break_xml() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package
+            .edit_page_breaks(0usize)
+            .expect("worksheet selector");
+        assert!(edit.before.is_none());
+        assert!(edit.staged.is_none());
+        assert!(edit.page_breaks().is_ok());
+        assert!(edit.before.is_some());
+    }
+
+    #[test]
+    fn failed_page_break_read_is_retryable_without_partial_state() {
+        let source = crate::Package::new().expect("minimal XLSX");
+        let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
+        let mut package = source.opc().clone();
+        package
+            .get_part_mut(&worksheet)
+            .expect("worksheet")
+            .set_blob(
+                br#"<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:rowBreaks count="2"><x:brk/></x:rowBreaks></x:worksheet>"#.to_vec(),
+            );
+        let package = crate::Package::from_opc(package).expect("defer worksheet XML");
+        let mut edit = package
+            .edit_page_breaks(0usize)
+            .expect("worksheet selector");
+        assert!(edit.page_breaks().is_err());
+        assert!(edit.before.is_none());
+        assert!(edit.page_breaks().is_err());
+        assert!(edit.before.is_none());
     }
 }

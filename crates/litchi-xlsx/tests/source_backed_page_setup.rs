@@ -204,7 +204,7 @@ fn target_setup() -> Setup {
 
 fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::page_setup::source::Edit {
     let mut edit = editor.edit_page_setup("Sheet1").unwrap();
-    assert!(edit.set(target_setup()));
+    assert!(edit.set(target_setup()).unwrap());
     edit
 }
 
@@ -390,10 +390,10 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let mut edit = editor.edit_page_setup("Sheet1").unwrap();
-    assert!(edit.set(target_setup()));
-    assert!(!edit.set(target_setup()));
-    assert!(edit.remove());
-    assert!(!edit.remove());
+    assert!(edit.set(target_setup()).unwrap());
+    assert!(!edit.set(target_setup()).unwrap());
+    assert!(edit.remove().unwrap());
+    assert!(!edit.remove().unwrap());
     let noop = edit.commit().unwrap();
     assert!(!noop.diagnostics().changed());
     let mut output = Vec::new();
@@ -410,7 +410,7 @@ fn add_replace_remove_noop_and_signed_refusal_are_exact() {
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(existing))).unwrap();
     let mut edit = editor.edit_page_setup("Sheet1").unwrap();
-    assert!(edit.set(target_setup()));
+    assert!(edit.set(target_setup()).unwrap());
     assert!(edit.commit().unwrap().diagnostics().changed());
 
     let signed = ordinary_fixture("", true);
@@ -441,7 +441,7 @@ fn printer_references_and_relationships_are_refused_without_materializing_resour
     let editor =
         SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(dangling))).unwrap();
     assert!(matches!(
-        editor.edit_page_setup("Sheet1"),
+        editor.edit_page_setup("Sheet1").unwrap().commit(),
         Err(Error::Unsupported { .. })
     ));
 
@@ -469,7 +469,7 @@ fn printer_references_and_relationships_are_refused_without_materializing_resour
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let opened = editor.cache_diagnostics().successful_loads;
     assert!(matches!(
-        editor.edit_page_setup("Sheet1"),
+        editor.edit_page_setup("Sheet1").unwrap().commit(),
         Err(Error::Unsupported { .. })
     ));
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
@@ -538,7 +538,7 @@ fn mce_limits_and_partial_sink_are_checked() {
     let mce = fixture(mce_sheet, "", false);
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
     let mut edit = editor.edit_page_setup("Sheet1").unwrap();
-    assert!(edit.set(target_setup()));
+    assert!(edit.set(target_setup()).unwrap());
     assert!(edit.commit().is_err());
 
     let limits = SourceLimits::builder()
@@ -598,7 +598,7 @@ fn source_edit_is_send_and_chartsheets_are_refused() {
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     assert!(matches!(
-        editor.edit_page_setup("Sheet1"),
+        editor.edit_page_setup("Sheet1").unwrap().commit(),
         Err(Error::NotWorksheet { .. })
     ));
 }

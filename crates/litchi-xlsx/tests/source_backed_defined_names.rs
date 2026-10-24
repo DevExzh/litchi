@@ -194,6 +194,16 @@ fn target_names() -> Vec<DefinedName> {
     ]
 }
 
+fn chained_names() -> Vec<DefinedName> {
+    let mut names = target_names();
+    names.push(DefinedName {
+        name: "ChainedRange".to_owned(),
+        reference: "'Sheet1'!$D$4".to_owned(),
+        ..DefinedName::default()
+    });
+    names
+}
+
 fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::defined_names::source::Edit {
     let mut edit = editor.edit_defined_names().unwrap();
     assert!(edit.replace(target_names()).unwrap());
@@ -346,6 +356,40 @@ fn replacement_clear_and_noop_are_exact() {
     assert!(edit.clear().unwrap());
     let cleared = edit.commit().unwrap();
     assert!(cleared.patch().after().defined_names().is_empty());
+}
+
+#[test]
+fn chained_edit_and_replay_resolve_the_deferred_defined_name_catalog() {
+    let bytes = fixture("", "", false);
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let first = changed_commit(&editor);
+
+    // The first commit is still deferred. Its next edit must prove against
+    // the committed target catalog, not the original owner's empty catalog.
+    let mut chained = first.package().edit_defined_names().unwrap();
+    assert_eq!(chained.defined_names().unwrap(), target_names().as_slice());
+    let expected = chained_names();
+    assert!(chained.replace(expected.clone()).unwrap());
+    let second = chained.commit().unwrap();
+    assert_eq!(second.patch().after().defined_names(), expected.as_slice());
+
+    // Replay likewise creates a deferred output. Starting a second edit from
+    // that replayed owner must observe the same target catalog and publish it.
+    let replayed = editor
+        .apply_defined_names(first.patch())
+        .unwrap()
+        .into_package();
+    let mut replay_edit = replayed.edit_defined_names().unwrap();
+    assert_eq!(
+        replay_edit.defined_names().unwrap(),
+        target_names().as_slice()
+    );
+    assert!(replay_edit.replace(expected.clone()).unwrap());
+    let replayed_second = replay_edit.commit().unwrap();
+    assert_eq!(
+        replayed_second.patch().after().defined_names(),
+        expected.as_slice()
+    );
 }
 
 #[test]

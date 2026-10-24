@@ -393,7 +393,7 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
         ))))
         .unwrap();
         let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
-        assert!(edit.clear());
+        assert!(edit.clear().unwrap());
         assert!(
             edit.commit()
                 .unwrap()
@@ -487,7 +487,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
     .unwrap();
     let snapshot = editor
         .edit_conditional_formats("Sheet1")
-        .map(|edit| edit.before().clone())
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert!(snapshot.collections().is_empty());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -635,6 +635,8 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         ))))
         .unwrap()
         .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .is_err()
     );
 
@@ -647,6 +649,8 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         ))))
         .unwrap()
         .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .is_err()
     );
 
@@ -661,6 +665,8 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
             SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes)))
                 .unwrap()
                 .edit_conditional_formats("Sheet1")
+                .unwrap()
+                .commit()
                 .is_err()
         );
     }
@@ -676,6 +682,8 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         ))))
         .unwrap()
         .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .is_err()
     );
 
@@ -686,6 +694,8 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         ))))
         .unwrap()
         .edit_conditional_formats("Sheet1")
+        .unwrap()
+        .commit()
         .is_err()
     );
 
@@ -717,7 +727,7 @@ fn x14_mce_opaque_dxf_priority_malformed_and_limits_are_refused() {
         assert!(
             editor
                 .edit_conditional_formats("Sheet1")
-                .map(|edit| edit.before().clone())
+                .and_then(|edit| edit.before().cloned())
                 .is_err()
         );
     }

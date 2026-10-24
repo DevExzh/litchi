@@ -124,7 +124,9 @@ fn opaque_byte_limit_accepts_exact_n_and_rejects_n_plus_one() {
 fn authored_source(calculation_id: u32, limits: &Limits) -> Result<Vec<u8>, Error> {
     let package = package();
     let mut transaction = edit(&package, limits)?;
-    transaction.set_properties(Properties::new().with_calculation_id(Some(calculation_id)));
+    transaction
+        .set_properties(Properties::new().with_calculation_id(Some(calculation_id)))
+        .unwrap();
     let package = transaction.commit()?.into_package();
     Ok(source(&package).as_ref().clone())
 }
@@ -143,7 +145,9 @@ fn output_limit_accepts_exact_n_and_failed_transaction_is_atomic_at_n_plus_one()
     let rejected = package();
     let before = source(&rejected);
     let mut transaction = edit(&rejected, &limits).unwrap();
-    transaction.set_properties(Properties::new().with_calculation_id(Some(10)));
+    transaction
+        .set_properties(Properties::new().with_calculation_id(Some(10)))
+        .unwrap();
     assert_limit_error(transaction.commit().unwrap_err());
     let after = source(&rejected);
     assert!(Arc::ptr_eq(&before, &after));
@@ -154,11 +158,15 @@ fn output_limit_accepts_exact_n_and_failed_transaction_is_atomic_at_n_plus_one()
 fn failed_patch_is_atomic_and_retains_the_exact_source() {
     let authored = package();
     let mut transaction = authored.edit_calculation_metadata().unwrap();
-    transaction.set_properties(Properties::new().with_calculation_id(Some(7)));
+    transaction
+        .set_properties(Properties::new().with_calculation_id(Some(7)))
+        .unwrap();
     let patch = transaction.commit().unwrap().patch().clone();
 
     let mut transaction = package().edit_calculation_metadata().unwrap();
-    transaction.set_properties(Properties::new().with_calculation_id(Some(8)));
+    transaction
+        .set_properties(Properties::new().with_calculation_id(Some(8)))
+        .unwrap();
     let stale = transaction.commit().unwrap().into_package();
     let before = source(&stale);
 
@@ -214,7 +222,9 @@ fn staged_features_are_checked_by_writer_count_and_name_limits() {
             .map(|name| Feature::new(name).unwrap())
             .collect::<Vec<_>>();
         let mut transaction = edit(&package, &limits).unwrap();
-        transaction.set_features(Features::try_from_vec(values).unwrap());
+        transaction
+            .set_features(Features::try_from_vec(values).unwrap())
+            .unwrap();
         assert_limit_error(transaction.commit().unwrap_err());
         assert!(Arc::ptr_eq(&before, &source(&package)));
     }

@@ -19,6 +19,7 @@ use super::{
     validate_data_validation_collections,
 };
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!("data-validation", super::Patch);
@@ -90,11 +91,11 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its XML
-    /// is invalid, or the source cannot be read.
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
     pub fn edit_data_validations<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
-        Ok(Edit::new(self.clone(), before))
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
     }
 
     /// Replay a data-validation patch onto this workbook.
@@ -112,39 +113,52 @@ impl SourceBackedWorkbook {
 /// An isolated data-validation edit over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
-    staged: Vec<Collection>,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` inherits the source collection; `Some` stores a complete
+    /// replacement, including an empty collection.
+    staged: Option<Vec<Collection>>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            workbook,
-            staged: before.collections().to_vec(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
         }
     }
 
-    /// Exact source state captured when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<&[Collection]> {
+        match self.staged.as_deref() {
+            Some(staged) => Ok(staged),
+            None => Ok(self.resolve_before()?.collections()),
+        }
+    }
+
+    /// Resolve the exact source state observed by this edit.
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Complete staged data-validation collections.
-    #[must_use]
-    pub fn collections(&self) -> &[Collection] {
-        &self.staged
+    pub fn collections(&self) -> Result<&[Collection]> {
+        self.effective()
     }
 
     /// Replace all staged data-validation collections after validation.
     pub fn set_collections(&mut self, value: Vec<Collection>) -> Result<bool> {
         validate_data_validation_collections(&value)?;
-        if self.staged == value {
+        if self.effective()? == value.as_slice() {
             return Ok(false);
         }
-        self.staged = value;
+        self.staged = Some(value);
         Ok(true)
     }
 
@@ -153,48 +167,44 @@ impl Edit {
         &mut self,
         operation: impl FnOnce(&mut Vec<Collection>) -> Result<()>,
     ) -> Result<bool> {
-        let mut candidate = self.staged.clone();
+        let mut candidate = self.effective()?.to_vec();
         operation(&mut candidate)?;
         self.set_collections(candidate)
     }
 
     /// Remove every data-validation collection from the selected worksheet.
-    pub fn clear(&mut self) -> bool {
-        if self.staged.is_empty() {
-            return false;
+    pub fn clear(&mut self) -> Result<bool> {
+        if self.effective()?.is_empty() {
+            return Ok(false);
         }
-        self.staged.clear();
-        true
+        self.staged = Some(Vec::new());
+        Ok(true)
     }
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
-        self.staged = self.before.collections().to_vec();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.collections() != self.staged
+        self.staged = None;
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        validate_data_validation_collections(&self.staged)?;
-        if !self.changed() {
-            let patch = super::Patch::new(self.before.clone(), self.before);
-            return commit_change(&self.workbook, patch);
+        let before = self.resolve_before()?.clone();
+        let staged = self.staged.unwrap_or_else(|| before.collections().to_vec());
+        before.check_execution()?;
+        validate_data_validation_collections(&staged)?;
+        if before.collections() == staged.as_slice() {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        let (output, readback) = replace_data_validation_collections_with_readback(
-            self.before.source_xml(),
-            &self.staged,
-        )?;
-        if readback != self.staged {
+        let (output, readback) =
+            replace_data_validation_collections_with_readback(before.source_xml(), &staged)?;
+        if readback != staged {
             return Err(invalid(
                 "data-validation publication changed the staged semantic state",
             ));
         }
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output, readback);
-        self.before.check_execution()?;
-        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
+        let snapshot = Snapshot::from_rewritten_source(&before, output, readback);
+        before.check_execution()?;
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

@@ -17,6 +17,7 @@ use litchi_opc::SourceBackedPackage;
 use super::package::validate_definition;
 use super::{Definition, Snapshot};
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!("auto-filter", super::Patch);
@@ -88,11 +89,11 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its XML
-    /// is invalid, or the source cannot be read.
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
     pub fn edit_auto_filter<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
-        Ok(Edit::new(self.clone(), before))
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
     }
 
     /// Replay a auto-filter patch onto this workbook.
@@ -110,39 +111,52 @@ impl SourceBackedWorkbook {
 /// An isolated auto-filter edit over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
-    staged: Option<Definition>,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` inherits the source value; `Some` stores the complete
+    /// replacement, including `None` for a cleared filter.
+    staged: Option<Option<Definition>>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            workbook,
-            staged: before.auto_filter().cloned(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
         }
     }
 
-    /// Exact source state captured when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<Option<&Definition>> {
+        match &self.staged {
+            Some(staged) => Ok(staged.as_ref()),
+            None => Ok(self.resolve_before()?.auto_filter()),
+        }
+    }
+
+    /// Resolve the exact source state observed by this edit.
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Complete currently staged filter and sort state.
-    #[must_use]
-    pub const fn auto_filter(&self) -> Option<&Definition> {
-        self.staged.as_ref()
+    pub fn auto_filter(&self) -> Result<Option<&Definition>> {
+        self.effective()
     }
 
     /// Create or replace the complete staged filter and sort state.
     pub fn set(&mut self, value: Definition) -> Result<bool> {
         validate_definition(&value)?;
-        if self.staged.as_ref() == Some(&value) {
+        if self.effective()?.is_some_and(|current| current == &value) {
             return Ok(false);
         }
-        self.staged = Some(value);
+        self.staged = Some(Some(value));
         Ok(true)
     }
 
@@ -151,56 +165,58 @@ impl Edit {
         &mut self,
         operation: impl FnOnce(&mut Option<Definition>) -> Result<()>,
     ) -> Result<bool> {
-        let mut candidate = self.staged.clone();
+        let mut candidate = self.effective()?.cloned();
         operation(&mut candidate)?;
         if let Some(value) = candidate.as_ref() {
             validate_definition(value)?;
         }
-        if candidate == self.staged {
+        if self.effective()? == candidate.as_ref() {
             return Ok(false);
         }
-        self.staged = candidate;
+        self.staged = Some(candidate);
         Ok(true)
     }
 
     /// Remove the direct worksheet auto-filter and its sort state.
-    pub fn clear(&mut self) -> bool {
-        self.staged.take().is_some()
+    pub fn clear(&mut self) -> Result<bool> {
+        if self.effective()?.is_none() {
+            return Ok(false);
+        }
+        self.staged = Some(None);
+        Ok(true)
     }
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
-        self.staged = self.before.auto_filter().cloned();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.auto_filter() != self.staged.as_ref()
+        self.staged = None;
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        if !self.changed() {
-            let patch = super::Patch::new(self.before.clone(), self.before);
-            return commit_change(&self.workbook, patch);
+        let before = self.resolve_before()?.clone();
+        let staged = self.staged.unwrap_or_else(|| before.auto_filter().cloned());
+        before.check_execution()?;
+        if before.auto_filter() == staged.as_ref() {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        if self.before.mutation_locked(self.staged.as_ref()) {
+        if before.mutation_locked(staged.as_ref()) {
             return Err(invalid(
                 "worksheet protection forbids the staged auto-filter or sort mutation",
             ));
         }
-        if let Some(value) = self.staged.as_ref() {
+        if let Some(value) = staged.as_ref() {
             validate_definition(value)?;
         }
-        let output = super::replace_auto_filter(self.before.source_xml(), self.staged.as_ref())?;
+        let output = super::replace_auto_filter(before.source_xml(), staged.as_ref())?;
         let readback = super::parse_auto_filter(&output)?;
-        if readback != self.staged {
+        if readback != staged {
             return Err(invalid(
                 "auto-filter publication changed the staged semantic state",
             ));
         }
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output, readback)?;
-        self.before.check_execution()?;
-        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
+        let snapshot = Snapshot::from_rewritten_source(&before, output, readback)?;
+        before.check_execution()?;
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

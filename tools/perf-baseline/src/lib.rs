@@ -20387,7 +20387,7 @@ fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     let mut edit = litchi_xlsx::Package::new()?.edit_calculation_metadata()?;
     edit.set_properties(
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(7)),
-    );
+    )?;
     let mut opc = edit.commit()?.into_package().into_plain_opc();
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     opc.get_part_mut(&worksheet_uri)?.set_blob(
@@ -53229,7 +53229,7 @@ fn publish_xlsx_calculation_metadata_edit<W: Write>(
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
         let mut edit = package.edit_calculation_metadata()?;
-        if !edit.set_properties(properties) {
+        if !edit.set_properties(properties)? {
             return Err("XLSX eager calculation edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
@@ -54699,7 +54699,7 @@ fn publish_xlsx_page_margin_edit<W: Write>(
     if source_backed {
         let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
         let mut edit = editor.edit_page_margins("Sheet1")?;
-        if !edit.set(margins) {
+        if !edit.set(margins)? {
             return Err("XLSX source-backed page-margin edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
@@ -54918,7 +54918,7 @@ fn publish_xlsx_page_setup_edit<W: Write>(
     if source_backed {
         let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
         let mut edit = editor.edit_page_setup("Sheet1")?;
-        if !edit.set(setup) {
+        if !edit.set(setup)? {
             return Err("XLSX source-backed page-setup edit reported an exact no-op".into());
         }
         let commit = edit.commit()?;
@@ -56808,7 +56808,7 @@ fn verify_xlsx_conditional_formatting_patch(corpus: &Corpus) -> Result<(), Box<d
         corpus.archive.clone(),
     )))?;
     let mut edit = editor.edit_conditional_formats("Sheet1")?;
-    if edit.collections() != xlsx_conditional_formatting_values(false)? {
+    if edit.collections()? != xlsx_conditional_formatting_values(false)? {
         return Err("XLSX conditional-formatting patch source differs from specification".into());
     }
     if !edit.set_collections(xlsx_conditional_formatting_values(true)?)? {
@@ -56936,7 +56936,7 @@ fn publish_xlsx_conditional_formatting_edit<W: Write>(
     if source_backed {
         let editor = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
         let mut edit = editor.edit_conditional_formats("Sheet1")?;
-        if edit.collections() != xlsx_conditional_formatting_values(false)? {
+        if edit.collections()? != xlsx_conditional_formatting_values(false)? {
             return Err(
                 "XLSX source-backed conditional-formatting source differs from specification"
                     .into(),

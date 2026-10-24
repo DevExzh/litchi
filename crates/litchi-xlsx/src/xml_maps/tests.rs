@@ -431,7 +431,7 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
         let value = fixture_info();
         let mut create = Transaction::new(&mut package).unwrap();
         create.set_conformance(conformance).unwrap();
-        assert!(create.info().is_none());
+        assert!(create.info().unwrap().is_none());
         assert!(create.set(value.clone()).unwrap());
         let commit = create.commit().unwrap();
         assert!(commit.changed());
@@ -455,7 +455,7 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
 
         let mut remove_map = Transaction::new(&mut package).unwrap();
         assert!(remove_map.remove_map(1).is_err());
-        assert_eq!(remove_map.info().unwrap().maps.len(), 1);
+        assert_eq!(remove_map.info().unwrap().unwrap().maps.len(), 1);
 
         let mut remove = Transaction::new(&mut package).unwrap();
         assert!(remove.remove().unwrap().is_some());

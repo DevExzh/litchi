@@ -12,13 +12,27 @@ use crate::Result as SheetResult;
 use crate::error::{invalid, malformed};
 use crate::raw::parse_catalog;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
+    let limits = package.read_limits();
+    read_pivot_tables_limited(package, &limits)
+}
+
+/// Read pivot tables under an operation's effective source policy.
+///
+/// The public reader keeps the package policy for compatibility.  Semantic
+/// package edits use this bounded entry point so nested pivot validation does
+/// not silently widen a caller's tighter [`SourceLimits`] back to the
+/// package-wide defaults.
+pub(crate) fn read_pivot_tables_limited(
+    package: &OpcPackage,
+    limits: &SourceLimits,
+) -> SheetResult<Vec<PivotTable>> {
     let workbook_part = package.main_document_part()?;
     let workbook_xml = workbook_part.blob();
 
-    let workbook = parse_catalog(workbook_xml, &package.read_limits())?;
+    let workbook = parse_catalog(workbook_xml, limits)?;
 
     let workbook_rels = workbook_part.rels();
     let mut worksheet_uris = HashMap::with_capacity(workbook.sheets.len());
@@ -65,6 +79,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
         workbook_rels,
         &workbook.pivot_caches,
         &worksheet_names_by_uri,
+        limits,
     )?;
     if workbook.sheets.is_empty() {
         return Ok(Vec::new());
@@ -95,6 +110,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
             let table_uri = rel.target_partname()?;
             let table_part = package.get_part(&table_uri)?;
             require_content_type(&table_uri, table_part.content_type(), ct::SML_PIVOT_TABLE)?;
+            crate::raw::check_source_bytes(table_part.blob().len(), limits)?;
             let cache_uri = resolve_pivot_table_cache_uri(table_part)?;
             let expected_cache_id = pivot_cache_ids_by_uri.get(&cache_uri).ok_or_else(|| { invalid(format!(
                     "pivot-table part '{table_uri}' references cache definition '{cache_uri}' that is not listed by the workbook"
@@ -103,6 +119,7 @@ pub fn read_pivot_tables(package: &OpcPackage) -> SheetResult<Vec<PivotTable>> {
                 .get(expected_cache_id)
                 .ok_or_else(|| invalid("resolved pivot cache is missing"))?;
             let bytes = litchi_ooxml_common::mce::process_part(table_part)?;
+            crate::raw::check_source_bytes(bytes.len(), limits)?;
             let xml = std::str::from_utf8(bytes.as_ref()).map_err(malformed)?;
 
             let mut table = parse_pivot_table_definition_with_cache(
@@ -141,6 +158,7 @@ fn resolve_workbook_pivot_caches(
     workbook_rels: &litchi_opc::Relationships,
     cache_references: &[crate::raw::PivotCache],
     worksheet_names_by_uri: &HashMap<PackURI, String>,
+    limits: &SourceLimits,
 ) -> SheetResult<(HashMap<u32, ResolvedPivotCache>, HashMap<PackURI, u32>)> {
     let mut caches = HashMap::with_capacity(cache_references.len());
     let mut ids_by_uri = HashMap::with_capacity(cache_references.len());
@@ -176,7 +194,9 @@ fn resolve_workbook_pivot_caches(
             cache_part.content_type(),
             ct::SML_PIVOT_CACHE_DEFINITION,
         )?;
+        crate::raw::check_source_bytes(cache_part.blob().len(), limits)?;
         let bytes = litchi_ooxml_common::mce::process_part(cache_part)?;
+        crate::raw::check_source_bytes(bytes.len(), limits)?;
         let xml = std::str::from_utf8(bytes.as_ref()).map_err(malformed)?;
         let mut definition = read_pivot_cache_definition(xml)?.ok_or_else(|| {
             invalid(format!(
@@ -189,6 +209,7 @@ fn resolve_workbook_pivot_caches(
             &cache_uri,
             &mut definition,
             worksheet_names_by_uri,
+            limits,
         )?;
         if ids_by_uri
             .insert(cache_uri.clone(), cache_reference.cache_id)
@@ -209,6 +230,7 @@ fn validate_pivot_cache_relationships(
     cache_uri: &PackURI,
     definition: &mut Definition,
     worksheet_names_by_uri: &HashMap<PackURI, String>,
+    limits: &SourceLimits,
 ) -> SheetResult<()> {
     if let Some(relationship_id) = definition.id.as_deref() {
         let rel = cache_part.rels().get(relationship_id).ok_or_else(|| { invalid(format!(
@@ -235,7 +257,9 @@ fn validate_pivot_cache_relationships(
             records_part.content_type(),
             ct::SML_PIVOT_CACHE_RECORDS,
         )?;
+        crate::raw::check_source_bytes(records_part.blob().len(), limits)?;
         let bytes = litchi_ooxml_common::mce::process_part(records_part)?;
+        crate::raw::check_source_bytes(bytes.len(), limits)?;
         let records_xml = std::str::from_utf8(bytes.as_ref()).map_err(malformed)?;
         validate_pivot_cache_records(
             records_xml,

@@ -33,43 +33,65 @@ impl EditOptions {
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
-    before: Snapshot,
+    before: Option<Snapshot>,
     draft: Option<Revisions>,
-    conformance: super::model::RevisionConformance,
+    conformance: Option<super::model::RevisionConformance>,
 }
 
 impl Edit {
     /// Start an edit from the package's main workbook.
     fn start(target: crate::record::Source, options: EditOptions) -> Result<Self> {
-        let before = Snapshot::load(&target)?;
-        let draft = before.revisions().cloned();
-        let conformance = options.conformance.unwrap_or_else(|| {
-            before
-                .conformance()
-                .unwrap_or(super::model::RevisionConformance::Transitional)
-        });
         Ok(Self {
             target,
-            before,
-            draft,
-            conformance,
+            before: None,
+            draft: None,
+            conformance: options.conformance,
         })
     }
 
+    /// Materialize the revision graph only when the edit first needs it.
+    /// Failed reads leave all staged state absent, so a later operation can
+    /// retry without retaining a partial graph.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(&self.target)?;
+        let draft = before.revisions().cloned();
+        let conformance = self.conformance.or_else(|| before.conformance());
+        self.draft = draft;
+        self.conformance = conformance;
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("revision edit is not prepared"))
+    }
+
+    fn draft(&self) -> Result<Option<&Revisions>> {
+        Ok(self.draft.as_ref())
+    }
+
     /// Immutable source snapshot used for conflict checks and inverse patches.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    #[must_use = "use the source snapshot or handle the error"]
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Borrow the currently staged revision package.
-    #[must_use]
-    pub fn revisions(&self) -> Option<&Revisions> {
-        self.draft.as_ref()
+    #[must_use = "use the staged revisions or handle the error"]
+    pub fn revisions(&mut self) -> Result<Option<&Revisions>> {
+        self.ensure_prepared()?;
+        self.draft()
     }
 
     /// Replace or remove the complete revision package.
     pub fn replace(&mut self, value: Option<Revisions>) -> Result<bool> {
+        self.ensure_prepared()?;
         if let Some(value) = &value {
             validation::revisions(value)?;
         }
@@ -82,6 +104,7 @@ impl Edit {
 
     /// Apply a checked mutation to the complete typed package.
     pub fn edit(&mut self, edit: impl FnOnce(&mut Revisions) -> Result<()>) -> Result<()> {
+        self.ensure_prepared()?;
         let mut value = self
             .draft
             .clone()
@@ -94,6 +117,7 @@ impl Edit {
 
     /// Insert or replace one typed revision user by its stable numeric ID.
     pub fn set_user(&mut self, value: RevisionUser) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -120,6 +144,7 @@ impl Edit {
 
     /// Remove one typed revision user by stable numeric ID.
     pub fn remove_user(&mut self, id: i32) -> Result<Option<RevisionUser>> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -135,6 +160,7 @@ impl Edit {
 
     /// Insert or replace a header and its matching inert log as one unit.
     pub fn set_revision(&mut self, header: RevisionHeader, log: RevisionLogPart) -> Result<bool> {
+        self.ensure_prepared()?;
         if header.relationship_id != log.relationship_id {
             return Err(invalid("revision header and log relationship IDs differ"));
         }
@@ -175,6 +201,7 @@ impl Edit {
 
     /// Remove a header and its matching log by relationship ID.
     pub fn remove_revision(&mut self, relationship_id: &str) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -206,6 +233,7 @@ impl Edit {
 
     /// Replace one existing inert log without changing its header.
     pub fn set_log(&mut self, value: RevisionLogPart) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -228,6 +256,7 @@ impl Edit {
 
     /// Insert or replace a record by its revision ID in one existing log.
     pub fn set_record(&mut self, relationship_id: &str, value: RevisionRecord) -> Result<bool> {
+        self.ensure_prepared()?;
         let revision_id = value
             .revision_id
             .ok_or_else(|| invalid("revision record CRUD requires a revision ID"))?;
@@ -264,6 +293,7 @@ impl Edit {
         relationship_id: &str,
         revision_id: u32,
     ) -> Result<Option<RevisionRecord>> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -288,12 +318,11 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.before.revisions().cloned();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.revisions() != self.draft.as_ref()
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let draft = self.snapshot()?.revisions().cloned();
+        self.draft = draft;
+        Ok(())
     }
 
     /// Validate and publish the staged owner atomically.
@@ -312,24 +341,34 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    pub(super) fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("revision edit is not prepared"))?;
+        let draft = self.draft.take();
+        let conformance = self
+            .conformance
+            .or_else(|| before.conformance())
+            .unwrap_or(super::model::RevisionConformance::Transitional);
+        if before.revisions() == draft.as_ref() {
+            let patch = Patch::new(before.clone(), before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                before,
             ));
         }
         crate::signature_policy::ensure_unsigned(&self.target)?;
         let mut candidate = OpcPackage::clone(&self.target);
-        replace_workbook_revisions(&mut candidate, self.draft.as_ref(), self.conformance)?;
+        replace_workbook_revisions(&mut candidate, draft.as_ref(), conformance)?;
         let snapshot = Snapshot::load(&candidate)?;
-        if !same_model(snapshot.revisions(), self.draft.as_ref()) {
+        if !same_model(snapshot.revisions(), draft.as_ref()) {
             return Err(invalid(
                 "revision package publication changed the staged model",
             ));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -400,4 +439,17 @@ fn canonical(value: &Revisions) -> Revisions {
         }
     }
     value
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    #[test]
+    fn edit_entry_defers_revision_graph() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package.edit_revisions().expect("revision edit");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert!(edit.revisions().expect("first revision read").is_none());
+        assert!(edit.before.is_some());
+    }
 }

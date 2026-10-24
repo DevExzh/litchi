@@ -21,7 +21,7 @@ use crate::error::{Result, invalid};
 pub struct Edit {
     target: crate::record::Source,
     worksheet: PackURI,
-    before: Snapshot,
+    before: Option<Snapshot>,
     draft: Option<OleObjects>,
     /// The candidate graph holding a collection added by [`Self::set`].
     created: Option<OpcPackage>,
@@ -62,27 +62,47 @@ crate::record::raw_test_route!(edit_ole_objects, worksheet: &PackURI => crate::r
 
 impl Edit {
     fn start(target: crate::record::Source, worksheet: &PackURI) -> Result<Self> {
-        let before = Snapshot::load(&target, worksheet)?;
-        let draft = before.objects().cloned();
         Ok(Self {
             target,
             worksheet: worksheet.clone(),
-            before,
-            draft,
+            before: None,
+            draft: None,
             created: None,
         })
     }
 
+    /// Read and clone the selected OLE graph only when an operation first
+    /// needs its typed state. A failed read leaves the edit untouched and can
+    /// be retried without retaining a partial graph or embedded payload.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(&self.target, &self.worksheet)?;
+        let draft = before.objects().cloned();
+        self.draft = draft;
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("OLE edit is not prepared"))
+    }
+
     /// Immutable source snapshot used for conflict checks and inverse patches.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    #[must_use = "use the source snapshot or handle the error"]
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Borrow the currently staged typed graph.
-    #[must_use]
-    pub fn objects(&self) -> Option<&OleObjects> {
-        self.draft.as_ref()
+    #[must_use = "use the staged OLE objects or handle the error"]
+    pub fn objects(&mut self) -> Result<Option<&OleObjects>> {
+        self.ensure_prepared()?;
+        Ok(self.draft.as_ref())
     }
 
     /// Edit one object by its stable `DrawingML` shape ID.
@@ -94,6 +114,7 @@ impl Edit {
         shape_id: u32,
         edit: impl FnOnce(&mut OleObject) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let mut draft = self
             .draft
             .clone()
@@ -137,6 +158,7 @@ impl Edit {
     /// Refuses a worksheet that already has OLE objects, and returns the
     /// validation errors of the collection.
     pub fn set(&mut self, value: OleObjects) -> Result<bool> {
+        self.ensure_prepared()?;
         if self.draft.is_some() {
             return Err(invalid("worksheet already contains OLE objects"));
         }
@@ -145,7 +167,7 @@ impl Edit {
             &mut candidate,
             &self.worksheet,
             &value,
-            self.before.conformance(),
+            self.snapshot()?.conformance(),
         )?;
         let stored = Snapshot::load(&candidate, &self.worksheet)?;
         self.draft = stored.objects().cloned();
@@ -154,13 +176,12 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.before.objects().cloned();
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let draft = self.snapshot()?.objects().cloned();
+        self.draft = draft;
         self.created = None;
-    }
-
-    fn changed(&self) -> bool {
-        self.created.is_some() || self.before.objects() != self.draft.as_ref()
+        Ok(())
     }
 
     /// Validate and publish the staged source-preserving edit as a new
@@ -176,16 +197,21 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    pub(super) fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("OLE edit is not prepared"))?;
+        let draft = self.draft.take();
+        if self.created.is_none() && before.objects() == draft.as_ref() {
+            let patch = Patch::new(before.clone(), before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                before,
             ));
         }
-        let after = self
-            .draft
+        let after = draft
             .as_ref()
             .ok_or_else(|| invalid("cannot remove a worksheet OLE collection in this edit"))?;
         let created = self.created.is_some();
@@ -194,7 +220,7 @@ impl Edit {
             None => {
                 let candidate = OpcPackage::clone(&self.target);
                 let current = Snapshot::load(&candidate, &self.worksheet)?;
-                if !current.same_source(&self.before) {
+                if !current.same_source(&before) {
                     return Err(crate::error::Error::PatchConflict {
                         part: self.worksheet.to_string(),
                     });
@@ -222,17 +248,55 @@ impl Edit {
         }
         let patch = if created {
             Patch::with_parts(
-                self.before,
+                before,
                 snapshot.clone(),
                 crate::part_edit::PartPatch::capture_all(&self.target, &candidate)?,
             )
         } else {
-            Patch::new(self.before, snapshot.clone())
+            Patch::new(before, snapshot.clone())
         };
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
             snapshot,
         ))
+    }
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    use super::*;
+
+    #[test]
+    fn edit_entry_defers_ole_graph_and_embedded_payloads() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package
+            .edit_ole_objects(0usize)
+            .expect("worksheet selector");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert_eq!(edit.objects().expect("first OLE read"), None);
+        assert!(edit.before.is_some());
+    }
+
+    #[test]
+    fn failed_ole_read_is_retryable_without_partial_state() {
+        let source = crate::Package::new().expect("minimal XLSX");
+        let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
+        let mut package = source.opc().clone();
+        package
+            .get_part_mut(&worksheet)
+            .expect("worksheet")
+            .set_blob(
+                br#"<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:oleObjects>"#.to_vec(),
+            );
+        let package = crate::Package::from_opc(package).expect("defer worksheet XML");
+        let mut edit = package
+            .edit_ole_objects(0usize)
+            .expect("worksheet selector");
+        assert!(edit.objects().is_err());
+        assert!(edit.before.is_none());
+        assert!(edit.objects().is_err());
+        assert!(edit.before.is_none());
     }
 }

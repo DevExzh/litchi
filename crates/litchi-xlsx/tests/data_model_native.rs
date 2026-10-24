@@ -27,8 +27,9 @@ fn unknown_model_profile_is_retained_on_package_write() {
             feature: "XLDM header version"
         })
     ));
+    let mut edit = package.edit_data_model().unwrap();
     assert!(matches!(
-        package.edit_data_model(),
+        edit.before(),
         Err(Error::Unsupported {
             feature: "XLDM header version"
         })
@@ -182,7 +183,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
 fn public_structural_descriptor_and_payload_replacement_is_refused_without_inner_identity_proof() {
     let package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
-    let mut replacement = edit.model().unwrap().to_owned();
+    let mut replacement = edit.model().unwrap().unwrap().to_owned();
     replacement.definition.tables[0].id.push_str("-replacement");
     replacement.definition.extension_list = Some(litchi_xlsx::DataModelOpaqueXml {
         xml: br#"<x15:extLst xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:ext uri="urn:replacement"/></x15:extLst>"#.to_vec(),
@@ -652,7 +653,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
     );
     // The refusal staged nothing.
     let mut refused = transaction;
-    refused.reset();
+    refused.reset().unwrap();
     let mut transaction = refused;
     assert!(
         transaction
@@ -753,7 +754,8 @@ fn native_workbook_relationship_compatibility_has_exact_owner_and_target() {
         rels.add_relationship(reltype.into(), target.into(), edge_id.clone(), external);
         let package = Package::from_opc(changed).unwrap();
         assert!(package.data_model().is_err());
-        assert!(package.edit_data_model().is_err());
+        let mut edit = package.edit_data_model().unwrap();
+        assert!(edit.before().is_err());
     }
     let mut duplicate = source.clone();
     duplicate
@@ -1092,7 +1094,8 @@ fn final_connections_owner_removal_refuses_unowned_content_and_edges_atomically(
         let before = raw.clone();
         let package = Package::from_opc(raw).unwrap();
         if case == 2 {
-            assert!(package.edit_data_model().is_err());
+            let mut edit = package.edit_data_model().unwrap();
+            assert!(edit.before().is_err());
         } else {
             let mut edit = package.edit_data_model().unwrap();
             edit.remove().unwrap();

@@ -15,6 +15,7 @@
 //! separate, explicitly fallible boundary when it would require detaching an
 //! allocation from that reservation.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
 use std::mem::size_of;
@@ -164,6 +165,64 @@ impl SourceSheetData {
 pub(crate) struct SourceCatalogProof {
     pub(crate) defined_names: Arc<[raw::DefinedName]>,
     pub(crate) limits: Arc<SourceLimits>,
+}
+
+/// The source and the resolved state of a source-backed edit.
+///
+/// Source-backed edit entry points must not turn a cheap immutable owner into
+/// a selected-part snapshot merely because a caller is about to stage an edit.
+/// This context therefore retains only the owner until the first operation
+/// that needs the selected source.  `OnceLock` also makes repeated accessors
+/// share the one authenticated snapshot without retaining a decoded payload
+/// in every discarded edit.
+pub(crate) struct LazySource<S> {
+    workbook: SourceBackedWorkbook,
+    resolved: OnceLock<S>,
+}
+
+impl<S> LazySource<S> {
+    pub(crate) fn new(workbook: SourceBackedWorkbook) -> Self {
+        Self {
+            workbook,
+            resolved: OnceLock::new(),
+        }
+    }
+
+    pub(crate) fn workbook(&self) -> &SourceBackedWorkbook {
+        &self.workbook
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        load: impl FnOnce(&SourceBackedPackage) -> Result<S>,
+    ) -> Result<&S> {
+        if let Some(resolved) = self.resolved.get() {
+            return Ok(resolved);
+        }
+        let package = self.workbook.edit_package()?;
+        let resolved = load(package)?;
+        // A concurrently resolving clone may win the one-time publication.
+        // Its snapshot is equivalent under the same immutable source policy;
+        // discard this duplicate and borrow the winner without panicking.
+        let _ = self.resolved.set(resolved);
+        self.resolved
+            .get()
+            .ok_or_else(|| invalid("lazy source snapshot was not retained"))
+    }
+}
+
+/// Make a selector owned so a deferred edit can outlive the caller's input.
+///
+/// XLSX currently has no stable-identity selector variant (`Id` is
+/// `Infallible`), but matching it explicitly keeps this helper correct if the
+/// alias gains one in a future API revision.
+pub(crate) fn own_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
+    match selector {
+        CoreSelector::Name(name) => Ok(CoreSelector::Name(Cow::Owned(name.into_owned()))),
+        CoreSelector::Position(position) => Ok(CoreSelector::Position(position)),
+        CoreSelector::Id(never) => match never {},
+        _ => Err(Error::UnsupportedSelector),
+    }
 }
 
 /// Caches used only by shared-string and conditional-format readers.

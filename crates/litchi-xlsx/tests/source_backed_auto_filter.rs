@@ -347,7 +347,7 @@ fn managed_snapshot_changed_publication_and_exact_inverse_are_bounded() {
     .unwrap();
     let snapshot = editor
         .edit_auto_filter("Sheet1")
-        .map(|edit| edit.before().clone())
+        .and_then(|edit| edit.before().cloned())
         .unwrap();
     assert!(snapshot.auto_filter().is_none());
     assert_eq!(budget.used(Resource::Memory), exact);
@@ -418,8 +418,8 @@ fn add_replace_clear_noop_protection_and_mce_are_checked() {
     let mut edit = editor.edit_auto_filter("Sheet1").unwrap();
     assert!(edit.set(definition(false)).unwrap());
     assert!(!edit.set(definition(false)).unwrap());
-    assert!(edit.clear());
-    assert!(!edit.clear());
+    assert!(edit.clear().unwrap());
+    assert!(!edit.clear().unwrap());
     assert!(!edit.commit().unwrap().diagnostics().changed());
 
     let protected = fixture(

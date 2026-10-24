@@ -138,7 +138,8 @@ fn changed_edit(
     editor: &SourceBackedWorkbook,
 ) -> litchi_xlsx::calculation_properties::source::Edit {
     let mut edit = editor.edit_calculation_metadata().unwrap();
-    assert!(edit.set_properties(Properties::new().with_calculation_id(Some(91))));
+    assert!(edit
+        .set_properties(Properties::new().with_calculation_id(Some(91))));
     edit
 }
 

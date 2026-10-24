@@ -39,7 +39,7 @@ fn set_properties(package: &mut Package, properties: Properties) {
     let mut edit = package
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
-    assert!(edit.set_properties(properties));
+    assert!(edit.set_properties(properties).unwrap());
     *package = {
         let commit = edit.commit().expect("metadata commit");
         assert!(commit.diagnostics().changed());
@@ -51,7 +51,7 @@ fn set_features(package: &mut Package, features: Features) {
     let mut edit = package
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
-    assert!(edit.set_features(features));
+    assert!(edit.set_features(features).unwrap());
     *package = {
         let commit = edit.commit().expect("metadata commit");
         assert!(commit.diagnostics().changed());
@@ -211,7 +211,7 @@ fn existing_calc_pr_rewrite_removes_each_authored_attribute_and_then_the_tag() {
 
     let mut rewritten = rewritten;
     let mut remove = rewritten.edit_calculation_metadata().expect("remove edit");
-    assert!(remove.remove_properties());
+    assert!(remove.remove_properties().unwrap());
     rewritten = {
         let commit = remove.commit().expect("remove commit");
         assert!(commit.diagnostics().changed());
@@ -624,7 +624,9 @@ fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     );
 
     let mut edit = package.edit_calculation_metadata().expect("feature edit");
-    assert!(edit.set_features(Features::new(Feature::new("changed").unwrap())));
+    assert!(edit
+        .set_features(Features::new(Feature::new("changed").unwrap()))
+        .unwrap());
     let error = edit.commit().expect_err("projected edit must be refused");
     assert!(matches!(error, Error::Invalid(_)));
     assert!(error.to_string().contains("projected through MCE"));

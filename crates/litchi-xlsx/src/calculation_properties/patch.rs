@@ -133,7 +133,7 @@ mod tests {
         let mut package = crate::package::build_minimal_package().unwrap();
         let original = Snapshot::load(&package).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        transaction.set_properties(authored());
+        transaction.set_properties(authored()).unwrap();
         let commit = transaction.commit().unwrap();
         commit.patch().inverse().apply(&mut package).unwrap();
         assert!(Snapshot::load(&package).unwrap().same_source(&original));
@@ -144,7 +144,7 @@ mod tests {
         let mut package = crate::package::build_minimal_package().unwrap();
         let original = package.clone();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        transaction.set_properties(authored());
+        transaction.set_properties(authored()).unwrap();
         let patch = transaction.commit().unwrap().patch().clone();
 
         let mut stale = original;

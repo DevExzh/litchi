@@ -59,7 +59,7 @@ fn native_set(
 fn promote_source(bytes: &[u8]) -> Result<litchi_xlsx::Package> {
     let source = litchi_xlsx::SourceBackedWorkbook::from_reader(Cursor::new(bytes.to_vec()))?;
     let package = source
-        .source_backed_package()
+        .source_backed_package()?
         .to_opc_package_preserving_source()?;
     Ok(litchi_xlsx::Package::from_opc(package)?)
 }

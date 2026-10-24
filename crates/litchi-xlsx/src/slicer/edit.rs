@@ -1,8 +1,9 @@
 //! Immutable worksheet slicer edits of a [`crate::Package`] (record 0360).
 //!
-//! [`crate::Package::edit_slicers`] starts an [`Edit`] over the validated
-//! slicer graph; every operation works on a private candidate graph, so an
-//! error cannot stage a partial graph. [`Edit::commit`] validates the
+//! [`crate::Package::edit_slicers`] starts an [`Edit`] that retains the
+//! package and limits without loading the slicer graph; every operation
+//! works on a private candidate graph, so an error cannot stage a partial
+//! graph. [`Edit::commit`] validates the
 //! complete owner graph and returns a [`Commit`] holding the new package,
 //! the exact part-level [`Patch`] and the [`Diagnostics`];
 //! [`crate::Package::apply_slicers`] replays a patch onto an equal package.
@@ -55,19 +56,19 @@ impl EditOptions {
 pub struct Edit {
     staged: Staged,
     limits: SourceLimits,
-    /// The current staged graph has passed `graph_with_limits`. It is cleared
-    /// before a candidate replacement and restored only after validation;
-    /// `reset` returns to the already validated source graph.
+    /// Whether the current staged graph has passed `graph_with_limits`.
+    /// Validation is deferred until a graph operation or commit requires it.
     graph_validated: bool,
 }
 
 impl Package {
-    /// Start a slicer edit after validating the existing slicer graph.
+    /// Start a slicer edit without loading the existing slicer graph.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the slicer graph.
+    /// refused. Existing graph errors are reported by the first operation or
+    /// by [`Edit::commit`].
     pub fn edit_slicers(&self) -> Result<Edit> {
         self.edit_slicers_with_options(EditOptions::default())
     }
@@ -79,11 +80,10 @@ impl Package {
             .opc()
             .read_limits()
             .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
-        super::validation::graph_with_limits(staged.opc(), &limits)?;
         Ok(Edit {
             staged,
             limits,
-            graph_validated: true,
+            graph_validated: false,
         })
     }
 
@@ -112,16 +112,19 @@ impl Edit {
 
     /// Find a cache by its case-insensitive semantic name.
     pub fn cache(&self, name: &str) -> Result<Option<Cache>> {
-        crate::slicer_cache::crud::find_slicer_cache(self.staged.opc(), name)
+        crate::slicer_cache::crud::find_slicer_cache(self.staged.opc(), name, &self.limits)
     }
 
     /// Find a worksheet slicer by its case-insensitive semantic name.
     pub fn view(&self, worksheet: &PackURI, name: &str) -> Result<Option<Slicer>> {
-        crate::slicer_cache::crud::find_slicer(self.staged.opc(), worksheet, name)
+        crate::slicer_cache::crud::find_slicer(self.staged.opc(), worksheet, name, &self.limits)
     }
 
     pub fn add_cache(&mut self, definition: Definition) -> Result<Cache> {
-        self.apply(|candidate| crate::slicer_cache::crud::add_slicer_cache(candidate, definition))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::add_slicer_cache(candidate, definition, &limits)
+        })
     }
 
     /// Insert a workbook-owned Slicer Cache with its caller-selected native
@@ -141,10 +144,23 @@ impl Edit {
             &value.relationship_id,
             &uri,
         )?;
+        // Admit the existing package before serializing the caller's value.
+        // In particular, an already-over-limit source must report its
+        // aggregate refusal rather than spending the output budget on a new
+        // cache first.  Keep the operation-local proof and reuse it on the
+        // unchanged candidate so this path pays one package census.
+        crate::slicer::validate(&value.definition)?;
+        let additions = [(
+            value.relationship_id.clone(),
+            crate::slicer_cache::SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(workbook.base_uri()),
+        )];
+        let budget =
+            crate::raw::prepare_package_budget(self.staged.opc(), &workbook, &additions, &limits)?;
         let prepared = raw::prepare_cache(value, workbook.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::package::store_slicer_cache_prepared_in_place(
-                candidate, &prepared, &limits,
+            crate::slicer_cache::package::store_slicer_cache_prepared_in_place_with_budget(
+                candidate, &prepared, &limits, &budget,
             )
         })
     }
@@ -153,30 +169,39 @@ impl Edit {
     where
         F: FnOnce(&mut Definition),
     {
-        self.apply(|candidate| {
-            crate::slicer_cache::crud::update_slicer_cache(candidate, name, update)
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::update_slicer_cache(candidate, name, update, &limits)
         })
     }
 
     pub fn replace_cache(&mut self, name: &str, replacement: Definition) -> Result<bool> {
-        self.apply(|candidate| {
-            crate::slicer_cache::crud::replace_slicer_cache(candidate, name, replacement)
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::replace_slicer_cache(candidate, name, replacement, &limits)
         })
     }
 
     pub fn reorder_caches(&mut self, names: &[String]) -> Result<Vec<Cache>> {
         let names = names.to_vec();
-        self.apply(|candidate| crate::slicer_cache::crud::reorder_slicer_caches(candidate, &names))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::reorder_slicer_caches(candidate, &names, &limits)
+        })
     }
 
     pub fn remove_cache(&mut self, name: &str) -> Result<bool> {
-        self.apply(|candidate| crate::slicer_cache::crud::remove_slicer_cache(candidate, name))
+        let limits = self.limits;
+        self.apply(move |candidate| {
+            crate::slicer_cache::crud::remove_slicer_cache(candidate, name, &limits)
+        })
     }
 
     pub fn add_view(&mut self, worksheet: &PackURI, view: Slicer) -> Result<Part> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::add_slicer(candidate, &worksheet, view)
+            crate::slicer_cache::crud::add_slicer(candidate, &worksheet, view, &limits)
         })
     }
 
@@ -193,10 +218,18 @@ impl Edit {
             &value.relationship_id,
             &uri,
         )?;
+        let additions = [(
+            value.relationship_id.clone(),
+            crate::slicer_cache::views::SLICERS_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(worksheet.base_uri()),
+        )];
+        // Admit the existing package before serializing the caller's value.
+        let budget =
+            crate::raw::prepare_package_budget(self.staged.opc(), &worksheet, &additions, &limits)?;
         let prepared = raw::prepare_part(value, worksheet.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::views::store_slicer_part_prepared_limited(
-                candidate, &worksheet, &prepared, &limits,
+            crate::slicer_cache::views::store_slicer_part_prepared_limited_with_budget(
+                candidate, &worksheet, &prepared, &limits, &budget,
             )
         })
     }
@@ -206,8 +239,9 @@ impl Edit {
         F: FnOnce(&mut Slicer),
     {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::update_slicer(candidate, &worksheet, name, update)
+            crate::slicer_cache::crud::update_slicer(candidate, &worksheet, name, update, &limits)
         })
     }
 
@@ -218,23 +252,32 @@ impl Edit {
         replacement: Slicer,
     ) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::replace_slicer(candidate, &worksheet, name, replacement)
+            crate::slicer_cache::crud::replace_slicer(
+                candidate,
+                &worksheet,
+                name,
+                replacement,
+                &limits,
+            )
         })
     }
 
     pub fn reorder_views(&mut self, worksheet: &PackURI, names: &[String]) -> Result<Vec<Slicer>> {
         let worksheet = worksheet.clone();
         let names = names.to_vec();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::reorder_slicers(candidate, &worksheet, &names)
+            crate::slicer_cache::crud::reorder_slicers(candidate, &worksheet, &names, &limits)
         })
     }
 
     pub fn remove_view(&mut self, worksheet: &PackURI, name: &str) -> Result<bool> {
         let worksheet = worksheet.clone();
+        let limits = self.limits;
         self.apply(move |candidate| {
-            crate::slicer_cache::crud::remove_slicer(candidate, &worksheet, name)
+            crate::slicer_cache::crud::remove_slicer(candidate, &worksheet, name, &limits)
         })
     }
 
@@ -251,7 +294,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
-        self.graph_validated = true;
+        self.graph_validated = false;
     }
 
     /// Validate the staged slicer graph and publish it to a new package. An

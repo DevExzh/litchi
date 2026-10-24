@@ -16,6 +16,7 @@ use litchi_opc::SourceBackedPackage;
 
 use super::{Setup, Snapshot};
 use crate::error::{Result, invalid};
+use crate::workbook::source::{LazySource, own_selector};
 use crate::{Selector, SourceBackedWorkbook};
 
 crate::workbook::source::deferred::source_family!("page-setup", super::Patch);
@@ -85,11 +86,11 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns an error when the selector does not name a worksheet, its XML
-    /// is invalid, or the source cannot be read.
+    /// Source-resolution errors are returned by the first accessor, staging
+    /// operation, or commit that needs the selected worksheet.
     pub fn edit_page_setup<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
-        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
-        Ok(Edit::new(self.clone(), before))
+        self.check_execution()?;
+        Ok(Edit::new(self.clone(), own_selector(selector.into())?))
     }
 
     /// Replay a page-setup patch onto this workbook.
@@ -107,76 +108,90 @@ impl SourceBackedWorkbook {
 /// An isolated page-setup edit over one exact source worksheet of a
 /// [`SourceBackedWorkbook`]. Dropping it discards it.
 pub struct Edit {
-    workbook: SourceBackedWorkbook,
-    before: Snapshot,
-    staged: Option<Setup>,
+    source: LazySource<Snapshot>,
+    selector: Selector<'static>,
+    /// `None` inherits the source value; `Some` stores the complete
+    /// replacement, including `None` for removal.
+    staged: Option<Option<Setup>>,
 }
 
 impl Edit {
-    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
+    fn new(workbook: SourceBackedWorkbook, selector: Selector<'static>) -> Self {
         Self {
-            workbook,
-            staged: before.page_setup().cloned(),
-            before,
+            source: LazySource::new(workbook),
+            selector,
+            staged: None,
         }
     }
 
-    /// Exact source state captured when this edit began.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
+    fn resolve_before(&self) -> Result<&Snapshot> {
+        let selector = self.selector.clone();
+        self.source
+            .resolve(|package| Snapshot::load_source_backed(package, selector))
+    }
+
+    fn effective(&self) -> Result<Option<&Setup>> {
+        match &self.staged {
+            Some(staged) => Ok(staged.as_ref()),
+            None => Ok(self.resolve_before()?.page_setup()),
+        }
+    }
+
+    /// Resolve the exact source state observed by this edit.
+    pub fn before(&self) -> Result<&Snapshot> {
+        self.resolve_before()
     }
 
     /// Currently staged page-setup state.
-    #[must_use]
-    pub const fn page_setup(&self) -> Option<&Setup> {
-        self.staged.as_ref()
+    pub fn page_setup(&self) -> Result<Option<&Setup>> {
+        self.effective()
     }
 
     /// Create or replace the complete staged relationship-free settings.
     ///
     /// An existing printer-settings relationship, if present, is retained
     /// exactly by the worksheet codec and is never exposed for mutation here.
-    pub fn set(&mut self, value: Setup) -> bool {
-        if self.staged.as_ref() == Some(&value) {
-            return false;
+    pub fn set(&mut self, value: Setup) -> Result<bool> {
+        if self.effective()?.is_some_and(|current| current == &value) {
+            return Ok(false);
         }
-        self.staged = Some(value);
-        true
+        self.staged = Some(Some(value));
+        Ok(true)
     }
 
     /// Remove direct page setup.
     ///
     /// Commit retains the typed refusal when printer settings are attached.
-    pub fn remove(&mut self) -> bool {
-        self.staged.take().is_some()
+    pub fn remove(&mut self) -> Result<bool> {
+        if self.effective()?.is_none() {
+            return Ok(false);
+        }
+        self.staged = Some(None);
+        Ok(true)
     }
 
     /// Discard every staged change in place.
     pub fn reset(&mut self) {
-        self.staged = self.before.page_setup().cloned();
-    }
-
-    fn changed(&self) -> bool {
-        self.before.page_setup() != self.staged.as_ref()
+        self.staged = None;
     }
 
     /// Validate and freeze this isolated edit for source-backed publication.
     pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        if !self.changed() {
-            let patch = super::Patch::new(self.before.clone(), self.before);
-            return commit_change(&self.workbook, patch);
+        let before = self.resolve_before()?.clone();
+        let staged = self.staged.unwrap_or_else(|| before.page_setup().cloned());
+        before.check_execution()?;
+        if before.page_setup() == staged.as_ref() {
+            let patch = super::Patch::new(before.clone(), before);
+            return commit_change(self.source.workbook(), patch);
         }
-        let output =
-            super::replace_worksheet_page_setup(self.before.source_xml(), self.staged.as_ref())?;
-        let snapshot = Snapshot::from_rewritten_source(&self.before, output)?;
+        let output = super::replace_worksheet_page_setup(before.source_xml(), staged.as_ref())?;
+        let snapshot = Snapshot::from_rewritten_source(&before, output)?;
         snapshot.check_execution()?;
-        if snapshot.page_setup() != self.staged.as_ref() {
+        if snapshot.page_setup() != staged.as_ref() {
             return Err(invalid(
                 "page-setup publication changed the staged semantic state",
             ));
         }
-        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
+        commit_change(self.source.workbook(), super::Patch::new(before, snapshot))
     }
 }

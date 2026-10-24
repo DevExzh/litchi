@@ -76,7 +76,7 @@ impl SourceBackedEditor {
     }
 
     pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        Ok(self.workbook.edit_sheet_values(selector)?.before().clone())
+        Ok(self.workbook.edit_sheet_values(selector)?.before()?.clone())
     }
 
     pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<cell_values::sheet::Edit> {

@@ -113,8 +113,11 @@ fn compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit() {
     let row_bytes = fixture(row_order, false);
     let row_source = Arc::new(VersionedSource::new(row_bytes.clone()));
     let row_editor = SourceBackedEditor::from_read_at(row_source.clone()).unwrap();
-    let row_error = match row_editor.edit_sheets(["Sheet1".into()]) {
-        Ok(_) => panic!("out-of-order rows unexpectedly entered planning"),
+    let row_error = match row_editor
+        .edit_sheets(["Sheet1".into()])
+        .and_then(|edit| edit.commit())
+    {
+        Ok(_) => panic!("out-of-order rows unexpectedly committed"),
         Err(error) => error,
     };
     assert_invalid_exact(

@@ -1151,7 +1151,7 @@ mod shared_owners {
         props: Props,
     ) -> Result<Package, litchi_xlsx::metadata::Error> {
         let mut edit = package.edit_metadata()?;
-        edit.set_custom_props(props);
+        edit.set_custom_props(props)?;
         Ok(edit.commit()?.into_package())
     }
 

@@ -40,6 +40,108 @@ fn package() -> (OpcPackage, PackURI) {
     (package, worksheet)
 }
 
+#[test]
+fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
+    let (mut package, _) = package();
+    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
+    let slicer_cache = PackURI::new("/xl/slicerCaches/malformed.xml").unwrap();
+    let timeline_cache = PackURI::new("/xl/timelineCaches/malformed.xml").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        slicer_cache.clone(),
+        slicer::CACHE_CONTENT_TYPE.into(),
+        b"<malformed".to_vec(),
+    )));
+    package.add_part(Box::new(BlobPart::new(
+        timeline_cache.clone(),
+        litchi_xlsx::timeline::CACHE_CONTENT_TYPE.into(),
+        b"<malformed".to_vec(),
+    )));
+    let workbook_part = package.get_part_mut(&workbook).unwrap();
+    workbook_part.rels_mut().add_relationship(
+        slicer::CACHE_RELATIONSHIP_TYPE.into(),
+        slicer_cache.relative_ref(workbook.base_uri()),
+        "rIdMalformedSlicerCache".into(),
+        false,
+    );
+    workbook_part.rels_mut().add_relationship(
+        litchi_xlsx::timeline::CACHE_RELATIONSHIP_TYPE.into(),
+        timeline_cache.relative_ref(workbook.base_uri()),
+        "rIdMalformedTimelineCache".into(),
+        false,
+    );
+
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let slicers = source.edit_slicers().unwrap();
+    assert!(slicers.commit().is_err());
+    let timelines = source.edit_timelines().unwrap();
+    assert!(timelines.commit().is_err());
+}
+
+#[test]
+fn slicer_pivot_validation_preserves_typed_nested_limits_and_staging() {
+    let (mut package, _) = package();
+    let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+    let pivot_cache_uri = PackURI::new("/xl/pivotCache/pivotCacheDefinition1.xml").unwrap();
+    let workbook_xml = String::from_utf8(package.get_part(&workbook_uri).unwrap().blob().to_vec())
+        .unwrap()
+        .replace(
+            "</sheets>",
+            r#"</sheets><pivotCaches><pivotCache cacheId="5" r:id="rIdPivotCache"/></pivotCaches>"#,
+        );
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_xml.into_bytes());
+    package.add_part(Box::new(BlobPart::new(
+        pivot_cache_uri.clone(),
+        ct::SML_PIVOT_CACHE_DEFINITION.into(),
+        vec![b'x'; 4096],
+    )));
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            rt::PIVOT_CACHE_DEFINITION.into(),
+            pivot_cache_uri.relative_ref("/xl/"),
+            "rIdPivotCache".into(),
+            false,
+        );
+    let workbook_bytes = package.get_part(&workbook_uri).unwrap().blob().len();
+    let candidate_bytes = slicer::codec::write(&slicer_cache("NestedLimit", "State"))
+        .unwrap()
+        .len();
+    let effective_cap = workbook_bytes.max(candidate_bytes) + 1;
+    assert!(effective_cap < 4096);
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let limits = SourceLimits::builder()
+        .max_part_bytes(effective_cap as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .add_cache(slicer_cache("NestedLimit", "State"))
+        .expect_err("nested pivot validation must honor the effective limit");
+    assert!(matches!(
+        error,
+        Error::Package(OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed,
+            maximum,
+        }) if observed == 4096 && maximum == effective_cap as u64
+    ));
+    assert!(edit.cache("NestedLimit").unwrap().is_none());
+    assert!(
+        edit.opc()
+            .get_part(&PackURI::new("/xl/slicerCaches/slicerCache1.xml").unwrap())
+            .is_err()
+    );
+}
+
 fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
     let eocd = bytes
         .windows(4)
@@ -255,30 +357,38 @@ fn raw_slicer_rejects_lazy_baseline_without_decoding_payloads() {
 
 #[test]
 fn raw_slicer_rejects_a_misdeclared_lazy_member_without_mutation() {
-    let (package, _) = package();
+    let (mut package, _) = package();
+    let unrelated = PackURI::new("/xl/unrelated.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        unrelated,
+        "application/octet-stream".into(),
+        b"unrelated lazy payload".to_vec(),
+    )));
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    let bytes = misdeclare_member(bytes, "xl/worksheets/sheet1.xml");
+    let bytes = misdeclare_member(bytes, "xl/unrelated.bin");
     let source = litchi_xlsx::Package::from_opc(
         OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap(),
     )
     .unwrap();
-    let before = PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap();
     let before_counters = source.clone().into_plain_opc().deferred_decode_counters();
 
-    let error = source
+    let mut edit = source
         .edit_slicers_with_options(slicer::EditOptions::default())
+        .unwrap();
+    let error = edit
+        .insert_cache(slicer::raw::Cache {
+            relationship_id: "rIdMisdeclared".into(),
+            part_name: "/xl/slicerCaches/misdeclared.xml".into(),
+            definition: slicer_cache("Misdeclared", "State"),
+        })
         .expect_err("raw edit must reject the declared-versus-decoded mismatch");
     assert!(matches!(error, Error::Package(OpcError::ZipError(_))));
     assert_eq!(
-        source.clone().into_plain_opc().deferred_decode_counters(),
+        edit.opc().deferred_decode_counters(),
         before_counters,
         "the bounded mismatch probe must not charge a failed payload"
     );
-    assert_eq!(
-        PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap(),
-        before,
-        "a rejected raw edit must not publish a mutation"
-    );
+    assert!(edit.cache("Misdeclared").unwrap().is_none());
 }
 
 #[test]

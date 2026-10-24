@@ -203,11 +203,11 @@ fn assert_rejected_owner(xml: String) {
         .blob()
         .to_vec();
     assert!(load_rich_value_refresh_raw(&package, &SourceLimits::default()).is_err());
-    assert!(
-        Package::from_opc(package.clone())
-            .and_then(|package| package.edit_rich_value_refresh())
-            .is_err()
-    );
+    let result = Package::from_opc(package.clone()).and_then(|package| {
+        let mut edit = package.edit_rich_value_refresh()?;
+        edit.before().map(|_| ())
+    });
+    assert!(result.is_err());
     assert_eq!(
         package
             .get_part(&PackURI::new("/xl/richValueTypes.xml").unwrap())

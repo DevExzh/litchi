@@ -1184,7 +1184,7 @@ fn prove_edit_variant_is_admitted(archive: &[u8]) -> Result<(), Box<dyn Error>> 
         OwnedSource::new(archive.to_vec()),
     ))?;
     let transaction = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
-    if transaction.worksheet_count() != 1 {
+    if transaction.worksheet_count()? != 1 {
         return Err("producer XLSX edit variant planned an unexpected worksheet count".into());
     }
     Ok(())
@@ -2766,7 +2766,7 @@ fn run_xlsx_planning(
         let planned = editor.edit_sheets(selectors.iter().cloned());
         let duration = started.elapsed();
         let transaction = planned?;
-        if transaction.worksheet_count() != 1 {
+        if transaction.worksheet_count()? != 1 {
             return Err("producer XLSX planning selected an unexpected worksheet count".into());
         }
         let commit = transaction.commit()?;

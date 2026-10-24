@@ -1,9 +1,10 @@
 //! Immutable worksheet smart-tag edits of a [`crate::Package`] (record
 //! 0360).
 //!
-//! [`crate::Package::edit_smart_tags`] starts an [`Edit`] of one
-//! worksheet's inert smart tags; every operation validates a private
-//! candidate, so an error cannot stage a partial worksheet.
+//! [`crate::Package::edit_smart_tags`] starts an [`Edit`] that retains an
+//! owned selector without loading the worksheet's smart tags; every
+//! operation validates a private candidate, so an error cannot stage a
+//! partial worksheet.
 //! [`Edit::commit`] returns a [`Commit`] holding the new package, the exact
 //! part-level [`Patch`] and the [`Diagnostics`];
 //! [`crate::Package::apply_smart_tags`] replays a patch onto an equal
@@ -33,38 +34,30 @@ pub use crate::opc::LimitKind;
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    worksheet: PackURI,
+    package: Package,
+    selector: crate::workbook::Selector<'static>,
 }
 
 impl Package {
-    /// Start a smart-tag edit of a semantic worksheet.
+    /// Start a smart-tag edit of a semantic worksheet without loading its
+    /// worksheet part or smart-tag collection.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, a `NotFound` refusal for a selector that matches no sheet,
-    /// [`Error::NotWorksheet`] for a chart or dialog sheet, and the parse
-    /// errors of the worksheet's smart tags.
+    /// refused. Selector, worksheet-kind, and smart-tag parse errors are
+    /// reported by the first operation or by [`Edit::commit`].
     pub fn edit_smart_tags<'a>(
         &self,
         sheet: impl Into<crate::workbook::Selector<'a>>,
     ) -> Result<Edit> {
         let staged = Staged::new(self, "edit_smart_tags")?;
-        let worksheet = {
-            let worksheet = self.workbook_ref().sheet(sheet)?.ok_or(Error::refused(
-                litchi_core::edit::RefusalKind::NotFound,
-                "edit_smart_tags",
-                "the worksheet selector matches no sheet",
-            ))?;
-            if worksheet.kind() != crate::workbook::WorksheetKind::Worksheet {
-                return Err(Error::NotWorksheet {
-                    sheet: worksheet.name().to_owned(),
-                });
-            }
-            worksheet.part_uri().clone()
-        };
-        super::package::load(staged.opc(), &worksheet)?;
-        Ok(Edit { staged, worksheet })
+        let selector = crate::workbook::source::own_selector(sheet.into())?;
+        Ok(Edit {
+            staged,
+            package: self.clone(),
+            selector,
+        })
     }
 
     /// Apply a smart-tag patch to a new package; this one is unchanged. An
@@ -87,7 +80,8 @@ impl Edit {
     /// Return the current staged collection. Absence is represented by an
     /// empty semantic collection.
     pub fn collection(&self) -> Result<Collection> {
-        Ok(super::package::load(self.staged.opc(), &self.worksheet)?.unwrap_or_default())
+        let worksheet = self.worksheet()?;
+        Ok(super::package::load(self.staged.opc(), &worksheet)?.unwrap_or_default())
     }
 
     /// Replace the complete collection. An empty value removes `smartTags`.
@@ -138,18 +132,37 @@ impl Edit {
     /// Returns the parse errors, [`Error::Signed`] for a changed signed
     /// package and the workbook validation errors of the staged package.
     pub fn commit(self) -> Result<Commit> {
-        super::package::load(self.staged.opc(), &self.worksheet)?;
+        let worksheet = self.worksheet()?;
+        super::package::load(self.staged.opc(), &worksheet)?;
         Ok(Commit::new(self.staged.commit()?))
+    }
+
+    fn worksheet(&self) -> Result<PackURI> {
+        let worksheet = self
+            .package
+            .workbook_ref()
+            .sheet(self.selector.clone())?
+            .ok_or(Error::refused(
+                litchi_core::edit::RefusalKind::NotFound,
+                "edit_smart_tags",
+                "the worksheet selector matches no sheet",
+            ))?;
+        if worksheet.kind() != crate::workbook::WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: worksheet.name().to_owned(),
+            });
+        }
+        Ok(worksheet.part_uri().clone())
     }
 
     fn apply<T>(
         &mut self,
         operation: impl FnOnce(&mut OpcPackage, &PackURI) -> Result<T>,
     ) -> Result<T> {
-        let worksheet = &self.worksheet;
-        self.staged.update_part(worksheet, |candidate| {
-            let value = operation(candidate, worksheet)?;
-            super::package::load(candidate, worksheet)?;
+        let worksheet = self.worksheet()?;
+        self.staged.update_part(&worksheet, |candidate| {
+            let value = operation(candidate, &worksheet)?;
+            super::package::load(candidate, &worksheet)?;
             Ok(value)
         })
     }
