@@ -3,6 +3,7 @@ use litchi_core::simd::xor::xor_32_bytes_inplace;
 
 /// Errors produced while parsing a font obfuscation key.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     #[error("invalid GUID format: {0}")]
     InvalidGuid(String),
