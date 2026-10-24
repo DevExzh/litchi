@@ -1,0 +1,46 @@
+{
+  "source_head": "dcc7cfbdefc982cb9593fdf3ede732f9f81dfdf1",
+  "merged_leaf": "e8d51bb07a00dd0b9feeb6ed5e134c521c89be4d",
+  "resolved_index_tree_before_record": "29f2b28a0bcbed33c534c91e6dedd493ae066de8",
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_prepare_xlsx_raw_inputs",
+    "tools.test_xlsx_raw_native_qualification",
+    "tools.test_native_qualification_runner",
+    "tools.test_legacy_native_qualification",
+    "tools.test_ppt_lazy_native_qualification",
+    "tools.test_no_3rdparty_references"
+  ],
+  "environment": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "passed_tests": 67,
+  "test_runner_seconds": 9.981,
+  "tool_session": 69775,
+  "terminal_exit": 0,
+  "separate_log_retained": false,
+  "independent_review": "READY on corrected source and guards",
+  "actual_cli_artifacts": [
+    {
+      "path": "/tmp/legacy-cli-review-xls-staging-2984703/preparation.json",
+      "bytes": 6936,
+      "sha256": "fe0143f6926f6bec05d4cf9ee15155c19a9331b5c36932795dad19f12b7bf666"
+    },
+    {
+      "path": "/tmp/legacy-cli-review-xls-staging-2984703/runner-output/abba-receipt.json",
+      "bytes": 1473,
+      "sha256": "e82e2178d8b75f7b63fe8100625d634eb71da9c3833b86a4c97c0ff6664c5c5c"
+    }
+  ],
+  "actual_cli_scope": "preparer succeeded; runner loaded receipt and refused missing build receipt",
+  "cargo_or_native_executed": false,
+  "prior_aborted_composition": {
+    "index_tree_before_draft": "100ef2521f4f5c66d22b13710f16edfcd1c9146b",
+    "patch_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-composition-return/resolved-before-execution-returns.patch",
+    "patch_bytes": 150269,
+    "patch_sha256": "8759ae84c441b128720e195e640c2629662cb3768971d7246fe88c7c3096093a"
+  },
+  "post_validation_delta": "this record and reduced receipt only"
+}
