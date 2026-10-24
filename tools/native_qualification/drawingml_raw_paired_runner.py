@@ -73,6 +73,7 @@ DRAWINGML_FEATURES = {
     "drawingml-theme-family-owner-limits-current",
     "drawingml-transform-limits-current",
 }
+DRAWINGML_PROBE_FEATURE = "drawingml-probe"
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
 TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
@@ -593,13 +594,19 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
     target_after = Path(master["target_root"]) / profile_id / "candidate"
     adapter_paths = list(PROBE_PATHS)
 
-    def build(role: str) -> list[dict[str, Any]]:
+    def features_for(role: str) -> list[str]:
         features = list(
             profile.get(
                 "baseline_features" if role == "baseline" else "candidate_features",
                 (),
             )
         )
+        if DRAWINGML_PROBE_FEATURE not in features:
+            features.append(DRAWINGML_PROBE_FEATURE)
+        return features
+
+    def build(role: str) -> list[dict[str, Any]]:
+        features = features_for(role)
         feature_args = ["--features", ",".join(features)] if features else []
         no_default = ["--no-default-features"] if role == "baseline" else []
         cargo = [
@@ -690,8 +697,8 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
         "baseline_workspace_lock_bytes": int(master["baseline_workspace_lock_bytes"]),
         "candidate_workspace_lock_sha256": str(master["candidate_workspace_lock_sha256"]),
         "candidate_workspace_lock_bytes": int(master["candidate_workspace_lock_bytes"]),
-        "drawingml_baseline_features": list(profile.get("baseline_features", ())),
-        "drawingml_candidate_features": list(profile.get("candidate_features", ())),
+        "drawingml_baseline_features": features_for("baseline"),
+        "drawingml_candidate_features": features_for("candidate"),
         "source_fence": str(profile["source_fence"]),
         "rounds": 31,
         "abba_order": list(generic.ABBA_ORDER),

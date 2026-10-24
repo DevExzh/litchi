@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import tomllib
 import unittest
 
 
@@ -121,8 +122,36 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         materialized = paired._profile_manifest(master, profile, master["output_dir"])
         paired.generic._validate_drawingml_raw_workload(materialized)
         self.assertEqual(materialized["abba_order"], list(paired.generic.ABBA_ORDER))
+        self.assertEqual(
+            materialized["drawingml_baseline_features"],
+            [paired.DRAWINGML_PROBE_FEATURE],
+        )
+        for leg in ("before", "after"):
+            argv = materialized["legs"][leg]["build"][0]["argv"]
+            feature_index = argv.index("--features")
+            self.assertEqual(argv[feature_index + 1], paired.DRAWINGML_PROBE_FEATURE)
         self.assertEqual(materialized["legs"]["before"]["lock_paths"], ["Cargo.lock", "tools/perf-baseline/Cargo.lock"])
         self.assertIn("fixture_bytes", materialized["controls"][0]["compare"])
+
+    def test_drawingml_probe_isolated_from_no_default_feature_lanes(self) -> None:
+        cargo = tomllib.loads((ROOT / "tools/perf-baseline/Cargo.toml").read_text(encoding="utf-8"))
+        default = set(cargo["features"]["default"])
+        self.assertIn(paired.DRAWINGML_PROBE_FEATURE, cargo["features"])
+        self.assertIn(paired.DRAWINGML_PROBE_FEATURE, default)
+        self.assertIn("rtf-current-api", default)
+        for feature in (
+            "drawingml-raw-current",
+            "drawingml-owner-current",
+            "drawingml-theme-family-current",
+            "drawingml-theme-family-owner-limits-current",
+            "drawingml-ink-limits-current",
+            "drawingml-transform-limits-current",
+        ):
+            self.assertIn(feature, default)
+        lib = (ROOT / "tools/perf-baseline/src/lib.rs").read_text(encoding="utf-8")
+        self.assertIn('#[cfg(feature = "drawingml-probe")]\npub mod drawingml_raw_probe;', lib)
+        manifest = (ROOT / "tools/perf-baseline/Cargo.toml").read_text(encoding="utf-8")
+        self.assertIn('required-features = ["drawingml-probe"]', manifest)
 
     def test_probe_is_real_source_backed_adapter(self) -> None:
         source = (ROOT / "tools/perf-baseline/src/drawingml_raw_probe.rs").read_text(encoding="utf-8")
