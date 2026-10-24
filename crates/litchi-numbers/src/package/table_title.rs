@@ -2006,7 +2006,7 @@ mod tests {
         assert!(matches!(
             attempted,
             Err(Error::Limit {
-                kind: super::LimitKind::TransactionWork,
+                kind: LimitKind::TransactionWork,
                 ..
             })
         ));
