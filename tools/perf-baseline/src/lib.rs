@@ -28851,10 +28851,6 @@ fn xls_comment_value(
     )?)
 }
 
-fn xls_comment_opaque_stream_name(index: usize) -> String {
-    format!("Payload{index:03}")
-}
-
 fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = xls_f3_corpus::build_xls_comments_fixture()?;
 

@@ -355,7 +355,7 @@ fn run_case(source: &[u8], args: &Args, retention: Retention) -> Result<CaseResu
         edit.replace_paragraph(Position::new(0), requested_text)?;
         let after = edit.retained_render_bytes();
         let after_release = if retention.releases_after_stage() {
-            edit.release_retained_render();
+            edit.release_retained_render()?;
             edit.retained_render_bytes()
         } else {
             None
