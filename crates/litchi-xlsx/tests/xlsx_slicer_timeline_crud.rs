@@ -108,9 +108,14 @@ fn slicer_pivot_validation_preserves_typed_nested_limits_and_staging() {
             false,
         );
     let workbook_bytes = package.get_part(&workbook_uri).unwrap().blob().len();
+    let candidate_bytes = slicer::codec::write(&slicer_cache("NestedLimit", "State"))
+        .unwrap()
+        .len();
+    let effective_cap = workbook_bytes.max(candidate_bytes) + 1;
+    assert!(effective_cap < 4096);
     let source = litchi_xlsx::Package::from_opc(package).unwrap();
     let limits = SourceLimits::builder()
-        .max_part_bytes((workbook_bytes + 1) as u64)
+        .max_part_bytes(effective_cap as u64)
         .unwrap()
         .build()
         .unwrap();
@@ -127,7 +132,7 @@ fn slicer_pivot_validation_preserves_typed_nested_limits_and_staging() {
             kind: SourceLimitKind::PartBytes,
             observed,
             maximum,
-        }) if observed > maximum
+        }) if observed == 4096 && maximum == effective_cap as u64
     ));
     assert!(edit.cache("NestedLimit").unwrap().is_none());
     assert!(
