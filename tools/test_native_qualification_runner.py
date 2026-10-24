@@ -1295,6 +1295,9 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             ) as kill:
                 safe._signal_owned_processes(owned, leader_pid=123, sig=runner.signal.SIGTERM)
             kill.assert_not_called()
+            with mock.patch.object(runner.os, "waitpid") as waitpid:
+                safe._reap_owned_processes(owned, leader_pid=123, snapshot=snapshot)
+            waitpid.assert_not_called()
 
     @staticmethod
     def _make_escaping_fake_cargo_source(root: Path) -> Path:

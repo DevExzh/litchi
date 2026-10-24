@@ -2728,11 +2728,20 @@ class SafeRunner:
             owned[child_pid] = _process_record(entry)
 
     @staticmethod
-    def _reap_owned_processes(owned: Mapping[int, Mapping[str, Any]], *, leader_pid: int) -> None:
+    def _reap_owned_processes(
+        owned: Mapping[int, Mapping[str, Any]],
+        *,
+        leader_pid: int,
+        snapshot: Mapping[int, Mapping[str, Any]] | None = None,
+    ) -> None:
         """Reap only descendants that this runner has already identified."""
 
+        snapshot = _proc_snapshot() if snapshot is None else snapshot
         for child_pid in sorted(owned):
             if child_pid == leader_pid:
+                continue
+            entry = snapshot.get(child_pid)
+            if entry is None or not _same_process_identity(entry, owned[child_pid]):
                 continue
             try:
                 os.waitpid(child_pid, os.WNOHANG)
@@ -2815,7 +2824,7 @@ class SafeRunner:
             and _same_process_identity(snapshot[pid], record)
         ]
         if not escaped:
-            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             return {"escaped": [], "survivors": [], "pid_reuse": list(pid_reuse)}
 
         self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGTERM)
@@ -2831,7 +2840,7 @@ class SafeRunner:
                 owned=owned,
                 pid_reuse=pid_reuse,
             )
-            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             survivors = self._live_owned_processes(
                 owned,
                 leader_pid=leader_pid,
@@ -2845,7 +2854,7 @@ class SafeRunner:
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
             snapshot = _proc_snapshot()
-            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             survivors = self._live_owned_processes(
                 owned,
                 leader_pid=leader_pid,

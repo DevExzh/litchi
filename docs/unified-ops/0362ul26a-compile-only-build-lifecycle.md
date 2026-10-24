@@ -48,8 +48,17 @@ The repaired source files at this leaf are:
 
 | Path | Bytes | SHA-256 |
 | --- | ---: | --- |
-| `tools/native_qualification_runner.py` | 188,569 | `babfc45c1ea2ded9c78f7c3ea0caebca6da9b8c2c976b271ef0eb74af41914f2` |
-| `tools/test_native_qualification_runner.py` | 73,612 | `dbcdf40e65091d4fbc0c1a72678f0dfb5c05acd4b7e7969e078230e0fa42c95b` |
+| `tools/native_qualification_runner.py` | 188,946 | `38c221982e201fd5e6b88c94f7af8fabb53bd0d71a63c104d2f692434d6a1a56` |
+| `tools/test_native_qualification_runner.py` | 73,806 | `8a278c5b4bc3733de2e9620b3ee8efe12a33205394eb709bd1c4701243d41f89` |
+
+The follow-up source-only rerun used the same commands and is retained under
+`/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024-r2/`:
+`pycompile.log` (0 bytes, SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`),
+`native-runner-tests.log` (333 bytes, SHA-256
+`07a7924c6d51d2f57916921f096a3f656c1d1094824378cf456f74e2520f6c67`), and
+`paired-runner-tests.log` (98 bytes, SHA-256
+`df92f1da813f79675b00846421966de998dfd837b423a276a44f425ef55baa3b`).
 
 This record makes no correctness, performance, RSS, target-size, or native
 qualification acceptance claim. Compile-cohort permits remain paused until
