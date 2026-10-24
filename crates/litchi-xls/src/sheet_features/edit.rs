@@ -1179,14 +1179,104 @@ pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use super::Edit;
+    use super::{Edit, Error};
+    use crate::{Builder, SourceBackedError, SourceBackedWorkbook};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::io;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+    struct SourceHook {
+        bytes: Arc<[u8]>,
+        observations: AtomicUsize,
+        revision: AtomicU64,
+        bump_at: AtomicUsize,
+    }
+
+    impl SourceHook {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::from(bytes),
+                observations: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+                bump_at: AtomicUsize::new(0),
+            }
+        }
+
+        fn bump_after_versions(&self, additional: usize) {
+            self.bump_at.store(
+                self.observations
+                    .load(Ordering::SeqCst)
+                    .saturating_add(additional),
+                Ordering::SeqCst,
+            );
+        }
+    }
+
+    impl ReadAt for SourceHook {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::other("source length does not fit u64"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let ordinal = self.observations.fetch_add(1, Ordering::SeqCst) + 1;
+            let observed =
+                SourceVersion::new(0x584c_535f_4645_4154, self.revision.load(Ordering::SeqCst));
+            if self.bump_at.load(Ordering::SeqCst) == ordinal {
+                self.bump_at.store(0, Ordering::SeqCst);
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(observed)
+        }
+    }
+
+    fn source_bytes() -> Vec<u8> {
+        let mut builder = Builder::new();
+        let sheet = builder.add_worksheet("Sheet1").unwrap();
+        builder.write_number(sheet, 0, 0, 1.0).unwrap();
+        builder.build().unwrap().to_bytes().unwrap()
+    }
 
     #[test]
     fn package_edit_entry_keeps_workbook_stream_cold() {
-        let package = crate::Builder::new().build().unwrap();
+        let package = Builder::new().build().unwrap();
         let edit = Edit::new(&package).unwrap();
         assert!(edit.source.is_none());
         assert!(edit.stream.is_empty());
+    }
+
+    #[test]
+    fn render_error_prefers_a_source_change_seen_after_the_leading_fence() {
+        let source = Arc::new(SourceHook::new(source_bytes()));
+        let reader: Arc<dyn ReadAt> = source.clone();
+        let workbook = SourceBackedWorkbook::from_read_at(reader).unwrap();
+        let package = crate::Package::from_source(workbook).unwrap();
+        let mut edit = Edit::new(&package).unwrap();
+        edit.ensure_ready().unwrap();
+        // Object-package admission rejects a stream over its finite limit.
+        // The hook bumps immediately after `before`'s last source observation,
+        // leaving that admission error to the trailing owner fence.
+        edit.stream = vec![0; 128 * 1024 * 1024 + 1];
+        source.bump_after_versions(5);
+
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Package(crate::package::Error::Source(
+                SourceBackedError::SourceChanged { .. }
+            )))
+        ));
     }
 }
 
