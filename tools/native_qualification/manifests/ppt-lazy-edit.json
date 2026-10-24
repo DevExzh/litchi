@@ -1,0 +1,54 @@
+{
+  "schema": "litchi.ppt.lazy-native-qualification.input.v1",
+  "baseline": {
+    "root": "PARAMETERIZED_EXTERNAL_BASELINE_ROOT",
+    "ref": "8779d059add6c90c74552801372c44f770db9f0f",
+    "tree": "27e0b56e2f8e3ab11b00c119604b5636f358dfe2",
+    "lock": {
+      "path": "tools/perf-baseline/Cargo.lock",
+      "bytes": 57158,
+      "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
+    },
+    "normal_binary": {
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET/release/examples/ppt_lazy_native",
+      "bytes": null,
+      "sha256": null
+    },
+    "allocator_binary": {
+      "path": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET/release/examples/ppt_lazy_native_alloc",
+      "bytes": null,
+      "sha256": null
+    },
+    "target_dir": "PARAMETERIZED_EXTERNAL_BASELINE_TARGET",
+    "allocator_target_dir": "PARAMETERIZED_EXTERNAL_BASELINE_ALLOCATOR_TARGET"
+  },
+  "candidate": null,
+  "probe_sources": [
+    {
+      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/ppt_lazy_native.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "path": "PARAMETERIZED_EXTERNAL_PROBE_ROOT/tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "protocol": {
+    "cpu": 3,
+    "blocks": 2,
+    "warmups": 3,
+    "target_ms": 500,
+    "minimum_ms": 150,
+    "max_load": 1.0,
+    "max_iterations": 1000000,
+    "timeout_s": 300.0
+  },
+  "claim_scope": "preparation and reproducible native qualification protocol only; no native timing claim"
+}
