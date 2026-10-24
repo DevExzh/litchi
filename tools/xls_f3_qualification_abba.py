@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Run the native XLS F3 probe in a strict, calibrated A1/B1/B2/A2 lane.
 
-The driver never builds the probe. It validates the two clean, pinned source
-snapshots and their copied probe sources, calibrates each endpoint separately,
-then runs every requested route/corpus cell in a fixed ABBA order. A normal
-run is the complete three-route by two-corpus matrix. A subset is permitted
-only with ``--diagnostic`` and is explicitly unqualified in the receipt.
+The driver never builds the probe. It validates the two pinned source
+snapshots and their copied probe sources, using an explicit role-specific
+harness ref for each endpoint, calibrates each endpoint separately, then runs
+every requested route/corpus cell in a fixed ABBA order. A normal run is the
+complete three-route by two-corpus matrix. A subset is permitted only with
+``--diagnostic`` and is explicitly unqualified in the receipt.
 
 Every child is started with an actual Linux CPU affinity and RLIMIT_AS scope;
 the driver's process/load snapshots before and after each child are retained in
@@ -46,9 +47,12 @@ DEFAULT_CALIBRATION_MAX_BATCH = 1 << 20
 MAX_QUIET_LOADAVG = 1.0
 MAX_QUIET_RUNNABLE = 1
 BASELINE_SOURCE_REF = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
-# The harness is copied as a deterministic file overlay from this frozen
-# source commit.  The runner itself is deliberately not an overlay path, so a
-# runner change does not require a self-referential commit list.
+# The historical baseline keeps its one-argument CFB consumer overlay from
+# this frozen source commit.  The current candidate uses the exact 472b tree
+# as its consumer/harness source.  The runner itself is deliberately not an
+# overlay path, so a runner change does not require a self-referential commit
+# list.
+BASELINE_HARNESS_REF = "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76"
 COMMON_HARNESS_REF = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
 CANDIDATE_SOURCE_REF = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
 CANDIDATE_PRODUCTION_COMMITS = (
@@ -672,6 +676,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--candidate-binary", type=Path, required=True)
     parser.add_argument("--control-source", type=Path, required=True)
     parser.add_argument("--candidate-source", type=Path, required=True)
+    parser.add_argument("--control-harness-ref", default=BASELINE_HARNESS_REF)
     parser.add_argument("--harness-ref", default=COMMON_HARNESS_REF)
     parser.add_argument("--control-source-ref", default=BASELINE_SOURCE_REF)
     parser.add_argument("--candidate-source-ref", default=CANDIDATE_SOURCE_REF)
@@ -717,6 +722,7 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
     if options.timeout_seconds <= 0:
         raise RunnerError("timeout must be positive")
     for label, value in (
+        ("control harness ref", options.control_harness_ref),
         ("harness ref", options.harness_ref),
         ("control source ref", options.control_source_ref),
         ("candidate source ref", options.candidate_source_ref),
@@ -748,9 +754,13 @@ def validate_options(options: argparse.Namespace) -> tuple[list[str], list[str]]
         raise RunnerError(
             "only the complete 3-route x 2-corpus matrix qualifies; use --diagnostic for subsets"
         )
+    if not options.diagnostic and options.control_harness_ref != BASELINE_HARNESS_REF:
+        raise RunnerError(
+            "control harness ref overrides require --diagnostic and are explicitly unqualified"
+        )
     if not options.diagnostic and options.harness_ref != COMMON_HARNESS_REF:
         raise RunnerError(
-            "harness ref overrides require --diagnostic and are explicitly unqualified"
+            "candidate harness ref overrides require --diagnostic and are explicitly unqualified"
         )
     if not options.diagnostic and options.control_source_ref != BASELINE_SOURCE_REF:
         raise RunnerError(
@@ -998,9 +1008,12 @@ def main() -> int:
         if control_binary["sha256"] == candidate_binary["sha256"]:
             raise RunnerError("control and candidate binaries have the same SHA-256")
         repo = Path(__file__).resolve().parent.parent
-        harness_ref = resolve_commit(repo, options.harness_ref)
-        expected_probe = probe_identities(repo, harness_ref)
-        expected_overlay_manifest = overlay_manifest_sha256(expected_probe)
+        control_harness_ref = resolve_commit(repo, options.control_harness_ref)
+        candidate_harness_ref = resolve_commit(repo, options.harness_ref)
+        expected_control_probe = probe_identities(repo, control_harness_ref)
+        expected_candidate_probe = probe_identities(repo, candidate_harness_ref)
+        expected_control_overlay_manifest = overlay_manifest_sha256(expected_control_probe)
+        expected_candidate_overlay_manifest = overlay_manifest_sha256(expected_candidate_probe)
         expected_control_production = hash_git_manifest(
             options.control_source.expanduser().resolve(strict=True),
             options.control_source_ref,
@@ -1012,24 +1025,24 @@ def main() -> int:
             PROBE_PATHS,
         )
         expected_control_source = source_manifest_sha256(
-            expected_control_production, expected_probe
+            expected_control_production, expected_control_probe
         )
         expected_candidate_source = source_manifest_sha256(
-            expected_candidate_production, expected_probe
+            expected_candidate_production, expected_candidate_probe
         )
         control_source = source_identity(
             options.control_source,
             source_ref=options.control_source_ref,
-            harness_ref=harness_ref,
-            expected_probe=expected_probe,
+            harness_ref=control_harness_ref,
+            expected_probe=expected_control_probe,
             expected_production_manifest=expected_control_production,
             expected_source_manifest=expected_control_source,
         )
         candidate_source = source_identity(
             options.candidate_source,
             source_ref=options.candidate_source_ref,
-            harness_ref=harness_ref,
-            expected_probe=expected_probe,
+            harness_ref=candidate_harness_ref,
+            expected_probe=expected_candidate_probe,
             expected_production_manifest=expected_candidate_production,
             expected_source_manifest=expected_candidate_source,
             required_production_commits=options.candidate_production_commits,
@@ -1127,8 +1140,11 @@ def main() -> int:
             },
             "sources": {"control": control_source, "candidate": candidate_source},
             "provenance": {
-                "harness_ref": harness_ref,
-                "overlay_manifest_sha256": expected_overlay_manifest,
+                "harness_ref": candidate_harness_ref,
+                "control_harness_ref": control_harness_ref,
+                "candidate_harness_ref": candidate_harness_ref,
+                "control_overlay_manifest_sha256": expected_control_overlay_manifest,
+                "candidate_overlay_manifest_sha256": expected_candidate_overlay_manifest,
                 "overlay_paths": list(PROBE_PATHS),
                 "candidate_production_commits": list(options.candidate_production_commits),
                 "probe_implementations": {
