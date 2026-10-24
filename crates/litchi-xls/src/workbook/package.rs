@@ -36,7 +36,7 @@ impl<R: Read + Seek> Reader<R> {
             encryption: None,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
-            sheets: Vec::new(),
+            sheets: Arc::from(Vec::<SheetMetadata>::new()),
             shared_strings: None,
             shared_string_properties: None,
             shared_string_reference_count: 0,
@@ -242,11 +242,13 @@ impl<R: Read + Seek> Reader<R> {
             all_sheet_names.iter().map(String::as_str),
             &mut tolerance,
         )?;
-        self.sheets = bound_sheets
-            .iter()
-            .enumerate()
-            .map(|(index, sheet)| SheetMetadata::from_bound_sheet(index, sheet))
-            .collect();
+        self.sheets = Arc::from(
+            bound_sheets
+                .iter()
+                .enumerate()
+                .map(|(index, sheet)| SheetMetadata::from_bound_sheet(index, sheet))
+                .collect::<Vec<_>>(),
+        );
         self.worksheet_names.clear();
         self.formula_context.set_sheet_names(all_sheet_names);
         self.formula_context.set_scoped_defined_names(
@@ -286,7 +288,8 @@ impl<R: Read + Seek> Reader<R> {
                     let worksheet_index = self.worksheets.len();
                     self.worksheet_names.push(bound_sheet.name.clone());
                     self.worksheets.push(worksheet);
-                    self.sheets[sheet_index].set_parsed_worksheet_index(worksheet_index);
+                    Arc::make_mut(&mut self.sheets)[sheet_index]
+                        .set_parsed_worksheet_index(worksheet_index);
                 },
                 Err(error @ Error::InvalidRecord { record_type, .. })
                     if pivot_table::is_worksheet_view_record(record_type) =>

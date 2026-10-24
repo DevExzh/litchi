@@ -16,28 +16,29 @@ use crate::error::{Code, Error, Result};
 use crate::path::vocabulary::Case;
 
 /// A worksheet descriptor whose BIFF payload remains unopened.  It borrows
-/// the immutable owner and its cached tab catalog, so resolving a tab copies
-/// nothing.
-#[derive(Clone, Copy)]
+/// the immutable owner and shares its immutable tab catalog, so resolving a
+/// tab copies no names.
+#[derive(Clone)]
 pub(super) struct SheetHandle<'f> {
     package: &'f Package,
     /// Position in the complete BoundSheet8 catalog.
     position: usize,
-    metadata: &'f SheetMetadata,
+    catalog: Arc<[SheetMetadata]>,
 }
 
 impl<'f> SheetHandle<'f> {
     pub(super) fn at(file: &'f Xls, position: usize) -> Result<Option<Self>> {
-        let Some(entry) = file.owner().sheet_catalog()?.get(position) else {
+        let catalog = catalog(file)?;
+        let Some(_entry) = catalog.get(position) else {
             return Ok(None);
         };
-        Ok(Some(Self::from_metadata(file, position, entry)))
+        Ok(Some(Self::from_catalog(file, position, catalog)))
     }
 
     pub(super) fn named(file: &'f Xls, name: &str, case: Case) -> Result<Option<Self>> {
-        let names = file.owner().sheet_catalog()?;
-        let mut found: Option<(usize, &'f SheetMetadata)> = None;
-        for (position, candidate) in names.iter().enumerate() {
+        let catalog = catalog(file)?;
+        let mut found = None;
+        for (position, candidate) in catalog.iter().enumerate() {
             if case.matches(candidate.name(), name) {
                 if found.is_some() {
                     return Err(Error::new(
@@ -46,39 +47,43 @@ impl<'f> SheetHandle<'f> {
                     )
                     .with_format(litchi_core::FileFormat::Xls));
                 }
-                found = Some((position, candidate));
+                found = Some(position);
             }
         }
-        Ok(found.map(|(position, entry)| Self::from_metadata(file, position, entry)))
+        Ok(found.map(|position| Self::from_catalog(file, position, catalog)))
     }
 
-    fn from_metadata(file: &'f Xls, position: usize, entry: &'f SheetMetadata) -> Self {
+    fn from_catalog(file: &'f Xls, position: usize, catalog: Arc<[SheetMetadata]>) -> Self {
         Self {
             package: file.owner(),
             position,
-            metadata: entry,
+            catalog,
         }
+    }
+
+    fn metadata(&self) -> &SheetMetadata {
+        &self.catalog[self.position]
     }
 
     pub(super) const fn position(&self) -> usize {
         self.position
     }
 
-    pub(super) fn name(&self) -> &'f str {
-        self.metadata.name()
+    pub(super) fn name(&self) -> &str {
+        self.metadata().name()
     }
 
     pub(super) fn visibility(&self) -> SheetVisibility {
-        self.metadata.visibility()
+        self.metadata().visibility()
     }
 
     pub(super) fn is_grid(&self) -> bool {
-        self.metadata.parsed_worksheet_index().is_some()
-            && matches!(self.metadata.kind(), SheetKind::WorksheetOrDialog)
+        self.metadata().parsed_worksheet_index().is_some()
+            && matches!(self.metadata().kind(), SheetKind::WorksheetOrDialog)
     }
 
     pub(super) fn grid(&self) -> Result<Grid> {
-        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+        let worksheet_index = self.metadata().parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -94,7 +99,7 @@ impl<'f> SheetHandle<'f> {
     /// answering this lookup, but it returns only the selected cell. Eager
     /// readers use their indexed worksheet map directly.
     pub(super) fn cell(&self, at: (u32, u32)) -> Result<Option<CellData>> {
-        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+        let worksheet_index = self.metadata().parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -150,7 +155,7 @@ impl<'f> SheetHandle<'f> {
     }
 
     fn eager_worksheet(&self) -> Result<&'f litchi_xls::Worksheet> {
-        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+        let worksheet_index = self.metadata().parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -172,7 +177,7 @@ impl<'f> SheetHandle<'f> {
         let Some(source) = self.package.source_workbook() else {
             return Ok(None);
         };
-        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+        let worksheet_index = self.metadata().parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -210,7 +215,7 @@ impl<'f> SheetHandle<'f> {
         if self.package.source_workbook().is_some() {
             return Ok(None);
         }
-        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+        let worksheet_index = self.metadata().parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -223,6 +228,17 @@ impl<'f> SheetHandle<'f> {
             .map_err(|error| worksheet_error(error.to_string()))?;
         Ok(Some(worksheet.stored_cells()))
     }
+}
+
+/// Use the adapter-local shared catalog only inside the active unified read
+/// fence. Outside that scope, retain the package projection's source check.
+fn catalog(file: &Xls) -> Result<Arc<[SheetMetadata]>> {
+    if crate::path::fence::is_active(file.fence_key())
+        && let Some(catalog) = file.cached_sheet_catalog()
+    {
+        return Ok(catalog);
+    }
+    file.sheet_catalog()
 }
 
 /// One row's layout record.

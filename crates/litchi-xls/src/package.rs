@@ -195,8 +195,6 @@ enum PackageState {
         /// can serve source-backed reads without ever constructing this
         /// eager reader.
         materialized: OnceLock<std::result::Result<Arc<RawReader>, Arc<SourceBackedError>>>,
-        /// The complete tab catalog, captured on first catalog read.
-        catalog: OnceLock<Box<[crate::SheetMetadata]>>,
     },
 }
 
@@ -252,6 +250,9 @@ struct PackageInner {
     policy: RetainedPolicy,
     signed: bool,
     metadata: OnceLock<Metadata>,
+    /// The complete tab catalog, captured on first catalog read and shared
+    /// by package projections and adapters without copying its names.
+    catalog: OnceLock<Arc<[crate::SheetMetadata]>>,
     edit_snapshot: Option<crate::cell_values::Snapshot>,
     /// The Workbook stream, read once for worksheet-feature reads.
     workbook_stream: OnceLock<Arc<[u8]>>,
@@ -406,7 +407,6 @@ impl Package {
                     workbook,
                     encryption: None,
                     materialized: OnceLock::new(),
-                    catalog: OnceLock::new(),
                 },
                 policy: RetainedPolicy::Source {
                     limits: source_limits,
@@ -414,6 +414,7 @@ impl Package {
                 },
                 signed,
                 metadata: OnceLock::new(),
+                catalog: OnceLock::new(),
                 edit_snapshot: None,
                 workbook_stream: OnceLock::new(),
             }),
@@ -453,6 +454,7 @@ impl Package {
                 },
                 signed,
                 metadata: metadata_cache,
+                catalog: OnceLock::new(),
                 edit_snapshot: None,
                 workbook_stream: OnceLock::new(),
             }),
@@ -508,14 +510,15 @@ impl Package {
         }
     }
 
-    /// Borrow the complete workbook-tab catalog; see
+    /// Share the complete workbook-tab catalog; see
     /// [`Workbook::sheet_catalog`].
     ///
     /// # Errors
     ///
-    /// Returns the positional owner's source or metadata read error on the
-    /// first borrow.
-    pub fn sheet_catalog(&self) -> Result<&[crate::SheetMetadata]> {
+    /// Returns the positional owner's source or metadata read error while
+    /// reading the catalog. A source-backed package checks its source on
+    /// every direct access, including accesses after the catalog is shared.
+    pub fn sheet_catalog(&self) -> Result<Arc<[crate::SheetMetadata]>> {
         sheet_catalog(&self.inner)
     }
 
@@ -1005,13 +1008,12 @@ impl Workbook {
         }
     }
 
-    /// Borrow the complete workbook-tab catalog in original tab order.
+    /// Share the complete workbook-tab catalog in original tab order.
     ///
-    /// The eager reader lends its parsed catalog; a positional owner captures
-    /// the catalog once, under its source fence, and lends it afterwards.
-    /// The catalog belongs to this immutable snapshot, so later borrows do
-    /// not re-read the source; callers that must observe a changed source
-    /// keep their own freshness fence.
+    /// The package captures the catalog once, under its source fence when
+    /// needed, and shares the immutable result without copying its names.
+    /// Callers that must observe a changed source retain their own freshness
+    /// fence around this projection.
     ///
     /// ```
     /// let package = litchi_xls::Package::new()?;
@@ -1022,9 +1024,10 @@ impl Workbook {
     ///
     /// # Errors
     ///
-    /// Returns the positional owner's source or metadata read error on the
-    /// first borrow.
-    pub fn sheet_catalog(&self) -> Result<&[crate::SheetMetadata]> {
+    /// Returns the positional owner's source or metadata read error while
+    /// reading the catalog. A source-backed package checks its source on
+    /// every direct access, including accesses after the catalog is shared.
+    pub fn sheet_catalog(&self) -> Result<Arc<[crate::SheetMetadata]>> {
         sheet_catalog(&self.package)
     }
 
@@ -1584,19 +1587,24 @@ fn read_bounded<R: Read>(reader: &mut R, limits: SourceLimits) -> Result<Vec<u8>
     Ok(bytes)
 }
 
-fn sheet_catalog(inner: &PackageInner) -> Result<&[crate::SheetMetadata]> {
+fn sheet_catalog(inner: &PackageInner) -> Result<Arc<[crate::SheetMetadata]>> {
     match &inner.state {
-        PackageState::Source {
-            workbook, catalog, ..
-        } => {
+        PackageState::Source { workbook, .. } => {
             ensure_source_fence(inner)?;
-            if let Some(catalog) = catalog.get() {
-                return Ok(catalog);
+            if let Some(catalog) = inner.catalog.get() {
+                return Ok(Arc::clone(catalog));
             }
             let captured = workbook.sheet_metadata().map_err(Error::Source)?;
-            Ok(catalog.get_or_init(|| captured.into_boxed_slice()))
+            let captured: Arc<[crate::SheetMetadata]> = Arc::from(captured.into_boxed_slice());
+            Ok(Arc::clone(inner.catalog.get_or_init(|| captured)))
         },
-        PackageState::Eager { reader, .. } => Ok(reader.sheets()),
+        PackageState::Eager { reader, .. } => {
+            if let Some(catalog) = inner.catalog.get() {
+                return Ok(Arc::clone(catalog));
+            }
+            let captured = reader.shared_sheets();
+            Ok(Arc::clone(inner.catalog.get_or_init(|| captured)))
+        },
     }
 }
 

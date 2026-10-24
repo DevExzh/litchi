@@ -244,6 +244,36 @@ fn source_adoption_is_lazy_and_retains_the_original_cfb_identity() {
 }
 
 #[test]
+fn sheet_catalog_rechecks_direct_source_after_capture() {
+    let source = Arc::new(CountingReadAt::new(fixture("ole/xls/Simple.xls")));
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let package = Package::from_source(workbook).unwrap();
+
+    let before = source.version_observations.load(Ordering::SeqCst);
+    assert!(!package.sheet_catalog().unwrap().is_empty());
+    let after_first = source.version_observations.load(Ordering::SeqCst);
+    assert!(
+        after_first > before,
+        "cold catalog access must fence the source"
+    );
+
+    assert!(!package.sheet_catalog().unwrap().is_empty());
+    let after_second = source.version_observations.load(Ordering::SeqCst);
+    assert!(
+        after_second > after_first,
+        "a repeated direct catalog access must retain its source fence"
+    );
+
+    source.bump();
+    assert!(matches!(
+        package.sheet_catalog(),
+        Err(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        ))
+    ));
+}
+
+#[test]
 fn signed_owner_publishes_exactly_and_allows_identity_editing() {
     let bytes = signed_package();
     let package = Package::from_bytes(&bytes).unwrap();

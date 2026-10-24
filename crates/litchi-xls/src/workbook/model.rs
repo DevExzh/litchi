@@ -31,7 +31,7 @@ pub struct Reader<R: Read + Seek> {
     pub(super) encryption: Option<crate::EncryptionProfile>,
     pub(super) worksheets: Vec<Worksheet>,
     pub(super) worksheet_names: Vec<String>,
-    pub(super) sheets: Vec<SheetMetadata>,
+    pub(super) sheets: Arc<[SheetMetadata]>,
     /// Shared string table (Arc for zero-copy sharing across worksheets)
     pub(super) shared_strings: Option<Arc<Vec<String>>>,
     /// Sparse rich-text and phonetic properties parallel to `shared_strings`.
@@ -394,6 +394,12 @@ impl<R: Read + Seek> Reader<R> {
     /// All workbook sheet directory entries in tab order.
     pub fn sheets(&self) -> &[SheetMetadata] {
         &self.sheets
+    }
+
+    /// Share the parsed tab catalog with package projections without cloning
+    /// its names. The reader owns this immutable allocation after parsing.
+    pub(crate) fn shared_sheets(&self) -> Arc<[SheetMetadata]> {
+        Arc::clone(&self.sheets)
     }
 
     /// Sheet directory entry at a workbook tab index.

@@ -3404,3 +3404,72 @@ See [0063](0063-source-pptx-modern-comments.md).
   and dispositions, actual corpus replay, glossary closure and quiet native
   qualification remain required. Only comprehensive redaction audit 22 is
   deferred. Nothing is pushed.
+
+
+- Coordinator checkpoint (2026-10-24, acceptance repairs and source-bound evidence):
+  The f6fe full gate passed 25 steps before its operations tests exposed the
+  XLS duplicate source check, stale fidelity/CRUD reports and encrypted DOCX
+  closure admission failure. Its session then ended without a finalized
+  operations result. Record 0362uma retains the interrupted attempt and
+  subsequent selected checks; none is relabeled as a full pass.
+
+  Reviewed inventory coverage source `668249cebf` merges at `e7f19874c1`.
+  Policy-declared immutable owners now participate even when their names do
+  not match the old heuristic; missing or ambiguous owners fail closed.
+  The new disposition validator checks exact row coverage and structure,
+  while semantic evidence still requires review. CI runs both new test
+  modules. The all-68 final capture and dispositions remain outstanding.
+
+  Encrypted DOCX source `6b05b8063c` and locked receipt `696352d066` merge at
+  `dd78c02a23`. The O(1) publication-policy check refuses an unlocked
+  encrypted document before invoking its edit closure, preserving signed
+  no-ops and source fences. Both locked feature selections pass (22 and 20
+  tests). The original record's lock explanation and size transcription are
+  explicitly corrected. Unix socket fixture source `35f47e34dc` merges at
+  `250769e1dc`; all three tests pass with a 167-character TMPDIR.
+
+  Corpus source `2510bf5b40` merges at `c13737083e`. Every one of the seven
+  fidelity and five CRUD changes was reviewed. Both flat ODP fixtures prove
+  a real rename followed by exact inverse restoration; XLSX's second run
+  supplies the intended sibling-pair coverage. Five refusal-detail rows only
+  change the fixed display wrapper. The unblessed report rerun opens 1,020
+  files and reports zero unreached claimed CRUD cells. The fidelity TSV's
+  empty final fields are retained as data.
+
+  Selected f6fe diagnostics pass 332 core tests, the iWork leaf API check,
+  the non-iWork gate and static corpus dispositions. Facade testing returns
+  only the repaired socket fixture failure (208 passed, one failed). The
+  1,360-test tooling run returns stale boundary rules, ODG guard-literal
+  scanner matches and unclassified diagnostic evidence. Reviewed scanner
+  and evidence corrections merge at `ec0d6bb0db` and `2b88f4ad75`;
+  the boundary correction remains in review. Reviewed XLS source
+  `dfe8281fb3` and receipt `3ddd72e97e` are now merged: a canonical shared
+  catalog preserves O(1) adapter entry, direct native source checks and
+  trailing-fence precedence without cloning eager sheet names. All 1,907
+  native tests/doctests pass; the two existing ignored evidence/example
+  cases remain explicit. Catalog conversion and Arc costs still require
+  native qualification.
+
+  W8 protocol source `e12b57d624` merges at `cf8e83e716` after repeated
+  review returns closed artifact and mutable-validation gaps. All 39 unique
+  W8 tests pass, including the complete pair-runner path. The explicit
+  policy preserves pristine f2, pins the reviewed local graph changes and
+  rechecks source/build/validation artifacts before timing; ordinary equal-
+  projection checks remain strict. Its f6fe candidate is diagnostic until
+  the new final freeze. The composed inventory, ODG, glossary and matrix
+  tooling selection also passes all 113 tests at that merge.
+
+  Cleanups twenty-eight and twenty-nine remove three merged leaves after
+  independent payload/ref/ancestry/restore-layout verification. Branches,
+  ignored locks, targets and validation evidence remain. Removing 126 exact
+  duplicate build executables restores 3,712,220,600 bytes of gate headroom;
+  benchmark/profile outputs remain intact. The immutable ODG baseline
+  capture completes with all 460,379 entries, recorded externally under
+  0362ugy; no build or native timing result is inferred from it.
+
+  Source integration remains staging. Strict all-target/all-feature checks
+  for the 19 native gate packages and ODS pass on f6fe; the remaining native
+  tests are running while required repairs finish. A fresh composed
+  source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
+  glossary closure and quiet native qualification remain required. Only
+  comprehensive redaction audit 22 is deferred. Nothing is pushed.
