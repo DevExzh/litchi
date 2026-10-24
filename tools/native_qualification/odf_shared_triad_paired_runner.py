@@ -70,12 +70,56 @@ class RunnerError(RuntimeError):
     """A fail-closed manifest, source, process, or receipt error."""
 
 
+def _build_keys() -> tuple[str, ...]:
+    """Return the role/variant order used by both build and receipt phases."""
+
+    return tuple(
+        f"{role}/{variant}"
+        for variant in ("normal", "allocator")
+        for role in ROLES
+    )
+
+
+def _validate_build_event_journal(journal: Any) -> dict[str, Mapping[str, Any]]:
+    expected_keys = _build_keys()
+    if not isinstance(journal, Mapping) or journal.get("count") != len(expected_keys):
+        raise RunnerError("build receipt event journal is incomplete")
+    events = journal.get("events")
+    if not isinstance(events, list) or len(events) != len(expected_keys):
+        raise RunnerError("build receipt event journal events are incomplete")
+    journal_hash = _sha256_bytes(json.dumps(events, sort_keys=True, separators=(",", ":")).encode())
+    if journal.get("sha256") != journal_hash:
+        raise RunnerError("build receipt event journal hash differs")
+    expected_event_ids = [f"build-{key.replace('/', '-')}" for key in expected_keys]
+    actual_event_ids = [event.get("event_id") for event in events if isinstance(event, Mapping)]
+    if actual_event_ids != expected_event_ids:
+        raise RunnerError("build receipt event journal order differs")
+    events_by_id = {event.get("event_id"): event for event in events if isinstance(event, Mapping)}
+    if len(events_by_id) != len(expected_keys):
+        raise RunnerError("build receipt event journal has duplicate or malformed event IDs")
+    return events_by_id
+
+
 def _now() -> str:
     return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="milliseconds")
 
 
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _resolve_executable(name: str, cwd: Path, env: Mapping[str, str]) -> Path:
+    """Resolve a child executable using the child's cwd and PATH."""
+
+    path_value = env.get("PATH", os.defpath)
+    for directory_name in path_value.split(os.pathsep):
+        directory = Path(directory_name or ".")
+        if not directory.is_absolute():
+            directory = cwd / directory
+        candidate = directory / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate.resolve(strict=True)
+    raise RunnerError(f"{name} executable is not available in the build PATH")
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -249,7 +293,7 @@ def _production_tree(root: Path) -> str:
     return _sha256_bytes(_git(root, "ls-tree", "-r", "--full-tree", "HEAD").encode())
 
 
-def _cargo_config_identity(root: Path) -> dict[str, Any]:
+def _cargo_config_paths(root: Path) -> list[Path]:
     try:
         config_paths = list(generic._cargo_config_files(root))
     except generic.RunnerError as error:
@@ -264,16 +308,41 @@ def _cargo_config_identity(root: Path) -> dict[str, Any]:
         path = _resolve(path)
         if path not in unique_paths:
             unique_paths.append(path)
+    return sorted(unique_paths)
+
+
+def _stat_identity(path: Path) -> dict[str, int]:
+    if path.is_symlink() or not path.is_file():
+        raise RunnerError(f"expected a regular file: {path}")
+    stat = path.stat()
+    return {
+        "device": stat.st_dev,
+        "inode": stat.st_ino,
+        "mode": stat.st_mode,
+        "bytes": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+
+
+def _cargo_config_identity(root: Path) -> dict[str, Any]:
+    config_paths = _cargo_config_paths(root)
     files = []
     digest = hashlib.sha256()
-    for path in sorted(unique_paths):
+    for path in config_paths:
         file_hash, file_bytes = _sha256_file(path)
         digest.update(str(path).encode())
         digest.update(b"\0")
         digest.update(file_hash.encode())
         digest.update(b"\0")
         digest.update(str(file_bytes).encode())
-        files.append({"path": str(path), "sha256": file_hash, "bytes": file_bytes})
+        files.append(
+            {
+                "path": str(path),
+                "sha256": file_hash,
+                "bytes": file_bytes,
+                "stat": _stat_identity(path),
+            }
+        )
     return {"sha256": digest.hexdigest(), "files": files}
 
 
@@ -302,8 +371,10 @@ def _tracked_closure(root: Path) -> dict[str, Any]:
         if mode not in {"100644", "100755"}:
             raise RunnerError(f"source closure contains unsupported tracked mode {mode}: {relative}")
         head_paths.add(relative)
-    status_records = _git(root, "ls-files", "-v", "-z").split("\0")
-    tracked_records = _git(root, "ls-files", "--stage", "-z").split("\0")
+    status_raw = _git(root, "ls-files", "-v", "-z")
+    tracked_raw = _git(root, "ls-files", "--stage", "-z")
+    status_records = status_raw.split("\0")
+    tracked_records = tracked_raw.split("\0")
     files = []
     digest = hashlib.sha256()
     seen = set()
@@ -343,7 +414,12 @@ def _tracked_closure(root: Path) -> dict[str, Any]:
         raise RunnerError(f"source worktree is not a materialized full HEAD tree: missing={missing}, extra={extra}")
     if len(files) != len(seen):
         raise RunnerError("source worktree tracked-file closure is incomplete")
-    return {"sha256": digest.hexdigest(), "file_count": len(files)}
+    return {
+        "sha256": digest.hexdigest(),
+        "file_count": len(files),
+        "flags_sha256": _sha256_bytes(status_raw.encode()),
+        "index_sha256": _sha256_bytes(tracked_raw.encode()),
+    }
 
 
 def _source_state(root: Path) -> dict[str, Any]:
@@ -367,6 +443,66 @@ def _source_state(root: Path) -> dict[str, Any]:
         "status_paths": _status_paths(status),
         "tracked_closure": closure,
         "cargo_configs": configs,
+    }
+
+
+def _sparse_checkout_value(root: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(root), "config", "--bool", "core.sparseCheckout"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode not in (0, 1) or result.stderr.strip():
+        raise RunnerError(f"cannot inspect sparse-checkout configuration: {result.stderr.strip()}")
+    return result.stdout.strip().lower()
+
+
+def _git_diff_clean(root: Path, *args: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode not in (0, 1):
+        raise RunnerError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result.returncode == 0
+
+
+def _cheap_source_snapshot(root: Path) -> dict[str, Any]:
+    status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
+    tracked_flags = _git(root, "ls-files", "-v", "-z")
+    tracked_index = _git(root, "ls-files", "--stage", "-z")
+    config_stats = []
+    for path in _cargo_config_paths(root):
+        config_hash, config_bytes = _sha256_file(path)
+        config_stats.append(
+            {
+                "path": str(path),
+                "sha256": config_hash,
+                "bytes": config_bytes,
+                "stat": _stat_identity(path),
+            }
+        )
+    file_stats = []
+    for relative in (PACKAGE_MANIFEST, PROBE_PATH, LOCK_PATH):
+        path = _resolve(relative, base=root)
+        file_stats.append({"path": str(path), "stat": _stat_identity(path)})
+    return {
+        "head": _git(root, "rev-parse", "HEAD").strip(),
+        "tree": _git(root, "rev-parse", "HEAD^{tree}").strip(),
+        "status_sha256": _sha256_bytes(status.encode()),
+        "status_paths": _status_paths(status),
+        "worktree_clean": _git_diff_clean(root, "diff", "--quiet", "HEAD", "--"),
+        "index_clean": _git_diff_clean(root, "diff", "--cached", "--quiet", "--"),
+        "sparse_checkout": _sparse_checkout_value(root),
+        "tracked_flags_sha256": _sha256_bytes(tracked_flags.encode()),
+        "tracked_index_sha256": _sha256_bytes(tracked_index.encode()),
+        "config_stats": config_stats,
+        "file_stats": file_stats,
     }
 
 
@@ -658,6 +794,7 @@ class PairedRunner:
             candidate_commit=self.candidate_commit,
             candidate_lock_sha256=self.candidate_lock_sha256,
         )
+        self._endpoint_cache: dict[str, dict[str, Any]] = {}
         self.guard = generic.ProcessGuard()
         self.runner_hash, _ = _sha256_file(Path(__file__).resolve())
         if self.phase == "build":
@@ -869,17 +1006,48 @@ class PairedRunner:
             raise RunnerError(f"child failed during {event_id} with exit {returncode}; stderr={stderr_path}")
         return event
 
-    def _toolchain(self) -> dict[str, str]:
-        values: dict[str, str] = {}
+    def _toolchain(self, cwd: Path, env: Mapping[str, str]) -> dict[str, Any]:
+        values: dict[str, Any] = {}
+        recorded_environment = self._recorded_environment(env)
         for command, label in ((["rustc", "-Vv"], "rustc"), (["cargo", "-V"], "cargo")):
-            result = subprocess.run(command, check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            executable_path = _resolve_executable(command[0], cwd, env)
+            if "3rd" + "party" in executable_path.parts or not executable_path.is_file():
+                raise RunnerError(f"{label} executable is not a permitted regular file: {executable_path}")
+            result = subprocess.run(
+                command,
+                cwd=str(cwd),
+                env=dict(env),
+                check=False,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
             if result.returncode:
                 raise RunnerError(f"{label} identity command failed: {result.stderr.strip()}")
-            values[label] = result.stdout.strip()
+            executable_hash, executable_bytes = _sha256_file(executable_path)
+            values[label] = {
+                "argv": command,
+                "cwd": str(cwd),
+                "environment": recorded_environment,
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "executable": {
+                    "path": str(executable_path),
+                    "sha256": executable_hash,
+                    "bytes": executable_bytes,
+                },
+            }
         return values
 
-    def _endpoint(self, role: str) -> dict[str, Any]:
-        return _endpoint_identity(
+    def _endpoint(self, role: str, *, full: bool = False) -> dict[str, Any]:
+        if not full and role in self._endpoint_cache:
+            cached = self._endpoint_cache[role]
+            current_snapshot = _cheap_source_snapshot(cached["root"])
+            if current_snapshot != cached["cheap_snapshot"]:
+                raise RunnerError(f"{role} cheap source identity changed between qualification probes")
+            return cached["endpoint"]
+        endpoint = _endpoint_identity(
             self.manifest,
             role=role,
             root=self.baseline_root if role == "baseline" else self.candidate_root,
@@ -887,9 +1055,21 @@ class PairedRunner:
             candidate_lock_sha256=self.candidate_lock_sha256,
             preparation=self.preparation,
         )
+        self._endpoint_cache[role] = {
+            "root": Path(endpoint["root"]),
+            "endpoint": endpoint,
+            "cheap_snapshot": _cheap_source_snapshot(Path(endpoint["root"])),
+        }
+        return endpoint
 
-    def _assert_endpoint_unchanged(self, role: str, expected: Mapping[str, Any]) -> dict[str, Any]:
-        actual = self._endpoint(role)
+    def _assert_endpoint_unchanged(
+        self,
+        role: str,
+        expected: Mapping[str, Any],
+        *,
+        full: bool = False,
+    ) -> dict[str, Any]:
+        actual = self._endpoint(role, full=full)
         for key in (
             "commit",
             "tree",
@@ -927,7 +1107,7 @@ class PairedRunner:
     def _binary_path(self, role: str, variant: str) -> Path:
         return self._target_path(role, variant) / "debug" / "examples" / PROBE_PATH.stem
 
-    def _build(self, role: str, variant: str, toolchain: Mapping[str, str]) -> dict[str, Any]:
+    def _build(self, role: str, variant: str) -> dict[str, Any]:
         root = self.baseline_root if role == "baseline" else self.candidate_root
         target = self._target_path(role, variant)
         tmpdir = self._tmp_path(role, variant)
@@ -935,6 +1115,7 @@ class PairedRunner:
         self._fresh_dir(tmpdir, f"{role}/{variant} tmpdir")
         endpoint = self._endpoint(role)
         env = self._environment(role, variant, target, tmpdir)
+        toolchain = self._toolchain(root, env)
         binary = self._binary_path(role, variant)
         command = self._build_command()
         stdout = self.output / "build" / f"{role}-{variant}.stdout"
@@ -958,7 +1139,8 @@ class PairedRunner:
             "sha256": binary_hash,
             "bytes": binary_bytes,
         }
-        endpoint_after = self._assert_endpoint_unchanged(role, endpoint)
+        event["toolchain"] = toolchain
+        endpoint_after = self._assert_endpoint_unchanged(role, endpoint, full=True)
         if _directory_size(target) > TARGET_PREFLIGHT_BYTES:
             raise RunnerError(f"{role}/{variant} target exceeded the 19.2 GB preflight limit")
         return {
@@ -975,22 +1157,16 @@ class PairedRunner:
         }
 
     def build(self) -> None:
-        toolchain: dict[str, str] = {}
         endpoints: dict[str, Any] = {}
         builds: dict[str, Any] = {}
         receipt_path = self.output / "build-receipt.json"
         try:
-            toolchain = self._toolchain()
             for role in ROLES:
-                endpoints[role] = self._endpoint(role)
+                endpoints[role] = self._endpoint(role, full=True)
             for variant in ("normal", "allocator"):
                 for role in ROLES:
-                    builds[f"{role}/{variant}"] = self._build(role, variant, toolchain)
-            journal_events = [
-                builds[f"{role}/{variant}"]["event"]
-                for role in ROLES
-                for variant in ("normal", "allocator")
-            ]
+                    builds[f"{role}/{variant}"] = self._build(role, variant)
+            journal_events = [builds[key]["event"] for key in _build_keys()]
             receipt = {
                 "schema": SCHEMA,
                 "phase": "build",
@@ -998,7 +1174,7 @@ class PairedRunner:
                 "manifest": {"path": str(self.manifest_path), "sha256": self.manifest_sha256},
                 "preparation": {"path": str(self.preparation_path), **self.preparation},
                 "runner": {"path": str(Path(__file__).resolve()), "sha256": self.runner_hash},
-                "toolchain": toolchain,
+                "toolchain": {key: builds[key]["toolchain"] for key in _build_keys()},
                 "cpu_affinity": self.cpu,
                 "features": list(FEATURES),
                 "routes": list(self.manifest["routes"]),
@@ -1055,36 +1231,18 @@ class PairedRunner:
         if receipt.get("claim_scope") != "build identity only; no native acceptance claim":
             raise RunnerError("build receipt claim scope is not non-acceptance")
         builds = receipt.get("builds")
-        expected_keys = {f"{role}/{variant}" for role in ROLES for variant in ("normal", "allocator")}
+        expected_keys = set(_build_keys())
         if not isinstance(builds, Mapping) or set(builds) != expected_keys:
             raise RunnerError("build receipt does not contain exactly four role/variant builds")
         endpoints = receipt.get("endpoints")
         if not isinstance(endpoints, Mapping) or set(endpoints) != set(ROLES):
             raise RunnerError("build receipt endpoint identities are incomplete")
-        current_toolchain = self._toolchain()
-        if receipt.get("toolchain") != current_toolchain:
-            raise RunnerError("build receipt toolchain identity differs from the current toolchain")
-        journal = receipt.get("event_journal")
-        if not isinstance(journal, Mapping) or journal.get("count") != len(expected_keys):
-            raise RunnerError("build receipt event journal is incomplete")
-        events = journal.get("events")
-        if not isinstance(events, list) or len(events) != len(expected_keys):
-            raise RunnerError("build receipt event journal events are incomplete")
-        journal_hash = _sha256_bytes(json.dumps(events, sort_keys=True, separators=(",", ":")).encode())
-        if journal.get("sha256") != journal_hash:
-            raise RunnerError("build receipt event journal hash differs")
-        expected_event_ids = [
-            f"build-{role}-{variant}"
-            for variant in ("normal", "allocator")
-            for role in ROLES
-        ]
-        if [event.get("event_id") for event in events if isinstance(event, Mapping)] != expected_event_ids:
-            raise RunnerError("build receipt event journal order differs")
-        events_by_id = {event.get("event_id"): event for event in events if isinstance(event, Mapping)}
-        if len(events_by_id) != len(expected_keys):
-            raise RunnerError("build receipt event journal has duplicate or malformed event IDs")
+        events_by_id = _validate_build_event_journal(receipt.get("event_journal"))
+        toolchains = receipt.get("toolchain")
+        if not isinstance(toolchains, Mapping) or set(toolchains) != expected_keys:
+            raise RunnerError("build receipt per-endpoint toolchain identities are incomplete")
         for role in ROLES:
-            current = self._endpoint(role)
+            current = self._endpoint(role, full=True)
             if endpoints[role] != current:
                 raise RunnerError(f"build receipt endpoint identity changed for {role}")
             for variant in ("normal", "allocator"):
@@ -1098,14 +1256,17 @@ class PairedRunner:
                 tmpdir = self._tmp_path(role, variant)
                 expected_binary = self._binary_path(role, variant)
                 expected_command = self._build_command()
-                expected_env = self._recorded_environment(
-                    self._environment(role, variant, target, tmpdir)
+                build_env = self._environment(role, variant, target, tmpdir)
+                expected_env = self._recorded_environment(build_env)
+                current_toolchain = self._toolchain(
+                    self.baseline_root if role == "baseline" else self.candidate_root,
+                    build_env,
                 )
                 if build.get("command") != expected_command:
                     raise RunnerError(f"build command differs for {key}")
                 if build.get("environment") != expected_env:
                     raise RunnerError(f"build environment differs for {key}")
-                if build.get("toolchain") != current_toolchain:
+                if build.get("toolchain") != current_toolchain or toolchains[key] != current_toolchain:
                     raise RunnerError(f"build toolchain differs for {key}")
                 if _resolve(str(build.get("tmpdir"))) != tmpdir:
                     raise RunnerError(f"build temporary directory differs for {key}")
@@ -1156,6 +1317,8 @@ class PairedRunner:
                     or event_binary.get("bytes") != binary_bytes
                 ):
                     raise RunnerError(f"build event binary hash differs for {key}")
+                if event.get("toolchain") != current_toolchain:
+                    raise RunnerError(f"build event toolchain differs for {key}")
                 for stream_name in ("stdout", "stderr"):
                     stream = event.get(stream_name)
                     if not isinstance(stream, Mapping):
@@ -1290,6 +1453,8 @@ class PairedRunner:
                 index=0,
                 iterations=self.manifest["paired"]["calibration"]["iterations"],
             )
+        for role in ROLES:
+            self._assert_endpoint_unchanged(role, builds[f"{role}/normal"]["source"], full=True)
         return result
 
     def _abba_phase(self, builds: Mapping[str, Mapping[str, Any]], phase: str) -> dict[str, Any]:
@@ -1324,6 +1489,8 @@ class PairedRunner:
         expected = (WARMUPS + SAMPLES) * len(ABBA_ORDER)
         if len(records) != expected:
             raise RunnerError(f"{phase} ABBA record count {len(records)} differs from {expected}")
+        for role in ROLES:
+            self._assert_endpoint_unchanged(role, builds[f"{role}/{phase}"]["source"], full=True)
         return {
             "phase": phase,
             "mode": NORMAL_MODE if phase == "normal" else ALLOCATOR_MODE,

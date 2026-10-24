@@ -7,9 +7,11 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from tools.native_qualification import odf_shared_triad_paired_runner as paired
 from tools.native_qualification import odf_shared_triad_runner as shared
@@ -153,6 +155,94 @@ class OdfSharedTriadPairedRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(paired.RunnerError, "must not overwrite"):
                 runner._fresh_file(existing, "receipt")
 
+    def test_build_writer_journal_is_accepted_in_actual_build_order(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-paired-journal-write-") as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            runner = object.__new__(paired.PairedRunner)
+            runner.output = output
+            runner.manifest_path = root / "manifest.json"
+            runner.preparation_path = root / "preparation.json"
+            runner.manifest_sha256 = "manifest"
+            runner.preparation = {"sha256": "preparation"}
+            runner.runner_hash = "runner"
+            runner.cpu = 0
+            runner.manifest = self.manifest
+            runner._toolchain = lambda: {"rustc": "test-rustc", "cargo": "test-cargo"}
+            runner._endpoint = lambda role, **kwargs: {"role": role}
+            runner._build = lambda role, variant: {
+                "event": {"event_id": f"build-{role}-{variant}"},
+                "toolchain": {"role": role, "variant": variant},
+            }
+            captured: dict[str, object] = {}
+            runner._write_receipt = lambda path, receipt: captured.update(receipt)
+
+            runner.build()
+
+            journal = captured["event_journal"]
+            self.assertEqual(
+                [event["event_id"] for event in journal["events"]],
+                [f"build-{key.replace('/', '-')}" for key in paired._build_keys()],
+            )
+            accepted = paired._validate_build_event_journal(journal)
+            self.assertEqual(set(accepted), set(f"build-{key.replace('/', '-')}" for key in paired._build_keys()))
+
+    def test_toolchain_identity_uses_each_build_endpoint_context(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-paired-toolchain-") as directory:
+            root = Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            executables = {}
+            for name in ("rustc", "cargo"):
+                executable = bin_dir / name
+                executable.write_bytes(name.encode("ascii"))
+                executable.chmod(0o755)
+                executables[name] = executable
+            cwd = root / "endpoint"
+            cwd.mkdir()
+            environment = {"PATH": "../bin", "CARGO_TARGET_DIR": str(root / "target")}
+            calls: list[tuple[list[str], dict[str, object]]] = []
+
+            def fake_run(command: list[str], **kwargs: object) -> object:
+                calls.append((command, kwargs))
+                return type("Result", (), {"returncode": 0, "stdout": "identity\n", "stderr": ""})()
+
+            runner = object.__new__(paired.PairedRunner)
+            with mock.patch.object(paired.subprocess, "run", side_effect=fake_run):
+                identity = runner._toolchain(cwd, environment)
+
+            self.assertEqual([command for command, _ in calls], [["rustc", "-Vv"], ["cargo", "-V"]])
+            for command, kwargs in calls:
+                self.assertEqual(kwargs["cwd"], str(cwd))
+                self.assertEqual(kwargs["env"], environment)
+            for name in ("rustc", "cargo"):
+                self.assertEqual(identity[name]["cwd"], str(cwd))
+                self.assertEqual(identity[name]["environment"], environment)
+                self.assertEqual(identity[name]["executable"]["path"], str(executables[name].resolve()))
+
+    def test_endpoint_cache_uses_cheap_mutation_guard_between_full_checks(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="odf-paired-cache-") as directory:
+            root = Path(directory) / "source"
+            repository(root, probe=b"adapter\n", lock=b"lock\n")
+            package_manifest = root / paired.PACKAGE_MANIFEST
+            package_manifest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / paired.PACKAGE_MANIFEST, package_manifest)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "-c", "user.email=test@example.invalid", "-c", "user.name=runner-test", "commit", "-qm", "manifest"],
+                check=True,
+            )
+            snapshot = paired._cheap_source_snapshot(root)
+            runner = object.__new__(paired.PairedRunner)
+            runner._endpoint_cache = {
+                "baseline": {"root": root, "endpoint": {"role": "baseline"}, "cheap_snapshot": snapshot}
+            }
+            self.assertEqual(runner._endpoint("baseline"), {"role": "baseline"})
+            package_manifest.write_text(package_manifest.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(paired.RunnerError, "cheap source identity"):
+                runner._endpoint("baseline")
+
     def test_build_receipt_rejects_reordered_event_journal(self) -> None:
         with tempfile.TemporaryDirectory(prefix="odf-paired-journal-") as directory:
             root = Path(directory)
@@ -166,11 +256,7 @@ class OdfSharedTriadPairedRunnerTests(unittest.TestCase):
             runner.cpu = 0
             runner.manifest = self.manifest
             runner._toolchain = lambda: {}
-            events = [
-                {"event_id": f"build-{role}-{variant}"}
-                for variant in ("normal", "allocator")
-                for role in paired.ROLES
-            ]
+            events = [{"event_id": f"build-{key.replace('/', '-')}"} for key in paired._build_keys()]
             receipt = {
                 "schema": paired.SCHEMA,
                 "phase": "build",

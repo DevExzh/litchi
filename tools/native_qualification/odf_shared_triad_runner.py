@@ -184,6 +184,121 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout
 
 
+def _sparse_checkout_value(root: Path) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(root), "config", "--bool", "core.sparseCheckout"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if result.returncode not in (0, 1) or result.stderr.strip():
+        raise RunnerError(f"cannot inspect sparse-checkout configuration: {result.stderr.strip()}")
+    return result.stdout.strip().lower()
+
+
+def _tracked_closure_identity(root: Path) -> dict[str, Any]:
+    if _sparse_checkout_value(root) == "true":
+        raise RunnerError(f"sparse-checkout is enabled for source endpoint: {root}")
+    head_records = _git(root, "ls-tree", "-r", "-z", "--full-tree", "HEAD").split("\0")
+    head_paths: set[str] = set()
+    for record in head_records:
+        if not record:
+            continue
+        header, separator, relative = record.partition("\t")
+        if not separator:
+            raise RunnerError(f"malformed HEAD tree record: {record!r}")
+        mode = header.split(" ", 1)[0]
+        if mode not in {"100644", "100755"}:
+            raise RunnerError(f"source closure contains unsupported tracked mode {mode}: {relative}")
+        head_paths.add(relative)
+    status_raw = _git(root, "ls-files", "-v", "-z")
+    index_raw = _git(root, "ls-files", "--stage", "-z")
+    seen: set[str] = set()
+    for record in status_raw.split("\0"):
+        if not record:
+            continue
+        marker, separator, relative = record.partition(" ")
+        if not separator or marker != "H":
+            raise RunnerError(f"source endpoint has sparse/skip-worktree/assume-unchanged entry: {record!r}")
+        seen.add(relative)
+    digest = hashlib.sha256()
+    files = []
+    for record in index_raw.split("\0"):
+        if not record:
+            continue
+        header, separator, relative = record.partition("\t")
+        if not separator:
+            raise RunnerError(f"malformed tracked-file record: {record!r}")
+        mode = header.split(" ", 1)[0]
+        if mode not in {"100644", "100755"}:
+            raise RunnerError(f"source closure contains unsupported tracked mode {mode}: {relative}")
+        if relative not in seen:
+            raise RunnerError(f"tracked file is missing from full worktree status: {relative}")
+        path = _resolve(relative, base=root)
+        file_hash, file_bytes = _sha256_file(path)
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(mode.encode())
+        digest.update(b"\0")
+        digest.update(file_hash.encode())
+        digest.update(b"\0")
+        digest.update(str(file_bytes).encode())
+        files.append({"path": relative, "mode": mode, "sha256": file_hash, "bytes": file_bytes})
+    if seen != head_paths:
+        raise RunnerError("source worktree is not a materialized full HEAD tree")
+    if len(files) != len(seen):
+        raise RunnerError("source worktree tracked-file closure is incomplete")
+    return {
+        "sha256": digest.hexdigest(),
+        "file_count": len(files),
+        "flags_sha256": _sha256_bytes(status_raw.encode()),
+        "index_sha256": _sha256_bytes(index_raw.encode()),
+    }
+
+
+def _cargo_config_paths(root: Path) -> list[Path]:
+    paths: list[Path] = []
+    current = root
+    while True:
+        cargo = current / ".cargo"
+        for name in ("config.toml", "config"):
+            candidate = cargo / name
+            if candidate.exists() or candidate.is_symlink():
+                paths.append(candidate)
+        if current.parent == current:
+            break
+        current = current.parent
+    home_cargo = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
+    for name in ("config.toml", "config"):
+        candidate = home_cargo / name
+        if candidate.exists() or candidate.is_symlink():
+            paths.append(candidate)
+    configured = os.environ.get("CARGO_CONFIG")
+    if configured:
+        paths.append(Path(configured))
+    unique: list[Path] = []
+    for path in paths:
+        resolved = _resolve(path)
+        if resolved not in unique:
+            unique.append(resolved)
+    return sorted(unique)
+
+
+def _cargo_config_identity(root: Path) -> dict[str, Any]:
+    files = []
+    digest = hashlib.sha256()
+    for path in _cargo_config_paths(root):
+        file_hash, file_bytes = _sha256_file(path)
+        digest.update(str(path).encode())
+        digest.update(b"\0")
+        digest.update(file_hash.encode())
+        digest.update(b"\0")
+        digest.update(str(file_bytes).encode())
+        files.append({"path": str(path), "sha256": file_hash, "bytes": file_bytes})
+    return {"sha256": digest.hexdigest(), "files": files}
+
+
 def _require_sha(value: Any, label: str) -> str:
     if not isinstance(value, str) or not FULL_SHA.fullmatch(value):
         raise RunnerError(f"{label} must be a full 40-character lowercase commit SHA")
@@ -316,6 +431,12 @@ def source_identity(
     status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     if status:
         raise RunnerError(f"source worktree is dirty:\n{status}")
+    # A clean porcelain status does not expose sparse/skip-worktree entries,
+    # and Cargo can also be redirected through configuration outside the
+    # repository.  Capture both closures from the actual endpoint before
+    # constructing the receipt; callers must not be able to self-report them.
+    tracked_closure = _tracked_closure_identity(root)
+    cargo_configs = _cargo_config_identity(root)
     tree = _git(root, "rev-parse", "HEAD^{tree}").strip()
     diff = _git(root, "diff", "--no-ext-diff", "--binary")
 
@@ -347,13 +468,27 @@ def source_identity(
     if package.get("name") != "litchi-ops":
         raise RunnerError("source package manifest is not litchi-ops")
     package_hash, package_bytes = _sha256_file(package_manifest)
-    source_tree_sha256 = _sha256_bytes((tree + "\0" + status + "\0" + diff).encode())
+    source_tree_sha256 = _sha256_bytes(
+        (
+            tree
+            + "\0"
+            + status
+            + "\0"
+            + diff
+            + "\0"
+            + tracked_closure["sha256"]
+            + "\0"
+            + cargo_configs["sha256"]
+        ).encode()
+    )
     return {
         "role": role,
         "root": str(root),
         "commit": head,
         "tree": tree,
         "source_tree_sha256": source_tree_sha256,
+        "tracked_closure": tracked_closure,
+        "cargo_configs": cargo_configs,
         "clean": True,
         "package_manifest": {
             "path": str(package_manifest),
@@ -997,6 +1132,30 @@ def validate_receipt_bindings(
         raise RunnerError("receipt source identity is not clean")
     if not FULL_SHA.fullmatch(str(source.get("commit", ""))) or not FULL_SHA.fullmatch(str(source.get("tree", ""))):
         raise RunnerError("receipt source commit/tree identity is malformed")
+    _require_hash(source.get("source_tree_sha256"), "receipt.source_tree_sha256")
+    tracked_closure = source.get("tracked_closure")
+    if not isinstance(tracked_closure, Mapping):
+        raise RunnerError("receipt tracked source closure is missing")
+    for key in ("sha256", "flags_sha256", "index_sha256"):
+        _require_hash(tracked_closure.get(key), f"receipt.tracked_closure.{key}")
+    if not isinstance(tracked_closure.get("file_count"), int) or tracked_closure["file_count"] <= 0:
+        raise RunnerError("receipt.tracked_closure.file_count is invalid")
+    cargo_configs = source.get("cargo_configs")
+    if not isinstance(cargo_configs, Mapping):
+        raise RunnerError("receipt Cargo configuration closure is missing")
+    _require_hash(cargo_configs.get("sha256"), "receipt.cargo_configs.sha256")
+    config_files = cargo_configs.get("files")
+    if not isinstance(config_files, list):
+        raise RunnerError("receipt Cargo configuration files are malformed")
+    for index, config in enumerate(config_files):
+        if not isinstance(config, Mapping):
+            raise RunnerError(f"receipt.cargo_configs.files[{index}] is malformed")
+        path = config.get("path")
+        if not isinstance(path, str) or not Path(path).is_absolute() or UPSTREAM_COMPONENT in Path(path).parts:
+            raise RunnerError(f"receipt.cargo_configs.files[{index}] path is invalid")
+        _require_hash(config.get("sha256"), f"receipt.cargo_configs.files[{index}].sha256")
+        if not isinstance(config.get("bytes"), int) or config["bytes"] < 0:
+            raise RunnerError(f"receipt.cargo_configs.files[{index}].bytes is invalid")
     package_manifest = source.get("package_manifest")
     if not isinstance(package_manifest, Mapping) or package_manifest.get("name") != "litchi-ops":
         raise RunnerError("receipt package manifest identity is missing")

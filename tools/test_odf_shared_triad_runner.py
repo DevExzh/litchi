@@ -6,12 +6,14 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -302,6 +304,37 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
                 lock_sha256=lock_sha,
             )
             self.assertEqual(identity["commit"], commit)
+            self.assertGreater(identity["tracked_closure"]["file_count"], 0)
+            self.assertIn("sha256", identity["cargo_configs"])
+            subprocess.run(
+                ["git", "-C", str(root), "update-index", "--skip-worktree", "Cargo.lock"],
+                check=True,
+            )
+            with self.assertRaisesRegex(runner.RunnerError, "sparse/skip-worktree"):
+                runner.source_identity(
+                    manifest,
+                    role="baseline",
+                    source_root=root,
+                    source_commit=None,
+                    lock_sha256=lock_sha,
+                )
+            subprocess.run(
+                ["git", "-C", str(root), "update-index", "--no-skip-worktree", "Cargo.lock"],
+                check=True,
+            )
+            config_target = root.parent / f"cargo-config-{root.name}"
+            config_target.write_text("[net]\noffline = true\n", encoding="utf-8")
+            config_link = root.parent / f"cargo-config-link-{root.name}"
+            config_link.symlink_to(config_target)
+            with mock.patch.dict(os.environ, {"CARGO_CONFIG": str(config_link)}):
+                with self.assertRaisesRegex(runner.RunnerError, "symlink"):
+                    runner.source_identity(
+                        manifest,
+                        role="baseline",
+                        source_root=root,
+                        source_commit=None,
+                        lock_sha256=lock_sha,
+                    )
             with self.assertRaisesRegex(runner.RunnerError, "lock"):
                 runner.source_identity(
                     manifest,
@@ -449,6 +482,13 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
                     "name": "litchi-ops",
                 },
                 "source_tree_sha256": "e" * 64,
+                "tracked_closure": {
+                    "sha256": "f" * 64,
+                    "file_count": 1,
+                    "flags_sha256": "1" * 64,
+                    "index_sha256": "2" * 64,
+                },
+                "cargo_configs": {"sha256": "3" * 64, "files": []},
                 "root": "/source",
                 "probe": {
                     "path": "/source/crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
