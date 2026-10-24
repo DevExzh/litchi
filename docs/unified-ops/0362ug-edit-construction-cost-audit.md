@@ -404,3 +404,23 @@ This pin precedes the DOCX/PPT merges and is not the final gate. The remaining
 known source returns are XLS changed-publication freshness under 0362ugea and
 the PPTX refusal-kind classifier. Final full gates, all-68 inventory, corpus,
 glossary and native qualification remain required.
+
+
+The subsequent combined strict check also passes at
+`99c875ca41d7fa4a6185b2fff122e4499b6c0d88`, including the DOCX and PPT
+merges: all-target/all-feature CLI, operations, facade and Python Clippy
+exits zero in 145.777 seconds. Its source stays clean, three post-exit
+observations find no owned builders, and the target stabilizes at
+4,706,726,912 bytes. The [reduced receipt](results/0362ug/composed-consumer-check.json)
+binds source, command, locks, policy, plan/state and logs. This selected step
+remains distinct from the required full 53-step gate.
+
+PPTX refusal-kind correction 0362ugt merges at `c1eda2fdf6`. `FinalSlide`
+now follows its existing `InvalidValue` kind; signed/protected refusals retain
+`document_protected`. Operation and reason text no longer override the code.
+Classifier, slide-removal, capability and registry tests pass, as does the
+strict PPTX-only operations check. Both generated consumers and the one-line
+capability-table digest are synchronized. The coordinator verified all seven
+logs/receipts and root configuration, then independently reran both static
+OfficeCLI table checks on the composed tree. The final actual corpus replay
+remains part of final acceptance. No unrelated DOC behavior changes.

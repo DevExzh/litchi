@@ -918,3 +918,27 @@ The 8,089-byte mover has SHA-256
 the 2,066-byte restore helper has SHA-256
 `eb1e8d0b053c5ddd8e4a3dfbfd4f2a60d91e3a7f3c64832a599827f289515558`.
 Recreate both worktrees from their retained branches, then run `restore.py`.
+
+
+## Twenty-third cleanup, 2026-10-24
+
+Fresh checks against `c1eda2fdf6` permitted removal of the completed PPT
+and PPTX refusal-kind leaves without force. Their retained refs remain at
+`70a9b5762258a69cec53c04b1b7d30b5e8286703` and
+`dd39bbe82eff43b63d6f129a86a20027fe88496e`. The pre-relocation checkout
+sizes were 412,717,056 and 7,551,844,352 apparent bytes. Eight ignored
+generated files totaling 761,901 bytes were separately quarantined; their
+806,912 allocated bytes are preserved and not claimed as reclaimed space.
+The coordinator independently verified every quarantined file, retained ref,
+ancestry, removed path and protected external-root existence. No external
+target/evidence or active XLS-property leaf was modified.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twenty-third-wave/receipt.md`
+(2,310 bytes, SHA-256
+`c146b2403d9956d40226dc824c7457cea9f13db1337402b9f1f9055e2e4f3ca0`).
+The adjacent 2,096-byte manifest has SHA-256
+`99005a6ee2747022374a71510cd4ae25dd86d8b62ed34914623c09fe75e2510e`;
+the 1,639-byte restore helper has SHA-256
+`86e0fa2c95a4902ddc2707578922ab5214e06ebb17b2ead763fe3776d4230300`.
+Recreate the leaves from their retained branches, then run `restore.py`.
