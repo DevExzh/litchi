@@ -399,16 +399,15 @@ fn reachable_header_footer_crud_is_typed_and_transactional() {
     let regions = (PagesPackage::header_footers)(&package).unwrap();
     assert_eq!(regions[0].text(), "A東京B");
     assert!(regions[1].is_empty());
-    assert!(
-        package
-            .edit_header_footer_text(HeaderFooterSelector::index(
-                0,
-                Template::Odd,
-                Kind::Header,
-                usize::MAX,
-            ))
-            .is_err()
-    );
+    let mut invalid_edit = package
+        .edit_header_footer_text(HeaderFooterSelector::index(
+            0,
+            Template::Odd,
+            Kind::Header,
+            usize::MAX,
+        ))
+        .unwrap();
+    assert!(invalid_edit.before().is_err());
     let reparsed = Draft::from_bytes(&editor.to_bytes().unwrap()).unwrap();
     let package = PagesPackage::from_bytes(&reparsed.to_bytes().unwrap()).unwrap();
     let regions = (PagesPackage::header_footers)(&package).unwrap();
