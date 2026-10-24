@@ -68,6 +68,7 @@ def main() -> None:
             "pid=os.fork()\n"
             "if pid:\n"
             "    os._exit(0)\n"
+            "os.setsid()\n"
             "os.close(1); os.close(2)\n"
             "time.sleep(0.25)\n"
             "with open(os.path.join(target,'late-child'),'wb') as stream:\n"
