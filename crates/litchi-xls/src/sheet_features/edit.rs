@@ -1249,6 +1249,16 @@ mod tests {
         builder.build().unwrap().to_bytes().unwrap()
     }
 
+    fn oversized_edit(source: &Arc<SourceHook>) -> Edit {
+        let reader: Arc<dyn ReadAt> = source.clone();
+        let workbook = SourceBackedWorkbook::from_read_at(reader).unwrap();
+        let package = crate::Package::from_source(workbook).unwrap();
+        let mut edit = Edit::new(&package).unwrap();
+        edit.ensure_ready().unwrap();
+        edit.stream = vec![0; 128 * 1024 * 1024 + 1];
+        edit
+    }
+
     #[test]
     fn package_edit_entry_keeps_workbook_stream_cold() {
         let package = Builder::new().build().unwrap();
@@ -1258,17 +1268,28 @@ mod tests {
     }
 
     #[test]
+    fn render_error_keeps_the_stable_admission_limit() {
+        let source = Arc::new(SourceHook::new(source_bytes()));
+        let edit = oversized_edit(&source);
+
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Records(crate::Error::Object(
+                litchi_ole_common::Error::Limit {
+                    kind: litchi_ole_common::LimitKind::StreamBytes,
+                    ..
+                }
+            )))
+        ));
+    }
+
+    #[test]
     fn render_error_prefers_a_source_change_seen_after_the_leading_fence() {
         let source = Arc::new(SourceHook::new(source_bytes()));
-        let reader: Arc<dyn ReadAt> = source.clone();
-        let workbook = SourceBackedWorkbook::from_read_at(reader).unwrap();
-        let package = crate::Package::from_source(workbook).unwrap();
-        let mut edit = Edit::new(&package).unwrap();
-        edit.ensure_ready().unwrap();
+        let edit = oversized_edit(&source);
         // Object-package admission rejects a stream over its finite limit.
         // The hook bumps immediately after `before`'s last source observation,
         // leaving that admission error to the trailing owner fence.
-        edit.stream = vec![0; 128 * 1024 * 1024 + 1];
         source.bump_after_versions(5);
 
         assert!(matches!(
