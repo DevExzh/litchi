@@ -335,6 +335,8 @@ impl<R: BufRead> ChartXmlReader<R> {
         &mut self,
         buffer: &'buffer mut Vec<u8>,
     ) -> Result<Event<'buffer>> {
+        let limits = self.limits;
+        let decoder = self.inner.decoder();
         let (namespace, event) = self
             .inner
             .read_resolved_event_into(buffer)
@@ -342,8 +344,7 @@ impl<R: BufRead> ChartXmlReader<R> {
 
         match event {
             Event::Start(mut element) => {
-                validate_attributes(&element, self.limits, self.decoder())?;
-                let limits = self.limits;
+                validate_attributes(&element, limits, decoder)?;
                 count_node_values(&mut self.nodes, limits)?;
                 let is_chart = is_chart_namespace(&namespace, &element);
                 let is_drawing = is_drawing_namespace(&namespace, &element);
@@ -425,8 +426,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                 Ok(Event::Start(element))
             },
             Event::Empty(mut element) => {
-                validate_attributes(&element, self.limits, self.decoder())?;
-                let limits = self.limits;
+                validate_attributes(&element, limits, decoder)?;
                 count_node_values(&mut self.nodes, limits)?;
                 if self.depth == 0 {
                     return Err(Error::Invalid(

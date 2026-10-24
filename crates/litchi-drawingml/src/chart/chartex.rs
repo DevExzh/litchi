@@ -793,7 +793,8 @@ fn attribute_name(
     reader: &NsReader<&[u8]>,
     attribute: &quick_xml::events::attributes::Attribute<'_>,
 ) -> String {
-    let local = String::from_utf8_lossy(attribute.key.local_name().as_ref());
+    let local_name = attribute.key.local_name();
+    let local = String::from_utf8_lossy(local_name.as_ref());
     let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
     match namespace {
         ResolveResult::Unbound => local.into_owned(),
