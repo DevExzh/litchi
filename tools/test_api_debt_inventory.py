@@ -189,6 +189,12 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
         valid = commit_shape_fixture("fixture", ("foreign",), methods)
         self.assertIn(path, inventory.auditable_commit_nominals(valid, "fixture"))
 
+        foreign_index_only = copy.deepcopy(valid)
+        foreign_index_only["index"]["2"]["crate_id"] = 99
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(foreign_index_only, "fixture")
+        )
+
         foreign_index_item = copy.deepcopy(valid)
         foreign_index_item["index"]["2"]["crate_id"] = 99
         foreign_index_item["paths"]["2"]["crate_id"] = 99

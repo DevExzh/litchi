@@ -190,11 +190,13 @@ def auditable_commit_nominals(document, crate: str, delegated_globs=frozenset())
     covered = set()
     for path, kind in surface.exports.items():
         item_id = surface.item_ids.get(path)
+        item = surface.index.get(str(item_id)) if item_id is not None else None
         definition = surface.paths.get(str(item_id))
         identity = (surface._nominal_identity(item_id)
                     if item_id is not None else None)
         if (kind not in gate.TYPE_KINDS or not path or path[0] != crate
-                or item_id not in surface.index
+                or not isinstance(item, dict)
+                or item.get("crate_id") != surface.crate_id
                 or not isinstance(definition, dict)
                 or definition.get("crate_id") != surface.crate_id
                 or identity is None or identity[0] != surface.crate_id):
