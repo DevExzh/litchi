@@ -146,7 +146,7 @@ fn gfm_extended_autolinks_preserve_source_ranges_and_transfer() -> Result<(), Er
     let destination =
         Snapshot::read_with("Destination", Dialect::GitHubFlavored, ReadLimits::DEFAULT)?;
     let transferred = gfm.preflight_transfer_block(0, &destination)?.into_commit();
-    assert!(transferred.snapshot().references().any(|reference| {
+    assert!(transferred.package().references().any(|reference| {
         reference.kind() == ReferenceKind::Link
             && reference.destination() == Some("http://www.commonmark.org/help")
     }));
@@ -223,12 +223,12 @@ fn nested_and_inline_structural_edits_are_exact_and_durable() -> Result<(), Erro
         .replace_inline(1, strong_position, "_gentle_")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.snapshot().source(),
+        commit.package().source(),
         "> new `code`\n\noutside _gentle_"
     );
     let json = commit.patch().to_json(PatchEnvelopeLimits::DEFAULT)?;
     let restored = Patch::from_json(&json, PatchEnvelopeLimits::DEFAULT)?;
-    assert_eq!(source.apply(&restored)?.snapshot(), commit.snapshot());
+    assert_eq!(source.apply(&restored)?.package(), commit.package());
     Ok(())
 }
 
@@ -251,8 +251,8 @@ fn contained_link_definitions_are_nested_and_remain_reference_aware() -> Result<
     let mut edit = source.edit();
     edit.replace_nested_block(1, definition, "[foo]: /new")?;
     let commit = edit.commit()?;
-    assert_eq!(commit.snapshot().source(), "[foo]\n\n> [foo]: /new\n");
-    assert!(commit.snapshot().references().any(|reference| {
+    assert_eq!(commit.package().source(), "[foo]\n\n> [foo]: /new\n");
+    assert!(commit.package().references().any(|reference| {
         reference.kind() == ReferenceKind::Link && reference.destination() == Some("/new")
     }));
     Ok(())
@@ -271,10 +271,10 @@ fn dependency_aware_transfer_and_projection_are_preflighted() -> Result<(), Erro
     assert_eq!(plan.dependency_count(), 2);
     assert_eq!(destination.source(), "Destination");
     let transferred = plan.into_commit();
-    assert!(transferred.snapshot().references().any(|reference| {
+    assert!(transferred.package().references().any(|reference| {
         reference.kind() == ReferenceKind::LinkDefinition && reference.label() == Some("id")
     }));
-    assert!(transferred.snapshot().references().any(|reference| {
+    assert!(transferred.package().references().any(|reference| {
         reference.kind() == ReferenceKind::FootnoteDefinition && reference.label() == Some("n")
     }));
 
@@ -323,12 +323,12 @@ fn literal_edit_helpers_cannot_inject_markdown_blocks() -> Result<(), Error> {
     edit.replace_block_with_text(0, "# heading\n- list\n[link](target) <tag>")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.snapshot().source(),
+        commit.package().source(),
         "\\# heading\n\\- list\n\\[link\\](target) \\<tag\\>"
     );
-    assert_eq!(commit.snapshot().blocks().len(), 1);
+    assert_eq!(commit.package().blocks().len(), 1);
     assert_eq!(
-        commit.snapshot().block(0).map(|block| block.kind()),
+        commit.package().block(0).map(|block| block.kind()),
         Some(BlockKind::Paragraph)
     );
     Ok(())
@@ -404,7 +404,7 @@ fn multi_operation_edits_are_atomic_ordered_and_overlap_checked() -> Result<(), 
         .append_block("five")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.snapshot().source(),
+        commit.package().source(),
         "ONE\n\ntwo\n\nTHREE\n\nfour\n\nfive"
     );
     assert_eq!(commit.patch().operation_count(), 4);
@@ -432,13 +432,13 @@ fn referenced_definitions_require_dependency_closure() -> Result<(), Error> {
     let mut update = source.edit();
     update.replace_block(1, "[id]: /new")?;
     let updated = update.commit()?;
-    assert!(updated.snapshot().references().any(|reference| {
+    assert!(updated.package().references().any(|reference| {
         reference.kind() == ReferenceKind::Link && reference.destination() == Some("/new")
     }));
 
     let mut closure = source.edit();
     closure.remove_block(0)?.remove_block(1)?;
-    assert_eq!(closure.commit()?.snapshot().source(), "\n");
+    assert_eq!(closure.commit()?.package().source(), "\n");
     Ok(())
 }
 
@@ -483,13 +483,13 @@ fn durable_patch_json_is_deterministic_bounded_and_semantically_verified() -> Re
     assert_eq!(first, second);
     let decoded = Patch::from_json(&first, limits)?;
     assert_eq!(
-        source.apply(&decoded)?.snapshot().source(),
+        source.apply(&decoded)?.package().source(),
         "ONE\n\ntwo\n\nthree"
     );
 
     let inverse_json = commit.patch().inverse().to_json(limits)?;
     let inverse = Patch::from_json(&inverse_json, limits)?;
-    assert_eq!(commit.snapshot().apply(&inverse)?.snapshot(), &source);
+    assert_eq!(commit.package().apply(&inverse)?.package(), &source);
 
     let tampered = first.replace("\"replacement\":\"ONE\"", "\"replacement\":\"wrong\"");
     assert!(matches!(
@@ -530,7 +530,7 @@ fn independent_patch_join_reports_structured_conflicts() -> Result<(), Error> {
             JoinError::Conflicts(_) => Error::PatchConflict,
         })?;
     assert_eq!(
-        joined.snapshot().source(),
+        joined.package().source(),
         "ONE\n\ntwo\n\nTHREE\n\nleft tail\n\nright tail"
     );
 
@@ -559,8 +559,7 @@ fn three_way_merge_plan_never_mutates_its_base() -> Result<(), Error> {
     let plan = left.patch().plan_merge(right.patch())?;
     assert!(plan.conflicts().is_empty());
     assert_eq!(
-        plan.merged_commit()
-            .map(|commit| commit.snapshot().source()),
+        plan.merged_commit().map(|commit| commit.package().source()),
         Some("A\n\nb\n\nC")
     );
     assert_eq!(base.source(), "a\n\nb\n\nc");
@@ -652,16 +651,18 @@ fn replacement_commit_preserves_untouched_bytes_and_is_reversible() -> Result<()
     edit.replace_block(0, "## Replacement")?;
     let commit = edit.commit()?;
     assert_eq!(
-        commit.snapshot().source(),
+        commit.package().source(),
         "## Replacement\r\n\r\nKeep  \r\n\r\n- one\r\n"
     );
-    assert!(commit.diagnostics().changed());
-    assert!(commit.diagnostics().full_reparse_performed());
-    assert_eq!(commit.diagnostics().touched_blocks(), 1);
+    let diagnostics = *commit.diagnostics();
+    assert!(diagnostics.changed());
+    assert!(diagnostics.full_reparse_performed());
+    assert_eq!(diagnostics.touched_blocks(), 1);
 
-    let restored = commit.snapshot().apply(&commit.patch().inverse())?;
-    assert_eq!(restored.snapshot(), &source);
-    assert_eq!(restored.snapshot().source(), source.source());
+    let (package, patch) = commit.into_parts();
+    let restored = package.apply(&patch.inverse())?;
+    assert_eq!(restored.package(), &source);
+    assert_eq!(restored.into_package().source(), source.source());
     Ok(())
 }
 
@@ -671,7 +672,7 @@ fn append_remove_noop_and_conflict_paths_are_typed() -> Result<(), Error> {
     let mut append = source.edit();
     append.append_block("- two")?;
     let appended = append.commit()?;
-    assert_eq!(appended.snapshot().source(), "one\n\n- two");
+    assert_eq!(appended.package().source(), "one\n\n- two");
 
     let stale = Snapshot::read("different")?;
     assert!(matches!(
@@ -679,10 +680,10 @@ fn append_remove_noop_and_conflict_paths_are_typed() -> Result<(), Error> {
         Err(Error::PatchConflict)
     ));
 
-    let mut remove = appended.snapshot().edit();
+    let mut remove = appended.package().edit();
     remove.remove_block(1)?;
     let removed = remove.commit()?;
-    assert_eq!(removed.snapshot().source(), "one\n\n");
+    assert_eq!(removed.package().source(), "one\n\n");
 
     let mut noop_edit = source.edit();
     noop_edit.replace_block(0, "one")?;

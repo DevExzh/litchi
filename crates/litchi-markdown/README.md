@@ -30,10 +30,10 @@ let source = Snapshot::read("# Original\n\nBody")?;
 let mut edit = source.edit();
 edit.replace_block_with_text(0, "# literal heading marker")?;
 let commit = edit.commit()?;
-assert_eq!(commit.snapshot().source(), "\\# literal heading marker\n\nBody");
+assert_eq!(commit.package().source(), "\\# literal heading marker\n\nBody");
 
-let restored = commit.snapshot().apply(&commit.patch().inverse())?;
-assert_eq!(restored.snapshot().source(), source.source());
+let restored = commit.package().apply(&commit.patch().inverse())?;
+assert_eq!(restored.package().source(), source.source());
 # Ok::<(), litchi_markdown::reader::Error>(())
 ```
 
