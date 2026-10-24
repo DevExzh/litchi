@@ -3770,3 +3770,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   completed removal and preserved payloads. Final assembled capture, gate,
   corpus and native qualification remain pending. Only audit 22 is deferred.
   Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, remaining row readiness):
+  Record 0362ul11 checks all 156 historical result-contract rows against clean
+  staging `778d7a5e6c`: 83 exact registered semantic identities, nine removed
+  aliases, 42 repaired non-DrawingML rows and 22 active DrawingML rows. No
+  surviving non-DrawingML gap is found among those historical rows. This is
+  source readiness, not a replacement for fresh all-68 capture/dispositions.
+
+  Fragment source review passes; its test receipt is corrected to the actual
+  diagnostic 6d lock and unlocked offline commands. Pinned composed validation
+  remains required. Diagram is returned for remaining selected-budget and
+  nested-graph fidelity defects. Text/media's six standalone SVG consumers
+  are queued for actual locked checks. The native DrawingML protocol is
+  returned for simulated owner operations and preflight evidence; real API
+  adapters and distinct Ink baselines remain mandatory. The repaired OLE
+  qualification packet is under renewed independent review.
+
+  Cleanup forty-two removes the merged legacy protocol leaf non-forced,
+  retaining its branch and all nine payloads (356,146 bytes), with successful
+  restoration and independent hash/mode/ancestry verification. Existing
+  native endpoints, targets and the protected trunk probe remain intact.
+  Final capture, full gate, real corpus and native qualification still await
+  the assembled source. Only audit 22 is deferred. Nothing is pushed.

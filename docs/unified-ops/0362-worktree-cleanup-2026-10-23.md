@@ -1546,3 +1546,37 @@ Recreate the selected worktree at its retained branch, then run
 `python3 restore.py <leaf>` in its evidence directory. The recorded preparation
 helper regenerates a manifest from restored leaves; any later removal must
 repeat holder and identity checks.
+
+## Forty-second cleanup: merged legacy native protocol
+
+At staging `778d7a5e6cc1b28838c7462049cfdc5a5288debe`, the clean merged
+`uo2-legacy-native-protocol` worktree was removed non-forced. Its branch
+remains at `e8d51bb07a00dd0b9feeb6ed5e134c521c89be4d`. All nine ignored
+payloads (356,146 apparent bytes; 397,312 allocated bytes) remain in quarantine.
+Restoration passed every hash/mode check. The coordinator independently
+verified every payload, retained ref, merge ancestry, absent leaf path and
+unchanged protected trunk probe. Physical reclaimed bytes were not measured.
+
+A fresh preflight first stopped on an obsolete Git audit process group. Its
+author confirmed ownership and terminated only that group before holder
+checks were repeated. Cleanup sent no signals. The endpoint audit found no
+active native preparation or target depending on this leaf. All 54 protected
+external roots, 121 untouched worktrees and prior cleanup receipts remain
+unchanged. Staging HEAD was held throughout this cleanup.
+
+Evidence remains outside Git under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave42/`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `manifest.json` | 63078 | `11849a10de6f8cbf5232526d012d926ce83505cb11b31f54ea69e38e425436f2` |
+| `receipt.json` | 114821 | `a0f3d6214d515ddcaff89cc69d2dd915030d9264e85b46e39ced77fba3ff7c34` |
+| `prepare_cleanup.py` | 6615 | `d2a86c85984de528dbebc3c95a6eb9c19b4595a91242d5f11d1102187f31efe4` |
+| `restore.py` | 4804 | `e04fed70c54421538cf379e78ee1f62ebbf73d7319e140be40d328e71852fa75` |
+| `endpoint-audit.json` | 1630 | `290fbd12c986a1ea387fe672c368ea36c56f732651674583432135ca7bd2a87b` |
+| `coordinator-verification.json` | 3069 | `0169c4778a64acccc6c626e7df09939210923d3de884b55c28ca1a0361314cbc` |
+| `root-verification.json` | 715 | `c42bfb94f53baa15d75b7463040a2c2fff5b2565767abca6323a91a30acd606c` |
+
+Recreate the leaf at its retained branch, then run
+`python3 restore.py legacy-native-protocol` in this evidence directory.
+Any further removal requires a fresh holder and endpoint audit.
