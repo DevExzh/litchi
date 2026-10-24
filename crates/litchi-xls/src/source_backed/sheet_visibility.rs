@@ -38,9 +38,9 @@ impl Edit {
             })?;
             self.inner = Some(inner);
         }
-        self.inner
-            .as_mut()
-            .ok_or_else(|| Error::Internal("source-backed visibility edit engine was not retained"))
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed visibility edit engine was not retained",
+        ))
     }
 
     /// Stage one exact visible, hidden or very-hidden outcome.

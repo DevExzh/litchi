@@ -42,9 +42,9 @@ impl Edit {
             })?;
             self.inner = Some(snapshot.edit());
         }
-        self.inner
-            .as_mut()
-            .ok_or_else(|| Error::Internal("source-backed cell edit engine was not retained"))
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed cell edit engine was not retained",
+        ))
     }
 
     /// Stage a number into an existing numeric cell.

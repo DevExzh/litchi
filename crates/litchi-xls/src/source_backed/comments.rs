@@ -39,9 +39,9 @@ impl Edit {
             })?;
             self.inner = Some(inner);
         }
-        self.inner
-            .as_mut()
-            .ok_or_else(|| Error::Internal("source-backed comment edit engine was not retained"))
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed comment edit engine was not retained",
+        ))
     }
 
     /// Replace the complete text and author of one existing comment.
