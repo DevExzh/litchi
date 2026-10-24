@@ -47,13 +47,33 @@ def _read_rows(path: Path, fields: tuple[str, ...], label: str) -> tuple[list[di
     errors: list[str] = []
     try:
         with path.open(newline="", encoding="utf-8") as stream:
-            reader = csv.DictReader(stream, delimiter="\t")
-            if reader.fieldnames != list(fields):
+            reader = csv.reader(stream, delimiter="\t", strict=True)
+            try:
+                header = next(reader)
+            except StopIteration:
+                return [], [f"{label}: missing header"]
+            if header != list(fields):
                 errors.append(
                     f"{label}: expected header {' '.join(fields)}, "
-                    f"got {reader.fieldnames!r}"
+                    f"got {header!r}"
                 )
-            rows = list(reader)
+            rows: list[dict[str, str]] = []
+            for line, values in enumerate(reader, 2):
+                if len(values) != len(fields):
+                    errors.append(
+                        f"{label} line {line}: expected {len(fields)} fields, "
+                        f"got {len(values)}"
+                    )
+                # Keep malformed rows available for one-to-one diagnostics,
+                # while padding short rows so later checks cannot traceback.
+                normalized = (values + [""] * len(fields))[:len(fields)]
+                row = dict(zip(fields, normalized))
+                rows.append(row)
+                for field in ("crate", "category", "path"):
+                    if not row[field].strip():
+                        errors.append(
+                            f"{label} line {line}: {field} must be nonblank"
+                        )
     except (OSError, csv.Error) as error:
         return [], [f"{label}: cannot read: {error}"]
     return rows, errors

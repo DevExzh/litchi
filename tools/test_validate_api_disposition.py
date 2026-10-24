@@ -91,6 +91,63 @@ class DispositionValidationTests(unittest.TestCase):
         errors = validator.validate(self.inventory, self.disposition)
         self.assertTrue(any("requires a redaction row" in error for error in errors))
 
+    def test_rejects_short_and_extra_rows_without_traceback(self) -> None:
+        self.inventory.write_text(
+            "crate\tcategory\tpath\tdetail\ttarget\n"
+            "fixture\tmut_owner\tfixture::Package::set\n"
+            "fixture\tmut_owner\tfixture::Package::get\tdetail\ttarget\textra\n",
+            encoding="utf-8",
+        )
+        self.disposition.write_text(
+            "crate\tcategory\tpath\tdetail\ttarget\tdecision\tevidence\towner\n"
+            "fixture\tmut_owner\tfixture::Package::set\t\t\tFIXED\tevidence\towner\n"
+            "fixture\tmut_owner\tfixture::Package::get\t\t\tFIXED\tevidence\n",
+            encoding="utf-8",
+        )
+        errors = validator.validate(self.inventory, self.disposition)
+        self.assertTrue(any("inventory line 2: expected 5 fields, got 3" in error for error in errors))
+        self.assertTrue(any("inventory line 3: expected 5 fields, got 6" in error for error in errors))
+        self.assertTrue(any("disposition line 3: expected 8 fields, got 7" in error for error in errors))
+        self.assertTrue(any("disposition line 3: owner must be nonblank" in error for error in errors))
+
+    def test_rejects_blank_identity_fields_in_both_inputs(self) -> None:
+        self.inventory.write_text(
+            "crate\tcategory\tpath\tdetail\ttarget\n"
+            "\tmut_owner\tfixture::Package::set\tdetail\ttarget\n"
+            "fixture\t\tfixture::Package::get\tdetail\ttarget\n"
+            "fixture\tmut_owner\t\tdetail\ttarget\n",
+            encoding="utf-8",
+        )
+        self.disposition.write_text(
+            "crate\tcategory\tpath\tdetail\ttarget\tdecision\tevidence\towner\n"
+            "\tmut_owner\tfixture::Package::set\t\t\tFIXED\tevidence\towner\n"
+            "fixture\t\tfixture::Package::get\t\t\tFIXED\tevidence\towner\n"
+            "fixture\tmut_owner\t\t\t\tFIXED\tevidence\towner\n",
+            encoding="utf-8",
+        )
+        errors = validator.validate(self.inventory, self.disposition)
+        for label, field in (
+            ("inventory", "crate"), ("inventory", "category"),
+            ("inventory", "path"), ("disposition", "crate"),
+            ("disposition", "category"), ("disposition", "path"),
+        ):
+            self.assertTrue(
+                any(f"{label} line " in error and f"{field} must be nonblank" in error
+                    for error in errors),
+                (label, field, errors),
+            )
+
+    def test_accepts_crlf_and_empty_detail_or_target(self) -> None:
+        self.inventory.write_bytes(
+            b"crate\tcategory\tpath\tdetail\ttarget\r\n"
+            b"fixture\tmut_owner\tfixture::Package::set\t\t\r\n"
+        )
+        self.disposition.write_bytes(
+            b"crate\tcategory\tpath\tdetail\ttarget\tdecision\tevidence\towner\r\n"
+            b"fixture\tmut_owner\tfixture::Package::set\t\t\tFIXED\trecord 0362\towner\r\n"
+        )
+        self.assertEqual(validator.validate(self.inventory, self.disposition), [])
+
 
 if __name__ == "__main__":
     unittest.main()
