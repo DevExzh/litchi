@@ -168,6 +168,7 @@ pub(crate) fn parse_axis_common_element(
     common: &mut ParsedAxisCommon,
     element: &BytesStart<'_>,
     decoder: Decoder,
+    max_text_bytes: usize,
 ) -> Result<bool> {
     match element.local_name().as_ref() {
         b"axId" => common.axis_id = Some(required_axis_id_attr(element, "chart axis ID")?),
@@ -175,7 +176,12 @@ pub(crate) fn parse_axis_common_element(
         b"delete" => common.deleted = parse_bool_attr(element)?,
         b"axPos" => common.position = Some(parse_axis_position(element)?),
         b"numFmt" => {
-            common.number_format = Some(parse_number_format(element, decoder, "chart axis")?);
+            common.number_format = Some(parse_number_format(
+                element,
+                decoder,
+                max_text_bytes,
+                "chart axis",
+            )?);
         },
         b"majorTickMark" => common.major_tick_mark = parse_tick_mark(element)?,
         b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
@@ -332,7 +338,12 @@ pub(crate) fn parse_category_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -436,7 +447,12 @@ pub(crate) fn parse_value_axis<R: BufRead>(
                 ));
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -767,7 +783,12 @@ pub(crate) fn parse_date_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();
@@ -860,7 +881,12 @@ pub(crate) fn parse_series_axis<R: BufRead>(
                 parse_axis_title(reader, &mut common)?;
             },
             Ok(Event::Start(ref element) | Event::Empty(ref element))
-                if !parse_axis_common_element(&mut common, element, reader.decoder())? =>
+                if !parse_axis_common_element(
+                    &mut common,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )? =>
             {
                 if in_scaling && scaling.parse_element(element)? {
                     buf.clear();

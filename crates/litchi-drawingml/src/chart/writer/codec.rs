@@ -40,10 +40,10 @@ pub fn write_with_rels<W: Write>(
     limits.validate_chart(chart)?;
     validate_structure(
         chart,
+        limits,
         external_data_relationship_id,
         user_shapes_relationship_id,
-    )
-    .map_err(Error::Io)?;
+    )?;
     let mut bounded = LimitedWriter::new(writer, limits.max_output_bytes);
     match write_chart_space(
         &mut bounded,
@@ -63,11 +63,13 @@ pub fn write_with_rels<W: Write>(
 
 fn validate_structure(
     chart: &Chart,
+    limits: Limits,
     external_data_relationship_id: Option<&str>,
     user_shapes_relationship_id: Option<&str>,
-) -> std::io::Result<()> {
-    validate_chart_style(chart.style)?;
+) -> Result<()> {
+    validate_chart_style(chart.style).map_err(Error::Io)?;
     validate_relationship(
+        limits,
         chart
             .external_data
             .as_ref()
@@ -76,6 +78,7 @@ fn validate_structure(
         "chart external data",
     )?;
     validate_relationship(
+        limits,
         chart
             .user_shapes
             .as_ref()
@@ -87,22 +90,33 @@ fn validate_structure(
 }
 
 fn validate_relationship(
+    limits: Limits,
     metadata: Option<Option<&str>>,
     override_id: Option<&str>,
     description: &str,
-) -> std::io::Result<()> {
+) -> Result<()> {
     if metadata.is_none() {
         if override_id.is_some() {
-            return Err(invalid_chart_input(format!(
+            return Err(Error::Io(invalid_chart_input(format!(
                 "chart package supplied {description} without chart metadata"
-            )));
+            ))));
         }
         return Ok(());
     }
-    if override_id.or(metadata.flatten()).is_none_or(str::is_empty) {
-        return Err(invalid_chart_input(format!(
+    let relationship_id = override_id.or(metadata.flatten());
+    if relationship_id.is_none_or(str::is_empty) {
+        return Err(Error::Io(invalid_chart_input(format!(
             "{description} have no relationship ID"
-        )));
+        ))));
+    }
+    if let Some(relationship_id) = relationship_id {
+        if relationship_id.len() > limits.max_attribute_value_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::AttributeValueBytes,
+                relationship_id.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
     }
     Ok(())
 }

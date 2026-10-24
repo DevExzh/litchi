@@ -571,6 +571,7 @@ pub(crate) fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> R
                         labels.number_format = Some(parse_number_format(
                             element,
                             reader.decoder(),
+                            reader.max_text_bytes(),
                             "chart data-label",
                         )?);
                         saw_number_format = true;
@@ -765,6 +766,7 @@ pub(crate) fn parse_data_label<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Re
                         label.number_format = Some(parse_number_format(
                             element,
                             reader.decoder(),
+                            reader.max_text_bytes(),
                             "chart point data-label",
                         )?);
                         true
@@ -1095,6 +1097,7 @@ pub(crate) fn parse_trendline_label<R: BufRead>(
                 number_format = Some(parse_number_format(
                     element,
                     reader.decoder(),
+                    reader.max_text_bytes(),
                     "chart trendline-label",
                 )?);
             },

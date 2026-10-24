@@ -153,7 +153,7 @@ fn invalid_extended_specs_are_refused() {
 
 #[test]
 fn foreign_parts_read_but_are_not_authored() {
-    let xml = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><cx:chartData><cx:data id="0"><cx:numDim type="val"><cx:lvl ptCount="2"><cx:pt idx="0">1</cx:pt><cx:pt idx="1">2</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:title><cx:tx><cx:rich><a:p><a:r><a:t>Rich</a:t></a:r></a:p></cx:rich></cx:tx></cx:title><cx:plotArea><cx:plotAreaRegion><cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"#;
+    let xml = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:foo="urn:foreign"><cx:chartData><cx:data unknown:id="opaque" foo:id="wrong" id="0"><cx:numDim type="val"><cx:lvl ptCount="2"><cx:pt foo:idx="99" idx="0">1</cx:pt><cx:pt foo:idx="99" idx="1">2</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:title><cx:tx><cx:rich><a:p><a:r><a:t>Rich</a:t></a:r></a:p></cx:rich></cx:tx></cx:title><cx:plotArea><cx:plotAreaRegion><cx:series layoutId="funnel"><cx:dataId foo:val="wrong" val="0"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"#;
     let chart = read(xml, &Limits::DEFAULT).unwrap();
     assert_eq!(chart.spec.variant().kind, Kind::Funnel);
     assert_eq!(chart.spec.title(), Some("Rich"));
@@ -172,4 +172,45 @@ fn companion_parts_are_valid_chart_styles() {
     let style = crate::chart::style::parse(&style_xml(), &Limits::DEFAULT).unwrap();
     assert_eq!(style.info().entries.len(), 30);
     crate::chart::style::parse_color(&colors_xml(), &Limits::DEFAULT).unwrap();
+}
+
+#[test]
+fn waterfall_subtotals_are_admitted_before_their_vector_grows() {
+    let spec = Spec::new(Variant::new(Kind::Waterfall)).with_series(Series::new("Only", vec![1.0]));
+    let xml = String::from_utf8(spec.to_xml(None).unwrap())
+        .unwrap()
+        .replace(
+            "</cx:subtotals>",
+            r#"<cx:idx val="0"/><cx:idx val="0"/></cx:subtotals>"#,
+        );
+    let mut limits = Limits::DEFAULT;
+    limits.max_points = 2;
+    assert!(matches!(
+        read(xml.as_bytes(), &limits),
+        Err(Error::Limit {
+            kind: crate::LimitKind::ChartPoints,
+            observed: 3,
+            maximum: 2,
+        })
+    ));
+}
+
+#[test]
+fn chartex_requires_one_complete_root_and_a_restricted_prolog() {
+    let source = sample(Kind::Funnel).to_xml(None).unwrap();
+    let mut second_root = source.clone();
+    second_root.extend_from_slice(b"<cx:other/>");
+    assert!(read(&second_root, &Limits::DEFAULT).is_err());
+
+    let mut text_before_root = b"text".to_vec();
+    text_before_root.extend_from_slice(&source);
+    assert!(read(&text_before_root, &Limits::DEFAULT).is_err());
+
+    let mut doctype = b"<!DOCTYPE cx:chartSpace>".to_vec();
+    doctype.extend_from_slice(&source);
+    assert!(read(&doctype, &Limits::DEFAULT).is_err());
+
+    let mut processing_instruction = source;
+    processing_instruction.extend_from_slice(b"<?chart extension?>");
+    assert!(read(&processing_instruction, &Limits::DEFAULT).is_err());
 }

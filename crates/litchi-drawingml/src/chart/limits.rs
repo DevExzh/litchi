@@ -335,6 +335,50 @@ impl Limits {
                 self.max_text_bytes,
             )?;
         }
+        if let Some(source) = &chart.pivot_source {
+            check_count(
+                LimitKind::ChartTextBytes,
+                source.name.len(),
+                self.max_text_bytes,
+            )?;
+        }
+        if let Some(external_data) = &chart.external_data {
+            if let Some(relationship_id) = &external_data.relationship_id {
+                check_count(
+                    LimitKind::AttributeValueBytes,
+                    relationship_id.len(),
+                    self.max_attribute_value_bytes,
+                )?;
+            }
+        }
+        if let Some(user_shapes) = &chart.user_shapes {
+            if let Some(relationship_id) = &user_shapes.relationship_id {
+                check_count(
+                    LimitKind::AttributeValueBytes,
+                    relationship_id.len(),
+                    self.max_attribute_value_bytes,
+                )?;
+            }
+        }
+        if let Some(header_footer) = chart
+            .print_settings
+            .as_ref()
+            .and_then(|settings| settings.header_footer.as_ref())
+        {
+            for value in [
+                header_footer.odd_header.as_ref(),
+                header_footer.odd_footer.as_ref(),
+                header_footer.even_header.as_ref(),
+                header_footer.even_footer.as_ref(),
+                header_footer.first_header.as_ref(),
+                header_footer.first_footer.as_ref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                check_count(LimitKind::ChartTextBytes, value.len(), self.max_text_bytes)?;
+            }
+        }
         for axis in &chart.plot_area.axes {
             check_title_text(self, axis.common().title.as_ref())?;
             if let Some(number_format) = &axis.common().number_format {

@@ -789,8 +789,27 @@ fn append_text(node: &mut Node, text: &str, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn attribute_name(attribute: &quick_xml::events::attributes::Attribute<'_>) -> String {
-    String::from_utf8_lossy(attribute.key.local_name().as_ref()).into_owned()
+fn attribute_name(
+    reader: &NsReader<&[u8]>,
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+) -> String {
+    let local = String::from_utf8_lossy(attribute.key.local_name().as_ref());
+    let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
+    match namespace {
+        ResolveResult::Unbound => local.into_owned(),
+        ResolveResult::Bound(namespace)
+            if namespace.as_ref() == RELATIONSHIPS_NS.as_bytes()
+                || namespace.as_ref() == STRICT_RELATIONSHIPS_NS.as_bytes() =>
+        {
+            format!("r:{local}")
+        },
+        ResolveResult::Bound(namespace) => {
+            format!("{{{}}}{local}", String::from_utf8_lossy(namespace.as_ref()))
+        },
+        ResolveResult::Unknown(prefix) => {
+            format!("{{?{}}}{local}", String::from_utf8_lossy(prefix.as_ref()))
+        },
+    }
 }
 
 fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
@@ -807,6 +826,10 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
     let mut nodes = 0_usize;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut declaration_seen = false;
+    let mut pre_root_event_seen = false;
     let open = |reader: &NsReader<&[u8]>, element: &BytesStart<'_>| -> Result<Node> {
         let (namespace, local) = reader.resolver().resolve_element(element.name());
         let uri = match namespace {
@@ -846,14 +869,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
         let mut attributes = Vec::new();
         for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-            let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
-            let relationship = matches!(namespace, ResolveResult::Bound(namespace)
-                if namespace.as_ref() == RELATIONSHIPS_NS.as_bytes()
-                    || namespace.as_ref() == STRICT_RELATIONSHIPS_NS.as_bytes());
-            let mut name = attribute_name(&attribute);
-            if relationship {
-                name.insert_str(0, "r:");
-            }
+            let name = attribute_name(&reader, &attribute);
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| Error::Xml(error.to_string()))?
@@ -871,8 +887,18 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
         })
     };
     loop {
-        match reader.read_event()? {
+        let event = reader.read_event()?;
+        if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
+            pre_root_event_seen = true;
+        }
+        match event {
             Event::Start(element) => {
+                if root_closed {
+                    return Err(Error::Invalid(
+                        "chartex XML contains more than one root element".into(),
+                    ));
+                }
+                root_seen = true;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
@@ -905,6 +931,12 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 stack.push(node);
             },
             Event::Empty(element) => {
+                if root_closed {
+                    return Err(Error::Invalid(
+                        "chartex XML contains more than one root element".into(),
+                    ));
+                }
+                root_seen = true;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
@@ -936,7 +968,10 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 let node = open(&reader, &element)?;
                 match stack.last_mut() {
                     Some(parent) => parent.children.push(node),
-                    None => root = Some(node),
+                    None => {
+                        root = Some(node);
+                        root_closed = true;
+                    },
                 }
             },
             Event::End(_) => {
@@ -945,7 +980,10 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                     .ok_or_else(|| Error::Xml("unbalanced chartex XML".into()))?;
                 match stack.last_mut() {
                     Some(parent) => parent.children.push(node),
-                    None => root = Some(node),
+                    None => {
+                        root = Some(node);
+                        root_closed = true;
+                    },
                 }
             },
             Event::Text(text) => {
@@ -968,53 +1006,86 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                         .xml_content(XmlVersion::Implicit1_0)
                         .map_err(|error| Error::Xml(error.to_string()))?;
                     append_text(node, &text, limits)?;
+                } else if !text
+                    .xml_content(XmlVersion::Implicit1_0)
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(Error::Invalid(
+                        "chartex XML contains text outside its root".into(),
+                    ));
                 }
             },
             Event::GeneralRef(reference) => {
-                if let Some(node) = stack.last_mut() {
-                    let resolved = match reference
-                        .resolve_char_ref()
-                        .map_err(|error| Error::Xml(error.to_string()))?
-                    {
-                        Some(character) => character.to_string(),
-                        None => {
-                            let name = reference
-                                .decode()
-                                .map_err(|error| Error::Xml(error.to_string()))?;
-                            quick_xml::escape::resolve_predefined_entity(&name)
-                                .ok_or_else(|| Error::Xml("unknown XML entity".into()))?
-                                .to_owned()
-                        },
-                    };
-                    append_text(node, &resolved, limits)?;
-                }
+                let Some(node) = stack.last_mut() else {
+                    return Err(Error::Invalid(
+                        "chartex XML contains a reference outside its root".into(),
+                    ));
+                };
+                let resolved = match reference
+                    .resolve_char_ref()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                {
+                    Some(character) => character.to_string(),
+                    None => {
+                        let name = reference
+                            .decode()
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        quick_xml::escape::resolve_predefined_entity(&name)
+                            .ok_or_else(|| Error::Xml("unknown XML entity".into()))?
+                            .to_owned()
+                    },
+                };
+                append_text(node, &resolved, limits)?;
             },
             Event::CData(data) => {
-                if let Some(node) = stack.last_mut() {
-                    let raw_length = node.text.len().checked_add(data.len()).ok_or_else(|| {
-                        Error::limit(
-                            crate::LimitKind::ChartTextBytes,
-                            usize::MAX,
-                            limits.max_text_bytes,
-                        )
-                    })?;
-                    if raw_length > limits.max_text_bytes {
-                        return Err(Error::limit(
-                            crate::LimitKind::ChartTextBytes,
-                            raw_length,
-                            limits.max_text_bytes,
-                        ));
-                    }
-                    let text = String::from_utf8_lossy(&data);
-                    append_text(node, &text, limits)?;
+                let Some(node) = stack.last_mut() else {
+                    return Err(Error::Invalid(
+                        "chartex XML contains data outside its root".into(),
+                    ));
+                };
+                let raw_length = node.text.len().checked_add(data.len()).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::ChartTextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
+                if raw_length > limits.max_text_bytes {
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartTextBytes,
+                        raw_length,
+                        limits.max_text_bytes,
+                    ));
                 }
+                let text = String::from_utf8_lossy(&data);
+                append_text(node, &text, limits)?;
+            },
+            Event::Decl(_) => {
+                if root_seen || declaration_seen || pre_root_event_seen {
+                    return Err(Error::Invalid(
+                        "chartex XML declaration is misplaced".into(),
+                    ));
+                }
+                declaration_seen = true;
+            },
+            Event::DocType(_) => {
+                return Err(Error::Invalid(
+                    "chartex XML cannot contain a document type".into(),
+                ));
+            },
+            Event::PI(_) => {
+                return Err(Error::Invalid(
+                    "chartex XML cannot contain processing instructions".into(),
+                ));
             },
             Event::Eof => break,
-            _ => {},
+            Event::Comment(_) => {},
         }
     }
-    if !stack.is_empty() {
-        return Err(Error::Xml("unclosed chartex XML".into()));
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(Error::Invalid("chartex XML has no complete root".into()));
     }
     let root = root.ok_or_else(|| Error::Xml("empty chartex XML".into()))?;
     if !(root.cx && root.name == "chartSpace") {
@@ -1304,7 +1375,7 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Parsed> {
                 });
             }
             if let Some(layout) = node.child("layoutPr") {
-                read_layout(layout, kind, &mut appearance);
+                read_layout(layout, kind, &mut appearance, limits)?;
             } else if kind == Kind::Waterfall {
                 appearance.subtotals = Some(Vec::new());
             }
@@ -1398,20 +1469,35 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Parsed> {
     })
 }
 
-fn read_layout(layout: &Node, kind: Kind, appearance: &mut Appearance) {
+fn read_layout(
+    layout: &Node,
+    kind: Kind,
+    appearance: &mut Appearance,
+    limits: Limits,
+) -> Result<()> {
     match kind {
         Kind::Waterfall => {
-            appearance.subtotals = Some(
-                layout
-                    .child("subtotals")
-                    .map(|totals| {
-                        totals
-                            .all("idx")
-                            .filter_map(|idx| idx.attribute("val")?.parse().ok())
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            );
+            let mut subtotals = Vec::new();
+            if let Some(totals) = layout.child("subtotals") {
+                for idx in totals.all("idx") {
+                    let Some(value) = idx.attribute("val").and_then(|value| value.parse().ok())
+                    else {
+                        continue;
+                    };
+                    let count = subtotals.len().checked_add(1).ok_or_else(|| {
+                        Error::limit(crate::LimitKind::ChartPoints, usize::MAX, limits.max_points)
+                    })?;
+                    if count > limits.max_points {
+                        return Err(Error::limit(
+                            crate::LimitKind::ChartPoints,
+                            count,
+                            limits.max_points,
+                        ));
+                    }
+                    subtotals.push(value);
+                }
+            }
+            appearance.subtotals = Some(subtotals);
         },
         Kind::Treemap => {
             appearance.parent_labels = layout
@@ -1455,6 +1541,7 @@ fn read_layout(layout: &Node, kind: Kind, appearance: &mut Appearance) {
         },
         _ => {},
     }
+    Ok(())
 }
 
 /// Recover per-point fills: a waterfall's increase, decrease and total

@@ -76,6 +76,7 @@ pub fn read<R: BufRead>(reader: R, limits: &Limits) -> Result<Chart> {
                     e,
                     b"val",
                     xml_reader.decoder(),
+                    xml_reader.max_text_bytes(),
                     "chart language",
                 )?);
                 consume_empty_chart_element(&mut xml_reader, b"lang", "chart language")?;
@@ -90,6 +91,7 @@ pub fn read<R: BufRead>(reader: R, limits: &Limits) -> Result<Chart> {
                     e,
                     b"val",
                     xml_reader.decoder(),
+                    xml_reader.max_text_bytes(),
                     "chart language",
                 )?);
             },

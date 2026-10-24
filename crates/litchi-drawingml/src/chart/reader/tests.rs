@@ -68,6 +68,31 @@ fn round_trips_and_validates_chart_language_and_pivot_source() {
 }
 
 #[test]
+fn retained_chart_attributes_are_bounded_before_owned_decode() {
+    let mut limits = crate::chart::Limits::DEFAULT;
+    limits.max_text_bytes = 3;
+    let language = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:lang val="a&#x1F600;"/><c:chart><c:plotArea/></c:chart></c:chartSpace>"#;
+    assert!(matches!(
+        read_with_limits(language.as_slice(), &limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            observed: 5,
+            maximum: 3,
+        })
+    ));
+
+    let number_format = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="1"/><c:scaling/><c:axPos val="l"/><c:numFmt formatCode="a&#x1F600;"/><c:crossAx val="2"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#;
+    assert!(matches!(
+        read_with_limits(number_format.as_slice(), &limits),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            observed: 5,
+            maximum: 3,
+        })
+    ));
+}
+
+#[test]
 fn round_trips_and_validates_chart_protection() {
     let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
         <c:protection><c:chartObject/><c:data val="0"/><c:formatting val="true"/>

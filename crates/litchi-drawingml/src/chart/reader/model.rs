@@ -69,6 +69,10 @@ impl<R: BufRead> ChartXmlReader<R> {
         self.inner.decoder()
     }
 
+    pub(super) fn max_text_bytes(&self) -> usize {
+        self.limits.max_text_bytes
+    }
+
     /// Append decoded semantic text without allowing a caller-selected text
     /// field to grow past its bound.  XML text may arrive as several events
     /// (or as entity references), so checking only the final model would make
