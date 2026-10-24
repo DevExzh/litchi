@@ -4,6 +4,7 @@ use std::{borrow::Cow, ops::Range};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::model3d as drawing;
+use litchi_drawingml::{Error as DrawingError, LimitKind};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -453,8 +454,8 @@ fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
 }
 
-fn drawing_limit(kind: drawing::LimitKind, observed: usize, maximum: usize) -> Error {
-    Error::Drawing(drawing::Error::Limit {
+fn drawing_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Drawing(DrawingError::Limit {
         kind,
         observed,
         maximum,
@@ -468,7 +469,7 @@ fn drawing_limit(kind: drawing::LimitKind, observed: usize, maximum: usize) -> E
 fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> {
     if xml.len() > limits.max_xml_bytes {
         return Err(drawing_limit(
-            drawing::LimitKind::XmlBytes,
+            LimitKind::XmlBytes,
             xml.len(),
             limits.max_xml_bytes,
         ));
@@ -509,7 +510,7 @@ fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> 
             })?;
     if prepared_len > limits.max_xml_bytes {
         return Err(drawing_limit(
-            drawing::LimitKind::XmlBytes,
+            LimitKind::XmlBytes,
             prepared_len,
             limits.max_xml_bytes,
         ));

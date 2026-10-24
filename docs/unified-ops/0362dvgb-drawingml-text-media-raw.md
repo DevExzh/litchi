@@ -20,6 +20,29 @@ The second independent review found two adapter-boundary issues:
 
 Regression coverage includes typed source and prepared-size refusals and a
 large retained opaque scene whose narrow output policy is refused before the
-writer can publish output. No Cargo command was run while this repair was
-source-only; rustfmt and `git diff --check` are the only checks performed so
-far. No generated artifacts, binaries, or third-party paths are tracked.
+writer can publish output. The source-only packet was checked with rustfmt and
+`git diff --check`; no generated artifacts, binaries, or third-party paths are
+tracked.
+
+The follow-up review found that the no-clone path suppressed the shared
+writer's hard-coded `m3d:` and `r:` declarations whenever an alternate prefix
+bound the same URI. The writer now checks the prefix and URI that it actually
+emits, retains all existing declarations, and injects only missing bindings.
+The same writer path is used by output-size preflight, so the injected bytes
+are counted before an output refusal. PPTX regressions cover successful
+alternate-prefix output and reparsing, plus a one-byte-narrower policy that
+confirms the complete emitted size is refused.
+
+Validation receipt for the corrected source tree (parent `8ce87b6143`, before
+the follow-up commit), using `Cargo.lock` SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`,
+`--locked --offline`, `CARGO_BUILD_JOBS=1`, the coordinator cargo shim, and a
+20 GiB memory cap:
+
+- `cargo test --lib -p litchi-pptx 'model3d::tests::codec_'`: 6 passed.
+- `cargo test --lib -p litchi-drawingml`: 241 passed.
+- `cargo test -p litchi-drawingml --test svg_blip`: 24 passed.
+- `cargo check -p litchi-spreadsheet-drawing -p litchi-docx -p litchi-pptx -p litchi-xlsx`: passed.
+
+The external generated target was cleaned after validation; no generated
+target files are part of the commit.

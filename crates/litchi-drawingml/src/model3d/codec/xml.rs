@@ -540,18 +540,25 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Bli
 
 fn write_inner<W: Write>(output: &mut W, metadata: &Metadata) -> std::io::Result<()> {
     output.write_all(b"<m3d:model3d")?;
-    let mut has_model = false;
-    let mut has_rel = false;
+    // The writer uses the stable `m3d:` and `r:` spellings below.  An input
+    // document may bind the same URIs under alternate prefixes, but those
+    // bindings do not make the prefixes emitted here usable.  Keep every
+    // retained declaration and add only the binding required by the emitted
+    // spelling.  `output_size` calls this same path, so injected declarations
+    // are included in the output admission count without cloning the wire.
+    let mut has_model_prefix = false;
+    let mut has_rel_prefix = false;
     for declaration in &metadata.namespaces {
-        has_model |= declaration.uri() == NAMESPACE;
-        has_rel |= declaration.uri() == RELATIONSHIP_NAMESPACE
-            || declaration.uri() == RELATIONSHIP_NAMESPACE_STRICT;
+        has_model_prefix |= declaration.prefix() == Some("m3d") && declaration.uri() == NAMESPACE;
+        has_rel_prefix |= declaration.prefix() == Some("r")
+            && (declaration.uri() == RELATIONSHIP_NAMESPACE
+                || declaration.uri() == RELATIONSHIP_NAMESPACE_STRICT);
         write_namespace(output, declaration)?;
     }
-    if !has_model {
+    if !has_model_prefix {
         write_namespace_value(output, Some("m3d"), NAMESPACE)?;
     }
-    if !has_rel {
+    if !has_rel_prefix {
         write_namespace_value(output, Some("r"), RELATIONSHIP_NAMESPACE)?;
     }
     write_reference(output, &metadata.reference)?;
