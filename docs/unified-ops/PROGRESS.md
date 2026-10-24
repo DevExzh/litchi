@@ -3666,3 +3666,25 @@ See [0063](0063-source-pptx-modern-comments.md).
   disk space. CFB and DrawingML engineering remain active. The next source
   freeze still requires fresh inventory, the full gate, real corpus replay
   and native qualification. Only audit 22 is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, exact remaining source roles):
+  Independent review proves 38 current raw-reader methods and 11 composition,
+  wire, archive and OPC splice descriptors as exact non-lifecycle values.
+  Six removed raw-reader aliases remain stale diagnostic rows and are excluded
+  from every allowance. Record 0362ul7 binds all 55 inspected old-capture
+  identities to source `0dcc767c68`; it does not claim a fresh final capture.
+
+  The validator registration merges at `14161bfd63`. Coordinator conflict
+  resolution retains all 34 prior AST/wire identities and the 49 new exact
+  identities, with no module, crate, Reader or Edit suffix exemption. All 91
+  combined glossary/inventory/disposition tooling tests pass, and independent
+  review confirms the existing evidence, one-to-one and deferral checks.
+
+  CFB retains custom policies through facade ingress, layout adoption,
+  sequential validation and overlay/inverse composition in its active repair.
+  DrawingML owner/replay review passes, while typed producer observations and
+  nested DOCX/PPTX classifications are being corrected. Neither lane is merged
+  yet. Preparation also checks the missing PPT lazy-entry and XLSX raw native
+  execution protocols; no native qualification has been claimed. Final
+  source capture, the 53-step gate, real corpus replay and all native lanes
+  remain required. Only redaction audit 22 is deferred. Nothing is pushed.

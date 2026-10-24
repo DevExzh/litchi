@@ -73,3 +73,28 @@ Pending before final acceptance:
 
 No production source or `PROGRESS.md` was changed. No Cargo or capture command
 was run; the Python tool test above is the only new execution receipt.
+
+## Coordinator integration
+
+The reviewed implementation `22aed11db8` merges at `14161bfd63`. Its older
+tooling base overlaps the prior AST/wire registration, so the coordinator
+resolves the two conflicts by retaining both sets: 34 prior exact identities
+and 49 new ones, for 83 total. The six removed raw-reader aliases are absent
+from every semantic category. Independent review verifies this union and
+the unchanged one-to-one, duplicate, evidence/owner, scaffold and deferral
+guards before the merge is committed.
+
+The four composed tooling modules pass 91 tests on that resolved tree:
+
+```text
+python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory \
+  tools.test_validate_api_disposition tools.test_final_api_inventory
+Ran 91 tests in 1.298s — OK
+```
+
+The run precedes the merge commit on the same resolved source; no test log
+was separately retained. The earlier 87-test run on `76c21c49cf`, before
+this registration, has a retained external log and a reduced receipt at
+[`composed-tooling-before-merge.json`](results/0362ul7/composed-tooling-before-merge.json).
+These results validate tooling behavior. They do not replace final-source
+rustdoc capture, per-row disposition review, or the full workspace gate.
