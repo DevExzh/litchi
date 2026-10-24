@@ -55,4 +55,3 @@ Passing logs under `.coord/drawingml-chart-raw-validation-vc/`:
 - `consumer-check-9280092a3c.log`: DOCX, PPTX, spreadsheet-drawing, XLSX,
   XLSB, and OPS all checked with all features.
 - `docx-chart-tests-9280092a3c.log`: 9 DOCX chart tests passed.
-
