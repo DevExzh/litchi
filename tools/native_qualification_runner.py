@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed runner for the W4b XLSB and W5 legacy native ABBA lanes.
+"""Fail-closed runner for the W4b XLSB, W4 XLSX raw, and W5 legacy native ABBA lanes.
 
 The runner deliberately takes all source, target, binary, fixture, and output
 paths from a JSON manifest.  It does not know a wave commit and therefore
@@ -284,8 +284,8 @@ def load_manifest(path: Path) -> dict[str, Any]:
     data = _expand_environment(data)
     if data.get("schema") != SCHEMA:
         raise RunnerError(f"manifest schema must be {SCHEMA!r}")
-    if data.get("lane") not in {"w4b-xlsb", "w5-legacy"}:
-        raise RunnerError("lane must be w4b-xlsb or w5-legacy")
+    if data.get("lane") not in {"w4b-xlsb", "w4-xlsx-raw", "w5-legacy"}:
+        raise RunnerError("lane must be w4b-xlsb, w4-xlsx-raw, or w5-legacy")
     if data.get("abba_order") != list(ABBA_ORDER):
         raise RunnerError(f"abba_order must be {list(ABBA_ORDER)!r}")
     if data.get("rounds") != ROUNDS:
@@ -424,7 +424,11 @@ def _validate_lane_workload(data: Mapping[str, Any]) -> None:
         ],
         "w5-legacy": [("source", ["{rounds}"]), ("ops", ["{rounds}"])],
     }
-    expected_programs = expected[str(data["lane"])]
+    lane = str(data["lane"])
+    if lane == "w4-xlsx-raw":
+        _validate_xlsx_raw_workload(data)
+        return
+    expected_programs = expected[lane]
     for leg, spec in data["legs"].items():
         actual = [(program["id"], program["argv"]) for program in spec["programs"]]
         if actual != expected_programs:
@@ -439,7 +443,7 @@ def _validate_lane_workload(data: Mapping[str, Any]) -> None:
                 "source": "{output_dir}/source-{leg}-{index}.json",
                 "ops": "{output_dir}/ops-{leg}-{index}.json",
             },
-        }[str(data["lane"])]
+        }[lane]
         for program in spec["programs"]:
             if program.get("stdout") != expected_stdout[program["id"]]:
                 raise RunnerError(f"{leg}/{program['id']} does not use the historical analyzer filename")
@@ -455,6 +459,85 @@ def _validate_lane_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("each lane needs exactly one historical-analyze validator")
     if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
         raise RunnerError("historical analyzer must write summary.json in the output directory")
+
+
+def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
+    """Validate the paired allocator/native XLSX raw-identity workload.
+
+    The source probe itself owns the four-corpus lifecycle and fidelity
+    checks. This runner owns only the build identity and quiet ABBA envelope,
+    so both its allocation and native binaries must execute in every leg.
+    """
+
+    manifest_path = "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml"
+    expected_build_features = {
+        "before": ["--no-default-features", "--features", "allocator-metrics,legacy-xlsx-raw-opc"],
+        "after": ["--features", "allocator-metrics,current-xlsx-raw-opc"],
+    }
+    expected_artifacts = [
+        "{target_dir}/release/xlsx-raw-identity-alloc",
+        "{target_dir}/release/xlsx-raw-identity-native",
+    ]
+    expected_build_ids = ["xlsx_raw_identity"]
+    expected_program_ids = ["raw-alloc", "raw-native"]
+    for leg, spec in data["legs"].items():
+        commands = spec["build"]
+        if [command["id"] for command in commands] != expected_build_ids:
+            raise RunnerError(f"{leg} does not preserve the XLSX raw build command identity")
+        command = commands[0]
+        argv = command["argv"]
+        expected_prefix = ["cargo", "build", "--release", "--locked"]
+        if argv[:4] != expected_prefix or "--manifest-path" not in argv:
+            raise RunnerError(f"{leg} does not use the locked standalone XLSX raw manifest")
+        manifest_index = argv.index("--manifest-path")
+        if argv[manifest_index + 1] != manifest_path:
+            raise RunnerError(f"{leg} does not use the standalone XLSX raw manifest")
+        if argv[manifest_index + 2 :] != [*expected_build_features[leg], "--bin", "xlsx-raw-identity-alloc", "--bin", "xlsx-raw-identity-native"]:
+            raise RunnerError(f"{leg} does not preserve the XLSX raw feature route")
+        if command["artifacts"] != expected_artifacts:
+            raise RunnerError(f"{leg} does not declare both XLSX raw binaries")
+
+        programs = spec["programs"]
+        if [program["id"] for program in programs] != expected_program_ids:
+            raise RunnerError(f"{leg} does not preserve paired XLSX raw programs")
+        expected_variant = "original" if leg == "before" else "candidate"
+        for route, program in zip(("alloc", "native"), programs):
+            expected_argv = [
+                "xlsx-raw-identity",
+                "--api-variant",
+                expected_variant,
+                "--source-revision",
+                "$XLSX_BEFORE_REVISION" if leg == "before" else "$XLSX_AFTER_REVISION",
+                "--iterations",
+                "5",
+                "--warmups",
+                "2",
+                "--json",
+                "{output}",
+            ]
+            # Environment placeholders are expanded before validation; only
+            # the revision's 40-hex shape is intentionally left flexible for
+            # the final assembled candidate.
+            actual = program["argv"]
+            if actual[:4] != expected_argv[:4] or actual[5:] != expected_argv[5:]:
+                raise RunnerError(f"{leg}/{route} does not preserve the XLSX raw probe arguments")
+            revision = actual[4]
+            if len(revision) != 40 or not all(char in "0123456789abcdefABCDEF" for char in revision):
+                raise RunnerError(f"{leg}/{route} must carry a 40-character source revision")
+            if program.get("outputs") != [f"{{output_dir}}/xlsx-raw-{route}-{{leg}}-{{index}}.json"]:
+                raise RunnerError(f"{leg}/{route} does not use its dedicated XLSX raw JSON output")
+            if program.get("stdout") != f"{{output_dir}}/xlsx-raw-{route}-{{leg}}-{{index}}.stdout":
+                raise RunnerError(f"{leg}/{route} does not use its dedicated stdout log")
+            if program.get("stderr") != f"{{output_dir}}/xlsx-raw-{route}-{{leg}}-{{index}}.stderr":
+                raise RunnerError(f"{leg}/{route} does not use its dedicated stderr log")
+            if program.get("require_stdout") is not False:
+                raise RunnerError(f"{leg}/{route} must write its report through --json, not stdout")
+
+    validators = data.get("validators", [])
+    if len(validators) != 1 or validators[0].get("id") != "xlsx-raw-identity":
+        raise RunnerError("XLSX raw lane needs exactly one xlsx-raw-identity validator")
+    if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
+        raise RunnerError("XLSX raw validator must write summary.json in the output directory")
 
 
 def _render(value: str, context: Mapping[str, Any]) -> str:

@@ -105,6 +105,53 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     else:
                         os.environ[key] = value
 
+    def test_xlsx_raw_manifest_preserves_original_and_candidate_routes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="xlsx-raw-manifest-") as directory:
+            root = Path(directory)
+            environment = {
+                "NATIVE_QUAL_OUTPUT": str(root / "output"),
+                "LITCHI_COORD_BIN": str(root),
+                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
+                "XLSX_BEFORE_SOURCE": str(ROOT),
+                "XLSX_AFTER_SOURCE": str(root / "after-source"),
+                "XLSX_TARGET_ROOT": str(root / "targets"),
+                "XLSX_BEFORE_REVISION": "0befb112d96d2409e6f40c9abfeb4813665905ad",
+                "XLSX_AFTER_REVISION": "1" * 40,
+            }
+            old = {key: os.environ.get(key) for key in environment}
+            try:
+                os.environ.update(environment)
+                manifest = runner.load_manifest(
+                    ROOT / "tools/native_qualification/manifests/w4-xlsx-raw.json"
+                )
+                self.assertEqual(manifest["lane"], "w4-xlsx-raw")
+                self.assertEqual(
+                    [program["id"] for program in manifest["legs"]["before"]["programs"]],
+                    ["raw-alloc", "raw-native"],
+                )
+                self.assertEqual(
+                    manifest["legs"]["before"]["build"][0]["argv"][8],
+                    "allocator-metrics,legacy-xlsx-raw-opc",
+                )
+                self.assertEqual(
+                    manifest["legs"]["after"]["build"][0]["argv"][7],
+                    "allocator-metrics,current-xlsx-raw-opc",
+                )
+                self.assertEqual(
+                    manifest["legs"]["before"]["programs"][0]["argv"][4],
+                    environment["XLSX_BEFORE_REVISION"],
+                )
+                self.assertEqual(
+                    manifest["legs"]["after"]["programs"][0]["argv"][4],
+                    environment["XLSX_AFTER_REVISION"],
+                )
+            finally:
+                for key, value in old.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
     def test_manifest_cannot_weaken_fixed_limits(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-limits-") as directory:
             data = json.loads(
