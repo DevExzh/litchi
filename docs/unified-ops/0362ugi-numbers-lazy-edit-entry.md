@@ -63,5 +63,7 @@ The raw logs remain outside the repository at
 
 `cargo fmt --all -- --check` and `git diff --check` passed for the validated
 commit above.  The selector deferral follow-up is statically formatted and
-diff-clean; rerun the Numbers, iWork, facade, and strict-Clippy commands above
-on its successor before coordinator integration.
+diff-clean in source commit
+`86c762d2a7284e3d45e2168f86865f13ea9fe3af`; rerun the Numbers, iWork, facade,
+and strict-Clippy commands above on this successor before coordinator
+integration.
