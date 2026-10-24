@@ -53,7 +53,11 @@ OWNER_ROUTES = {
     "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
 }
 RAW_SCOPES = {"bulk", "family"}
-DRAWINGML_FEATURES = {"drawingml-owner-current", "drawingml-theme-family-current"}
+DRAWINGML_FEATURES = {
+    "drawingml-owner-current",
+    "drawingml-theme-family-current",
+    "drawingml-ink-limits-current",
+}
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
 TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
@@ -230,9 +234,13 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
                     f"{profile_id}.{label} has unknown DrawingML feature(s): {sorted(unknown_features)}"
                 )
         if profile_id == "drawingml-theme-family-raw":
-            if baseline_features:
+            if "drawingml-owner-current" not in baseline_features:
                 raise RunnerError(
-                    "drawingml-theme-family-raw must compile its 11728 baseline without current API features"
+                    "drawingml-theme-family-raw must compile its 11728 baseline with the current Package/Edit owner API"
+                )
+            if "drawingml-theme-family-current" in baseline_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw must keep the 11728 part caller-limit API on its legacy branch"
                 )
             if "drawingml-theme-family-current" not in candidate_features:
                 raise RunnerError(

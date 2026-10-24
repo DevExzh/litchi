@@ -81,9 +81,14 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             route_profiles[0]["approved_baseline_revisions"],
             ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
         )
-        self.assertEqual(route_profiles[0]["baseline_features"], [])
+        self.assertEqual(route_profiles[0]["baseline_features"], ["drawingml-owner-current"])
         self.assertEqual(
-            route_profiles[0]["candidate_features"], ["drawingml-theme-family-current"]
+            route_profiles[0]["candidate_features"],
+            [
+                "drawingml-owner-current",
+                "drawingml-theme-family-current",
+                "drawingml-ink-limits-current",
+            ],
         )
         self.assertEqual(len(manifest["owner_profiles"]), 4)
         self.assertTrue(all(profile["endpoint"] == "owner" for profile in manifest["owner_profiles"]))

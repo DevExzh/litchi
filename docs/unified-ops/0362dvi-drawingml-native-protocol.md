@@ -80,9 +80,17 @@ use the production shared editors: chart
 `Edit::from_profile`/`commit`/`Prepared::apply`, and transform
 `Package::edit`/`Edit::commit`/`Package::apply`. Their outside-clock proofs bind the
 source, changed, forward, inverse, and typed stale-refusal identities. The
+owner receipts retain the native stale-error identity (`Error::Invalid` with
+the route-specific legacy reason before the owner transition, and
+`Error::PatchConflict` after it) and verify that reason before normalizing the
+paired classification.
 chart, theme-family, InkML, and transform owner routes are deliberately
 fragment-level; host package placement remains outside this paired raw
 qualification.
+Replay rows retain prebuilt source recipients (`Package`/`Snapshot`, or the
+strict Ink `Prepared`) and apply only the already-prepared patch inside the
+timed operation; source parsing and recipient preparation happen before the
+first timing sample.
 `read_shared_when_supported` is capability-driven as well: it times only the
 formatcode2 and theme-family shared readers and emits an explicit N/A receipt
 for lanes with no shared-reader API. The complete Theme-family raw route also
@@ -90,7 +98,15 @@ executes and records the source-backed `add_family`, `replace_family`, and
 `remove_family` operations outside the timed rows, with source/output hashes
 and parsed-owner checks. The 11728 baseline uses its explicit
 `*_with_limit` entry points; the candidate uses the current `part::Limits`
-policy. This route is not conflated with the detached fragment owner pair.
+policy. The 11728 baseline nevertheless enables only the independent
+Package/Edit owner feature: that parent already has the current owner shape
+but still lacks `part::Limits`. The candidate enables the owner, Theme-part,
+and Ink-policy gates. This
+route is not conflated with the detached fragment owner pair.
+The Ink action reader has a third, independent
+`drawingml-ink-limits-current` gate: historical parents retain the
+one-argument reader, while the candidate passes `actions::Limits::DEFAULT`
+explicitly.
 
 The adapter's capability matrix distinguishes production sink routes from
 Vec/String-only codecs. Bounded-sink rows call only the former (chart,
