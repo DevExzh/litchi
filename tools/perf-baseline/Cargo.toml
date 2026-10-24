@@ -21,6 +21,12 @@ drawingml-owner-current = []
 # from the detached owner transition.  The historical 11728 parent keeps the
 # explicit *_with_limit methods; current source uses part::Limits.
 drawingml-theme-family-current = []
+# Raw DrawingML codec lanes use this feature only in the current endpoint.
+# Historical baseline endpoints keep their limit-less entry points so the
+# paired run compares the same operation matrix at each source fence.
+drawingml-raw-current = []
+# InkML's caller-selected raw policy is split from the detached owner feature.
+drawingml-ink-limits-current = []
 allocator-metrics = []
 current-xlsx-raw-opc = []
 legacy-xlsx-raw-opc = []

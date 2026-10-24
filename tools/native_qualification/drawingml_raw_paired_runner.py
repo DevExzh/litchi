@@ -53,7 +53,12 @@ OWNER_ROUTES = {
     "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
 }
 RAW_SCOPES = {"bulk", "family"}
-DRAWINGML_FEATURES = {"drawingml-owner-current", "drawingml-theme-family-current"}
+DRAWINGML_FEATURES = {
+    "drawingml-owner-current",
+    "drawingml-theme-family-current",
+    "drawingml-raw-current",
+    "drawingml-ink-limits-current",
+}
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
 TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")

@@ -59,6 +59,14 @@ PRODUCTION_SINK_PARTS = {
     "transform",
 }
 STRUCTURAL_BOUNDARY_PARTS = {"geometry"}
+SOURCE_EXACT_PARTS = {
+    "formatcode2",
+    "svg-blip",
+    "theme-family",
+    "theme-family-part",
+    "ink-actions",
+}
+SCANNER_PARTS = {"image-blip"}
 
 
 class ValidationError(ValueError):
@@ -338,19 +346,39 @@ def _validate_rows(
             "changed_sha256",
             "changed_output_sha256",
             "malformed_sha256",
-            "source_readback_sha256",
-            "changed_readback_sha256",
+            "source_semantic_sha256",
+            "source_output_semantic_sha256",
+            "changed_semantic_sha256",
+            "changed_output_semantic_sha256",
         ):
             _expect(_is_hash(receipt.get(key)), f"{path}: raw fidelity {key} is missing")
         _expect(
-            isinstance(receipt.get("source_preserving_expected"), bool)
+            receipt.get("fidelity_mode") in {"model", "source_exact", "scanner"}
+            and isinstance(receipt.get("source_semantic_equal"), bool)
+            and isinstance(receipt.get("changed_semantic_equal"), bool)
+            and isinstance(receipt.get("semantic_changed_differs"), bool),
+            f"{path}: raw fidelity semantic receipt is missing",
+        )
+        expected_mode = (
+            "source_exact"
+            if part_id in SOURCE_EXACT_PARTS
+            else "scanner"
+            if part_id in SCANNER_PARTS
+            else "model"
+        )
+        _expect(
+            receipt["fidelity_mode"] == expected_mode
+            and receipt.get("source_preserving_expected") == (expected_mode == "source_exact")
             and isinstance(receipt.get("source_output_exact"), bool),
             f"{path}: raw fidelity source-preservation receipt is missing",
         )
         _expect(
-            receipt["source_readback_sha256"] == receipt["source_output_sha256"]
-            and receipt["changed_readback_sha256"] == receipt["changed_output_sha256"],
-            f"{path}: raw fidelity readback is not canonical",
+            receipt["source_semantic_sha256"] == receipt["source_output_semantic_sha256"]
+            and receipt["changed_semantic_sha256"]
+            == receipt["changed_output_semantic_sha256"]
+            and receipt["source_semantic_equal"] is True
+            and receipt["changed_semantic_equal"] is True,
+            f"{path}: raw fidelity semantic model changed during write",
         )
         if receipt["source_preserving_expected"]:
             _expect(
@@ -373,7 +401,12 @@ def _validate_rows(
             receipt.get("changed_output_differs") is True
             and receipt["source_sha256"] != receipt["changed_sha256"]
             and receipt["source_output_sha256"] != receipt["changed_output_sha256"],
-            f"{path}: raw fidelity does not prove the changed readback",
+            f"{path}: raw fidelity does not prove changed output bytes",
+        )
+        _expect(
+            receipt["semantic_changed_differs"] is True
+            and receipt["source_semantic_sha256"] != receipt["changed_semantic_sha256"],
+            f"{path}: raw fidelity does not prove changed semantic content",
         )
     if endpoint == "raw":
         _expect(fidelity_routes == raw_routes, f"{path}: raw fidelity omits a part")
@@ -616,22 +649,49 @@ def _validate_rows(
                             f"{path}: production boundary lacks typed limit details",
                         )
                 if sink_supported:
+                    preflight = part.get("preflight")
                     _expect(
-                        isinstance(part.get("preflight_bytes"), int)
-                        and part["preflight_bytes"] > 0
-                        and part.get("sink_writes") == 0,
-                        f"{path}: preflight part sink receipt is incomplete",
+                        preflight in {"typed_output_limit", "not_applicable"},
+                        f"{path}: sink-backed preflight lacks a production route declaration",
                     )
                     _expect(
-                        part.get("sink_limit") == part["preflight_bytes"] - 1
-                        and part.get("observed_output") == part["preflight_bytes"],
-                        f"{path}: preflight sink bound is not bound to the measured output",
+                        part.get("sink_writes") == 0,
+                        f"{path}: preflight part wrote before admission/refusal",
                     )
-                    _refusal(part.get("sink_refusal"), "io_error", path, "preflight sink")
+                    if preflight == "typed_output_limit":
+                        _expect(
+                            isinstance(part.get("preflight_bytes"), int)
+                            and part["preflight_bytes"] > 0
+                            and part.get("output_limit") == part["preflight_bytes"] - 1
+                            and part.get("observed_output") == part["preflight_bytes"],
+                            f"{path}: typed output preflight is not bound to measured output",
+                        )
+                        _refusal(part.get("sink_refusal"), "limit", path, "preflight output")
+                    else:
+                        _expect(
+                            isinstance(part.get("reason"), str) and part["reason"],
+                            f"{path}: N/A sink preflight lacks its production reason",
+                        )
+                        for key in (
+                            "preflight_bytes",
+                            "sink_limit",
+                            "output_limit",
+                            "observed_output",
+                            "sink_refusal",
+                        ):
+                            _expect(
+                                key not in part,
+                                f"{path}: N/A sink preflight carries synthetic {key} evidence",
+                            )
                 else:
                     _expect(
                         part.get("sink_writes") == 0
                         and "preflight_bytes" not in part
+                        and "sink_limit" not in part
+                        and "preflight" not in part
+                        and "reason" not in part
+                        and "output_limit" not in part
+                        and "observed_output" not in part
                         and "sink_refusal" not in part,
                         f"{path}: non-sink route carries synthetic preflight evidence",
                     )

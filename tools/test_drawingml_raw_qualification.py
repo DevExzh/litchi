@@ -135,7 +135,12 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("conservation_ok", source)
         self.assertIn("supports_production_sink", source)
         self.assertIn("production_preflight", source)
-        self.assertIn("source_readback_sha256", source)
+        self.assertIn("PreparedValue", source)
+        self.assertIn("semantic_changed_differs", source)
+        self.assertIn("write_contextual_to", source)
+        self.assertIn("read_svg_contextual_value", source)
+        self.assertNotIn("source_readback_sha256", source)
+        self.assertNotIn("changed_readback_sha256", source)
         self.assertNotIn("FormattingSink", source)
         self.assertNotIn("lane adapter is not supplied until the final source freeze", source)
 
