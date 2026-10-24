@@ -2686,7 +2686,26 @@ class SafeRunner:
         reuse rather than a process we may signal.
         """
 
-        candidates = set(_descendants(snapshot, process_pid))
+        candidates: set[int] = set()
+        rejected_descendants: set[int] = set()
+        leader_record = owned.get(process_pid)
+        leader_entry = snapshot.get(process_pid)
+        # Never walk a PID whose exact start time is not the one captured at
+        # spawn.  If the leader PID has been reused, its current descendants
+        # belong to the replacement process and are foreign to this command.
+        if leader_record is not None and leader_entry is not None:
+            if _same_process_identity(leader_entry, leader_record):
+                candidates.update(_descendants(snapshot, process_pid))
+            else:
+                reuse = {
+                    "pid": process_pid,
+                    "kind": "owned_pid_reused",
+                    "expected_starttime": leader_record.get("starttime"),
+                    "observed_starttime": str(leader_entry.get("starttime")),
+                }
+                if reuse not in pid_reuse:
+                    pid_reuse.append(reuse)
+                rejected_descendants.update(_descendants(snapshot, process_pid))
         for child_pid in _descendants(snapshot, runner_pid):
             if child_pid == runner_pid:
                 continue
@@ -2695,18 +2714,56 @@ class SafeRunner:
                 continue
             old_starttime = preexisting.get(child_pid)
             if old_starttime is not None:
+                if child_pid in owned and child_pid != process_pid:
+                    # A pre-existing identity must never remain in the owned
+                    # set after it is discovered through a leader-tree race;
+                    # otherwise cleanup could signal that unrelated child.
+                    owned.pop(child_pid, None)
+                    reuse = {
+                        "pid": child_pid,
+                        "kind": "preexisting_identity_admitted",
+                        "expected_starttime": old_starttime,
+                        "observed_starttime": str(entry.get("starttime")),
+                    }
+                    if reuse not in pid_reuse:
+                        pid_reuse.append(reuse)
                 if old_starttime != str(entry.get("starttime")):
-                    pid_reuse.append(
-                        {
-                            "pid": child_pid,
-                            "kind": "preexisting_pid_reused",
-                            "expected_starttime": old_starttime,
-                            "observed_starttime": str(entry.get("starttime")),
-                        }
-                    )
+                    reuse = {
+                        "pid": child_pid,
+                        "kind": "preexisting_pid_reused",
+                        "expected_starttime": old_starttime,
+                        "observed_starttime": str(entry.get("starttime")),
+                    }
+                    if reuse not in pid_reuse:
+                        pid_reuse.append(reuse)
+                # A pre-existing runner child is not admitted even when it
+                # appears in the leader's tree; reject its entire current
+                # subtree before processing candidates below.
+                rejected_descendants.update(_descendants(snapshot, child_pid))
+                continue
+            if child_pid == process_pid:
+                # The leader is admitted only through its exact identity
+                # check above.  Do not re-admit a reused or unobserved PID via
+                # the runner's reparented-child closure.
+                continue
+            existing = owned.get(child_pid)
+            if existing is not None and not _same_process_identity(entry, existing):
+                reuse = {
+                    "pid": child_pid,
+                    "kind": "owned_pid_reused",
+                    "expected_starttime": existing.get("starttime"),
+                    "observed_starttime": str(entry.get("starttime")),
+                }
+                if reuse not in pid_reuse:
+                    pid_reuse.append(reuse)
+                rejected_descendants.update(_descendants(snapshot, child_pid))
                 continue
             candidates.add(child_pid)
 
+        # The leader tree may have contained a reused/pre-existing PID before
+        # the runner examined the reparented closure.  Remove those identities
+        # and every descendant of them before admitting anything new.
+        candidates.difference_update(rejected_descendants)
         for child_pid in sorted(candidates):
             if child_pid == runner_pid:
                 continue
@@ -2715,15 +2772,6 @@ class SafeRunner:
                 continue
             existing = owned.get(child_pid)
             if existing is not None:
-                if not _same_process_identity(entry, existing):
-                    pid_reuse.append(
-                        {
-                            "pid": child_pid,
-                            "kind": "owned_pid_reused",
-                            "expected_starttime": existing.get("starttime"),
-                            "observed_starttime": str(entry.get("starttime")),
-                        }
-                    )
                 continue
             owned[child_pid] = _process_record(entry)
 
@@ -2816,20 +2864,25 @@ class SafeRunner:
             owned=owned,
             pid_reuse=pid_reuse,
         )
-        escaped = [
-            dict(record)
-            for pid, record in sorted(owned.items())
-            if pid != leader_pid
-            and snapshot.get(pid) is not None
-            and _same_process_identity(snapshot[pid], record)
-        ]
-        if not escaped:
+        escaped_by_pid: dict[int, dict[str, Any]] = {}
+
+        def remember_escaped(current: Mapping[int, Mapping[str, Any]]) -> None:
+            for pid, record in sorted(owned.items()):
+                if (
+                    pid != leader_pid
+                    and current.get(pid) is not None
+                    and _same_process_identity(current[pid], record)
+                ):
+                    escaped_by_pid.setdefault(pid, dict(record))
+
+        remember_escaped(snapshot)
+        if not escaped_by_pid:
             self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             return {"escaped": [], "survivors": [], "pid_reuse": list(pid_reuse)}
 
         self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGTERM)
         deadline = time.monotonic() + 5.0
-        survivors: list[dict[str, Any]] = escaped
+        survivors: list[dict[str, Any]] = list(escaped_by_pid.values())
         while time.monotonic() < deadline:
             snapshot = _proc_snapshot()
             self._record_owned_processes(
@@ -2840,6 +2893,8 @@ class SafeRunner:
                 owned=owned,
                 pid_reuse=pid_reuse,
             )
+            remember_escaped(snapshot)
+            self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGTERM)
             self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             survivors = self._live_owned_processes(
                 owned,
@@ -2847,13 +2902,29 @@ class SafeRunner:
                 snapshot=snapshot,
             )
             if not survivors:
-                return {"escaped": escaped, "survivors": [], "pid_reuse": list(pid_reuse)}
+                return {
+                    "escaped": list(escaped_by_pid.values()),
+                    "survivors": [],
+                    "pid_reuse": list(pid_reuse),
+                }
             time.sleep(0.05)
 
         self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGKILL)
         deadline = time.monotonic() + 1.0
         while time.monotonic() < deadline:
             snapshot = _proc_snapshot()
+            self._record_owned_processes(
+                snapshot,
+                process_pid=leader_pid,
+                runner_pid=runner_pid,
+                preexisting=preexisting,
+                owned=owned,
+                pid_reuse=pid_reuse,
+            )
+            remember_escaped(snapshot)
+            # Re-capture before every final signal: a surviving descendant
+            # may fork/reparent a new child after the first KILL snapshot.
+            self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGKILL)
             self._reap_owned_processes(owned, leader_pid=leader_pid, snapshot=snapshot)
             survivors = self._live_owned_processes(
                 owned,
@@ -2863,7 +2934,11 @@ class SafeRunner:
             if not survivors:
                 break
             time.sleep(0.05)
-        return {"escaped": escaped, "survivors": survivors, "pid_reuse": list(pid_reuse)}
+        return {
+            "escaped": list(escaped_by_pid.values()),
+            "survivors": survivors,
+            "pid_reuse": list(pid_reuse),
+        }
 
     def _stabilize_target(self, target: Path) -> int:
         previous: int | None = None

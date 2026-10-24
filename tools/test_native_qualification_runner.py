@@ -1299,6 +1299,133 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 safe._reap_owned_processes(owned, leader_pid=123, snapshot=snapshot)
             waitpid.assert_not_called()
 
+    def test_owned_record_rejects_reused_leader_tree(self) -> None:
+        def entry(pid: int, ppid: int, starttime: str) -> dict[str, object]:
+            return {
+                "pid": pid,
+                "ppid": ppid,
+                "pgrp": pid,
+                "starttime": starttime,
+                "comm": "cargo",
+                "exe": "/usr/bin/cargo",
+                "cwd": str(ROOT),
+                "cmdline": ["cargo", "build"],
+            }
+
+        leader = entry(991992, 1, "leader-old")
+        snapshot = {
+            1: entry(1, 0, "runner"),
+            991992: entry(991992, 1, "leader-new"),
+            991993: entry(991993, 991992, "foreign-child"),
+        }
+        owned = {991992: runner._process_record(leader)}
+        pid_reuse: list[dict[str, object]] = []
+        runner.SafeRunner._record_owned_processes(
+            snapshot,
+            process_pid=991992,
+            runner_pid=1,
+            preexisting={},
+            owned=owned,
+            pid_reuse=pid_reuse,
+        )
+        self.assertNotIn(991993, owned)
+        self.assertTrue(any(item["pid"] == 991992 for item in pid_reuse))
+
+    def test_owned_record_discards_reused_preexisting_subtree(self) -> None:
+        def entry(pid: int, ppid: int, starttime: str) -> dict[str, object]:
+            return {
+                "pid": pid,
+                "ppid": ppid,
+                "pgrp": pid,
+                "starttime": starttime,
+                "comm": "cargo",
+                "exe": "/usr/bin/cargo",
+                "cwd": str(ROOT),
+                "cmdline": ["cargo", "build"],
+            }
+
+        leader = entry(991994, 1, "leader")
+        snapshot = {
+            1: entry(1, 0, "runner"),
+            991994: leader,
+            991995: entry(991995, 991994, "preexisting-new"),
+            991996: entry(991996, 991995, "preexisting-grandchild"),
+        }
+        owned = {991994: runner._process_record(leader)}
+        pid_reuse: list[dict[str, object]] = []
+        runner.SafeRunner._record_owned_processes(
+            snapshot,
+            process_pid=991994,
+            runner_pid=1,
+            preexisting={991995: "preexisting-old"},
+            owned=owned,
+            pid_reuse=pid_reuse,
+        )
+        self.assertNotIn(991995, owned)
+        self.assertNotIn(991996, owned)
+        self.assertTrue(any(item["pid"] == 991995 for item in pid_reuse))
+
+    def test_final_kill_recaptures_a_child_forked_after_first_snapshot(self) -> None:
+        def entry(pid: int, ppid: int, starttime: str) -> dict[str, object]:
+            return {
+                "pid": pid,
+                "ppid": ppid,
+                "pgrp": pid,
+                "starttime": starttime,
+                "comm": "cargo",
+                "exe": "/usr/bin/cargo",
+                "cwd": str(ROOT),
+                "cmdline": ["cargo", "build"],
+            }
+
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-final-kill-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "schema": runner.SCHEMA,
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(root / "target")}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            leader = entry(991997, 1, "leader")
+            child = entry(991998, 1, "child")
+            forked = entry(991999, 991998, "forked-after-kill-snapshot")
+            snapshots = [
+                {1: entry(1, 0, "runner"), 991998: child},
+                {1: entry(1, 0, "runner"), 991998: child},
+                {1: entry(1, 0, "runner"), 991998: child, 991999: forked},
+                {1: entry(1, 0, "runner")},
+            ]
+            signal_calls: list[set[int]] = []
+            monotonic_values = iter((0.0, 0.0, 6.0, 6.0, 6.1, 6.2))
+
+            def record_signal(owned, *, leader_pid, sig):
+                signal_calls.append(set(owned))
+
+            with mock.patch.object(runner, "_proc_snapshot", side_effect=snapshots), mock.patch.object(
+                runner.time, "monotonic", side_effect=monotonic_values
+            ), mock.patch.object(runner.time, "sleep"), mock.patch.object(
+                safe, "_signal_owned_processes", side_effect=record_signal
+            ), mock.patch.object(safe, "_reap_owned_processes"):
+                lifecycle = safe._cleanup_owned_descendants(
+                    leader_pid=991997,
+                    runner_pid=1,
+                    preexisting={},
+                    owned={991997: runner._process_record(leader)},
+                    pid_reuse=[],
+                )
+
+            self.assertEqual(lifecycle["survivors"], [])
+            self.assertEqual(
+                {record["pid"] for record in lifecycle["escaped"]},
+                {991998, 991999},
+            )
+            self.assertIn(991999, signal_calls[-2])
+
     @staticmethod
     def _make_escaping_fake_cargo_source(root: Path) -> Path:
         """Create a fake Cargo that leaves a real setsid child behind."""
