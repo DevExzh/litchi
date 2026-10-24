@@ -303,7 +303,7 @@ fn validate_staged_candidate(
                 report,
             },
             source => SequentialWriteError::CandidateValidation {
-                source,
+                source: Box::new(source),
                 progress: staged(),
                 report,
             },
@@ -313,7 +313,7 @@ fn validate_staged_candidate(
     validated
         .require_conformant()
         .map_err(|source| SequentialWriteError::CandidateValidation {
-            source,
+            source: Box::new(source),
             progress: staged(),
             report,
         })?;
@@ -412,7 +412,11 @@ pub enum SequentialWriteError {
     /// The staged candidate was read successfully but failed full CFB validation.
     CandidateValidation {
         /// Candidate validation failure.
-        source: OleError,
+        ///
+        /// The boxed source keeps the public error's `Result` layout small:
+        /// candidate validation is an exceptional path, while every
+        /// successful sequential write pays only the compact enum layout.
+        source: Box<OleError>,
         /// Staged output state.
         progress: SequentialWriteProgress,
         /// Complete staged artifact report.
@@ -516,7 +520,7 @@ impl std::error::Error for SequentialWriteError {
             | Self::Flush { source, .. }
             | Self::Committed { source, .. }
             | Self::Stage { source, .. } => Some(source),
-            Self::CandidateValidation { source, .. } => Some(source),
+            Self::CandidateValidation { source, .. } => Some(source.as_ref()),
             Self::SourceLength { .. }
             | Self::WriteZero { .. }
             | Self::Indeterminate { .. }
@@ -2349,6 +2353,7 @@ mod tests {
 
     use super::*;
     use crate::consts::TWO_GIB_BYTES;
+    use std::mem::size_of;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -2370,6 +2375,35 @@ mod tests {
             .add_stream(&[name], payload.len() as u64, io::Cursor::new(payload))
             .unwrap();
         writer
+    }
+
+    #[test]
+    fn candidate_validation_error_keeps_result_layout_bounded_and_source_typed() {
+        // OleError owns several unbounded diagnostic strings.  Candidate
+        // validation is exceptional, so keep that source behind one pointer
+        // rather than inflating every Result<_, SequentialWriteError> call.
+        assert!(size_of::<SequentialWriteError>() < 128);
+
+        let report = SequentialWriteReport {
+            output_bytes: 1,
+            payload_bytes: 1,
+            metadata_bytes: 0,
+            stream_count: 1,
+            publication_buffer_bytes: 64,
+            candidate_limits: OleFileLimits::default(),
+        };
+        let error = SequentialWriteError::CandidateValidation {
+            source: Box::new(OleError::InvalidData("invalid candidate".to_owned())),
+            progress: SequentialWriteProgress::Complete { bytes: 1 },
+            report,
+        };
+        assert_eq!(
+            error.progress(),
+            SequentialWriteProgress::Complete { bytes: 1 }
+        );
+        let source = std::error::Error::source(&error).expect("candidate source");
+        assert!(source.downcast_ref::<OleError>().is_some());
+        assert!(error.to_string().contains("invalid candidate"));
     }
 
     #[test]
