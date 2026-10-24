@@ -3793,3 +3793,36 @@ See [0063](0063-source-pptx-modern-comments.md).
   native endpoints, targets and the protected trunk probe remain intact.
   Final capture, full gate, real corpus and native qualification still await
   the assembled source. Only audit 22 is deferred. Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, OLE protocol and PPT preparation):
+  Reviewed OLE owner qualification packet `89142c8518` merges at
+  `15263c83d2`. It binds the true pre-owner baseline, eleven routes, complete
+  output oracles, retained histories, actual toolchain selection and ordered
+  artifact evidence. All 89 combined tooling tests pass; record 0362ul10f
+  accepts the protocol implementation. Actual paired builds, correctness and
+  performance qualification remain required.
+
+  PPT fixture-preparation packet `95257e5103` merges at `7fc786eedc` after
+  independent validation of the real sparse-checkout CLI receipt and all 94
+  composed tooling tests. Five additional compile fixtures were already in
+  the historical tree but absent from the sparse worktree. Record 0362ugjac
+  preserves the failed attempts and distinguishes preparation acceptance from
+  native qualification. The baseline release build subsequently passes;
+  correctness reporting exposes an optional-endpoint null/false bug, and its
+  consumer repair still needs paired rebuilt validation.
+
+  The actual current RTF crate-example check fails at the byte/string parse
+  and Commit accessor boundaries. Consumer-only baseline/current adapters
+  subsequently compile and pass eight correctness routes each, but review
+  returns the packet because the original live crate example remains broken.
+  Both consumers must migrate before acceptance; the historical failed
+  receipt stays intact.
+
+  Chart, diagram, fragment and text/media source reviews pass. All six SVG
+  standalone harnesses also pass locked checks, with registry identities
+  unchanged. Theme/Ink remains under a final return for replacement font
+  counts and mixed modeled namespaces. The true common DrawingML owner
+  baseline is `945eb1d6b9`; `2d330c3305` is already post-owner and cannot
+  qualify that migration. Raw lanes retain their separate baselines. Final
+  source capture, the full gate, real corpus and all native qualification
+  remain required. Only redaction audit 22 is deferred. Nothing is pushed.
