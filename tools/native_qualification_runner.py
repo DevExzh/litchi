@@ -512,8 +512,10 @@ def _validate_build_execution(
         return
     if not isinstance(execution, dict):
         raise RunnerError("build_execution must be an object")
+    if execution.get("class") == "exclusive":
+        return
     if execution.get("class") != "compile_only":
-        raise RunnerError("build_execution.class must be compile_only")
+        raise RunnerError("build_execution.class must be exclusive or compile_only")
     permit_value = execution.get("permit_path")
     if not isinstance(permit_value, str) or not permit_value:
         raise RunnerError("compile_only build_execution needs permit_path")

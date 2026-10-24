@@ -53,8 +53,8 @@ No Cargo or native qualification command was run. The exact reduced receipt is
 
 External logs are under
 `/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024/`.
-The runner source is 152,389 bytes (SHA-256
-`597c2e46027b11c7f882d7ae28bc3c8b3a8abff9d92e015fbb25e6be32a8752c`) and its
+The runner source is 152,463 bytes (SHA-256
+`045ef7430fb50446faa4a6d95d3490f2d45d349681ce1cd71f7a134a8dcfc463`) and its
 focused test source is 50,216 bytes (SHA-256
 `e767c6943d50a70417a68aef27b01371ab03fb5a0b35882f940ecc53fbd5d947`). This
 leaf makes no performance, ABBA, RSS, or native correctness acceptance claim.
