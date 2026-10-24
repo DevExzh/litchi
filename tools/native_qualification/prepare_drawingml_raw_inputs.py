@@ -45,13 +45,13 @@ ADAPTER_PATHS = (
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
     "Cargo.lock": HISTORICAL_WORKSPACE_LOCK_SHA256,
-    "tools/perf-baseline/Cargo.toml": "b203b4b5f58938c9fee1027127a80b620a263ee4a4652c527090f879aba62ce1",
+    "tools/perf-baseline/Cargo.toml": "16b8dcca90a6d3ce18b915e24dfed619b124a7afed7257fca61cc5d658301438",
     "tools/perf-baseline/src/lib.rs": "99b2595d031c9d0ece1a5b46e17d0ddc017629c7e69655909508a28e725aed04",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "5d7eda0f85cc9849f564821422b117509a2dee5ffb8b4b127a648eb99697f437",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "e5c996fc5dde633bbf946e048d3bc7677cba35e2109eb9b0152882ea300ed383",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
-    "tools/native_qualification/drawingml_raw_validator.py": "2fac4102715b631c8e5fe2683608da6924329bbe8af15296e0a6d2ab4d133d34",
+    "tools/native_qualification/drawingml_raw_validator.py": "d24133a130977081caae190af826d36cc9b0f31b4efb0dba7ab9a0c2a124e954",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 

@@ -49,6 +49,16 @@ TARGET_MS = 500
 WARMUPS = 3
 SAMPLES = 20
 BLOCKS = 5
+PRODUCTION_SINK_PARTS = {
+    "chart",
+    "formatcode2",
+    "svg-blip",
+    "model3d",
+    "theme-family",
+    "ink-actions",
+    "transform",
+}
+STRUCTURAL_BOUNDARY_PARTS = {"geometry"}
 
 
 class ValidationError(ValueError):
@@ -232,6 +242,7 @@ def _validate_rows(
         f"{path}: capability matrix is missing",
     )
     raw_routes: set[str] = set()
+    raw_capabilities: dict[str, Mapping[str, Any]] = {}
     shared_reader_supported = False
     owner_operations: dict[str, list[str]] = {operation: [] for operation in OWNER_OPERATIONS}
     owner_route_names: set[str] = set()
@@ -257,14 +268,44 @@ def _validate_rows(
             isinstance(capability.get("read_shared"), bool),
             f"{path}: capability shared-reader receipt is missing",
         )
+        _expect(
+            isinstance(capability.get("production_sink"), bool),
+            f"{path}: capability production-sink receipt is missing",
+        )
+        _expect(
+            capability.get("production_boundary") in {"none", "input_limit", "structural"},
+            f"{path}: capability production-boundary receipt is invalid",
+        )
         if kind == "raw":
             _expect(endpoint == "raw", f"{path}: raw capability leaked into owner endpoint")
             _expect(status_value == "qualified", f"{path}: raw capability is not qualified")
             _expect(route not in raw_routes, f"{path}: duplicate raw capability {route}")
             raw_routes.add(route)
+            raw_capabilities[route] = capability
+            expected_sink = route in PRODUCTION_SINK_PARTS
+            expected_boundary = (
+                "structural"
+                if route in STRUCTURAL_BOUNDARY_PARTS
+                else "none"
+                if route in {"image-blip"}
+                else "input_limit"
+            )
+            _expect(
+                capability["production_sink"] is expected_sink,
+                f"{path}: {route} production-sink capability is not source-backed",
+            )
+            _expect(
+                capability["production_boundary"] == expected_boundary,
+                f"{path}: {route} production boundary is not source-backed",
+            )
             shared_reader_supported |= capability["read_shared"]
         else:
             _expect(endpoint == "owner", f"{path}: owner capability leaked into raw endpoint")
+            _expect(
+                capability["production_sink"] is False
+                and capability["production_boundary"] == "none",
+                f"{path}: owner capability carries raw boundary claims",
+            )
             _expect(
                 status_value in {"qualified", "not_applicable"},
                 f"{path}: unsupported owner capability status",
@@ -297,8 +338,26 @@ def _validate_rows(
             "changed_sha256",
             "changed_output_sha256",
             "malformed_sha256",
+            "source_readback_sha256",
+            "changed_readback_sha256",
         ):
             _expect(_is_hash(receipt.get(key)), f"{path}: raw fidelity {key} is missing")
+        _expect(
+            isinstance(receipt.get("source_preserving_expected"), bool)
+            and isinstance(receipt.get("source_output_exact"), bool),
+            f"{path}: raw fidelity source-preservation receipt is missing",
+        )
+        _expect(
+            receipt["source_readback_sha256"] == receipt["source_output_sha256"]
+            and receipt["changed_readback_sha256"] == receipt["changed_output_sha256"],
+            f"{path}: raw fidelity readback is not canonical",
+        )
+        if receipt["source_preserving_expected"]:
+            _expect(
+                receipt["source_output_exact"] is True
+                and receipt["source_output_sha256"] == receipt["source_sha256"],
+                f"{path}: promised source-preserving route changed bytes",
+            )
         _expect(
             receipt.get("fixture_identity_sha256")
             == _fixture_part_identity(
@@ -434,7 +493,45 @@ def _validate_rows(
                 row.get("sink") is None and details.get("reason"),
                 f"{path}: shared-reader N/A receipt is incomplete",
             )
-        elif operation in sink_operations:
+        elif operation == "write_to_bounded_sink":
+            if details.get("not_applicable") is True:
+                _expect(
+                    row.get("sink") is None
+                    and details.get("reason")
+                    and details.get("production_sink_parts") == [],
+                    f"{path}: bounded-sink N/A receipt is incomplete",
+                )
+            else:
+                sink = row.get("sink")
+                _expect(isinstance(sink, dict), f"{path}: bounded sink receipt is missing")
+                _expect(_is_hash(sink.get("sha256")), f"{path}: bounded sink hash is missing")
+                _expect(
+                    isinstance(sink.get("bytes"), int) and sink["bytes"] > 0,
+                    f"{path}: bounded sink byte receipt is missing",
+                )
+                _expect(
+                    isinstance(sink.get("writes"), int)
+                    and sink["writes"] > 0
+                    and row.get("sink_writes") == sink["writes"],
+                    f"{path}: bounded sink write receipt is incomplete",
+                )
+                _expect(
+                    details.get("sink_hash") == sink["sha256"]
+                    and details.get("sink_bytes") == sink["bytes"]
+                    and details.get("sink_writes") == sink["writes"],
+                    f"{path}: bounded sink detail receipt differs from row receipt",
+                )
+                expected_parts = sorted(
+                    route
+                    for route, capability in raw_capabilities.items()
+                    if capability["production_sink"]
+                )
+                _expect(
+                    sorted(details.get("route", {}).get("production_sink_parts", []))
+                    == expected_parts,
+                    f"{path}: bounded sink does not identify production routes",
+                )
+        elif operation in sink_operations - {"write_to_bounded_sink"}:
             sink = row.get("sink")
             _expect(isinstance(sink, dict), f"{path}: {operation} sink receipt is missing")
             _expect(_is_hash(sink.get("sha256")), f"{path}: {operation} sink hash is missing")
@@ -486,18 +583,58 @@ def _validate_rows(
                     f"{path}: duplicate preflight part identity",
                 )
                 seen.add(part_id)
+                capability = raw_capabilities.get(part_id)
+                _expect(capability is not None, f"{path}: preflight part is not a capability route")
+                boundary = part.get("boundary")
                 _expect(
-                    isinstance(part.get("preflight_bytes"), int)
-                    and part["preflight_bytes"] > 0
-                    and part.get("sink_writes") == 0,
-                    f"{path}: preflight part receipt is incomplete",
+                    boundary == capability["production_boundary"],
+                    f"{path}: preflight boundary differs from capability matrix",
                 )
+                sink_supported = capability["production_sink"]
                 _expect(
-                    part.get("sink_limit") == part["preflight_bytes"] - 1
-                    and part.get("observed_output") == part["preflight_bytes"],
-                    f"{path}: preflight sink bound is not bound to the measured output",
+                    part.get("sink_supported") is sink_supported,
+                    f"{path}: preflight sink capability differs from capability matrix",
                 )
-                _refusal(part.get("refusal"), "io_error", path, "preflight")
+                production_refusal = part.get("production_refusal")
+                if boundary == "none":
+                    _expect(production_refusal is None, f"{path}: unbounded part has a production refusal")
+                else:
+                    expected_kind = "limit" if boundary == "input_limit" else None
+                    if expected_kind is None:
+                        _expect(
+                            isinstance(production_refusal, dict)
+                            and production_refusal.get("kind") in {"limit", "invalid_input"},
+                            f"{path}: structural production refusal is missing",
+                        )
+                        expected_kind = production_refusal["kind"]
+                    _refusal(production_refusal, expected_kind, path, "production boundary")
+                    if expected_kind == "limit":
+                        _expect(
+                            production_refusal.get("limit_kind")
+                            and isinstance(production_refusal.get("limit"), int)
+                            and production_refusal["observed"] > production_refusal["limit"],
+                            f"{path}: production boundary lacks typed limit details",
+                        )
+                if sink_supported:
+                    _expect(
+                        isinstance(part.get("preflight_bytes"), int)
+                        and part["preflight_bytes"] > 0
+                        and part.get("sink_writes") == 0,
+                        f"{path}: preflight part sink receipt is incomplete",
+                    )
+                    _expect(
+                        part.get("sink_limit") == part["preflight_bytes"] - 1
+                        and part.get("observed_output") == part["preflight_bytes"],
+                        f"{path}: preflight sink bound is not bound to the measured output",
+                    )
+                    _refusal(part.get("sink_refusal"), "io_error", path, "preflight sink")
+                else:
+                    _expect(
+                        part.get("sink_writes") == 0
+                        and "preflight_bytes" not in part
+                        and "sink_refusal" not in part,
+                        f"{path}: non-sink route carries synthetic preflight evidence",
+                    )
             _expect(seen == raw_routes, f"{path}: preflight does not cover every raw part")
         elif operation == "malformed_refusal":
             _expect(
@@ -522,9 +659,38 @@ def _validate_rows(
             _expect(isinstance(limit, dict), f"{path}: malformed row lacks limit receipts")
             limit_parts = limit.get("parts")
             _expect(isinstance(limit_parts, list), f"{path}: limit part receipts are missing")
+            limit_seen: set[str] = set()
             for part in limit_parts:
                 _expect(isinstance(part, dict), f"{path}: limit part is not an object")
-                _refusal(part.get("refusal"), "limit", path, "limit")
+                part_id = part.get("part_id")
+                _expect(
+                    isinstance(part_id, str)
+                    and part_id in raw_routes
+                    and part_id not in limit_seen,
+                    f"{path}: limit part identity is missing or duplicated",
+                )
+                limit_seen.add(part_id)
+                boundary = part.get("boundary")
+                capability = raw_capabilities[part_id]
+                _expect(
+                    boundary == capability["production_boundary"]
+                    and boundary != "none",
+                    f"{path}: limit boundary differs from capability matrix",
+                )
+                expected_kind = part.get("expected_kind")
+                _expect(
+                    expected_kind in {"limit", "invalid_input"},
+                    f"{path}: limit expected kind is missing",
+                )
+                _refusal(part.get("refusal"), expected_kind, path, "limit")
+                if expected_kind == "limit":
+                    _expect(
+                        isinstance(part["refusal"].get("limit_kind"), str)
+                        and isinstance(part["refusal"].get("limit"), int)
+                        and part["refusal"]["observed"] > part["refusal"]["limit"],
+                        f"{path}: limit receipt lacks typed boundary details",
+                    )
+            _expect(limit_seen == {part_id for part_id, capability in raw_capabilities.items() if capability["production_boundary"] != "none"}, f"{path}: limit receipts omit a production boundary")
         else:
             _expect(
                 operation in {"entry_read", "read_shared_when_supported", "vec_write", "write_to_bounded_sink"}
@@ -612,6 +778,11 @@ def _validate_rows(
             isinstance(item.get("bytes"), int) and item["bytes"] >= 0,
             f"{path}: size-class byte receipt is missing",
         )
+        capability = raw_capabilities[part_id]
+        _expect(
+            item.get("boundary") == capability["production_boundary"],
+            f"{path}: size-class boundary differs from capability matrix",
+        )
         applicable = item.get("applicable")
         _expect(isinstance(applicable, bool), f"{path}: size-class applicability is missing")
         if not applicable:
@@ -632,9 +803,22 @@ def _validate_rows(
             )
         elif class_name == "over_limit":
             _expect(item.get("accepted") is False, f"{path}: over-limit input was accepted")
-            _refusal(item.get("refusal"), "limit", path, "over-limit")
-            _expect(item["bytes"] > item["refusal"]["limit"], f"{path}: over-limit bytes are not over the bound")
-            _expect(item["refusal"]["observed"] == item["bytes"], f"{path}: over-limit observed bytes differ")
+            expected_kind = "limit" if item["boundary"] == "input_limit" else (
+                item.get("refusal", {}).get("kind")
+                if isinstance(item.get("refusal"), dict)
+                else None
+            )
+            _expect(
+                expected_kind in {"limit", "invalid_input"},
+                f"{path}: structural over-limit refusal kind is missing",
+            )
+            _refusal(item.get("refusal"), expected_kind, path, "over-limit")
+            if expected_kind == "limit":
+                _expect(
+                    item["bytes"] > item["refusal"]["limit"]
+                    and item["refusal"]["observed"] == item["bytes"],
+                    f"{path}: over-limit observed bytes are not bound to the typed limit",
+                )
         else:
             _expect(item.get("accepted") is False, f"{path}: malformed size class was accepted")
             _refusal(item.get("refusal"), "invalid_input", path, "malformed size")
@@ -748,6 +932,19 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
                     _expect(isinstance(resource_metrics[key], int) and resource_metrics[key] > 0, f"{path}: qualified {key} is missing")
             if status == "qualified":
                 _expect(
+                    isinstance(resource_metrics.get("pid"), int)
+                    and resource_metrics["pid"] > 0,
+                    f"{path}: qualified resource PID receipt is missing",
+                )
+                _expect(
+                    _is_hash(resource_metrics.get("command_sha256")),
+                    f"{path}: qualified resource command identity is missing",
+                )
+                _expect(
+                    resource_metrics.get("source_revision") == report.get("source_revision"),
+                    f"{path}: RSS receipt is not bound to the source revision",
+                )
+                _expect(
                     isinstance(resource_metrics.get("whole_process_peak_rss_bytes"), int)
                     and resource_metrics["whole_process_peak_rss_bytes"] > 0,
                     f"{path}: qualified whole-process RSS high-water mark is missing",
@@ -762,12 +959,16 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
             else:
                 _expect(isinstance(allocator_metrics, dict), f"{path}: allocator report has no allocator receipt")
                 _expect(allocator_metrics.get("elapsed_claimable") is False, f"{path}: allocator elapsed was made claimable")
-                metric_keys = ("direct_bytes", "realloc_bytes", "live_balance", "peak_live_delta", "process_rss_bytes", "peak_rss_bytes") if status == "unavailable" else ("direct_bytes", "deallocated_bytes", "realloc_old_bytes", "realloc_new_bytes", "live_before", "live_after", "live_balance", "peak_live_delta", "process_rss_bytes", "peak_rss_bytes", "whole_process_peak_rss_bytes", "allocation_calls", "deallocation_calls", "reallocation_calls", "failed_calls", "conservation_ok")
+                metric_keys = ("direct_bytes", "realloc_bytes", "live_balance", "peak_live_delta", "process_rss_bytes", "peak_rss_bytes") if status == "unavailable" else ("direct_bytes", "deallocated_bytes", "realloc_old_bytes", "realloc_new_bytes", "live_before", "live_after", "live_balance", "peak_live_delta", "process_rss_bytes", "peak_rss_bytes", "whole_process_peak_rss_bytes", "allocation_calls", "deallocation_calls", "reallocation_calls", "failed_calls", "conservation_ok", "pid", "command_sha256", "source_revision")
                 for key in metric_keys:
                     _expect(key in allocator_metrics, f"{path}: allocator metric {key} is missing")
                     if status == "qualified":
                         if key == "conservation_ok":
                             _expect(allocator_metrics[key] is True, f"{path}: allocator conservation is not proven")
+                        elif key == "command_sha256":
+                            _expect(_is_hash(allocator_metrics[key]), f"{path}: allocator command identity is invalid")
+                        elif key == "source_revision":
+                            _expect(allocator_metrics[key] == report.get("source_revision"), f"{path}: allocator source identity differs")
                         else:
                             _expect(isinstance(allocator_metrics[key], int) and allocator_metrics[key] >= 0, f"{path}: qualified allocator metric {key} is invalid")
                 if status == "qualified":
@@ -775,7 +976,15 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
                     _expect(allocator_metrics["live_after"] - allocator_metrics["live_before"] == allocator_metrics["live_balance"], f"{path}: allocator live balance is inconsistent")
                     _expect(allocator_metrics["live_balance"] == allocator_metrics["direct_bytes"] + allocator_metrics["realloc_new_bytes"] - allocator_metrics["deallocated_bytes"] - allocator_metrics["realloc_old_bytes"], f"{path}: allocator byte conservation equation is not proven")
                     _expect(allocator_metrics["peak_live_delta"] >= max(0, allocator_metrics["live_balance"]), f"{path}: allocator peak-live receipt is inconsistent")
-                    _expect(allocator_metrics["process_rss_bytes"] == resource_metrics["process_rss_bytes"] and allocator_metrics["peak_rss_bytes"] == resource_metrics["peak_rss_bytes"] and allocator_metrics["whole_process_peak_rss_bytes"] == resource_metrics["whole_process_peak_rss_bytes"], f"{path}: allocator and process RSS receipts differ")
+                    _expect(
+                        allocator_metrics["process_rss_bytes"] == resource_metrics["process_rss_bytes"]
+                        and allocator_metrics["peak_rss_bytes"] == resource_metrics["peak_rss_bytes"]
+                        and allocator_metrics["whole_process_peak_rss_bytes"] == resource_metrics["whole_process_peak_rss_bytes"]
+                        and allocator_metrics.get("pid") == resource_metrics.get("pid")
+                        and allocator_metrics.get("command_sha256") == resource_metrics.get("command_sha256")
+                        and allocator_metrics.get("source_revision") == resource_metrics.get("source_revision"),
+                        f"{path}: allocator and process RSS receipts differ",
+                    )
     return {
         "schema": SUMMARY_SCHEMA,
         "lane": arguments.lane,

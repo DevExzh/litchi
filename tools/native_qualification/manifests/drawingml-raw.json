@@ -80,7 +80,8 @@
       "perf_lock_sha256": "${DRAWINGML_THEME_FAMILY_PERF_LOCK_SHA256}",
       "preparation_receipt": "${DRAWINGML_THEME_FAMILY_PREPARATION}",
       "approved_baseline_revisions": ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
-      "baseline_features": ["drawingml-owner-current"],
+      "baseline_features": [],
+      "candidate_features": ["drawingml-theme-family-current"],
       "source_fence": "theme-family raw codec parent 11728db; this is separate from the 996651b6 bulk endpoint",
       "record": "0362dvi §4 theme-family raw"
     }

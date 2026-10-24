@@ -77,7 +77,7 @@ rows are covered only by their raw endpoint. The actual DrawingML owner rows
 use the production shared editors: chart
 `Package::edit`/`Edit::commit`/`Package::apply`, theme-family
 `Package::edit`/`Edit::commit`/`Package::apply`, strict InkML `Prepared` plus
-`Edit::from_profile`/`commit`/`Patch::apply`, and transform
+`Edit::from_profile`/`commit`/`Prepared::apply`, and transform
 `Package::edit`/`Edit::commit`/`Package::apply`. Their outside-clock proofs bind the
 source, changed, forward, inverse, and typed stale-refusal identities. The
 chart, theme-family, InkML, and transform owner routes are deliberately
@@ -87,9 +87,30 @@ qualification.
 formatcode2 and theme-family shared readers and emits an explicit N/A receipt
 for lanes with no shared-reader API. The complete Theme-family raw route also
 executes and records the source-backed `add_family`, `replace_family`, and
-`remove_family` operations against one bounded `part::Limits` policy outside
-the timed rows, with source/output hashes and parsed-owner checks; this route
-is not conflated with the detached fragment owner pair.
+`remove_family` operations outside the timed rows, with source/output hashes
+and parsed-owner checks. The 11728 baseline uses its explicit
+`*_with_limit` entry points; the candidate uses the current `part::Limits`
+policy. This route is not conflated with the detached fragment owner pair.
+
+The adapter's capability matrix distinguishes production sink routes from
+Vec/String-only codecs. Bounded-sink rows call only the former (chart,
+formatcode2, SVG, model3d, theme-family fragments, Ink actions, and
+transform); diagram, text body, image blip, theme palette, geometry, and
+color remain raw read/Vec-write routes and receive an explicit sink N/A rather
+than a synthetic stream claim. The chart boundary is the real MCE default
+input policy (256 MiB, classified as `mce_input_bytes`), while geometry also
+has a 1,025-path structural boundary against the 1,024-path reader limit.
+Preflight records both the production typed refusal and, where a stream API
+exists, a zero-write bounded-sink refusal.
+
+Canonical raw fixtures are checked by an outside-clock second decode/encode
+oracle. Routes promised source preservation must reproduce the exact source
+bytes; diagram and Ink action routes explicitly record that canonicalization
+is not source-preserving. Timed rows execute only their named production
+operation: digesting, JSON receipt construction, and fidelity/refusal
+validation occur in the detail pass after timing. Each RSS receipt is bound
+to the child PID, command-line SHA-256, source revision, and kernel
+whole-process `VmHWM`; allocator reports repeat those identities.
 
 The endpoint coverage is explicit: chart authoring/reader/writer plus
 `formatcode2`; SmartArt data-model edits and drawing relationships; text-body,

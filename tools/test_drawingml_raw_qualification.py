@@ -81,6 +81,10 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             route_profiles[0]["approved_baseline_revisions"],
             ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
         )
+        self.assertEqual(route_profiles[0]["baseline_features"], [])
+        self.assertEqual(
+            route_profiles[0]["candidate_features"], ["drawingml-theme-family-current"]
+        )
         self.assertEqual(len(manifest["owner_profiles"]), 4)
         self.assertTrue(all(profile["endpoint"] == "owner" for profile in manifest["owner_profiles"]))
 
@@ -129,6 +133,10 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             self.assertIn(endpoint, source)
         self.assertIn("size_class_receipts", source)
         self.assertIn("conservation_ok", source)
+        self.assertIn("supports_production_sink", source)
+        self.assertIn("production_preflight", source)
+        self.assertIn("source_readback_sha256", source)
+        self.assertNotIn("FormattingSink", source)
         self.assertNotIn("lane adapter is not supplied until the final source freeze", source)
 
     def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:

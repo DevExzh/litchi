@@ -53,6 +53,7 @@ OWNER_ROUTES = {
     "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
 }
 RAW_SCOPES = {"bulk", "family"}
+DRAWINGML_FEATURES = {"drawingml-owner-current", "drawingml-theme-family-current"}
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
 TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
@@ -223,6 +224,20 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
                 not isinstance(feature, str) or not feature for feature in features
             ):
                 raise RunnerError(f"{profile_id}.{label} must be a list of non-empty feature names")
+            unknown_features = set(features) - DRAWINGML_FEATURES
+            if unknown_features:
+                raise RunnerError(
+                    f"{profile_id}.{label} has unknown DrawingML feature(s): {sorted(unknown_features)}"
+                )
+        if profile_id == "drawingml-theme-family-raw":
+            if baseline_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw must compile its 11728 baseline without current API features"
+                )
+            if "drawingml-theme-family-current" not in candidate_features:
+                raise RunnerError(
+                    "drawingml-theme-family-raw candidate must select the current caller-limit API"
+                )
         baseline_root = _path(str(profile.get("baseline_root", "")))
         baseline_revision = _full_sha(profile.get("baseline_revision"), f"{profile_id}.baseline_revision")
         perf_lock_sha256 = _full_hash(profile.get("perf_lock_sha256"), f"{profile_id}.perf_lock_sha256")

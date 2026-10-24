@@ -8,7 +8,6 @@
 #![forbid(unsafe_code)]
 
 use std::env;
-use std::fmt;
 use std::fs;
 use std::hint::black_box;
 use std::io::{self, Write};
@@ -150,6 +149,8 @@ struct CapabilityReceipt {
     status: &'static str,
     evidence: &'static str,
     read_shared: bool,
+    production_sink: bool,
+    production_boundary: &'static str,
 }
 
 fn supports_shared(kind: PartKind) -> bool {
@@ -157,6 +158,41 @@ fn supports_shared(kind: PartKind) -> bool {
         kind,
         PartKind::FormatCode | PartKind::ThemeFamily | PartKind::ThemeFamilyPart
     )
+}
+
+/// Only codecs which expose a real `Write`/`write_to` production endpoint are
+/// admitted to the bounded-sink lane.  Vec/String codecs remain covered by
+/// `entry_read` and `vec_write`; wrapping them in a synthetic sink would turn
+/// an adapter detail into a false capability claim.
+fn supports_production_sink(kind: PartKind) -> bool {
+    matches!(
+        kind,
+        PartKind::Chart
+            | PartKind::FormatCode
+            | PartKind::SvgBlip
+            | PartKind::Model3d
+            | PartKind::ThemeFamily
+            | PartKind::InkActions
+            | PartKind::Transform
+    )
+}
+
+fn boundary_kind(kind: PartKind) -> &'static str {
+    match kind {
+        PartKind::Geometry => "structural",
+        _ if input_limit(kind).is_some() => "input_limit",
+        _ => "none",
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+const fn structural_refusal_kind() -> &'static str {
+    "limit"
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+const fn structural_refusal_kind() -> &'static str {
+    "invalid_input"
 }
 
 const CHART_OWNER_ROUTES: &[OwnerRoute] = &[OwnerRoute::DrawingmlChart];
@@ -262,6 +298,8 @@ fn capability_receipts(case: &LaneCase, endpoint: &str) -> Vec<CapabilityReceipt
                 status: "qualified",
                 evidence: raw_route_evidence(part.kind),
                 read_shared: supports_shared(part.kind),
+                production_sink: supports_production_sink(part.kind),
+                production_boundary: boundary_kind(part.kind),
             });
         }
     } else {
@@ -273,6 +311,8 @@ fn capability_receipts(case: &LaneCase, endpoint: &str) -> Vec<CapabilityReceipt
                     status: "qualified",
                     evidence: owner_route_evidence(fixture.route),
                     read_shared: false,
+                    production_sink: false,
+                    production_boundary: "none",
                 });
             }
         }
@@ -296,6 +336,7 @@ struct LaneCase {
     parts: Vec<Part>,
     stale: Vec<u8>,
     owners: Vec<OwnerFixture>,
+    prepared_owners: Vec<OwnerWork>,
     fixture_identity_sha256: String,
 }
 
@@ -304,6 +345,12 @@ struct OwnerFixture {
     route: OwnerRoute,
     source: Vec<u8>,
     stale: Vec<u8>,
+}
+
+struct OwnerWork {
+    fixture: OwnerFixture,
+    changed: Vec<u8>,
+    patch: OwnerPatch,
 }
 
 #[derive(Debug)]
@@ -338,6 +385,10 @@ struct RawFidelityReceipt {
     changed_output_sha256: String,
     malformed_sha256: String,
     changed_output_differs: bool,
+    source_preserving_expected: bool,
+    source_output_exact: bool,
+    source_readback_sha256: String,
+    changed_readback_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -401,10 +452,14 @@ struct SizeClassReceipt {
     accepted: bool,
     output_sha256: Option<String>,
     refusal: Option<RefusalReceipt>,
+    boundary: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct ResourceMetrics {
+    pid: u32,
+    command_sha256: String,
+    source_revision: String,
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
     whole_process_peak_rss_bytes: u64,
@@ -428,6 +483,9 @@ struct AllocatorReport {
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
     whole_process_peak_rss_bytes: u64,
+    pid: u32,
+    command_sha256: String,
+    source_revision: String,
     conservation_ok: bool,
 }
 
@@ -643,6 +701,11 @@ fn sha256(bytes: &[u8]) -> String {
     format!("{:x}", digest.finalize())
 }
 
+fn command_identity_sha256() -> String {
+    let command = env::args().collect::<Vec<_>>().join("\0");
+    sha256(command.as_bytes())
+}
+
 fn load_fixture(path: &Path, lane: &str) -> io::Result<(Vec<u8>, FixtureLane)> {
     let bytes = fs::read(path)?;
     let value: FixtureFile = serde_json::from_slice(&bytes).map_err(|error| {
@@ -679,6 +742,32 @@ fn invalid_input(message: impl Into<String>, observed: usize) -> ProbeFailure {
     }
 }
 
+fn mce_limit_kind(kind: litchi_ooxml_common::mce::LimitKind) -> &'static str {
+    use litchi_ooxml_common::mce::LimitKind;
+    match kind {
+        LimitKind::InputBytes => "mce_input_bytes",
+        LimitKind::OutputBytes => "mce_output_bytes",
+        LimitKind::SourceBytes => "mce_source_bytes",
+        LimitKind::MarkedBytes => "mce_marked_bytes",
+        LimitKind::OffsetCount => "mce_offset_count",
+        LimitKind::MarkerBytes => "mce_marker_bytes",
+        LimitKind::Depth => "mce_depth",
+        LimitKind::NamespaceBindings => "mce_namespace_bindings",
+        LimitKind::DirectiveTokens => "mce_directive_tokens",
+        LimitKind::Choices => "mce_choices",
+        LimitKind::Branches => "mce_branches",
+        LimitKind::Attributes => "mce_attributes",
+        LimitKind::Events => "mce_events",
+        LimitKind::EventBytes => "mce_event_bytes",
+        LimitKind::AttributeBytes => "mce_attribute_bytes",
+        LimitKind::ContextBytes => "mce_context_bytes",
+        LimitKind::NameBytes => "mce_name_bytes",
+        LimitKind::ReportCounters => "mce_report_counters",
+        LimitKind::RetryCount => "mce_retry_count",
+        _ => "mce_unknown",
+    }
+}
+
 #[cfg(not(feature = "drawingml-owner-current"))]
 fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
     let message = error.to_string();
@@ -692,6 +781,22 @@ fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
             observed,
             message: error.to_string(),
         }),
+        dml::Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind,
+            observed: error_observed,
+            maximum,
+        }) => {
+            let resource = mce_limit_kind(kind);
+            Some(RefusalReceipt {
+                kind: "limit",
+                source_kind: None,
+                limit_kind: Some(resource),
+                resource: Some(resource),
+                limit: Some(maximum),
+                observed: error_observed.max(observed),
+                message: message.clone(),
+            })
+        },
         dml::Error::Limit { resource, limit } => Some(RefusalReceipt {
             kind: "limit",
             source_kind: None,
@@ -727,6 +832,22 @@ fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
             observed,
             message: error.to_string(),
         }),
+        dml::Error::Mce(litchi_ooxml_common::mce::Error::LimitExceeded {
+            kind,
+            observed: error_observed,
+            maximum,
+        }) => {
+            let resource = mce_limit_kind(kind);
+            Some(RefusalReceipt {
+                kind: "limit",
+                source_kind: None,
+                limit_kind: Some(resource),
+                resource: Some(resource),
+                limit: Some(maximum),
+                observed: error_observed.max(observed),
+                message: message.clone(),
+            })
+        },
         dml::Error::Limit {
             kind,
             observed: error_observed,
@@ -867,7 +988,10 @@ fn read_theme_family_part(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
     theme_family_replace(&snapshot, family).map_err(|error| classify(error, bytes.len()))
 }
 
-#[cfg(not(feature = "drawingml-owner-current"))]
+#[cfg(not(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+)))]
 fn theme_family_replace(
     snapshot: &dml::theme::family::part::Snapshot,
     family: &dml::theme::family::Family,
@@ -875,7 +999,10 @@ fn theme_family_replace(
     snapshot.replace_family_with_limit(family, dml::theme::family::part::MAX_XML_BYTES)
 }
 
-#[cfg(feature = "drawingml-owner-current")]
+#[cfg(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+))]
 fn theme_family_replace(
     snapshot: &dml::theme::family::part::Snapshot,
     family: &dml::theme::family::Family,
@@ -883,7 +1010,10 @@ fn theme_family_replace(
     snapshot.replace_family(family, dml::theme::family::part::Limits::DEFAULT)
 }
 
-#[cfg(not(feature = "drawingml-owner-current"))]
+#[cfg(not(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+)))]
 fn theme_family_add(source: &[u8], family: &dml::theme::family::Family) -> dml::Result<Vec<u8>> {
     dml::theme::family::part::add_family_with_limit(
         source,
@@ -892,12 +1022,18 @@ fn theme_family_add(source: &[u8], family: &dml::theme::family::Family) -> dml::
     )
 }
 
-#[cfg(feature = "drawingml-owner-current")]
+#[cfg(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+))]
 fn theme_family_add(source: &[u8], family: &dml::theme::family::Family) -> dml::Result<Vec<u8>> {
     dml::theme::family::part::add_family(source, family, dml::theme::family::part::Limits::DEFAULT)
 }
 
-#[cfg(not(feature = "drawingml-owner-current"))]
+#[cfg(not(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+)))]
 fn theme_family_remove(source: &[u8]) -> dml::Result<Vec<u8>> {
     dml::theme::family::part::remove_family_with_limit(
         source,
@@ -905,7 +1041,10 @@ fn theme_family_remove(source: &[u8]) -> dml::Result<Vec<u8>> {
     )
 }
 
-#[cfg(feature = "drawingml-owner-current")]
+#[cfg(any(
+    feature = "drawingml-owner-current",
+    feature = "drawingml-theme-family-current"
+))]
 fn theme_family_remove(source: &[u8]) -> dml::Result<Vec<u8>> {
     dml::theme::family::part::remove_family(source, dml::theme::family::part::Limits::DEFAULT)
 }
@@ -1057,16 +1196,24 @@ struct CountingSink {
     cap: usize,
     bytes: usize,
     writes: usize,
-    digest: Sha256,
+    digest: Option<Sha256>,
 }
 
 impl CountingSink {
     fn new(cap: usize) -> Self {
+        Self::with_digest(cap, true)
+    }
+
+    fn timed(cap: usize) -> Self {
+        Self::with_digest(cap, false)
+    }
+
+    fn with_digest(cap: usize, digest: bool) -> Self {
         Self {
             cap,
             bytes: 0,
             writes: 0,
-            digest: Sha256::new(),
+            digest: digest.then(Sha256::new),
         }
     }
 }
@@ -1078,59 +1225,14 @@ impl Write for CountingSink {
         }
         self.writes = self.writes.saturating_add(1);
         self.bytes = self.bytes.saturating_add(bytes.len());
-        self.digest.update(bytes);
+        if let Some(digest) = self.digest.as_mut() {
+            digest.update(bytes);
+        }
         Ok(bytes.len())
     }
 
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
-    }
-}
-
-/// Adapt the shared codecs which expose `fmt::Write` to the bounded sink
-/// without first collecting their complete output in a `String`.
-struct FormattingSink<'a, W: Write> {
-    writer: &'a mut W,
-    attempted: usize,
-    error: Option<io::Error>,
-}
-
-impl<'a, W: Write> FormattingSink<'a, W> {
-    fn new(writer: &'a mut W) -> Self {
-        Self {
-            writer,
-            attempted: 0,
-            error: None,
-        }
-    }
-
-    fn failure(&mut self, fallback: impl Into<String>) -> ProbeFailure {
-        let message = fallback.into();
-        match self.error.take() {
-            Some(error) => io_failure(error, self.attempted),
-            None => invalid_input(message, self.attempted),
-        }
-    }
-
-    fn write_text(&mut self, value: &str) -> Result<(), ProbeFailure> {
-        if fmt::Write::write_str(self, value).is_err() {
-            Err(self.failure("formatted sink write failed"))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl<W: Write> fmt::Write for FormattingSink<'_, W> {
-    fn write_str(&mut self, value: &str) -> fmt::Result {
-        self.attempted = self.attempted.saturating_add(value.len());
-        match self.writer.write_all(value.as_bytes()) {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                self.error = Some(error);
-                Err(fmt::Error)
-            },
-        }
     }
 }
 
@@ -1141,42 +1243,50 @@ fn write_text_body_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), Prob
         dml::text::body::reader::Limits::DEFAULT,
     )
     .map_err(|error| classify(error, bytes.len()))?;
-    let mut sink = FormattingSink::new(writer);
-    sink.write_text(
-        "<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
-    )?;
-    if dml::text::body::writer::write(&mut sink, &body).is_err() {
-        return Err(sink.failure("text body writer failed"));
-    }
-    sink.write_text("</a:txBody>")
+    let mut output = String::new();
+    output.push_str("<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">");
+    dml::text::body::writer::write(&mut output, &body)
+        .map_err(|error| classify(error, bytes.len()))?;
+    output.push_str("</a:txBody>");
+    writer
+        .write_all(output.as_bytes())
+        .map_err(|error| io_failure(error, output.len()))
 }
 
 fn write_geometry_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), ProbeFailure> {
     let geometry = parse_geometry(bytes)?;
-    let mut sink = FormattingSink::new(writer);
-    dml::geometry::writer::write_custom_geometry(&mut sink, &geometry);
-    if sink.error.is_some() {
-        return Err(sink.failure("geometry writer failed"));
-    }
-    Ok(())
+    // The production geometry codec deliberately exposes a String-only
+    // writer. Keep that API boundary explicit; the bounded sink is applied
+    // only after the named production operation has completed.
+    let mut output = String::new();
+    dml::geometry::writer::write_custom_geometry(&mut output, &geometry);
+    writer
+        .write_all(output.as_bytes())
+        .map_err(|error| io_failure(error, output.len()))
 }
 
 fn write_blip_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), ProbeFailure> {
     let relationship = dml::blip::find_first_embed(bytes)
         .map_err(|error| classify(error, bytes.len()))?
         .ok_or_else(|| invalid_input("image blip has no embedded relationship", bytes.len()))?;
-    let mut sink = FormattingSink::new(writer);
-    if dml::blip::write_embed(&mut sink, &relationship, true).is_err() {
-        return Err(sink.failure("image blip writer failed"));
-    }
-    Ok(())
+    let mut output = String::new();
+    dml::blip::write_embed(&mut output, &relationship, true)
+        .map_err(|_| invalid_input("image blip writer failed", bytes.len()))?;
+    writer
+        .write_all(output.as_bytes())
+        .map_err(|error| io_failure(error, output.len()))
 }
 
 fn write_receipt(sink: CountingSink) -> SinkReceipt {
     SinkReceipt {
         writes: sink.writes,
         bytes: sink.bytes,
-        sha256: format!("{:x}", sink.digest.finalize()),
+        sha256: format!(
+            "{:x}",
+            sink.digest
+                .expect("timed sink cannot produce a receipt")
+                .finalize()
+        ),
     }
 }
 
@@ -1245,8 +1355,11 @@ fn chart_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         source,
         changed,
         malformed: malformed_fragment("chart", &fixture.malformed),
-        over: Vec::new(),
-        limit_resource: "chart editor XML",
+        // chart::reader::read delegates its input admission to the shared
+        // MCE default policy (256 MiB).  Keep the boundary fixture tied to
+        // that real production limit rather than treating Chart as unbounded.
+        over: vec![b' '; 256 * 1024 * 1024 + 1],
+        limit_resource: "MCE input bytes",
     }])
 }
 
@@ -1503,6 +1616,16 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     }
     let mut changed_geometry_xml = String::new();
     dml::geometry::writer::write_custom_geometry(&mut changed_geometry_xml, &changed_geometry);
+    // The reader admits at most 1024 paths.  This is a structural boundary,
+    // not an input-byte policy: the bytes remain small enough to exercise the
+    // actual geometry parser before it allocates a 1025th path.
+    let mut structural_over = String::from(
+        r#"<a:custGeom xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:pathLst>"#,
+    );
+    for _ in 0..1025 {
+        structural_over.push_str(r#"<a:path w="1" h="1"/>"#);
+    }
+    structural_over.push_str("</a:pathLst></a:custGeom>");
     let color_source =
         dml::color::write(&dml::color::Value::rgb(dml::color::Rgb::new(51, 102, 153)))
             .map_err(|error| classify(error, 0))?;
@@ -1531,7 +1654,7 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source,
             changed: changed_geometry_xml.into_bytes(),
             malformed: malformed_fragment("geometry", &fixture.malformed),
-            over: Vec::new(),
+            over: structural_over.into_bytes(),
             limit_resource: "geometry structural limits",
         },
         Part {
@@ -1601,6 +1724,7 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
         parts,
         stale,
         owners,
+        prepared_owners: Vec::new(),
         fixture_identity_sha256,
     })
 }
@@ -1615,6 +1739,13 @@ fn select_owner_route(case: &mut LaneCase, route: &str) -> Result<(), ProbeFailu
             owner_route_name(route)
         )));
     }
+    let fixture = &case.owners[0];
+    let (changed, patch) = owner_commit(fixture, true)?;
+    case.prepared_owners.push(OwnerWork {
+        fixture: fixture.clone(),
+        changed,
+        patch,
+    });
     Ok(())
 }
 
@@ -1632,16 +1763,50 @@ fn select_raw_scope(case: &mut LaneCase, scope: &str) -> Result<(), ProbeFailure
         return Err(fail(format!("raw scope {scope} has no fixture parts")));
     }
     case.owners.clear();
+    case.prepared_owners.clear();
     Ok(())
 }
 
 #[cfg(not(feature = "drawingml-owner-current"))]
-fn owner_error(route: OwnerRoute, error: impl std::fmt::Display) -> ProbeFailure {
-    fail(format!("{}: {error}", owner_route_name(route)))
+fn owner_error(route: OwnerRoute, error: dml::Error) -> ProbeFailure {
+    let message = error.to_string();
+    let refusal = if legacy_patch_conflict(route, &error) {
+        Some(RefusalReceipt {
+            kind: "patch_conflict",
+            source_kind: Some("invalid_input"),
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed: 0,
+            message: message.clone(),
+        })
+    } else {
+        None
+    };
+    ProbeFailure { message, refusal }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn legacy_patch_conflict(route: OwnerRoute, error: &dml::Error) -> bool {
+    let dml::Error::Invalid(message) = error else {
+        return false;
+    };
+    match route {
+        OwnerRoute::DrawingmlChart => {
+            message == "chart patch source does not match its byte precondition"
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            message == "theme family patch source does not match its byte precondition"
+        },
+        OwnerRoute::DrawingmlInkActions => message == "ink action patch source is stale",
+        OwnerRoute::DrawingmlTransform => {
+            message == "DrawingML transform patch source state does not match its precondition"
+        },
+    }
 }
 
 #[cfg(feature = "drawingml-owner-current")]
-fn owner_error(route: OwnerRoute, error: dml::Error) -> ProbeFailure {
+fn owner_error(_route: OwnerRoute, error: dml::Error) -> ProbeFailure {
     let message = error.to_string();
     let refusal = if matches!(&error, dml::Error::PatchConflict) {
         Some(RefusalReceipt {
@@ -1778,10 +1943,10 @@ fn owner_commit(
             ))
         },
         OwnerRoute::DrawingmlInkActions => {
-            use dml::ink::actions::{ActionSelector, Edit, Limits};
+            use dml::ink::actions::{ActionSelector, Edit, EditOptions};
             let profile = dml::ink::actions::read_profile(&fixture.source)
                 .map_err(|error| owner_error(fixture.route, error))?;
-            let mut edit = Edit::from_profile(&profile, Limits::default())
+            let mut edit = Edit::from_profile(&profile, EditOptions::default())
                 .map_err(|error| owner_error(fixture.route, error))?;
             if changed {
                 edit.set_start_time(ActionSelector::ordinal(0), "0.50")
@@ -1909,13 +2074,22 @@ fn owner_apply(
                 .map_err(|error| owner_error(route, error))
         },
         (OwnerRoute::DrawingmlInkActions, OwnerPatch::DrawingmlInkActions(patch)) => {
+            use dml::ink::actions::{Edit, EditOptions};
             let patch = if inverse {
                 patch.inverse()
             } else {
                 patch.clone()
             };
-            patch
-                .apply(source)
+            let profile = dml::ink::actions::read_profile(source)
+                .map_err(|error| owner_error(route, error))?;
+            let prepared = Edit::from_profile(&profile, EditOptions::default())
+                .map_err(|error| owner_error(route, error))?
+                .commit()
+                .map_err(|error| owner_error(route, error))?
+                .into_package();
+            prepared
+                .apply(&patch)
+                .map(|commit| commit.package().as_bytes().to_vec())
                 .map_err(|error| owner_error(route, error))
         },
         (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
@@ -1980,19 +2154,15 @@ fn owner_stale_refusal(
             }
             #[cfg(not(feature = "drawingml-owner-current"))]
             {
-                // The pre-owner baseline rejects stale patches as its generic
-                // invalid-input error.  Keep that historical behavior in the
-                // receipt while naming the normalized contract kind used by
-                // the paired validator.
-                Ok(RefusalReceipt {
-                    kind: "patch_conflict",
-                    source_kind: Some("invalid_input"),
-                    limit_kind: None,
-                    resource: None,
-                    limit: None,
-                    observed: fixture.stale.len(),
-                    message: error.message,
-                })
+                let Some(mut refusal) = error.refusal else {
+                    return Err(fail(format!(
+                        "{} stale replay returned an unexpected error: {}",
+                        owner_route_name(fixture.route),
+                        error.message
+                    )));
+                };
+                refusal.observed = fixture.stale.len();
+                Ok(refusal)
             }
         },
     }
@@ -2062,6 +2232,30 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                     part.id
                 )));
             }
+            // A canonical fixture must be stable under a second decode/encode
+            // pass.  This is the semantic oracle for Vec/String codecs; it is
+            // deliberately outside the timed rows.
+            let source_readback = roundtrip(part.kind, &source_output)?;
+            let changed_readback = roundtrip(part.kind, &changed_output)?;
+            if source_readback != source_output {
+                return Err(fail(format!(
+                    "{} source readback is not canonical",
+                    part.id
+                )));
+            }
+            if changed_readback != changed_output {
+                return Err(fail(format!(
+                    "{} changed readback is not canonical",
+                    part.id
+                )));
+            }
+            let source_preserving_expected = source_preserving(part.kind);
+            if source_preserving_expected && source_output != part.source {
+                return Err(fail(format!(
+                    "{} canonical source changed under a promised source-preserving route",
+                    part.id
+                )));
+            }
             let source_sha256 = sha256(&part.source);
             let changed_sha256 = sha256(&part.changed);
             let malformed_sha256 = sha256(&part.malformed);
@@ -2080,14 +2274,23 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                 changed_output_sha256: sha256(&changed_output),
                 malformed_sha256,
                 changed_output_differs: true,
+                source_preserving_expected,
+                source_output_exact: source_output == part.source,
+                source_readback_sha256: sha256(&source_readback),
+                changed_readback_sha256: sha256(&changed_readback),
             })
         })
         .collect()
 }
 
+fn source_preserving(kind: PartKind) -> bool {
+    !matches!(kind, PartKind::Diagram | PartKind::InkActions)
+}
+
 fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFailure> {
     let mut receipts = Vec::with_capacity(case.parts.len().saturating_mul(5));
     for part in &case.parts {
+        let boundary = boundary_kind(part.kind);
         let cases = if input_limit(part.kind).is_some() {
             let maximum = part.over.len().saturating_sub(1);
             vec![
@@ -2105,6 +2308,24 @@ fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFa
                     true,
                 ),
                 ("over_limit", part.over.clone(), Some("limit"), true),
+                (
+                    "malformed",
+                    part.malformed.clone(),
+                    Some("invalid_input"),
+                    true,
+                ),
+            ]
+        } else if boundary == "structural" {
+            vec![
+                ("small", part.source.clone(), None, true),
+                ("near_limit", part.source.clone(), None, true),
+                ("at_limit", part.source.clone(), None, true),
+                (
+                    "over_limit",
+                    part.over.clone(),
+                    Some(structural_refusal_kind()),
+                    true,
+                ),
                 (
                     "malformed",
                     part.malformed.clone(),
@@ -2136,6 +2357,7 @@ fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFa
                     accepted: false,
                     output_sha256: None,
                     refusal: None,
+                    boundary,
                 });
                 continue;
             }
@@ -2155,6 +2377,7 @@ fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFa
                         accepted: true,
                         output_sha256: Some(sha256(&output)),
                         refusal: None,
+                        boundary,
                     });
                 },
                 Err(error) => {
@@ -2175,6 +2398,7 @@ fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFa
                         accepted: false,
                         output_sha256: None,
                         refusal: Some(refusal),
+                        boundary,
                     });
                 },
             }
@@ -2195,6 +2419,7 @@ fn sized_with_whitespace(source: &[u8], target: usize) -> Vec<u8> {
 
 fn input_limit(kind: PartKind) -> Option<(&'static str, usize)> {
     match kind {
+        PartKind::Chart => Some(("MCE input bytes", 256 * 1024 * 1024)),
         PartKind::FormatCode => Some(("formatcode2 XML bytes", 1 << 20)),
         PartKind::Diagram => Some(("diagram data-model bytes", 16 * 1024 * 1024)),
         PartKind::TextBody => Some(("text body input bytes", 64 * 1024 * 1024)),
@@ -2207,7 +2432,7 @@ fn input_limit(kind: PartKind) -> Option<(&'static str, usize)> {
         PartKind::InkActions => Some(("ink actions source bytes", 16 * 1024 * 1024)),
         PartKind::Color => Some(("DrawingML color XML", 64 * 1024)),
         PartKind::Transform => Some(("DrawingML transform XML", 1 << 20)),
-        PartKind::Chart | PartKind::Blip | PartKind::Geometry => None,
+        PartKind::Blip | PartKind::Geometry => None,
     }
 }
 
@@ -2377,27 +2602,41 @@ fn malformed_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
 fn limit_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
     let mut parts = Vec::new();
     for part in &case.parts {
-        if input_limit(part.kind).is_none() {
+        let boundary = boundary_kind(part.kind);
+        if boundary == "none" {
             continue;
         }
+        let expected_kind = if boundary == "structural" {
+            structural_refusal_kind()
+        } else {
+            "limit"
+        };
         let error = roundtrip(part.kind, &part.over)
             .map(|_| ())
-            .expect_err("over-limit source must be refused");
+            .expect_err("boundary source must be refused");
         let refusal = error
             .refusal
-            .ok_or_else(|| fail(format!("{} over-limit input lacked typed refusal", part.id)))?;
-        if refusal.kind != "limit"
-            || refusal.limit_kind.is_none()
-            || refusal.limit.is_none()
-            || refusal.observed <= refusal.limit.unwrap_or(0)
+            .ok_or_else(|| fail(format!("{} boundary input lacked typed refusal", part.id)))?;
+        if refusal.kind != expected_kind {
+            return Err(fail(format!(
+                "{} boundary source was not a {} refusal: {}",
+                part.id, expected_kind, error.message
+            )));
+        }
+        if expected_kind == "limit"
+            && (refusal.limit_kind.is_none()
+                || refusal.limit.is_none()
+                || refusal.observed <= refusal.limit.unwrap_or(0))
         {
             return Err(fail(format!(
-                "{} over-limit source was not a typed limit refusal: {}",
+                "{} boundary source was not a typed limit refusal: {}",
                 part.id, error.message
             )));
         }
         parts.push(serde_json::json!({
             "part_id": part.id,
+            "boundary": boundary,
+            "expected_kind": expected_kind,
             "expected_legacy_resource": part.limit_resource,
             "refusal": refusal,
         }));
@@ -2473,7 +2712,44 @@ fn theme_family_mutations(
 
 fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
     let mut parts = Vec::with_capacity(case.parts.len());
+    let mut total_sink_writes = 0usize;
     for part in &case.parts {
+        let boundary = boundary_kind(part.kind);
+        let production_refusal = if boundary != "none" {
+            let error = roundtrip(part.kind, &part.over)
+                .map(|_| ())
+                .expect_err("production boundary source must be refused");
+            let refusal = error.refusal.ok_or_else(|| {
+                fail(format!(
+                    "{} production boundary lacked a typed refusal",
+                    part.id
+                ))
+            })?;
+            let expected = if boundary == "structural" {
+                structural_refusal_kind()
+            } else {
+                "limit"
+            };
+            if refusal.kind != expected {
+                return Err(fail(format!(
+                    "{} production boundary returned {} instead of {expected}",
+                    part.id, refusal.kind
+                )));
+            }
+            Some(refusal)
+        } else {
+            None
+        };
+        if !supports_production_sink(part.kind) {
+            parts.push(serde_json::json!({
+                "part_id": part.id,
+                "boundary": boundary,
+                "production_refusal": production_refusal,
+                "sink_supported": false,
+                "sink_writes": 0,
+            }));
+            continue;
+        }
         let mut full_sink = CountingSink::new(usize::MAX);
         write_kind_to(part.kind, &part.changed, &mut full_sink)?;
         let full_receipt = write_receipt(full_sink);
@@ -2489,74 +2765,174 @@ fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
         if sink.writes != 0 {
             return Err(fail(format!("{} preflight wrote before refusal", part.id)));
         }
+        total_sink_writes = total_sink_writes.saturating_add(sink.writes);
         parts.push(serde_json::json!({
             "part_id": part.id,
+            "boundary": boundary,
+            "production_refusal": production_refusal,
+            "sink_supported": true,
             "preflight_bytes": full_receipt.bytes,
             "sink_writes": sink.writes,
             "sink_limit": full_receipt.bytes - 1,
             "observed_output": full_receipt.bytes,
-            "refusal": refusal,
+            "sink_refusal": refusal,
         }));
     }
     Ok(serde_json::json!({
-        "preflight_zero_writes": true,
-        "sink_writes": 0,
+        "preflight_zero_writes": total_sink_writes == 0,
+        "sink_writes": total_sink_writes,
         "parts": parts,
     }))
 }
 
-fn normal_write(case: &LaneCase) -> Result<SinkReceipt, ProbeFailure> {
-    let mut sink = CountingSink::new(usize::MAX);
+/// Execute only the production boundary calls during a timed preflight row.
+/// Receipt construction and sink-cap experiments stay outside the clock.
+fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
     for part in &case.parts {
-        write_kind_to(part.kind, &part.changed, &mut sink)?;
+        if boundary_kind(part.kind) == "none" {
+            continue;
+        }
+        let error = roundtrip(part.kind, &part.over)
+            .map(|_| ())
+            .expect_err("production boundary source must be refused");
+        black_box(error);
     }
-    Ok(write_receipt(sink))
+    Ok(())
 }
 
-fn vector_receipt(
+/// The timed malformed row calls each real reader/writer route.  It does not
+/// serialize a JSON receipt or calculate a digest until the outside-clock
+/// detail pass.
+fn malformed_production(case: &LaneCase) -> Result<(), ProbeFailure> {
+    for part in &case.parts {
+        let error = roundtrip(part.kind, &part.malformed)
+            .map(|_| ())
+            .expect_err("malformed source must be refused");
+        black_box(error);
+    }
+    Ok(())
+}
+
+fn normal_write(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
+    let production_parts = case
+        .parts
+        .iter()
+        .filter(|part| supports_production_sink(part.kind))
+        .collect::<Vec<_>>();
+    if production_parts.is_empty() {
+        return Ok(if timed {
+            OperationValue::Timed
+        } else {
+            OperationValue::Details(serde_json::json!({
+                "not_applicable": true,
+                "reason": "this lane exposes only Vec/String raw writers",
+                "production_sink_parts": [],
+            }))
+        });
+    }
+    let mut sink = if timed {
+        CountingSink::timed(usize::MAX)
+    } else {
+        CountingSink::new(usize::MAX)
+    };
+    for part in production_parts {
+        write_kind_to(part.kind, &part.changed, &mut sink)?;
+    }
+    if timed {
+        Ok(OperationValue::Timed)
+    } else {
+        let sink = write_receipt(sink);
+        Ok(OperationValue::SinkDetails {
+            sink,
+            details: serde_json::json!({
+                "production_sink_parts": case
+                    .parts
+                    .iter()
+                    .filter(|part| supports_production_sink(part.kind))
+                    .map(|part| part.id)
+                    .collect::<Vec<_>>(),
+            }),
+        })
+    }
+}
+
+fn vector_receipt_timed(
     outputs: impl IntoIterator<Item = Result<Vec<u8>, ProbeFailure>>,
-) -> Result<SinkReceipt, ProbeFailure> {
+    timed: bool,
+) -> Result<OperationValue, ProbeFailure> {
+    if timed {
+        for output in outputs {
+            black_box(output?);
+        }
+        return Ok(OperationValue::Timed);
+    }
     let mut sink = CountingSink::new(usize::MAX);
     for output in outputs {
         let output = output?;
         sink.write_all(&output)
             .map_err(|error| io_failure(error, output.len()))?;
     }
-    Ok(write_receipt(sink))
+    Ok(OperationValue::Sink(write_receipt(sink)))
 }
 
-fn owner_operation(case: &LaneCase, operation_name: &str) -> Result<OperationValue, ProbeFailure> {
-    let mut sink = CountingSink::new(usize::MAX);
+fn owner_operation(
+    case: &LaneCase,
+    operation_name: &str,
+    timed: bool,
+) -> Result<OperationValue, ProbeFailure> {
+    let mut sink = if timed {
+        CountingSink::timed(usize::MAX)
+    } else {
+        CountingSink::new(usize::MAX)
+    };
     let mut refusals = Vec::new();
-    for fixture in &case.owners {
+    for work in &case.prepared_owners {
+        let fixture = &work.fixture;
         match operation_name {
             "noop_commit" => {
                 let output = owner_commit(fixture, false)?.0;
-                sink.write_all(&output)
-                    .map_err(|error| io_failure(error, output.len()))?;
+                if timed {
+                    black_box(output);
+                } else {
+                    sink.write_all(&output)
+                        .map_err(|error| io_failure(error, output.len()))?;
+                }
             },
             "changed_commit" => {
                 let output = owner_commit(fixture, true)?.0;
-                sink.write_all(&output)
-                    .map_err(|error| io_failure(error, output.len()))?;
+                if timed {
+                    black_box(output);
+                } else {
+                    sink.write_all(&output)
+                        .map_err(|error| io_failure(error, output.len()))?;
+                }
             },
             "forward_replay" => {
-                let (changed, patch) = owner_commit(fixture, true)?;
-                let _ = changed;
-                let output = owner_replay(fixture, &patch, false)?;
-                sink.write_all(&output)
-                    .map_err(|error| io_failure(error, output.len()))?;
+                let output = owner_apply(fixture.route, &fixture.source, &work.patch, false)?;
+                if timed {
+                    black_box(output);
+                } else {
+                    sink.write_all(&output)
+                        .map_err(|error| io_failure(error, output.len()))?;
+                }
             },
             "inverse_replay" => {
-                let (changed, patch) = owner_commit(fixture, true)?;
-                let _ = changed;
-                let output = owner_replay(fixture, &patch, true)?;
-                sink.write_all(&output)
-                    .map_err(|error| io_failure(error, output.len()))?;
+                let output = owner_apply(fixture.route, &work.changed, &work.patch, true)?;
+                if timed {
+                    black_box(output);
+                } else {
+                    sink.write_all(&output)
+                        .map_err(|error| io_failure(error, output.len()))?;
+                }
             },
             "stale_replay" => {
-                let (_changed, patch) = owner_commit(fixture, true)?;
-                refusals.push(owner_stale_refusal(fixture, &patch)?);
+                if timed {
+                    let error = owner_apply(fixture.route, &fixture.stale, &work.patch, false)
+                        .expect_err("owner route accepted a stale patch");
+                    black_box(error);
+                } else {
+                    refusals.push(owner_stale_refusal(fixture, &work.patch)?);
+                }
             },
             _ => {
                 return Err(fail(format!(
@@ -2566,10 +2942,16 @@ fn owner_operation(case: &LaneCase, operation_name: &str) -> Result<OperationVal
         }
     }
     if operation_name == "stale_replay" {
-        Ok(OperationValue::Details(serde_json::json!({
-            "refusal": refusals.first().cloned(),
-            "refusals": refusals,
-        })))
+        Ok(if timed {
+            OperationValue::Timed
+        } else {
+            OperationValue::Details(serde_json::json!({
+                "refusal": refusals.first().cloned(),
+                "refusals": refusals,
+            }))
+        })
+    } else if timed {
+        Ok(OperationValue::Timed)
     } else {
         Ok(OperationValue::Sink(write_receipt(sink)))
     }
@@ -2577,47 +2959,69 @@ fn owner_operation(case: &LaneCase, operation_name: &str) -> Result<OperationVal
 
 #[derive(Debug)]
 enum OperationValue {
-    Bytes(Vec<u8>),
+    Timed,
     Sink(SinkReceipt),
+    SinkDetails {
+        sink: SinkReceipt,
+        details: serde_json::Value,
+    },
     Details(serde_json::Value),
 }
 
-fn operation(case: &LaneCase, name: &str) -> Result<OperationValue, ProbeFailure> {
+fn operation(case: &LaneCase, name: &str, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if OWNER_OPERATIONS.contains(&name) {
         if case.owners.is_empty() {
             return Err(fail(format!(
                 "owner operation {name} was requested for a raw-only lane"
             )));
         }
-        return owner_operation(case, name);
+        return owner_operation(case, name, timed);
     }
     match name {
-        "entry_read" => Ok(OperationValue::Sink(vector_receipt(
+        "entry_read" => vector_receipt_timed(
             case.parts
                 .iter()
                 .map(|part| roundtrip(part.kind, &part.source)),
-        )?)),
+            timed,
+        ),
         "read_shared_when_supported" => {
             let outputs = read_shared_lane(case)?;
             if outputs.is_empty() {
-                Ok(OperationValue::Details(serde_json::json!({
-                    "not_applicable": true,
-                    "reason": "no shared-reader API exists for this lane",
-                })))
+                Ok(if timed {
+                    OperationValue::Timed
+                } else {
+                    OperationValue::Details(serde_json::json!({
+                        "not_applicable": true,
+                        "reason": "no shared-reader API exists for this lane",
+                    }))
+                })
             } else {
-                Ok(OperationValue::Sink(vector_receipt(
-                    outputs.into_iter().map(Ok),
-                )?))
+                vector_receipt_timed(outputs.into_iter().map(Ok), timed)
             }
         },
-        "vec_write" => Ok(OperationValue::Sink(vector_receipt(
+        "vec_write" => vector_receipt_timed(
             case.parts
                 .iter()
                 .map(|part| roundtrip(part.kind, &part.changed)),
-        )?)),
-        "write_to_bounded_sink" => Ok(OperationValue::Sink(normal_write(case)?)),
-        "preflight_refusal" => Ok(OperationValue::Details(preflight_check(case)?)),
-        "malformed_refusal" => Ok(OperationValue::Details(malformed_check(case)?)),
+            timed,
+        ),
+        "write_to_bounded_sink" => normal_write(case, timed),
+        "preflight_refusal" => {
+            if timed {
+                production_preflight(case)?;
+                Ok(OperationValue::Timed)
+            } else {
+                Ok(OperationValue::Details(preflight_check(case)?))
+            }
+        },
+        "malformed_refusal" => {
+            if timed {
+                malformed_production(case)?;
+                Ok(OperationValue::Timed)
+            } else {
+                Ok(OperationValue::Details(malformed_check(case)?))
+            }
+        },
         _ => Err(fail(format!("unsupported operation {name}"))),
     }
 }
@@ -2696,13 +3100,11 @@ fn measure(
     arguments: &Arguments,
     observer: Option<&dyn AllocationObserver>,
 ) -> Result<(Row, Option<AllocationMetrics>, u64), ProbeFailure> {
-    let mut warm = Vec::new();
     for _ in 0..arguments.warmups {
         for _ in 0..arguments.iterations {
-            warm.push(operation(case, operation_name)?);
+            black_box(operation(case, operation_name, true)?);
         }
     }
-    black_box(warm);
     let before = observer.map(AllocationObserver::begin);
     let mut samples = Vec::with_capacity(arguments.blocks * arguments.samples);
     let mut peak_rss = process_rss_bytes();
@@ -2716,7 +3118,7 @@ fn measure(
             let mut calls = 0usize;
             loop {
                 for _ in 0..arguments.iterations {
-                    last_value = Some(operation(case, operation_name)?);
+                    last_value = Some(operation(case, operation_name, true)?);
                     calls = calls.saturating_add(1);
                 }
                 if start.elapsed() >= sample_target {
@@ -2739,8 +3141,15 @@ fn measure(
         )));
     }
     let metrics = before.map(|before| observer.expect("observer disappeared").finish(before));
-    let value = operation(case, operation_name)?;
+    let value = operation(case, operation_name, false)?;
     let (details, sink) = match value {
+        OperationValue::Timed => (
+            serde_json::json!({
+                "not_applicable": true,
+                "reason": "operation produced no outside-clock receipt",
+            }),
+            None,
+        ),
         OperationValue::Sink(sink) => (
             serde_json::json!({
                 "sink_hash": sink.sha256,
@@ -2749,16 +3158,23 @@ fn measure(
             }),
             Some(sink),
         ),
-        OperationValue::Bytes(bytes) => (
-            serde_json::json!({ "output_sha256": sha256(&bytes), "output_bytes": bytes.len() }),
-            None,
-        ),
+        OperationValue::SinkDetails { sink, details } => {
+            let details = serde_json::json!({
+                "sink_hash": sink.sha256,
+                "sink_bytes": sink.bytes,
+                "sink_writes": sink.writes,
+                "route": details,
+            });
+            (details, Some(sink))
+        },
         OperationValue::Details(details) => (details, None),
     };
     let typed_refusal_checked = matches!(
         operation_name,
         "stale_replay" | "preflight_refusal" | "malformed_refusal"
     );
+    // The detail pass (including refusal/oracle checks) is always outside the
+    // timed samples; the row marker records that this happened.
     let fidelity_checked = true;
     Ok((
         Row {
@@ -2782,6 +3198,7 @@ fn allocator_report(
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
     whole_process_peak_rss_bytes: u64,
+    source_revision: &str,
 ) -> AllocatorReport {
     AllocatorReport {
         elapsed_claimable: metrics.elapsed_claimable,
@@ -2800,6 +3217,9 @@ fn allocator_report(
         process_rss_bytes,
         peak_rss_bytes,
         whole_process_peak_rss_bytes,
+        pid: std::process::id(),
+        command_sha256: command_identity_sha256(),
+        source_revision: source_revision.to_owned(),
         conservation_ok: metrics.conservation_ok,
     }
 }
@@ -2907,7 +3327,7 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
         raw_scope: arguments.raw_scope,
         role: arguments.role,
         mode: arguments.mode,
-        source_revision: arguments.source_revision,
+        source_revision: arguments.source_revision.clone(),
         status: "qualified",
         qualification_claim: true,
         fixture_bytes: fixture_bytes.len(),
@@ -2935,9 +3355,13 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
                 process_rss_bytes(),
                 peak_rss,
                 whole_process_peak_rss,
+                &arguments.source_revision,
             )
         }),
         resource_metrics: ResourceMetrics {
+            pid: std::process::id(),
+            command_sha256: command_identity_sha256(),
+            source_revision: arguments.source_revision.clone(),
             process_rss_bytes: process_rss_bytes(),
             peak_rss_bytes: peak_rss,
             whole_process_peak_rss_bytes: whole_process_peak_rss,

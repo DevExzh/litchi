@@ -17,6 +17,10 @@ current-property-api = []
 # source (945eb1d6...).  The baseline uses the pre-contract names while the
 # candidate build enables the Package/Edit API branch in the probe.
 drawingml-owner-current = []
+# The complete Theme-part raw route crossed its caller-limit API separately
+# from the detached owner transition.  The historical 11728 parent keeps the
+# explicit *_with_limit methods; current source uses part::Limits.
+drawingml-theme-family-current = []
 allocator-metrics = []
 current-xlsx-raw-opc = []
 legacy-xlsx-raw-opc = []
