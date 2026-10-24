@@ -3688,3 +3688,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   execution protocols; no native qualification has been claimed. Final
   source capture, the 53-step gate, real corpus replay and all native lanes
   remain required. Only redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, CFB composition and raw review):
+  Reviewed CFB `bf7f48741b` merges at `f1d63257e6`, with four retained-policy
+  returns closed. Composed checks expose and repair the independently added
+  VBA error matches and a chart-test qualification; the complete workspace
+  all-features/all-targets check then passes on the current 4100 lock. Record
+  0362zada retains both failures and the passing receipt rather than replacing
+  them. Reviewed XLSX raw native protocol `5e6555d840` merges at `95ce396d83`;
+  all 37 composed Python tests pass, with no native measurement claimed.
+
+  DrawingML raw engineering is split into chart, diagram, text/media,
+  theme/ink and geometry/color/transform/formatcode2 lanes. Fixed static caps
+  do not exempt raw codecs from required policies. Text/media is returned
+  after review finds allocation-admission and SVG byte-fidelity defects
+  despite focused test passes. PPT and legacy native protocols also retain
+  concrete fixture/provenance and historical API-adapter returns. Record
+  0362ul9 describes the exact scope; no new exception is accepted.
+
+  Cleanup thirty-nine removes three merged leaves non-forced, retaining all
+  branches and eleven payloads (566,586 bytes), with restoration and independent
+  hash/mode/ancestry checks. Final assembled capture, the full 53-step gate,
+  actual corpus replay, glossary closure and all required native qualification
+  remain pending the source repairs. Only redaction audit 22 is deferred.
+  Nothing is pushed.
