@@ -854,10 +854,31 @@ class PairedRunner:
                     or event.get("source_identity_sha256") != recorded_identity.get("identity_sha256")
                     or event.get("source_identity_before") != recorded_identity
                     or event.get("source_identity_after") != recorded_identity
+                    or event.get("phase") != "build"
+                    or event.get("role") != role
+                    or event.get("variant") != variant
+                    or event.get("argv") != build.get("command")
+                    or event.get("cwd") != str(self.driver_roots[role])
+                    or event.get("process_guard_violations")
+                    or event.get("post_exit_descendants")
+                    or event.get("post_exit_offenders")
                 ):
                     raise RunnerError(f"build event identity or result differs for {key}")
+                expected_environment = {
+                    name: self._environment(role, variant).get(name)
+                    for name in ("CARGO_TARGET_DIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL", "LITCHI_MEM_MAX")
+                }
+                if event.get("environment") != expected_environment:
+                    raise RunnerError(f"build environment differs for {key}")
                 artifacts = _require_mapping(build.get("artifacts"), f"receipt.builds.{key}.artifacts")
                 expected = self._binary_paths(role, variant)
+                event_outputs = event.get("outputs")
+                if (
+                    not isinstance(event_outputs, list)
+                    or not all(isinstance(item, Mapping) for item in event_outputs)
+                    or [item.get("path") for item in event_outputs] != [str(path) for path in expected.values()]
+                ):
+                    raise RunnerError(f"build event outputs differ for {key}")
                 for name, path in expected.items():
                     item = _require_mapping(artifacts.get(name), f"artifact {key}/{name}")
                     if _resolve(str(item.get("path", ""))) != path:
@@ -867,7 +888,18 @@ class PairedRunner:
                     digest, size = _sha256_file(path)
                     if item.get("sha256") != digest or item.get("bytes") != size:
                         raise RunnerError(f"artifact hash changed: {path}")
-                    self.artifacts[role][variant][name] = path
+                    event_output = _require_mapping(event_outputs[list(expected).index(name)], f"build event output {key}/{name}")
+                    if event_output.get("sha256") != digest or event_output.get("bytes") != size or event_output.get("exists") is not True:
+                        raise RunnerError(f"build event artifact hash differs: {path}")
+                for stream_name in ("stdout", "stderr"):
+                    stream = _require_mapping(event.get(stream_name), f"build event {key}.{stream_name}")
+                    stream_path = _resolve(str(stream.get("path", "")))
+                    if not _under(stream_path, self.output / "commands"):
+                        raise RunnerError(f"build event log escapes commands directory: {stream_path}")
+                    digest, size = _sha256_file(stream_path)
+                    if stream.get("sha256") != digest or stream.get("bytes") != size:
+                        raise RunnerError(f"build event log hash differs: {stream_path}")
+                self.artifacts[role][variant] = {name: path for name, path in expected.items()}
         self.build_receipt_hash = receipt_hash
 
     def _parse_route(self, path: Path, route: str, expected_rows: int) -> list[dict[str, int]]:
