@@ -14345,10 +14345,12 @@ mod tests {
         let mut mutation = source.edit();
         mutation.set_page_name(0, "Materialized page").unwrap();
         assert!(mutation.content.owned.is_some());
-        assert!(mutation
-            .styles
-            .as_ref()
-            .is_some_and(|part| part.owned.is_none()));
+        assert!(
+            mutation
+                .styles
+                .as_ref()
+                .is_some_and(|part| part.owned.is_none())
+        );
         drop(mutation);
 
         let no_op = source.edit().commit().unwrap();

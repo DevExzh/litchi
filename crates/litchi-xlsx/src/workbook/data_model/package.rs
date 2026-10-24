@@ -1813,12 +1813,7 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.set(expected).unwrap();
         assert_eq!(
-            transaction
-                .model()
-                .unwrap()
-                .unwrap()
-                .payload()
-                .as_ptr(),
+            transaction.model().unwrap().unwrap().payload().as_ptr(),
             payload_pointer
         );
         let commit = transaction.commit().unwrap();

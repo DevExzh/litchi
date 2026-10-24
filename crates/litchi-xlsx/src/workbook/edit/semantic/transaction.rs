@@ -1532,9 +1532,7 @@ impl Edit {
             actions
                 .hyperlinks
                 .iter()
-                .filter(|((row, column, _, _), _)| {
-                    Address::at(*row, *column).ok() == Some(address)
-                })
+                .filter(|((row, column, _, _), _)| Address::at(*row, *column).ok() == Some(address))
                 .map(|(_, action)| hyperlink_action_retained_bytes(action))
                 .fold(0usize, usize::saturating_add)
         });
@@ -6059,7 +6057,8 @@ impl Edit {
             .and_then(|actions| actions.hyperlinks.get(&key))
             .map_or(0, hyperlink_action_retained_bytes);
         if source.is_none() {
-            let _capture = self.preflight_hyperlink_capture(position, address, previous_bytes, 0)?;
+            let _capture =
+                self.preflight_hyperlink_capture(position, address, previous_bytes, 0)?;
             self.sheets
                 .entry(position)
                 .or_default()

@@ -27,16 +27,18 @@ fn calculation_source() -> Package {
     let mut package =
         Package::from_bytes(&seed.to_plain_bytes().expect("seed bytes")).expect("seed package");
     let mut metadata = package.edit_calculation_metadata().expect("metadata edit");
-    assert!(metadata
-        .set_properties(
-            Properties::new()
-                .with_calculation_id(Some(123))
-                .with_calculation_mode(Some(Mode::Manual))
-                .with_full_calculation_on_load(Some(false))
-                .with_calculation_completed(Some(true))
-                .with_force_full_calculation(Some(false)),
-        )
-        .unwrap());
+    assert!(
+        metadata
+            .set_properties(
+                Properties::new()
+                    .with_calculation_id(Some(123))
+                    .with_calculation_mode(Some(Mode::Manual))
+                    .with_full_calculation_on_load(Some(false))
+                    .with_calculation_completed(Some(true))
+                    .with_force_full_calculation(Some(false)),
+            )
+            .unwrap()
+    );
     package = metadata.commit().expect("metadata commit").into_package();
 
     let mut raw = package.into_plain_opc();
@@ -115,9 +117,10 @@ fn calculation_metadata_patches() -> (Package, CalculationPatch, CalculationPatc
     let mut edit = changed_author
         .edit_calculation_metadata()
         .expect("changed metadata edit");
-    assert!(edit
-        .set_properties(Properties::new().with_calculation_id(Some(8675309)))
-        .unwrap());
+    assert!(
+        edit.set_properties(Properties::new().with_calculation_id(Some(8675309)))
+            .unwrap()
+    );
     let changed = edit
         .commit()
         .expect("changed metadata commit")
@@ -195,16 +198,18 @@ fn formula_invalidation_preserves_ordered_duplicate_calc_features_exactly() {
     let mut metadata = package
         .edit_calculation_metadata()
         .expect("feature metadata edit");
-    assert!(metadata
-        .set_features(
-            Features::try_from_vec(vec![
-                Feature::new("Case").expect("feature"),
-                Feature::new("case").expect("feature"),
-                Feature::new("Case").expect("duplicate feature"),
-            ])
-            .expect("ordered features"),
-        )
-        .unwrap());
+    assert!(
+        metadata
+            .set_features(
+                Features::try_from_vec(vec![
+                    Feature::new("Case").expect("feature"),
+                    Feature::new("case").expect("feature"),
+                    Feature::new("Case").expect("duplicate feature"),
+                ])
+                .expect("ordered features"),
+            )
+            .unwrap()
+    );
     package = metadata
         .commit()
         .expect("feature metadata commit")

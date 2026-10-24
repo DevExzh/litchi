@@ -624,9 +624,10 @@ fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     );
 
     let mut edit = package.edit_calculation_metadata().expect("feature edit");
-    assert!(edit
-        .set_features(Features::new(Feature::new("changed").unwrap()))
-        .unwrap());
+    assert!(
+        edit.set_features(Features::new(Feature::new("changed").unwrap()))
+            .unwrap()
+    );
     let error = edit.commit().expect_err("projected edit must be refused");
     assert!(matches!(error, Error::Invalid(_)));
     assert!(error.to_string().contains("projected through MCE"));

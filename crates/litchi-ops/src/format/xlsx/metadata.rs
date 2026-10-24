@@ -38,7 +38,8 @@ pub(super) fn commit(
     };
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
-        let props = assignments.apply_custom(edit.custom_props().map_err(native)?, FileFormat::Xlsx)?;
+        let props =
+            assignments.apply_custom(edit.custom_props().map_err(native)?, FileFormat::Xlsx)?;
         edit.set_custom_props(props).map_err(native)?;
     }
     // The staged value is the committed one; no second read of the parts.

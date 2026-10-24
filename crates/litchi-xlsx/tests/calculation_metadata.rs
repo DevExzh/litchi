@@ -326,12 +326,12 @@ fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
     let mut metadata = package.edit_calculation_metadata().unwrap();
     metadata
         .set_properties(
-        Properties::new()
-            .with_calculation_id(Some(123))
-            .with_calculation_mode(Some(Mode::Manual))
-            .with_full_calculation_on_load(Some(false))
-            .with_calculation_completed(Some(true))
-            .with_force_full_calculation(Some(false)),
+            Properties::new()
+                .with_calculation_id(Some(123))
+                .with_calculation_mode(Some(Mode::Manual))
+                .with_full_calculation_on_load(Some(false))
+                .with_calculation_completed(Some(true))
+                .with_force_full_calculation(Some(false)),
         )
         .unwrap();
     package = metadata.commit().unwrap().into_package();
