@@ -1,5 +1,5 @@
 use litchi_iwa_protos::table_physical_sort_codec::{
-    DecodeOptions, HeaderRowMove, RowMove, RowUidPermutation, decode_column_row_uid_map,
+    DecodeOptions, RowMove, RowUidPermutation, decode_column_row_uid_map,
     plan_header_storage_bucket_rows, plan_tile_rows_rewrite, rewrite_column_row_uid_map,
     rewrite_header_storage_bucket_rows, rewrite_tile_rows,
 };
@@ -216,14 +216,14 @@ fn header_rows_allow_sparse_records_and_reject_unknown_mutation() {
         rewrite_header_storage_bucket_rows(&unknown_source, 32, &[], options()).unwrap();
     assert_eq!(identity, unknown_source);
     assert_eq!(identity_report.changed_records(), 0);
-    let unknown_moves = [HeaderRowMove::new(0, 10), HeaderRowMove::new(10, 0)];
+    let unknown_moves = [RowMove::new(0, 10), RowMove::new(10, 0)];
     assert!(
         rewrite_header_storage_bucket_rows(&unknown_source, 32, &unknown_moves, options(),)
             .is_err()
     );
 
     let source = header_bucket_clean();
-    let moves = [HeaderRowMove::new(0, 10), HeaderRowMove::new(10, 0)];
+    let moves = [RowMove::new(0, 10), RowMove::new(10, 0)];
     let (rewritten, report) =
         rewrite_header_storage_bucket_rows(&source, 32, &moves, options()).unwrap();
     assert_eq!(report.changed_records(), 2);

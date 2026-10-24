@@ -1052,7 +1052,7 @@ fn attach_comment_list_to_model(
     let prepared =
         numbers_table_cell_storage_codec::prepare_table_model_comment_storage_table_rewrite(
             message.data.as_slice(),
-            numbers_table_cell_storage_codec::CommentStorageTableReferenceEdit::insert(identifier),
+            numbers_table_cell_storage_codec::ControlCellSpecTableReferenceEdit::insert(identifier),
             options,
         )
         .map_err(|error| super::map_table_codec_error(error, path))?;

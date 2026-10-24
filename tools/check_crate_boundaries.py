@@ -4843,7 +4843,6 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_WIRE_TYPES = frozenset(
         "Field",
         "FieldSpan",
         "HeaderRecord",
-        "HeaderRowMove",
         "HeaderSnapshot",
         "NestedFieldEdit",
         "NestedFieldReplacement",
@@ -5019,7 +5018,7 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_MARKER_GROUPS = {
     "sparse header affinity": (
         re.compile(
             r"\b(?:HeaderStorage|HeaderStorageBucket|Header(?:Snapshot)?|"
-            r"HeaderRowMove)\b"
+            r"RowMove)\b"
         ),
         re.compile(
             r"\b(?:row_header_indices|header_index|header_indices|sparse_headers)\b"

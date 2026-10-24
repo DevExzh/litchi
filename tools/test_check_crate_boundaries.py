@@ -5715,7 +5715,7 @@ def add_keynote_slide_table_physical_sort_canonical_scaffold(
         + "}\n"
         + "fn rows() {\n"
         + "    let _ = (TileRowInfoSnapshot, rowInfos, tile_row_index, numrows, row_permutation);\n"
-        + "    let _ = (HeaderRowMove, row_header_indices, bucket_index);\n"
+        + "    let _ = (RowMove, row_header_indices, bucket_index);\n"
         + "    let _ = (ColumnRowUIDMap, row_uid, uid_for_index, index_for_uid, bijection, inverse_consistent, uid_map, row_count, body_rows);\n"
         + "    let _ = (admit_physical_table, with_physical_topology, mutable_component_count);\n"
         + "    let _ = (hiding_state, column_uid, positional, restore, snapshot);\n"
@@ -24592,7 +24592,7 @@ fn rewrite_movie_title_operation(
     ) -> None:
         removals = (
             (("TileRowInfoSnapshot", "rowInfos", "tile_row_index"), "tile row affinity"),
-            (("HeaderRowMove", "row_header_indices", "bucket_index"), "sparse header affinity"),
+            (("RowMove", "row_header_indices", "bucket_index"), "sparse header affinity"),
             (("ColumnRowUIDMap", "row_uid", "uid_for_index", "index_for_uid"), "row UID bijection"),
             (("admit_physical_table", "with_physical_topology", "mutable_component_count"), "border/stroke affinity"),
             (("hiding_state", "column_uid", "positional"), "hidden-axis affinity"),
