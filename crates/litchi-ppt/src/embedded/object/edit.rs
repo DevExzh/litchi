@@ -108,7 +108,7 @@ impl Edit {
                 .unwrap_or_else(Collection::empty);
             let inner = Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
                 .map_err(scoped::publication("embedded_object.edit"))?;
-            Ok(State { source, inner })
+            Ok::<State, Failure>(State { source, inner })
         })
     }
 
@@ -231,7 +231,7 @@ impl Edit {
                 let inner =
                     Editor::open_admitting_signature(base.bytes()?.to_vec(), source.clone())
                         .map_err(scoped::publication("embedded_object.edit"))?;
-                Ok(State { source, inner })
+                Ok::<State, Failure>(State { source, inner })
             })
             .map_err(Error::from)?;
         let State { source, inner } = state.into_inner().ok_or_else(|| {

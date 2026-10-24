@@ -48,8 +48,7 @@ impl Edit {
 
     fn initialize_state(&self) -> std::result::Result<State, Failure> {
         let native = self.base.native()?;
-        let source =
-            slide_order::external_media_snapshot(&native).map_err(scoped::Failure::from)?;
+        let source = slide_order::external_media_snapshot(&native).map_err(Failure::from)?;
         let inner = source.edit();
         Ok(State {
             native,
@@ -66,8 +65,7 @@ impl Edit {
         let base = self.base.clone();
         self.state.get_or_try_init_mut(|| {
             let native = base.native()?;
-            let source =
-                slide_order::external_media_snapshot(&native).map_err(scoped::Failure::from)?;
+            let source = slide_order::external_media_snapshot(&native).map_err(Failure::from)?;
             let inner = source.edit();
             Ok(State {
                 native,

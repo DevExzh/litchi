@@ -59,7 +59,7 @@ impl Edit {
         self.inner.get_or_try_init_mut(|| {
             let snapshot = Snapshot::from_arc(base.shared_bytes()?, PackageLimits::default())
                 .map_err(scoped::publication("edit_fonts"))?;
-            Ok(RecordEdit::new(snapshot))
+            Ok::<RecordEdit, Failure>(RecordEdit::new(snapshot))
         })
     }
 
@@ -215,7 +215,7 @@ impl Edit {
             .get_or_try_init(|| {
                 let snapshot = Snapshot::from_arc(base.shared_bytes()?, PackageLimits::default())
                     .map_err(scoped::publication("edit_fonts"))?;
-                Ok(RecordEdit::new(snapshot))
+                Ok::<RecordEdit, Failure>(RecordEdit::new(snapshot))
             })
             .map_err(Error::from)?;
         let inner = inner.into_inner().ok_or_else(|| {

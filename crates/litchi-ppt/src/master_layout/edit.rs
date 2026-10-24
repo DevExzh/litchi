@@ -11,7 +11,7 @@ use litchi_core::Position;
 
 use super::model::Limits;
 use super::transaction::RecordEdit;
-use super::{Change, Commit, Context, Patch, Path, Result, Revision, Snapshot, View};
+use super::{Change, Commit, Context, Error, Patch, Path, Result, Revision, Snapshot, View};
 use crate::Package;
 use crate::master::{self, Kind};
 use crate::records::Record;
@@ -88,7 +88,7 @@ impl Edit {
                 Snapshot::parse_with_limits(located.context, &located.record, Limits::default())
                     .map_err(scoped::publication(OPERATION))?
                     .edit();
-            Ok(State {
+            Ok::<State, Failure>(State {
                 native,
                 owner: located.owner,
                 before: located.record,

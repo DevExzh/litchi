@@ -246,7 +246,7 @@ impl Edit {
             let bytes = source_bytes(&base, expected_source)?;
             let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
             let initial = SummaryProperties::from_editor(transaction.editor())?;
-            Ok(State {
+            Ok::<State, Error>(State {
                 transaction,
                 properties: initial.clone(),
                 initial,
@@ -297,7 +297,7 @@ impl Edit {
             let bytes = source_bytes(&base, expected_source)?;
             let transaction = property_set::Snapshot::from_bytes(bytes)?.transaction()?;
             let initial = SummaryProperties::from_editor(transaction.editor())?;
-            Ok(State {
+            Ok::<State, Error>(State {
                 transaction,
                 properties: initial.clone(),
                 initial,

@@ -89,16 +89,18 @@ impl<T> Lazy<T> {
             let value = initialize()?;
             let _ = self.value.set(value);
         }
-        // A mutable owner cannot race another initializer.  If a future
-        // implementation changes that invariant, retrying the initializer is
-        // still preferable to manufacturing a value or panicking.
-        loop {
-            if let Some(value) = self.value.get_mut() {
-                return Ok(value);
-            }
-            let value = initialize()?;
-            let _ = self.value.set(value);
-        }
+        // `&mut self` excludes a concurrent initializer, so the successful
+        // fallible initialization above leaves the cell populated.  Keep the
+        // invariant local rather than retrying through a borrow-checker loop
+        // that could retain a mutable borrow across another initialization.
+        Ok(self
+            .value
+            .get_mut()
+            .expect("fallible lazy initialization populated its cell"))
+    }
+
+    pub(crate) fn get(&self) -> Option<&T> {
+        self.value.get()
     }
 
     pub(crate) fn into_inner(self) -> Option<T> {
@@ -492,7 +494,7 @@ impl Base {
             self.ensure_source_version()?;
             let bytes = self.package.to_encrypted_bytes().map_err(Failure::from)?;
             self.ensure_source_version()?;
-            Ok(Arc::from(bytes))
+            Ok::<Arc<[u8]>, Failure>(Arc::from(bytes))
         })?;
         self.ensure_source_version()?;
         Ok(bytes)
@@ -1217,7 +1219,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
 
         assert!(!base.is_signed().unwrap());
         source.change();
@@ -1236,7 +1238,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         source.change();
 
         assert!(matches!(
@@ -1254,7 +1256,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         assert!(!base.bytes().unwrap().is_empty());
         source.change();
 
@@ -1273,7 +1275,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         base.bytes().unwrap();
         source.change();
 
@@ -1292,7 +1294,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         base.bytes().unwrap();
 
         // The cached-byte fence uses two version calls. Advance the
@@ -1314,7 +1316,7 @@ mod tests {
             source_package.to_encrypted_bytes().unwrap(),
         ));
         let control_package = Package::from_read_at(control_source.clone()).unwrap();
-        let control = super::Base::capture(&control_package).unwrap();
+        let control = Base::capture(&control_package).unwrap();
         control.bytes().unwrap();
         control_source.change_after_version_calls(2);
         let bytes = control.shared_bytes().unwrap();
@@ -1490,7 +1492,7 @@ mod tests {
         let package =
             Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))
                 .unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         base.admit_output_length(maximum).unwrap();
         for observed in [maximum + 1, usize::MAX] {
             assert!(matches!(
@@ -1514,14 +1516,14 @@ mod tests {
         ));
 
         let signed = super::signed(&source);
-        let signed_base = super::Base::capture(&signed).unwrap();
+        let signed_base = Base::capture(&signed).unwrap();
         assert!(matches!(
             signed_base.admit_output_length(usize::MAX),
             Err(super::Failure::Signed)
         ));
         let versioned = Arc::new(VersionedSource::new(source.to_bytes().unwrap()));
         let package = Package::from_read_at(versioned.clone()).unwrap();
-        let base = super::Base::capture(&package).unwrap();
+        let base = Base::capture(&package).unwrap();
         versioned.change();
         assert!(matches!(
             base.admit_output_length(usize::MAX),

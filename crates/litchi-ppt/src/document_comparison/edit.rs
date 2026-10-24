@@ -46,7 +46,7 @@ impl Edit {
             let snapshot =
                 PackageSnapshot::from_bytes_with_limits(base.bytes()?.to_vec(), Limits::default())
                     .map_err(scoped::publication("edit_document_comparison"))?;
-            Ok(snapshot.edit())
+            Ok::<RecordEdit, Failure>(snapshot.edit())
         })
     }
 
@@ -188,7 +188,7 @@ impl Edit {
                     Limits::default(),
                 )
                 .map_err(scoped::publication("edit_document_comparison"))?;
-                Ok(snapshot.edit())
+                Ok::<RecordEdit, Failure>(snapshot.edit())
             })
             .map_err(Error::from)?;
         let inner = inner.into_inner().ok_or_else(|| {
@@ -211,13 +211,13 @@ impl Edit {
 
 /// Map a toolbar staging failure: a document without a review payload cannot
 /// carry the state.
-fn target(operation: &'static str) -> impl FnOnce(crate::package::Error) -> scoped::Failure {
+fn target(operation: &'static str) -> impl FnOnce(crate::package::Error) -> Failure {
     move |error| match error {
         crate::package::Error::InvalidFormat(_) => scoped::unsupported_target(
             operation,
             "the live document has no PowerPoint 10 review payload",
         ),
-        error => scoped::Failure::Package(error),
+        error => Failure::Package(error),
     }
 }
 

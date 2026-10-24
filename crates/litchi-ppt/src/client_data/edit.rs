@@ -8,7 +8,7 @@
 
 use super::codec::OFFICE_ART_CLIENT_DATA_RECORD_TYPE;
 use super::transaction::{RecordEdit, Snapshot};
-use super::{Change, ClientData, ClientDataChild, Commit, Patch, Result};
+use super::{Change, ClientData, ClientDataChild, Commit, Error, Patch, Result};
 use crate::Package;
 use crate::record_wire as wire;
 use crate::scoped::{self, Base, Failure, Lazy};
@@ -156,7 +156,7 @@ impl Edit {
             })?;
             let source = Snapshot::parse(&record).map_err(scoped::publication(OPERATION))?;
             let inner = source.edit();
-            Ok(State {
+            Ok::<State, Failure>(State {
                 native,
                 shape_id,
                 slide,

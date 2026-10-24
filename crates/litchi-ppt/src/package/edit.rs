@@ -931,7 +931,7 @@ impl Edit {
     }
 
     fn commit_with(
-        mut self,
+        self,
         native: impl FnOnce(slide_order::Transaction) -> slide_order::Result<slide_order::Commit>,
     ) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;

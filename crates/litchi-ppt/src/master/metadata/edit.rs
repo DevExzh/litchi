@@ -10,7 +10,8 @@
 use litchi_core::Position;
 
 use super::{
-    Change, Commit, Context, Name, Patch, RecordEdit, Result, Snapshot, notes_styles, template,
+    Change, Commit, Context, Error, Name, Patch, RecordEdit, Result, Snapshot, notes_styles,
+    template,
 };
 use crate::Package;
 use crate::master::{self, Kind};
@@ -86,7 +87,7 @@ impl Edit {
             let inner = Snapshot::parse(located.context, &located.record)
                 .map_err(scoped::publication(OPERATION))?
                 .edit();
-            Ok(State {
+            Ok::<State, Failure>(State {
                 native,
                 owner: located.owner,
                 before: located.record,
