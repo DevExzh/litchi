@@ -162,6 +162,17 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(validator.ValidationError, "ELF executable"):
                 validator._validate_hash_record(_record(path), "artifact", require_executable=True)
 
+    def test_symlinked_artifact_path_is_rejected_before_resolution(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-symlink-artifact-") as directory:
+            root = Path(directory)
+            target = root / "real"
+            target.write_bytes(b"\x7fELF qualification fixture")
+            target.chmod(0o755)
+            link = root / "link"
+            link.symlink_to(target)
+            with self.assertRaisesRegex(validator.ValidationError, "contains a symlink"):
+                validator._validate_hash_record(_record(link), "artifact", require_executable=True)
+
     def test_validator_rejects_missing_rtf_route(self) -> None:
         with tempfile.TemporaryDirectory(prefix="legacy-native-rft-invalid-") as directory:
             # The valid-fixture setup is intentionally kept in the preceding

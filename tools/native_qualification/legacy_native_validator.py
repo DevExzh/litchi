@@ -164,6 +164,15 @@ def _sha256(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
+def _reject_symlink_components(path: Path, label: str) -> None:
+    """Reject the raw path before resolution can hide a symlink."""
+
+    cursor = Path(path.anchor)
+    for component in path.parts[1:]:
+        cursor /= component
+        _expect(not cursor.is_symlink(), f"{label} path contains a symlink: {cursor}")
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     _expect(not path.is_symlink() and path.is_file(), f"JSON file is missing or symlinked: {path}")
     try:
@@ -201,6 +210,7 @@ def _validate_hash_record(
     _expect(isinstance(raw_path, str) and raw_path, f"{label} path is missing")
     path = Path(raw_path)
     _expect(path.is_absolute(), f"{label} path must be absolute: {path}")
+    _reject_symlink_components(path, label)
     path = path.resolve(strict=False)
     if expected_path is not None:
         _expect(path == expected_path.resolve(), f"{label} path is not the reviewed input: {path}")
@@ -234,11 +244,9 @@ def _validate_preparation_receipt(
 ) -> dict[str, Any]:
     preparation = receipt.get("preparation")
     _expect(isinstance(preparation, dict), "build receipt preparation binding is missing")
-    raw_path = preparation.get("path")
-    _expect(isinstance(raw_path, str) and Path(raw_path).is_absolute(), "preparation receipt path is not absolute")
-    path = Path(raw_path).resolve()
-    digest, size = _sha256(path)
-    _expect(preparation.get("sha256") == digest and preparation.get("bytes") == size, "preparation receipt hash changed")
+    normalized_preparation = _validate_hash_record(preparation, "preparation receipt")
+    path = Path(normalized_preparation["path"])
+    digest, size = normalized_preparation["sha256"], normalized_preparation["bytes"]
     prepared = _read_json(path)
     _expect(prepared.get("schema") == "litchi.legacy-native-preparation.v1", "preparation schema mismatch")
     _expect(prepared.get("lane") == lane, "preparation lane mismatch")
@@ -305,6 +313,8 @@ def _validate_reviewed_inputs(lane: str, identity: dict[str, Any], leg: str) -> 
     expected_fixtures = [str((root / value).resolve()) for value in spec["fixture_relatives"]]
     _expect(fixture_paths == expected_fixtures, f"{leg} fixture paths are not the reviewed inputs")
     files = _identity_file_map(identity, f"{leg}")
+    lock = files.get(str(expected_lock))
+    _expect(lock is not None, f"{leg} lock file is not bound into source identity")
     probe = files.get(str(expected_probe))
     _expect(probe is not None and probe["sha256"] == spec["probe_sha256"][leg], f"{leg} probe is not the reviewed generator")
     fixture_records: dict[str, dict[str, Any]] = {}
@@ -320,7 +330,7 @@ def _validate_reviewed_inputs(lane: str, identity: dict[str, Any], leg: str) -> 
         if expected_sha is not None:
             _expect(record["sha256"] == expected_sha, f"{leg} fixture hash differs: {relative}")
         fixture_records[relative] = record
-    return {"probe": probe, "fixtures": fixture_records}
+    return {"lock": lock, "probe": probe, "fixtures": fixture_records}
 
 
 def _normalize_cargo(argv: list[str]) -> list[str]:
@@ -427,6 +437,7 @@ def _validate_build_receipt(
             "lock_paths": [str(path) for path in lock_paths],
             "probe_paths": [str(path) for path in probe_paths],
             "fixture_paths": fixture_paths,
+            "reviewed_lock": reviewed_inputs["lock"],
             "reviewed_probe": reviewed_inputs["probe"],
             "reviewed_fixtures": reviewed_inputs["fixtures"],
             "identity_files": normalized_files,
