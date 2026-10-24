@@ -83,6 +83,32 @@ fn profile_empty_property_content_rejects_whitespace_but_preserves_comments() {
         actions::write_profile(&profile, actions::Limits::DEFAULT).unwrap(),
         source.as_bytes()
     );
+    let nested = root(
+        r#"<iact:action type="add" startTime="0"><iact:property name="style"><iact:future/></iact:property></iact:action>"#,
+        "m",
+        "s",
+    );
+    assert_rejected(nested.as_bytes());
+}
+
+#[test]
+fn source_replay_enforces_action_count_before_copying_bytes() {
+    let source = root(
+        r#"<iact:action type="add" startTime="0"/><iact:action type="remove" startTime="1"/>"#,
+        "m",
+        "s",
+    );
+    let parsed = actions::read(source.as_bytes(), actions::Limits::DEFAULT).unwrap();
+    let mut limits = actions::Limits::DEFAULT;
+    limits.max_actions = 1;
+    assert!(matches!(
+        actions::write(&parsed, limits),
+        Err(Error::Limit {
+            kind: LimitKind::Actions,
+            observed,
+            maximum: 1,
+        }) if observed > 1
+    ));
 }
 
 #[test]

@@ -1234,7 +1234,7 @@ fn adjust_replacement_namespace(
     replacement: &[u8],
     source_namespace: &[u8],
 ) -> Result<Option<Vec<u8>>> {
-    let Some(range) = replacement_root_attribute_range(replacement, b"xmlns:a")? else {
+    let Some(range) = replacement_root_namespace_range(replacement, source_namespace)? else {
         return Ok(None);
     };
     let current = &replacement[range.clone()];
@@ -1255,7 +1255,7 @@ fn adjust_replacement_namespace(
 }
 
 fn adjusted_replacement_len(replacement: &[u8], source_namespace: &[u8]) -> Result<usize> {
-    let Some(range) = replacement_root_attribute_range(replacement, b"xmlns:a")? else {
+    let Some(range) = replacement_root_namespace_range(replacement, source_namespace)? else {
         return Ok(replacement.len());
     };
     let current = &replacement[range];
@@ -1274,6 +1274,82 @@ fn adjusted_replacement_len(replacement: &[u8], source_namespace: &[u8]) -> Resu
         .ok_or_else(|| invalid("theme replacement length overflows"))
 }
 
+fn replacement_root_namespace_range(
+    xml: &[u8],
+    source_namespace: &[u8],
+) -> Result<Option<Range<usize>>> {
+    let mut reader = Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let prefix = element.name().prefix();
+                let raw = xml
+                    .get(start..end)
+                    .ok_or_else(|| invalid("theme replacement root range is invalid"))?;
+                let relative = if prefix == Some(b"a".as_slice()) {
+                    optional_attribute_value_range(raw, b"xmlns:a")?
+                } else if prefix.is_none() {
+                    optional_attribute_value_range(raw, b"xmlns")?
+                } else {
+                    let prefix = prefix.expect("checked arbitrary root prefix");
+                    let mut wanted = b"xmlns:".to_vec();
+                    wanted.extend_from_slice(prefix);
+                    optional_attribute_value_range(raw, &wanted)?
+                };
+                let Some(relative) = relative else {
+                    return Ok(None);
+                };
+                let range = (start + relative.start)..(start + relative.end);
+                let current = xml
+                    .get(range.clone())
+                    .ok_or_else(|| invalid("theme replacement namespace range is invalid"))?;
+                if current == source_namespace {
+                    return Ok(None);
+                }
+                let counterpart = if source_namespace == NAMESPACE.as_bytes() {
+                    STRICT_NAMESPACE.as_bytes()
+                } else if source_namespace == STRICT_NAMESPACE.as_bytes() {
+                    NAMESPACE.as_bytes()
+                } else {
+                    return Err(invalid("theme source has an unsupported namespace"));
+                };
+                if current == counterpart {
+                    if prefix != Some(b"a".as_slice()) {
+                        return Err(invalid(
+                            "theme replacement cross-conformance namespace uses an unrewritable prefix",
+                        ));
+                    }
+                    return Ok(Some(range));
+                }
+                return Err(invalid(
+                    "theme replacement has an unsupported DrawingML namespace",
+                ));
+            },
+            Event::DocType(_) | Event::PI(_) | Event::End(_) => {
+                return Err(invalid(
+                    "theme replacement has forbidden markup before its root",
+                ));
+            },
+            Event::Eof => return Ok(None),
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
 /// Validate a replacement fragment before namespace adjustment or patched
 /// output allocation. The source scheme checker validates the existing
 /// modeled scheme; this pass applies the caller's generic XML/resource
@@ -1290,6 +1366,12 @@ struct SourceStats {
     target_nodes: usize,
     outside_max_depth: usize,
     target_parent_depth: usize,
+}
+
+#[derive(Debug)]
+struct ReplacementFrame {
+    local: Vec<u8>,
+    opaque: bool,
 }
 
 fn validate_replacement_fragment(
@@ -1312,7 +1394,7 @@ fn validate_replacement_fragment(
     reader
         .resolver_mut()
         .set_max_declarations_per_element(limits.max_namespace_declarations);
-    let mut stack: Vec<Vec<u8>> = Vec::new();
+    let mut stack: Vec<ReplacementFrame> = Vec::new();
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
@@ -1347,12 +1429,25 @@ fn validate_replacement_fragment(
                     !root_seen,
                     target,
                     source_namespace,
+                    stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
                 if !root_seen && local.as_slice() != target {
                     return Err(invalid("theme replacement root does not match target"));
                 }
+                let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
+                let opaque = parent_opaque
+                    || !replacement_element_is_drawingml(&namespace, &element, source_namespace);
+                validate_replacement_scheme_element(
+                    target,
+                    &stack,
+                    &namespace,
+                    &element,
+                    source_namespace,
+                    opaque,
+                    limits,
+                )?;
                 if stack.len() >= limits.max_depth {
                     return Err(limit(
                         LimitKind::XmlDepth,
@@ -1362,7 +1457,7 @@ fn validate_replacement_fragment(
                 }
                 max_depth = max_depth.max(stack.len() + 1);
                 root_seen = true;
-                stack.push(local);
+                stack.push(ReplacementFrame { local, opaque });
             },
             Event::Empty(element) => {
                 nodes = nodes
@@ -1380,11 +1475,24 @@ fn validate_replacement_fragment(
                     !root_seen,
                     target,
                     source_namespace,
+                    stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
                 if !root_seen && element.local_name().as_ref() != target {
                     return Err(invalid("theme replacement root does not match target"));
                 }
+                let parent_opaque = stack.last().is_some_and(|frame| frame.opaque);
+                let opaque = parent_opaque
+                    || !replacement_element_is_drawingml(&namespace, &element, source_namespace);
+                validate_replacement_scheme_element(
+                    target,
+                    &stack,
+                    &namespace,
+                    &element,
+                    source_namespace,
+                    opaque,
+                    limits,
+                )?;
                 if 1 > limits.max_depth {
                     return Err(limit(LimitKind::XmlDepth, 1, limits.max_depth));
                 }
@@ -1400,7 +1508,7 @@ fn validate_replacement_fragment(
                         "theme replacement has an unexpected closing element",
                     ));
                 };
-                if local.as_slice() != element.local_name().as_ref() {
+                if local.local.as_slice() != element.local_name().as_ref() {
                     return Err(invalid("theme replacement closing element does not match"));
                 }
                 if stack.is_empty() {
@@ -1556,7 +1664,16 @@ fn validate_replacement_namespace(
     root: bool,
     target: &[u8],
     source_namespace: &[u8],
+    opaque_parent: bool,
 ) -> Result<()> {
+    if opaque_parent && !root {
+        return match namespace {
+            ResolveResult::Unknown(_) => Err(invalid(
+                "theme replacement uses an undeclared namespace prefix",
+            )),
+            _ => Ok(()),
+        };
+    }
     let local = element.local_name();
     let known = is_known_replacement_local(local.as_ref(), target);
     match namespace {
@@ -1597,6 +1714,175 @@ fn validate_replacement_namespace(
         )),
         ResolveResult::Unbound => Err(invalid("theme replacement has an unbound namespace")),
     }
+}
+
+fn replacement_element_is_drawingml(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    source_namespace: &[u8],
+) -> bool {
+    match namespace {
+        ResolveResult::Bound(Namespace(value)) => {
+            *value == source_namespace
+                || (*value == NAMESPACE.as_bytes()
+                    && source_namespace == STRICT_NAMESPACE.as_bytes())
+                || (*value == STRICT_NAMESPACE.as_bytes()
+                    && source_namespace == NAMESPACE.as_bytes())
+        },
+        ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => true,
+        ResolveResult::Unbound if element.name().prefix().is_none() => false,
+        _ => false,
+    }
+}
+
+fn validate_replacement_scheme_element(
+    target: &[u8],
+    stack: &[ReplacementFrame],
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    source_namespace: &[u8],
+    opaque: bool,
+    limits: Limits,
+) -> Result<()> {
+    let local = element.local_name();
+    let drawingml = replacement_element_is_drawingml(namespace, element, source_namespace);
+    if opaque {
+        if !drawingml
+            && !stack.last().is_some_and(|frame| frame.opaque)
+            && is_known_replacement_local(local.as_ref(), target)
+        {
+            return Err(invalid(
+                "theme replacement modeled child has no DrawingML namespace",
+            ));
+        }
+        return Ok(());
+    }
+    if !drawingml {
+        return Err(invalid(
+            "theme replacement modeled child has no DrawingML namespace",
+        ));
+    }
+    let parent = stack
+        .last()
+        .map(|frame| frame.local.as_slice())
+        .unwrap_or_default();
+    let allowed: &[&[u8]] = if stack.is_empty() {
+        if local.as_ref() != target {
+            return Err(invalid("theme replacement root does not match target"));
+        }
+        &[b"name"]
+    } else if target == b"clrScheme" {
+        if parent == b"clrScheme" {
+            if Slot::from_token(std::str::from_utf8(local.as_ref()).unwrap_or_default()).is_none() {
+                return Err(invalid(
+                    "color scheme contains an unsupported replacement child",
+                ));
+            }
+            &[]
+        } else if is_color_replacement_value(local.as_ref(), parent) {
+            match local.as_ref() {
+                b"srgbClr" | b"schemeClr" | b"prstClr" => &[b"val"],
+                b"sysClr" => &[b"val", b"lastClr"],
+                b"scrgbClr" => &[b"r", b"g", b"b"],
+                _ => &[b"val"],
+            }
+        } else if is_color_replacement_value_name(parent) {
+            if !is_color_replacement_transform(local.as_ref()) {
+                return Err(invalid(
+                    "color value contains an unsupported replacement child",
+                ));
+            }
+            &[b"val"]
+        } else {
+            return Err(invalid(
+                "color scheme contains an unsupported replacement child",
+            ));
+        }
+    } else if target == b"fontScheme" {
+        if parent == b"fontScheme" {
+            if !matches!(local.as_ref(), b"majorFont" | b"minorFont") {
+                return Err(invalid(
+                    "font scheme contains an unsupported replacement child",
+                ));
+            }
+            &[]
+        } else if matches!(parent, b"majorFont" | b"minorFont") {
+            match local.as_ref() {
+                b"latin" | b"ea" | b"cs" => &[b"typeface", b"panose"],
+                b"font" => &[b"script", b"typeface", b"panose"],
+                _ => {
+                    return Err(invalid(
+                        "font face contains an unsupported replacement child",
+                    ));
+                },
+            }
+        } else {
+            return Err(invalid(
+                "font scheme contains an unsupported replacement child",
+            ));
+        }
+    } else {
+        return Err(invalid("unsupported theme scheme for replacement"));
+    };
+    ensure_replacement_attributes(element, allowed, limits)
+}
+
+fn is_color_replacement_value(local: &[u8], parent: &[u8]) -> bool {
+    is_color_replacement_slot(parent) && is_color_replacement_value_name(local)
+}
+
+fn is_color_replacement_slot(local: &[u8]) -> bool {
+    Slot::from_token(std::str::from_utf8(local).unwrap_or_default()).is_some()
+}
+
+fn is_color_replacement_value_name(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"srgbClr" | b"sysClr" | b"scrgbClr" | b"schemeClr" | b"prstClr"
+    )
+}
+
+fn is_color_replacement_transform(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"tint"
+            | b"shade"
+            | b"alpha"
+            | b"red"
+            | b"green"
+            | b"blue"
+            | b"hue"
+            | b"sat"
+            | b"lum"
+            | b"gamma"
+            | b"invGamma"
+    )
+}
+
+fn ensure_replacement_attributes(
+    element: &BytesStart<'_>,
+    allowed: &[&[u8]],
+    limits: Limits,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let key = attribute.key.as_ref();
+        if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            continue;
+        }
+        if attribute.key.prefix().is_some() || !allowed.contains(&key) {
+            return Err(invalid(
+                "theme replacement contains an unsupported attribute",
+            ));
+        }
+        if allowed.contains(&key) {
+            crate::preflight_attribute_value_bytes(
+                attribute.value.as_ref(),
+                limits.max_attribute_value_bytes,
+            )?;
+        }
+    }
+    Ok(())
 }
 
 fn is_known_replacement_local(local: &[u8], target: &[u8]) -> bool {
@@ -2469,7 +2755,40 @@ mod tests {
             replace_scheme(
                 &original,
                 b"clrScheme",
+                br#"<d:clrScheme xmlns:d="http://purl.oclc.org/ooxml/drawingml/main"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<clrScheme xmlns="http://purl.oclc.org/ooxml/drawingml/main"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
                 br#"<a:clrScheme><x:dk1 xmlns:x="urn:foreign"/></a:clrScheme>"#
+            )
+            .is_err()
+        );
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<a:clrScheme><a:fontScheme/></a:clrScheme>"#
+            )
+            .is_err()
+        );
+        assert!(replace_scheme(&original, b"clrScheme", br#"<a:clrScheme future="1"/>"#).is_err());
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<a:clrScheme><a:future/></a:clrScheme>"#
             )
             .is_err()
         );
@@ -2669,7 +2988,7 @@ mod tests {
             super::replace_scheme(
                 &original,
                 b"clrScheme",
-                b"<a:clrScheme><a:future/><a:another/></a:clrScheme>",
+                b"<a:clrScheme><a:dk1/><a:lt1/></a:clrScheme>",
                 node_limits,
             ),
             Err(Error::Limit {

@@ -962,6 +962,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
     let mut root_closed = false;
     let mut nodes = 0usize;
     let mut groups = 0usize;
+    let mut actions = 0usize;
     let mut declaration_seen = false;
     let mut preamble_content_seen = false;
     let mut legacy_fragment = false;
@@ -1028,6 +1029,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                     increment_groups(&mut groups, limits.max_action_groups)?;
                     validate_action_attrs(&element, &reader, limits)?;
                 } else if action_element {
+                    increment_action_count(&mut actions, limits.max_actions)?;
                     record_group_action(&mut stack);
                     validate_action_attrs(&element, &reader, limits)?;
                 }
@@ -1058,6 +1060,7 @@ fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
                 } else if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
                     && local.as_ref() == b"action"
                 {
+                    increment_action_count(&mut actions, limits.max_actions)?;
                     record_group_action(&mut stack);
                     validate_action_attrs(&element, &reader, limits)?;
                 }
@@ -2109,9 +2112,12 @@ fn validation_profile_start_kind<R: std::io::BufRead>(
                 "ink actions profile actionData contains an unknown direct child",
             ));
         },
-        ValidationFrameKind::Property
-        | ValidationFrameKind::DataChild { .. }
-        | ValidationFrameKind::Opaque => {
+        ValidationFrameKind::Property => {
+            return Err(invalid(
+                "ink actions profile property cannot contain a child",
+            ));
+        },
+        ValidationFrameKind::DataChild { .. } | ValidationFrameKind::Opaque => {
             return Ok(ValidationFrameKind::Opaque);
         },
     }
@@ -3531,6 +3537,18 @@ fn increment_groups(groups: &mut usize, maximum: usize) -> Result<()> {
     *groups = next;
     Ok(())
 }
+
+fn increment_action_count(actions: &mut usize, maximum: usize) -> Result<()> {
+    let next = actions
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::Actions, next, maximum));
+    }
+    *actions = next;
+    Ok(())
+}
+
 fn ensure_action_capacity(actions: &[Action], maximum: usize) -> Result<()> {
     if actions.len() >= maximum {
         Err(limit(LimitKind::Actions, actions.len() + 1, maximum))
