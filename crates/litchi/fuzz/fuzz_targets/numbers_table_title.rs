@@ -149,7 +149,7 @@ fn exercise_package(package: &Package, data: &[u8], check_native_locality: bool)
 
     // The explicit no-op is required to retain both optional-field presence
     // bits and the exact package snapshot without touching a component.
-    let no_op = match package.edit_table_title(0usize, 0usize) {
+    let mut no_op = match package.edit_table_title(0usize, 0usize) {
         Ok(edit) => edit.set(before),
         Err(error) => {
             observe_error(error);
@@ -157,8 +157,20 @@ fn exercise_package(package: &Package, data: &[u8], check_native_locality: bool)
             return;
         },
     };
-    assert_eq!(no_op.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(no_op.settings(), before);
+    match no_op.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    match no_op.settings() {
+        Ok(settings) => assert_eq!(settings, before),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
     let no_op_commit = match no_op.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -275,7 +287,7 @@ fn exercise_transition(
     after: Settings,
     check_native_locality: bool,
 ) {
-    let edit = match package.edit_table_title(0usize, 0usize) {
+    let mut edit = match package.edit_table_title(0usize, 0usize) {
         Ok(edit) => edit.set(after),
         Err(error) => {
             observe_error(error);
@@ -283,8 +295,21 @@ fn exercise_transition(
             return;
         },
     };
-    assert_eq!(edit.path(), TitlePath::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), after);
+    match edit.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
+    let staged = match edit.settings() {
+        Ok(settings) => settings,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    assert_eq!(staged, after);
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {

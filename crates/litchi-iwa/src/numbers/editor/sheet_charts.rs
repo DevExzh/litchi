@@ -750,7 +750,7 @@ fn set_focused_sheet_chart_data(
             "focused Numbers chart data source failed: {error}"
         )))
     })?;
-    let edit = match focused.edit_sheet_chart_data(
+    let mut edit = match focused.edit_sheet_chart_data(
         FocusedSheetSelector::index(sheet_index),
         FocusedChartSelector::index(chart_position),
     ) {
@@ -769,23 +769,21 @@ fn set_focused_sheet_chart_data(
             )));
         },
     };
-    let committed = edit.set(data).commit().map_err(|error| {
-        if matches!(
-            &error,
-            litchi_numbers::sheet::chart::data::Error::Refused(
-                litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
-            )
-        ) {
-            FocusedSheetChartDataError::Host(Error::InvalidFormat(
-                "focused Numbers chart data commit rejected a previously admitted dependency"
-                    .to_owned(),
-            ))
-        } else {
-            FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
-                "focused Numbers chart data commit failed: {error}"
-            )))
-        }
-    })?;
+    // The focused constructor defers dependency admission.  Ask it to load
+    // the source while the caller still owns the requested grid, so a
+    // deferred UnsupportedDependency can move that exact input into the
+    // legacy full-grid replacement without cloning the grid on success.
+    if let Err(error) = edit.before() {
+        return Err(map_focused_chart_data_error(error, data));
+    }
+    let committed = match edit.set(data).commit() {
+        Ok(committed) => committed,
+        Err(error) => {
+            return Err(FocusedSheetChartDataError::Host(Error::InvalidFormat(
+                format!("focused Numbers chart data commit failed: {error}"),
+            )));
+        },
+    };
     let mut target_bytes = Vec::new();
     committed
         .package()
@@ -803,6 +801,24 @@ fn set_focused_sheet_chart_data(
 enum FocusedSheetChartDataError {
     UnsupportedDependency(ChartData),
     Host(Error),
+}
+
+fn map_focused_chart_data_error(
+    error: litchi_numbers::sheet::chart::data::Error,
+    fallback_data: ChartData,
+) -> FocusedSheetChartDataError {
+    if matches!(
+        &error,
+        litchi_numbers::sheet::chart::data::Error::Refused(
+            litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency
+        )
+    ) {
+        FocusedSheetChartDataError::UnsupportedDependency(fallback_data)
+    } else {
+        FocusedSheetChartDataError::Host(Error::InvalidFormat(format!(
+            "focused Numbers chart data admission failed: {error}"
+        )))
+    }
 }
 
 fn update_chart_payload(
@@ -917,6 +933,22 @@ mod tests {
             vec![vec![Some(12.0), Some(18.0)], vec![Some(9.0), Some(21.0)]],
         )
         .unwrap()
+    }
+
+    #[test]
+    fn deferred_chart_dependency_refusal_keeps_full_replace_input() {
+        let data = sample_data();
+        let error = litchi_numbers::sheet::chart::data::Error::Refused(
+            litchi_numbers::sheet::chart::data::Refusal::UnsupportedDependency,
+        );
+        match map_focused_chart_data_error(error, data.clone()) {
+            FocusedSheetChartDataError::UnsupportedDependency(fallback) => {
+                assert_eq!(fallback, data);
+            },
+            FocusedSheetChartDataError::Host(error) => {
+                panic!("deferred dependency refusal lost fallback classification: {error}");
+            },
+        }
     }
 
     fn pie_data() -> ChartData {
