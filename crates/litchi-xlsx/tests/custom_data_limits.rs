@@ -1370,6 +1370,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .expect("removal candidate transaction starts");
     let removal_index = removal_candidate_transaction
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("removal candidate storage exists");
@@ -1397,6 +1398,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .expect("source-admitted removal relationship cap admits source");
     let exact_removal_index = exact_removal
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("exact removal storage exists");
@@ -1430,6 +1432,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
         .expect("removal transaction starts");
     let index = remove_transaction
         .entries()
+        .unwrap()
         .iter()
         .position(|entry| entry.id() == "uid-B")
         .expect("unreferenced storage exists");
